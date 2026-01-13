@@ -5,7 +5,7 @@ Self-contained Docker deployment with pre-seeded demo data and automatic TLS via
 ## Quick Start
 
 ```bash
-cd frontend/e2e/demo
+cd scripts/demo
 
 # Local testing (self-signed certificate)
 ./setup-demo.sh localhost
@@ -17,8 +17,8 @@ cd frontend/e2e/demo
 **Note:** The setup script automatically handles the Docker build context. If running docker compose manually, run from the project root:
 
 ```bash
-# From project root
-HOSTNAME=localhost docker compose -f frontend/e2e/demo/docker-compose.yml up --build
+# From project root (core/)
+HOSTNAME=localhost docker compose -f scripts/demo/docker-compose.yml up --build
 ```
 
 ## What's Included
@@ -92,15 +92,77 @@ docker compose down -v
 - **Windshift**: Application server with SQLite database
 - **Data**: Pre-seeded demo database, persisted in Docker volume
 
-## Customization
+---
 
-### Using a Different Port
-Edit `docker-compose.yml` to change the host port mappings:
-```yaml
-ports:
-  - "8080:80"    # Map host 8080 to container 80
-  - "8443:443"   # Map host 8443 to container 443
+# Demo Content Generator
+
+For development and testing, you can run the demo content generator directly without Docker.
+
+> **Note**: This tool is configured via environment variables `APP_NAME` (default: WINDSHIFT) and `BINARY_NAME` (default: windshift) for easy rebranding.
+
+## Prerequisites
+
+1. **Node.js** (v18 or higher)
+2. **Server binary** built: `go build -o windshift`
+
+## Quick Start
+
+```bash
+cd scripts/demo
+node generate-demo.js
 ```
+
+This will:
+1. Create a new `demo.db` database
+2. Start server on port 8080
+3. Complete initial setup
+4. Generate all demo content
+5. Keep the server running
+
+## Usage Options
+
+```bash
+# Custom port
+node generate-demo.js --port 3000
+
+# Custom database
+node generate-demo.js --db my-demo.db
+
+# Use existing server (for CI/testing)
+node generate-demo.js --no-server --base-url http://localhost:8080
+
+# Stop server after generation
+node generate-demo.js --stop-server
+
+# Custom binary path
+node generate-demo.js --binary /path/to/windshift
+
+# Help
+node generate-demo.js --help
+```
+
+## Generated Content
+
+### Workspaces
+
+1. **Software Development (SOFT)**
+   - Projects: Mobile App Rewrite, API v2 Development
+   - Work items: Epics with stories and tasks
+   - Custom fields: Story Points, Estimated Hours, Environment, Browser
+
+2. **Customer Support (SUPP)**
+   - Projects: Customer Onboarding, Technical Support
+   - Work items: Support categories with tickets and sub-tasks
+   - Custom fields: Customer Tier, Request Type, Severity
+
+3. **Marketing (MKTG)**
+   - Project: Q1 2025 Campaign
+   - Work items: Campaigns with tasks
+   - Custom fields: Campaign Type, Due Date, Release Date
+
+---
+
+## Customization
 
 ### Environment Variables
 - `HOSTNAME`: Domain name for TLS certificate (default: localhost)
@@ -119,17 +181,50 @@ docker volume rm windshift-demo_demo-data
 docker compose up -d
 ```
 
+### Modify Demo Content
+
+Edit `demo-data.js` to customize workspaces, users, and work items.
+
+---
+
 ## Troubleshooting
 
-### Certificate Issues
-If Let's Encrypt fails to provision a certificate:
+### Certificate Issues (Production)
 1. Verify DNS points to your server: `dig +short your-domain.com`
 2. Check port 80 is accessible: `curl -I http://your-domain.com`
 3. View Caddy logs: `docker compose logs demo | grep -i cert`
 
-### Demo Data Not Loading
-1. Check seeder stage in build: `docker compose build --no-cache`
-2. View startup logs: `docker compose logs demo`
-
 ### Browser Security Warning (localhost)
-This is expected when using `localhost`. Caddy generates a self-signed certificate for local development. Click "Advanced" and proceed to the site.
+This is expected. Caddy generates a self-signed certificate for local development. Click "Advanced" and proceed.
+
+### Binary Not Found
+Build the binary first:
+```bash
+go build -o windshift
+```
+
+### Server Startup Timeout
+- Check if port is already in use
+- Verify database permissions
+- Try a different port: `--port 3000`
+
+### Database Locked
+Ensure no other server instances are running:
+```bash
+rm demo.db demo.db-shm demo.db-wal
+```
+
+## File Structure
+
+```
+scripts/demo/
+├── setup-demo.sh       # Quick start script for Docker deployment
+├── build.sh            # Manual Docker image build script
+├── docker-compose.yml  # Docker Compose configuration
+├── Dockerfile          # Multi-stage Docker build
+├── Caddyfile.template  # Caddy reverse proxy config
+├── entrypoint.sh       # Container entrypoint
+├── generate-demo.js    # Demo content generator
+├── demo-data.js        # Demo data definitions
+└── README.md           # This file
+```

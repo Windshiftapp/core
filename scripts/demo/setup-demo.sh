@@ -106,13 +106,13 @@ echo ""
 
 # Get script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Build from project root to ensure correct context
 cd "$PROJECT_ROOT"
 
 # Build and start using the demo docker-compose file
-docker compose -f frontend/e2e/demo/docker-compose.yml up --build -d
+docker compose -f scripts/demo/docker-compose.yml up --build -d
 
 echo ""
 print_success "Demo is starting!"

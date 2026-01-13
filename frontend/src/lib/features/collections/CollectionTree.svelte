@@ -6,7 +6,7 @@
   import { getStatusColor, getStatusInlineStyle, getTextColorForBackground } from '../../utils/statusColors.js';
   import { workspaceGradientIndex, applyToAllViews, loadWorkspaceGradient, getGradientStyle } from '../../stores/workspaceGradient.js';
   import { gradients } from '../../utils/gradients.js';
-  import { ChevronRight, ChevronDown, GitBranch, Circle, AlertCircle, Calendar, FileCheck } from 'lucide-svelte';
+  import { ChevronRight, ChevronDown, GitBranch, Circle, AlertCircle, Calendar, FileCheck, Minus } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import ViewHeader from '../../layout/ViewHeader.svelte';
   import ItemKey from '../items/ItemKey.svelte';

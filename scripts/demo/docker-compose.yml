@@ -1,11 +1,11 @@
-# Run from project root: docker compose -f frontend/e2e/demo/docker-compose.yml up --build
-# Or use: ./setup-demo.sh <hostname>
+# Run from project root: docker compose -f scripts/demo/docker-compose.yml up --build
+# Or use: ./scripts/demo/setup-demo.sh <hostname>
 
 services:
   windshift:
     build:
-      context: ../../..  # Project root (relative to this file's location)
-      dockerfile: frontend/e2e/demo/Dockerfile
+      context: ../..  # Project root (relative to this file's location)
+      dockerfile: scripts/demo/Dockerfile
     image: windshift:demo
     container_name: windshift-demo
     ports:

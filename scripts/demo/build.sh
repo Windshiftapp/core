@@ -11,9 +11,9 @@ set -e
 
 TAG="${1:-windshift-demo}"
 
-# Get project root (3 levels up from this script)
+# Get project root (2 levels up from this script)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 echo "Building windshift-demo image..."
 echo "  Project root: $PROJECT_ROOT"
@@ -21,7 +21,7 @@ echo "  Tag: $TAG"
 echo ""
 
 cd "$PROJECT_ROOT"
-docker build -f frontend/e2e/demo/Dockerfile -t "$TAG" .
+docker build -f scripts/demo/Dockerfile -t "$TAG" .
 
 echo ""
 echo "Build complete: $TAG"

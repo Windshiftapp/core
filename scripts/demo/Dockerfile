@@ -4,8 +4,8 @@
 # This Dockerfile expects the build context to be the PROJECT ROOT, not the demo directory.
 #
 # Usage:
-#   From project root:  docker build -f frontend/e2e/demo/Dockerfile -t windshift-demo .
-#   With compose:       docker compose -f frontend/e2e/demo/docker-compose.yml up --build
+#   From project root:  docker build -f scripts/demo/Dockerfile -t windshift-demo .
+#   With compose:       docker compose -f scripts/demo/docker-compose.yml up --build
 
 # ============================================================
 # Stage 1: Build windshift server binary
@@ -47,8 +47,8 @@ WORKDIR /app
 COPY --from=builder /build/windshift /usr/local/bin/
 
 # Copy demo generation scripts from builder
-COPY --from=builder /build/frontend/e2e/generate-demo.js ./
-COPY --from=builder /build/frontend/e2e/demo-data.js ./
+COPY --from=builder /build/scripts/demo/generate-demo.js ./
+COPY --from=builder /build/scripts/demo/demo-data.js ./
 
 # Create data directory
 RUN mkdir -p /data
@@ -97,8 +97,8 @@ COPY --from=seeder /data/demo.db /data/demo.db
 RUN chown windshift:windshift /data/demo.db
 
 # Copy Caddy configuration template and entrypoint from builder
-COPY --from=builder /build/frontend/e2e/demo/Caddyfile.template /etc/caddy/Caddyfile.template
-COPY --from=builder /build/frontend/e2e/demo/entrypoint.sh /entrypoint.sh
+COPY --from=builder /build/scripts/demo/Caddyfile.template /etc/caddy/Caddyfile.template
+COPY --from=builder /build/scripts/demo/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Expose ports
