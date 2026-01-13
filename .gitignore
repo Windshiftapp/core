@@ -12,7 +12,6 @@ cx
 # Test binary, built with `go test -c`
 *.test
 windshift-test
-plugins
 data
 
 # Output of the go coverage tool, specifically when used with LiteIDE
