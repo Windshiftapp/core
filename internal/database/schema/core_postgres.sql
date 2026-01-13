@@ -1,0 +1,2 @@
+-- Core tables (custom field definitions)
+-- custom_field_definitions table moved to base_tables_postgres.sql

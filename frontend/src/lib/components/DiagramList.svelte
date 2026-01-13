@@ -1,0 +1,128 @@
+<script>
+  import { onMount } from 'svelte';
+  import { api } from '../api.js';
+  import { Workflow, Pencil, Trash2 } from 'lucide-svelte';
+  import Tooltip from './Tooltip.svelte';
+  import Spinner from './Spinner.svelte';
+
+  export let itemId;
+  export let onEdit = () => {};
+  export let onDelete = () => {};
+
+  let diagrams = [];
+  let loading = true;
+  let error = null;
+
+  async function loadDiagrams() {
+    try {
+      loading = true;
+      error = null;
+      diagrams = await api.getDiagrams(itemId);
+    } catch (err) {
+      console.error('Failed to load diagrams:', err);
+      error = 'Failed to load diagrams';
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function handleDelete(diagramId) {
+    if (!confirm('Are you sure you want to delete this diagram?')) {
+      return;
+    }
+
+    try {
+      await api.deleteDiagram(diagramId);
+      await loadDiagrams();
+      onDelete(diagramId);
+    } catch (err) {
+      console.error('Failed to delete diagram:', err);
+      alert('Failed to delete diagram');
+    }
+  }
+
+  function formatDate(dateStr) {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+  }
+
+  onMount(() => {
+    loadDiagrams();
+  });
+
+  export function refresh() {
+    loadDiagrams();
+  }
+</script>
+
+{#if loading}
+  <div class="text-center py-8">
+    <Spinner class="mx-auto" />
+    <p class="text-sm text-gray-500 mt-2">Loading diagrams...</p>
+  </div>
+{:else if diagrams && diagrams.length > 0}
+  <div class="attachment-list space-y-1">
+    {#each diagrams as diagram (diagram.id)}
+      <div class="attachment-item rounded border p-2 transition-colors hover:bg-gray-50"
+           style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 flex-1 min-w-0">
+            <!-- Diagram icon -->
+            <div class="flex-shrink-0">
+              <div class="flex items-center justify-center w-8 h-8">
+                <Workflow class="w-5 h-5 text-gray-500" />
+              </div>
+            </div>
+
+            <!-- Diagram info -->
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <p class="text-sm truncate" style="color: var(--ds-text);">
+                  {diagram.name}
+                </p>
+              </div>
+              <div class="flex items-center gap-2 text-xs text-gray-500">
+                {#if diagram.updated_by_name}
+                  <span>{formatDate(diagram.updated_at)}</span>
+                  <span>•</span>
+                  <span>{diagram.updated_by_name}</span>
+                {:else}
+                  <span>{formatDate(diagram.created_at)}</span>
+                  {#if diagram.creator_name}
+                    <span>•</span>
+                    <span>{diagram.creator_name}</span>
+                  {/if}
+                {/if}
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center gap-1 flex-shrink-0">
+              <Tooltip content="Edit diagram">
+                {#snippet children()}
+                  <button
+                    onclick={() => onEdit(diagram)}
+                    class="p-1 rounded hover:bg-blue-50"
+                  >
+                    <Pencil class="w-4 h-4 text-gray-500 hover:text-blue-500" />
+                  </button>
+                {/snippet}
+              </Tooltip>
+
+              <Tooltip content="Delete">
+                {#snippet children()}
+                  <button
+                    onclick={() => handleDelete(diagram.id)}
+                    class="p-1 rounded hover:bg-red-50"
+                  >
+                    <Trash2 class="w-4 h-4 text-gray-500 hover:text-red-500" />
+                  </button>
+                {/snippet}
+              </Tooltip>
+            </div>
+          </div>
+        </div>
+      </div>
+    {/each}
+  </div>
+{/if}

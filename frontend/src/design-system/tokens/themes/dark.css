@@ -1,0 +1,190 @@
+/* =================================================================
+   DARK THEME
+   Semantic token values for dark mode
+   ================================================================= */
+
+html[data-color-mode="dark"] {
+  /* =================================================================
+     SURFACE COLORS
+     Background colors for UI layers
+     ================================================================= */
+  --ds-surface: #1d2125;
+  --ds-surface-hovered: #282e33;
+  --ds-surface-pressed: #3a424a;
+  --ds-surface-raised: #282e33;
+  --ds-surface-overlay: #282e33;
+  --ds-surface-selected: #09326c;
+  --ds-surface-card: #313940;
+
+  /* =================================================================
+     TEXT COLORS
+     ================================================================= */
+  --ds-text: #b6c2cf;
+  --ds-text-subtle: #8c9bab;
+  --ds-text-subtlest: #6b778c;
+  --ds-text-disabled: #5e6c84;
+  --ds-text-inverse: #1d2125;
+  --ds-text-link: #579dff;
+  --ds-text-link-hovered: #85b8ff;
+
+  /* =================================================================
+     BORDER COLORS
+     ================================================================= */
+  --ds-border: #a1bdd933;
+  --ds-border-bold: #a6c5e24d;
+  --ds-border-focused: #579dff;
+
+  /* =================================================================
+     ICON COLORS
+     ================================================================= */
+  --ds-icon: #8c9bab;
+  --ds-icon-subtle: #6b778c;
+  --ds-icon-disabled: #5e6c84;
+
+  /* =================================================================
+     INTERACTIVE COLORS (Primary/Brand)
+     For buttons, links, and other interactive elements
+     ================================================================= */
+  --ds-interactive: var(--color-primary-500);
+  --ds-interactive-hovered: var(--color-primary-400);
+  --ds-interactive-pressed: var(--color-primary-600);
+  --ds-interactive-subtle: #09326c;
+
+  /* =================================================================
+     FEEDBACK COLORS - DANGER (Red)
+     ================================================================= */
+  --ds-danger: var(--color-red-500);
+  --ds-danger-subtle: #5d1f1a;
+  --ds-text-danger: #ff8f73;
+  --ds-border-danger: #ae2e24;
+  --ds-icon-danger: var(--color-red-400);
+  --ds-background-danger-bold: var(--color-red-500);
+  --ds-background-danger-bold-hovered: var(--color-red-600);
+
+  /* =================================================================
+     FEEDBACK COLORS - SUCCESS (Green)
+     ================================================================= */
+  --ds-text-success: #4bce97;
+  --ds-border-success: #216e4e;
+  --ds-icon-success: var(--color-green-400);
+
+  /* =================================================================
+     FEEDBACK COLORS - WARNING (Yellow/Orange)
+     ================================================================= */
+  --ds-text-warning: #f5cd47;
+  --ds-border-warning: #7f5f01;
+  --ds-icon-warning: var(--color-yellow-400);
+  --ds-background-warning-bold: var(--color-yellow-500);
+  --ds-background-warning-bold-hovered: var(--color-yellow-600);
+
+  /* =================================================================
+     FEEDBACK COLORS - INFO (Blue)
+     ================================================================= */
+  --ds-text-info: #579dff;
+  --ds-border-info: #0747a6;
+  --ds-icon-info: var(--color-blue-400);
+
+  /* =================================================================
+     NEUTRAL BACKGROUNDS
+     ================================================================= */
+  --ds-background-neutral: #a1bdd933;
+  --ds-background-neutral-hovered: #a6c5e24d;
+  --ds-background-input: #22272b;
+  --ds-background-input-hovered: #282e33;
+
+  /* =================================================================
+     ACCENT COLORS
+     For badges, tags, and category indicators
+     ================================================================= */
+  /* Blue */
+  --ds-accent-blue: var(--color-blue-400);
+  --ds-accent-blue-subtle: #09326c;
+  --ds-accent-blue-subtler: #0847a3;
+  --ds-icon-accent-blue: #579dff;
+
+  /* Green */
+  --ds-accent-green: var(--color-green-400);
+  --ds-accent-green-subtle: #164b35;
+  --ds-accent-green-subtler: #216e4e;
+  --ds-icon-accent-green: #4bce97;
+
+  /* Purple */
+  --ds-accent-purple: var(--color-purple-400);
+  --ds-accent-purple-subtle: #352c63;
+  --ds-accent-purple-subtler: #5243aa;
+  --ds-icon-accent-purple: #9f8fef;
+
+  /* Teal */
+  --ds-accent-teal: var(--color-teal-400);
+  --ds-accent-teal-subtle: #164555;
+  --ds-accent-teal-subtler: #206a83;
+  --ds-icon-accent-teal: #60c6d2;
+
+  /* Orange */
+  --ds-accent-orange: var(--color-orange-400);
+  --ds-accent-orange-subtle: #5f3811;
+  --ds-accent-orange-subtler: #974f0c;
+  --ds-icon-accent-orange: #faa53d;
+
+  /* =================================================================
+     STATUS COLORS
+     For test status badges, progress indicators, and status buttons
+     ================================================================= */
+  /* Success (Passed, Completed) */
+  --ds-status-success-bg: #052e16;
+  --ds-status-success-text: #4ade80;
+  --ds-status-success-border: #166534;
+  --ds-status-success-solid: #22c55e;
+
+  /* Danger (Failed) */
+  --ds-status-danger-bg: #450a0a;
+  --ds-status-danger-text: #f87171;
+  --ds-status-danger-border: #991b1b;
+  --ds-status-danger-solid: #ef4444;
+
+  /* Warning (Blocked) */
+  --ds-status-warning-bg: #422006;
+  --ds-status-warning-text: #fbbf24;
+  --ds-status-warning-border: #92400e;
+  --ds-status-warning-solid: #f59e0b;
+
+  /* Info (In Progress) */
+  --ds-status-info-bg: #1e3a5f;
+  --ds-status-info-text: #60a5fa;
+  --ds-status-info-border: #1e40af;
+  --ds-status-info-solid: #3b82f6;
+
+  /* Neutral (Not Run, Skipped) */
+  --ds-status-neutral-bg: #374151;
+  --ds-status-neutral-text: #9ca3af;
+  --ds-status-neutral-border: #4b5563;
+  --ds-status-neutral-solid: #6b7280;
+
+  /* Progress bar colors */
+  --ds-progress-track: #374151;
+  --ds-progress-fill: var(--color-primary-400);
+
+  /* =================================================================
+     CUSTOM DROP TARGET COLORS (Drag & Drop)
+     ================================================================= */
+  --ra-background: var(--ds-surface-pressed);
+  --ra-background-raised: #313940;
+  --ra-background-hovered: #3a424a;
+
+  /* =================================================================
+     GLASSMORPHISM TOKENS
+     ================================================================= */
+  --ds-glass-bg: rgba(40, 46, 51, 0.8);
+  --ds-glass-bg-subtle: rgba(40, 46, 51, 0.6);
+  --ds-glass-border: rgba(255, 255, 255, 0.1);
+  --ds-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --ds-glow-nav: 0 0 15px rgba(87, 157, 255, 0.25);
+  --ds-glow-primary: 0 0 25px rgba(87, 157, 255, 0.3);
+
+  /* =================================================================
+     GRADIENT ANIMATION COLORS
+     ================================================================= */
+  --ds-gradient-start: #3b82f6;
+  --ds-gradient-mid: #6366f1;
+  --ds-gradient-end: #8b5cf6;
+}

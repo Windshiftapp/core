@@ -1,0 +1,1020 @@
+package handlers
+
+import (
+	"windshift/internal/database"
+	"windshift/internal/services"
+	"crypto/rand"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"image"
+	"image/jpeg"
+	_ "image/png" // Register PNG decoder
+	_ "image/gif" // Register GIF decoder
+	"io"
+	"log/slog"
+	"mime"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+	"windshift/internal/models"
+
+	"golang.org/x/image/draw"
+)
+
+type AttachmentHandler struct {
+	db                database.Database
+	attachmentPath    string
+	permissionService *services.PermissionService
+}
+
+func NewAttachmentHandler(db database.Database, attachmentPath string, permissionService *services.PermissionService) *AttachmentHandler {
+	return &AttachmentHandler{
+		db:                db,
+		attachmentPath:    attachmentPath,
+		permissionService: permissionService,
+	}
+}
+
+// getUserFromContext extracts the authenticated user from request context
+func (h *AttachmentHandler) getUserFromContext(r *http.Request) *models.User {
+	if user := r.Context().Value("user"); user != nil {
+		if u, ok := user.(*models.User); ok {
+			return u
+		}
+	}
+	return nil
+}
+
+// IsEnabled checks if attachments are enabled (attachment path is set)
+func (h *AttachmentHandler) IsEnabled() bool {
+	return h.attachmentPath != ""
+}
+
+// Upload handles file upload to an item
+func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
+	slog.Debug("upload request received", slog.String("component", "attachments"))
+	
+	if !h.IsEnabled() {
+		slog.Warn("upload failed: attachments not enabled", slog.String("component", "attachments"))
+		http.Error(w, "Attachments are not enabled on this server", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Parse form data (32MB max)
+	slog.Debug("parsing multipart form", slog.String("component", "attachments"))
+	err := r.ParseMultipartForm(32 << 20)
+	if err != nil {
+		slog.Error("failed to parse form data", slog.String("component", "attachments"), slog.Any("error", err))
+		http.Error(w, "Failed to parse form data: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Get entity info from form
+	// Support both old (item_id) and new (entity_type + entity_id) parameters
+	entityIDStr := r.FormValue("entity_id")
+	if entityIDStr == "" {
+		entityIDStr = r.FormValue("item_id") // Backwards compatibility
+	}
+	entityType := r.FormValue("entity_type")
+	category := r.FormValue("category")
+
+	// Determine entity type from category for backwards compatibility
+	if entityType == "" {
+		switch category {
+		case "avatar":
+			entityType = "avatar"
+		case "workspace_avatar":
+			entityType = "workspace_avatar"
+		default:
+			entityType = "item" // Default to item for backwards compatibility
+		}
+	}
+
+	slog.Debug("entity info received", slog.String("component", "attachments"), slog.String("entity_id", entityIDStr), slog.String("entity_type", entityType), slog.String("category", category))
+
+	// Handle avatar uploads differently (they don't need a real entity)
+	isAvatar := entityType == "avatar"
+	isWorkspaceAvatar := entityType == "workspace_avatar"
+
+	// Validate entity_id is provided (except for avatars)
+	if entityIDStr == "" && !isAvatar && !isWorkspaceAvatar {
+		slog.Debug("missing entity_id in form", slog.String("component", "attachments"))
+		http.Error(w, "entity_id is required", http.StatusBadRequest)
+		return
+	}
+
+	var entityID int
+	if entityIDStr != "" {
+		entityID, err = strconv.Atoi(entityIDStr)
+		if err != nil {
+			slog.Error("invalid entity_id", slog.String("component", "attachments"), slog.Any("error", err))
+			http.Error(w, "Invalid entity_id", http.StatusBadRequest)
+			return
+		}
+	}
+	slog.Debug("uploading to entity", slog.String("component", "attachments"), slog.String("entity_type", entityType), slog.Int("entity_id", entityID))
+
+	// Verify entity exists based on type
+	if !isAvatar && !isWorkspaceAvatar {
+		var exists bool
+		var checkQuery string
+
+		switch entityType {
+		case "item":
+			checkQuery = "SELECT EXISTS(SELECT 1 FROM items WHERE id = ?)"
+		case "test_case":
+			checkQuery = "SELECT EXISTS(SELECT 1 FROM test_cases WHERE id = ?)"
+		default:
+			slog.Debug("unknown entity type", slog.String("component", "attachments"), slog.String("entity_type", entityType))
+			http.Error(w, "Unknown entity type", http.StatusBadRequest)
+			return
+		}
+
+		slog.Debug("verifying entity exists", slog.String("component", "attachments"), slog.String("entity_type", entityType), slog.Int("entity_id", entityID))
+		err = h.db.QueryRow(checkQuery, entityID).Scan(&exists)
+		if err != nil {
+			slog.Error("database error checking entity existence", slog.String("component", "attachments"), slog.Any("error", err))
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
+		if !exists {
+			slog.Debug("entity not found", slog.String("component", "attachments"), slog.String("entity_type", entityType), slog.Int("entity_id", entityID))
+			http.Error(w, fmt.Sprintf("%s not found", entityType), http.StatusNotFound)
+			return
+		}
+		slog.Debug("entity exists", slog.String("component", "attachments"), slog.String("entity_type", entityType), slog.Int("entity_id", entityID))
+	} else {
+		slog.Debug("skipping entity existence check for avatar upload", slog.String("component", "attachments"))
+	}
+
+	// Get file from form
+	slog.Debug("getting file from form", slog.String("component", "attachments"))
+	file, fileHeader, err := r.FormFile("file")
+	if err != nil {
+		slog.Error("failed to get file from form", slog.String("component", "attachments"), slog.Any("error", err))
+		http.Error(w, "Failed to get file from form: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	slog.Debug("file received", slog.String("component", "attachments"), slog.String("filename", fileHeader.Filename), slog.Int64("size", fileHeader.Size), slog.String("content_type", fileHeader.Header.Get("Content-Type")))
+
+	// Read entire file into memory to avoid multipart.File seek issues
+	slog.Debug("reading file into memory", slog.String("component", "attachments"))
+	fileData, err := io.ReadAll(file)
+	if err != nil {
+		slog.Error("failed to read file data", slog.String("component", "attachments"), slog.Any("error", err))
+		http.Error(w, "Failed to read file data: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	slog.Debug("file data read", slog.String("component", "attachments"), slog.Int("bytes", len(fileData)))
+
+	// SECURITY: Validate file extension against dangerous extensions blacklist
+	slog.Debug("validating file extension", slog.String("component", "attachments"))
+	if err := h.validateFileExtension(fileHeader.Filename); err != nil {
+		slog.Warn("extension validation failed", slog.String("component", "attachments"), slog.Any("error", err))
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// SECURITY: Verify actual file content matches extension
+	slog.Debug("verifying file content", slog.String("component", "attachments"))
+	detectedMimeType, err := h.verifyFileContentFromBytes(fileData, fileHeader.Filename)
+	if err != nil {
+		slog.Warn("content verification failed", slog.String("component", "attachments"), slog.Any("error", err))
+		http.Error(w, "File content validation failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	slog.Debug("content verified", slog.String("component", "attachments"), slog.String("mime_type", detectedMimeType))
+
+	// Get attachment settings for validation
+	slog.Debug("getting attachment settings", slog.String("component", "attachments"))
+	settings, err := h.getAttachmentSettings()
+	if err != nil {
+		slog.Error("failed to get attachment settings", slog.String("component", "attachments"), slog.Any("error", err))
+		http.Error(w, "Failed to get attachment settings", http.StatusInternalServerError)
+		return
+	}
+	slog.Debug("attachment settings loaded", slog.String("component", "attachments"), slog.Bool("enabled", settings.Enabled), slog.Int64("max_size", settings.MaxFileSize))
+
+	if !settings.Enabled {
+		http.Error(w, "Attachments are disabled", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Validate file size
+	if fileHeader.Size > settings.MaxFileSize {
+		http.Error(w, fmt.Sprintf("File too large. Maximum size: %d bytes", settings.MaxFileSize), http.StatusBadRequest)
+		return
+	}
+
+	// Validate MIME type against allowed types (if restrictions are set)
+	// Use the detected MIME type from content verification (not client header)
+	if settings.AllowedMimeTypes != "" {
+		var allowedTypes []string
+		if err := json.Unmarshal([]byte(settings.AllowedMimeTypes), &allowedTypes); err == nil {
+			if len(allowedTypes) > 0 {
+				allowed := false
+				for _, allowedType := range allowedTypes {
+					if strings.HasPrefix(detectedMimeType, allowedType) {
+						allowed = true
+						break
+					}
+				}
+
+				if !allowed {
+					http.Error(w, fmt.Sprintf("File type %s not allowed by server configuration", detectedMimeType), http.StatusBadRequest)
+					return
+				}
+			}
+		}
+	}
+
+	// Generate unique filename
+	slog.Debug("generating unique filename", slog.String("component", "attachments"), slog.String("original_filename", fileHeader.Filename))
+	uniqueFilename, err := h.generateUniqueFilename(fileHeader.Filename)
+	if err != nil {
+		slog.Error("failed to generate filename", slog.String("component", "attachments"), slog.Any("error", err))
+		http.Error(w, "Failed to generate filename", http.StatusInternalServerError)
+		return
+	}
+	slog.Debug("generated filename", slog.String("component", "attachments"), slog.String("unique_filename", uniqueFilename))
+
+	// Ensure attachment directory exists based on entity type
+	var itemDir string
+	switch entityType {
+	case "avatar":
+		itemDir = filepath.Join(h.attachmentPath, "avatars")
+	case "workspace_avatar":
+		itemDir = filepath.Join(h.attachmentPath, "workspace_avatars")
+	case "test_case":
+		itemDir = filepath.Join(h.attachmentPath, "test_cases", strconv.Itoa(entityID))
+	default: // "item"
+		itemDir = filepath.Join(h.attachmentPath, "items", strconv.Itoa(entityID))
+	}
+	slog.Debug("creating directory", slog.String("component", "attachments"), slog.String("path", itemDir))
+	if err := os.MkdirAll(itemDir, 0755); err != nil {
+		slog.Error("failed to create directory", slog.String("component", "attachments"), slog.String("path", itemDir), slog.Any("error", err))
+		http.Error(w, "Failed to create attachment directory", http.StatusInternalServerError)
+		return
+	}
+
+	// Create file path
+	filePath := filepath.Join(itemDir, uniqueFilename)
+	slog.Debug("creating file", slog.String("component", "attachments"), slog.String("path", filePath))
+
+	// Write file data directly (already in memory from earlier read)
+	slog.Debug("writing file data", slog.String("component", "attachments"))
+	err = os.WriteFile(filePath, fileData, 0644)
+	if err != nil {
+		slog.Error("failed to write file", slog.String("component", "attachments"), slog.String("path", filePath), slog.Any("error", err))
+		http.Error(w, "Failed to save file", http.StatusInternalServerError)
+		return
+	}
+	fileSize := int64(len(fileData))
+	slog.Debug("file saved", slog.String("component", "attachments"), slog.Int64("bytes", fileSize))
+
+	// Get uploader ID from context/session
+	var uploaderID *int
+	if user := r.Context().Value("user"); user != nil {
+		if u, ok := user.(*models.User); ok {
+			uploaderID = &u.ID
+		}
+	}
+
+	// Save attachment record to database
+	// Use the detected MIME type from content verification (not client header)
+	mimeType := detectedMimeType
+
+	// Generate thumbnail for images
+	hasThumbnail := false
+	var thumbnailPath string
+	if strings.HasPrefix(mimeType, "image/") {
+		slog.Debug("generating thumbnail for image", slog.String("component", "attachments"), slog.String("filename", uniqueFilename))
+		thumbnailPath, err = h.generateThumbnail(filePath, uniqueFilename)
+		if err == nil {
+			hasThumbnail = true
+			slog.Debug("thumbnail generated", slog.String("component", "attachments"), slog.String("thumbnail_path", thumbnailPath))
+		} else {
+			slog.Warn("failed to generate thumbnail", slog.String("component", "attachments"), slog.String("filename", uniqueFilename), slog.Any("error", err))
+		}
+	} else {
+		slog.Debug("skipping thumbnail generation for non-image", slog.String("component", "attachments"), slog.String("mime_type", mimeType))
+	}
+
+	slog.Debug("saving attachment record to database", slog.String("component", "attachments"))
+	
+	var attachmentID int64
+	
+	// Add entity_type column if it doesn't exist (for polymorphic attachment support)
+	_, err = h.db.ExecWrite("ALTER TABLE attachments ADD COLUMN entity_type TEXT DEFAULT 'item'")
+	if err != nil && !strings.Contains(err.Error(), "duplicate column name") && !strings.Contains(err.Error(), "already exists") {
+		slog.Warn("failed to add entity_type column (may already exist)", slog.String("component", "attachments"), slog.Any("error", err))
+	}
+
+	// Add category column if it doesn't exist (for avatar support)
+	_, err = h.db.ExecWrite("ALTER TABLE attachments ADD COLUMN category TEXT DEFAULT ''")
+	if err != nil && !strings.Contains(err.Error(), "duplicate column name") && !strings.Contains(err.Error(), "already exists") {
+		slog.Warn("failed to add category column (may already exist)", slog.String("component", "attachments"), slog.Any("error", err))
+	}
+
+	// For avatars and workspace avatars, use NULL for item_id since they're not associated with entities
+	var attachmentEntityID interface{}
+	if isAvatar || isWorkspaceAvatar {
+		attachmentEntityID = nil // NULL for avatars and workspace avatars
+	} else {
+		attachmentEntityID = entityID // Entity ID for regular attachments
+	}
+
+	// Insert attachment record with entity_type
+	err = h.db.QueryRow(`
+		INSERT INTO attachments (item_id, entity_type, filename, original_filename, file_path, mime_type, file_size, uploaded_by, has_thumbnail, thumbnail_path, category)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+	`, attachmentEntityID, entityType, uniqueFilename, fileHeader.Filename, filePath, mimeType, fileSize, uploaderID, hasThumbnail, thumbnailPath, category).Scan(&attachmentID)
+
+	if err != nil {
+		slog.Error("failed to save attachment record", slog.String("component", "attachments"), slog.Any("error", err))
+		os.Remove(filePath) // Clean up on error
+		http.Error(w, "Failed to save attachment record", http.StatusInternalServerError)
+		return
+	}
+	slog.Debug("attachment saved", slog.String("component", "attachments"), slog.Int64("attachment_id", attachmentID))
+
+	// Record history for item attachments only (not test_case, avatars, etc.)
+	if entityType == "item" && attachmentEntityID != nil {
+		if entityIDInt, ok := attachmentEntityID.(int); ok {
+			if err := h.recordAttachmentHistory(entityIDInt, uploaderID, "attachment_uploaded", nil, attachmentID, fileHeader.Filename); err != nil {
+				slog.Warn("failed to record attachment history", slog.String("component", "attachments"), slog.Any("error", err))
+				// Don't fail the whole operation if history recording fails
+			}
+		}
+	}
+
+	// For avatars, also update the user's avatar_url with the attachment download URL
+	if isAvatar && uploaderID != nil {
+		avatarURL := fmt.Sprintf("/api/attachments/%d/download", attachmentID)
+		slog.Debug("updating user avatar_url", slog.String("component", "attachments"), slog.Int("user_id", *uploaderID), slog.String("avatar_url", avatarURL))
+
+		_, err = h.db.ExecWrite(`UPDATE users SET avatar_url = ? WHERE id = ?`, avatarURL, *uploaderID)
+		if err != nil {
+			slog.Warn("failed to update user avatar_url", slog.String("component", "attachments"), slog.Any("error", err))
+			// Don't fail the whole operation, avatar was still uploaded
+		} else {
+			slog.Debug("user avatar updated successfully", slog.String("component", "attachments"))
+		}
+	}
+
+	// Return success response
+	if isAvatar || isWorkspaceAvatar {
+		// For avatars and workspace avatars, return the attachment download URL
+		avatarURL := fmt.Sprintf("/api/attachments/%d/download", attachmentID)
+		message := "Avatar uploaded successfully"
+		if isWorkspaceAvatar {
+			message = "Workspace avatar uploaded successfully"
+		}
+		response := map[string]interface{}{
+			"success":    true,
+			"message":    message,
+			"avatar_url": avatarURL,
+			"attachment_id": attachmentID,
+			"filename":   uniqueFilename,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+		return
+	} else {
+		// For regular attachments, return attachment structure
+		attachment := models.Attachment{
+			ID:               int(attachmentID),
+			ItemID:           &entityID,
+			Filename:         uniqueFilename,
+			OriginalFilename: fileHeader.Filename,
+			MimeType:         mimeType,
+			FileSize:         fileSize,
+			UploadedBy:       uploaderID,
+			CreatedAt:        time.Now(),
+		}
+
+		response := models.AttachmentUploadResponse{
+			Success:    true,
+			Message:    "File uploaded successfully",
+			Attachment: attachment,
+		}
+
+		slog.Debug("upload completed successfully", slog.String("component", "attachments"))
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+// GetByItem returns attachments for a specific item with pagination support
+func (h *AttachmentHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
+	itemID, err := strconv.Atoi(r.PathValue("itemId"))
+	if err != nil {
+		http.Error(w, "Invalid item ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get user from context and check permissions
+	user := h.getUserFromContext(r)
+	if user == nil {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
+	}
+
+	// Look up the item to get its workspace_id for permission check
+	var workspaceID int
+	err = h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "Item not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	// Check workspace view permission
+	if h.permissionService != nil {
+		canView, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionItemView)
+		if err != nil {
+			http.Error(w, "Permission check failed", http.StatusInternalServerError)
+			return
+		}
+		if !canView {
+			http.Error(w, "Insufficient permissions to view attachments for this item", http.StatusForbidden)
+			return
+		}
+	}
+
+	// Parse pagination parameters
+	page := 1
+	limit := 50 // Default items per page
+	maxLimit := 100 // Maximum items that can be returned from API
+	
+	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+	
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+			if limit > maxLimit {
+				limit = maxLimit
+			}
+		}
+	}
+	
+	offset := (page - 1) * limit
+
+	// Get total count first
+	var totalCount int
+	err = h.db.QueryRow(`
+		SELECT COUNT(*) FROM attachments WHERE item_id = ?
+	`, itemID).Scan(&totalCount)
+	
+	if err != nil {
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	// Query attachments with uploader info and pagination
+	rows, err := h.db.Query(`
+		SELECT a.id, a.item_id, a.filename, a.original_filename, a.mime_type, a.file_size, 
+		       a.uploaded_by, a.has_thumbnail, a.created_at,
+		       u.first_name || ' ' || u.last_name as uploader_name, u.email as uploader_email
+		FROM attachments a
+		LEFT JOIN users u ON a.uploaded_by = u.id
+		WHERE a.item_id = ?
+		ORDER BY a.created_at DESC
+		LIMIT ? OFFSET ?
+	`, itemID, limit, offset)
+	
+	if err != nil {
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var attachments []models.Attachment
+	for rows.Next() {
+		var attachment models.Attachment
+		var itemID sql.NullInt64
+		var uploaderName, uploaderEmail sql.NullString
+		
+		err := rows.Scan(
+			&attachment.ID, &itemID, &attachment.Filename, &attachment.OriginalFilename,
+			&attachment.MimeType, &attachment.FileSize, &attachment.UploadedBy, &attachment.HasThumbnail, &attachment.CreatedAt,
+			&uploaderName, &uploaderEmail,
+		)
+		if err != nil {
+			http.Error(w, "Failed to scan attachment", http.StatusInternalServerError)
+			return
+		}
+		
+		if itemID.Valid {
+			id := int(itemID.Int64)
+			attachment.ItemID = &id
+		}
+		if uploaderName.Valid {
+			attachment.UploaderName = uploaderName.String
+		}
+		if uploaderEmail.Valid {
+			attachment.UploaderEmail = uploaderEmail.String
+		}
+		
+		attachments = append(attachments, attachment)
+	}
+
+	// Create paginated response
+	response := models.PaginatedAttachmentsResponse{
+		Attachments: attachments,
+		Pagination: models.PaginationMeta{
+			Page:       page,
+			Limit:      limit,
+			Total:      totalCount,
+			TotalPages: (totalCount + limit - 1) / limit,
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// Download serves a specific attachment file
+func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
+	slog.Debug("download request received", slog.String("component", "attachments"), slog.String("attachment_id", r.PathValue("id")))
+
+	attachmentID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		slog.Error("invalid attachment ID", slog.String("component", "attachments"), slog.Any("error", err))
+		http.Error(w, "Invalid attachment ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get attachment info
+	slog.Debug("getting attachment info", slog.String("component", "attachments"), slog.Int("attachment_id", attachmentID))
+	var attachment models.Attachment
+	var itemID sql.NullInt64
+	err = h.db.QueryRow(`
+		SELECT id, item_id, filename, original_filename, file_path, mime_type, file_size
+		FROM attachments WHERE id = ?
+	`, attachmentID).Scan(
+		&attachment.ID, &itemID, &attachment.Filename, &attachment.OriginalFilename,
+		&attachment.FilePath, &attachment.MimeType, &attachment.FileSize,
+	)
+
+	if itemID.Valid {
+		id := int(itemID.Int64)
+		attachment.ItemID = &id
+	}
+
+	if err == sql.ErrNoRows {
+		slog.Debug("attachment not found in database", slog.String("component", "attachments"), slog.Int("attachment_id", attachmentID))
+		http.Error(w, "Attachment not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		slog.Error("database error", slog.String("component", "attachments"), slog.Any("error", err))
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	slog.Debug("found attachment", slog.String("component", "attachments"), slog.String("original_filename", attachment.OriginalFilename), slog.String("path", attachment.FilePath))
+
+	// Validate file path is within attachment directory (prevent path traversal)
+	absPath, err := filepath.Abs(attachment.FilePath)
+	if err != nil {
+		slog.Error("failed to resolve file path", slog.String("component", "attachments"), slog.Any("error", err))
+		http.Error(w, "Invalid file path", http.StatusBadRequest)
+		return
+	}
+	absBasePath, _ := filepath.Abs(h.attachmentPath)
+	if !strings.HasPrefix(absPath, absBasePath+string(os.PathSeparator)) {
+		slog.Warn("path traversal attempt detected", slog.String("component", "attachments"), slog.String("file_path", attachment.FilePath))
+		http.Error(w, "Invalid file path", http.StatusBadRequest)
+		return
+	}
+
+	// Check if file exists
+	slog.Debug("checking if file exists", slog.String("component", "attachments"), slog.String("file_path", attachment.FilePath))
+	if _, err := os.Stat(attachment.FilePath); os.IsNotExist(err) {
+		slog.Debug("file not found on disk", slog.String("component", "attachments"), slog.String("file_path", attachment.FilePath))
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+
+	// Open file
+	slog.Debug("opening file", slog.String("component", "attachments"), slog.String("file_path", attachment.FilePath))
+	file, err := os.Open(attachment.FilePath)
+	if err != nil {
+		slog.Error("failed to open file", slog.String("component", "attachments"), slog.Any("error", err))
+		http.Error(w, "Failed to open file", http.StatusInternalServerError)
+		return
+	}
+	defer file.Close()
+
+	// Set headers
+	slog.Debug("setting headers and serving file", slog.String("component", "attachments"), slog.String("original_filename", attachment.OriginalFilename))
+	w.Header().Set("Content-Type", attachment.MimeType)
+	w.Header().Set("Content-Length", strconv.FormatInt(attachment.FileSize, 10))
+
+	// SECURITY: Add security headers to prevent attacks
+	// Prevent browsers from MIME-sniffing the response
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	// Prevent embedding in iframes
+	w.Header().Set("X-Frame-Options", "DENY")
+	// Control how the file is displayed/downloaded
+	// Force download for potentially dangerous types (HTML, JS, SVG) to prevent XSS
+	if strings.HasPrefix(attachment.MimeType, "text/html") ||
+		strings.HasPrefix(attachment.MimeType, "application/javascript") ||
+		strings.HasPrefix(attachment.MimeType, "text/javascript") ||
+		strings.HasPrefix(attachment.MimeType, "image/svg+xml") ||
+		strings.Contains(attachment.MimeType, "script") {
+		// Force download for dangerous types
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", attachment.OriginalFilename))
+		w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
+		slog.Debug("forcing download for potentially dangerous file type", slog.String("component", "attachments"), slog.String("mime_type", attachment.MimeType))
+	} else {
+		// Allow inline display for safe types (images, PDFs, etc.)
+		w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", attachment.OriginalFilename))
+	}
+
+	// Serve file
+	bytesServed, err := io.Copy(w, file)
+	if err != nil {
+		slog.Error("error serving file", slog.String("component", "attachments"), slog.Any("error", err))
+	} else {
+		slog.Debug("successfully served file", slog.String("component", "attachments"), slog.Int64("bytes_served", bytesServed))
+	}
+}
+
+// Delete removes an attachment
+func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	attachmentID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "Invalid attachment ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get user from context for history tracking
+	var userID *int
+	if user := r.Context().Value("user"); user != nil {
+		if u, ok := user.(*models.User); ok {
+			userID = &u.ID
+		}
+	}
+
+	// Get attachment details before deletion (for history tracking)
+	var filePath string
+	var itemID sql.NullInt64
+	var originalFilename string
+	err = h.db.QueryRow("SELECT file_path, item_id, original_filename FROM attachments WHERE id = ?", attachmentID).Scan(&filePath, &itemID, &originalFilename)
+	if err == sql.ErrNoRows {
+		http.Error(w, "Attachment not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	// Record history if attachment is associated with an item
+	if itemID.Valid && userID != nil {
+		if err := h.recordAttachmentHistory(int(itemID.Int64), userID, "attachment_deleted", &originalFilename, 0, originalFilename); err != nil {
+			slog.Warn("failed to record attachment deletion history", slog.String("component", "attachments"), slog.Any("error", err))
+			// Don't fail the whole operation if history recording fails
+		}
+	}
+
+	// Delete from database
+	result, err := h.db.ExecWrite("DELETE FROM attachments WHERE id = ?", attachmentID)
+	if err != nil {
+		http.Error(w, "Failed to delete attachment record", http.StatusInternalServerError)
+		return
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		http.Error(w, "Failed to verify deletion", http.StatusInternalServerError)
+		return
+	}
+
+	if rowsAffected == 0 {
+		http.Error(w, "Attachment not found", http.StatusNotFound)
+		return
+	}
+
+	// Delete physical file
+	if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
+		// Log warning but don't fail the request if file removal fails
+		slog.Warn("failed to delete attachment file", slog.String("component", "attachments"), slog.String("file_path", filePath), slog.Any("error", err))
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// Thumbnail serves a thumbnail for an image attachment
+func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
+	attachmentID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "Invalid attachment ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get attachment info
+	var hasThumbnail bool
+	var thumbnailPath string
+	var mimeType string
+	err = h.db.QueryRow(`
+		SELECT has_thumbnail, thumbnail_path, mime_type
+		FROM attachments WHERE id = ?
+	`, attachmentID).Scan(&hasThumbnail, &thumbnailPath, &mimeType)
+	
+	if err == sql.ErrNoRows {
+		http.Error(w, "Attachment not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	if !hasThumbnail || thumbnailPath == "" {
+		http.Error(w, "No thumbnail available", http.StatusNotFound)
+		return
+	}
+
+	// Check if thumbnail file exists
+	if _, err := os.Stat(thumbnailPath); os.IsNotExist(err) {
+		http.Error(w, "Thumbnail file not found", http.StatusNotFound)
+		return
+	}
+
+	// Open thumbnail file
+	file, err := os.Open(thumbnailPath)
+	if err != nil {
+		http.Error(w, "Failed to open thumbnail", http.StatusInternalServerError)
+		return
+	}
+	defer file.Close()
+
+	// Get file info for size
+	fileInfo, err := file.Stat()
+	if err != nil {
+		http.Error(w, "Failed to get file info", http.StatusInternalServerError)
+		return
+	}
+
+	// Set headers for thumbnail (always JPEG)
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Content-Length", strconv.FormatInt(fileInfo.Size(), 10))
+	w.Header().Set("Cache-Control", "public, max-age=31536000") // Cache for 1 year
+
+	// Serve thumbnail
+	io.Copy(w, file)
+}
+
+// verifyFileContent detects actual file content and validates it matches the extension
+func (h *AttachmentHandler) verifyFileContent(file io.ReadSeeker, filename string) (string, error) {
+	// Read first 512 bytes for content detection
+	buffer := make([]byte, 512)
+	n, err := file.Read(buffer)
+	if err != nil && err != io.EOF {
+		return "", fmt.Errorf("failed to read file for content detection: %w", err)
+	}
+
+	// Reset file pointer to beginning for subsequent reads
+	if _, err := file.Seek(0, 0); err != nil {
+		return "", fmt.Errorf("failed to reset file pointer: %w", err)
+	}
+
+	// Detect actual content type from file content
+	detectedType := http.DetectContentType(buffer[:n])
+
+	// Get expected type from file extension
+	ext := filepath.Ext(filename)
+	expectedType := mime.TypeByExtension(ext)
+
+	// Validate content matches extension (if we have an expected type)
+	if expectedType != "" {
+		// Extract base type (before semicolon and parameters)
+		detectedBase := strings.Split(detectedType, ";")[0]
+		expectedBase := strings.Split(expectedType, ";")[0]
+
+		// Allow octet-stream as it's a generic fallback
+		// Otherwise, types must match
+		if detectedBase != expectedBase && detectedBase != "application/octet-stream" {
+			return "", fmt.Errorf("file content type (%s) doesn't match extension %s (expected %s)", detectedBase, ext, expectedBase)
+		}
+	}
+
+	slog.Debug("content verification passed", slog.String("component", "attachments"), slog.String("filename", filename), slog.String("detected_type", detectedType))
+	return detectedType, nil
+}
+
+// verifyFileContentFromBytes detects actual file content from bytes and validates it matches the extension
+func (h *AttachmentHandler) verifyFileContentFromBytes(fileData []byte, filename string) (string, error) {
+	// Use first 512 bytes for content detection (or less if file is smaller)
+	detectSize := 512
+	if len(fileData) < detectSize {
+		detectSize = len(fileData)
+	}
+
+	// Detect actual content type from file content
+	detectedType := http.DetectContentType(fileData[:detectSize])
+
+	// Get expected type from file extension
+	ext := filepath.Ext(filename)
+	expectedType := mime.TypeByExtension(ext)
+
+	// Validate content matches extension (if we have an expected type)
+	if expectedType != "" {
+		// Extract base type (before semicolon and parameters)
+		detectedBase := strings.Split(detectedType, ";")[0]
+		expectedBase := strings.Split(expectedType, ";")[0]
+
+		// Allow octet-stream as it's a generic fallback
+		// Otherwise, types must match
+		if detectedBase != expectedBase && detectedBase != "application/octet-stream" {
+			return "", fmt.Errorf("file content type (%s) doesn't match extension %s (expected %s)", detectedBase, ext, expectedBase)
+		}
+	}
+
+	slog.Debug("content verification passed", slog.String("component", "attachments"), slog.String("filename", filename), slog.String("detected_type", detectedType))
+	return detectedType, nil
+}
+
+// validateFileExtension checks if the file extension is allowed (not in dangerous list)
+func (h *AttachmentHandler) validateFileExtension(filename string) error {
+	// List of dangerous extensions that could be used for attacks
+	dangerousExtensions := []string{
+		".exe", ".bat", ".cmd", ".com", ".pif", ".scr", ".msi",  // Windows executables
+		".js", ".jsx", ".ts", ".tsx",                             // JavaScript/TypeScript (XSS risk)
+		".html", ".htm", ".svg",                                  // HTML/SVG (XSS risk)
+		".sh", ".bash", ".zsh", ".fish",                          // Shell scripts
+		".py", ".rb", ".pl", ".php", ".asp", ".aspx", ".jsp",    // Server-side scripts
+		".jar", ".class", ".dex",                                 // Java/Android executables
+		".app", ".dmg", ".pkg",                                   // macOS executables/installers
+		".deb", ".rpm",                                           // Linux packages
+		".apk", ".ipa",                                           // Mobile app packages
+	}
+
+	ext := strings.ToLower(filepath.Ext(filename))
+
+	// Check if extension is in the dangerous list
+	for _, dangerous := range dangerousExtensions {
+		if ext == dangerous {
+			return fmt.Errorf("file extension %s is not allowed for security reasons", ext)
+		}
+	}
+
+	// Additional check: reject files with no extension
+	if ext == "" || ext == "." {
+		return fmt.Errorf("files without extensions are not allowed")
+	}
+
+	slog.Debug("extension validation passed", slog.String("component", "attachments"), slog.String("extension", ext))
+	return nil
+}
+
+// generateUniqueFilename creates a unique filename while preserving the extension
+func (h *AttachmentHandler) generateUniqueFilename(originalFilename string) (string, error) {
+	ext := filepath.Ext(originalFilename)
+
+	// Generate random bytes for filename
+	randomBytes := make([]byte, 16)
+	if _, err := rand.Read(randomBytes); err != nil {
+		return "", err
+	}
+
+	// Create hex string from random bytes
+	randomStr := fmt.Sprintf("%x", randomBytes)
+
+	return randomStr + ext, nil
+}
+
+// getAttachmentSettings retrieves current attachment settings
+func (h *AttachmentHandler) getAttachmentSettings() (*models.AttachmentSettings, error) {
+	settings := &models.AttachmentSettings{
+		MaxFileSize:      52428800, // 50MB default
+		AllowedMimeTypes: "",
+		AttachmentPath:   h.attachmentPath,
+		Enabled:          true,
+	}
+
+	// Try to get settings from database
+	err := h.db.QueryRow(`
+		SELECT max_file_size, allowed_mime_types, attachment_path, enabled
+		FROM attachment_settings ORDER BY id DESC LIMIT 1
+	`).Scan(&settings.MaxFileSize, &settings.AllowedMimeTypes, &settings.AttachmentPath, &settings.Enabled)
+	
+	if err == sql.ErrNoRows {
+		// No settings in database, use defaults
+		return settings, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return settings, nil
+}
+
+// generateThumbnail creates a thumbnail for an image file
+func (h *AttachmentHandler) generateThumbnail(originalPath, filename string) (string, error) {
+	slog.Debug("starting thumbnail generation", slog.String("component", "attachments"), slog.String("original_path", originalPath))
+
+	// Open original image
+	file, err := os.Open(originalPath)
+	if err != nil {
+		slog.Error("failed to open image file", slog.String("component", "attachments"), slog.Any("error", err))
+		return "", err
+	}
+	defer file.Close()
+
+	// Decode image
+	slog.Debug("decoding image", slog.String("component", "attachments"))
+	img, format, err := image.Decode(file)
+	if err != nil {
+		slog.Error("failed to decode image", slog.String("component", "attachments"), slog.Any("error", err))
+		return "", err
+	}
+	slog.Debug("image decoded successfully", slog.String("component", "attachments"), slog.String("format", format))
+
+	// Calculate thumbnail dimensions (max 200x200, maintaining aspect ratio)
+	bounds := img.Bounds()
+	origWidth := bounds.Dx()
+	origHeight := bounds.Dy()
+	slog.Debug("original dimensions", slog.String("component", "attachments"), slog.Int("width", origWidth), slog.Int("height", origHeight))
+
+	maxSize := 200
+	var newWidth, newHeight int
+
+	if origWidth > origHeight {
+		newWidth = maxSize
+		newHeight = (origHeight * maxSize) / origWidth
+	} else {
+		newHeight = maxSize
+		newWidth = (origWidth * maxSize) / origHeight
+	}
+	slog.Debug("thumbnail dimensions", slog.String("component", "attachments"), slog.Int("width", newWidth), slog.Int("height", newHeight))
+
+	// Create thumbnail image
+	slog.Debug("creating thumbnail image", slog.String("component", "attachments"))
+	thumbnail := image.NewRGBA(image.Rect(0, 0, newWidth, newHeight))
+	slog.Debug("scaling image", slog.String("component", "attachments"))
+	draw.CatmullRom.Scale(thumbnail, thumbnail.Bounds(), img, bounds, draw.Over, nil)
+
+	// Generate thumbnail filename (remove original extension, add .thumb.jpg)
+	base := strings.TrimSuffix(filename, filepath.Ext(filename))
+	thumbnailFilename := base + ".thumb.jpg"
+	slog.Debug("thumbnail filename generated", slog.String("component", "attachments"), slog.String("thumbnail_filename", thumbnailFilename))
+
+	// Create thumbnail path (same directory as original)
+	thumbnailPath := filepath.Join(filepath.Dir(originalPath), thumbnailFilename)
+	slog.Debug("thumbnail path", slog.String("component", "attachments"), slog.String("thumbnail_path", thumbnailPath))
+
+	// Create thumbnail file
+	slog.Debug("creating thumbnail file", slog.String("component", "attachments"))
+	thumbnailFile, err := os.Create(thumbnailPath)
+	if err != nil {
+		slog.Error("failed to create thumbnail file", slog.String("component", "attachments"), slog.Any("error", err))
+		return "", err
+	}
+	defer thumbnailFile.Close()
+
+	// Encode as JPEG with good quality
+	slog.Debug("encoding thumbnail as JPEG", slog.String("component", "attachments"))
+	err = jpeg.Encode(thumbnailFile, thumbnail, &jpeg.Options{Quality: 85})
+	if err != nil {
+		slog.Error("failed to encode thumbnail", slog.String("component", "attachments"), slog.Any("error", err))
+		return "", err
+	}
+
+	slog.Debug("thumbnail generation completed successfully", slog.String("component", "attachments"))
+	return thumbnailPath, nil
+}
+
+// recordAttachmentHistory records attachment-related changes to item history
+func (h *AttachmentHandler) recordAttachmentHistory(itemID int, userID *int, action string, oldValue *string, attachmentID int64, filename string) error {
+	if userID == nil {
+		return nil // Skip if no user context
+	}
+
+	var value string
+	if action == "attachment_uploaded" {
+		value = fmt.Sprintf("attachment:%d:%s", attachmentID, filename)
+	} else {
+		value = filename
+	}
+
+	query := `INSERT INTO item_history (item_id, user_id, field_name, old_value, new_value, changed_at)
+	          VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+
+	_, err := h.db.ExecWrite(query, itemID, *userID, action, oldValue, value)
+	return err
+}

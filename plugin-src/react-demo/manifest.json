@@ -1,0 +1,20 @@
+{
+  "name": "react-demo",
+  "version": "1.0.0",
+  "description": "React 19 demo plugin demonstrating UI bridge capabilities",
+  "author": "System",
+  "entryPoint": "plugin.wasm",
+  "extensions": [
+    {
+      "point": "admin.tab",
+      "id": "react-demo-plugin",
+      "label": "React Demo App",
+      "description": "Demo plugin showcasing React 19 with UI bridge integration",
+      "icon": "code",
+      "displayMode": "iframe",
+      "component": "index.html",
+      "group": "Development",
+      "order": 200
+    }
+  ]
+}

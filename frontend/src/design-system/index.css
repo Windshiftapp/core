@@ -1,0 +1,6 @@
+/* =================================================================
+   WINDSHIFT DESIGN SYSTEM
+   Entry point for all design system styles
+   ================================================================= */
+
+@import "./tokens/index.css";

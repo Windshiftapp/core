@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: windshift-postgres-test
+    environment:
+      POSTGRES_USER: windshift_test
+      POSTGRES_PASSWORD: windshift_test_password
+      POSTGRES_DB: postgres
+    ports:
+      - "${POSTGRES_PORT:-15432}:5432"
+    command:
+      - "postgres"
+      # Performance monitoring
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "pg_stat_statements.track=all"
+      # Connection pooling
+      - "-c"
+      - "max_connections=300"
+      # Memory tuning (for 1GB available RAM)
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "effective_cache_size=768MB"
+      - "-c"
+      - "work_mem=4MB"
+      - "-c"
+      - "maintenance_work_mem=64MB"
+      # SSD optimization
+      - "-c"
+      - "random_page_cost=1.1"
+      - "-c"
+      - "effective_io_concurrency=200"
+      # WAL settings
+      - "-c"
+      - "wal_buffers=16MB"
+      - "-c"
+      - "checkpoint_completion_target=0.9"
+      - "-c"
+      - "max_wal_size=1GB"
+      # Slow query logging
+      - "-c"
+      - "log_min_duration_statement=1000"
+      - "-c"
+      - "log_line_prefix=%t [%p]: "
+      - "-c"
+      - "log_statement=none"
+      - "-c"
+      - "log_duration=off"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U windshift_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

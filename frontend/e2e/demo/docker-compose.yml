@@ -1,0 +1,36 @@
+# Run from project root: docker compose -f frontend/e2e/demo/docker-compose.yml up --build
+# Or use: ./setup-demo.sh <hostname>
+
+services:
+  windshift:
+    build:
+      context: ../../..  # Project root (relative to this file's location)
+      dockerfile: frontend/e2e/demo/Dockerfile
+    image: windshift:demo
+    container_name: windshift-demo
+    ports:
+      - "80:80"      # HTTP (required for Let's Encrypt ACME challenge)
+      - "443:443"    # HTTPS (main access)
+      - "8443:8443"  # Alternative HTTPS port
+    environment:
+      - HOSTNAME=${HOSTNAME:-localhost}
+      - WINDSHIFT_PORT=8080
+    volumes:
+      - demo-data:/data           # Persistent data (if you want to keep changes)
+      - caddy-data:/data/caddy    # Persist Let's Encrypt certificates
+      - caddy-config:/config      # Caddy configuration
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/csrf-token"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  demo-data:
+    driver: local
+  caddy-data:
+    driver: local
+  caddy-config:
+    driver: local

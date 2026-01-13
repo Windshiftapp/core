@@ -1,0 +1,548 @@
+<script>
+  import UserPicker from '../../pickers/UserPicker.svelte';
+  import AssetPicker from '../../pickers/AssetPicker.svelte';
+  import ItemPicker from '../../pickers/ItemPicker.svelte';
+  import PersonalLabelCombobox from '../../pickers/PersonalLabelCombobox.svelte';
+  import BasePicker from '../../pickers/BasePicker.svelte';
+  import { Box, Globe, Building2, Calendar, User, Target } from 'lucide-svelte';
+  import ColorDot from '../../components/ColorDot.svelte';
+  import { api } from '../../api.js';
+
+  // Helper to parse field options
+  function parseOptions(optionsStr) {
+    if (!optionsStr) return [];
+    return optionsStr.startsWith('[')
+      ? JSON.parse(optionsStr)
+      : optionsStr.split(',').map(opt => opt.trim());
+  }
+
+  // Local state for user lookup (Svelte 4 compatible)
+  let users = [];
+  let usersLoading = false;
+  let usersLoaded = false;
+
+  async function loadUsers() {
+    if (usersLoading || usersLoaded) return;
+    usersLoading = true;
+    try {
+      users = await api.getUsers() || [];
+      usersLoaded = true;
+    } catch (e) {
+      console.error('Failed to load users:', e);
+      users = [];
+    } finally {
+      usersLoading = false;
+    }
+  }
+
+  // Click outside action
+  function clickOutside(node) {
+    const handleClick = (event) => {
+      if (!node.contains(event.target)) {
+        node.dispatchEvent(new CustomEvent('clickOutside'));
+      }
+    };
+
+    document.addEventListener('click', handleClick, true);
+
+    return {
+      destroy() {
+        document.removeEventListener('click', handleClick, true);
+      }
+    };
+  }
+
+  export let field;
+  export let value = '';
+  export let onChange = () => {};
+  export let milestones = [];
+  export let iterations = [];
+  export let isDarkMode = false;
+  export let required = false;
+
+  // Mode control
+  export let readonly = true;      // Default to read-only (display mode)
+  export let disabled = false;     // Disable interaction
+
+  // Callbacks
+  export let onStartEdit = null;   // Called when user clicks to edit in read mode
+  export let onCancel = null;      // Called when edit is cancelled
+
+  // Picker display control
+  export let showSelectedInTrigger = true;
+
+  $: isRequired = required || field.required || field.is_required;
+
+  // Milestone config for ItemPicker
+  const milestoneConfig = {
+    getValue: (item) => item.id,
+    getLabel: (item) => item.name,
+    searchFields: ['name'],
+    groupBy: null
+  };
+
+  // Iteration config for ItemPicker
+  const iterationConfig = {
+    getValue: (item) => item.id,
+    getLabel: (item) => item.name,
+    searchFields: ['name'],
+    groupBy: (item) => item.is_global ? 'Global' : 'Team'
+  };
+
+  // Helper to format date for display
+  function formatDateDisplay(dateValue) {
+    if (!dateValue) return '';
+    try {
+      const date = new Date(dateValue);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (e) {
+      return dateValue;
+    }
+  }
+
+  // Helper to format date for input[type="date"] (YYYY-MM-DD)
+  function formatDateForInput(dateValue) {
+    if (!dateValue) return '';
+    try {
+      const date = new Date(dateValue);
+      return date.toISOString().split('T')[0];
+    } catch (e) {
+      return '';
+    }
+  }
+
+  // Helper to format date from input back to ISO string
+  function formatDateFromInput(inputValue) {
+    if (!inputValue) return '';
+    try {
+      return new Date(inputValue).toISOString();
+    } catch (e) {
+      return inputValue;
+    }
+  }
+
+  // Helper to render value text for display
+  function renderDisplayValue() {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+
+    switch (field.field_type) {
+      case 'user':
+        if (typeof value === 'object' && value.name) {
+          return value.name;
+        }
+        return value;
+      case 'iteration':
+        if (value && iterations) {
+          const iteration = iterations.find(i => i.id === parseInt(value));
+          return iteration ? iteration.name : value;
+        }
+        return value;
+      case 'milestone':
+        if (value && milestones) {
+          const milestone = milestones.find(m => m.id === parseInt(value));
+          return milestone ? milestone.name : value;
+        }
+        return value;
+      case 'asset':
+        if (typeof value === 'object' && value.title) {
+          return value.asset_tag ? `${value.asset_tag} - ${value.title}` : value.title;
+        }
+        return `Asset #${value}`;
+      case 'select':
+      case 'multiselect':
+        if (field.options) {
+          try {
+            let options;
+            if (field.options.startsWith('[')) {
+              options = JSON.parse(field.options);
+            } else {
+              options = field.options.split(',').map(opt => opt.trim());
+            }
+            if (field.field_type === 'multiselect') {
+              const selectedValues = Array.isArray(value) ? value : value.split(',').map(v => v.trim());
+              return selectedValues.filter(v => options.includes(v)).join(', ');
+            }
+            return options.includes(value) ? value : value;
+          } catch (e) {
+            return value;
+          }
+        }
+        return value;
+      case 'number':
+        const num = parseFloat(value);
+        return isNaN(num) ? value : num.toString();
+      case 'date':
+        return formatDateDisplay(value);
+      default:
+        return value;
+    }
+  }
+
+  // Handle keydown for text/number inputs
+  function handleKeydown(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      // Trigger save by calling onChange with current value
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      onCancel?.();
+    }
+  }
+
+  // Handle click on read mode to start editing
+  function handleClick() {
+    if (!disabled && onStartEdit) {
+      onStartEdit();
+    }
+  }
+
+  // Get iteration data for icon rendering
+  $: iterationData = field.field_type === 'iteration' && value && iterations
+    ? iterations.find(i => i.id === parseInt(value))
+    : null;
+
+  // Load users when we need to look up a user by ID
+  $: if (readonly && field.field_type === 'user' && value && typeof value !== 'object') {
+    loadUsers();
+  }
+
+  // Reactive user data computation - Svelte tracks `users` dependency for re-render
+  $: userData = (() => {
+    if (field.field_type !== 'user' || !value) return null;
+    // If it's already an object with name, use it
+    if (typeof value === 'object' && value.name) return value;
+    // If it's an ID, look up the user
+    const userId = typeof value === 'object' ? value.id : value;
+    const user = users.find(u => u.id === parseInt(userId));
+    if (user) {
+      return {
+        id: user.id,
+        name: `${user.first_name} ${user.last_name}`.trim() || user.username
+      };
+    }
+    return null;
+  })();
+
+  // Reactive milestone data computation
+  $: milestoneData = (() => {
+    if (field.field_type !== 'milestone' || !value) return null;
+    const milestone = milestones.find(m => m.id === parseInt(value));
+    return milestone || null;
+  })();
+
+  // Get combobox labels array
+  function getComboboxLabels(val) {
+    if (!val) return [];
+    return val.split(',').map(v => v.trim()).filter(v => v);
+  }
+</script>
+
+{#if readonly}
+  <!-- Read-only display mode -->
+  <div>
+    {#if onStartEdit && !disabled}
+      <button
+        type="button"
+        class="w-full flex items-center gap-2 justify-start px-3 py-2 text-sm hover:bg-gray-50 transition-colors text-left rounded"
+        onclick={handleClick}
+      >
+        {#if value !== null && value !== undefined && value !== ''}
+          {#if field.field_type === 'user'}
+            <!-- Display user with avatar -->
+            {#if userData}
+              <div class="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white text-[9px] font-medium flex-shrink-0">
+                {userData.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+              </div>
+              <span style="color: var(--ds-text);">{userData.name}</span>
+            {:else if usersLoading}
+              <span style="color: var(--ds-text-subtle);">Loading...</span>
+            {:else}
+              <span style="color: var(--ds-text-subtle);">Unknown user</span>
+            {/if}
+          {:else if field.field_type === 'milestone'}
+            <!-- Display milestone with color dot -->
+            {#if milestoneData}
+              <ColorDot color={milestoneData.category_color || '#9CA3AF'} />
+              <span style="color: var(--ds-text);">{milestoneData.name}</span>
+            {:else}
+              <Target class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+              <span style="color: var(--ds-text-subtle);">Set {field.name.toLowerCase()}</span>
+            {/if}
+          {:else if field.field_type === 'iteration'}
+            <!-- Display iteration with icon -->
+            {#if iterationData}
+              {#if iterationData.is_global}
+                <Globe class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+              {:else}
+                <Building2 class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+              {/if}
+            {:else}
+              <Calendar class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+            {/if}
+            <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
+          {:else if field.field_type === 'asset'}
+            <!-- Display asset with icon -->
+            <Box class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+            <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
+          {:else if field.field_type === 'combobox'}
+            <!-- Display labels as chips/tags -->
+            <div class="flex items-center gap-1 flex-wrap">
+              {#each getComboboxLabels(value) as labelName}
+                <span class="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
+                  {labelName}
+                </span>
+              {/each}
+            </div>
+          {:else if field.field_type === 'number'}
+            <span class="tabular-nums" style="color: var(--ds-text);">{renderDisplayValue()}</span>
+          {:else}
+            <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
+          {/if}
+        {:else}
+          {#if field.field_type === 'user'}
+            <User class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+          {:else if field.field_type === 'milestone'}
+            <Target class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+          {:else if field.field_type === 'asset'}
+            <Box class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+          {/if}
+          <span style="color: var(--ds-text-subtle);">Set {field.name.toLowerCase()}</span>
+        {/if}
+      </button>
+    {:else}
+      <!-- Static display (no click handler or disabled) -->
+      <div class="px-3 py-2 text-sm {disabled ? 'opacity-50' : ''}">
+        {#if value !== null && value !== undefined && value !== ''}
+          {#if field.field_type === 'user'}
+            {#if userData}
+              <div class="flex items-center gap-2">
+                <div class="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white text-[9px] font-medium flex-shrink-0">
+                  {userData.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                </div>
+                <span style="color: var(--ds-text);">{userData.name}</span>
+              </div>
+            {:else if usersLoading}
+              <span style="color: var(--ds-text-subtle);">Loading...</span>
+            {:else}
+              <span style="color: var(--ds-text-subtle);">Unknown user</span>
+            {/if}
+          {:else if field.field_type === 'milestone'}
+            <div class="flex items-center gap-2">
+              {#if milestoneData}
+                <ColorDot color={milestoneData.category_color || '#9CA3AF'} />
+                <span style="color: var(--ds-text);">{milestoneData.name}</span>
+              {:else}
+                <span style="color: var(--ds-text-subtle);">Not set</span>
+              {/if}
+            </div>
+          {:else if field.field_type === 'iteration'}
+            <div class="flex items-center gap-2">
+              {#if iterationData}
+                {#if iterationData.is_global}
+                  <Globe class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+                {:else}
+                  <Building2 class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+                {/if}
+              {:else}
+                <Calendar class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+              {/if}
+              <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
+            </div>
+          {:else if field.field_type === 'asset'}
+            <div class="flex items-center gap-2">
+              <Box class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+              <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
+            </div>
+          {:else if field.field_type === 'combobox'}
+            <div class="flex items-center gap-1 flex-wrap">
+              {#each getComboboxLabels(value) as labelName}
+                <span class="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
+                  {labelName}
+                </span>
+              {/each}
+            </div>
+          {:else if field.field_type === 'number'}
+            <span class="tabular-nums" style="color: var(--ds-text);">{renderDisplayValue()}</span>
+          {:else}
+            <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
+          {/if}
+        {:else}
+          <span style="color: var(--ds-text-subtle);">Not set</span>
+        {/if}
+      </div>
+    {/if}
+  </div>
+{:else}
+  <!-- Edit mode -->
+  <div class="{disabled ? 'opacity-50 pointer-events-none' : ''}">
+    {#if field.field_type === 'milestone'}
+      <ItemPicker
+        {value}
+        items={milestones}
+        config={milestoneConfig}
+        placeholder="Select milestone..."
+        showUnassigned={true}
+        unassignedLabel="No milestone"
+        autoOpen={true}
+        class="w-full"
+        {disabled}
+        on:select={(e) => onChange(e.detail?.id || null)}
+        on:cancel={() => onCancel?.()}
+      />
+    {:else if field.field_type === 'user'}
+      {@const userValue = value && typeof value === 'object' ? value.id : value}
+      <UserPicker
+        value={userValue}
+        placeholder="Select user..."
+        showUnassigned={true}
+        {showSelectedInTrigger}
+        autoOpen={true}
+        class="w-full"
+        {disabled}
+        onSelect={(selectedUser) => {
+          onChange(selectedUser ? {
+            id: selectedUser.id,
+            name: `${selectedUser.first_name} ${selectedUser.last_name}`.trim() || selectedUser.username
+          } : null);
+        }}
+        onCancel={() => onCancel?.()}
+      />
+    {:else if field.field_type === 'iteration'}
+      <ItemPicker
+        {value}
+        items={iterations}
+        config={iterationConfig}
+        placeholder="Select iteration..."
+        showUnassigned={true}
+        unassignedLabel="No iteration"
+        autoOpen={true}
+        class="w-full"
+        {disabled}
+        on:select={(e) => onChange(e.detail?.id || null)}
+        on:cancel={() => onCancel?.()}
+      />
+    {:else if field.field_type === 'asset'}
+      {@const assetConfig = field.options ? JSON.parse(field.options) : {}}
+      {@const assetValue = value && typeof value === 'object' ? value.id : value}
+      <AssetPicker
+        value={assetValue}
+        assetSetId={assetConfig.asset_set_id}
+        cqlQuery={assetConfig.cql_query}
+        placeholder="Select asset..."
+        showUnassigned={true}
+        autoOpen={true}
+        class="w-full"
+        {disabled}
+        onSelect={(asset) => {
+          onChange(asset ? {
+            id: asset.id,
+            title: asset.title,
+            asset_tag: asset.asset_tag || ''
+          } : null);
+        }}
+        onCancel={() => onCancel?.()}
+      />
+    {:else if field.field_type === 'combobox'}
+      <PersonalLabelCombobox
+        {value}
+        placeholder="Select or create labels..."
+        class="w-full"
+        userId={null}
+        {disabled}
+        on:select={(e) => {
+          const labelArray = e.detail.value || [];
+          onChange(labelArray.join(','));
+        }}
+        on:cancel={() => onCancel?.()}
+      />
+    {:else if field.field_type === 'select'}
+      <BasePicker
+        {value}
+        items={parseOptions(field.options)}
+        placeholder="Select {field.name.toLowerCase()}..."
+        showUnassigned={true}
+        unassignedLabel="Select {field.name.toLowerCase()}..."
+        getValue={(item) => item}
+        getLabel={(item) => item}
+        {disabled}
+        onSelect={(item) => onChange(item || '')}
+      />
+    {:else if field.field_type === 'multiselect'}
+      <BasePicker
+        value={value ? value.split(',').filter(v => v) : []}
+        items={parseOptions(field.options)}
+        placeholder="Select {field.name.toLowerCase()}..."
+        getValue={(item) => item}
+        getLabel={(item) => item}
+        multiple={true}
+        {disabled}
+        onChange={(selected) => onChange(selected.join(','))}
+      />
+    {:else if field.field_type === 'date'}
+      <div use:clickOutside onclickOutside={() => onCancel?.()}>
+        <input
+          type="date"
+          value={formatDateForInput(value)}
+          oninput={(e) => onChange(formatDateFromInput(e.target.value))}
+          class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded"
+          style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
+          onkeydown={handleKeydown}
+          {disabled}
+          required={isRequired}
+          autofocus
+        />
+      </div>
+    {:else if field.field_type === 'textarea'}
+      <div use:clickOutside onclickOutside={() => onCancel?.()}>
+        <textarea
+          {value}
+          oninput={(e) => onChange(e.target.value)}
+          class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded"
+          style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
+          placeholder="Enter {field.name.toLowerCase()}..."
+          rows="3"
+          {disabled}
+          required={isRequired}
+          autofocus
+        ></textarea>
+      </div>
+    {:else if field.field_type === 'number'}
+      <div use:clickOutside onclickOutside={() => onCancel?.()}>
+        <input
+          type="number"
+          {value}
+          oninput={(e) => onChange(e.target.value)}
+          class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded tabular-nums"
+          style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
+          placeholder="Enter {field.name.toLowerCase()}..."
+          onkeydown={handleKeydown}
+          {disabled}
+          required={isRequired}
+          autofocus
+        />
+      </div>
+    {:else}
+      <!-- Default: text input -->
+      <div use:clickOutside onclickOutside={() => onCancel?.()}>
+        <input
+          type="text"
+          {value}
+          oninput={(e) => onChange(e.target.value)}
+          class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded"
+          style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
+          placeholder="Enter {field.name.toLowerCase()}..."
+          onkeydown={handleKeydown}
+          {disabled}
+          required={isRequired}
+          autofocus
+        />
+      </div>
+    {/if}
+  </div>
+{/if}

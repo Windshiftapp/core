@@ -1,0 +1,269 @@
+/* =================================================================
+   GLOBAL ANIMATION KEYFRAMES
+   Reusable CSS animations for the Windshift design system
+   ================================================================= */
+
+/* =================================================================
+   GRADIENT ANIMATIONS
+   ================================================================= */
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes gradient-rotate {
+  0% { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+
+/* =================================================================
+   GLOW EFFECTS
+   ================================================================= */
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: var(--glow-primary-soft);
+    opacity: 0.8;
+  }
+  50% {
+    box-shadow: var(--glow-primary);
+    opacity: 1;
+  }
+}
+
+@keyframes glow-breathe {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+/* =================================================================
+   ENTRANCE ANIMATIONS
+   ================================================================= */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-down {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* =================================================================
+   LOADING & PROGRESS ANIMATIONS
+   ================================================================= */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes progress-fill {
+  from { width: 0%; }
+}
+
+@keyframes progress-glow {
+  0%, 100% {
+    box-shadow: 0 0 4px var(--ds-gradient-start);
+  }
+  50% {
+    box-shadow: 0 0 12px var(--ds-gradient-start);
+  }
+}
+
+/* =================================================================
+   INDICATOR ANIMATIONS
+   ================================================================= */
+@keyframes indicator-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(59, 130, 246, 0.6);
+  }
+}
+
+/* =================================================================
+   UTILITY CLASSES
+   ================================================================= */
+
+/* Staggered entrance for child elements */
+.animate-stagger > * {
+  opacity: 0;
+  animation: fade-up var(--duration-normal, 200ms) var(--ease-smooth, ease-out) forwards;
+}
+.animate-stagger > *:nth-child(1) { animation-delay: calc(0 * var(--stagger-delay, 50ms)); }
+.animate-stagger > *:nth-child(2) { animation-delay: calc(1 * var(--stagger-delay, 50ms)); }
+.animate-stagger > *:nth-child(3) { animation-delay: calc(2 * var(--stagger-delay, 50ms)); }
+.animate-stagger > *:nth-child(4) { animation-delay: calc(3 * var(--stagger-delay, 50ms)); }
+.animate-stagger > *:nth-child(5) { animation-delay: calc(4 * var(--stagger-delay, 50ms)); }
+.animate-stagger > *:nth-child(6) { animation-delay: calc(5 * var(--stagger-delay, 50ms)); }
+.animate-stagger > *:nth-child(7) { animation-delay: calc(6 * var(--stagger-delay, 50ms)); }
+.animate-stagger > *:nth-child(8) { animation-delay: calc(7 * var(--stagger-delay, 50ms)); }
+
+/* Hover lift effect */
+.hover-lift {
+  transition: transform var(--duration-normal, 200ms) var(--ease-smooth, ease-out),
+              box-shadow var(--duration-normal, 200ms) var(--ease-smooth, ease-out);
+}
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lift);
+}
+
+/* Subtle hover lift */
+.hover-lift-sm {
+  transition: transform var(--duration-fast, 100ms) var(--ease-smooth, ease-out),
+              box-shadow var(--duration-fast, 100ms) var(--ease-smooth, ease-out);
+}
+.hover-lift-sm:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Hover glow effect */
+.hover-glow {
+  transition: box-shadow var(--duration-normal, 200ms) var(--ease-smooth, ease-out);
+}
+.hover-glow:hover {
+  box-shadow: var(--ds-glow-primary);
+}
+
+/* Glassmorphism base class */
+.glass {
+  background: var(--ds-glass-bg);
+  backdrop-filter: var(--glass-blur-medium) var(--glass-saturation);
+  -webkit-backdrop-filter: var(--glass-blur-medium) var(--glass-saturation);
+  border: 1px solid var(--ds-glass-border);
+  box-shadow: var(--ds-glass-shadow);
+}
+
+.glass-subtle {
+  background: var(--ds-glass-bg-subtle);
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
+}
+
+/* Animated gradient background */
+.gradient-animated {
+  background: linear-gradient(
+    135deg,
+    var(--ds-gradient-start),
+    var(--ds-gradient-mid),
+    var(--ds-gradient-end),
+    var(--ds-gradient-start)
+  );
+  background-size: 300% 300%;
+  animation: gradient-shift var(--duration-gradient-cycle, 8s) ease infinite;
+}
+
+/* Progress bar with animation */
+.progress-animated {
+  transition: width var(--duration-slow, 300ms) var(--ease-smooth, ease-out);
+}
+.progress-animated.initial {
+  animation: progress-fill var(--duration-extra-slow, 400ms) var(--ease-smooth, ease-out) forwards;
+}
+
+/* Shimmer loading effect */
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.15),
+    transparent
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+/* =================================================================
+   ACCESSIBILITY - REDUCED MOTION
+   ================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .gradient-animated {
+    animation: none;
+  }
+
+  .hover-lift:hover,
+  .hover-lift-sm:hover {
+    transform: none;
+  }
+
+  .shimmer::after {
+    animation: none;
+    display: none;
+  }
+}

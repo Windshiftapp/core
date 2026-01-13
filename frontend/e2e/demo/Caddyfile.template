@@ -1,0 +1,42 @@
+# Windshift Demo - Caddy Configuration
+# This template is processed by envsubst to replace ${HOSTNAME}
+
+# Main HTTPS endpoint (port 443)
+# Let's Encrypt will auto-provision TLS certificate if:
+# - Port 80 is accessible from the internet
+# - DNS points to this server
+${HOSTNAME} {
+    reverse_proxy localhost:8080
+
+    # Security headers
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Logging
+    log {
+        output stdout
+        format console
+    }
+}
+
+# Alternative HTTPS endpoint (port 8443)
+# Useful when ports 80/443 are blocked by firewall
+${HOSTNAME}:8443 {
+    reverse_proxy localhost:8080
+
+    # Security headers
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Logging
+    log {
+        output stdout
+        format console
+    }
+}

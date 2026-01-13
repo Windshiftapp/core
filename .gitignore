@@ -1,0 +1,118 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.zip
+*.wasm
+*.dylib
+windshift
+cx
+
+# Test binary, built with `go test -c`
+*.test
+windshift-test
+plugins
+data
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Go workspace file
+go.work
+
+# Database files (SQLite and WAL mode files)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+
+# Log files
+*.log
+server.log
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Frontend dependencies
+frontend/node_modules/
+frontend/dist/
+frontend/.svelte-kit/
+frontend/build/
+
+# Frontend cache and temp files
+frontend/.vite/
+frontend/.svelte-kit/
+frontend/vite.config.js.timestamp-*
+
+# Biome cache
+.biome/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Build artifacts
+dist/
+build/
+
+# NPM debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# E2E Test Artifacts
+e2e/test-results/
+e2e/playwright-report/
+e2e/test-results.json
+e2e/test-results.xml
+e2e/*.png
+e2e/node_modules/
+
+# Svelte
+.svelte-kit
+
+# PostCSS
+postcss.config.js
+
+# Deployment
+deployment/.env
+deployment/build/
+node_modules
+.gocache
+
+# Test Reports
+tests/reports/
+tests/cmd/testreport/testreport
+.ssh

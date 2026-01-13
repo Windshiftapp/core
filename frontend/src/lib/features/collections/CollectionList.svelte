@@ -1,0 +1,773 @@
+<script>
+  import { onMount, onDestroy } from 'svelte';
+  import { api } from '../../api.js';
+  import { navigate } from '../../router.js';
+  import { getCollection } from '../collections/collectionService.js';
+  import { getStatusCategory as getStatusCategoryUtil, getStatusColor as getStatusColorUtil, getStatusInlineStyle, getTextColorForBackground } from '../../utils/statusColors.js';
+  import { workspaceGradientIndex, applyToAllViews, loadWorkspaceGradient, getGradientStyle } from '../../stores/workspaceGradient.js';
+  import { gradients } from '../../utils/gradients.js';
+  import { Plus, Filter, MoreHorizontal, Calendar, User, AlertCircle, Edit, Trash2, Eye } from 'lucide-svelte';
+  import { itemTypeIconMap } from '../../utils/icons.js';
+  import SearchInput from '../../components/SearchInput.svelte';
+  import DropdownMenu from '../../layout/DropdownMenu.svelte';
+  import Pagination from '../../components/Pagination.svelte';
+  import ViewHeader from '../../layout/ViewHeader.svelte';
+  import InlineFieldEditor from '../../editors/InlineFieldEditor.svelte';
+  import ItemPicker from '../../pickers/ItemPicker.svelte';
+  import ItemKey from '../items/ItemKey.svelte';
+  import ColorDot from '../../components/ColorDot.svelte';
+  import Lozenge from '../../components/Lozenge.svelte';
+  import { formatDate } from '../../utils/dateFormatter.js';
+
+  export let workspaceId;
+  export let collectionId = null;
+
+  let workspace = null;
+  let workItems = [];
+  let allItems = []; // Store all items for search filtering
+  let itemTypes = [];
+  let itemsPagination = null;
+  let statuses = [];
+  let statusCategories = [];
+  let users = [];
+  let milestones = [];
+  let priorities = [];
+  
+  let loading = true;
+  let loadingItems = false;
+  let currentCollectionName = 'Default';
+  let currentView = 'list';
+  let searchQuery = '';
+  let currentPage = 1;
+  let itemsPerPage = 50;
+
+  // Status transition caching for lazy loading
+  let itemTransitions = new Map(); // Cache transitions per item ID
+  let loadingTransitions = new Set(); // Track which items are currently loading transitions
+  let requestQueue = new Set(); // Queue for pending requests
+  const MAX_CONCURRENT_REQUESTS = 3; // Limit concurrent API calls
+  let activeRequests = 0;
+
+  // Reactive gradient styling
+  $: gradientStyle = ($applyToAllViews && $workspaceGradientIndex > 0) ? getGradientStyle($workspaceGradientIndex) : null;
+  $: hasGradient = gradientStyle !== null;
+  $: backgroundStyle = hasGradient ? `background: ${gradientStyle};` : 'background-color: var(--ds-surface);';
+  $: textClass = hasGradient ? 'text-white' : '';
+  $: subtleTextClass = hasGradient ? 'text-white/80' : '';
+  // Style strings for gradient/non-gradient mode
+  $: textStyle = hasGradient ? 'color: white;' : 'color: var(--ds-text);';
+  $: subtleTextStyle = hasGradient ? 'color: rgba(255, 255, 255, 0.8);' : 'color: var(--ds-text-subtle);';
+  $: tableBgStyle = hasGradient ? 'background-color: rgba(255, 255, 255, 0.8);' : 'background-color: var(--ds-surface-raised);';
+  $: tableHeaderBgStyle = hasGradient ? 'background-color: rgba(249, 250, 251, 0.5);' : 'background-color: var(--ds-surface);';
+  $: tableTextStyle = hasGradient ? 'color: #374151;' : 'color: var(--ds-text);';
+  $: tableSubtleTextStyle = hasGradient ? 'color: #6b7280;' : 'color: var(--ds-text-subtle);';
+
+  onMount(async () => {
+    if (workspaceId) {
+      await loadWorkspaceGradient(workspaceId);
+      await loadWorkspace();
+      await loadWorkItems();
+    }
+    loading = false;
+    
+    // Listen for refresh events
+    window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener('refresh-work-items', loadWorkItems);
+  });
+
+  onDestroy(() => {
+    window.removeEventListener('focus', handleWindowFocus);
+    window.removeEventListener('refresh-work-items', loadWorkItems);
+  });
+
+  // Refresh when window gains focus (user returns from another tab/window)
+  function handleWindowFocus() {
+    if (!loadingItems) {
+      loadWorkItems();
+    }
+  }
+
+  async function loadWorkspace() {
+    try {
+      const [workspaceData, itemTypesData, statusesData, statusCategoriesData, usersData, milestonesData, prioritiesData] = await Promise.all([
+        api.workspaces.get(workspaceId),
+        api.itemTypes.getAll(),
+        api.workspaces.getStatuses(workspaceId),
+        api.statusCategories.getAll(),
+        api.getUsers(),
+        api.milestones.getAll(),
+        api.priorities.getAll()
+      ]);
+      workspace = workspaceData;
+      itemTypes = itemTypesData || [];
+      statuses = statusesData || [];
+      statusCategories = statusCategoriesData || [];
+      users = usersData || [];
+      milestones = milestonesData || [];
+      priorities = prioritiesData || [];
+    } catch (error) {
+      console.error('Failed to load workspace:', error);
+    }
+  }
+
+  async function loadWorkItems(page = 1, limit = itemsPerPage) {
+    try {
+      loadingItems = true;
+      
+      // Build base filters
+      const filters = { 
+        workspace_id: workspaceId,
+        page: page,
+        limit: limit
+      };
+      
+      // Apply collection filter if specified
+      if (collectionId) {
+        const collection = await getCollection(collectionId);
+        if (collection) {
+          currentCollectionName = collection.name;
+          if (collection.cql_query) {
+            filters.vql = collection.cql_query;
+          }
+        }
+      } else {
+        currentCollectionName = 'Default';
+      }
+      
+      if (searchQuery.trim()) {
+        // When searching, load ALL items and filter locally
+        await loadAllItemsForSearch();
+        currentPage = page;
+        itemsPerPage = limit;
+        updatePaginatedResults();
+      } else {
+        // Normal paginated loading
+        const response = await api.items.getAll(filters);
+        
+        if (response && response.items) {
+          // Handle paginated response
+          workItems = response.items;
+          itemsPagination = response.pagination;
+          currentPage = page;
+          itemsPerPage = limit;
+        } else {
+          // Handle legacy response (backward compatibility)
+          workItems = response || [];
+          itemsPagination = null;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load work items:', error);
+      workItems = [];
+      itemsPagination = null;
+    } finally {
+      loadingItems = false;
+    }
+  }
+
+  async function loadAllItemsForSearch() {
+    const filters = { 
+      workspace_id: workspaceId,
+      page: 1,
+      limit: 1000 // Load a large number to get all items
+    };
+    
+    // Apply collection filter if specified
+    if (collectionId) {
+      const collection = await getCollection(collectionId);
+      if (collection?.cql_query) {
+        filters.vql = collection.cql_query;
+      }
+    }
+    
+    const response = await api.items.getAll(filters);
+    if (response && response.items) {
+      allItems = response.items;
+    } else {
+      allItems = response || [];
+    }
+  }
+
+  function updatePaginatedResults() {
+    // Filter the items based on search query
+    const filteredItems = allItems.filter(item => {
+      const query = searchQuery.toLowerCase();
+      return item.title.toLowerCase().includes(query) || 
+             (item.description && item.description.toLowerCase().includes(query));
+    });
+
+    // Calculate pagination for filtered results
+    const totalFiltered = filteredItems.length;
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    
+    workItems = filteredItems.slice(startIndex, endIndex);
+    
+    // Create custom pagination object for filtered results
+    itemsPagination = {
+      page: currentPage,
+      limit: itemsPerPage,
+      total: totalFiltered,
+      totalPages: Math.ceil(totalFiltered / itemsPerPage)
+    };
+  }
+
+  function createWorkItem() {
+    // Open create modal with work-item type and preselect current workspace
+    window.dispatchEvent(new CustomEvent('open-create-modal'));
+    
+    // Set the type to work-item
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('set-create-type', { 
+        detail: { type: 'work-item' } 
+      }));
+    }, 50);
+    
+    // Preselect current workspace
+    if (workspaceId) {
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('set-create-workspace', { 
+          detail: { workspaceId: parseInt(workspaceId) } 
+        }));
+      }, 100);
+    }
+  }
+
+  // Use shared status utility functions
+  function getStatusCategory(statusName) {
+    return getStatusCategoryUtil(statusName, statuses, statusCategories);
+  }
+
+  function getStatusColor(status) {
+    return getStatusColorUtil(status, statuses, statusCategories);
+  }
+
+  function getPriorityColor(priority) {
+    const colors = {
+      low: 'text-gray-500',
+      medium: 'text-blue-500',
+      high: 'text-orange-500',
+      critical: 'text-red-500'
+    };
+    return colors[priority] || 'text-gray-500';
+  }
+
+
+  // Handle pagination events
+  async function handlePageChange(event) {
+    await loadWorkItems(event.detail.page, event.detail.itemsPerPage);
+  }
+  
+  async function handlePageSizeChange(event) {
+    await loadWorkItems(event.detail.page, event.detail.itemsPerPage);
+  }
+  
+
+  // Reload items when search query changes
+  $: if (searchQuery !== undefined) {
+    currentPage = 1; // Reset to first page when search changes
+    loadWorkItems(1, itemsPerPage);
+  }
+
+  // For display purposes, we now use workItems directly (no additional client-side filtering needed)
+  $: filteredItems = workItems;
+
+  function viewItem(item) {
+    const url = collectionId 
+      ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
+      : `/workspaces/${workspaceId}/items/${item.id}`;
+    navigate(url);
+  }
+
+  function editItem(item) {
+    const url = collectionId 
+      ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
+      : `/workspaces/${workspaceId}/items/${item.id}`;
+    navigate(url);
+  }
+
+  async function deleteItem(item) {
+    if (!confirm(`Are you sure you want to delete "${item.title}"? This action cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      await api.items.delete(item.id);
+      // Refresh the work items list
+      await loadWorkItems();
+    } catch (error) {
+      console.error('Failed to delete item:', error);
+      alert('Failed to delete item: ' + (error.message || error));
+    }
+  }
+
+  async function toggleTaskStatus(item, isCompleted) {
+    const newStatus = isCompleted ? 'completed' : 'open';
+    
+    try {
+      await api.items.update(item.id, { status: newStatus });
+      // Update local state
+      item.status = newStatus;
+      // Trigger reactivity
+      workItems = [...workItems];
+    } catch (error) {
+      console.error('Failed to update task status:', error);
+      alert('Failed to update task status: ' + (error.message || error));
+    }
+  }
+
+  async function handleStatusChange(item, newStatus) {
+    if (newStatus === item.status) return;
+    
+    try {
+      await api.items.update(item.id, { status: newStatus });
+      
+      // Update the item in the local workItems array
+      const index = workItems.findIndex(workItem => workItem.id === item.id);
+      if (index !== -1) {
+        workItems[index].status = newStatus;
+        workItems = [...workItems]; // Trigger reactivity
+      }
+      
+      // Also update in allItems if we're in search mode
+      if (searchQuery.trim() && allItems.length > 0) {
+        const allIndex = allItems.findIndex(workItem => workItem.id === item.id);
+        if (allIndex !== -1) {
+          allItems[allIndex].status = newStatus;
+          allItems = [...allItems]; // Trigger reactivity
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update status:', error);
+      alert('Failed to update status: ' + (error.message || error));
+    }
+  }
+
+  function buildItemActions(item) {
+    return [
+      {
+        id: 'view',
+        type: 'regular',
+        icon: Eye,
+        title: 'View Details',
+        onClick: () => viewItem(item)
+      },
+      {
+        id: 'edit',
+        type: 'regular',
+        icon: Edit,
+        title: 'Edit',
+        onClick: () => editItem(item)
+      },
+      { type: 'divider' },
+      {
+        id: 'delete',
+        type: 'regular',
+        icon: Trash2,
+        title: 'Delete',
+        color: '#dc2626',
+        hoverClass: 'hover:bg-red-50 hover:text-red-700',
+        onClick: () => deleteItem(item)
+      }
+    ];
+  }
+
+  // Handle inline editing events
+  function handleItemUpdated(event) {
+    const { item: updatedItem, field, value } = event.detail;
+    
+    // Update the item in the local workItems array
+    const index = workItems.findIndex(item => item.id === updatedItem.id);
+      if (index !== -1) {
+        workItems[index] = {
+          ...updatedItem,
+          item_type_id: updatedItem.item_type_id ?? workItems[index].item_type_id,
+          item_type: itemTypes.find(type => type.id === (updatedItem.item_type_id ?? workItems[index].item_type_id))
+        };
+        workItems = [...workItems]; // Trigger reactivity
+      }
+    
+    // Also update in allItems if we're in search mode
+    if (searchQuery.trim() && allItems.length > 0) {
+      const allIndex = allItems.findIndex(item => item.id === updatedItem.id);
+      if (allIndex !== -1) {
+        allItems[allIndex] = updatedItem;
+        allItems = [...allItems]; // Trigger reactivity
+      }
+    }
+  }
+  
+  function handleUpdateError(event) {
+    const { error, field, value } = event.detail;
+    console.error(`Failed to update ${field}:`, error);
+    // You could show a toast notification here
+    alert(`Failed to update ${field}: ${error}`);
+  }
+
+  // Throttled status transition loader
+  async function loadStatusTransitions(itemId) {
+    // Return cached result if available
+    if (itemTransitions.has(itemId)) {
+      return itemTransitions.get(itemId);
+    }
+    
+    // Don't load if already loading
+    if (loadingTransitions.has(itemId)) {
+      return null;
+    }
+    
+    // If too many requests are active, queue this one
+    if (activeRequests >= MAX_CONCURRENT_REQUESTS) {
+      requestQueue.add(itemId);
+      return null;
+    }
+    
+    return await executeStatusTransitionRequest(itemId);
+  }
+  
+  // Execute the actual API request
+  async function executeStatusTransitionRequest(itemId) {
+    try {
+      activeRequests++;
+      loadingTransitions.add(itemId);
+      
+      const result = await api.items.getAvailableStatusTransitions(itemId);
+      
+      // Cache the result
+      itemTransitions.set(itemId, result.available_transitions || []);
+      return result.available_transitions || [];
+    } catch (error) {
+      console.error('Failed to load status transitions:', error);
+      // Cache empty result to prevent repeated failures
+      itemTransitions.set(itemId, []);
+      return [];
+    } finally {
+      activeRequests--;
+      loadingTransitions.delete(itemId);
+      
+      // Trigger reactivity update
+      itemTransitions = itemTransitions;
+      
+      // Process next item in queue
+      processQueue();
+    }
+  }
+  
+  // Process queued requests
+  function processQueue() {
+    if (requestQueue.size > 0 && activeRequests < MAX_CONCURRENT_REQUESTS) {
+      const nextItemId = requestQueue.values().next().value;
+      requestQueue.delete(nextItemId);
+      executeStatusTransitionRequest(nextItemId);
+    }
+  }
+
+  // Reload data when workspaceId or collectionId changes
+  $: if (workspaceId && !loading) {
+    // Watch both workspaceId and collectionId for changes
+    workspaceId, collectionId, loadWorkItems();
+  }
+
+</script>
+
+{#if loading}
+  <div class="p-6">
+    <div class="animate-pulse">Loading...</div>
+  </div>
+{:else if workspace}
+  <div class="min-h-screen" style="{backgroundStyle}">
+    <!-- Content Container -->
+    <div class="p-6">
+      <div class="mb-6">
+        <ViewHeader
+          workspaceName={workspace.name}
+          collection={currentCollectionName}
+          viewName="List"
+          itemCount={itemsPagination?.total || workItems.length}
+          hasGradient={hasGradient}
+          textStyle={textStyle}
+          subtleTextStyle={subtleTextStyle}
+        />
+      </div>
+
+      <!-- Controls Bar -->
+      <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-4">
+          <!-- Search -->
+          <SearchInput
+            bind:value={searchQuery}
+            placeholder="Search work items..."
+            hasGradient={hasGradient}
+          />
+
+        </div>
+
+      </div>
+
+      <!-- Work Items Table -->
+      {#if loadingItems}
+        <div class="rounded-xl border shadow-sm p-8 text-center" style="{tableBgStyle} {hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
+          <div class="animate-pulse {subtleTextClass}" style="{subtleTextStyle}">Loading work items...</div>
+        </div>
+      {:else if filteredItems.length === 0}
+        <div class="rounded-xl border shadow-sm p-12 text-center" style="{tableBgStyle} {hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
+          {#if workItems.length === 0}
+            <AlertCircle class="w-12 h-12 {subtleTextClass} mx-auto mb-4" style="{subtleTextStyle}" />
+            <h3 class="text-lg font-medium {textClass} mb-2" style="{textStyle}">No work items yet</h3>
+            <p class="{subtleTextClass}" style="{subtleTextStyle}">Get started by creating your first work item in this workspace.</p>
+          {:else}
+            <AlertCircle class="w-12 h-12 {subtleTextClass} mx-auto mb-4" style="{subtleTextStyle}" />
+            <h3 class="text-lg font-medium {textClass} mb-2" style="{textStyle}">No items match your search</h3>
+            <p class="{subtleTextClass}" style="{subtleTextStyle}">Try adjusting your search terms or filters.</p>
+          {/if}
+        </div>
+      {:else}
+        <div class="rounded-xl border shadow-sm overflow-hidden" style="{tableBgStyle} {hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
+          <!-- Table Header -->
+          <div class="px-4 py-3 border-b" style="{tableHeaderBgStyle} {hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
+            <div class="grid grid-cols-12 gap-4 text-xs font-semibold uppercase tracking-wider" style="{tableSubtleTextStyle}">
+              <div class="col-span-6">Title</div>
+              <div class="col-span-2">Status</div>
+              <div class="col-span-2">Priority</div>
+              <div class="col-span-1">Created</div>
+              <div class="col-span-1">Actions</div>
+            </div>
+          </div>
+
+          <!-- Table Body -->
+          <div>
+            {#each filteredItems as item}
+              <div class="px-4 py-3 list-row transition-colors" style="border-top: 1px solid var(--ds-border);">
+                <div class="grid grid-cols-12 gap-4 items-center">
+                  <!-- Title -->
+                  <div class="col-span-6">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <!-- Issue Key -->
+                      <ItemKey
+                        {item}
+                        {workspace}
+                        href={collectionId
+                          ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
+                          : `/workspaces/${workspaceId}/items/${item.id}`}
+                        className="text-xs font-mono px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0 transition-colors cursor-pointer item-key"
+                        style="background-color: var(--ds-interactive-subtle); color: var(--ds-text-subtle);"
+                      />
+                      <!-- Item Type Icon -->
+                      {#if item.item_type_id && itemTypes.length > 0}
+                        {@const itemType = itemTypes.find(type => type.id === item.item_type_id)}
+                        {#if itemType}
+                          <div 
+                            class="w-4 h-4 rounded flex items-center justify-center text-white text-xs flex-shrink-0"
+                            style="background-color: {itemType.color};"
+                            title={itemType.name}
+                          >
+                            <svelte:component this={itemTypeIconMap[itemType.icon] || itemTypeIconMap.FileText} class="w-3 h-3" />
+                          </div>
+                        {/if}
+                      {/if}
+                      <!-- Task Icon (fallback for task items without type) -->
+                      {#if item.is_task && (!item.item_type_id || !itemTypes.find(type => type.id === item.item_type_id))}
+                        <CheckSquare class="w-4 h-4 text-blue-500 flex-shrink-0" />
+                      {/if}
+                      <!-- Inline Title Editor -->
+                      <div class="flex-1 min-w-0">
+                        <InlineFieldEditor
+                          {item}
+                          field="title"
+                          fieldType="text"
+                          placeholder="Enter title..."
+                          required={true}
+                          className="font-medium"
+                          on:item-updated={handleItemUpdated}
+                          on:update-error={handleUpdateError}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Status / Task Checkbox -->
+                  <div class="col-span-2">
+                    {#if item.is_task}
+                      <!-- Task checkbox -->
+                      <label class="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={item.status === 'completed'}
+                          on:change={(e) => toggleTaskStatus(item, e.target.checked)}
+                          class="w-4 h-4 rounded focus:ring-2"
+                          style="accent-color: var(--ds-background-brand-bold);"
+                        />
+                        <span class="text-sm" style="color: var(--ds-text-subtle);">
+                          {item.status === 'completed' ? 'Done' : 'Todo'}
+                        </span>
+                      </label>
+                    {:else}
+                      <!-- Status Picker -->
+                      {@const selectedStatus = statuses.find(s => s.id === item.status_id)}
+                      {@const statusCategory = selectedStatus ? statusCategories.find(sc => sc.id === selectedStatus.category_id) : null}
+                      <ItemPicker
+                        value={item.status_id}
+                        items={statuses}
+                        config={{
+                          icon: {
+                            type: 'color-dot',
+                            source: (status) => {
+                              const category = statusCategories.find(sc => sc.id === status.category_id);
+                              return category?.color || '#6b7280';
+                            },
+                            size: 'w-2 h-2'
+                          },
+                          primary: { text: (status) => status.name },
+                          getValue: (status) => status.id,
+                          getLabel: (status) => status.name,
+                          searchFields: ['name']
+                        }}
+                        placeholder="Set status"
+                        showUnassigned={false}
+                        allowClear={false}
+                        on:select={async (e) => {
+                          const statusId = e.detail?.id;
+                          if (statusId && statusId !== item.status_id) {
+                            try {
+                              const updatedItem = await api.items.update(item.id, { status_id: statusId });
+                              handleItemUpdated({ detail: { item: updatedItem, field: 'status_id', value: statusId } });
+                            } catch (error) {
+                              handleUpdateError({ detail: { error: error.message, field: 'status_id', value: statusId } });
+                            }
+                          }
+                        }}
+                      >
+                        {#snippet children()}
+                          <span class="cursor-pointer">
+                            <Lozenge
+                              text={selectedStatus ? selectedStatus.name : 'Set status'}
+                              customBg={statusCategory?.color || '#6b7280'}
+                            />
+                          </span>
+                        {/snippet}
+                      </ItemPicker>
+                    {/if}
+                  </div>
+
+                  <!-- Priority -->
+                  <div class="col-span-2">
+                  <!-- Priority -->
+                  <ItemPicker
+                    value={item.priority_id}
+                    items={priorities}
+                    config={{
+                      icon: {
+                        type: 'color-dot',
+                        source: (priority) => priority.color || '#6b7280',
+                        size: 'w-2 h-2'
+                      },
+                      primary: { text: (priority) => priority.name },
+                      getValue: (priority) => priority.id,
+                      getLabel: (priority) => priority.name,
+                      searchFields: ['name']
+                    }}
+                    placeholder="Select priority"
+                    showUnassigned={true}
+                    unassignedLabel="No priority"
+                    allowClear={true}
+                    on:select={async (e) => {
+                      const priorityId = e.detail?.id || null;
+                      try {
+                        const updatedItem = await api.items.update(item.id, { priority_id: priorityId });
+                        handleItemUpdated({ detail: { item: updatedItem, field: 'priority_id', value: priorityId } });
+                      } catch (error) {
+                        handleUpdateError({ detail: { error: error.message, field: 'priority_id', value: priorityId } });
+                      }
+                    }}
+                  >
+                    {#snippet children()}
+                      {#if item.priority_id}
+                        {@const selectedPriority = priorities.find(p => p.id === item.priority_id)}
+                        <span
+                          class="w-full flex items-center justify-start gap-2 text-sm text-left cursor-pointer"
+                          style={selectedPriority && selectedPriority.color ? `color: ${selectedPriority.color};` : 'color: var(--ds-text-subtle);'}
+                        >
+                          {#if selectedPriority}
+                            <ColorDot color={selectedPriority.color} />
+                            {selectedPriority.name}
+                          {/if}
+                        </span>
+                      {:else}
+                        <span
+                          class="w-full flex items-center justify-start gap-2 text-sm text-left cursor-pointer"
+                          style="color: var(--ds-text-subtle);"
+                        >
+                          Select priority
+                        </span>
+                      {/if}
+                    {/snippet}
+                  </ItemPicker>
+                  </div>
+
+                  <!-- Created Date -->
+                  <div class="col-span-1">
+                    <div class="flex items-center gap-1 text-sm" style="color: var(--ds-text-subtle);">
+                      <Calendar class="w-4 h-4" />
+                      {formatDate(item.created_at) || '-'}
+                    </div>
+                  </div>
+
+                  <!-- Actions -->
+                  <div class="col-span-1">
+                    <DropdownMenu
+                      triggerText=""
+                      triggerIcon={MoreHorizontal}
+                      triggerClass="p-2 rounded action-btn transition-colors"
+                      items={buildItemActions(item)}
+                      align="right"
+                    />
+                  </div>
+                </div>
+              </div>
+            {/each}
+          </div>
+        </div>
+
+        <!-- Pagination -->
+        {#if itemsPagination && itemsPagination.total > 0}
+          <div class="mt-6">
+            <Pagination
+              currentPage={itemsPagination.page}
+              totalItems={itemsPagination.total}
+              itemsPerPage={itemsPagination.limit}
+              maxItems={100}
+              hasGradient={hasGradient}
+              on:pageChange={handlePageChange}
+              on:pageSizeChange={handlePageSizeChange}
+            />
+          </div>
+        {:else}
+          <!-- Results Summary for legacy/non-paginated responses -->
+          <div class="mt-4 text-sm {subtleTextClass} text-center" style="{subtleTextStyle}">
+            Showing {filteredItems.length} work items
+          </div>
+        {/if}
+      {/if}
+    </div>
+  </div>
+{:else}
+  <div class="p-6">
+    <div class="text-center {subtleTextClass}" style="{subtleTextStyle}">
+      Workspace not found.
+    </div>
+  </div>
+{/if}
+
+<style>
+  .list-row:hover {
+    background-color: var(--ds-surface-hovered);
+  }
+
+  :global(.item-key:hover) {
+    background-color: var(--ds-surface-hovered) !important;
+  }
+
+  .action-btn:hover {
+    background-color: var(--ds-surface-hovered);
+  }
+</style>
