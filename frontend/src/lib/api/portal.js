@@ -1,101 +1,29 @@
 import { fetchAPI } from './core.js';
 
-// Portal API (public endpoints, no authentication)
+// Portal API (uses fetchAPI for automatic CSRF handling)
 export const portal = {
-  // Get portal configuration by slug
-  get: async (slug) => {
-    const response = await fetch(`/api/portal/${slug}`);
-    if (!response.ok) {
-      throw new Error(`Portal not found: ${response.statusText}`);
-    }
-    return response.json();
-  },
+  get: (slug) => fetchAPI(`/portal/${slug}`),
 
-  // Submit to portal (for future use)
-  submit: async (slug, data) => {
-    const response = await fetch(`/api/portal/${slug}/submit`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'same-origin', // Include session cookie for authenticated users
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || 'Submission failed');
-    }
-    return response.json();
-  },
+  submit: (slug, data) => fetchAPI(`/portal/${slug}/submit`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
 
-  // Search knowledge base
-  searchKnowledgeBase: async (slug, query) => {
-    const response = await fetch(`/api/portal/${slug}/knowledge-base/search`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ query }),
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || 'Knowledge base search failed');
-    }
-    return response.json();
-  },
+  searchKnowledgeBase: (slug, query) => fetchAPI(`/portal/${slug}/knowledge-base/search`, {
+    method: 'POST',
+    body: JSON.stringify({ query }),
+  }),
 
-  // Get authenticated portal customer's requests
-  getMyRequests: async (slug) => {
-    const response = await fetch(`/api/portal/${slug}/my-requests`, {
-      credentials: 'same-origin', // Include session cookie
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || 'Failed to fetch requests');
-    }
-    return response.json();
-  },
+  getMyRequests: (slug) => fetchAPI(`/portal/${slug}/my-requests`),
 
-  // Get details for a specific request
-  getRequestDetail: async (slug, itemId) => {
-    const response = await fetch(`/api/portal/${slug}/requests/${itemId}`, {
-      credentials: 'same-origin', // Include session cookie
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || 'Failed to fetch request details');
-    }
-    return response.json();
-  },
+  getRequestDetail: (slug, itemId) => fetchAPI(`/portal/${slug}/requests/${itemId}`),
 
-  // Get comments for a request
-  getRequestComments: async (slug, itemId) => {
-    const response = await fetch(`/api/portal/${slug}/requests/${itemId}/comments`, {
-      credentials: 'same-origin', // Include session cookie
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || 'Failed to fetch comments');
-    }
-    return response.json();
-  },
+  getRequestComments: (slug, itemId) => fetchAPI(`/portal/${slug}/requests/${itemId}/comments`),
 
-  // Add a comment to a request
-  addRequestComment: async (slug, itemId, content) => {
-    const response = await fetch(`/api/portal/${slug}/requests/${itemId}/comments`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'same-origin', // Include session cookie
-      body: JSON.stringify({ content }),
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || 'Failed to add comment');
-    }
-    return response.json();
-  },
+  addRequestComment: (slug, itemId, content) => fetchAPI(`/portal/${slug}/requests/${itemId}/comments`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  }),
 };
 
 // Portal Customers Management (requires customers.manage permission)
