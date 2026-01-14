@@ -752,8 +752,8 @@
       canDrop: ({ source }) => source.data.type === 'test-case',
       onDragEnter: () => {
         isDropTarget = true;
-        element.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-        element.style.borderColor = '#3B82F6';
+        element.style.backgroundColor = 'var(--ds-interactive-subtle)';
+        element.style.borderColor = 'var(--ds-interactive)';
       },
       onDragLeave: () => {
         isDropTarget = false;
@@ -847,7 +847,8 @@
               {#if folder.children && folder.children.length > 0}
                 <button
                   type="button"
-                  class="mr-1 inline-flex h-5 w-5 items-center justify-center text-gray-500 hover:text-gray-700 cursor-pointer bg-transparent border-0 p-0"
+                  class="mr-1 inline-flex h-5 w-5 items-center justify-center cursor-pointer bg-transparent border-0 p-0"
+                  style="color: var(--ds-icon-subtle);"
                   aria-label={isFolderCollapsed(folder.id) ? 'Expand folder' : 'Collapse folder'}
                   onclick={(e) => { e.stopPropagation(); toggleFolderCollapse(folder.id); }}
                 >
@@ -865,7 +866,7 @@
                 {#snippet children()}
                   <span class="block truncate">
                     {#if depth > 0}
-                      <span class="text-gray-400 mr-1">↳</span>
+                      <span class="mr-1" style="color: var(--ds-text-subtlest);">↳</span>
                     {/if}
                     {folder.name}
                   </span>
@@ -875,24 +876,30 @@
                 {#if selectedFolder === folder.id}
                   <div
                     onclick={(e) => { e.stopPropagation(); showEditFolderForm(folder); }}
-                    class="p-1 text-gray-400 hover:text-blue-600 cursor-pointer rounded"
+                    class="p-1 cursor-pointer rounded"
+                    style="color: var(--ds-icon-subtle);"
                     role="button"
                     tabindex="0"
                     onkeydown={(e) => e.key === 'Enter' && showEditFolderForm(folder)}
+                    onmouseenter={(e) => e.currentTarget.style.color = 'var(--ds-interactive)'}
+                    onmouseleave={(e) => e.currentTarget.style.color = 'var(--ds-icon-subtle)'}
                   >
                     <Edit size="12" />
                   </div>
                   <div
                     onclick={(e) => { e.stopPropagation(); deleteFolder(folder.id); }}
-                    class="p-1 text-gray-400 hover:text-red-600 cursor-pointer rounded"
+                    class="p-1 cursor-pointer rounded"
+                    style="color: var(--ds-icon-subtle);"
                     role="button"
                     tabindex="0"
                     onkeydown={(e) => e.key === 'Enter' && deleteFolder(folder.id)}
+                    onmouseenter={(e) => e.currentTarget.style.color = 'var(--ds-danger)'}
+                    onmouseleave={(e) => e.currentTarget.style.color = 'var(--ds-icon-subtle)'}
                   >
                     <Trash2 size="12" />
                   </div>
                 {/if}
-                <span class="text-xs text-gray-500 min-w-[20px] text-right">
+                <span class="text-xs min-w-[20px] text-right" style="color: var(--ds-text-subtle);">
                   {getFolderDisplayCount(folder, depth)}
                 </span>
               </div>
@@ -1398,7 +1405,7 @@
                       {/if}
                     </div>
                     {#if isAssigned}
-                      <div class="text-xs px-2 py-1 rounded text-green-700 bg-green-100">
+                      <div class="text-xs px-2 py-1 rounded" style="background: var(--ds-status-success-bg); color: var(--ds-status-success-text);">
                         Assigned
                       </div>
                     {:else}

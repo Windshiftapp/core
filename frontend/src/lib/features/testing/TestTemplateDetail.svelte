@@ -137,9 +137,9 @@
 
   function getRunStatus(run) {
     if (run.ended_at) {
-      return { text: 'Completed', color: 'bg-green-100 text-green-800' };
+      return { text: 'Completed', style: 'background: var(--ds-status-success-bg); color: var(--ds-status-success-text);' };
     }
-    return { text: 'In Progress', color: 'bg-blue-100 text-blue-800' };
+    return { text: 'In Progress', style: 'background: var(--ds-status-info-bg); color: var(--ds-status-info-text);' };
   }
 
   // Keyboard shortcuts
@@ -166,7 +166,10 @@
         <div class="flex items-center gap-3">
           <button
             onclick={goBack}
-            class="p-2 hover:bg-gray-100 rounded cursor-pointer"
+            class="p-2 rounded cursor-pointer"
+            style="&:hover { background: var(--ds-surface-hovered); }"
+            onmouseenter={(e) => e.target.style.background = 'var(--ds-surface-hovered)'}
+            onmouseleave={(e) => e.target.style.background = ''}
           >
             <ArrowLeft class="w-5 h-5" />
           </button>
@@ -196,35 +199,33 @@
 
         <div class="flex items-center gap-3">
           {#if editMode}
-            <button
+            <Button
+              variant="primary"
               onclick={saveEdit}
-              class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition cursor-pointer"
             >
               Save
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="default"
               onclick={toggleEditMode}
-              class="px-4 py-2 border rounded hover:bg-gray-50 transition cursor-pointer"
-              style="border-color: var(--ds-border); color: var(--ds-text);"
             >
               Cancel
-            </button>
+            </Button>
           {:else}
-            <button
+            <Button
+              variant="default"
               onclick={toggleEditMode}
-              class="flex items-center gap-2 px-4 py-2 border rounded hover:bg-gray-50 transition cursor-pointer"
-              style="border-color: var(--ds-border); color: var(--ds-text);"
+              icon={Edit2}
             >
-              <Edit2 class="w-4 h-4" />
               Edit
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="danger"
               onclick={deleteTemplate}
-              class="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded hover:bg-red-50 transition cursor-pointer"
+              icon={Trash2}
             >
-              <Trash2 class="w-4 h-4" />
               Delete
-            </button>
+            </Button>
             <Button
               variant="primary"
               onclick={executeTemplate}
@@ -249,7 +250,7 @@
               <div>
                 <div class="text-sm font-medium mb-1" style="color: var(--ds-text-subtle);">Test Plan</div>
                 {#if testSet}
-                  <a href={`/workspaces/${workspaceId}/tests/sets/${testSet.id}`} class="text-blue-600 hover:text-blue-800 hover:underline">
+                  <a href={`/workspaces/${workspaceId}/tests/sets/${testSet.id}`} class="hover:underline" style="color: var(--ds-text-link);">
                     {testSet.name}
                   </a>
                 {:else}
@@ -294,7 +295,7 @@
               <div class="space-y-3">
                 {#each executions as execution}
                   {@const status = getRunStatus(execution)}
-                  <div class="border rounded p-4 hover:bg-gray-50 transition" style="border-color: var(--ds-border);">
+                  <div class="border rounded p-4 transition" style="border-color: var(--ds-border);" onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'} onmouseleave={(e) => e.currentTarget.style.background = ''}>
                     <div class="flex items-center justify-between">
                       <div class="flex-1">
                         <div class="font-medium mb-1" style="color: var(--ds-text);">
@@ -308,21 +309,23 @@
                         </div>
                       </div>
                       <div class="flex items-center gap-3">
-                        <span class="px-2 py-1 text-xs font-semibold rounded-full {status.color}">
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full" style={status.style}>
                           {status.text}
                         </span>
                         <div class="flex gap-2">
                           {#if !execution.ended_at}
                             <button
                               onclick={() => continueExecution(execution)}
-                              class="text-green-600 hover:text-green-900 cursor-pointer text-sm font-medium"
+                              class="cursor-pointer text-sm font-medium"
+                              style="color: var(--ds-text-success);"
                             >
                               Continue
                             </button>
                           {/if}
                           <button
                             onclick={() => viewRunDetails(execution)}
-                            class="text-blue-600 hover:text-blue-900 cursor-pointer text-sm"
+                            class="cursor-pointer text-sm"
+                            style="color: var(--ds-text-link);"
                           >
                             {execution.ended_at ? 'Results' : 'Progress'}
                           </button>
@@ -365,13 +368,13 @@
               </div>
               <div class="flex justify-between">
                 <span class="text-sm" style="color: var(--ds-text-subtle);">Completed</span>
-                <span class="text-sm font-medium text-green-600">
+                <span class="text-sm font-medium" style="color: var(--ds-text-success);">
                   {executions.filter(e => e.ended_at).length}
                 </span>
               </div>
               <div class="flex justify-between">
                 <span class="text-sm" style="color: var(--ds-text-subtle);">In Progress</span>
-                <span class="text-sm font-medium text-blue-600">
+                <span class="text-sm font-medium" style="color: var(--ds-text-info);">
                   {executions.filter(e => !e.ended_at).length}
                 </span>
               </div>
@@ -386,7 +389,7 @@
               <div class="space-y-3">
                 <div>
                   <div class="text-sm font-medium" style="color: var(--ds-text-subtle);">Name</div>
-                  <a href={`/workspaces/${workspaceId}/tests/sets/${testSet.id}`} class="text-sm text-blue-600 hover:text-blue-800 hover:underline">
+                  <a href={`/workspaces/${workspaceId}/tests/sets/${testSet.id}`} class="text-sm hover:underline" style="color: var(--ds-text-link);">
                     {testSet.name}
                   </a>
                 </div>
@@ -405,13 +408,15 @@
       </div>
     {:else}
       <div class="text-center py-12">
-        <div class="text-gray-500">Template not found</div>
-        <button
-          onclick={goBack}
-          class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition cursor-pointer"
-        >
-          Back to Templates
-        </button>
+        <div style="color: var(--ds-text-subtle);">Template not found</div>
+        <div class="mt-4">
+          <Button
+            variant="primary"
+            onclick={goBack}
+          >
+            Back to Templates
+          </Button>
+        </div>
       </div>
     {/if}
   </div>

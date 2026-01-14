@@ -231,7 +231,7 @@
     </div>
   {:else if error}
     <div class="text-center py-12">
-      <div class="text-red-600 text-lg font-medium mb-2">Error</div>
+      <div class="text-lg font-medium mb-2" style="color: var(--ds-text-danger);">Error</div>
       <div class="text-sm" style="color: var(--ds-text-subtle);">{error}</div>
     </div>
   {:else if testCase}
