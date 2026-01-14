@@ -11,6 +11,7 @@
   import { confirm } from '../../composables/useConfirm.js';
   import { addToast, successToast, errorToast } from '../../stores/toasts.svelte.js';
   import { useTimer } from '../../composables/useTimer.svelte.js';
+  import { useItemAttachments } from '../../composables/useItemAttachments.svelte.js';
   import { createEventDispatcher } from 'svelte';
 import { 
     registerContextCommands, 
@@ -45,6 +46,12 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   // Initialize timer composable with reactive stores
   const timer = useTimer();
   const { activeTimer, canStartTimer, canStopTimer } = timer;
+
+  // Initialize attachment composable
+  const attachmentManager = useItemAttachments(
+    () => item?.id,
+    (title, message) => errorToast(message, title)
+  );
 
   // All component state variables...
   let item = $state(null);
@@ -120,12 +127,6 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   let workItems = $state([]);
   let customers = $state([]);
   let workspaces = $state([]);
-  let attachments = $state([]);
-  let attachmentPagination = $state(null);
-  let attachmentSettings = $state(null);
-  let loadingAttachments = $state(false);
-  let currentAttachmentPage = $state(1);
-  let attachmentPageSize = $state(50);
 
   // Diagrams
   let diagrams = $state([]);
@@ -1027,104 +1028,6 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     }
   });
 
-  // Attachment functions
-  async function loadAttachmentSettings() {
-    try {
-      attachmentSettings = await api.attachmentSettings.get();
-    } catch (err) {
-      // If attachment settings endpoint doesn't exist (404), attachments are not configured
-      if (err.message.includes('Not Found')) {
-        attachmentSettings = {
-          enabled: false,
-          attachment_path: null,
-          max_file_size: 52428800, // 50MB default
-          allowed_mime_types: '[]'
-        };
-      } else {
-        console.error('Failed to load attachment settings:', err);
-        // Set defaults for other errors
-        attachmentSettings = {
-          enabled: false,
-          attachment_path: null,
-          max_file_size: 52428800, // 50MB
-          allowed_mime_types: '[]'
-        };
-      }
-    }
-  }
-
-  async function loadAttachments(page = 1, limit = attachmentPageSize) {
-    if (!item?.id) return;
-    
-    try {
-      loadingAttachments = true;
-      const response = await api.attachments.getByItem(item.id, { page, limit });
-      
-      if (response && response.attachments) {
-        // Handle paginated response
-        attachments = response.attachments;
-        attachmentPagination = response.pagination;
-        currentAttachmentPage = page;
-        attachmentPageSize = limit;
-      } else {
-        // Handle legacy response (backward compatibility)
-        attachments = response || [];
-        attachmentPagination = null;
-      }
-    } catch (err) {
-      console.error('Failed to load attachments:', err);
-      attachments = [];
-      attachmentPagination = null;
-    } finally {
-      loadingAttachments = false;
-    }
-  }
-
-  async function handleAttachmentUpload(event) {
-    const { attachment, message } = event.detail;
-    
-    // Reload attachments to get updated pagination info
-    if (attachmentsEnabled()) {
-      await loadAttachments(1, attachmentPageSize); // Go to first page to see new upload
-    }
-  }
-
-  async function handleAttachmentDelete(event) {
-    const attachment = event.detail;
-    
-    try {
-      await api.attachments.delete(attachment.id);
-      
-      // Reload current page to update pagination
-      if (attachmentsEnabled()) {
-        await loadAttachments(currentAttachmentPage, attachmentPageSize);
-      }
-
-
-    } catch (err) {
-      console.error('Failed to delete attachment:', err);
-      showError('Failed to delete attachment', err.message || String(err));
-    }
-  }
-
-  // Handle attachment pagination events
-  async function handleAttachmentPageChange(event) {
-    if (attachmentsEnabled()) {
-      await loadAttachments(event.detail.page, event.detail.itemsPerPage);
-    }
-  }
-
-  async function handleAttachmentPageSizeChange(event) {
-    if (attachmentsEnabled()) {
-      await loadAttachments(event.detail.page, event.detail.itemsPerPage);
-    }
-  }
-
-  // Check if attachments are enabled
-  function attachmentsEnabled() {
-    return attachmentSettings?.enabled && attachmentSettings?.attachment_path;
-  }
-
   // Load diagrams for the item
   async function loadDiagrams() {
     if (!item?.id) return;
@@ -1143,43 +1046,6 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   // Handle diagram saved event - reload diagrams
   async function handleDiagramSaved() {
     await loadDiagrams();
-  }
-
-  // Handle file upload from the Attach button
-  async function handleAttachmentUploadFiles(event) {
-    const { files } = event.detail;
-    if (!files || files.length === 0) return;
-
-    for (const file of files) {
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('item_id', item.id.toString());
-
-        const response = await fetch('/api/attachments/upload', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || 'Upload failed');
-        }
-
-        const result = await response.json();
-        if (!result.success) {
-          throw new Error(result.message || 'Upload failed');
-        }
-      } catch (err) {
-        console.error('Upload error:', err);
-        showError('Failed to upload attachment', err.message || String(err));
-      }
-    }
-
-    // Reload attachments after all uploads complete
-    if (attachmentsEnabled()) {
-      await loadAttachments(1, attachmentPageSize);
-    }
   }
 
   onMount(async () => {
@@ -1424,9 +1290,9 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
       await loadItemTypeData();
       
       // Load attachment settings and attachments
-      await loadAttachmentSettings();
-      if (attachmentsEnabled()) {
-        await loadAttachments();
+      await attachmentManager.loadSettings();
+      if (attachmentManager.isEnabled()) {
+        await attachmentManager.load();
       }
 
       // Load diagrams (always load, not dependent on attachment settings)
@@ -1734,9 +1600,9 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     {milestones}
     {iterations}
     {priorities}
-    {attachments}
-    {attachmentPagination}
-    {attachmentSettings}
+    attachments={attachmentManager.attachments}
+    attachmentPagination={attachmentManager.pagination}
+    attachmentSettings={attachmentManager.settings}
     {diagrams}
     {loadingDiagrams}
     on:navigate={handleNavigate}
@@ -1762,11 +1628,11 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     on:start-timer={handleStartTimer}
     on:log-time={handleLogTime}
     on:parent-changed={handleParentChanged}
-    on:attachment-upload={handleAttachmentUpload}
-    on:attachment-upload-files={handleAttachmentUploadFiles}
-    on:attachment-delete={handleAttachmentDelete}
-    on:attachment-page-change={handleAttachmentPageChange}
-    on:attachment-page-size-change={handleAttachmentPageSizeChange}
+    on:attachment-upload={attachmentManager.handleUpload}
+    on:attachment-upload-files={attachmentManager.uploadFiles}
+    on:attachment-delete={attachmentManager.handleDelete}
+    on:attachment-page-change={attachmentManager.handlePageChange}
+    on:attachment-page-size-change={attachmentManager.handlePageSizeChange}
     on:diagram-saved={handleDiagramSaved}
     on:close={closeModal}
   />
