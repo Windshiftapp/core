@@ -1,12 +1,19 @@
 <script>
-  let { href = null, onclick = null, compact = false, children } = $props();
+  let { href = null, onclick = null, compact = false, hasGradient = false, children } = $props();
+
+  let bgStyle = $derived(hasGradient
+    ? 'backdrop-filter: blur(12px); background-color: rgba(255, 255, 255, 0.1);'
+    : 'background-color: var(--ds-surface-card);');
+  let borderStyle = $derived(hasGradient
+    ? 'border-color: rgba(255, 255, 255, 0.2);'
+    : 'border-color: var(--ds-border);');
 </script>
 
 {#if href}
   <a
     {href}
     class="item-card block {compact ? 'p-2' : 'p-3'} rounded-lg border no-underline text-inherit group"
-    style="background-color: var(--ds-surface-card); border-color: var(--ds-border);"
+    style="{bgStyle} {borderStyle}"
     {onclick}
   >
     <div class="item-card-content relative">
@@ -16,7 +23,7 @@
 {:else}
   <div
     class="item-card block {compact ? 'p-2' : 'p-3'} rounded-lg border group"
-    style="background-color: var(--ds-surface-card); border-color: var(--ds-border);"
+    style="{bgStyle} {borderStyle}"
     role={onclick ? 'button' : undefined}
     tabindex={onclick ? 0 : undefined}
     {onclick}

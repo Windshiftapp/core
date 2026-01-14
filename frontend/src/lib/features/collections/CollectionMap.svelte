@@ -15,6 +15,7 @@
   import ItemDetail from '../items/ItemDetail.svelte';
   import { infoToast, errorToast } from '../../stores/toasts.svelte.js';
   import ItemKey from '../items/ItemKey.svelte';
+  import ItemCard from '../items/ItemCard.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import { getStatusCategory } from '../../utils/statusColors.js';
 
@@ -757,57 +758,60 @@ async function loadStatuses() {
             {@const itemType = getItemTypeInfo(backboneItem.item_type_id)}
             <div class="flex-none w-64">
               <!-- Backbone Item -->
-              <div class="{cardBgClass} rounded border px-3 py-3 mb-3 shadow-sm hover:shadow-md transition-shadow"
-                   style="{cardBgStyle} border-color: {hasGradient ? 'rgba(255, 255, 255, 0.3)' : 'var(--ds-border)'};">
-                <!-- Title -->
-                <button
-                  onclick={() => navigateToItem(backboneItem.id)}
-                  class="font-medium text-sm mb-2 leading-snug text-left w-full line-clamp-3 transition-colors"
-                  style="{hasGradient ? 'color: #111827;' : 'color: var(--ds-text);'}"
-                >
-                  {backboneItem.title}
-                </button>
+              <div class="mb-3">
+                <ItemCard {hasGradient} compact>
+                  <!-- Title -->
+                  <button
+                    onclick={() => navigateToItem(backboneItem.id)}
+                    class="font-medium text-sm mb-2 leading-snug text-left w-full line-clamp-3 transition-colors"
+                    style="{hasGradient ? 'color: #111827;' : 'color: var(--ds-text);'}"
+                  >
+                    {backboneItem.title}
+                  </button>
 
-                <!-- Bottom row: Key, Icon, Status, Drill Down -->
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <button
-                      class="text-xs font-mono flex-shrink-0 hover:underline cursor-pointer"
-                      style="{hasGradient ? 'color: #6b7280;' : 'color: var(--ds-text-subtle);'}"
-                      onclick={(e) => handleKeyClick(backboneItem, e)}
-                    >
-                      <ItemKey item={backboneItem} {workspace} className="" />
-                    </button>
-                    {#if itemType}
-                      <div
-                        class="w-4 h-4 rounded flex items-center justify-center text-white text-xs flex-shrink-0"
-                        style="background-color: {itemType.color};"
-                        title={itemType.name}
+                  <!-- Bottom row: Key, Icon, Status, Drill Down -->
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <button
+                        class="text-xs font-mono flex-shrink-0 hover:underline cursor-pointer"
+                        style="{hasGradient ? 'color: #6b7280;' : 'color: var(--ds-text-subtle);'}"
+                        onclick={(e) => handleKeyClick(backboneItem, e)}
                       >
-                        <svelte:component this={iconMap[itemType.icon] || FileText} class="w-3 h-3" />
-                      </div>
-                    {/if}
-                    <Lozenge
-                      text={(backboneItem.status_name || backboneItem.status)?.replace('_', ' ') || 'Status'}
-                      customBg={getStatusCategory(backboneItem.status_name || backboneItem.status, statuses, statusCategories)?.color || 'var(--ds-text-subtle)'}
-                    />
-                  </div>
-
-                  <!-- Drill Down Arrow (only show if item has children) -->
-                  {#if childItemsByParent[backboneItem.id]?.length > 0}
-                    <Tooltip content="Drill down to show children as backbone">
-                      {#snippet children()}
-                        <button
-                          onclick={() => drillDown(backboneItem.id)}
-                          class="p-1.5 rounded-full hover:bg-blue-100 transition-colors group"
-                          style="color: var(--ds-interactive);"
+                        <ItemKey item={backboneItem} {workspace} className="" />
+                      </button>
+                      {#if itemType}
+                        <div
+                          class="w-4 h-4 rounded flex items-center justify-center text-white text-xs flex-shrink-0"
+                          style="background-color: {itemType.color};"
+                          title={itemType.name}
                         >
-                          <ChevronDown class="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
-                        </button>
-                      {/snippet}
-                    </Tooltip>
-                  {/if}
-                </div>
+                          <svelte:component this={iconMap[itemType.icon] || FileText} class="w-3 h-3" />
+                        </div>
+                      {/if}
+                      <Lozenge
+                        text={(backboneItem.status_name || backboneItem.status)?.replace('_', ' ') || 'Status'}
+                        customBg={getStatusCategory(backboneItem.status_name || backboneItem.status, statuses, statusCategories)?.color || 'var(--ds-text-subtle)'}
+                      />
+                    </div>
+
+                    <!-- Drill Down Arrow (only show if item has children) -->
+                    {#if childItemsByParent[backboneItem.id]?.length > 0}
+                      <Tooltip content="Drill down to show children as backbone">
+                        {#snippet children()}
+                          <button
+                            onclick={() => drillDown(backboneItem.id)}
+                            class="p-1.5 rounded-full transition-colors group"
+                            style="color: var(--ds-interactive);"
+                            onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
+                            onmouseleave={(e) => e.currentTarget.style.background = ''}
+                          >
+                            <ChevronDown class="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+                          </button>
+                        {/snippet}
+                      </Tooltip>
+                    {/if}
+                  </div>
+                </ItemCard>
               </div>
 
               <!-- Drop Zone for this parent -->
@@ -826,8 +830,8 @@ async function loadStatuses() {
                   {#each childItemsByParent[backboneItem.id] || [] as childItem}
                     {@const childItemType = getItemTypeInfo(childItem.item_type_id)}
                     <div
-                      class="{cardBgClass} rounded border px-3 py-3 shadow-sm hover:shadow-md transition-shadow cursor-move"
-                      style="{cardBgStyle} border-color: {hasGradient ? 'rgba(255, 255, 255, 0.3)' : 'var(--ds-border)'};"
+                      class="item-card rounded-lg border p-2 cursor-move"
+                      style="{hasGradient ? 'backdrop-filter: blur(12px); background-color: rgba(255, 255, 255, 0.1);' : 'background-color: var(--ds-surface-card);'} {hasGradient ? 'border-color: rgba(255, 255, 255, 0.2);' : 'border-color: var(--ds-border);'}"
                       data-item-id={childItem.id}
                       data-testid="draggable-item-{childItem.id}"
                       ondblclick={(e) => startEditingItem(childItem, e)}
