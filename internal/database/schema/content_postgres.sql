@@ -37,16 +37,19 @@ CREATE TABLE IF NOT EXISTS attachment_settings (
 CREATE TABLE IF NOT EXISTS comments (
 	id SERIAL PRIMARY KEY,
 	item_id INTEGER NOT NULL,
-	author_id INTEGER NOT NULL,
+	author_id INTEGER,
+	portal_customer_id INTEGER,
 	content TEXT NOT NULL,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
-	FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
+	FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
+	FOREIGN KEY (portal_customer_id) REFERENCES portal_customers(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_comments_item_id ON comments(item_id);
 CREATE INDEX IF NOT EXISTS idx_comments_author_id ON comments(author_id);
+CREATE INDEX IF NOT EXISTS idx_comments_portal_customer_id ON comments(portal_customer_id);
 
 -- Diagram System Tables
 CREATE TABLE IF NOT EXISTS item_diagrams (
