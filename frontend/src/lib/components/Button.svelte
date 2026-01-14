@@ -51,9 +51,6 @@
   }[variant]);
   
   // No custom styles needed anymore
-  const primaryStyle = $derived('');
-  const selectedStyle = $derived('');
-  const defaultStyle = $derived('');
   
   // Combine all classes
   const allClasses = $derived(`${baseClasses} ${sizeClasses} ${variantClasses}`);
@@ -85,7 +82,6 @@
       {href}
       {target}
       class={allClasses}
-      style="{primaryStyle}{selectedStyle}{defaultStyle}"
       onclick={(e) => onclick?.(e)}
     >
       {#if icon && iconPosition === 'left'}
@@ -110,7 +106,6 @@
       {type}
       {disabled}
       class={allClasses}
-      style="{primaryStyle}{selectedStyle}{defaultStyle}"
       onclick={(e) => onclick?.(e)}
     >
       {#if loading}
@@ -144,7 +139,6 @@
       {href}
       {target}
       class={allClasses}
-      style="{primaryStyle}{selectedStyle}{defaultStyle}"
       onclick={(e) => onclick?.(e)}
     >
       {#if icon && iconPosition === 'left'}
@@ -169,7 +163,6 @@
       {type}
       {disabled}
       class={allClasses}
-      style="{primaryStyle}{selectedStyle}{defaultStyle}"
       onclick={(e) => onclick?.(e)}
     >
       {#if loading}

@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import {
     Milestone, Calendar, CheckCircle, Clock, Plus, Edit, Trash2,
     MoreHorizontal, Tag, MessageSquare, Globe, Building2
@@ -21,7 +21,7 @@
   import Label from '../../components/Label.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
-  import { matchesShortcut } from '../../utils/keyboardShortcuts.js';
+  import { createShortcutHandler } from '../../utils/keyboardShortcuts.js';
 
   // Props for workspace-scoped view (optional)
   let { workspaceId = null } = $props();
@@ -70,23 +70,12 @@
       showCategoryForm = true;
     });
 
-    // Add global keyboard listener for 'A' to add milestone
-    window.addEventListener('keydown', handleGlobalKeydown);
-  });
-
-  onDestroy(() => {
-    window.removeEventListener('keydown', handleGlobalKeydown);
   });
 
   function handleGlobalKeydown(event) {
-    // 'a' to add/create new milestone
-    if (matchesShortcut(event, { key: 'a' }) && !showCreateForm) {
-      const target = event.target;
-      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.contentEditable.includes('true')) {
-        event.preventDefault();
-        startCreate();
-      }
-    }
+    createShortcutHandler({
+      add: startCreate
+    }, 'milestones', { guard: () => !showCreateForm })(event);
   }
 
   async function loadData() {
@@ -305,6 +294,8 @@
     }
   ]);
 </script>
+
+<svelte:window onkeydown={handleGlobalKeydown} />
 
 <!-- Main container with two-panel layout -->
 <div class="flex min-h-screen" style="background-color: var(--ds-surface);">
@@ -596,6 +587,7 @@
     confirmLabel={editingMilestone ? 'Update Milestone' : 'Create Milestone'}
     disabled={!formData.name.trim()}
     showKeyboardHint={true}
+    confirmKeyboardHint={submitHint}
   />
 </Modal>
 

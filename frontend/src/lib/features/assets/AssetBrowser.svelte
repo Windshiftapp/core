@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import Button from '../../components/Button.svelte';
@@ -13,7 +13,7 @@
   import DataTable from '../../components/DataTable.svelte';
   import { Plus, Package, Edit, Trash2, Box, ChevronRight, ChevronDown, Folder, FolderOpen, Search, ExternalLink, Code } from 'lucide-svelte';
   import CustomFieldRenderer from '../items/CustomFieldRenderer.svelte';
-  import { matchesShortcut } from '../../utils/keyboardShortcuts.js';
+  import { createShortcutHandler } from '../../utils/keyboardShortcuts.js';
 
   // Props for detail view
   let { assetId = null } = $props();
@@ -88,22 +88,12 @@
   onMount(async () => {
     await loadAssetSets();
     loading = false;
-    window.addEventListener('keydown', handleGlobalKeydown);
-  });
-
-  onDestroy(() => {
-    window.removeEventListener('keydown', handleGlobalKeydown);
   });
 
   function handleGlobalKeydown(event) {
-    // 'a' to add new asset (only when a set is selected)
-    if (matchesShortcut(event, { key: 'a' }) && selectedSetId && !showAssetForm) {
-      const target = event.target;
-      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.isContentEditable) {
-        event.preventDefault();
-        showAddAssetForm();
-      }
-    }
+    createShortcutHandler({
+      add: showAddAssetForm
+    }, 'assets', { guard: () => selectedSetId && !showAssetForm })(event);
   }
 
   async function loadAssetSets() {
@@ -401,6 +391,8 @@
     ];
   }
 </script>
+
+<svelte:window onkeydown={handleGlobalKeydown} />
 
 <div class="flex h-full min-h-screen" style="background: var(--ds-surface);">
   <!-- Left sidebar: Category tree -->

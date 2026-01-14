@@ -8,7 +8,7 @@
   import Label from '../../components/Label.svelte';
   import Spinner from '../../components/Spinner.svelte';
   import DataTable from '../../components/DataTable.svelte';
-  import { matchesShortcut } from '../../utils/keyboardShortcuts.js';
+  import { createShortcutHandler } from '../../utils/keyboardShortcuts.js';
 
   let { workspaceId = null } = $props();
 
@@ -50,18 +50,13 @@
     }
   });
 
-  // Global keyboard shortcut handler
+  // Global keyboard shortcut handler using centralized system
+  // Note: handler is created as a function that returns a new handler each render
+  // to ensure it captures the current showStepForm state
   function handleGlobalKeydown(event) {
-    // Only handle shortcuts when not typing in inputs or textareas
-    if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.tagName === 'SELECT' || event.target.isContentEditable) {
-      return;
-    }
-
-    // 'a' key to add test step
-    if (matchesShortcut(event, { key: 'a' }) && !showStepForm) {
-      event.preventDefault();
-      showAddStepForm();
-    }
+    createShortcutHandler({
+      addStep: showAddStepForm
+    }, 'testSteps', { guard: () => !showStepForm })(event);
   }
 
 

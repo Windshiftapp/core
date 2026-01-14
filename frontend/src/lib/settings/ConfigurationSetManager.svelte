@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
   import {
@@ -23,7 +23,7 @@
   import BasePicker from '../pickers/BasePicker.svelte';
   import Label from '../components/Label.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
-  import { matchesShortcut } from '../utils/keyboardShortcuts.js';
+  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
 
   // Icon mapping for item types
   const iconMap = {
@@ -84,24 +84,12 @@
 
   onMount(async () => {
     await loadData(currentPage, itemsPerPage, searchQuery);
-
-    // Add global keyboard listener
-    window.addEventListener('keydown', handleGlobalKeydown);
-  });
-
-  onDestroy(() => {
-    window.removeEventListener('keydown', handleGlobalKeydown);
   });
 
   function handleGlobalKeydown(event) {
-    // 'a' to add/create new configuration set
-    if (matchesShortcut(event, { key: 'a' }) && !creating) {
-      const target = event.target;
-      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.contentEditable.includes('true')) {
-        event.preventDefault();
-        startCreating();
-      }
-    }
+    createShortcutHandler({
+      add: startCreating
+    }, 'configurationSets', { guard: () => !creating })(event);
   }
 
   async function loadData(page = 1, limit = 10, search = '') {
@@ -396,6 +384,8 @@
   }
 </script>
 
+<svelte:window onkeydown={handleGlobalKeydown} />
+
 {#snippet headerActions()}
   <Button variant="primary" icon={Plus} onclick={startCreating} keyboardHint="A">
     Add Configuration Set
@@ -430,7 +420,7 @@
     </div>
   {:else}
     <!-- Create Form -->
-    <Modal isOpen={creating} onclose={cancelCreating} maxWidth="max-w-2xl">
+    <Modal isOpen={creating} onclose={cancelCreating} maxWidth="max-w-2xl" onSubmit={createConfigurationSet} let:submitHint>
       <!-- Modal header -->
       <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
         <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
@@ -574,6 +564,7 @@
         onConfirm={createConfigurationSet}
         confirmLabel="Create Configuration Set"
         showKeyboardHint={true}
+        confirmKeyboardHint={submitHint}
       />
     </Modal>
 
@@ -889,6 +880,7 @@
     onConfirm={updateConfigurationSet}
     confirmLabel="Save Changes"
     showKeyboardHint={true}
+    confirmKeyboardHint={submitHint}
   />
 </Modal>
 

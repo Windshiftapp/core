@@ -8,6 +8,7 @@
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import { exportTasksToICS } from '../../utils/icsExport.js';
   import { authStore, workspacesStore } from '../../stores';
+  import { getStatusStyleFromStatuses } from '../../utils/statusColors.js';
 
   // Get current date and week
   let currentDate = new Date();
@@ -228,23 +229,6 @@
   function getStatusName(statusId) {
     const statusObj = availableStatuses.find(s => s.id === statusId);
     return statusObj?.name || 'Open';
-  }
-
-  function getStatusColor(statusName) {
-    const statusObj = availableStatuses.find(s => s.name.toLowerCase() === statusName?.toLowerCase());
-    if (!statusObj) return 'bg-gray-100 text-gray-800 border-gray-300';
-
-    const color = statusObj.category_color;
-
-    // Convert hex color to Tailwind classes
-    if (color === '#6b7280') return 'bg-gray-100 text-gray-800 border-gray-300';
-    if (color === '#3b82f6') return 'bg-blue-100 text-blue-800 border-blue-300';
-    if (color === '#10b981') return 'bg-green-100 text-green-800 border-green-300';
-    if (color === '#f59e0b') return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-    if (color === '#ef4444') return 'bg-red-100 text-red-800 border-red-300';
-
-    // Default fallback
-    return 'bg-gray-100 text-gray-800 border-gray-300';
   }
 
   // Open work item in modal
@@ -857,7 +841,7 @@
                       <span class="text-xs px-1.5 py-0.5 rounded text-[10px] font-medium" style="background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue);">
                         {item.workspace_name}
                       </span>
-                      <span class="text-xs px-1.5 py-0.5 rounded font-medium {getStatusColor(getStatusName(item.status_id))}">
+                      <span class="text-xs px-1.5 py-0.5 rounded font-medium" style={getStatusStyleFromStatuses(getStatusName(item.status_id), availableStatuses)}>
                         {getStatusName(item.status_id)}
                       </span>
                     </div>

@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import {
     Calendar, CheckCircle, Clock, Plus, Edit, Trash2,
     Globe, Building2, Target
@@ -14,6 +14,7 @@
   import { currentRoute, navigate } from '../../router.js';
   import ColorDot from '../../components/ColorDot.svelte';
   import SectionHeader from '../../layout/SectionHeader.svelte';
+  import { createShortcutHandler } from '../../utils/keyboardShortcuts.js';
 
   // Props for workspace-scoped view (backward compatibility)
   let { workspaceId = null, typeId = null } = $props();
@@ -54,14 +55,12 @@
 
     // Listen for manage iteration types event from navigation
     document.addEventListener('manage-iteration-types', handleManageTypes);
-
-    // Add global keyboard listener for 'A' to add iteration
-    window.addEventListener('keydown', handleGlobalKeydown);
   });
 
-  onDestroy(() => {
-    document.removeEventListener('manage-iteration-types', handleManageTypes);
-    window.removeEventListener('keydown', handleGlobalKeydown);
+  $effect(() => {
+    return () => {
+      document.removeEventListener('manage-iteration-types', handleManageTypes);
+    };
   });
 
   function handleManageTypes() {
@@ -69,18 +68,10 @@
     navigate('/admin/iteration-types');
   }
 
-  function handleGlobalKeydown(e) {
-    // Check if we're in an input, textarea, or content-editable element
-    const isInInputField = e.target.tagName === 'INPUT' ||
-                          e.target.tagName === 'TEXTAREA' ||
-                          e.target.contentEditable === 'true' ||
-                          e.target.closest('[contenteditable="true"]');
-
-    // "A" key for create iteration (only when not in input fields and no modifiers)
-    if (e.key === 'a' && !e.ctrlKey && !e.metaKey && !e.altKey && !isInInputField && !showModal) {
-      e.preventDefault();
-      startCreate();
-    }
+  function handleGlobalKeydown(event) {
+    createShortcutHandler({
+      add: startCreate
+    }, 'iterations', { guard: () => !showModal })(event);
   }
 
   async function loadData() {
@@ -257,6 +248,8 @@
 
   // No need for tableData wrapper - pass props directly
 </script>
+
+<svelte:window onkeydown={handleGlobalKeydown} />
 
 <!-- Main container with conditional two-panel layout for global view -->
 <div class="flex min-h-screen" style="background-color: var(--ds-surface);">

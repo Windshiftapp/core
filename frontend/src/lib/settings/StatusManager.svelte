@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { Plus, Edit, Trash2, Save, X, CheckCircle, Circle, MoreHorizontal, GitBranch } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
@@ -12,7 +12,7 @@
   import Toggle from '../components/Toggle.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
-  import { matchesShortcut } from '../utils/keyboardShortcuts.js';
+  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
 
   // System-protected status IDs (cannot be deleted)
   const PROTECTED_STATUS_IDS = [1, 6]; // Open and Closed
@@ -36,24 +36,13 @@
   onMount(async () => {
     await loadStatusCategories();
     await loadStatuses();
-
-    // Add global keyboard listener
-    window.addEventListener('keydown', handleGlobalKeydown);
   });
 
-  onDestroy(() => {
-    window.removeEventListener('keydown', handleGlobalKeydown);
-  });
-
+  // Global keyboard shortcut handler
   function handleGlobalKeydown(event) {
-    // 'a' to add/create new status
-    if (matchesShortcut(event, { key: 'a' }) && !showCreateForm) {
-      const target = event.target;
-      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.contentEditable.includes('true')) {
-        event.preventDefault();
-        startCreate();
-      }
-    }
+    createShortcutHandler({
+      add: startCreate
+    }, 'statuses', { guard: () => !showCreateForm })(event);
   }
 
   async function loadStatusCategories() {
@@ -271,6 +260,8 @@
   ];
 </script>
 
+<svelte:window onkeydown={handleGlobalKeydown} />
+
 <div style="background-color: var(--ds-surface); min-height: 100vh;">
   <PageHeader 
     icon={GitBranch} 
@@ -326,7 +317,7 @@
     </DataTable>
   {/if}
 
-  <Modal isOpen={showCreateForm} onclose={cancelForm} maxWidth="max-w-lg">
+  <Modal isOpen={showCreateForm} onclose={cancelForm} maxWidth="max-w-lg" onSubmit={saveStatus} let:submitHint>
     <!-- Modal header -->
     <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
       <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
@@ -383,6 +374,7 @@
           onConfirm={saveStatus}
           confirmLabel="{editingId ? 'Update' : 'Create'} Status"
           showKeyboardHint={true}
+          confirmKeyboardHint={submitHint}
           class="mx-[-1.5rem] mb-[-1rem] mt-0"
         />
       </form>

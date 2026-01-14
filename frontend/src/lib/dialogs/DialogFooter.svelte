@@ -31,6 +31,7 @@
     confirmType = 'button', // 'button' | 'submit'
     showKeyboardHint = false,
     cancelKeyboardHint = 'Esc',
+    confirmKeyboardHint = '⏎',
     loadingLabel = null, // Optional loading text (e.g., "Saving...")
     class: className = ''
   } = $props();
@@ -63,7 +64,7 @@
         onclick={onConfirm}
         {loading}
         disabled={disabled || loading}
-        keyboardHint={showKeyboardHint ? '⏎' : undefined}
+        keyboardHint={showKeyboardHint ? confirmKeyboardHint : undefined}
       >
         {loading && loadingLabel ? loadingLabel : confirmLabel}
       </Button>

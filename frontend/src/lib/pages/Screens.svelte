@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
@@ -14,7 +14,7 @@
   import Modal from '../dialogs/Modal.svelte';
   import DropIndicator from '../layout/DropIndicator.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
-  import { matchesShortcut } from '../utils/keyboardShortcuts.js';
+  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
 
   let screens = $state([]);
   let customFields = $state([]);
@@ -39,24 +39,12 @@
 
   onMount(async () => {
     await loadScreens();
-
-    // Add global keyboard listener
-    window.addEventListener('keydown', handleGlobalKeydown);
-  });
-
-  onDestroy(() => {
-    window.removeEventListener('keydown', handleGlobalKeydown);
   });
 
   function handleGlobalKeydown(event) {
-    // 'a' to add/create new screen
-    if (matchesShortcut(event, { key: 'a' }) && !showCreateForm) {
-      const target = event.target;
-      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.contentEditable.includes('true')) {
-        event.preventDefault();
-        startCreate();
-      }
-    }
+    createShortcutHandler({
+      add: startCreate
+    }, 'screens', { guard: () => !showCreateForm })(event);
   }
 
   async function loadScreens() {
@@ -221,8 +209,10 @@
   let setupCleanups = [];
   let setupTimeout;
 
-  onDestroy(() => {
-    cleanupDragAndDrop();
+  $effect(() => {
+    return () => {
+      cleanupDragAndDrop();
+    };
   });
 
   function cleanupDragAndDrop() {
@@ -525,6 +515,8 @@
     }
   ];
 </script>
+
+<svelte:window onkeydown={handleGlobalKeydown} />
 
 {#if !showFieldEditor}
   <PageHeader

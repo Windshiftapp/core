@@ -487,5 +487,6 @@
     confirmLabel="Update Milestone"
     disabled={!formData.name.trim()}
     showKeyboardHint={true}
+    confirmKeyboardHint={submitHint}
   />
 </Modal>

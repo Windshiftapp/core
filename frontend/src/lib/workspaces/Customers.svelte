@@ -1,10 +1,10 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { Users, Mail, Search, GripVertical, Plus, X, Edit2, Trash2, MoreHorizontal } from 'lucide-svelte';
   import { api } from '../api.js';
   import { confirm } from '../composables/useConfirm.js';
-  import { getShortcut, matchesShortcut } from '../utils/keyboardShortcuts.js';
+  import { createShortcutHandler, getShortcut, getDisplayString, matchesShortcut } from '../utils/keyboardShortcuts.js';
   import PageHeader from '../layout/PageHeader.svelte';
   import Button from '../components/Button.svelte';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
@@ -133,18 +133,18 @@
   });
 
   onMount(async () => {
-    window.addEventListener('keydown', handleGlobalKeydown);
     await Promise.all([loadOrganisations(), loadPortalCustomers(), loadCustomFields()]);
     loading = false;
   });
 
-  onDestroy(() => {
-    window.removeEventListener('keydown', handleGlobalKeydown);
-    if (setupTimeout) {
-      clearTimeout(setupTimeout);
-    }
-    setupElements.forEach(cleanup => cleanup());
-    setupElements.clear();
+  $effect(() => {
+    return () => {
+      if (setupTimeout) {
+        clearTimeout(setupTimeout);
+      }
+      setupElements.forEach(cleanup => cleanup());
+      setupElements.clear();
+    };
   });
 
   async function loadCustomFields() {
@@ -268,13 +268,9 @@
   }
 
   function handleGlobalKeydown(event) {
-    if (matchesShortcut(event, { key: 'a' }) && !showCreateModal) {
-      const target = event.target;
-      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.contentEditable.includes('true')) {
-        event.preventDefault();
-        startCreate();
-      }
-    }
+    createShortcutHandler({
+      add: startCreate
+    }, 'customers', { guard: () => !showCreateModal })(event);
   }
 
   function startCreate() {
@@ -418,6 +414,8 @@
     }
   }
 </script>
+
+<svelte:window onkeydown={handleGlobalKeydown} />
 
 <div class="flex min-h-screen" style="background-color: var(--ds-surface);">
   <!-- Sidebar Navigation -->
@@ -665,6 +663,7 @@
         confirmLabel="Create Customer"
         disabled={!formData.name.trim() || !formData.email.trim()}
         showKeyboardHint={true}
+        confirmKeyboardHint={getDisplayString(submitShortcut)}
       />
     </div>
   </div>

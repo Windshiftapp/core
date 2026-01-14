@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { writable } from 'svelte/store';
   import { api } from '../api.js';
   import { Plus, Edit, Trash2, Palette, Check, X } from 'lucide-svelte';
@@ -11,7 +11,7 @@
   import Spinner from '../components/Spinner.svelte';
   import ColorPicker from '../editors/ColorPicker.svelte';
   import Label from '../components/Label.svelte';
-  import { matchesShortcut } from '../utils/keyboardShortcuts.js';
+  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
 
   // State management
   let themes = [];
@@ -35,24 +35,13 @@
   onMount(async () => {
     await loadThemes();
     await loadActiveTheme();
-
-    // Add global keyboard listener
-    window.addEventListener('keydown', handleGlobalKeydown);
   });
 
-  onDestroy(() => {
-    window.removeEventListener('keydown', handleGlobalKeydown);
-  });
-
+  // Global keyboard shortcut handler
   function handleGlobalKeydown(event) {
-    // 'a' to add/create new theme
-    if (matchesShortcut(event, { key: 'a' }) && !showCreateForm) {
-      const target = event.target;
-      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.contentEditable.includes('true')) {
-        event.preventDefault();
-        showCreateForm = true;
-      }
-    }
+    createShortcutHandler({
+      add: () => { showCreateForm = true; }
+    }, 'themes', { guard: () => !showCreateForm })(event);
   }
 
   async function loadThemes() {
@@ -189,6 +178,8 @@
     });
   }
 </script>
+
+<svelte:window onkeydown={handleGlobalKeydown} />
 
 <div class="theme-manager">
   <PageHeader

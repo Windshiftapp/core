@@ -86,6 +86,55 @@ const shortcuts = {
     addChannel: { key: 'a' },
     submitForm: { key: 'Enter' },
     cancelForm: { key: 'Escape' }
+  },
+  testSteps: {
+    addStep: { key: 'a' }
+  },
+  timeEntry: {
+    openLog: { key: 'a' },
+    toggleSelector: { key: 'l', modifierKey: true }
+  },
+  // Settings
+  statuses: {
+    add: { key: 'a' }
+  },
+  customFields: {
+    add: { key: 'a' }
+  },
+  themes: {
+    add: { key: 'a' }
+  },
+  itemTypes: {
+    add: { key: 'a' }
+  },
+  priorities: {
+    add: { key: 'a' }
+  },
+  permissionSets: {
+    add: { key: 'a' }
+  },
+  hierarchyLevels: {
+    add: { key: 'a' }
+  },
+  configurationSets: {
+    add: { key: 'a' }
+  },
+  // Features
+  milestones: {
+    add: { key: 'a' }
+  },
+  iterations: {
+    add: { key: 'a' }
+  },
+  assets: {
+    upload: { key: 'a' }
+  },
+  customers: {
+    add: { key: 'a' }
+  },
+  // Pages
+  screens: {
+    add: { key: 'a' }
   }
 };
 
@@ -215,24 +264,45 @@ export function getShortcutDisplay(context, action) {
 }
 
 /**
+ * Check if a keyboard event originated from a text input field
+ * (INPUT, TEXTAREA, SELECT, or contenteditable element)
+ * @param {KeyboardEvent} event - The keyboard event
+ * @returns {boolean} True if user is typing in an input field
+ */
+export function isTypingInField(event) {
+  const target = event.target;
+  return (
+    target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.tagName === 'SELECT' ||
+    target.isContentEditable
+  );
+}
+
+/**
  * Create a keyboard event handler that matches shortcuts and calls actions
  * @param {Object} shortcuts - Map of shortcut names to handler functions
  * @param {string} context - The context for shortcuts
+ * @param {Object} options - Optional settings
+ * @param {Function} options.guard - Guard function, shortcuts disabled if returns false
  * @returns {Function} Event handler function
  */
-export function createShortcutHandler(shortcuts, context) {
+export function createShortcutHandler(shortcuts, context, options = {}) {
   return (event) => {
+    // Check guard first - skip if guard returns false
+    if (options.guard && !options.guard()) {
+      return;
+    }
+
     // Don't handle shortcuts when typing in inputs, except for special keys
-    const isInputField = event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA';
     const isSpecialKey = event.key === 'Enter' || event.key === 'Escape';
-    const isTextArea = event.target.tagName === 'TEXTAREA';
 
     // Allow Enter in INPUT fields (for form submission), but not in TEXTAREA (for new lines)
     // Allow Escape in all input fields (to cancel/close)
-    if (isInputField && !isSpecialKey) {
+    if (isTypingInField(event) && !isSpecialKey) {
       return;
     }
-    if (isTextArea && event.key === 'Enter') {
+    if (event.target.tagName === 'TEXTAREA' && event.key === 'Enter') {
       return;
     }
 

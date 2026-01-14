@@ -1,5 +1,6 @@
 <script>
   import { X } from 'lucide-svelte';
+    import Button from '../components/Button.svelte';
 
   let {
     title,
@@ -23,12 +24,10 @@
     </div>
   </div>
   {#if showCloseButton && onClose}
-    <button
+    <Button
       onclick={onClose}
-      class="p-2 hover:bg-gray-100 rounded cursor-pointer transition-colors"
-      aria-label="Close"
     >
       <X class="w-5 h-5" style="color: var(--ds-text-subtle);" />
-    </button>
+    </Button>
   {/if}
 </div>

@@ -16,7 +16,7 @@
   import PageHeader from '../../layout/PageHeader.svelte';
   import Tooltip from '../../components/Tooltip.svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-  import { createShortcutHandler, getShortcutDisplay, matchesShortcut } from '../../utils/keyboardShortcuts.js';
+  import { createShortcutHandler, getShortcutDisplay, matchesShortcut, isTypingInField } from '../../utils/keyboardShortcuts.js';
   import { currentRoute, navigate } from '../../router.js';
 
   let { workspaceId = null } = $props();
@@ -499,8 +499,8 @@
 
   // Custom keyboard handler for two-key steps navigation (S + 1-9)
   function handleStepsKeyboard(event) {
-    // Ignore if typing in input
-    if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+    // Ignore if typing in input field (INPUT, TEXTAREA, SELECT, or contenteditable)
+    if (isTypingInField(event)) {
       return;
     }
 

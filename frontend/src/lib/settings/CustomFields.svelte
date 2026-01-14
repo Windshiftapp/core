@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { Plus, Edit, Trash2, MoreHorizontal, Circle, Database } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
@@ -15,7 +15,7 @@
   import Toggle from '../components/Toggle.svelte';
   import Label from '../components/Label.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
-  import { matchesShortcut } from '../utils/keyboardShortcuts.js';
+  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
 
   let customFields = [];
   let screens = [];
@@ -64,24 +64,13 @@
       console.error('Failed to load asset sets:', error);
       assetSets = [];
     }
-
-    // Add global keyboard listener
-    window.addEventListener('keydown', handleGlobalKeydown);
   });
 
-  onDestroy(() => {
-    window.removeEventListener('keydown', handleGlobalKeydown);
-  });
-
+  // Global keyboard shortcut handler
   function handleGlobalKeydown(event) {
-    // 'a' to add/create new custom field
-    if (matchesShortcut(event, { key: 'a' }) && !showCreateForm) {
-      const target = event.target;
-      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.contentEditable.includes('true')) {
-        event.preventDefault();
-        startCreate();
-      }
-    }
+    createShortcutHandler({
+      add: startCreate
+    }, 'customFields', { guard: () => !showCreateForm })(event);
   }
 
   async function loadCustomFields() {
@@ -448,6 +437,8 @@
     }
   ];
 </script>
+
+<svelte:window onkeydown={handleGlobalKeydown} />
 
 <PageHeader
   icon={Database}

@@ -486,6 +486,7 @@
     confirmLabel="Create Channel"
     disabled={!channelFormData.name.trim()}
     showKeyboardHint={true}
+    confirmKeyboardHint={submitHint}
   />
 </Modal>
 

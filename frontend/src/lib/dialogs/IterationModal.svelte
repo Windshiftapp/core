@@ -1,6 +1,7 @@
 <script>
   import { Globe, Building2, Calendar, Tag, FileText } from 'lucide-svelte';
   import Modal from './Modal.svelte';
+  import DialogFooter from './DialogFooter.svelte';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import Select from '../components/Select.svelte';
@@ -98,6 +99,9 @@
   isOpen={true}
   onclose={handleCancel}
   maxWidth="max-w-2xl"
+  onSubmit={handleSave}
+  submitDisabled={saving}
+  let:submitHint
 >
   <!-- Modal header -->
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
@@ -208,26 +212,16 @@
         </Select>
       </div>
 
-      <!-- Form Actions -->
-      <div class="flex items-center justify-end gap-3 pt-4 border-t" style="border-color: var(--ds-border);">
-        <Button
-          type="button"
-          variant="subtle"
-          size="medium"
-          onclick={handleCancel}
-          disabled={saving}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          variant="primary"
-          size="medium"
-          disabled={saving}
-        >
-          {saving ? 'Saving...' : iteration ? 'Update Iteration' : 'Create Iteration'}
-        </Button>
-      </div>
     </form>
+
+    <DialogFooter
+      onCancel={handleCancel}
+      onConfirm={handleSave}
+      confirmLabel={iteration ? 'Update Iteration' : 'Create Iteration'}
+      disabled={saving}
+      loading={saving}
+      showKeyboardHint={true}
+      confirmKeyboardHint={submitHint}
+    />
   </div>
 </Modal>

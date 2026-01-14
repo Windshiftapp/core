@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { createEventDispatcher } from 'svelte';
   import { Plus, Edit, Trash2, FileText } from 'lucide-svelte';
@@ -14,7 +14,7 @@
   import Input from '../components/Input.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import ColorPicker from '../editors/ColorPicker.svelte';
-  import { matchesShortcut } from '../utils/keyboardShortcuts.js';
+  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
 
   const dispatch = createEventDispatcher();
 
@@ -40,24 +40,12 @@
       loadItemTypes(),
       loadHierarchyLevels()
     ]);
-
-    // Add global keyboard listener
-    window.addEventListener('keydown', handleGlobalKeydown);
-  });
-
-  onDestroy(() => {
-    window.removeEventListener('keydown', handleGlobalKeydown);
   });
 
   function handleGlobalKeydown(event) {
-    // 'a' to add/create new item type
-    if (matchesShortcut(event, { key: 'a' }) && !showCreateForm) {
-      const target = event.target;
-      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.contentEditable.includes('true')) {
-        event.preventDefault();
-        startCreate();
-      }
-    }
+    createShortcutHandler({
+      add: startCreate
+    }, 'itemTypes', { guard: () => !showCreateForm })(event);
   }
 
   async function loadItemTypes() {
@@ -232,7 +220,9 @@
   }
 </script>
 
-<PageHeader 
+<svelte:window onkeydown={handleGlobalKeydown} />
+
+<PageHeader
   icon={FileText} 
   title="Work Item Types" 
   subtitle="Configure work item types with icons, colors, and hierarchy levels"

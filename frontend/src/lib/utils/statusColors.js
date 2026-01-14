@@ -11,33 +11,33 @@
  */
 export function getStatusCategory(statusName, statuses, statusCategories) {
   if (!statusName || !statuses.length) return null;
-  
+
   // Normalize the input status name
   const normalizedStatusName = statusName.toLowerCase().trim();
-  
+
   // Try different matching strategies
   let status = null;
-  
+
   // 1. Exact match
   status = statuses.find(s => s.name === statusName);
-  
+
   // 2. Case-insensitive exact match
   if (!status) {
     status = statuses.find(s => s.name.toLowerCase() === normalizedStatusName);
   }
-  
+
   // 3. Convert underscores to spaces and match
   if (!status) {
     const withSpaces = statusName.replace(/_/g, ' ');
     status = statuses.find(s => s.name.toLowerCase() === withSpaces.toLowerCase());
   }
-  
+
   // 4. Convert spaces to underscores and match
   if (!status) {
     const withUnderscores = statusName.replace(/ /g, '_');
     status = statuses.find(s => s.name.toLowerCase() === withUnderscores.toLowerCase());
   }
-  
+
   // 5. Title case conversion (to_do -> To Do)
   if (!status) {
     const titleCase = statusName.replace(/_/g, ' ').split(' ')
@@ -45,38 +45,102 @@ export function getStatusCategory(statusName, statuses, statusCategories) {
       .join(' ');
     status = statuses.find(s => s.name === titleCase);
   }
-  
+
   if (!status || !status.category_id) {
     return null;
   }
-  
+
   return statusCategories.find(cat => cat.id === status.category_id);
 }
 
 /**
- * Get status color styling using official status category colors
+ * Map status names to design system status types for fallback styling
  * @param {string} status - The status name
- * @param {Array} statuses - Array of status objects
- * @param {Array} statusCategories - Array of status category objects
- * @returns {string} CSS classes for styling
+ * @returns {string} Design system status type (info, success, warning, danger, neutral)
  */
-export function getStatusColor(status, statuses, statusCategories) {
-  const category = getStatusCategory(status, statuses, statusCategories);
-  
-  if (category && category.color) {
-    // Use actual category color with dynamic text color
-    const textColor = getTextColorForBackground(category.color);
-    return `${textColor}`;
-  }
-  
-  // Fallback to hardcoded colors
-  const colors = {
-    open: 'bg-blue-100 text-blue-800',
-    in_progress: 'bg-yellow-100 text-yellow-800', 
-    completed: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800'
+export function getStatusType(status) {
+  const normalizedStatus = status?.toLowerCase().replace(/[_\s]/g, '') || '';
+
+  const statusTypeMap = {
+    // Info/Open states
+    open: 'info',
+    new: 'info',
+    todo: 'info',
+    backlog: 'info',
+
+    // Warning/In Progress states
+    inprogress: 'warning',
+    pending: 'warning',
+    review: 'warning',
+    inreview: 'warning',
+    blocked: 'warning',
+
+    // Success/Completed states
+    completed: 'success',
+    done: 'success',
+    closed: 'success',
+    resolved: 'success',
+    approved: 'success',
+    passed: 'success',
+
+    // Danger/Cancelled states
+    cancelled: 'danger',
+    canceled: 'danger',
+    rejected: 'danger',
+    failed: 'danger'
   };
-  return colors[status] || 'bg-gray-100 text-gray-800';
+
+  return statusTypeMap[normalizedStatus] || 'neutral';
+}
+
+/**
+ * Get inline styles for status using design system colors (simple version)
+ * Use this when you don't have access to statuses/statusCategories arrays
+ * @param {string} status - The status name
+ * @returns {string} Inline CSS styles
+ */
+export function getStatusStyle(status) {
+  const statusType = getStatusType(status);
+  return `background-color: var(--ds-status-${statusType}-bg); color: var(--ds-status-${statusType}-text);`;
+}
+
+/**
+ * Map a category hex color to design system status styles
+ * Use this when you have the category_color directly on the status object
+ * @param {string} color - Hex color code
+ * @returns {string} Inline CSS styles
+ */
+export function getStatusStyleFromCategoryColor(color) {
+  const colorMap = {
+    '#6b7280': 'neutral',
+    '#3b82f6': 'info',
+    '#10b981': 'success',
+    '#f59e0b': 'warning',
+    '#ef4444': 'danger'
+  };
+
+  const statusType = colorMap[color] || 'neutral';
+  return `background-color: var(--ds-status-${statusType}-bg); color: var(--ds-status-${statusType}-text);`;
+}
+
+/**
+ * Get inline styles for status by looking up in a statuses array with category_color
+ * Use this when you have a statuses array where each status has category_color directly
+ * @param {string} statusName - The status name to look up
+ * @param {Array} statuses - Array of status objects with category_color property
+ * @returns {string} Inline CSS styles
+ */
+export function getStatusStyleFromStatuses(statusName, statuses) {
+  if (!statusName || !statuses?.length) {
+    return getStatusStyle(statusName);
+  }
+
+  const statusObj = statuses.find(s => s.name?.toLowerCase() === statusName?.toLowerCase());
+  if (!statusObj?.category_color) {
+    return getStatusStyle(statusName);
+  }
+
+  return getStatusStyleFromCategoryColor(statusObj.category_color);
 }
 
 /**
@@ -88,23 +152,41 @@ export function getStatusColor(status, statuses, statusCategories) {
  */
 export function getStatusInlineStyle(status, statuses, statusCategories) {
   const category = getStatusCategory(status, statuses, statusCategories);
-  
+
   if (category && category.color) {
     const textColor = getTextColorForBackground(category.color);
-    const color = textColor === 'text-gray-800' ? '#1f2937' : '#ffffff';
-    return `background-color: ${category.color}; color: ${color};`;
+    return `background-color: ${category.color}; color: ${textColor};`;
   }
-  
-  return '';
+
+  // Fallback to design system status colors
+  const statusType = getStatusType(status);
+  return `background-color: var(--ds-status-${statusType}-bg); color: var(--ds-status-${statusType}-text);`;
+}
+
+/**
+ * Get status color styling using official status category colors
+ * Returns inline styles instead of Tailwind classes for theme compatibility
+ * @param {string} status - The status name
+ * @param {Array} statuses - Array of status objects
+ * @param {Array} statusCategories - Array of status category objects
+ * @returns {string} Inline CSS styles
+ */
+export function getStatusColor(status, statuses, statusCategories) {
+  return getStatusInlineStyle(status, statuses, statusCategories);
 }
 
 /**
  * Utility function to determine text color based on background brightness
  * @param {string} backgroundColor - Hex color code (with or without #)
- * @returns {string} Tailwind CSS text color class
+ * @returns {string} CSS color value
  */
 export function getTextColorForBackground(backgroundColor) {
-  if (!backgroundColor) return 'text-gray-800';
+  if (!backgroundColor) return 'var(--ds-text)';
+
+  // If it's a CSS variable, return appropriate fallback
+  if (backgroundColor.startsWith('var(')) {
+    return 'var(--ds-text)';
+  }
 
   // Remove # if present
   const hex = backgroundColor.replace('#', '');
@@ -125,10 +207,10 @@ export function getTextColorForBackground(backgroundColor) {
   // For grey/desaturated colors (low saturation), use lower luminance threshold
   // For saturated colors, use higher luminance threshold
   if (saturation < 0.15) {
-    // Grey color - use black text if luminance > 0.4
-    return luminance > 0.4 ? 'text-gray-800' : 'text-white';
+    // Grey color - use dark text if luminance > 0.4
+    return luminance > 0.4 ? 'var(--ds-text)' : 'var(--ds-text-inverse)';
   } else {
-    // Saturated color - use black text only if luminance > 0.65
-    return luminance > 0.65 ? 'text-gray-800' : 'text-white';
+    // Saturated color - use dark text only if luminance > 0.65
+    return luminance > 0.65 ? 'var(--ds-text)' : 'var(--ds-text-inverse)';
   }
 }

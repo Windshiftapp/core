@@ -524,5 +524,6 @@
     confirmLabel="Update Iteration"
     disabled={!formData.name.trim() || !formData.start_date || !formData.end_date}
     showKeyboardHint={true}
+    confirmKeyboardHint={submitHint}
   />
 </Modal>

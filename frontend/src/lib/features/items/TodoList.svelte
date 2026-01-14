@@ -7,7 +7,7 @@
   import { navigate } from '../../router.js';
   import ItemDetail from '../items/ItemDetail.svelte';
   import PersonalTaskDetail from '../personal/PersonalTaskDetail.svelte';
-  import { getStatusColor as getStatusColorUtil, getTextColorForBackground } from '../../utils/statusColors.js';
+  import { getStatusStyleFromStatuses, getTextColorForBackground } from '../../utils/statusColors.js';
   import { authStore } from '../../stores';
   import { formatDate } from '../../utils/dateFormatter.js';
 
@@ -164,23 +164,6 @@
     // For now, return all statuses since we don't have workspace-specific status configuration
     // In a real system, this would filter based on workspace configuration
     return statuses;
-  }
-
-  function getStatusColor(statusName) {
-    const statusObj = statuses.find(s => s.name.toLowerCase() === statusName?.toLowerCase());
-    if (!statusObj) return 'bg-gray-100 text-gray-800 border-gray-300';
-    
-    const color = statusObj.category_color;
-    
-    // Convert hex color to Tailwind classes
-    if (color === '#6b7280') return 'bg-gray-100 text-gray-800 border-gray-300';
-    if (color === '#3b82f6') return 'bg-blue-100 text-blue-800 border-blue-300';  
-    if (color === '#10b981') return 'bg-green-100 text-green-800 border-green-300';
-    if (color === '#f59e0b') return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-    if (color === '#ef4444') return 'bg-red-100 text-red-800 border-red-300';
-    
-    // Default fallback
-    return 'bg-gray-100 text-gray-800 border-gray-300';
   }
 
   function getStatusName(statusId) {
@@ -516,7 +499,7 @@
                           {#snippet children()}
                             <span
                               class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-colors"
-                              style={statusCategory && statusCategory.color ? `background-color: ${statusCategory.color}; color: ${getTextColorForBackground(statusCategory.color) === 'text-gray-800' ? '#1f2937' : '#ffffff'};` : getStatusColor(getStatusName(item.status_id))}
+                              style={statusCategory && statusCategory.color ? `background-color: ${statusCategory.color}; color: ${getTextColorForBackground(statusCategory.color)};` : getStatusStyleFromStatuses(getStatusName(item.status_id), statuses)}
                             >
                               {getStatusName(item.status_id)}
                             </span>

@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { Plus, Edit, Trash2, Move, ChevronUp, ChevronDown, Circle, MoreHorizontal, Network } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
@@ -10,7 +10,7 @@
   import { errorToast } from '../stores/toasts.svelte.js';
   import Textarea from '../components/Textarea.svelte';
   import { confirm } from '../composables/useConfirm.js';
-  import { matchesShortcut } from '../utils/keyboardShortcuts.js';
+  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
 
   let hierarchyLevels = $state([]);
   let isLoading = $state(true);
@@ -28,24 +28,12 @@
 
   onMount(() => {
     loadHierarchyLevels();
-
-    // Add global keyboard listener
-    window.addEventListener('keydown', handleGlobalKeydown);
-  });
-
-  onDestroy(() => {
-    window.removeEventListener('keydown', handleGlobalKeydown);
   });
 
   function handleGlobalKeydown(event) {
-    // 'a' to add/create new hierarchy level
-    if (matchesShortcut(event, { key: 'a' }) && !showCreateForm) {
-      const target = event.target;
-      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.contentEditable.includes('true')) {
-        event.preventDefault();
-        startCreate();
-      }
-    }
+    createShortcutHandler({
+      add: startCreate
+    }, 'hierarchyLevels', { guard: () => !showCreateForm })(event);
   }
 
   async function loadHierarchyLevels() {
@@ -231,6 +219,8 @@
   }
 </script>
 
+<svelte:window onkeydown={handleGlobalKeydown} />
+
 <PageHeader
   icon={Network}
   title="Hierarchy Levels"
@@ -264,7 +254,7 @@
   actionItems={buildHierarchyDropdownItems}
 />
 
-<Modal isOpen={showCreateForm} on:close={cancelEdit} maxWidth="max-w-lg">
+<Modal isOpen={showCreateForm} on:close={cancelEdit} maxWidth="max-w-lg" onSubmit={saveHierarchyLevel} let:submitHint>
   <!-- Modal header -->
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
@@ -317,6 +307,7 @@
     onConfirm={saveHierarchyLevel}
     confirmLabel={editingId ? 'Update Level' : 'Create Level'}
     showKeyboardHint={true}
+    confirmKeyboardHint={submitHint}
   />
 </Modal>
 

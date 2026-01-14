@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
   import { Plus, Edit, Trash2, Shield } from 'lucide-svelte';
@@ -9,7 +9,7 @@
   import Textarea from '../components/Textarea.svelte';
   import Label from '../components/Label.svelte';
   import { confirm } from '../composables/useConfirm.js';
-  import { matchesShortcut } from '../utils/keyboardShortcuts.js';
+  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
 
   let permissionSets = [];
   let loading = true;
@@ -23,24 +23,12 @@
 
   onMount(async () => {
     await loadPermissionSets();
-
-    // Add global keyboard listener
-    window.addEventListener('keydown', handleGlobalKeydown);
-  });
-
-  onDestroy(() => {
-    window.removeEventListener('keydown', handleGlobalKeydown);
   });
 
   function handleGlobalKeydown(event) {
-    // 'a' to add/create new permission set
-    if (matchesShortcut(event, { key: 'a' }) && !showCreateModal) {
-      const target = event.target;
-      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.contentEditable.includes('true')) {
-        event.preventDefault();
-        startCreate();
-      }
-    }
+    createShortcutHandler({
+      add: startCreate
+    }, 'permissionSets', { guard: () => !showCreateModal })(event);
   }
 
   function handleModalKeydown(event) {
@@ -170,6 +158,8 @@
     { key: 'actions', label: '', width: 'w-16' }
   ];
 </script>
+
+<svelte:window onkeydown={handleGlobalKeydown} />
 
 <div class="space-y-6">
   <PageHeader

@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { createEventDispatcher } from 'svelte';
   import { Plus, Edit, Trash2, AlertCircle } from 'lucide-svelte';
@@ -15,7 +15,7 @@
   import Input from '../components/Input.svelte';
   import ColorPicker from '../editors/ColorPicker.svelte';
   import Toggle from '../components/Toggle.svelte';
-  import { matchesShortcut } from '../utils/keyboardShortcuts.js';
+  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
 
   const dispatch = createEventDispatcher();
 
@@ -37,24 +37,12 @@
 
   onMount(async () => {
     await loadPriorities();
-
-    // Add global keyboard listener
-    window.addEventListener('keydown', handleGlobalKeydown);
-  });
-
-  onDestroy(() => {
-    window.removeEventListener('keydown', handleGlobalKeydown);
   });
 
   function handleGlobalKeydown(event) {
-    // 'a' to add/create new priority
-    if (matchesShortcut(event, { key: 'a' }) && !showCreateForm) {
-      const target = event.target;
-      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.contentEditable.includes('true')) {
-        event.preventDefault();
-        startCreate();
-      }
-    }
+    createShortcutHandler({
+      add: startCreate
+    }, 'priorities', { guard: () => !showCreateForm })(event);
   }
 
   async function loadPriorities() {
@@ -205,6 +193,8 @@
   }
 </script>
 
+<svelte:window onkeydown={handleGlobalKeydown} />
+
 <PageHeader
   icon={AlertCircle}
   title="Priorities"
@@ -260,7 +250,7 @@
     </div>
   </DataTable>
 
-  <Modal isOpen={showCreateForm} onclose={cancelEdit} maxWidth="max-w-2xl">
+  <Modal isOpen={showCreateForm} onclose={cancelEdit} maxWidth="max-w-2xl" onSubmit={savePriority} let:submitHint>
     <!-- Modal header -->
     <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
       <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
@@ -340,6 +330,7 @@
       onConfirm={savePriority}
       confirmLabel={editingId ? 'Update Priority' : 'Create Priority'}
       showKeyboardHint={true}
+      confirmKeyboardHint={submitHint}
     />
   </Modal>
 

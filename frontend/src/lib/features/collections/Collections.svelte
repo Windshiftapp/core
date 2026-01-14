@@ -10,7 +10,7 @@
   import CollectionsBreadcrumbs from '../collections/CollectionsBreadcrumbs.svelte';
   import CollectionQueryBar from '../collections/CollectionQueryBar.svelte';
   import { QLEvaluator, QLBuilder } from '../../utils/ql.js';
-  import { getStatusColor as getStatusColorUtil, getStatusInlineStyle } from '../../utils/statusColors.js';
+  import { getStatusColor as getStatusColorUtil, getStatusInlineStyle, getStatusStyle } from '../../utils/statusColors.js';
   import { formatDate } from '../../utils/dateFormatter.js';
   import { searchStore } from '../../stores/searchStore.svelte.js';
   import Modal from '../../dialogs/Modal.svelte';
@@ -485,19 +485,12 @@
   }
 
   function getStatusColor(status) {
-    // Use utility function if we have status data, otherwise fall back to hardcoded colors
+    // Use utility function if we have status data, otherwise fall back to design system colors
     if (statuses.length > 0 && statusCategories.length > 0) {
       return getStatusColorUtil(status, statuses, statusCategories);
     }
-
-    // Fallback to hardcoded colors (temporary until API endpoint is added)
-    const colors = {
-      open: 'bg-blue-100 text-blue-800',
-      in_progress: 'bg-yellow-100 text-yellow-800',
-      completed: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+    // Fallback to design system status colors
+    return getStatusStyle(status);
   }
 
   function getPriorityColor(priority) {
