@@ -23,7 +23,7 @@
         >
           About Windshift
         </button>
-        <a href="https://github.com/anthropics/claude-code/issues" target="_blank" rel="noopener noreferrer" class="text-[var(--ds-text-link)] hover:text-[var(--ds-text-link-hovered)] transition-colors">
+        <a href="https://github.com/Windshiftapp/core/issues" target="_blank" rel="noopener noreferrer" class="text-[var(--ds-text-link)] hover:text-[var(--ds-text-link-hovered)] transition-colors">
           Report a problem
         </a>
       </div>

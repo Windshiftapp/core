@@ -123,7 +123,7 @@
       <section class="text-center">
         <div class="flex justify-center gap-4">
           <Button
-            onclick={() => window.open('https://github.com/anthropics/claude-code/issues', '_blank')}
+            onclick={() => window.open('https://github.com/Windshiftapp/core', '_blank')}
             variant="default"
             size="medium"
             icon={Github}
@@ -131,7 +131,7 @@
             Report Issues
           </Button>
           <Button
-            onclick={() => navigate('/')}
+            onclick={() => navigate('https://windshift.sh/docs')}
             variant="primary"
             size="medium"
           >
