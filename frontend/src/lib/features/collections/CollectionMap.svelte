@@ -789,7 +789,7 @@ async function loadStatuses() {
                     {/if}
                     <Lozenge
                       text={(backboneItem.status_name || backboneItem.status)?.replace('_', ' ') || 'Status'}
-                      customBg={getStatusCategory(backboneItem.status_name || backboneItem.status, statuses, statusCategories)?.color || '#6b7280'}
+                      customBg={getStatusCategory(backboneItem.status_name || backboneItem.status, statuses, statusCategories)?.color || 'var(--ds-text-subtle)'}
                     />
                   </div>
 
@@ -838,7 +838,7 @@ async function loadStatuses() {
                           bind:value={editingTitle}
                           data-item-id={childItem.id}
                           class="font-medium text-sm mb-2 leading-snug w-full resize-none overflow-hidden bg-transparent border-none outline-none p-0 m-0"
-                          style="{hasGradient ? 'color: #111827;' : 'color: var(--ds-text);'}"
+                          style="{hasGradient ? 'color: #111827; caret-color: #111827;' : 'color: var(--ds-text); caret-color: var(--ds-text);'}"
                           rows="3"
                           onblur={() => saveEditingItem(childItem)}
                           onkeydown={(e) => {
@@ -878,7 +878,7 @@ async function loadStatuses() {
                         {/if}
                         <Lozenge
                           text={(childItem.status_name || childItem.status)?.replace('_', ' ') || 'Status'}
-                          customBg={getStatusCategory(childItem.status_name || childItem.status, statuses, statusCategories)?.color || '#6b7280'}
+                          customBg={getStatusCategory(childItem.status_name || childItem.status, statuses, statusCategories)?.color || 'var(--ds-text-subtle)'}
                         />
                       </div>
                     </div>
@@ -952,8 +952,8 @@ async function loadStatuses() {
                           }}
                           placeholder="Enter a summary..."
                           rows="2"
-                          class="w-full px-0 py-0 text-sm resize-none border-0 focus:outline-none focus:ring-0 text-gray-900"
-                          style="background-color: transparent;"
+                          class="w-full px-0 py-0 text-sm resize-none border-0 focus:outline-none focus:ring-0"
+                          style="background-color: transparent; color: var(--ds-text); caret-color: var(--ds-text);"
                         ></textarea>
                       </div>
 
@@ -977,7 +977,7 @@ async function loadStatuses() {
                                 }
                               }}
                               class="w-7 h-7 rounded-md flex items-center justify-center border overflow-hidden transition-all hover:scale-105"
-                              style="{selectedWorkspace?.avatar_url ? '' : `background-color: ${selectedWorkspace?.color || '#3b82f6'};`} border-color: var(--ds-border);"
+                              style="{selectedWorkspace?.avatar_url ? '' : `background-color: ${selectedWorkspace?.color || 'var(--ds-interactive)'};`} border-color: var(--ds-border);"
                               title={selectedWorkspace?.name || 'Select workspace'}
                             >
                               {#if selectedWorkspace?.avatar_url}
@@ -1005,13 +1005,15 @@ async function loadStatuses() {
                                       const dropdown = document.getElementById(dropdownId);
                                       if (dropdown) dropdown.classList.add('hidden');
                                     }}
-                                    class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 transition-colors"
+                                    class="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors"
                                     style="color: var(--ds-text);"
+                                    onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
+                                    onmouseleave={(e) => e.currentTarget.style.background = ''}
                                   >
                                     {#if ws.avatar_url}
                                       <img src={ws.avatar_url} alt="{ws.name} avatar" class="w-5 h-5 rounded object-cover flex-shrink-0" />
                                     {:else}
-                                      <div class="w-5 h-5 rounded flex items-center justify-center flex-shrink-0" style="background-color: {ws.color || '#3b82f6'};">
+                                      <div class="w-5 h-5 rounded flex items-center justify-center flex-shrink-0" style="background-color: {ws.color || 'var(--ds-interactive)'};">
                                         {#if ws.icon}
                                           <svelte:component this={iconMap[ws.icon] || Package} class="w-3 h-3 text-white" />
                                         {:else}

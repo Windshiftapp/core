@@ -167,7 +167,6 @@
           <button
             onclick={goBack}
             class="p-2 rounded cursor-pointer"
-            style="&:hover { background: var(--ds-surface-hovered); }"
             onmouseenter={(e) => e.target.style.background = 'var(--ds-surface-hovered)'}
             onmouseleave={(e) => e.target.style.background = ''}
           >
