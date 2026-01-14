@@ -115,3 +115,7 @@ node_modules
 tests/reports/
 tests/cmd/testreport/testreport
 .ssh
+
+# Runtime plugins directory (plugins are loaded at runtime, not committed)
+plugins/
+!plugins/.gitkeep

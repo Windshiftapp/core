@@ -39,13 +39,14 @@ type SCMService interface {
 
 // ManagerOptions controls runtime behaviour of the plugin manager.
 type ManagerOptions struct {
-	PluginTimeout time.Duration
-	MemoryLimit   uint64
-	HTTPClient    *http.Client
-	SMTPSender    SMTPSender
-	SCMService    SCMService
-	Logger        *slog.Logger
-	Database      database.Database
+	PluginTimeout        time.Duration
+	MemoryLimit          uint64
+	HTTPClient           *http.Client
+	SMTPSender           SMTPSender
+	SCMService           SCMService
+	Logger               *slog.Logger
+	Database             database.Database
+	AdditionalPluginDirs []string
 }
 
 // Option configures the ManagerOptions.
@@ -100,6 +101,14 @@ func WithSCMService(s SCMService) Option {
 	}
 }
 
+// WithAdditionalPluginDirs adds additional directories to search for plugins.
+// This allows loading plugins from multiple locations (e.g., for separate plugin repositories).
+func WithAdditionalPluginDirs(dirs ...string) Option {
+	return func(o *ManagerOptions) {
+		o.AdditionalPluginDirs = append(o.AdditionalPluginDirs, dirs...)
+	}
+}
+
 // LoadedPlugin represents a loaded plugin instance backed by a compiled Extism module.
 type LoadedPlugin struct {
 	Manifest   PluginManifest
@@ -115,7 +124,7 @@ type LoadedPlugin struct {
 type Manager struct {
 	mu            sync.RWMutex
 	plugins       map[string]*LoadedPlugin
-	pluginDir     string
+	pluginDirs    []string
 	httpClient    *http.Client
 	smtpSender    SMTPSender
 	scmService    SCMService
@@ -143,9 +152,13 @@ func NewManager(pluginDir string, opts ...Option) *Manager {
 		opt(&options)
 	}
 
+	// Build list of plugin directories: primary dir + any additional dirs
+	pluginDirs := []string{pluginDir}
+	pluginDirs = append(pluginDirs, options.AdditionalPluginDirs...)
+
 	m := &Manager{
 		plugins:       make(map[string]*LoadedPlugin),
-		pluginDir:     pluginDir,
+		pluginDirs:    pluginDirs,
 		httpClient:    options.HTTPClient,
 		smtpSender:    options.SMTPSender,
 		scmService:    options.SCMService,
@@ -170,14 +183,32 @@ func (m *Manager) SetSCMService(s SCMService) {
 	m.scmService = s
 }
 
-// LoadPlugins loads all plugins from the plugins directory.
+// LoadPlugins loads all plugins from configured plugin directories.
 func (m *Manager) LoadPlugins() error {
-	if err := os.MkdirAll(m.pluginDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create plugins directory: %w", err)
+	for _, pluginDir := range m.pluginDirs {
+		if err := m.loadPluginsFromDir(pluginDir); err != nil {
+			m.logger.Warn("failed to load plugins from directory", "dir", pluginDir, "error", err)
+		}
+	}
+	return nil
+}
+
+// loadPluginsFromDir loads all plugins from a single directory.
+func (m *Manager) loadPluginsFromDir(pluginDir string) error {
+	// Only create the primary plugins directory, not additional ones
+	if pluginDir == m.pluginDirs[0] {
+		if err := os.MkdirAll(pluginDir, 0o755); err != nil {
+			return fmt.Errorf("failed to create plugins directory: %w", err)
+		}
 	}
 
-	entries, err := os.ReadDir(m.pluginDir)
+	entries, err := os.ReadDir(pluginDir)
 	if err != nil {
+		if os.IsNotExist(err) {
+			// Additional directories may not exist, that's okay
+			m.logger.Debug("plugin directory does not exist", "dir", pluginDir)
+			return nil
+		}
 		return fmt.Errorf("failed to read plugins directory: %w", err)
 	}
 
@@ -186,7 +217,7 @@ func (m *Manager) LoadPlugins() error {
 			continue
 		}
 
-		pluginPath := filepath.Join(m.pluginDir, entry.Name())
+		pluginPath := filepath.Join(pluginDir, entry.Name())
 		if err := m.LoadPlugin(pluginPath); err != nil {
 			m.logger.Warn("failed to load plugin", "path", pluginPath, "error", err)
 		}
@@ -522,7 +553,8 @@ func (m *Manager) UploadPlugin(name string, zipData []byte) error {
 		name = manifest.Name
 	}
 
-	pluginPath := filepath.Join(m.pluginDir, name)
+	// Install plugins to the primary plugin directory
+	pluginPath := filepath.Join(m.pluginDirs[0], name)
 	if err := os.MkdirAll(pluginPath, 0o755); err != nil {
 		return fmt.Errorf("failed to create plugin directory: %w", err)
 	}
@@ -586,7 +618,8 @@ func (m *Manager) UploadPluginLegacy(name string, wasmData []byte, manifestData 
 		name = manifest.Name
 	}
 
-	pluginPath := filepath.Join(m.pluginDir, name)
+	// Install plugins to the primary plugin directory
+	pluginPath := filepath.Join(m.pluginDirs[0], name)
 	if err := os.MkdirAll(pluginPath, 0o755); err != nil {
 		return fmt.Errorf("failed to create plugin directory: %w", err)
 	}
@@ -610,11 +643,21 @@ func (m *Manager) UploadPluginLegacy(name string, wasmData []byte, manifestData 
 
 // DeletePlugin removes a plugin from the filesystem.
 func (m *Manager) DeletePlugin(name string) error {
+	m.mu.RLock()
+	plugin, exists := m.plugins[name]
+	m.mu.RUnlock()
+
+	if !exists {
+		return fmt.Errorf("plugin %s not found", name)
+	}
+
+	// Store the path before unloading (unload removes from map)
+	pluginPath := plugin.Path
+
 	if err := m.UnloadPlugin(name); err != nil {
 		return err
 	}
 
-	pluginPath := filepath.Join(m.pluginDir, name)
 	return os.RemoveAll(pluginPath)
 }
 

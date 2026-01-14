@@ -956,10 +956,25 @@ func main() {
 	diagramHandler := handlers.NewDiagramHandler(db)
 
 	// Initialize plugin system
-	pluginManager := plugins.NewManager("plugins",
-		plugins.WithDatabase(db),
-		plugins.WithSCMService(scmSyncService),
-	)
+	// PLUGIN_DIRS env var allows loading plugins from additional directories (opt-in)
+	var pluginOpts []plugins.Option
+	pluginOpts = append(pluginOpts, plugins.WithDatabase(db), plugins.WithSCMService(scmSyncService))
+
+	if pluginDirsEnv := os.Getenv("PLUGIN_DIRS"); pluginDirsEnv != "" {
+		var additionalDirs []string
+		for _, dir := range strings.Split(pluginDirsEnv, ",") {
+			dir = strings.TrimSpace(dir)
+			if dir != "" && dir != "plugins" {
+				additionalDirs = append(additionalDirs, dir)
+			}
+		}
+		if len(additionalDirs) > 0 {
+			slog.Info("loading plugins from additional directories", "dirs", additionalDirs)
+			pluginOpts = append(pluginOpts, plugins.WithAdditionalPluginDirs(additionalDirs...))
+		}
+	}
+
+	pluginManager := plugins.NewManager("plugins", pluginOpts...)
 	slog.Info("initializing plugin system")
 	if err := pluginManager.LoadPlugins(); err != nil {
 		slog.Warn("failed to load plugins", "error", err)
