@@ -53,7 +53,7 @@
   // Global keyboard shortcut handler
   function handleGlobalKeydown(event) {
     // Only handle shortcuts when not typing in inputs or textareas
-    if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.tagName === 'SELECT') {
+    if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.tagName === 'SELECT' || event.target.isContentEditable) {
       return;
     }
 
