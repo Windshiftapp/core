@@ -64,7 +64,7 @@
     <div class="flex border-b" style="border-color: var(--ds-border);">
       <button
         class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative"
-        style="{tab === 'comments' ? 'background-color: var(--ds-surface-raised); color: #2563eb; margin-bottom: -1px; border-bottom: 2px solid #2563eb;' : 'color: var(--ds-text-subtle);'}"
+        style="{tab === 'comments' ? 'background-color: var(--ds-surface-raised); color: var(--ds-interactive); margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : 'color: var(--ds-text-subtle);'}"
         onclick={() => switchTab('comments')}
       >
         <MessageSquare class="w-4 h-4" />
@@ -76,7 +76,7 @@
       {#if moduleSettings.time_tracking_enabled}
         <button
           class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative"
-          style="{tab === 'time' ? 'background-color: var(--ds-surface-raised); color: #2563eb; margin-bottom: -1px; border-bottom: 2px solid #2563eb;' : 'color: var(--ds-text-subtle);'}"
+          style="{tab === 'time' ? 'background-color: var(--ds-surface-raised); color: var(--ds-interactive); margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : 'color: var(--ds-text-subtle);'}"
           onclick={() => switchTab('time')}
         >
           <Clock class="w-4 h-4" />
@@ -88,7 +88,7 @@
       {/if}
       <button
         class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative"
-        style="{tab === 'details' ? 'background-color: var(--ds-surface-raised); color: #2563eb; margin-bottom: -1px; border-bottom: 2px solid #2563eb;' : 'color: var(--ds-text-subtle);'}"
+        style="{tab === 'details' ? 'background-color: var(--ds-surface-raised); color: var(--ds-interactive); margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : 'color: var(--ds-text-subtle);'}"
         onclick={() => switchTab('details')}
       >
         <Info class="w-4 h-4" />
@@ -96,7 +96,7 @@
       </button>
       <button
         class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative"
-        style="{tab === 'history' ? 'background-color: var(--ds-surface-raised); color: #2563eb; margin-bottom: -1px; border-bottom: 2px solid #2563eb;' : 'color: var(--ds-text-subtle);'}"
+        style="{tab === 'history' ? 'background-color: var(--ds-surface-raised); color: var(--ds-interactive); margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : 'color: var(--ds-text-subtle);'}"
         onclick={() => switchTab('history')}
       >
         <History class="w-4 h-4" />
