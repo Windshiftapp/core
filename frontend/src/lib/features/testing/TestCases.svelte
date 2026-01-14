@@ -1282,7 +1282,7 @@
                 onclick={showCreateLabelFormModal}
                 icon={Plus}
                 size="small"
-                class="text-blue-600 hover:text-blue-800"
+                style="color: var(--ds-interactive);"
               >
                 New Label
               </Button>
@@ -1309,8 +1309,8 @@
                     <div class="flex items-center gap-3">
                       <!-- Color Preview Circle -->
                       <div
-                        class="w-8 h-8 rounded-full border-2 border-gray-300 flex-shrink-0"
-                        style="background-color: {newLabelData.color};"
+                        class="w-8 h-8 rounded-full border-2 flex-shrink-0"
+                        style="background-color: {newLabelData.color}; border-color: var(--ds-border-bold);"
                       ></div>
                       
                       <!-- Color Palette -->
@@ -1319,8 +1319,8 @@
                           <button
                             type="button"
                             onclick={() => newLabelData.color = color}
-                            class="w-6 h-6 rounded-full border-2 transition-all hover:scale-110 {newLabelData.color === color ? 'border-gray-600 ring-2 ring-gray-300' : 'border-gray-300 hover:border-gray-400'}"
-                            style="background-color: {color};"
+                            class="w-6 h-6 rounded-full border-2 transition-all hover:scale-110 {newLabelData.color === color ? 'ring-2' : ''}"
+                            style="background-color: {color}; border-color: {newLabelData.color === color ? 'var(--ds-border-bold)' : 'var(--ds-border)'}; {newLabelData.color === color ? '--tw-ring-color: var(--ds-border);' : ''}"
                             aria-label="Select color {color}"
                           ></button>
                         {/each}
@@ -1330,10 +1330,11 @@
                           <input
                             type="color"
                             bind:value={newLabelData.color}
-                            class="w-6 h-6 rounded-full border-2 border-gray-300 hover:border-gray-400 cursor-pointer opacity-0 absolute inset-0"
+                            class="w-6 h-6 rounded-full border-2 cursor-pointer opacity-0 absolute inset-0"
+                            style="border-color: var(--ds-border);"
                             aria-label="Custom color picker"
                           />
-                          <div class="w-6 h-6 rounded-full border-2 border-gray-300 hover:border-gray-400 cursor-pointer flex items-center justify-center text-xs font-bold text-gray-500" style="background: linear-gradient(45deg, #ff0000 25%, #ffff00 25%, #ffff00 50%, #00ff00 50%, #00ff00 75%, #0000ff 75%);">
+                          <div class="w-6 h-6 rounded-full border-2 cursor-pointer flex items-center justify-center text-xs font-bold" style="border-color: var(--ds-border); color: var(--ds-text-subtle); background: linear-gradient(45deg, #ff0000 25%, #ffff00 25%, #ffff00 50%, #00ff00 50%, #00ff00 75%, #0000ff 75%);">
                             +
                           </div>
                         </div>
