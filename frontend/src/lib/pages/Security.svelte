@@ -350,15 +350,15 @@
 <div class="max-w-4xl mx-auto space-y-6">
 	<!-- Page Header -->
 	<div class="mb-6">
-		<h1 class="text-3xl font-bold text-gray-900 flex items-center gap-3">
-			<Shield class="h-8 w-8 text-blue-600" />
+		<h1 class="text-3xl font-bold flex items-center gap-3" style="color: var(--ds-text);">
+			<Shield class="h-8 w-8" style="color: var(--ds-interactive);" />
 			Security
 		</h1>
-		<p class="text-gray-600 mt-2">Manage your account security, authentication methods, and API access.</p>
+		<p class="mt-2" style="color: var(--ds-text-subtle);">Manage your account security, authentication methods, and API access.</p>
 	</div>
 
 	<!-- Security Credentials -->
-	<div class="bg-white shadow rounded p-6">
+	<div class="shadow rounded-lg border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
 		<SectionHeader title="Security Credentials" subtitle="Manage your authentication methods" class="mb-6">
 			{#snippet actions()}
 				<Button
@@ -376,12 +376,12 @@
 		<!-- Credentials List -->
 		<div class="space-y-3">
 			{#each credentials as credential}
-				<div class="flex items-center justify-between p-4 border rounded hover:bg-gray-50">
+				<div class="flex items-center justify-between p-4 border rounded hover-bg" style="border-color: var(--ds-border);">
 					<div class="flex items-center space-x-3">
-						<svelte:component this={getCredentialIcon(credential.credential_type)} class="h-6 w-6 text-gray-500" />
+						<svelte:component this={getCredentialIcon(credential.credential_type)} class="h-6 w-6" style="color: var(--ds-icon-subtle);" />
 						<div>
-							<div class="font-medium text-gray-900">{credential.name}</div>
-							<div class="text-sm text-gray-500">
+							<div class="font-medium" style="color: var(--ds-text);">{credential.name}</div>
+							<div class="text-sm" style="color: var(--ds-text-subtle);">
 								{getCredentialTypeName(credential.credential_type)} • Added {formatDateShort(credential.created_at) || '-'}
 							</div>
 						</div>
@@ -397,22 +397,22 @@
 				</div>
 			{:else}
 				<div class="text-center py-12">
-					<Shield class="h-12 w-12 mx-auto mb-4 text-gray-300" />
-					<h3 class="text-lg font-medium text-gray-900 mb-2">No security credentials</h3>
-					<p class="text-sm text-gray-600">Add a security key or authenticator app to secure your account.</p>
+					<Shield class="h-12 w-12 mx-auto mb-4" style="color: var(--ds-icon-subtlest);" />
+					<h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">No security credentials</h3>
+					<p class="text-sm" style="color: var(--ds-text-subtle);">Add a security key or authenticator app to secure your account.</p>
 				</div>
 			{/each}
 		</div>
 	</div>
 
 	<!-- Account Security -->
-	<div class="bg-white shadow rounded p-6">
-		<h2 class="text-lg font-medium text-gray-900 mb-4">Account Security</h2>
+	<div class="shadow rounded-lg border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+		<h2 class="text-lg font-medium mb-4" style="color: var(--ds-text);">Account Security</h2>
 		<div class="space-y-4">
 			<div class="flex items-center justify-between">
 				<div>
-					<div class="font-medium text-gray-900">Password</div>
-					<div class="text-sm text-gray-500">Last updated: Unknown</div>
+					<div class="font-medium" style="color: var(--ds-text);">Password</div>
+					<div class="text-sm" style="color: var(--ds-text-subtle);">Last updated: Unknown</div>
 				</div>
 				<Button variant="link" onclick={() => showChangePassword = true}>
 					Change Password
@@ -422,7 +422,7 @@
 	</div>
 
 	<!-- App Tokens -->
-	<div class="bg-white shadow rounded p-6">
+	<div class="shadow rounded-lg border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
 		<SectionHeader title="API Tokens" subtitle="Create tokens to access your account programmatically" class="mb-6">
 			{#snippet actions()}
 				<Button
@@ -476,12 +476,12 @@
 		<!-- Tokens List -->
 		<div class="space-y-3">
 			{#each apiTokens as token}
-				<div class="flex items-center justify-between p-4 border rounded hover:bg-gray-50">
+				<div class="flex items-center justify-between p-4 border rounded hover-bg" style="border-color: var(--ds-border);">
 					<div class="flex items-center space-x-3">
-						<Code class="h-6 w-6 text-gray-500" />
+						<Code class="h-6 w-6" style="color: var(--ds-icon-subtle);" />
 						<div>
-							<div class="font-medium text-gray-900">{token.name}</div>
-							<div class="text-sm text-gray-500">
+							<div class="font-medium" style="color: var(--ds-text);">{token.name}</div>
+							<div class="text-sm" style="color: var(--ds-text-subtle);">
 								Created {formatDateShort(token.created_at) || '-'} • Expires {formatDate(token.expires_at) || 'Never expires'}
 							</div>
 						</div>
@@ -497,9 +497,9 @@
 				</div>
 			{:else}
 				<div class="text-center py-12">
-					<Code class="h-12 w-12 mx-auto mb-4 text-gray-300" />
-					<h3 class="text-lg font-medium text-gray-900 mb-2">No API tokens</h3>
-					<p class="text-sm text-gray-600">Generate your first API token to access your account programmatically.</p>
+					<Code class="h-12 w-12 mx-auto mb-4" style="color: var(--ds-icon-subtlest);" />
+					<h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">No API tokens</h3>
+					<p class="text-sm" style="color: var(--ds-text-subtle);">Generate your first API token to access your account programmatically.</p>
 				</div>
 			{/each}
 		</div>
@@ -524,7 +524,7 @@
 
 	<div class="px-6 py-4">
 		{#if changePasswordError}
-			<div class="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+			<div class="mb-4 p-3 rounded text-sm" style="background-color: var(--ds-background-danger-subtle); border: 1px solid var(--ds-border-danger); color: var(--ds-text-danger);">
 				{changePasswordError}
 			</div>
 		{/if}
@@ -574,7 +574,8 @@
 						id="logout-all"
 						type="checkbox"
 						bind:checked={changePasswordData.logout_all}
-						class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+						class="h-4 w-4 rounded"
+						style="accent-color: var(--ds-interactive);"
 					/>
 					<label for="logout-all" class="text-sm" style="color: var(--ds-text-subtle);">
 						Log out of all other sessions
