@@ -526,7 +526,7 @@
         triggerIcon={MoreHorizontal}
         iconOnly={true}
         showChevron={false}
-        triggerClass="p-2 rounded hover:bg-gray-100"
+        triggerClass="p-2 rounded hover-bg"
         items={[
           { id: 'edit', title: 'Edit Set', icon: Edit, onClick: () => showEditSetForm(selectedSet) },
           { id: 'delete', title: 'Delete Set', icon: Trash2, color: 'var(--ds-text-danger)', onClick: () => deleteSet(selectedSetId) }
@@ -976,3 +976,4 @@
   onSave={handleFieldsSubmit}
   onCancel={handleFieldsCancel}
 />
+

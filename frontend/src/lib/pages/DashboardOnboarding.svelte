@@ -103,7 +103,7 @@
     <!-- Close button -->
     <button
       onclick={dismissOnboarding}
-      class="absolute top-4 right-4 p-2 rounded transition-all hover:bg-gray-100 z-10"
+      class="absolute top-4 right-4 p-2 rounded transition-all hover-bg z-10"
       style="color: var(--ds-text-subtle);"
       title="Dismiss onboarding"
       aria-label="Dismiss onboarding"

@@ -376,7 +376,7 @@
         type: 'regular',
         icon: Edit,
         title: 'Edit',
-        hoverClass: 'hover:bg-gray-100',
+        hoverClass: 'hover-bg',
         onClick: () => showEditAssetForm(asset)
       },
       {

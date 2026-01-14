@@ -701,7 +701,7 @@ async function loadStatuses() {
               <!-- Breadcrumb Button -->
               <button
                 onclick={() => navigateToLevel(breadcrumb.id)}
-                class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all {breadcrumb.isCurrent && !hasGradient ? 'bg-blue-50' : ''} {!breadcrumb.isCurrent && !hasGradient ? 'hover:bg-gray-100' : ''} {hasGradient ? 'backdrop-blur-md' : ''} {breadcrumb.isCurrent ? 'font-medium' : ''}"
+                class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all {breadcrumb.isCurrent && !hasGradient ? 'bg-blue-50' : ''} {!breadcrumb.isCurrent && !hasGradient ? 'hover-bg' : ''} {hasGradient ? 'backdrop-blur-md' : ''} {breadcrumb.isCurrent ? 'font-medium' : ''}"
                 style="{breadcrumb.isCurrent ? `color: ${hasGradient ? 'white' : 'var(--ds-interactive)'}; background-color: ${hasGradient ? 'rgba(255, 255, 255, 0.3)' : ''}; border: 1px solid ${hasGradient ? 'rgba(255, 255, 255, 0.3)' : 'var(--ds-border-focused)'};` : `color: ${hasGradient ? 'rgba(255, 255, 255, 0.8)' : 'var(--ds-text)'}; background-color: ${hasGradient ? 'rgba(255, 255, 255, 0.2)' : ''}; border: 1px solid transparent;`}"
               >
                 <!-- Icon -->
@@ -1071,7 +1071,7 @@ async function loadStatuses() {
                                         const dropdown = document.getElementById(dropdownId);
                                         if (dropdown) dropdown.classList.add('hidden');
                                       }}
-                                      class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 transition-colors"
+                                      class="w-full flex items-center gap-2 px-3 py-2 text-sm hover-bg transition-colors"
                                       style="color: var(--ds-text);"
                                     >
                                       <div class="w-5 h-5 rounded flex items-center justify-center flex-shrink-0" style="background-color: {type.color};">
@@ -1148,11 +1148,11 @@ async function loadStatuses() {
   [data-testid^="draggable-item"]:hover {
     transform: translateY(-1px);
   }
-  
+
   [data-testid^="drop-zone"] {
     transition: border-color 0.2s ease, background-color 0.2s ease;
   }
-  
+
   [data-testid^="drop-zone"]:hover {
     border-color: var(--ds-border-focused);
     background-color: var(--ds-background-selected);

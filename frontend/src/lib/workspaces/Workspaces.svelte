@@ -205,7 +205,7 @@
         type: 'regular',
         icon: Edit,
         title: 'Edit',
-        hoverClass: 'hover:bg-gray-100',
+        hoverClass: 'hover-bg',
         onClick: () => startEdit(workspace)
       }
       // Delete action removed - workspaces can only be deleted from workspace settings

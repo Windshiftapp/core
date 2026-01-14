@@ -463,7 +463,7 @@
           </div>
           <button
             type="button"
-            class="p-2 rounded-md hover:bg-gray-100"
+            class="p-2 rounded-md hover-bg"
             style="color: var(--ds-text-subtle);"
             on:click={copyCallbackUrl}
             title="Copy to clipboard"

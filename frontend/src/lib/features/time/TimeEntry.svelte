@@ -102,7 +102,7 @@
         type: 'regular',
         icon: Edit,
         title: 'Edit',
-        hoverClass: 'hover:bg-gray-100',
+        hoverClass: 'hover-bg',
         onClick: () => editWorklog(worklog)
       },
       {
@@ -355,7 +355,7 @@
                   triggerIcon={MoreHorizontal}
                   showChevron={false}
                   iconOnly={true}
-                  triggerClass="p-2 rounded-md hover:bg-gray-100 transition-colors duration-150"
+                  triggerClass="p-2 rounded-md hover-bg transition-colors duration-150"
                 />
               </td>
             </tr>
@@ -391,3 +391,4 @@
     oncancel={handleModalCancel}
   />
 {/if}
+

@@ -214,7 +214,7 @@
         <div class="flex items-center gap-1 flex-shrink-0">
           <button
             onclick={() => startEdit(category)}
-            class="p-1.5 rounded hover:bg-gray-100 transition-colors"
+            class="p-1.5 rounded hover-bg transition-colors"
             title="Edit"
           >
             <Edit class="w-4 h-4" style="color: var(--ds-text-subtle);" />
@@ -240,3 +240,4 @@
   on:save={saveCategory}
   on:cancel={cancelForm}
 />
+

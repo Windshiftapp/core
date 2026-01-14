@@ -467,7 +467,7 @@
         type: 'regular',
         icon: Settings,
         title: 'Fields',
-        hoverClass: 'hover:bg-gray-100',
+        hoverClass: 'hover-bg',
         onClick: () => startEditFields(screen)
       },
       {
@@ -475,7 +475,7 @@
         type: 'regular',
         icon: Edit,
         title: 'Edit',
-        hoverClass: 'hover:bg-gray-100',
+        hoverClass: 'hover-bg',
         onClick: () => startEdit(screen)
       }
     ];
@@ -719,7 +719,7 @@
                 {/if}
                 <!-- Drag Handle -->
                 <div 
-                  class="cursor-grab active:cursor-grabbing flex-shrink-0 p-1 rounded hover:bg-gray-100 transition-colors"
+                  class="cursor-grab active:cursor-grabbing flex-shrink-0 p-1 rounded hover-bg transition-colors"
                   style="touch-action: none;"
                 >
                   <svg class="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="currentColor" viewBox="0 0 24 24">

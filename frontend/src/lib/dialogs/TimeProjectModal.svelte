@@ -118,7 +118,7 @@
             </div>
             <button
               onclick={() => formData.color = ''}
-              class="text-sm px-3 py-1 rounded hover:bg-gray-100 transition-colors"
+              class="text-sm px-3 py-1 rounded hover-bg transition-colors"
               style="color: var(--ds-text-subtle);"
               type="button"
             >
@@ -208,4 +208,5 @@
     border-color: #374151;
     box-shadow: 0 0 0 2px #3b82f6;
   }
+
 </style>

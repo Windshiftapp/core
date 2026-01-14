@@ -149,3 +149,8 @@ textarea {
   white-space: nowrap;
   border-width: 0;
 }
+
+/* Hover background utility */
+.hover-bg:hover {
+  background-color: var(--ds-background-neutral-hovered);
+}

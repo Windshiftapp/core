@@ -221,7 +221,7 @@
       </div>
       {#if embedded}
         <button
-          class="inline-flex items-center gap-2 rounded border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 transition"
+          class="inline-flex items-center gap-2 rounded border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover-bg transition"
           onclick={handleClose}
         >
           <ArrowLeft class="w-4 h-4" />

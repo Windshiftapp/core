@@ -151,7 +151,7 @@
         <DropdownMenu
           triggerText=""
           triggerIcon={MoreHorizontal}
-          triggerClass="p-2 rounded hover:bg-gray-100 transition-colors"
+          triggerClass="p-2 rounded hover-bg transition-colors"
           items={buildActionItems()}
           placement="bottom-end"
         />
@@ -305,8 +305,9 @@
   .notification-wrapper {
     transition: all 0.2s ease;
   }
-  
+
   .notification-wrapper:hover {
-    background-color: #fafafa;
+    background-color: var(--ds-background-neutral-hovered);
   }
+
 </style>

@@ -217,7 +217,7 @@
 				type: 'regular',
 				icon: Edit,
 				title: 'Edit',
-				hoverClass: 'hover:bg-gray-100',
+				hoverClass: 'hover-bg',
 				onClick: () => editUser(user)
 			},
 			{
@@ -225,7 +225,7 @@
 				type: 'regular',
 				icon: RotateCcw,
 				title: 'Reset Password',
-				hoverClass: 'hover:bg-gray-100',
+				hoverClass: 'hover-bg',
 				onClick: () => resetUserPassword(user.id, user.full_name)
 			}
 		];
@@ -655,4 +655,3 @@
 		</DataTable>
 	{/if}
 </div>
-

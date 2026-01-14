@@ -867,7 +867,7 @@
 							<h3 class="text-base font-medium" style="color: var(--ds-text);">Your Calendar Feed URL</h3>
 							<div class="flex items-center gap-2">
 								<button
-									class="text-sm px-2 py-1 rounded hover:bg-gray-100"
+									class="text-sm px-2 py-1 rounded hover-bg"
 									style="color: var(--ds-link);"
 									onclick={() => showFullFeedUrl = !showFullFeedUrl}
 								>

@@ -1,11 +1,10 @@
 <script>
   import { onMount } from 'svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-  import { Users, Mail, Search, GripVertical, Plus, X, Edit2, Trash2, MoreHorizontal } from 'lucide-svelte';
+  import { Users, Mail, Search, GripVertical, Plus, Edit2, Trash2, MoreHorizontal } from 'lucide-svelte';
   import { api } from '../api.js';
   import { confirm } from '../composables/useConfirm.js';
-  import { createShortcutHandler, getShortcut, getDisplayString, matchesShortcut } from '../utils/keyboardShortcuts.js';
-  import PageHeader from '../layout/PageHeader.svelte';
+  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
   import Button from '../components/Button.svelte';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
@@ -15,10 +14,9 @@
   import BasePicker from '../pickers/BasePicker.svelte';
   import Label from '../components/Label.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
-
-  // Keyboard shortcuts
-  const submitShortcut = getShortcut('modal', 'submit');
-  const cancelShortcut = getShortcut('modal', 'cancel');
+  import Modal from '../dialogs/Modal.svelte';
+  import ModalHeader from '../dialogs/ModalHeader.svelte';
+  import TextField from '../components/TextField.svelte';
 
   // State
   let customerOrganisations = $state([]);
@@ -46,7 +44,6 @@
 
   // Create customer modal
   let showCreateModal = $state(false);
-  let nameInputRef;
   let formData = $state({
     name: '',
     email: '',
@@ -107,15 +104,6 @@
   $effect(() => {
     selectedOrgId;
     displayLimit = 15;
-  });
-
-  // Autofocus name input when create modal opens
-  $effect(() => {
-    if (showCreateModal && nameInputRef) {
-      setTimeout(() => {
-        nameInputRef.focus();
-      }, 100);
-    }
   });
 
   // Setup drag and drop after rendering (track both customers and orgs)
@@ -299,7 +287,7 @@
       name: customer.name,
       email: customer.email,
       phone: customer.phone || '',
-      customer_organisation_id: customer.customer_organisation_id,
+      customer_organisation_id: customer.customer_organisation_id ?? null,
       custom_field_values: customer.custom_field_values || {}
     };
     showDetailModal = true;
@@ -384,36 +372,7 @@
     ];
   }
 
-  function handleModalBackdropClick(e) {
-    if (e.target === e.currentTarget) {
-      closeModal();
-    }
-  }
-
-  function handleModalKeydown(e) {
-    if (matchesShortcut(e, cancelShortcut)) {
-      closeModal();
-      return;
-    }
-    if (matchesShortcut(e, submitShortcut)) {
-      e.preventDefault();
-      if (!formData.name.trim() || !formData.email.trim()) return;
-      handleCreateCustomer();
-    }
-  }
-
-  function handleDetailModalBackdropClick(e) {
-    if (e.target === e.currentTarget) {
-      closeDetailModal();
-    }
-  }
-
-  function handleDetailModalKeydown(e) {
-    if (e.key === 'Escape') {
-      closeDetailModal();
-    }
-  }
-</script>
+  </script>
 
 <svelte:window onkeydown={handleGlobalKeydown} />
 
@@ -535,7 +494,7 @@
                   <DropdownMenu
                     triggerText=""
                     triggerIcon={MoreHorizontal}
-                    triggerClass="p-2 rounded hover:bg-gray-100 transition-colors"
+                    triggerClass="p-2 rounded hover-bg transition-colors"
                     items={buildCustomerActions(customer)}
                     align="right"
                   />
@@ -559,244 +518,182 @@
 </div>
 
 <!-- Create Customer Modal -->
-{#if showCreateModal}
-  <div
-    class="fixed inset-0 flex items-center justify-center p-4 z-50"
-    style="background-color: rgba(0, 0, 0, 0.3); backdrop-filter: blur(2px);"
-    onclick={handleModalBackdropClick}
-    onkeydown={handleModalKeydown}
-    role="dialog"
-    aria-modal="true"
-  >
-    <div class="rounded shadow-xl w-full max-w-md" style="background-color: var(--ds-surface-raised);" onclick={(e) => e.stopPropagation()}>
-      <!-- Header -->
-      <div class="flex items-center justify-between p-6 border-b" style="border-color: var(--ds-border);">
-        <h2 class="text-xl font-semibold" style="color: var(--ds-text);">Add Portal Customer</h2>
-        <Button
-          onclick={closeModal}
-          variant="default"
-          size="small"
-          icon={X}
-          aria-label="Close"
-          class="p-2 !bg-transparent !border-none hover:!bg-gray-100"
+<Modal
+  isOpen={showCreateModal}
+  maxWidth="max-w-md"
+  onSubmit={handleCreateCustomer}
+  submitDisabled={!formData.name.trim() || !formData.email.trim()}
+  onclose={closeModal}
+>
+  {#snippet children(submitHint)}
+    <ModalHeader title="Add Portal Customer" onClose={closeModal} />
+
+    <div class="p-6 space-y-4">
+      <TextField
+        label="Name"
+        id="customer-name"
+        bind:value={formData.name}
+        placeholder="Enter customer name"
+        required
+      />
+
+      <TextField
+        label="Email"
+        id="customer-email"
+        type="email"
+        bind:value={formData.email}
+        placeholder="customer@example.com"
+        required
+      />
+
+      <TextField
+        label="Phone"
+        id="customer-phone"
+        type="tel"
+        bind:value={formData.phone}
+        placeholder="+1 (555) 123-4567"
+      />
+
+      <div>
+        <Label for="customer-org" class="mb-2">Customer Organisation</Label>
+        <BasePicker
+          bind:value={formData.customer_organisation_id}
+          items={customerOrganisations}
+          placeholder="None (Unassigned)"
+          showUnassigned={true}
+          unassignedLabel="None (Unassigned)"
+          getValue={(item) => item.id}
+          getLabel={(item) => item.name}
         />
       </div>
 
-      <!-- Form -->
-      <div class="p-6 space-y-4">
-        <div>
-          <Label for="customer-name" required class="mb-2">Name</Label>
-          <input
-            id="customer-name"
-            bind:this={nameInputRef}
-            bind:value={formData.name}
-            type="text"
-            class="w-full px-4 py-2 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500"
-            style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-            placeholder="Enter customer name"
-            required
-          />
-        </div>
-
-        <div>
-          <Label for="customer-email" required class="mb-2">Email</Label>
-          <input
-            id="customer-email"
-            bind:value={formData.email}
-            type="email"
-            class="w-full px-4 py-2 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500"
-            style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-            placeholder="customer@example.com"
-            required
-          />
-        </div>
-
-        <div>
-          <Label for="customer-phone" class="mb-2">Phone</Label>
-          <input
-            id="customer-phone"
-            bind:value={formData.phone}
-            type="tel"
-            class="w-full px-4 py-2 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500"
-            style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-            placeholder="+1 (555) 123-4567"
-          />
-        </div>
-
-        <div>
-          <Label for="customer-org" class="mb-2">Customer Organisation</Label>
-          <BasePicker
-            bind:value={formData.customer_organisation_id}
-            items={customerOrganisations}
-            placeholder="None (Unassigned)"
-            showUnassigned={true}
-            unassignedLabel="None (Unassigned)"
-            getValue={(item) => item.id}
-            getLabel={(item) => item.name}
-          />
-        </div>
-
-        <!-- Custom Fields -->
-        {#if portalCustomerFields.length > 0}
-          <div class="col-span-full pt-4 border-t" style="border-color: var(--ds-border);">
-            <h3 class="text-sm font-medium mb-3" style="color: var(--ds-text);">Custom Fields</h3>
-            <div class="space-y-4">
-              {#each portalCustomerFields as field}
-                <CustomFieldRenderer
-                  {field}
-                  bind:value={formData.custom_field_values[field.name]}
-                  readonly={false}
-                  onChange={(val) => {
-                    formData.custom_field_values[field.name] = val;
-                  }}
-                />
-              {/each}
-            </div>
+      <!-- Custom Fields -->
+      {#if portalCustomerFields.length > 0}
+        <div class="col-span-full pt-4 border-t" style="border-color: var(--ds-border);">
+          <h3 class="text-sm font-medium mb-3" style="color: var(--ds-text);">Custom Fields</h3>
+          <div class="space-y-4">
+            {#each portalCustomerFields as field}
+              <CustomFieldRenderer
+                {field}
+                bind:value={formData.custom_field_values[field.name]}
+                readonly={false}
+                onChange={(val) => {
+                  formData.custom_field_values[field.name] = val;
+                }}
+              />
+            {/each}
           </div>
-        {/if}
-      </div>
-
-      <!-- Footer -->
-      <DialogFooter
-        onCancel={closeModal}
-        onConfirm={handleCreateCustomer}
-        confirmLabel="Create Customer"
-        disabled={!formData.name.trim() || !formData.email.trim()}
-        showKeyboardHint={true}
-        confirmKeyboardHint={getDisplayString(submitShortcut)}
-      />
+        </div>
+      {/if}
     </div>
-  </div>
-{/if}
+
+    <DialogFooter
+      onCancel={closeModal}
+      onConfirm={handleCreateCustomer}
+      confirmLabel="Create Customer"
+      disabled={!formData.name.trim() || !formData.email.trim()}
+      showKeyboardHint={true}
+      confirmKeyboardHint={submitHint}
+    />
+  {/snippet}
+</Modal>
 
 <!-- Detail/Edit Customer Modal -->
-{#if showDetailModal && selectedCustomer}
-  <div
-    class="fixed inset-0 flex items-center justify-center p-4 z-50"
-    style="background-color: rgba(0, 0, 0, 0.3); backdrop-filter: blur(2px);"
-    onclick={handleDetailModalBackdropClick}
-    onkeydown={handleDetailModalKeydown}
-    role="dialog"
-    aria-modal="true"
-  >
-    <div class="rounded shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" style="background-color: var(--ds-surface-raised);" onclick={(e) => e.stopPropagation()}>
-      <!-- Header -->
-      <div class="flex items-center justify-between p-6 border-b sticky top-0 z-10" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-        <div class="flex items-center gap-3">
-          <Edit2 class="w-5 h-5" style="color: var(--ds-text-subtle);" />
-          <h2 class="text-xl font-semibold" style="color: var(--ds-text);">Edit Portal Customer</h2>
-        </div>
-        <Button
-          onclick={closeDetailModal}
-          variant="default"
-          size="small"
-          icon={X}
-          aria-label="Close"
-          class="p-2 !bg-transparent !border-none hover:!bg-gray-100"
+<Modal
+  isOpen={showDetailModal && selectedCustomer !== null}
+  maxWidth="max-w-2xl"
+  onSubmit={handleUpdateCustomer}
+  submitDisabled={!editFormData.name.trim() || !editFormData.email.trim()}
+  onclose={closeDetailModal}
+>
+  {#snippet children(submitHint)}
+    <ModalHeader title="Edit Portal Customer" icon={Edit2} onClose={closeDetailModal} />
+
+    <div class="p-6 space-y-4">
+      <TextField
+        label="Name"
+        id="edit-customer-name"
+        bind:value={editFormData.name}
+        placeholder="Enter customer name"
+        required
+      />
+
+      <TextField
+        label="Email"
+        id="edit-customer-email"
+        type="email"
+        bind:value={editFormData.email}
+        placeholder="customer@example.com"
+        required
+      />
+
+      <TextField
+        label="Phone"
+        id="edit-customer-phone"
+        type="tel"
+        bind:value={editFormData.phone}
+        placeholder="+1 (555) 123-4567"
+      />
+
+      <div>
+        <Label for="edit-customer-org" class="mb-2">Customer Organisation</Label>
+        <BasePicker
+          bind:value={editFormData.customer_organisation_id}
+          items={customerOrganisations}
+          placeholder="None (Unassigned)"
+          showUnassigned={true}
+          unassignedLabel="None (Unassigned)"
+          getValue={(item) => item.id}
+          getLabel={(item) => item.name}
         />
       </div>
 
-      <!-- Form -->
-      <div class="p-6 space-y-4">
-        <div>
-          <Label for="edit-customer-name" required class="mb-2">Name</Label>
-          <input
-            id="edit-customer-name"
-            bind:value={editFormData.name}
-            type="text"
-            class="w-full px-4 py-2 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500"
-            style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-            placeholder="Enter customer name"
-            required
-          />
-        </div>
-
-        <div>
-          <Label for="edit-customer-email" required class="mb-2">Email</Label>
-          <input
-            id="edit-customer-email"
-            bind:value={editFormData.email}
-            type="email"
-            class="w-full px-4 py-2 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500"
-            style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-            placeholder="customer@example.com"
-            required
-          />
-        </div>
-
-        <div>
-          <Label for="edit-customer-phone" class="mb-2">Phone</Label>
-          <input
-            id="edit-customer-phone"
-            bind:value={editFormData.phone}
-            type="tel"
-            class="w-full px-4 py-2 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500"
-            style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-            placeholder="+1 (555) 123-4567"
-          />
-        </div>
-
-        <div>
-          <Label for="edit-customer-org" class="mb-2">Customer Organisation</Label>
-          <BasePicker
-            bind:value={editFormData.customer_organisation_id}
-            items={customerOrganisations}
-            placeholder="None (Unassigned)"
-            showUnassigned={true}
-            unassignedLabel="None (Unassigned)"
-            getValue={(item) => item.id}
-            getLabel={(item) => item.name}
-          />
-        </div>
-
-        <!-- Custom Fields -->
-        {#if portalCustomerFields.length > 0}
-          <div class="pt-4 border-t" style="border-color: var(--ds-border);">
-            <h3 class="text-sm font-medium mb-3" style="color: var(--ds-text);">Custom Fields</h3>
-            <div class="space-y-4">
-              {#each portalCustomerFields as field}
-                <CustomFieldRenderer
-                  {field}
-                  bind:value={editFormData.custom_field_values[field.name]}
-                  readonly={false}
-                  onChange={(val) => {
-                    editFormData.custom_field_values[field.name] = val;
-                  }}
-                />
-              {/each}
-            </div>
+      <!-- Custom Fields -->
+      {#if portalCustomerFields.length > 0}
+        <div class="pt-4 border-t" style="border-color: var(--ds-border);">
+          <h3 class="text-sm font-medium mb-3" style="color: var(--ds-text);">Custom Fields</h3>
+          <div class="space-y-4">
+            {#each portalCustomerFields as field}
+              <CustomFieldRenderer
+                {field}
+                bind:value={editFormData.custom_field_values[field.name]}
+                readonly={false}
+                onChange={(val) => {
+                  editFormData.custom_field_values[field.name] = val;
+                }}
+              />
+            {/each}
           </div>
-        {/if}
+        </div>
+      {/if}
 
-        <!-- Metadata -->
-        {#if selectedCustomer.created_at}
-          <div class="pt-4 border-t space-y-2" style="border-color: var(--ds-border);">
+      <!-- Metadata -->
+      {#if selectedCustomer?.created_at}
+        <div class="pt-4 border-t space-y-2" style="border-color: var(--ds-border);">
+          <div class="text-xs" style="color: var(--ds-text-subtle);">
+            <span class="font-medium">Created:</span> {new Date(selectedCustomer.created_at).toLocaleString()}
+          </div>
+          {#if selectedCustomer.updated_at}
             <div class="text-xs" style="color: var(--ds-text-subtle);">
-              <span class="font-medium">Created:</span> {new Date(selectedCustomer.created_at).toLocaleString()}
+              <span class="font-medium">Updated:</span> {new Date(selectedCustomer.updated_at).toLocaleString()}
             </div>
-            {#if selectedCustomer.updated_at}
-              <div class="text-xs" style="color: var(--ds-text-subtle);">
-                <span class="font-medium">Updated:</span> {new Date(selectedCustomer.updated_at).toLocaleString()}
-              </div>
-            {/if}
-            {#if selectedCustomer.user_name}
-              <div class="text-xs" style="color: var(--ds-text-subtle);">
-                <span class="font-medium">Linked User:</span> {selectedCustomer.user_name} ({selectedCustomer.user_email})
-              </div>
-            {/if}
-          </div>
-        {/if}
-      </div>
-
-      <!-- Footer -->
-      <DialogFooter
-        onCancel={closeDetailModal}
-        onConfirm={handleUpdateCustomer}
-        confirmLabel="Save Changes"
-        disabled={!editFormData.name.trim() || !editFormData.email.trim()}
-        showKeyboardHint={true}
-      />
+          {/if}
+          {#if selectedCustomer.user_name}
+            <div class="text-xs" style="color: var(--ds-text-subtle);">
+              <span class="font-medium">Linked User:</span> {selectedCustomer.user_name} ({selectedCustomer.user_email})
+            </div>
+          {/if}
+        </div>
+      {/if}
     </div>
-  </div>
-{/if}
 
+    <DialogFooter
+      onCancel={closeDetailModal}
+      onConfirm={handleUpdateCustomer}
+      confirmLabel="Save Changes"
+      disabled={!editFormData.name.trim() || !editFormData.email.trim()}
+      showKeyboardHint={true}
+      confirmKeyboardHint={submitHint}
+    />
+  {/snippet}
+</Modal>

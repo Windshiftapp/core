@@ -173,7 +173,7 @@
 				type: 'regular',
 				icon: Edit,
 				title: 'Edit',
-				hoverClass: 'hover:bg-gray-100',
+				hoverClass: 'hover-bg',
 				onClick: () => editGroup(group)
 			},
 			{
@@ -181,7 +181,7 @@
 				type: 'regular',
 				icon: UserStar,
 				title: 'Manage Members',
-				hoverClass: 'hover:bg-gray-100',
+				hoverClass: 'hover-bg',
 				onClick: () => manageMembers(group)
 			}
 		];

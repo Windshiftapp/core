@@ -186,7 +186,7 @@
         type: 'regular',
         icon: Edit,
         title: 'Edit',
-        hoverClass: 'hover:bg-gray-100',
+        hoverClass: 'hover-bg',
         onClick: () => startEdit(hierarchyLevel)
       },
       {
@@ -194,7 +194,7 @@
         type: 'regular',
         icon: ChevronUp,
         title: 'Move Up',
-        hoverClass: 'hover:bg-gray-100',
+        hoverClass: 'hover-bg',
         disabled: hierarchyLevel.level === 0,
         onClick: () => moveLevel(hierarchyLevel.id, 'up')
       },
@@ -203,7 +203,7 @@
         type: 'regular',
         icon: ChevronDown,
         title: 'Move Down',
-        hoverClass: 'hover:bg-gray-100',
+        hoverClass: 'hover-bg',
         onClick: () => moveLevel(hierarchyLevel.id, 'down')
       },
       {

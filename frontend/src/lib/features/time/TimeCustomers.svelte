@@ -148,7 +148,7 @@
         type: 'regular',
         icon: Edit,
         title: 'Edit',
-        hoverClass: 'hover:bg-gray-100',
+        hoverClass: 'hover-bg',
         onClick: () => startEdit(customer)
       },
       {
@@ -233,3 +233,4 @@
       <Lozenge color={customer.active ? 'green' : 'gray'} text={customer.active ? 'Active' : 'Inactive'} />
     </div>
   </DataTable>
+
