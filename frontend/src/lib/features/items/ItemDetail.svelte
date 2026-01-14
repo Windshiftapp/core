@@ -1776,7 +1776,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   <Modal
     isOpen={true}
     maxWidth={isFullscreen ? 'max-w-[95vw]' : 'max-w-[80vw]'}
-    on:close={closeModal}
+    onclose={closeModal}
   >
     <div
       bind:this={modalElement}

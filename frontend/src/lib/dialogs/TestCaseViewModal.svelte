@@ -30,8 +30,6 @@
   let error = $state(null);
   let testCase = $state(null);
   let testSteps = $state([]);
-  let relatedSets = $state([]);
-  let runTemplates = $state([]);
   let executions = $state([]);
   let lastLoadedId = $state(null);
   const workspaceTestsBasePath = $derived.by(() => workspaceId ? `/workspaces/${workspaceId}/tests` : '/workspaces');
@@ -73,8 +71,6 @@
 
       testCase = caseData;
       testSteps = Array.isArray(stepsData) ? stepsData : [];
-      relatedSets = connections?.test_sets || [];
-      runTemplates = connections?.run_templates || [];
       executions = connections?.executions || [];
       lastLoadedId = numericId;
     } catch (err) {
