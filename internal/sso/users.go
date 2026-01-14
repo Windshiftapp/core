@@ -12,11 +12,12 @@ import (
 )
 
 var (
-	ErrExternalAccountNotFound = errors.New("external account not found")
-	ErrUserNotFound            = errors.New("user not found")
-	ErrEmailNotVerified        = errors.New("email not verified by SSO provider")
-	ErrAutoProvisionDisabled   = errors.New("automatic user provisioning is disabled")
-	ErrAccountLinkingFailed    = errors.New("failed to link external account")
+	ErrExternalAccountNotFound           = errors.New("external account not found")
+	ErrUserNotFound                      = errors.New("user not found")
+	ErrEmailNotVerified                  = errors.New("email not verified by SSO provider")
+	ErrAutoProvisionDisabled             = errors.New("automatic user provisioning is disabled")
+	ErrAccountLinkingFailed              = errors.New("failed to link external account")
+	ErrAccountLinkingRequiresVerification = errors.New("account linking requires verified email from identity provider")
 )
 
 // FindOrCreateResult contains the result of FindOrCreateUser with verification status
@@ -308,10 +309,18 @@ func (s *UserStore) FindOrCreateUser(provider *SSOProvider, claims *OIDCClaims) 
 		return result, nil
 	}
 
-	// 2. Try to link by email
+	// 2. Try to link by email - ONLY if IdP has verified the email
+	// Security: This prevents account takeover via malicious IdP that claims
+	// unverified emails matching existing users
 	if claims.Email != "" {
 		existingUser, err := s.FindUserByEmail(claims.Email)
 		if err == nil {
+			// Security check: Only auto-link if IdP has explicitly verified the email
+			// This prevents account takeover where an attacker controls an IdP and
+			// creates a user with a victim's email address
+			if !claims.EmailVerified || !claims.EmailVerifiedProvided {
+				return nil, fmt.Errorf("%w: cannot automatically link to existing account '%s' without verified email from identity provider", ErrAccountLinkingRequiresVerification, claims.Email)
+			}
 			// Link the external account to existing user
 			if err := s.LinkExternalAccount(existingUser.ID, provider.ID, claims.Subject, claims.Email, claims); err != nil {
 				return nil, fmt.Errorf("%w: %v", ErrAccountLinkingFailed, err)

@@ -655,6 +655,8 @@ func main() {
 	emailVerifyLimiter := middleware.NewRateLimiter(10.0/60.0, 15, useProxy, additionalProxyList)
 	// Setup: 5 requests per minute with burst of 10
 	setupLimiter := middleware.NewRateLimiter(5.0/60.0, 10, useProxy, additionalProxyList)
+	// SSO: 10 requests per minute with burst of 5 (stricter to prevent OIDC resource exhaustion)
+	ssoRateLimiter := middleware.NewRateLimiter(10.0/60.0, 5, useProxy, additionalProxyList)
 
 	defer loginRateLimiter.Stop()
 	defer scimRateLimiter.Stop()
@@ -664,6 +666,7 @@ func main() {
 	defer portalSearchLimiter.Stop()
 	defer emailVerifyLimiter.Stop()
 	defer setupLimiter.Stop()
+	defer ssoRateLimiter.Stop()
 
 	// Note: emailVerificationService is initialized later after smtpSender
 	var authHandler *handlers.AuthHandler
@@ -850,7 +853,8 @@ func main() {
 
 	// SSO handler for Single Sign-On
 	// Pass allowedHosts, emailVerificationService, and disableCSRF (dev mode) for secure redirect URI handling
-	ssoHandler := handlers.NewSSOHandler(db, sessionManager, permService, emailVerificationService, allowedHosts, disableCSRF, ipExtractor)
+	// Also pass useProxy and additionalProxyList for trusted proxy validation
+	ssoHandler := handlers.NewSSOHandler(db, sessionManager, permService, emailVerificationService, allowedHosts, disableCSRF, ipExtractor, useProxy, additionalProxyList)
 
 	// SCM provider handler for GitHub, GitLab, Gitea, Bitbucket integration
 	scmProviderHandler := handlers.NewSCMProviderHandler(db)
@@ -1033,6 +1037,7 @@ func main() {
 		LoginRateLimiter:    loginRateLimiter,
 		AuthRateLimiter:     authRateLimiter,
 		FIDORateLimiter:     fidoRateLimiter,
+		SSORateLimiter:      ssoRateLimiter,
 		PortalSubmitLimiter: portalSubmitLimiter,
 		PortalSearchLimiter: portalSearchLimiter,
 		EmailVerifyLimiter:  emailVerifyLimiter,

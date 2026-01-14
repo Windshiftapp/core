@@ -3,12 +3,15 @@ package handlers
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -23,6 +26,7 @@ import (
 
 	"github.com/zitadel/oidc/v3/pkg/client/rp"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
+	"golang.org/x/crypto/hkdf"
 )
 
 // oidcErrorMessages maps OIDC error codes to safe user-facing messages
@@ -56,6 +60,8 @@ type SSOHandler struct {
 	allowedHosts             []string           // Allowed hosts for redirect URI validation (from --allowed-hosts)
 	devMode                  bool               // Development mode (from --no-csrf flag)
 	ipExtractor              *utils.IPExtractor // IP extractor with proxy validation
+	useProxy                 bool               // Whether proxy mode is enabled
+	additionalProxies        []net.IP           // Additional trusted proxy IPs beyond private ranges
 }
 
 // SSOStatusResponse represents the public SSO status
@@ -107,7 +113,9 @@ type SSOProviderRequest struct {
 // allowedHostsStr: comma-separated list of allowed hosts from --allowed-hosts flag
 // devMode: true if --no-csrf flag is set (development mode)
 // emailVerificationService: service for handling email verification (can be nil if SMTP not configured)
-func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, permissionService *services.PermissionService, emailVerificationService *services.EmailVerificationService, allowedHostsStr string, devMode bool, ipExtractor *utils.IPExtractor) *SSOHandler {
+// useProxy: whether to trust proxy headers from trusted sources
+// additionalProxiesStr: comma-separated list of additional trusted proxy IPs
+func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, permissionService *services.PermissionService, emailVerificationService *services.EmailVerificationService, allowedHostsStr string, devMode bool, ipExtractor *utils.IPExtractor, useProxy bool, additionalProxiesStr []string) *SSOHandler {
 	// Get server secret for encryption
 	serverSecret := os.Getenv("SSO_SECRET")
 	if serverSecret == "" {
@@ -133,6 +141,14 @@ func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, pe
 		}
 	}
 
+	// Parse additional proxy IPs (beyond auto-trusted private ranges)
+	var additionalProxies []net.IP
+	for _, proxyStr := range additionalProxiesStr {
+		if ip := net.ParseIP(strings.TrimSpace(proxyStr)); ip != nil {
+			additionalProxies = append(additionalProxies, ip)
+		}
+	}
+
 	// Log warning for production without BASE_URL
 	if !devMode && baseURL == "" {
 		if len(allowedHosts) > 0 {
@@ -142,9 +158,13 @@ func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, pe
 		}
 	}
 
-	// Create cookie key from server secret (32 bytes for AES-256)
+	// Derive a 32-byte cookie key using HKDF (HMAC-based Key Derivation Function)
+	// This ensures proper key derivation even with short secrets, unlike direct byte copy
+	hkdfReader := hkdf.New(sha256.New, []byte(serverSecret), nil, []byte("windshift-sso-cookie-key-v1"))
 	cookieKey := make([]byte, 32)
-	copy(cookieKey, []byte(serverSecret))
+	if _, err := io.ReadFull(hkdfReader, cookieKey); err != nil {
+		log.Fatal("FATAL: Failed to derive cookie encryption key")
+	}
 
 	return &SSOHandler{
 		db:                       db,
@@ -159,6 +179,8 @@ func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, pe
 		allowedHosts:             allowedHosts,
 		devMode:                  devMode,
 		ipExtractor:              ipExtractor,
+		useProxy:                 useProxy,
+		additionalProxies:        additionalProxies,
 	}
 }
 
@@ -309,6 +331,8 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 				h.redirectWithError(w, r, "User account not found. Contact your administrator.")
 			} else if errors.Is(err, sso.ErrEmailNotVerified) {
 				h.redirectWithError(w, r, "Your email address has not been verified by the identity provider")
+			} else if errors.Is(err, sso.ErrAccountLinkingRequiresVerification) {
+				h.redirectWithError(w, r, "Cannot link to existing account: your identity provider must verify your email address first")
 			} else {
 				h.redirectWithError(w, r, "Failed to process user account")
 			}
@@ -639,11 +663,24 @@ func (h *SSOHandler) TestProvider(w http.ResponseWriter, r *http.Request) {
 	// Test connection
 	ctx := context.Background()
 	if err := h.oidcService.TestConnection(ctx, provider, clientSecret); err != nil {
+		// Log detailed error server-side for debugging
+		slog.Error("OIDC test connection failed",
+			slog.String("component", "sso"),
+			slog.Int("provider_id", id),
+			slog.Any("error", err))
+
+		// Return a safe, generic error message to prevent information leakage
+		// Raw errors may contain internal paths, IP addresses, or other sensitive info
+		safeMessage := "Failed to connect to OIDC provider. Check issuer URL and client credentials."
+		if errors.Is(err, sso.ErrOIDCDiscoveryFailed) {
+			safeMessage = "OIDC discovery failed. Verify the issuer URL is correct and accessible."
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
-			"error":   err.Error(),
+			"error":   safeMessage,
 		})
 		return
 	}
@@ -707,10 +744,15 @@ func (h *SSOHandler) getRedirectURI(r *http.Request, slug string) string {
 		return strings.TrimSuffix(h.baseURL, "/") + "/api/sso/callback/" + slug
 	}
 
-	// Get host from request or forwarded header
+	// Get host from request
 	host := r.Host
-	if forwardedHost := r.Header.Get("X-Forwarded-Host"); forwardedHost != "" {
-		host = forwardedHost
+
+	// Only trust X-Forwarded-Host from trusted proxy IPs
+	// This prevents header injection attacks from untrusted sources
+	if h.isTrustedRequest(r) {
+		if forwardedHost := r.Header.Get("X-Forwarded-Host"); forwardedHost != "" {
+			host = forwardedHost
+		}
 	}
 
 	// Validate host against allowed hosts (unless in dev mode)
@@ -729,22 +771,64 @@ func (h *SSOHandler) getRedirectURI(r *http.Request, slug string) string {
 	if h.devMode {
 		// Dev mode: allow HTTP fallback for local development
 		if r.TLS == nil {
-			if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
-				scheme = proto
+			// Only trust X-Forwarded-Proto from trusted proxies
+			if h.isTrustedRequest(r) {
+				if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+					scheme = proto
+				} else {
+					scheme = "http"
+				}
 			} else {
 				scheme = "http"
 			}
 		}
 	} else {
-		// Production: only trust X-Forwarded-Proto if it says HTTPS
+		// Production: only trust X-Forwarded-Proto from trusted proxies
 		// Otherwise, always use HTTPS (never fall back to HTTP)
-		if proto := r.Header.Get("X-Forwarded-Proto"); proto == "https" {
-			scheme = "https"
+		if h.isTrustedRequest(r) {
+			if proto := r.Header.Get("X-Forwarded-Proto"); proto == "https" {
+				scheme = "https"
+			}
 		}
 		// Default remains HTTPS - never use HTTP in production
 	}
 
 	return fmt.Sprintf("%s://%s/api/sso/callback/%s", scheme, host, slug)
+}
+
+// isTrustedRequest checks if the request comes from a trusted proxy
+func (h *SSOHandler) isTrustedRequest(r *http.Request) bool {
+	if !h.useProxy {
+		return false // Proxy mode disabled - trust nothing
+	}
+
+	// Get the immediate client IP (could be proxy)
+	remoteAddr := r.RemoteAddr
+	if colonIndex := strings.LastIndex(remoteAddr, ":"); colonIndex != -1 {
+		remoteAddr = remoteAddr[:colonIndex]
+	}
+
+	clientIP := net.ParseIP(remoteAddr)
+	if clientIP == nil {
+		return false
+	}
+
+	return h.isTrustedProxy(clientIP)
+}
+
+// isTrustedProxy checks if an IP is a trusted proxy (private IP or in additional list)
+func (h *SSOHandler) isTrustedProxy(ip net.IP) bool {
+	// Check if IP is a private/internal address
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() {
+		return true
+	}
+	// Check additional trusted proxies
+	for _, trustedIP := range h.additionalProxies {
+		if ip.Equal(trustedIP) {
+			return true
+		}
+	}
+	return false
 }
 
 // isAllowedHost checks if a host is in the allowed hosts list

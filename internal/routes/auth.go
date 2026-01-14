@@ -35,10 +35,11 @@ func RegisterAuthRoutes(deps *Deps) {
 	api.HandleH("POST /auth/webauthn/login/start", deps.FIDORateLimiter.Limit(http.HandlerFunc(deps.Auth.WebAuthn.StartFIDOLoginNew)))
 	api.HandleH("POST /auth/webauthn/login/complete", deps.FIDORateLimiter.Limit(http.HandlerFunc(deps.Auth.WebAuthn.CompleteFIDOLoginNew)))
 
-	// SSO (Single Sign-On) endpoints - Public
+	// SSO (Single Sign-On) endpoints - Public with rate limiting
+	// Rate limiting prevents brute force attacks and DoS on SSO endpoints
 	api.Handle("GET /sso/status", deps.Auth.SSO.GetStatus)
-	api.Handle("GET /sso/login/{slug}", deps.Auth.SSO.StartLogin)
-	api.Handle("GET /sso/callback/{slug}", deps.Auth.SSO.Callback)
+	api.HandleH("GET /sso/login/{slug}", deps.SSORateLimiter.Limit(http.HandlerFunc(deps.Auth.SSO.StartLogin)))
+	api.HandleH("GET /sso/callback/{slug}", deps.SSORateLimiter.Limit(http.HandlerFunc(deps.Auth.SSO.Callback)))
 
 	// SSO Admin endpoints for provider management
 	api.HandleH("GET /sso/providers", admin(http.HandlerFunc(deps.Auth.SSO.ListProviders)))
