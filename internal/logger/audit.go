@@ -328,6 +328,18 @@ const (
 	ActionAPITokenCreate = "api_token.create"
 	ActionAPITokenRevoke = "api_token.revoke"
 
+	// SCIM provisioning
+	ActionSCIMUserCreate       = "scim.user.create"
+	ActionSCIMUserUpdate       = "scim.user.update"
+	ActionSCIMUserDelete       = "scim.user.delete"
+	ActionSCIMGroupCreate      = "scim.group.create"
+	ActionSCIMGroupUpdate      = "scim.group.update"
+	ActionSCIMGroupDelete      = "scim.group.delete"
+	ActionSCIMGroupAddMember   = "scim.group.add_member"
+	ActionSCIMGroupRemoveMember = "scim.group.remove_member"
+	ActionSCIMTokenCreate      = "scim.token.create"
+	ActionSCIMTokenRevoke      = "scim.token.revoke"
+
 	// Hierarchy level management
 	ActionHierarchyLevelCreate = "hierarchy_level.create"
 	ActionHierarchyLevelUpdate = "hierarchy_level.update"
@@ -439,4 +451,5 @@ const (
 	ResourceTestCase             = "test_case"
 	ResourceTestRun              = "test_run"
 	ResourceTestSet              = "test_set"
+	ResourceSCIMToken            = "scim_token"
 )

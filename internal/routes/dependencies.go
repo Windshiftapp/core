@@ -32,7 +32,8 @@ type Deps struct {
 	LoginRateLimiter     RateLimiter
 	AuthRateLimiter      RateLimiter
 	FIDORateLimiter      RateLimiter
-	SSORateLimiter       RateLimiter // Rate limiter for SSO login/callback endpoints
+	SSORateLimiter       RateLimiter  // Rate limiter for SSO login/callback endpoints
+	SCIMRateLimiter      RateLimiter  // Rate limiter for SCIM provisioning endpoints (10 req/sec)
 	PortalSubmitLimiter  RateLimiter
 	PortalSearchLimiter  RateLimiter
 	EmailVerifyLimiter   RateLimiter

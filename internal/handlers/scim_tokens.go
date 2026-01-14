@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
 	"windshift/internal/auth"
@@ -25,7 +26,10 @@ func NewSCIMTokenHandler(tokenManager *auth.SCIMTokenManager) *SCIMTokenHandler 
 func (h *SCIMTokenHandler) ListTokens(w http.ResponseWriter, r *http.Request) {
 	tokens, err := h.tokenManager.ListTokens()
 	if err != nil {
-		http.Error(w, "Failed to list SCIM tokens: "+err.Error(), http.StatusInternalServerError)
+		slog.Error("Failed to list SCIM tokens",
+			slog.String("component", "scim"),
+			slog.Any("error", err))
+		http.Error(w, "Failed to list SCIM tokens", http.StatusInternalServerError)
 		return
 	}
 
@@ -53,9 +57,20 @@ func (h *SCIMTokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) {
 
 	response, err := h.tokenManager.CreateToken(currentUser.ID, request)
 	if err != nil {
-		http.Error(w, "Failed to create SCIM token: "+err.Error(), http.StatusInternalServerError)
+		slog.Error("Failed to create SCIM token",
+			slog.String("component", "scim"),
+			slog.Int("created_by", currentUser.ID),
+			slog.String("token_name", request.Name),
+			slog.Any("error", err))
+		http.Error(w, "Failed to create SCIM token", http.StatusInternalServerError)
 		return
 	}
+
+	slog.Info("SCIM token created",
+		slog.String("component", "scim"),
+		slog.Int("created_by", currentUser.ID),
+		slog.String("token_name", request.Name),
+		slog.String("token_prefix", response.SCIMToken.TokenPrefix))
 
 	respondJSONCreated(w, response)
 }
@@ -83,15 +98,31 @@ func (h *SCIMTokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	userID := 0
+	if currentUser != nil {
+		userID = currentUser.ID
+	}
+
 	err := h.tokenManager.RevokeToken(id)
 	if err != nil {
 		if err.Error() == "token not found" {
 			http.Error(w, "Token not found", http.StatusNotFound)
 			return
 		}
-		http.Error(w, "Failed to revoke token: "+err.Error(), http.StatusInternalServerError)
+		slog.Error("Failed to revoke SCIM token",
+			slog.String("component", "scim"),
+			slog.Int("token_id", id),
+			slog.Int("revoked_by", userID),
+			slog.Any("error", err))
+		http.Error(w, "Failed to revoke token", http.StatusInternalServerError)
 		return
 	}
+
+	slog.Info("SCIM token revoked",
+		slog.String("component", "scim"),
+		slog.Int("token_id", id),
+		slog.Int("revoked_by", userID))
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -100,7 +131,10 @@ func (h *SCIMTokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 func (h *SCIMTokenHandler) GetActiveTokenCount(w http.ResponseWriter, r *http.Request) {
 	count, err := h.tokenManager.GetActiveTokenCount()
 	if err != nil {
-		http.Error(w, "Failed to count tokens: "+err.Error(), http.StatusInternalServerError)
+		slog.Error("Failed to count SCIM tokens",
+			slog.String("component", "scim"),
+			slog.Any("error", err))
+		http.Error(w, "Failed to count tokens", http.StatusInternalServerError)
 		return
 	}
 

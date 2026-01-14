@@ -1038,6 +1038,7 @@ func main() {
 		AuthRateLimiter:     authRateLimiter,
 		FIDORateLimiter:     fidoRateLimiter,
 		SSORateLimiter:      ssoRateLimiter,
+		SCIMRateLimiter:     scimRateLimiter,
 		PortalSubmitLimiter: portalSubmitLimiter,
 		PortalSearchLimiter: portalSearchLimiter,
 		EmailVerifyLimiter:  emailVerifyLimiter,

@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 )
 
@@ -27,8 +29,55 @@ func NewSCIMHandler(db database.Database, baseURL string) *SCIMHandler {
 }
 
 // =============================================================================
+// Constants
+// =============================================================================
+
+// scimMaxBodySize limits request body size to prevent memory exhaustion (1MB)
+const scimMaxBodySize = 1 * 1024 * 1024
+
+// =============================================================================
 // Response Helpers
 // =============================================================================
+
+// limitRequestBody wraps the request body with a size limiter
+// Returns true if the body was limited successfully, false if body is too large
+func (h *SCIMHandler) limitRequestBody(w http.ResponseWriter, r *http.Request) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, scimMaxBodySize)
+	return true
+}
+
+// logSCIMAuditEvent logs a SCIM provisioning event to the audit log
+func (h *SCIMHandler) logSCIMAuditEvent(r *http.Request, actionType string, resourceType string, resourceID *int, resourceName string, details map[string]interface{}, success bool, errorMsg string) {
+	// Get SCIM token from context to identify the requester
+	scimToken := middleware.GetSCIMToken(r)
+	tokenPrefix := ""
+	if scimToken != nil {
+		tokenPrefix = scimToken.TokenPrefix
+	}
+
+	// Add token prefix to details
+	if details == nil {
+		details = make(map[string]interface{})
+	}
+	details["scim_token_prefix"] = tokenPrefix
+
+	event := logger.AuditEvent{
+		UserID:       0, // SCIM uses token auth, not user auth
+		Username:     "SCIM:" + tokenPrefix,
+		IPAddress:    r.RemoteAddr,
+		UserAgent:    r.UserAgent(),
+		ActionType:   actionType,
+		ResourceType: resourceType,
+		ResourceID:   resourceID,
+		ResourceName: resourceName,
+		Details:      details,
+		Success:      success,
+		ErrorMessage: errorMsg,
+	}
+
+	// Fire and forget - don't block on audit logging
+	go logger.LogAudit(h.db, event)
+}
 
 // respondSCIMJSON sends a SCIM JSON response
 func respondSCIMJSON(w http.ResponseWriter, statusCode int, data interface{}) {
@@ -194,8 +243,15 @@ func (h *SCIMHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 // CreateUser creates a new SCIM-managed user (POST /scim/v2/Users)
 func (h *SCIMHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
+	// Security: Limit request body size to prevent memory exhaustion
+	h.limitRequestBody(w, r)
+
 	var scimUser models.SCIMUser
 	if err := json.NewDecoder(r.Body).Decode(&scimUser); err != nil {
+		if err.Error() == "http: request body too large" {
+			respondSCIMErrorMsg(w, http.StatusRequestEntityTooLarge, "Request body too large", "tooLarge")
+			return
+		}
 		respondSCIMErrorMsg(w, http.StatusBadRequest, "Invalid request body", "invalidValue")
 		return
 	}
@@ -265,6 +321,11 @@ func (h *SCIMHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Audit log: SCIM user created
+	userIDInt := int(userID)
+	h.logSCIMAuditEvent(r, logger.ActionSCIMUserCreate, logger.ResourceUser, &userIDInt, email,
+		map[string]interface{}{"username": scimUser.UserName, "email": email}, true, "")
+
 	respondSCIMJSON(w, http.StatusCreated, h.userToSCIM(user))
 }
 
@@ -287,6 +348,9 @@ func (h *SCIMHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 
 // ReplaceUser fully replaces a user (PUT /scim/v2/Users/{id})
 func (h *SCIMHandler) ReplaceUser(w http.ResponseWriter, r *http.Request) {
+	// Security: Limit request body size to prevent memory exhaustion
+	h.limitRequestBody(w, r)
+
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusBadRequest, "Invalid user ID", "invalidValue")
@@ -302,6 +366,10 @@ func (h *SCIMHandler) ReplaceUser(w http.ResponseWriter, r *http.Request) {
 
 	var scimUser models.SCIMUser
 	if err := json.NewDecoder(r.Body).Decode(&scimUser); err != nil {
+		if err.Error() == "http: request body too large" {
+			respondSCIMErrorMsg(w, http.StatusRequestEntityTooLarge, "Request body too large", "tooLarge")
+			return
+		}
 		respondSCIMErrorMsg(w, http.StatusBadRequest, "Invalid request body", "invalidValue")
 		return
 	}
@@ -349,11 +417,24 @@ func (h *SCIMHandler) ReplaceUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Audit log: SCIM user updated (full replace)
+	h.logSCIMAuditEvent(r, logger.ActionSCIMUserUpdate, logger.ResourceUser, &id, email,
+		map[string]interface{}{
+			"username":     scimUser.UserName,
+			"email":        email,
+			"active":       scimUser.Active,
+			"old_username": existingUser.Username,
+			"old_email":    existingUser.Email,
+		}, true, "")
+
 	respondSCIMJSON(w, http.StatusOK, h.userToSCIM(user))
 }
 
 // PatchUser partially updates a user (PATCH /scim/v2/Users/{id})
 func (h *SCIMHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
+	// Security: Limit request body size to prevent memory exhaustion
+	h.limitRequestBody(w, r)
+
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusBadRequest, "Invalid user ID", "invalidValue")
@@ -369,6 +450,10 @@ func (h *SCIMHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 
 	var patchReq models.SCIMPatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&patchReq); err != nil {
+		if err.Error() == "http: request body too large" {
+			respondSCIMErrorMsg(w, http.StatusRequestEntityTooLarge, "Request body too large", "tooLarge")
+			return
+		}
 		respondSCIMErrorMsg(w, http.StatusBadRequest, "Invalid request body", "invalidValue")
 		return
 	}
@@ -388,6 +473,10 @@ func (h *SCIMHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Audit log: SCIM user patched
+	h.logSCIMAuditEvent(r, logger.ActionSCIMUserUpdate, logger.ResourceUser, &id, user.Email,
+		map[string]interface{}{"operation_count": len(patchReq.Operations)}, true, "")
+
 	respondSCIMJSON(w, http.StatusOK, h.userToSCIM(user))
 }
 
@@ -399,18 +488,23 @@ func (h *SCIMHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get user info for audit logging before deactivation
+	user, err := h.getUserByID(id)
+	if err != nil {
+		respondSCIMErrorMsg(w, http.StatusNotFound, "User not found", "")
+		return
+	}
+
 	// Deactivate rather than delete
-	result, err := h.db.Exec(`UPDATE users SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, id)
+	_, err = h.db.Exec(`UPDATE users SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, id)
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to delete user", "")
 		return
 	}
 
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		respondSCIMErrorMsg(w, http.StatusNotFound, "User not found", "")
-		return
-	}
+	// Audit log: SCIM user deactivated
+	h.logSCIMAuditEvent(r, logger.ActionSCIMUserDelete, logger.ResourceUser, &id, user.Email,
+		map[string]interface{}{"username": user.Username, "email": user.Email}, true, "")
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -501,8 +595,15 @@ func (h *SCIMHandler) ListGroups(w http.ResponseWriter, r *http.Request) {
 
 // CreateGroup creates a new SCIM-managed group (POST /scim/v2/Groups)
 func (h *SCIMHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
+	// Security: Limit request body size to prevent memory exhaustion
+	h.limitRequestBody(w, r)
+
 	var scimGroup models.SCIMGroup
 	if err := json.NewDecoder(r.Body).Decode(&scimGroup); err != nil {
+		if err.Error() == "http: request body too large" {
+			respondSCIMErrorMsg(w, http.StatusRequestEntityTooLarge, "Request body too large", "tooLarge")
+			return
+		}
 		respondSCIMErrorMsg(w, http.StatusBadRequest, "Invalid request body", "invalidValue")
 		return
 	}
@@ -552,6 +653,12 @@ func (h *SCIMHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	members, _ := h.getGroupMembers(int(groupID))
+
+	// Audit log: SCIM group created
+	groupIDInt := int(groupID)
+	h.logSCIMAuditEvent(r, logger.ActionSCIMGroupCreate, logger.ResourceGroup, &groupIDInt, scimGroup.DisplayName,
+		map[string]interface{}{"member_count": len(scimGroup.Members)}, true, "")
+
 	respondSCIMJSON(w, http.StatusCreated, h.groupToSCIM(group, members))
 }
 
@@ -575,13 +682,16 @@ func (h *SCIMHandler) GetGroup(w http.ResponseWriter, r *http.Request) {
 
 // ReplaceGroup fully replaces a group (PUT /scim/v2/Groups/{id})
 func (h *SCIMHandler) ReplaceGroup(w http.ResponseWriter, r *http.Request) {
+	// Security: Limit request body size to prevent memory exhaustion
+	h.limitRequestBody(w, r)
+
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusBadRequest, "Invalid group ID", "invalidValue")
 		return
 	}
 
-	_, err = h.getGroupByID(id)
+	existingGroup, err := h.getGroupByID(id)
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusNotFound, "Group not found", "")
 		return
@@ -589,6 +699,10 @@ func (h *SCIMHandler) ReplaceGroup(w http.ResponseWriter, r *http.Request) {
 
 	var scimGroup models.SCIMGroup
 	if err := json.NewDecoder(r.Body).Decode(&scimGroup); err != nil {
+		if err.Error() == "http: request body too large" {
+			respondSCIMErrorMsg(w, http.StatusRequestEntityTooLarge, "Request body too large", "tooLarge")
+			return
+		}
 		respondSCIMErrorMsg(w, http.StatusBadRequest, "Invalid request body", "invalidValue")
 		return
 	}
@@ -625,11 +739,23 @@ func (h *SCIMHandler) ReplaceGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	members, _ := h.getGroupMembers(id)
+
+	// Audit log: SCIM group updated (full replace)
+	h.logSCIMAuditEvent(r, logger.ActionSCIMGroupUpdate, logger.ResourceGroup, &id, scimGroup.DisplayName,
+		map[string]interface{}{
+			"old_name":     existingGroup.Name,
+			"new_name":     scimGroup.DisplayName,
+			"member_count": len(scimGroup.Members),
+		}, true, "")
+
 	respondSCIMJSON(w, http.StatusOK, h.groupToSCIM(group, members))
 }
 
 // PatchGroup partially updates a group (PATCH /scim/v2/Groups/{id})
 func (h *SCIMHandler) PatchGroup(w http.ResponseWriter, r *http.Request) {
+	// Security: Limit request body size to prevent memory exhaustion
+	h.limitRequestBody(w, r)
+
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusBadRequest, "Invalid group ID", "invalidValue")
@@ -644,6 +770,10 @@ func (h *SCIMHandler) PatchGroup(w http.ResponseWriter, r *http.Request) {
 
 	var patchReq models.SCIMPatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&patchReq); err != nil {
+		if err.Error() == "http: request body too large" {
+			respondSCIMErrorMsg(w, http.StatusRequestEntityTooLarge, "Request body too large", "tooLarge")
+			return
+		}
 		respondSCIMErrorMsg(w, http.StatusBadRequest, "Invalid request body", "invalidValue")
 		return
 	}
@@ -662,6 +792,11 @@ func (h *SCIMHandler) PatchGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	members, _ := h.getGroupMembers(id)
+
+	// Audit log: SCIM group patched
+	h.logSCIMAuditEvent(r, logger.ActionSCIMGroupUpdate, logger.ResourceGroup, &id, group.Name,
+		map[string]interface{}{"operation_count": len(patchReq.Operations)}, true, "")
+
 	respondSCIMJSON(w, http.StatusOK, h.groupToSCIM(group, members))
 }
 
@@ -673,17 +808,22 @@ func (h *SCIMHandler) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.db.Exec(`DELETE FROM groups WHERE id = ?`, id)
+	// Get group info for audit logging before deletion
+	group, err := h.getGroupByID(id)
+	if err != nil {
+		respondSCIMErrorMsg(w, http.StatusNotFound, "Group not found", "")
+		return
+	}
+
+	_, err = h.db.Exec(`DELETE FROM groups WHERE id = ?`, id)
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to delete group", "")
 		return
 	}
 
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		respondSCIMErrorMsg(w, http.StatusNotFound, "Group not found", "")
-		return
-	}
+	// Audit log: SCIM group deleted
+	h.logSCIMAuditEvent(r, logger.ActionSCIMGroupDelete, logger.ResourceGroup, &id, group.Name,
+		nil, true, "")
 
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -16,6 +16,18 @@ const (
 	FilterOpPr = "pr" // present (has value)
 )
 
+// likeEscaper escapes SQL LIKE special characters to prevent pattern injection.
+// This ensures %, _, and \ are treated as literal characters, not wildcards.
+var likeEscaper = strings.NewReplacer(
+	`\`, `\\`,
+	`%`, `\%`,
+	`_`, `\_`,
+)
+
+func escapeLikePattern(s string) string {
+	return likeEscaper.Replace(s)
+}
+
 // Supported filter attributes for Users (SCIM attr -> SQL column)
 var userFilterAttrs = map[string]string{
 	"userName":        "username",
@@ -124,14 +136,17 @@ func ParseSCIMFilter(filter string, resourceType string) (*SCIMFilterResult, err
 			args = []interface{}{value}
 		}
 	case FilterOpCo:
-		whereClause = fmt.Sprintf("LOWER(%s) LIKE LOWER(?)", sqlCol)
-		args = []interface{}{"%" + value + "%"}
+		// Security: Escape LIKE wildcards to prevent pattern injection
+		whereClause = fmt.Sprintf("LOWER(%s) LIKE LOWER(?) ESCAPE '\\'", sqlCol)
+		args = []interface{}{"%" + escapeLikePattern(value) + "%"}
 	case FilterOpSw:
-		whereClause = fmt.Sprintf("LOWER(%s) LIKE LOWER(?)", sqlCol)
-		args = []interface{}{value + "%"}
+		// Security: Escape LIKE wildcards to prevent pattern injection
+		whereClause = fmt.Sprintf("LOWER(%s) LIKE LOWER(?) ESCAPE '\\'", sqlCol)
+		args = []interface{}{escapeLikePattern(value) + "%"}
 	case FilterOpEw:
-		whereClause = fmt.Sprintf("LOWER(%s) LIKE LOWER(?)", sqlCol)
-		args = []interface{}{"%" + value}
+		// Security: Escape LIKE wildcards to prevent pattern injection
+		whereClause = fmt.Sprintf("LOWER(%s) LIKE LOWER(?) ESCAPE '\\'", sqlCol)
+		args = []interface{}{"%" + escapeLikePattern(value)}
 	default:
 		return nil, fmt.Errorf("unsupported filter operator: %s", op)
 	}
