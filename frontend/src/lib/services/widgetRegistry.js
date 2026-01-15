@@ -102,6 +102,16 @@ export const widgetRegistry = [
     icon: 'CalendarDays',
     defaultWidth: 3,
   },
+
+  // Additional widgets (test management)
+  {
+    type: 'test-coverage',
+    name: 'Test Coverage',
+    description: 'Requirements covered by test cases',
+    category: widgetCategories.ADDITIONAL,
+    icon: 'ShieldCheck',
+    defaultWidth: 2,
+  },
 ];
 
 // Helper functions

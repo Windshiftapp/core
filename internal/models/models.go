@@ -1912,6 +1912,54 @@ type BoardColumnRequest struct {
 	StatusIDs    []int  `json:"status_ids"`
 }
 
+// Test Coverage Models
+
+// TestCoverageConfiguration represents the requirement type configuration for a collection or workspace
+type TestCoverageConfiguration struct {
+	ID                     int       `json:"id"`
+	WorkspaceID            *int      `json:"workspace_id,omitempty"`
+	CollectionID           *int      `json:"collection_id,omitempty"`
+	RequirementItemTypeIDs []int     `json:"requirement_item_type_ids"`
+	CreatedAt              time.Time `json:"created_at"`
+	UpdatedAt              time.Time `json:"updated_at"`
+}
+
+// TestCoverageConfigRequest represents the payload for creating/updating test coverage config
+type TestCoverageConfigRequest struct {
+	RequirementItemTypeIDs []int `json:"requirement_item_type_ids"`
+}
+
+// TestCoverageSummary represents the coverage statistics for pie chart
+type TestCoverageSummary struct {
+	Total        int     `json:"total"`
+	Covered      int     `json:"covered"`
+	NotCovered   int     `json:"not_covered"`
+	CoverageRate float64 `json:"coverage_rate"`
+}
+
+// RequirementCoverageItem represents a single requirement with its coverage status
+type RequirementCoverageItem struct {
+	ItemID           int    `json:"item_id"`
+	WorkspaceKey     string `json:"workspace_key"`
+	WorkspaceItemNum int    `json:"workspace_item_number"`
+	Title            string `json:"title"`
+	ItemTypeID       int    `json:"item_type_id"`
+	ItemTypeName     string `json:"item_type_name"`
+	ItemTypeIcon     string `json:"item_type_icon"`
+	ItemTypeColor    string `json:"item_type_color"`
+	StatusID         *int   `json:"status_id,omitempty"`
+	StatusName       string `json:"status_name,omitempty"`
+	IsCovered        bool   `json:"is_covered"`
+	LinkedTestCount  int    `json:"linked_test_count"`
+}
+
+// TestCoverageListResponse represents the paginated response for requirements list
+type TestCoverageListResponse struct {
+	Items      []RequirementCoverageItem `json:"items"`
+	Pagination PaginationMeta            `json:"pagination"`
+	Summary    TestCoverageSummary       `json:"summary"`
+}
+
 // SCM Provider Models
 
 // SCMProviderType represents the type of SCM provider

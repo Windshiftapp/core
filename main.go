@@ -768,6 +768,7 @@ func main() {
 	appTokenHandler := handlers.NewAppTokenHandler(db, permService)
 	collectionHandler := handlers.NewCollectionHandler(db)
 	boardConfigHandler := handlers.NewBoardConfigurationHandler(db)
+	testCoverageHandler := handlers.NewTestCoverageHandler(db, permService)
 	permissionHandler := handlers.NewPermissionHandlerWithCache(db, permService)
 	apiTokenHandler := handlers.NewApiTokenHandler(db, tokenManager, permService)
 
@@ -1146,9 +1147,10 @@ func main() {
 			Status:   assetStatusHandler,
 		},
 		Collections: routes.CollectionHandlers{
-			Category:    collectionCategoryHandler,
-			Collection:  collectionHandler,
-			BoardConfig: boardConfigHandler,
+			Category:     collectionCategoryHandler,
+			Collection:   collectionHandler,
+			BoardConfig:  boardConfigHandler,
+			TestCoverage: testCoverageHandler,
 		},
 		Misc: routes.MiscHandlers{
 			Homepage:     homepageHandler,

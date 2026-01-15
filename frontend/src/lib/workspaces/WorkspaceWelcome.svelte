@@ -24,6 +24,7 @@
   import SavedSearchWidget from '../widgets/SavedSearchWidget.svelte';
   import UpcomingDeadlinesWidget from '../widgets/UpcomingDeadlinesWidget.svelte';
   import SprintTimelineWidget from '../widgets/SprintTimelineWidget.svelte';
+  import TestCoverageWidget from '../widgets/TestCoverageWidget.svelte';
 
   // Customization sidebar
   import WorkspaceCustomizationSidebar from './WorkspaceCustomizationSidebar.svelte';
@@ -802,6 +803,8 @@
                       <UpcomingDeadlinesWidget {workspaceId} />
                     {:else if widget.type === 'sprint-timeline'}
                       <SprintTimelineWidget {workspaceId} />
+                    {:else if widget.type === 'test-coverage'}
+                      <TestCoverageWidget {workspaceId} collectionId={collectionId} />
                     {/if}
                   </WidgetWrapper>
                 {/each}

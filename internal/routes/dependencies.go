@@ -186,9 +186,10 @@ type AssetHandlers struct {
 
 // CollectionHandlers groups collection-related handlers.
 type CollectionHandlers struct {
-	Category    *handlers.EnumHandler
-	Collection  *handlers.CollectionHandler
-	BoardConfig *handlers.BoardConfigurationHandler
+	Category     *handlers.EnumHandler
+	Collection   *handlers.CollectionHandler
+	BoardConfig  *handlers.BoardConfigurationHandler
+	TestCoverage *handlers.TestCoverageHandler
 }
 
 // MiscHandlers groups miscellaneous handlers.
