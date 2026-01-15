@@ -47,15 +47,17 @@
   let gradientStyle = $derived(($applyToAllViews && $workspaceGradientIndex > 0) ? getGradientStyle($workspaceGradientIndex) : null);
   let hasGradient = $derived(gradientStyle !== null);
   let backgroundStyle = $derived(hasGradient ? `background: ${gradientStyle};` : 'background-color: var(--ds-surface);');
-  let textClass = $derived(hasGradient ? 'text-white' : '');
-  let subtleTextClass = $derived(hasGradient ? 'text-white/80' : '');
-  let emptyStateClass = $derived(hasGradient ? 'text-white/60' : '');
-  let cardBgClass = $derived(hasGradient ? 'bg-white/90 border-white/40' : '');
-  // Text style for gradient/non-gradient mode
+
+  // Text on gradient background (white for visibility)
   let textStyle = $derived(hasGradient ? 'color: white;' : 'color: var(--ds-text);');
   let subtleTextStyle = $derived(hasGradient ? 'color: rgba(255, 255, 255, 0.8);' : 'color: var(--ds-text-subtle);');
-  let tableTextStyle = $derived(hasGradient ? 'color: #374151;' : 'color: var(--ds-text);');
-  let tableSubtleTextStyle = $derived(hasGradient ? 'color: #4b5563;' : 'color: var(--ds-text-subtle);');
+
+  // Glass styling for cards/buttons/tables (theme-aware)
+  let glassStyle = $derived(hasGradient
+    ? 'background-color: var(--ds-glass-bg); border-color: var(--ds-glass-border); backdrop-filter: blur(12px);'
+    : 'background-color: var(--ds-surface-raised); border-color: var(--ds-border);');
+  let glassTextStyle = $derived('color: var(--ds-text);');
+  let glassSubtleTextStyle = $derived('color: var(--ds-text-subtle);');
 
   onMount(async () => {
     console.log('[CollectionTree] mount workspaceId=', workspaceId, 'collectionId=', collectionId);
@@ -495,17 +497,17 @@
       <!-- Tree View -->
       {#if allItems.length === 0}
         <div class="text-center py-12">
-          <GitBranch class="w-12 h-12 {emptyStateClass} mx-auto mb-4" style="{subtleTextStyle}" />
-          <h3 class="text-lg font-medium {textClass} mb-2" style="{textStyle}">No work items yet</h3>
-          <p class="{subtleTextClass}" style="{subtleTextStyle}">Create your first work item to see the hierarchy tree.</p>
+          <GitBranch class="w-12 h-12 mx-auto mb-4" style="{subtleTextStyle}" />
+          <h3 class="text-lg font-medium mb-2" style="{textStyle}">No work items yet</h3>
+          <p style="{subtleTextStyle}">Create your first work item to see the hierarchy tree.</p>
         </div>
       {:else}
         <!-- Tree Controls -->
         <div class="flex justify-between items-center mb-4">
           <div class="flex items-center gap-2">
             <button
-              class="{cardBgClass} flex items-center gap-2 px-3 py-2 text-sm border rounded-md hover:bg-opacity-80 transition-colors"
-              style="{hasGradient ? 'border-color: rgba(255, 255, 255, 0.6); color: #111827;' : 'border-color: var(--ds-border); background-color: var(--ds-surface-raised);'} {textStyle}"
+              class="flex items-center gap-2 px-3 py-2 text-sm border rounded-md transition-colors"
+              style="{glassStyle} {glassTextStyle}"
               onclick={toggleExpandCollapse}
             >
               {#if expandedItems.size === 0}
@@ -520,8 +522,8 @@
             <!-- Test Case Toggle Button (only show if module enabled) -->
             {#if $moduleSettings.test_management_enabled}
               <button
-                class="{cardBgClass} flex items-center gap-2 px-3 py-2 text-sm border rounded-md hover:bg-opacity-80 transition-colors"
-                style="{hasGradient ? 'border-color: rgba(255, 255, 255, 0.6); color: #111827;' : 'border-color: var(--ds-border); background-color: var(--ds-surface-raised);'} {showTestCases && !hasGradient ? 'background-color: var(--ds-background-accent-green-subtler); color: var(--ds-accent-green);' : textStyle}"
+                class="flex items-center gap-2 px-3 py-2 text-sm border rounded-md transition-colors"
+                style="{glassStyle} {showTestCases ? 'color: var(--ds-accent-green);' : glassTextStyle}"
                 onclick={toggleShowTestCases}
                 disabled={loadingTestCases}
               >
@@ -538,27 +540,27 @@
           <!-- Pagination Info and Controls -->
           {#if getTotalPages() > 1}
             <div class="flex items-center gap-4">
-              <span class="text-sm {textClass}" style="{textStyle}">
+              <span class="text-sm" style="{textStyle}">
                 Showing {paginationInfo.start}-{paginationInfo.end} of {paginationInfo.total} root items
               </span>
 
               <div class="flex items-center gap-2">
                 <button
-                  class="{cardBgClass} px-3 py-1 text-sm border rounded hover:bg-opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
-                  style="{hasGradient ? 'border-color: rgba(255, 255, 255, 0.6); color: #111827;' : 'border-color: var(--ds-border); background-color: var(--ds-surface-raised);'} {textStyle}"
+                  class="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  style="{glassStyle} {glassTextStyle}"
                   onclick={() => goToPage(currentPage - 1)}
                   disabled={currentPage === 1}
                 >
                   Previous
                 </button>
 
-                <span class="px-3 py-1 text-sm {textClass}" style="{textStyle}">
+                <span class="px-3 py-1 text-sm" style="{textStyle}">
                   Page {currentPage} of {getTotalPages()}
                 </span>
 
                 <button
-                  class="{cardBgClass} px-3 py-1 text-sm border rounded hover:bg-opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
-                  style="{hasGradient ? 'border-color: rgba(255, 255, 255, 0.6); color: #111827;' : 'border-color: var(--ds-border); background-color: var(--ds-surface-raised);'} {textStyle}"
+                  class="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  style="{glassStyle} {glassTextStyle}"
                   onclick={() => goToPage(currentPage + 1)}
                   disabled={currentPage === getTotalPages()}
                 >
@@ -570,10 +572,10 @@
         </div>
 
         <!-- Table Container -->
-        <div class="{cardBgClass} rounded-xl border shadow-sm overflow-hidden" style="{hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'background-color: var(--ds-surface-raised); border-color: var(--ds-border);'}">
+        <div class="rounded-xl border shadow-sm overflow-hidden" style="{glassStyle}">
           <!-- Table Header -->
-          <div class="border-b px-4 py-3" style="{hasGradient ? 'background-color: rgba(0, 0, 0, 0.03); border-color: rgba(0, 0, 0, 0.1);' : 'background-color: var(--ds-surface); border-color: var(--ds-border);'}">
-            <div class="flex items-center gap-4 text-xs font-semibold uppercase tracking-wider" style="{tableSubtleTextStyle}">
+          <div class="border-b px-4 py-3" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
+            <div class="flex items-center gap-4 text-xs font-semibold uppercase tracking-wider" style="{glassSubtleTextStyle}">
               <div class="w-12"></div> <!-- Expand + Icon space -->
               <div class="min-w-24">Issue</div>
               <div class="flex-1">Summary</div>
@@ -650,9 +652,9 @@
                       aria-label={isExpanded(item.id) ? 'Collapse' : 'Expand'}
                     >
                       {#if isExpanded(item.id)}
-                        <ChevronDown class="w-4 h-4" style="{tableTextStyle}" />
+                        <ChevronDown class="w-4 h-4" style="{glassTextStyle}" />
                       {:else}
-                        <ChevronRight class="w-4 h-4" style="{tableTextStyle}" />
+                        <ChevronRight class="w-4 h-4" style="{glassTextStyle}" />
                       {/if}
                     </button>
                   {:else}
@@ -677,7 +679,7 @@
                       ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
                       : `/workspaces/${workspaceId}/items/${item.id}`}
                     className="text-xs font-mono px-1.5 py-0.5 rounded cursor-pointer transition-colors item-key"
-                    style="{hasGradient ? 'background-color: rgba(255, 255, 255, 0.1); color: #4b5563;' : 'background-color: var(--ds-interactive-subtle);'} {tableSubtleTextStyle}"
+                    style="background-color: var(--ds-interactive-subtle); {glassSubtleTextStyle}"
                   />
 
                   <!-- Test Case Count Badge -->
@@ -696,7 +698,7 @@
                       ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
                       : `/workspaces/${workspaceId}/items/${item.id}`}
                     class="text-left w-full font-medium transition-colors truncate cursor-pointer summary-link"
-                    style="{tableTextStyle}"
+                    style="{glassTextStyle}"
                   >
                     {item.title}
                   </LinkComponent>
@@ -720,12 +722,12 @@
                       </span>
                     </div>
                   {:else}
-                    <span class="text-xs" style="{tableSubtleTextStyle}">-</span>
+                    <span class="text-xs" style="{glassSubtleTextStyle}">-</span>
                   {/if}
                 </div>
 
                 <!-- Created Date -->
-                <div class="w-20 text-xs" style="{tableSubtleTextStyle}">
+                <div class="w-20 text-xs" style="{glassSubtleTextStyle}">
                   {formatDate(item.created_at) || '-'}
                 </div>
               </div>
@@ -736,24 +738,24 @@
 
         <!-- Bottom Pagination -->
         {#if getTotalPages() > 1}
-          <div class="flex justify-center items-center gap-4 mt-6 pt-4 border-t" style="{hasGradient ? 'border-color: rgba(255, 255, 255, 0.2);' : 'border-color: var(--ds-border);'}">
+          <div class="flex justify-center items-center gap-4 mt-6 pt-4 border-t" style="border-color: var(--ds-border);">
             <div class="flex items-center gap-2">
               <button
-                class="{cardBgClass} px-3 py-2 text-sm border rounded hover:bg-opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
-                style="{hasGradient ? 'border-color: rgba(255, 255, 255, 0.6); color: #111827;' : 'border-color: var(--ds-border); background-color: var(--ds-surface-raised);'} {textStyle}"
+                class="px-3 py-2 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                style="{glassStyle} {glassTextStyle}"
                 onclick={() => goToPage(currentPage - 1)}
                 disabled={currentPage === 1}
               >
                 Previous
               </button>
 
-              <span class="px-4 py-2 text-sm {textClass}" style="{textStyle}">
+              <span class="px-4 py-2 text-sm" style="{textStyle}">
                 Page {currentPage} of {getTotalPages()}
               </span>
 
               <button
-                class="{cardBgClass} px-3 py-2 text-sm border rounded hover:bg-opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
-                style="{hasGradient ? 'border-color: rgba(255, 255, 255, 0.6); color: #111827;' : 'border-color: var(--ds-border); background-color: var(--ds-surface-raised);'} {textStyle}"
+                class="px-3 py-2 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                style="{glassStyle} {glassTextStyle}"
                 onclick={() => goToPage(currentPage + 1)}
                 disabled={currentPage === getTotalPages()}
               >

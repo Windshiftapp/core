@@ -3,9 +3,10 @@
   import { navigate } from '../router.js';
   import { api } from '../api.js';
   import { getCollection } from '../features/collections/collectionService.js';
-  import { Settings, SquareKanban, Inbox, Plus, GripVertical, Trash2, X } from 'lucide-svelte';
+  import { Plus, GripVertical, Trash2, X } from 'lucide-svelte';
   import ViewHeader from '../layout/ViewHeader.svelte';
   import Button from '../components/Button.svelte';
+  import CollectionViewSwitcher from '../features/collections/CollectionViewSwitcher.svelte';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -263,12 +264,6 @@
     navigate(url);
   }
 
-  function goToBacklog() {
-    const url = collectionId
-      ? `/workspaces/${workspaceId}/collections/${collectionId}/backlog`
-      : `/workspaces/${workspaceId}/backlog`;
-    navigate(url);
-  }
 </script>
 
 {#if loading}
@@ -286,41 +281,12 @@
           viewName="Configure Board"
           itemCount={columns.length}
         >
-          <div slot="actions" class="flex rounded p-1" style="background-color: var(--ds-background-neutral);">
-            <button
-              class="px-3 py-1.5 text-sm font-medium rounded transition-colors"
-              style="color: var(--ds-text);"
-              onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
-              onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
-              onclick={goToBoard}
-            >
-              <div class="flex items-center gap-2">
-                <SquareKanban class="w-4 h-4" />
-                Board
-              </div>
-            </button>
-            <button
-              class="px-3 py-1.5 text-sm font-medium rounded transition-colors"
-              style="color: var(--ds-text);"
-              onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
-              onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
-              onclick={goToBacklog}
-            >
-              <div class="flex items-center gap-2">
-                <Inbox class="w-4 h-4" />
-                Backlog
-              </div>
-            </button>
-            <button
-              class="px-3 py-1.5 text-sm font-medium rounded transition-colors shadow-sm"
-              style="color: var(--ds-text); background-color: var(--ds-surface-raised);"
-            >
-              <div class="flex items-center gap-2">
-                <Settings class="w-4 h-4" />
-                Configure
-              </div>
-            </button>
-          </div>
+          <CollectionViewSwitcher
+            slot="actions"
+            {workspaceId}
+            {collectionId}
+            activeView="configure"
+          />
         </ViewHeader>
       </div>
 

@@ -45,3 +45,8 @@ export { workspacePermissions } from './workspacePermissions.svelte.js';
 // ssoStore.initStatus(), ssoStore.startLogin(), ssoStore.loadProviders()
 // Manages SSO status, provider configuration, and external account linking
 export { ssoStore } from './sso.svelte.js';
+
+// Backlog store
+// Access via: backlogStore.count, backlogStore.loading, backlogStore.workspaceId
+// Methods: backlogStore.load(wsId), backlogStore.setCount(wsId, count), increment(), decrement()
+export { backlogStore } from './backlogStore.svelte.js';

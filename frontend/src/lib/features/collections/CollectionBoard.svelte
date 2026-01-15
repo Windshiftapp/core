@@ -4,7 +4,7 @@
   import { navigate } from '../../router.js';
   import { getCollection } from '../collections/collectionService.js';
   import { workspaceGradientIndex, applyToAllViews, loadWorkspaceGradient, getGradientStyle } from '../../stores/workspaceGradient.js';
-  import { Plus, SquareKanban, Inbox, Settings, GripVertical } from 'lucide-svelte';
+  import { Plus, GripVertical } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
@@ -12,6 +12,8 @@
   import DropIndicator from '../../layout/DropIndicator.svelte';
   import ViewHeader from '../../layout/ViewHeader.svelte';
   import ItemKey from '../items/ItemKey.svelte';
+  import CollectionViewSwitcher from './CollectionViewSwitcher.svelte';
+  import { backlogStore } from '../../stores/index.js';
 
   // Props
   let { workspaceId, collectionId = null } = $props();
@@ -45,16 +47,26 @@
   // Event handler for refresh-work-items event
   let handleRefreshWorkItems = null;
 
-  // Reactive gradient styling (fallback values prevent flash during CSS variable resolution race conditions)
+  // Reactive gradient styling
   let gradientStyle = $derived(($applyToAllViews && $workspaceGradientIndex > 0) ? getGradientStyle($workspaceGradientIndex) : null);
   let hasGradient = $derived(gradientStyle !== null);
-  let backgroundStyle = $derived(hasGradient ? `background: ${gradientStyle};` : 'background-color: var(--ds-surface, #fafbfc);');
-  let textStyle = $derived(hasGradient ? 'color: white;' : 'color: var(--ds-text, #172b4d);');
-  let subtleTextStyle = $derived(hasGradient ? 'color: rgba(255, 255, 255, 0.8);' : 'color: var(--ds-text-subtle, #6b778c);');
-  let emptyStateStyle = $derived(hasGradient ? 'color: rgba(255, 255, 255, 0.6);' : 'color: var(--ds-text-subtlest, #8993a4);');
-  let columnBgStyle = $derived(hasGradient ? 'backdrop-filter: blur(12px); background-color: rgba(255, 255, 255, 0.1);' : 'background-color: var(--ds-surface-raised, #ffffff);');
-  let cardBgStyle = $derived(hasGradient ? 'backdrop-filter: blur(4px); background-color: rgba(255, 255, 255, 0.9);' : 'background-color: var(--ds-surface-card, #ffffff);');
-  let dragHandleStyle = $derived(hasGradient ? 'color: #4b5563;' : 'color: var(--ds-text-subtlest, #8993a4);');
+  let backgroundStyle = $derived(hasGradient ? `background: ${gradientStyle};` : 'background-color: var(--ds-surface);');
+
+  // Text on gradient background (white for visibility)
+  let textStyle = $derived(hasGradient ? 'color: white;' : 'color: var(--ds-text);');
+  let subtleTextStyle = $derived(hasGradient ? 'color: rgba(255, 255, 255, 0.8);' : 'color: var(--ds-text-subtle);');
+  let emptyStateStyle = $derived(hasGradient ? 'color: rgba(255, 255, 255, 0.6);' : 'color: var(--ds-text-subtlest);');
+
+  // Glass styling for columns and cards (theme-aware)
+  let columnBgStyle = $derived(hasGradient
+    ? 'backdrop-filter: blur(12px); background-color: var(--ds-glass-bg); border-color: var(--ds-glass-border);'
+    : 'background-color: var(--ds-surface-raised); border-color: var(--ds-border);');
+  let cardBgStyle = $derived(hasGradient
+    ? 'backdrop-filter: blur(4px); background-color: var(--ds-glass-bg); border-color: var(--ds-glass-border);'
+    : 'background-color: var(--ds-surface-card); border-color: var(--ds-border);');
+  let glassTextStyle = $derived('color: var(--ds-text);');
+  let glassSubtleTextStyle = $derived('color: var(--ds-text-subtle);');
+  let dragHandleStyle = $derived('color: var(--ds-text-subtlest);');
 
   onMount(async () => {
     if (workspaceId) {
@@ -145,6 +157,7 @@
 
       // Set backlog items and item types from backend
       backlogItems = backlogData || [];
+      backlogStore.setCount(workspaceId, backlogItems.length);
       itemTypes = itemTypesData || [];
 
       // Get statuses for this workspace (uses workflow from config set or default workflow)
@@ -160,9 +173,18 @@
         boardConfig = null;
       }
 
+      // Preload transitions for all items so drag validation works correctly
+      await preloadAllTransitions();
+
     } catch (error) {
       console.error('Failed to load data:', error);
     }
+  }
+
+  // Preload status transitions for all items
+  async function preloadAllTransitions() {
+    const allItems = [...items, ...backlogItems];
+    await Promise.all(allItems.map(item => loadStatusTransitions(item.id)));
   }
 
   function getItemsByStatus(statusId) {
@@ -222,20 +244,6 @@
       return total + getItemsByColumn(column).length;
     }, 0);
   });
-
-  function goToBacklog() {
-    const url = collectionId
-      ? `/workspaces/${workspaceId}/collections/${collectionId}/backlog`
-      : `/workspaces/${workspaceId}/backlog`;
-    navigate(url);
-  }
-
-  function goToBoardConfig() {
-    const url = collectionId
-      ? `/workspaces/${workspaceId}/collections/${collectionId}/board/configure`
-      : `/workspaces/${workspaceId}/board/configure`;
-    navigate(url);
-  }
 
   function getStatusByName(statusName) {
     const normalizedName = statusName.toLowerCase().replace('_', ' ');
@@ -412,39 +420,28 @@
       const cleanup = dropTargetForElements({
         element,
         canDrop: ({ source }) => {
-          const data = source.data;
-          if (data.type !== 'work-item') return false;
-
-          return isValidTransition(data.item.id, data.item.status_id, statusId);
+          // Allow all work items to enter so we can show valid/invalid feedback
+          // Actual validation happens in onDrop
+          return source.data.type === 'work-item';
         },
         onDragEnter: ({ source }) => {
           const data = source.data;
           if (data.type === 'work-item') {
             if (isValidTransition(data.item.id, data.item.status_id, statusId)) {
-              // Valid drop - blue highlight
-              element.style.backgroundColor = hasGradient
-                ? 'rgba(59, 130, 246, 0.2)'  // blue with transparency for gradients
-                : '#dbeafe';                  // blue-100 for non-gradients
-              element.style.borderColor = hasGradient
-                ? 'rgba(255, 255, 255, 0.6)' // white border for gradients
-                : '#3b82f6';                  // blue-500 for non-gradients
+              // Valid drop - use border and shadow for highlight
+              element.style.borderColor = 'var(--ds-border-focused)';
+              element.style.boxShadow = 'inset 0 0 0 2px var(--ds-border-focused)';
             } else {
-              // Invalid drop - red highlight
-              element.style.backgroundColor = hasGradient
-                ? 'rgba(239, 68, 68, 0.2)'   // red with transparency for gradients
-                : '#fee2e2';                  // red-100 for non-gradients
-              element.style.borderColor = hasGradient
-                ? 'rgba(255, 255, 255, 0.6)' // white border for gradients
-                : '#ef4444';                  // red-500 for non-gradients
+              // Invalid drop - use border and shadow for highlight
+              element.style.borderColor = 'var(--ds-border-danger)';
+              element.style.boxShadow = 'inset 0 0 0 2px var(--ds-border-danger)';
             }
           }
         },
         onDragLeave: () => {
-          // Reset to original styles
-          element.style.backgroundColor = '';
-          // Restore original border color instead of clearing it (prevents black border)
-          const originalBorderColor = hasGradient ? 'rgba(255, 255, 255, 0.2)' : 'var(--ds-border)';
-          element.style.borderColor = originalBorderColor;
+          // Reset styles
+          element.style.borderColor = hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
+          element.style.boxShadow = '';
         },
         onDrop: async ({ source }) => {
           // Reset all column styles immediately
@@ -479,10 +476,8 @@
     // Reset all status column styles to their default state
     const statusColumns = document.querySelectorAll('[data-status-column]');
     statusColumns.forEach(element => {
-      element.style.backgroundColor = '';
-      // Restore original border color instead of clearing it (prevents black border)
-      const originalBorderColor = hasGradient ? 'rgba(255, 255, 255, 0.2)' : 'var(--ds-border)';
-      element.style.borderColor = originalBorderColor;
+      element.style.borderColor = hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
+      element.style.boxShadow = '';
     });
   }
 
@@ -527,10 +522,8 @@
     // Get cached transitions for this item
     const availableTransitions = itemTransitions.get(itemId);
     if (!availableTransitions) {
-      // If no cached data, trigger async load for next time
-      loadStatusTransitions(itemId);
-      // Be permissive when cache isn't loaded - backend will validate
-      return true;
+      // If no cached data, be restrictive - don't allow until we know it's valid
+      return false;
     }
 
     // Find the target status in available transitions
@@ -717,44 +710,13 @@
           textStyle={textStyle}
           subtleTextStyle={subtleTextStyle}
         >
-          <div slot="actions" class="flex rounded p-1" style="background-color: var(--ds-background-neutral);">
-            <button
-              class="px-3 py-1.5 text-sm font-medium rounded transition-colors shadow-sm"
-              style="color: var(--ds-text); background-color: var(--ds-surface-raised);"
-            >
-              <div class="flex items-center gap-2">
-                <SquareKanban class="w-4 h-4" />
-                Board
-              </div>
-            </button>
-            <button
-              class="px-3 py-1.5 text-sm font-medium rounded transition-colors"
-              style="color: var(--ds-text);"
-              onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
-              onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
-              onclick={goToBacklog}
-            >
-              <div class="flex items-center gap-2">
-                <Inbox class="w-4 h-4" />
-                Backlog
-                <span class="px-1.5 py-0.5 rounded-full text-xs" style="background-color: var(--ds-accent-blue-subtle); color: var(--ds-text-info);">
-                  {backlogItems.length}
-                </span>
-              </div>
-            </button>
-            <button
-              class="px-3 py-1.5 text-sm font-medium rounded transition-colors"
-              style="color: var(--ds-text);"
-              onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
-              onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
-              onclick={goToBoardConfig}
-            >
-              <div class="flex items-center gap-2">
-                <Settings class="w-4 h-4" />
-                Configure
-              </div>
-            </button>
-          </div>
+          <CollectionViewSwitcher
+            slot="actions"
+            {workspaceId}
+            {collectionId}
+            activeView="board"
+            {hasGradient}
+          />
         </ViewHeader>
       </div>
 
@@ -784,14 +746,14 @@
             {@const isOverWip = column.wip_limit && columnItems.length > column.wip_limit}
             <div
               class="rounded border shadow-sm transition-colors"
-              style="{columnBgStyle} border-color: {hasGradient ? 'rgba(255, 255, 255, 0.2)' : 'var(--ds-border, #091e4224)'};"
+              style="{columnBgStyle}"
               data-status-column
               data-status-id={column.status_ids[0]}
             >
-              <div class="p-4 border-b border-l-4" style="border-bottom-color: {hasGradient ? 'rgba(255, 255, 255, 0.2)' : 'var(--ds-border, #091e4224)'}; border-left-color: {column.color};">
-                <h3 class="font-semibold" style={textStyle}>{column.name}</h3>
+              <div class="p-4 border-b border-l-4" style="border-bottom-color: {hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'}; border-left-color: {column.color};">
+                <h3 class="font-semibold" style={glassTextStyle}>{column.name}</h3>
                 <div class="flex items-center justify-between">
-                  <span class="text-sm" style={subtleTextStyle}>{columnItems.length} items</span>
+                  <span class="text-sm" style={glassSubtleTextStyle}>{columnItems.length} items</span>
                   {#if column.wip_limit}
                     <span class="text-xs px-2 py-0.5 rounded"
                           style={isOverWip
@@ -805,7 +767,7 @@
               <div class="p-4 min-h-32">
                 {#if columnItems.length === 0}
                   <!-- Empty column state -->
-                  <div class="text-center py-8" style={emptyStateStyle}>
+                  <div class="text-center py-8" style={glassSubtleTextStyle}>
                     <Plus class="w-8 h-8 mx-auto mb-2" />
                     <p class="text-sm">No items in {column.name}</p>
                   </div>
@@ -816,7 +778,7 @@
                       <!-- Item card with edge-based drop detection -->
                       <div
                         class="relative border rounded px-3 py-3 shadow-sm hover:shadow-md transition-shadow"
-                        style="{cardBgStyle} border-color: {hasGradient ? 'rgba(255, 255, 255, 0.3)' : 'var(--ds-border, #091e4224)'};"
+                        style="{cardBgStyle}"
                         data-item-card
                         data-item-id={item.id}
                         role="button"
@@ -838,13 +800,13 @@
                           <!-- Content -->
                           <div class="flex-1 min-w-0">
                             <!-- Title - allows wrapping -->
-                            <h4 class="font-medium text-sm mb-2 leading-snug" style={hasGradient ? 'color: #111827;' : 'color: var(--ds-text, #172b4d);'}>
+                            <h4 class="font-medium text-sm mb-2 leading-snug" style={glassTextStyle}>
                               {item.title}
                             </h4>
 
                             <!-- Bottom row: Key, Icon, Priority -->
                             <div class="flex items-center gap-2">
-                              <ItemKey {item} {workspace} className="text-xs font-mono flex-shrink-0" style={hasGradient ? 'color: #6b7280;' : 'color: var(--ds-text-subtle, #6b778c);'} />
+                              <ItemKey {item} {workspace} className="text-xs font-mono flex-shrink-0" style="color: var(--ds-text-subtle);" />
                               {#if item.item_type_id && itemTypes.length > 0}
                                 {@const itemType = itemTypes.find(type => type.id === item.item_type_id)}
                                 {#if itemType}

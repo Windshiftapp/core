@@ -15,16 +15,16 @@
   export let compact = false; // For smaller spaces
   export let hasGradient = false; // Gradient background awareness
 
-  // Gradient-aware text classes with dark mode support
-  $: textClass = hasGradient ? 'text-white' : 'text-[var(--ds-text,#111827)]';
-  $: subtleTextClass = hasGradient ? 'text-white/80' : 'text-[var(--ds-text-subtle,#6b7280)]';
-  $: ellipsisClass = hasGradient ? 'text-white/60' : 'text-[var(--ds-text-subtlest,#9ca3af)]';
-  $: warningClass = hasGradient ? 'text-orange-300' : 'text-orange-600';
+  // Gradient-aware text styles (using inline styles instead of Tailwind classes)
+  $: textStyle = hasGradient ? 'color: var(--ds-text);' : 'color: var(--ds-text);';
+  $: subtleTextStyle = hasGradient ? 'color: var(--ds-text-subtle);' : 'color: var(--ds-text-subtle);';
+  $: ellipsisStyle = hasGradient ? 'color: var(--ds-text-subtlest);' : 'color: var(--ds-text-subtlest);';
+  $: warningStyle = hasGradient ? 'color: #ea580c;' : 'color: #ea580c;';
 
-  // Gradient-aware select box styling with dark mode support
-  $: selectClass = hasGradient
-    ? 'bg-white/90 backdrop-blur-sm border-white/60 text-gray-900'
-    : 'bg-[var(--ds-surface-raised,white)] border-[var(--ds-border,#d1d5db)] text-[var(--ds-text,#111827)]';
+  // Glass container style for gradient backgrounds
+  $: containerStyle = hasGradient
+    ? 'background-color: var(--ds-glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--ds-glass-border); border-radius: 0.75rem; padding: 1rem;'
+    : '';
 
   // Calculate pagination values
   $: totalPages = Math.ceil(Math.min(totalItems, maxItems) / itemsPerPage);
@@ -66,19 +66,19 @@
 </script>
 
 {#if totalItems > 0}
-  <div class="pagination-container {compact ? 'compact' : ''} {subtleTextClass}">
+  <div class="pagination-container {compact ? 'compact' : ''}" style="{containerStyle} {subtleTextStyle}">
 
     <!-- Items info and page size selector -->
     <div class="flex items-center justify-between gap-4 mb-4">
-      <div class="text-sm {textClass}">
+      <div class="text-sm" style={textStyle}>
         Showing {startItem}-{endItem} of {Math.min(totalItems, maxItems)}
         {#if totalItems > maxItems}
-          <span class="{warningClass}">(limited to {maxItems} items)</span>
+          <span style={warningStyle}>(limited to {maxItems} items)</span>
         {/if}
       </div>
 
       {#if showPageSizes && !compact}
-        <div class="flex items-center gap-2 text-sm {textClass}">
+        <div class="flex items-center gap-2 text-sm" style={textStyle}>
           <label>Items per page:</label>
           <div style="min-width: 100px;">
             <BasePicker
@@ -118,7 +118,7 @@
         <div class="flex items-center gap-1 mx-2">
           {#each visiblePages as page}
             {#if page === '...'}
-              <span class="px-2 py-1 {ellipsisClass}">
+              <span class="px-2 py-1" style={ellipsisStyle}>
                 <MoreHorizontal class="w-4 h-4" />
               </span>
             {:else}

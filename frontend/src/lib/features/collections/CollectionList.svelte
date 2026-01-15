@@ -52,15 +52,20 @@
   $: gradientStyle = ($applyToAllViews && $workspaceGradientIndex > 0) ? getGradientStyle($workspaceGradientIndex) : null;
   $: hasGradient = gradientStyle !== null;
   $: backgroundStyle = hasGradient ? `background: ${gradientStyle};` : 'background-color: var(--ds-surface);';
-  $: textClass = hasGradient ? 'text-white' : '';
-  $: subtleTextClass = hasGradient ? 'text-white/80' : '';
-  // Style strings for gradient/non-gradient mode
+
+  // Text on gradient background (white for visibility)
   $: textStyle = hasGradient ? 'color: white;' : 'color: var(--ds-text);';
   $: subtleTextStyle = hasGradient ? 'color: rgba(255, 255, 255, 0.8);' : 'color: var(--ds-text-subtle);';
-  $: tableBgStyle = hasGradient ? 'background-color: rgba(255, 255, 255, 0.8);' : 'background-color: var(--ds-surface-raised);';
-  $: tableHeaderBgStyle = hasGradient ? 'background-color: rgba(249, 250, 251, 0.5);' : 'background-color: var(--ds-surface);';
-  $: tableTextStyle = hasGradient ? 'color: #374151;' : 'color: var(--ds-text);';
-  $: tableSubtleTextStyle = hasGradient ? 'color: #6b7280;' : 'color: var(--ds-text-subtle);';
+
+  // Glass styling for table (theme-aware)
+  $: tableBgStyle = hasGradient
+    ? 'background-color: var(--ds-glass-bg); backdrop-filter: blur(12px); border-color: var(--ds-glass-border);'
+    : 'background-color: var(--ds-surface-raised); border-color: var(--ds-border);';
+  $: tableHeaderBgStyle = hasGradient
+    ? 'background-color: var(--ds-surface);'
+    : 'background-color: var(--ds-surface);';
+  $: glassTextStyle = 'color: var(--ds-text);';
+  $: glassSubtleTextStyle = 'color: var(--ds-text-subtle);';
 
   onMount(async () => {
     if (workspaceId) {
@@ -507,25 +512,25 @@
       <!-- Work Items Table -->
       {#if loadingItems}
         <div class="rounded-xl border shadow-sm p-8 text-center" style="{tableBgStyle} {hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
-          <div class="animate-pulse {subtleTextClass}" style="{subtleTextStyle}">Loading work items...</div>
+          <div class="animate-pulse " style="{subtleTextStyle}">Loading work items...</div>
         </div>
       {:else if filteredItems.length === 0}
         <div class="rounded-xl border shadow-sm p-12 text-center" style="{tableBgStyle} {hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
           {#if workItems.length === 0}
-            <AlertCircle class="w-12 h-12 {subtleTextClass} mx-auto mb-4" style="{subtleTextStyle}" />
-            <h3 class="text-lg font-medium {textClass} mb-2" style="{textStyle}">No work items yet</h3>
-            <p class="{subtleTextClass}" style="{subtleTextStyle}">Get started by creating your first work item in this workspace.</p>
+            <AlertCircle class="w-12 h-12  mx-auto mb-4" style="{subtleTextStyle}" />
+            <h3 class="text-lg font-medium  mb-2" style="{textStyle}">No work items yet</h3>
+            <p class="" style="{subtleTextStyle}">Get started by creating your first work item in this workspace.</p>
           {:else}
-            <AlertCircle class="w-12 h-12 {subtleTextClass} mx-auto mb-4" style="{subtleTextStyle}" />
-            <h3 class="text-lg font-medium {textClass} mb-2" style="{textStyle}">No items match your search</h3>
-            <p class="{subtleTextClass}" style="{subtleTextStyle}">Try adjusting your search terms or filters.</p>
+            <AlertCircle class="w-12 h-12  mx-auto mb-4" style="{subtleTextStyle}" />
+            <h3 class="text-lg font-medium  mb-2" style="{textStyle}">No items match your search</h3>
+            <p class="" style="{subtleTextStyle}">Try adjusting your search terms or filters.</p>
           {/if}
         </div>
       {:else}
         <div class="rounded-xl border shadow-sm overflow-hidden" style="{tableBgStyle} {hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
           <!-- Table Header -->
           <div class="px-4 py-3 border-b" style="{tableHeaderBgStyle} {hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
-            <div class="grid grid-cols-12 gap-4 text-xs font-semibold uppercase tracking-wider" style="{tableSubtleTextStyle}">
+            <div class="grid grid-cols-12 gap-4 text-xs font-semibold uppercase tracking-wider" style="{glassSubtleTextStyle}">
               <div class="col-span-6">Title</div>
               <div class="col-span-2">Status</div>
               <div class="col-span-2">Priority</div>
@@ -743,7 +748,7 @@
           </div>
         {:else}
           <!-- Results Summary for legacy/non-paginated responses -->
-          <div class="mt-4 text-sm {subtleTextClass} text-center" style="{subtleTextStyle}">
+          <div class="mt-4 text-sm  text-center" style="{subtleTextStyle}">
             Showing {filteredItems.length} work items
           </div>
         {/if}
@@ -752,7 +757,7 @@
   </div>
 {:else}
   <div class="p-6">
-    <div class="text-center {subtleTextClass}" style="{subtleTextStyle}">
+    <div class="text-center " style="{subtleTextStyle}">
       Workspace not found.
     </div>
   </div>

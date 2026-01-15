@@ -7,7 +7,7 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import { workspaceGradientIndex, applyToAllViews, loadWorkspaceGradient, getGradientStyle } from '../../stores/workspaceGradient.js';
   import { gradients } from '../../utils/gradients.js';
-  import { List, SquareKanban, Settings, Plus, GripVertical } from 'lucide-svelte';
+  import { Plus, GripVertical, List } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
@@ -15,6 +15,8 @@
   import DropIndicator from '../../layout/DropIndicator.svelte';
   import ViewHeader from '../../layout/ViewHeader.svelte';
   import ItemKey from '../items/ItemKey.svelte';
+  import CollectionViewSwitcher from './CollectionViewSwitcher.svelte';
+  import { backlogStore } from '../../stores/index.js';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -55,13 +57,19 @@
   const gradientStyle = $derived(($applyToAllViews && $workspaceGradientIndex > 0) ? getGradientStyle($workspaceGradientIndex) : null);
   const hasGradient = $derived(gradientStyle !== null);
   const backgroundStyle = $derived(hasGradient ? `background: ${gradientStyle};` : 'background-color: var(--ds-surface);');
+
+  // Text on gradient background (white for visibility)
   const textStyle = $derived(hasGradient ? 'color: white;' : 'color: var(--ds-text);');
   const subtleTextStyle = $derived(hasGradient ? 'color: rgba(255, 255, 255, 0.8);' : 'color: var(--ds-text-subtle);');
   const emptyStateStyle = $derived(hasGradient ? 'color: rgba(255, 255, 255, 0.6);' : 'color: var(--ds-text-subtlest);');
-  const cardBgClass = $derived(hasGradient ? 'backdrop-blur-sm' : '');
-  const cardBgStyle = $derived(hasGradient ? 'background-color: rgba(255, 255, 255, 0.9);' : 'background-color: var(--ds-surface-raised);');
-  const dragHandleStyle = $derived(hasGradient ? 'color: #4b5563;' : 'color: var(--ds-text-subtlest);');
-  const keyStyle = $derived(hasGradient ? 'color: #4b5563;' : 'color: var(--ds-text-subtle);');
+
+  // Glass styling for cards (theme-aware)
+  const cardBgStyle = $derived(hasGradient
+    ? 'background-color: var(--ds-glass-bg); backdrop-filter: blur(8px); border-color: var(--ds-glass-border);'
+    : 'background-color: var(--ds-surface-raised); border-color: var(--ds-border);');
+  const glassTextStyle = $derived('color: var(--ds-text);');
+  const glassSubtleTextStyle = $derived('color: var(--ds-text-subtle);');
+  const dragHandleStyle = $derived('color: var(--ds-text-subtlest);');
 
   onMount(async () => {
     if (workspaceId) {
@@ -127,6 +135,7 @@
 
       workspace = workspaceData;
       items = backlogItemsData || [];
+      backlogStore.setCount(workspaceId, items.length);
       itemTypes = itemTypesData || [];
       statuses = statusesData || [];
       statusCategories = statusCategoriesData || [];
@@ -136,20 +145,6 @@
     } finally {
       loading = false;
     }
-  }
-
-  function goToBoard() {
-    const url = collectionId
-      ? `/workspaces/${workspaceId}/collections/${collectionId}/board`
-      : `/workspaces/${workspaceId}/board`;
-    navigate(url);
-  }
-
-  function goToBoardConfig() {
-    const url = collectionId
-      ? `/workspaces/${workspaceId}/collections/${collectionId}/board/configure`
-      : `/workspaces/${workspaceId}/board/configure`;
-    navigate(url);
   }
 
   function getStatusName(item) {
@@ -425,44 +420,13 @@
           textStyle={textStyle}
           subtleTextStyle={subtleTextStyle}
         >
-          <div slot="actions" class="flex rounded p-1" style="background-color: var(--ds-background-neutral);">
-            <button
-              class="px-3 py-1.5 text-sm font-medium rounded transition-colors"
-              style="color: var(--ds-text);"
-              onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
-              onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
-              onclick={goToBoard}
-            >
-              <div class="flex items-center gap-2">
-                <SquareKanban class="w-4 h-4" />
-                Board
-              </div>
-            </button>
-            <button
-              class="px-3 py-1.5 text-sm font-medium rounded transition-colors shadow-sm"
-              style="color: var(--ds-text); background-color: var(--ds-surface-raised);"
-            >
-              <div class="flex items-center gap-2">
-                <List class="w-4 h-4" />
-                Backlog
-                <span class="px-1.5 py-0.5 rounded-full text-xs" style="background-color: var(--ds-accent-blue-subtle); color: var(--ds-text-info);">
-                  {backlogItems.length}
-                </span>
-              </div>
-            </button>
-            <button
-              class="px-3 py-1.5 text-sm font-medium rounded transition-colors"
-              style="color: var(--ds-text);"
-              onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
-              onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
-              onclick={goToBoardConfig}
-            >
-              <div class="flex items-center gap-2">
-                <Settings class="w-4 h-4" />
-                Configure
-              </div>
-            </button>
-          </div>
+          <CollectionViewSwitcher
+            slot="actions"
+            {workspaceId}
+            {collectionId}
+            activeView="backlog"
+            {hasGradient}
+          />
         </ViewHeader>
       </div>
 
@@ -486,8 +450,8 @@
               {@const statusName = getStatusName(item)}
               {@const statusCategory = statusName ? getStatusCategory(statusName, statuses, statusCategories) : null}
               <div
-                class="relative {cardBgClass} border rounded px-4 py-3 shadow-sm hover:shadow-md transition-shadow overflow-visible"
-                style="{hasGradient ? 'border-color: rgba(255, 255, 255, 0.3);' : 'border-color: var(--ds-border);'} {cardBgStyle}"
+                class="relative border rounded px-4 py-3 shadow-sm hover:shadow-md transition-shadow overflow-visible"
+                style="{cardBgStyle}"
                 data-item-card
                 data-item-id={item.id}
                 role="button"
@@ -507,7 +471,7 @@
                     </div>
                     <!-- Title with key and item type icon -->
                     <div class="flex items-center gap-2">
-                      <ItemKey {item} {workspace} className="text-xs font-mono" style={keyStyle} />
+                      <ItemKey {item} {workspace} className="text-xs font-mono" style={glassSubtleTextStyle} />
                       {#if item.item_type_id && itemTypes.length > 0}
                         {@const itemType = itemTypes.find(type => type.id === item.item_type_id)}
                         {#if itemType}

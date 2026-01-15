@@ -2,10 +2,10 @@
   let { href = null, onclick = null, compact = false, hasGradient = false, children } = $props();
 
   let bgStyle = $derived(hasGradient
-    ? 'backdrop-filter: blur(12px); background-color: rgba(255, 255, 255, 0.1);'
+    ? 'backdrop-filter: blur(12px); background-color: var(--ds-glass-bg);'
     : 'background-color: var(--ds-surface-card);');
   let borderStyle = $derived(hasGradient
-    ? 'border-color: rgba(255, 255, 255, 0.2);'
+    ? 'border-color: var(--ds-glass-border);'
     : 'border-color: var(--ds-border);');
 </script>
 

@@ -625,8 +625,8 @@
   bind:activeCategory={customizationCategory}
   bind:selectedGradient
   bind:applyToAllViews
-  onselectGradient={handleGradientSelection}
-  onapplyToAllViewsChange={handleApplyToAllViewsChange}
+  on:selectGradient={handleGradientSelection}
+  on:applyToAllViewsChange={handleApplyToAllViewsChange}
 />
 
 <div class="workspace-welcome-wrapper" style="{backgroundStyle}">
@@ -683,14 +683,6 @@
         >
           Add Section
         </Button>
-      </div>
-    {/if}
-
-    <!-- Customize mode notice -->
-    {#if isCustomizeMode}
-      <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded flex items-center gap-2 text-sm text-blue-800">
-        <LayoutGrid class="h-4 w-4" />
-        <span>Customize mode: Drag widgets from the sidebar to add them to sections</span>
       </div>
     {/if}
 

@@ -136,9 +136,8 @@
             <button
               onclick={() => selectGradient(index)}
               class="group relative w-[25px] h-[25px] rounded overflow-hidden transition-all hover:scale-110"
-              class:ring-2={selectedGradient === index}
-              class:ring-blue-500={selectedGradient === index}
               class:ring-offset-2={selectedGradient === index}
+              style={selectedGradient === index ? 'box-shadow: 0 0 0 2px var(--ds-border-focused); outline-offset: 2px;' : ''}
               title={gradient.name}
             >
               {#if index === 0}
@@ -158,7 +157,7 @@
               {#if selectedGradient === index}
                 <div class="absolute inset-0 flex items-center justify-center bg-black/20">
                   <div class="w-3 h-3 bg-white rounded-full flex items-center justify-center">
-                    <svg class="w-2 h-2 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <svg class="w-2 h-2" style="color: var(--ds-icon-accent-blue);" fill="currentColor" viewBox="0 0 20 20">
                       <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                     </svg>
                   </div>
@@ -169,7 +168,7 @@
         </div>
 
         <!-- Apply to All Views Toggle -->
-        <div class="mt-6 p-4 rounded" style="background-color: var(--ds-accent-blue-subtle); border: 1px solid var(--ds-accent-blue-subtler);">
+        <div class="mt-6 p-4 rounded" style="background-color: var(--ds-background-neutral); border: 1px solid var(--ds-border);">
           <label class="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
@@ -200,7 +199,7 @@
             >
               <div class="flex items-start gap-3">
                 <!-- Icon preview -->
-                <div class="w-10 h-10 rounded bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0">
+                <div class="w-10 h-10 rounded flex items-center justify-center flex-shrink-0" style="background: linear-gradient(to bottom right, var(--color-blue-500), var(--color-blue-600));">
                   <svelte:component this={IconComponent} class="w-5 h-5 text-white" />
                 </div>
 
@@ -230,7 +229,7 @@
         </div>
 
         <!-- Help text -->
-        <div class="mt-6 p-4 rounded" style="background-color: var(--ds-accent-blue-subtle); border: 1px solid var(--ds-accent-blue-subtler);">
+        <div class="mt-6 p-4 rounded" style="background-color: var(--ds-background-neutral); border: 1px solid var(--ds-border);">
           <p class="text-xs" style="color: var(--ds-text);">
             <strong>Tip:</strong> Drag widgets from here to any section on your workspace homepage to add them.
           </p>

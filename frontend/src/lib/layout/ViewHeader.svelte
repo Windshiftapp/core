@@ -16,7 +16,7 @@
         {viewName}
       </h1>
       {#if collection}
-        <span class="text-xs font-medium px-1.5 py-0.5 rounded" style={hasGradient ? 'background-color: rgba(255,255,255,0.2); color: white; backdrop-filter: blur(4px);' : 'background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue);'}>
+        <span class="text-xs font-medium px-1.5 py-0.5 rounded" style={hasGradient ? 'background-color: var(--ds-glass-bg); color: var(--ds-text); backdrop-filter: blur(4px); border: 1px solid var(--ds-glass-border);' : 'background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue);'}>
           {collection}
         </span>
       {/if}
