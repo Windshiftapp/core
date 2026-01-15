@@ -302,7 +302,7 @@ func (h *TestCoverageHandler) GetSummary(w http.ResponseWriter, r *http.Request)
 	query := `
 		SELECT
 			COUNT(*) as total,
-			SUM(CASE WHEN linked_count > 0 THEN 1 ELSE 0 END) as covered
+			COALESCE(SUM(CASE WHEN linked_count > 0 THEN 1 ELSE 0 END), 0) as covered
 		FROM (
 			SELECT
 				i.id,
@@ -549,7 +549,7 @@ func (h *TestCoverageHandler) GetRequirements(w http.ResponseWriter, r *http.Req
 	summaryQuery := `
 		SELECT
 			COUNT(*) as total,
-			SUM(CASE WHEN linked_count > 0 THEN 1 ELSE 0 END) as covered
+			COALESCE(SUM(CASE WHEN linked_count > 0 THEN 1 ELSE 0 END), 0) as covered
 		FROM (
 			SELECT
 				i.id,

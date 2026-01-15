@@ -1,14 +1,15 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../../api.js';
-  import { navigate } from '../../router.js';
+  import { currentRoute } from '../../router.js';
   import Button from '../../components/Button.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
+  import TabNav from '../../components/TabNav.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
   import ResponsiveLineChart from '../../widgets/ResponsiveLineChart.svelte';
-  import { BarChart3, RefreshCw, CheckCircle, XCircle, AlertTriangle, SkipForward, Clock, TrendingUp, ShieldCheck } from 'lucide-svelte';
+  import { BarChart3, RefreshCw, CheckCircle, XCircle, AlertTriangle, SkipForward, Clock, TrendingUp, Settings, ChevronDown } from 'lucide-svelte';
   import TestCoverageReport from './TestCoverageReport.svelte';
 
   let { workspaceId = null } = $props();
@@ -18,7 +19,58 @@
   let selectedMilestoneId = $state(null);
   let days = $state(30);
 
+  // Coverage report reference for accessing its state/methods
+  let coverageReportRef = $state(null);
+  let coverageCollections = $state([]);
+  let coverageSelectedCollectionId = $state(null);
+  let coverageFilterCovered = $state('all');
+
+  // Get subtab from URL query params, default to 'test-runs'
+  const subtab = $derived($currentRoute.query?.subtab || 'test-runs');
+
+  const tabs = [
+    { id: 'test-runs', label: 'Test Run Report' },
+    { id: 'coverage', label: 'Requirements Coverage' }
+  ];
+
+  // Compute basePath for TabNav
+  const basePath = $derived(workspaceId ? `/workspaces/${workspaceId}/tests/reports` : '/tests/reports');
+
   const workspaceTestBase = $derived.by(() => workspaceId ? `/workspaces/${workspaceId}/tests` : '/workspaces');
+
+  // Update coverage state from the component ref
+  function updateCoverageState() {
+    if (coverageReportRef) {
+      coverageCollections = coverageReportRef.getCollections();
+      coverageSelectedCollectionId = coverageReportRef.getSelectedCollectionId();
+      coverageFilterCovered = coverageReportRef.getFilterCovered();
+    }
+  }
+
+  function handleCoverageCollectionChange(event) {
+    const value = event.target.value;
+    const id = value === '' ? null : parseInt(value, 10);
+    coverageReportRef?.setSelectedCollectionId(id);
+    coverageSelectedCollectionId = id;
+  }
+
+  function handleCoverageFilterChange(event) {
+    const value = event.target.value;
+    coverageReportRef?.setFilterCovered(value);
+    coverageFilterCovered = value;
+  }
+
+  function handleOpenCoverageConfig() {
+    coverageReportRef?.triggerOpenConfigModal();
+  }
+
+  // Update coverage state when the ref becomes available
+  $effect(() => {
+    if (coverageReportRef && subtab === 'coverage') {
+      // Small delay to ensure the child component has initialized
+      setTimeout(updateCoverageState, 100);
+    }
+  });
 
   // Transform trend data for the chart
   const chartData = $derived.by(() => {
@@ -99,47 +151,55 @@
   }
 </script>
 
-<div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface-raised);">
-  <PageHeader
-    title="Test Reports"
-    subtitle="View test execution metrics and trends"
-  >
-    {#snippet actions()}
-      <div class="flex items-center gap-3">
-        <div class="w-48">
-          <MilestoneCombobox
-            bind:value={selectedMilestoneId}
-            placeholder="All milestones"
-            on:select={handleMilestoneSelect}
-          />
-        </div>
-        <Button
-          onclick={loadReportData}
-          variant="primary"
-          size="medium"
-          disabled={loading}
-        >
-          <RefreshCw class="w-4 h-4 {loading ? 'animate-spin' : ''}" />
-          {loading ? 'Loading...' : 'Refresh'}
-        </Button>
-      </div>
-    {/snippet}
-  </PageHeader>
+<div class="min-h-screen flex flex-col" style="background-color: var(--ds-surface-raised);">
+  <!-- Tab Navigation - Always at top -->
+  <div class="px-6">
+    <TabNav {tabs} {basePath} defaultTab="test-runs" />
+  </div>
 
-  <!-- Content wrapper -->
-  <div class="flex-1 -mx-6 -mb-6 px-10 py-6 space-y-6">
-  {#if loading}
-    <div class="text-center py-16">
-      <RefreshCw class="w-8 h-8 mx-auto mb-4 animate-spin" style="color: var(--ds-text-subtle);" />
-      <p style="color: var(--ds-text-subtle);">Loading report data...</p>
-    </div>
-  {:else if !reportData || reportData.overall?.total_runs === 0}
-    <EmptyState
-      icon={BarChart3}
-      title="No test data found"
-      description="Complete some test runs to see reports here."
-    />
-  {:else}
+  <!-- Tab Content -->
+  {#if subtab === 'test-runs'}
+    <div class="flex flex-col flex-1 p-6">
+      <PageHeader
+        title="Test Run Report"
+        subtitle="View test execution metrics and trends"
+      >
+        {#snippet actions()}
+          <div class="flex items-center gap-3">
+            <div class="w-48">
+              <MilestoneCombobox
+                bind:value={selectedMilestoneId}
+                placeholder="All milestones"
+                on:select={handleMilestoneSelect}
+              />
+            </div>
+            <Button
+              onclick={loadReportData}
+              variant="primary"
+              size="medium"
+              disabled={loading}
+            >
+              <RefreshCw class="w-4 h-4 {loading ? 'animate-spin' : ''}" />
+              {loading ? 'Loading...' : 'Refresh'}
+            </Button>
+          </div>
+        {/snippet}
+      </PageHeader>
+
+      <!-- Content wrapper -->
+      <div class="flex-1 -mx-6 -mb-6 px-10 py-6 space-y-6">
+        {#if loading}
+          <div class="text-center py-16">
+            <RefreshCw class="w-8 h-8 mx-auto mb-4 animate-spin" style="color: var(--ds-text-subtle);" />
+            <p style="color: var(--ds-text-subtle);">Loading report data...</p>
+          </div>
+        {:else if !reportData || reportData.overall?.total_runs === 0}
+          <EmptyState
+            icon={BarChart3}
+            title="No test data found"
+            description="Complete some test runs to see reports here."
+          />
+        {:else}
     <!-- Stats Cards -->
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
       <!-- Total Tests -->
@@ -299,13 +359,76 @@
         {/if}
       </div>
     </div>
-  {/if}
-
-  <!-- Requirements Coverage Section - always shown, handles its own empty state -->
-  {#if !loading}
-    <div class="rounded-lg border shadow-sm overflow-hidden" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-      <TestCoverageReport {workspaceId} />
+        {/if}
+      </div>
     </div>
   {/if}
-  </div>
+
+  {#if subtab === 'coverage'}
+    <div class="flex flex-col flex-1 p-6">
+      <PageHeader
+        title="Requirements Coverage"
+        subtitle="Track which requirements have linked test cases"
+      >
+        {#snippet actions()}
+          <div class="flex items-center gap-3">
+            <!-- Collection selector -->
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium" style="color: var(--ds-text-subtle);">Collection</label>
+              <div class="relative">
+                <select
+                  class="appearance-none px-3 py-2 pr-8 text-sm border rounded-md cursor-pointer min-w-[140px]"
+                  style="border-color: var(--ds-border); background-color: var(--ds-background-input); color: var(--ds-text);"
+                  value={coverageSelectedCollectionId ?? ''}
+                  onchange={handleCoverageCollectionChange}
+                >
+                  <option value="">Default</option>
+                  {#each coverageCollections as collection (collection.id)}
+                    <option value={collection.id}>{collection.name}</option>
+                  {/each}
+                </select>
+                <ChevronDown class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style="color: var(--ds-text-subtle);" />
+              </div>
+            </div>
+
+            <!-- Filter -->
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium" style="color: var(--ds-text-subtle);">Filter</label>
+              <div class="relative">
+                <select
+                  class="appearance-none px-3 py-2 pr-8 text-sm border rounded-md cursor-pointer min-w-[140px]"
+                  style="border-color: var(--ds-border); background-color: var(--ds-background-input); color: var(--ds-text);"
+                  value={coverageFilterCovered}
+                  onchange={handleCoverageFilterChange}
+                >
+                  <option value="all">All Requirements</option>
+                  <option value="true">Covered Only</option>
+                  <option value="false">Not Covered Only</option>
+                </select>
+                <ChevronDown class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style="color: var(--ds-text-subtle);" />
+              </div>
+            </div>
+
+            <!-- Configure button -->
+            <div class="flex flex-col gap-1">
+              <span class="text-xs font-medium invisible">Action</span>
+              <Button variant="default" onclick={handleOpenCoverageConfig}>
+                <Settings class="w-4 h-4" />
+                Configure
+              </Button>
+            </div>
+          </div>
+        {/snippet}
+      </PageHeader>
+
+      <!-- Content wrapper -->
+      <div class="flex-1 -mx-6 -mb-6 px-10 py-6">
+        <TestCoverageReport
+          {workspaceId}
+          hideHeader={true}
+          bind:this={coverageReportRef}
+        />
+      </div>
+    </div>
+  {/if}
 </div>

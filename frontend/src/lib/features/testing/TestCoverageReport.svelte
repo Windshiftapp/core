@@ -14,10 +14,16 @@
     CheckCircle,
     XCircle,
     ChevronDown,
-    Link2
+    Link2,
+    Package
   } from 'lucide-svelte';
+  import { itemTypeIconMap } from '../../utils/icons.js';
 
-  let { workspaceId = null } = $props();
+  let {
+    workspaceId = null,
+    hideTitle = false,
+    hideHeader = false  // Hide entire header section (for use with external PageHeader)
+  } = $props();
 
   // Data state
   let loading = $state(true);
@@ -36,6 +42,22 @@
   let showConfigModal = $state(false);
   let selectedTypeIds = $state([]);
 
+  // Expose state and handlers for external header controls
+  export function getCollections() { return collections; }
+  export function getSelectedCollectionId() { return selectedCollectionId; }
+  export function setSelectedCollectionId(id) {
+    selectedCollectionId = id;
+    currentPage = 1;
+    loadCoverageData();
+  }
+  export function getFilterCovered() { return filterCovered; }
+  export function setFilterCovered(value) {
+    filterCovered = value;
+    currentPage = 1;
+    loadCoverageData();
+  }
+  export function triggerOpenConfigModal() { openConfigModal(); }
+
   // Pie chart configuration
   const radius = 48;
   const circumference = 2 * Math.PI * radius;
@@ -52,6 +74,7 @@
       key: 'id',
       label: 'ID',
       width: '120px',
+      html: true,
       render: (item) =>
         `<a href="${workspaceTestBase}/${item.item_id}" style="color: var(--ds-text-link);" class="hover:underline font-medium">${item.workspace_key}-${item.workspace_item_number}</a>`
     },
@@ -64,6 +87,7 @@
       key: 'item_type_name',
       label: 'Type',
       width: '140px',
+      html: true,
       render: (item) =>
         `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium" style="background-color: ${item.item_type_color}20; color: ${item.item_type_color};">${item.item_type_name}</span>`
     },
@@ -77,6 +101,7 @@
       key: 'is_covered',
       label: 'Coverage',
       width: '100px',
+      html: true,
       render: (item) =>
         item.is_covered
           ? `<span class="inline-flex items-center gap-1 text-xs font-medium" style="color: var(--ds-status-success-solid);"><svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>Covered</span>`
@@ -87,6 +112,7 @@
       label: 'Tests',
       width: '80px',
       align: 'text-center',
+      html: true,
       render: (item) =>
         `<span class="inline-flex items-center gap-1" style="color: var(--ds-text-subtle);"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>${item.linked_test_count}</span>`
     }
@@ -258,18 +284,21 @@
 
 <div class="coverage-report">
   <!-- Header with controls -->
+  {#if !hideHeader}
   <div class="report-header">
-    <div class="header-left">
-      <div class="flex items-center gap-2">
-        <ShieldCheck class="w-5 h-5" style="color: var(--ds-text-subtle);" />
-        <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-          Requirements Coverage
-        </h3>
+    {#if !hideTitle}
+      <div class="header-left">
+        <div class="flex items-center gap-2">
+          <ShieldCheck class="w-5 h-5" style="color: var(--ds-text-subtle);" />
+          <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
+            Requirements Coverage
+          </h3>
+        </div>
+        <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
+          Track which requirements have linked test cases
+        </p>
       </div>
-      <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-        Track which requirements have linked test cases
-      </p>
-    </div>
+    {/if}
     <div class="header-controls">
       <!-- Collection selector -->
       <div class="control-group">
@@ -315,6 +344,7 @@
       </Button>
     </div>
   </div>
+  {/if}
 
   <!-- Content -->
   {#if loading}
@@ -441,10 +471,10 @@
               onclick={() => toggleItemType(type.id)}
             >
               <div class="type-icon" style="background-color: {type.color}20; color: {type.color};">
-                {#if type.icon}
-                  <span class="text-sm">{type.icon}</span>
+                {#if type.icon && itemTypeIconMap[type.icon]}
+                  <svelte:component this={itemTypeIconMap[type.icon]} size={20} />
                 {:else}
-                  <span class="text-sm">{type.name.charAt(0)}</span>
+                  <svelte:component this={Package} size={20} />
                 {/if}
               </div>
               <span class="type-name">{type.name}</span>
