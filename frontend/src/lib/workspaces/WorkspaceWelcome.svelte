@@ -8,6 +8,7 @@
   import { getDefaultWidth } from '../services/widgetRegistry.js';
   import { gradients } from '../utils/gradients.js';
   import Button from '../components/Button.svelte';
+  import BaseContainer from '../components/BaseContainer.svelte';
   import ViewHeader from '../layout/ViewHeader.svelte';
 
   // Widget components
@@ -697,7 +698,7 @@
     <div class="space-y-6">
       {#each sections as section (section.id)}
         {@const sectionWidgets = getWidgetsForSection(section.id)}
-        <div class="section-container">
+        <BaseContainer padding="spacious" glass>
           <!-- Section header -->
           <div class="flex items-center justify-between mb-4">
             {#if editingSectionId === section.id}
@@ -820,7 +821,7 @@
               </div>
             {/if}
           </div>
-        </div>
+        </BaseContainer>
       {/each}
     </div>
 
@@ -881,27 +882,6 @@
     animation: fade-up var(--duration-slow, 300ms) var(--ease-smooth, ease) forwards;
   }
 
-  /* Enhanced glassmorphism section container */
-  .section-container {
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(12px) saturate(180%);
-    -webkit-backdrop-filter: blur(12px) saturate(180%);
-    border-radius: 1rem;
-    padding: 1.5rem;
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
-    transition:
-      transform var(--duration-normal, 200ms) var(--ease-smooth, ease),
-      box-shadow var(--duration-normal, 200ms) var(--ease-smooth, ease),
-      border-color var(--duration-fast, 100ms) var(--ease-smooth, ease);
-  }
-
-  .section-container:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.15);
-    border-color: rgba(255, 255, 255, 0.35);
-  }
-
   .section-drop-zone {
     position: relative;
   }
@@ -916,9 +896,6 @@
     }
     .workspace-welcome {
       animation: none;
-    }
-    .section-container:hover {
-      transform: none;
     }
   }
 </style>
