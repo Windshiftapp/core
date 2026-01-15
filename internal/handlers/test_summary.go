@@ -292,7 +292,8 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 		LEFT JOIN test_results tres ON tr.id = tres.run_id
 		` + baseWhere
 
-	var totalRuns, totalTests, passed, failed, blocked, skipped, notRun int
+	var totalRuns, totalTests int
+	var passed, failed, blocked, skipped, notRun sql.NullInt64
 	err = h.getReadDB().QueryRow(statsQuery, baseArgs...).Scan(
 		&totalRuns, &totalTests, &passed, &failed, &blocked, &skipped, &notRun,
 	)
@@ -303,7 +304,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 
 	var passRate float64
 	if totalTests > 0 {
-		passRate = float64(passed) / float64(totalTests) * 100
+		passRate = float64(passed.Int64) / float64(totalTests) * 100
 	}
 
 	// Get trend data (daily pass rates)
@@ -335,14 +336,15 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 	trend := make([]TrendPoint, 0)
 	for trendRows.Next() {
 		var date string
-		var total, passedCount int
+		var total int
+		var passedCount sql.NullInt64
 		if err := trendRows.Scan(&date, &total, &passedCount); err != nil {
 			continue
 		}
 
 		var rate float64
 		if total > 0 {
-			rate = float64(passedCount) / float64(total) * 100
+			rate = float64(passedCount.Int64) / float64(total) * 100
 		}
 
 		trend = append(trend, TrendPoint{
@@ -453,11 +455,11 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 		"overall": map[string]interface{}{
 			"total_runs":  totalRuns,
 			"total_tests": totalTests,
-			"passed":      passed,
-			"failed":      failed,
-			"blocked":     blocked,
-			"skipped":     skipped,
-			"not_run":     notRun,
+			"passed":      passed.Int64,
+			"failed":      failed.Int64,
+			"blocked":     blocked.Int64,
+			"skipped":     skipped.Int64,
+			"not_run":     notRun.Int64,
 			"pass_rate":   passRate,
 		},
 		"trend":           trend,
