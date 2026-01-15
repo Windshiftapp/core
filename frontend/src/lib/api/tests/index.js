@@ -9,6 +9,7 @@ export { testRuns } from './testRuns.js';
 export { testResults } from './testResults.js';
 export { reports } from './reports.js';
 export { defects } from './defects.js';
+export { coverage } from './coverage.js';
 
 // Aggregated tests object for backward compatibility
 import { testFolders } from './testFolders.js';
@@ -21,6 +22,7 @@ import { testRuns } from './testRuns.js';
 import { testResults } from './testResults.js';
 import { reports } from './reports.js';
 import { defects } from './defects.js';
+import { coverage } from './coverage.js';
 
 export const tests = {
   testFolders,
@@ -33,4 +35,5 @@ export const tests = {
   testResults,
   reports,
   defects,
+  coverage,
 };

@@ -8,7 +8,8 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
   import ResponsiveLineChart from '../../widgets/ResponsiveLineChart.svelte';
-  import { BarChart3, RefreshCw, CheckCircle, XCircle, AlertTriangle, SkipForward, Clock, TrendingUp } from 'lucide-svelte';
+  import { BarChart3, RefreshCw, CheckCircle, XCircle, AlertTriangle, SkipForward, Clock, TrendingUp, ShieldCheck } from 'lucide-svelte';
+  import TestCoverageReport from './TestCoverageReport.svelte';
 
   let { workspaceId = null } = $props();
 
@@ -297,6 +298,13 @@
           />
         {/if}
       </div>
+    </div>
+  {/if}
+
+  <!-- Requirements Coverage Section - always shown, handles its own empty state -->
+  {#if !loading}
+    <div class="rounded-lg border shadow-sm overflow-hidden" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+      <TestCoverageReport {workspaceId} />
     </div>
   {/if}
   </div>

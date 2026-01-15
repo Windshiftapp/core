@@ -175,6 +175,21 @@ CREATE INDEX IF NOT EXISTS idx_board_columns_display_order ON board_columns(disp
 CREATE INDEX IF NOT EXISTS idx_board_column_statuses_board_column_id ON board_column_statuses(board_column_id);
 CREATE INDEX IF NOT EXISTS idx_board_column_statuses_status_id ON board_column_statuses(status_id);
 
+-- Test coverage configuration table
+CREATE TABLE IF NOT EXISTS test_coverage_configurations (
+	id SERIAL PRIMARY KEY,
+	workspace_id INTEGER,
+	collection_id INTEGER,
+	requirement_item_type_ids TEXT, -- JSON array of item type IDs
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+	FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_test_coverage_config_workspace_id ON test_coverage_configurations(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_test_coverage_config_collection_id ON test_coverage_configurations(collection_id);
+
 -- Audit logging table
 CREATE TABLE IF NOT EXISTS audit_logs (
 	id SERIAL PRIMARY KEY,

@@ -26,4 +26,14 @@ func RegisterCollectionRoutes(deps *Deps) {
 	api.HandleH("POST /collections/{id}/board-configuration", auth(http.HandlerFunc(deps.Collections.BoardConfig.CreateForCollection)))
 	api.HandleH("PUT /collections/{collectionId}/board-configuration/{configId}", auth(http.HandlerFunc(deps.Collections.BoardConfig.UpdateForCollection)))
 	api.HandleH("DELETE /collections/{collectionId}/board-configuration/{configId}", auth(http.HandlerFunc(deps.Collections.BoardConfig.DeleteForCollection)))
+
+	// Test coverage configuration endpoints
+	api.HandleH("GET /collections/{id}/test-coverage/config", auth(http.HandlerFunc(deps.Collections.TestCoverage.GetConfig)))
+	api.HandleH("POST /collections/{id}/test-coverage/config", auth(http.HandlerFunc(deps.Collections.TestCoverage.CreateConfig)))
+	api.HandleH("PUT /collections/{collectionId}/test-coverage/config/{configId}", auth(http.HandlerFunc(deps.Collections.TestCoverage.UpdateConfig)))
+	api.HandleH("DELETE /collections/{collectionId}/test-coverage/config/{configId}", auth(http.HandlerFunc(deps.Collections.TestCoverage.DeleteConfig)))
+
+	// Test coverage data endpoints
+	api.HandleH("GET /collections/{id}/test-coverage/summary", auth(http.HandlerFunc(deps.Collections.TestCoverage.GetSummary)))
+	api.HandleH("GET /collections/{id}/test-coverage/requirements", auth(http.HandlerFunc(deps.Collections.TestCoverage.GetRequirements)))
 }

@@ -1527,6 +1527,7 @@ func (h *WorkspaceHandler) UpdateHomepageLayout(w http.ResponseWriter, r *http.R
 		"saved-search":       true,
 		"upcoming-deadlines": true,
 		"sprint-timeline":    true,
+		"test-coverage":      true,
 	}
 
 	for _, widget := range layout.Widgets {
