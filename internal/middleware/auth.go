@@ -72,7 +72,22 @@ func (am *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		// Check for Bearer token first
+		// Check for X-Session-Token header (used by TUI/internal services)
+		if sessionToken := r.Header.Get("X-Session-Token"); sessionToken != "" {
+			clientIP := am.getClientIP(r)
+			session, err := am.sessionManager.ValidateSession(sessionToken, clientIP)
+			if err == nil {
+				ctx := context.WithValue(r.Context(), "session", session)
+				ctx = context.WithValue(ctx, "user", session.User)
+				ctx = context.WithValue(ctx, "auth_method", "session-header")
+				ctx = context.WithValue(ctx, "csrf_exempt", true) // Internal services are CSRF exempt
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+			// Fall through to try other auth methods if session validation fails
+		}
+
+		// Check for Bearer token (API tokens for external integrations)
 		authHeader := r.Header.Get("Authorization")
 		if strings.HasPrefix(authHeader, "Bearer ") {
 			token := strings.TrimPrefix(authHeader, "Bearer ")
@@ -133,7 +148,22 @@ func (am *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 // OptionalAuth middleware that adds user context if authenticated but doesn't require it
 func (am *AuthMiddleware) OptionalAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check for Bearer token first
+		// Check for X-Session-Token header (used by TUI/internal services)
+		if sessionToken := r.Header.Get("X-Session-Token"); sessionToken != "" {
+			clientIP := am.getClientIP(r)
+			session, err := am.sessionManager.ValidateSession(sessionToken, clientIP)
+			if err == nil {
+				ctx := context.WithValue(r.Context(), "session", session)
+				ctx = context.WithValue(ctx, "user", session.User)
+				ctx = context.WithValue(ctx, "auth_method", "session-header")
+				ctx = context.WithValue(ctx, "csrf_exempt", true)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+			// Fall through to try other auth methods
+		}
+
+		// Check for Bearer token (API tokens for external integrations)
 		authHeader := r.Header.Get("Authorization")
 		if strings.HasPrefix(authHeader, "Bearer ") {
 			token := strings.TrimPrefix(authHeader, "Bearer ")

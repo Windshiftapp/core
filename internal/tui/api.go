@@ -13,9 +13,9 @@ import (
 
 // APIClient handles communication with the Windshift API
 type APIClient struct {
-	baseURL     string
-	httpClient  *http.Client
-	bearerToken string
+	baseURL      string
+	httpClient   *http.Client
+	sessionToken string
 }
 
 // NewAPIClient creates a new API client
@@ -28,9 +28,9 @@ func NewAPIClient(baseURL string) *APIClient {
 	}
 }
 
-// SetBearerToken sets the bearer token for authentication
-func (c *APIClient) SetBearerToken(token string) {
-	c.bearerToken = token
+// SetSessionToken sets the session token for authentication
+func (c *APIClient) SetSessionToken(token string) {
+	c.sessionToken = token
 }
 
 // Data types matching the Windshift API
@@ -305,8 +305,8 @@ func (c *APIClient) getWorkspaces() ([]Workspace, error) {
 	}
 
 	// Add bearer token if available
-	if c.bearerToken != "" {
-		req.Header.Set("Authorization", "Bearer "+c.bearerToken)
+	if c.sessionToken != "" {
+		req.Header.Set("X-Session-Token", c.sessionToken)
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -336,8 +336,8 @@ func (c *APIClient) getWorkItems(workspaceID int) ([]WorkItem, error) {
 	}
 
 	// Add bearer token if available
-	if c.bearerToken != "" {
-		req.Header.Set("Authorization", "Bearer "+c.bearerToken)
+	if c.sessionToken != "" {
+		req.Header.Set("X-Session-Token", c.sessionToken)
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -377,8 +377,8 @@ func (c *APIClient) getComments(itemID int) ([]Comment, error) {
 	}
 
 	// Add bearer token if available
-	if c.bearerToken != "" {
-		req.Header.Set("Authorization", "Bearer "+c.bearerToken)
+	if c.sessionToken != "" {
+		req.Header.Set("X-Session-Token", c.sessionToken)
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -406,8 +406,8 @@ func (c *APIClient) getStatuses() ([]Status, error) {
 		return nil, err
 	}
 
-	if c.bearerToken != "" {
-		req.Header.Set("Authorization", "Bearer "+c.bearerToken)
+	if c.sessionToken != "" {
+		req.Header.Set("X-Session-Token", c.sessionToken)
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -435,8 +435,8 @@ func (c *APIClient) getPriorities() ([]Priority, error) {
 		return nil, err
 	}
 
-	if c.bearerToken != "" {
-		req.Header.Set("Authorization", "Bearer "+c.bearerToken)
+	if c.sessionToken != "" {
+		req.Header.Set("X-Session-Token", c.sessionToken)
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -464,8 +464,8 @@ func (c *APIClient) getTimeProjects() ([]TimeProject, error) {
 		return nil, err
 	}
 
-	if c.bearerToken != "" {
-		req.Header.Set("Authorization", "Bearer "+c.bearerToken)
+	if c.sessionToken != "" {
+		req.Header.Set("X-Session-Token", c.sessionToken)
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -511,8 +511,8 @@ func (c *APIClient) updateWorkItem(itemID int, title, description string, status
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	if c.bearerToken != "" {
-		req.Header.Set("Authorization", "Bearer "+c.bearerToken)
+	if c.sessionToken != "" {
+		req.Header.Set("X-Session-Token", c.sessionToken)
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -550,8 +550,8 @@ func (c *APIClient) createWorkItem(workspaceID int, title, description string, p
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	if c.bearerToken != "" {
-		req.Header.Set("Authorization", "Bearer "+c.bearerToken)
+	if c.sessionToken != "" {
+		req.Header.Set("X-Session-Token", c.sessionToken)
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -587,8 +587,8 @@ func (c *APIClient) createComment(itemID int, content string) error {
 	req.Header.Set("Content-Type", "application/json")
 
 	// Add bearer token if available
-	if c.bearerToken != "" {
-		req.Header.Set("Authorization", "Bearer "+c.bearerToken)
+	if c.sessionToken != "" {
+		req.Header.Set("X-Session-Token", c.sessionToken)
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -626,8 +626,8 @@ func (c *APIClient) createTimeLog(itemID int, projectID int, description, durati
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	if c.bearerToken != "" {
-		req.Header.Set("Authorization", "Bearer "+c.bearerToken)
+	if c.sessionToken != "" {
+		req.Header.Set("X-Session-Token", c.sessionToken)
 	}
 
 	resp, err := c.httpClient.Do(req)

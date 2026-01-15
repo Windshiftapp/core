@@ -94,7 +94,7 @@ type Model struct {
 	userInfo *UserInfo
 
 	// Authentication
-	bearerToken string
+	sessionToken string
 
 	// Window size
 	width  int
@@ -175,8 +175,8 @@ func NewModelWithUser(apiURL string, userInfo *UserInfo) Model {
 	return NewModelWithUserAndToken(apiURL, userInfo, "")
 }
 
-// NewModelWithUserAndToken creates a new model instance with user information and bearer token
-func NewModelWithUserAndToken(apiURL string, userInfo *UserInfo, bearerToken string) Model {
+// NewModelWithUserAndToken creates a new model instance with user information and session token
+func NewModelWithUserAndToken(apiURL string, userInfo *UserInfo, sessionToken string) Model {
 	styles := Styles{
 		Title: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#64FFAA")).
@@ -209,10 +209,10 @@ func NewModelWithUserAndToken(apiURL string, userInfo *UserInfo, bearerToken str
 			Padding(0, 1),
 	}
 
-	// Create API client with bearer token if provided
+	// Create API client with session token if provided
 	apiClient := NewAPIClient(apiURL)
-	if bearerToken != "" {
-		apiClient.SetBearerToken(bearerToken)
+	if sessionToken != "" {
+		apiClient.SetSessionToken(sessionToken)
 	}
 
 	return Model{
@@ -225,7 +225,7 @@ func NewModelWithUserAndToken(apiURL string, userInfo *UserInfo, bearerToken str
 		selectedItemIdx:     0,
 		apiClient:           apiClient,
 		userInfo:            userInfo,
-		bearerToken:         bearerToken,
+		sessionToken:         sessionToken,
 		styles:              styles,
 		timeForm: TimeLogForm{
 			date:      time.Now().Format("2006-01-02"),

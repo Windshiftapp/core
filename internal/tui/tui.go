@@ -12,12 +12,12 @@ import (
 )
 
 // NewTUIHandler creates a new TUI handler for SSH sessions
-func NewTUIHandler(apiURL string, tokenManager *auth.TokenManager) func(s ssh.Session) (tea.Model, []tea.ProgramOption) {
+func NewTUIHandler(apiURL string, sessionManager *auth.SessionManager) func(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	return func(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 		// Extract authenticated user information from SSH context
 		var userInfo *UserInfo
-		
-		var bearerToken string
+
+		var sessionToken string
 
 		if middleware.IsAuthenticated(s.Context()) {
 			userID, _ := middleware.GetAuthenticatedUserID(s.Context())
@@ -35,28 +35,30 @@ func NewTUIHandler(apiURL string, tokenManager *auth.TokenManager) func(s ssh.Se
 				LastName:       lastName,
 			}
 
-			// Create session token for this SSH session
-			if tokenManager != nil {
-				sessionName := fmt.Sprintf("SSH Session (%s via %s)", username, credentialName)
-				token, err := tokenManager.CreateSessionToken(userID, sessionName)
+			// Create a real session for this SSH connection (same as frontend users)
+			if sessionManager != nil {
+				remoteAddr := s.RemoteAddr().String()
+				userAgent := fmt.Sprintf("SSH TUI (%s via %s)", username, credentialName)
+				session, err := sessionManager.CreateSession(userID, remoteAddr, userAgent, false)
 				if err != nil {
-					slog.Error("failed to create session token",
+					slog.Error("failed to create session",
 						slog.String("component", "tui"),
 						slog.Int("user_id", int(userID)),
 						slog.Any("error", err))
 				} else {
-					bearerToken = token
-					slog.Debug("created session token",
+					sessionToken = session.Token
+					slog.Debug("created session for SSH TUI",
 						slog.String("component", "tui"),
 						slog.Int("user_id", int(userID)),
-						slog.String("username", username))
+						slog.String("username", username),
+						slog.Int("session_id", session.ID))
 				}
 			}
 		}
 
-		// Create new app instance for each session with token
-		model := NewModelWithUserAndToken(apiURL, userInfo, bearerToken)
-		
+		// Create new app instance for each session
+		model := NewModelWithUserAndToken(apiURL, userInfo, sessionToken)
+
 		return model, []tea.ProgramOption{
 			tea.WithAltScreen(),
 			tea.WithMouseCellMotion(),

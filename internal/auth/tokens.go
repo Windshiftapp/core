@@ -1,16 +1,15 @@
 package auth
 
 import (
-	"windshift/internal/database"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"golang.org/x/crypto/bcrypt"
+	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/services"
 )
@@ -291,45 +290,6 @@ func (tm *TokenManager) updateLastUsed(tokenID int) {
 	if tm.tokenTracker != nil {
 		tm.tokenTracker.RecordTokenUse(tokenID)
 	}
-}
-
-// CreateSessionToken creates a temporary API token for SSH sessions
-func (tm *TokenManager) CreateSessionToken(userID int, sessionName string) (string, error) {
-	// Generate token
-	token, err := tm.GenerateToken()
-	if err != nil {
-		return "", err
-	}
-
-	// Hash token
-	tokenHash, err := tm.HashToken(token)
-	if err != nil {
-		return "", err
-	}
-
-	// Get token prefix for identification
-	tokenPrefix := tm.GetTokenPrefix(token)
-
-	// Default permissions for SSH session (full access)
-	permissions := []string{"admin"}
-	permissionsJSON, err := json.Marshal(permissions)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal permissions: %w", err)
-	}
-
-	// Set expiry to 24 hours from now for session tokens
-	// Calculate expiry time in Go to avoid database-specific date functions
-	expiresAt := time.Now().Add(24 * time.Hour)
-
-	_, err = tm.db.ExecWrite(`
-		INSERT INTO api_tokens (user_id, name, token_hash, token_prefix, permissions, is_temporary, expires_at)
-		VALUES (?, ?, ?, ?, ?, 1, ?)
-	`, userID, sessionName, tokenHash, tokenPrefix, string(permissionsJSON), expiresAt)
-	if err != nil {
-		return "", fmt.Errorf("failed to create session token: %w", err)
-	}
-
-	return token, nil
 }
 
 // CleanupExpiredTokens removes expired tokens from the database

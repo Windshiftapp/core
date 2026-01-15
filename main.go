@@ -1226,7 +1226,7 @@ func main() {
 
 		// Add middleware
 		serverOptions = append(serverOptions, wish.WithMiddleware(
-			wishbubbletea.Middleware(tui.NewTUIHandler(apiURL, tokenManager)),
+			wishbubbletea.Middleware(tui.NewTUIHandler(apiURL, sessionManager)),
 			logging.Middleware(),
 		))
 
