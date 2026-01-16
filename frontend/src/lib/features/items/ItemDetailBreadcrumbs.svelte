@@ -150,7 +150,7 @@
 </script>
 
 <!-- Breadcrumb Navigation -->
-<div class="group flex items-center gap-2 text-sm mb-6 overflow-hidden" style="color: var(--ds-text-subtle);">
+<div class="group flex items-center gap-2 text-sm mb-6" style="color: var(--ds-text-subtle);">
   <button
     onclick={() => navigate('/workspaces')}
     class="transition-colors hover:underline"
@@ -217,7 +217,14 @@
     {/each}
   {:else if !item.parent_id && !(workspace?.is_personal && item.related_work_item_id)}
     <!-- Show placeholder for "no parent" scenario (not shown for personal tasks with linked work items) -->
-    <span class="italic" style="color: var(--ds-text-subtlest);">No parent</span>
+    <button
+      onclick={openParentSelector}
+      class="italic transition-colors hover:underline"
+      style="color: var(--ds-text-subtlest);"
+      title="Set parent"
+    >
+      No parent
+    </button>
     <span>/</span>
   {/if}
 

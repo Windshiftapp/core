@@ -71,6 +71,9 @@
   // Picker display control
   export let showSelectedInTrigger = true;
 
+  // Control auto-open behavior for ItemPicker/UserPicker/AssetPicker
+  export let autoOpenPickers = true;
+
   $: isRequired = required || field.required || field.is_required;
 
   // Milestone config for ItemPicker
@@ -389,7 +392,7 @@
         placeholder="Select milestone..."
         showUnassigned={true}
         unassignedLabel="No milestone"
-        autoOpen={true}
+        autoOpen={autoOpenPickers}
         class="w-full"
         {disabled}
         on:select={(e) => onChange(e.detail?.id || null)}
@@ -402,7 +405,7 @@
         placeholder="Select user..."
         showUnassigned={true}
         {showSelectedInTrigger}
-        autoOpen={true}
+        autoOpen={autoOpenPickers}
         class="w-full"
         {disabled}
         onSelect={(selectedUser) => {
@@ -421,7 +424,7 @@
         placeholder="Select iteration..."
         showUnassigned={true}
         unassignedLabel="No iteration"
-        autoOpen={true}
+        autoOpen={autoOpenPickers}
         class="w-full"
         {disabled}
         on:select={(e) => onChange(e.detail?.id || null)}
@@ -436,7 +439,7 @@
         cqlQuery={assetConfig.cql_query}
         placeholder="Select asset..."
         showUnassigned={true}
-        autoOpen={true}
+        autoOpen={autoOpenPickers}
         class="w-full"
         {disabled}
         onSelect={(asset) => {

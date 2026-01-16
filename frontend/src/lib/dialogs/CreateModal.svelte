@@ -18,6 +18,7 @@
   import Select from '../components/Select.svelte';
   import Label from '../components/Label.svelte';
   import { collectionCategoriesStore } from '../stores/collectionCategories.js';
+  import { getSystemFieldName } from '../stores/fieldConfig.js';
   import { getShortcut, matchesShortcut, getDisplayString } from '../utils/keyboardShortcuts.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { createPopover, melt } from '@melt-ui/svelte';
@@ -70,6 +71,7 @@
   let screenFields = $state([]);
   let screenSystemFields = $state([]);
   let customFieldValues = $state({});
+  let validationErrorMessages = $state([]);
   let loadingScreenFields = $state(false);
   let currentConfigSet = $state(null);
   let configSetLoadedForWorkspace = $state(null);
@@ -110,14 +112,14 @@
   // Computed required/non-required field lists
   let nonRequiredCustomFields = $derived(customFields.filter(cf => {
     const screenField = screenFields.find(f => f.field_type === 'custom' && parseInt(f.field_identifier) === cf.id);
-    return !screenField?.required;
+    return !screenField?.is_required;
   }));
 
-  let requiredSystemFields = $derived(screenFields.filter(f => f.required && f.field_type === 'system'));
+  let requiredSystemFields = $derived(screenFields.filter(f => f.is_required && f.field_type === 'system'));
 
   let requiredCustomFields = $derived(customFields.filter(cf => {
     const screenField = screenFields.find(f => f.field_type === 'custom' && parseInt(f.field_identifier) === cf.id);
-    return screenField?.required === true;
+    return screenField?.is_required === true;
   }));
 
   // Overflow menu popover
@@ -209,7 +211,7 @@
   // Helper functions for screen field configuration
   function isFieldRequired(fieldIdentifier) {
     const screenField = screenFields.find(f => f.field_identifier === fieldIdentifier);
-    return screenField?.required === true;
+    return screenField?.is_required === true;
   }
 
   function isFieldConfigured(fieldIdentifier) {
@@ -237,7 +239,8 @@
     try {
       const result = await api.customFields.getAll();
       allCustomFields = result || [];
-      customFields = allCustomFields;
+      // Don't set customFields here - let loadScreenFieldsForItemType() be the sole place
+      // that populates customFields based on screen configuration
       customFieldsLoaded = true;
     } catch (error) {
       console.error('Failed to load custom fields:', error);
@@ -471,6 +474,7 @@
     screenSystemFields = [];
     customFields = [];
     customFieldValues = {};
+    validationErrorMessages = [];
     storedItemTypeApplied = false;
     configSetDefaultApplied = false;
     collectionCategoryId = null;
@@ -527,17 +531,16 @@
         const validationErrors = [];
 
         for (const field of screenFields) {
-          if (field.required) {
+          if (field.is_required) {
             if (field.field_type === 'system') {
               const identifier = field.field_identifier;
-              if (identifier === 'priority' && !formData.priority_id) {
-                validationErrors.push('Priority is required');
-              }
-              if (identifier === 'due_date' && !formData.due_date) {
-                validationErrors.push('Due Date is required');
-              }
-              if (identifier === 'milestone' && !formData.milestone_id) {
-                validationErrors.push('Milestone is required');
+              // Map field identifiers to formData keys (some differ, e.g., 'title' -> 'name')
+              const fieldKeyMap = { 'title': 'name' };
+              const formKey = fieldKeyMap[identifier] || identifier;
+              // Try mapped key, then with _id suffix (e.g., 'priority' -> 'priority_id')
+              const value = formData[formKey] ?? formData[`${formKey}_id`];
+              if (!value) {
+                validationErrors.push(`${getSystemFieldName(identifier)} is required`);
               }
             } else if (field.field_type === 'custom') {
               const fieldId = parseInt(field.field_identifier);
@@ -551,7 +554,7 @@
         }
 
         if (validationErrors.length > 0) {
-          alert('Please fill in required fields:\n' + validationErrors.join('\n'));
+          validationErrorMessages = validationErrors;
           return;
         }
 
@@ -563,7 +566,7 @@
             priority_id: formData.priority_id || null,
             milestone_id: formData.milestone_id || null,
             assignee_id: formData.assignee_id || null,
-            due_date: formData.due_date || null,
+            due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null,
             status: 'open',
             item_type_id: formData.item_type_id,
             parent_id: parentItem ? parentItem.id : null,
@@ -1021,6 +1024,18 @@
 
       <!-- Body -->
       <div class="px-4 py-3 space-y-3">
+        <!-- Validation Errors -->
+        {#if validationErrorMessages.length > 0}
+          <div class="p-3 rounded text-sm" style="background-color: var(--ds-background-danger-subtle, #fef2f2); border: 1px solid var(--ds-border-danger, #fecaca); color: var(--ds-text-danger, #dc2626);">
+            <p class="font-medium mb-1">Please fill in required fields:</p>
+            <ul class="list-disc list-inside">
+              {#each validationErrorMessages as error}
+                <li>{error}</li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
+
         <!-- Parent Item Info (for sub-issues) -->
         {#if parentItem}
           <div class="text-xs px-2 py-1.5 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
@@ -1271,6 +1286,7 @@
                         onChange={(val) => customFieldValues[field.id] = val}
                         {milestones}
                         isDarkMode={false}
+                        autoOpenPickers={false}
                       />
                     </div>
                   {/each}

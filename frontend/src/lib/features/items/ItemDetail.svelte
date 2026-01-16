@@ -1010,7 +1010,6 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
         parentHierarchy = [];
         childItems = [];
         availableStatusTransitions = [];
-        attachments = [];
         customFieldDefinitions = [];
         workspaceScreenFields = [];
         itemLinks = [];
@@ -1280,9 +1279,11 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
       editTitle = item.title;
       editDescription = item.description || '';
       
-      // Load parent hierarchy if item has parents
+      // Load parent hierarchy if item has parents, otherwise clear it
       if (item.parent_id) {
         await loadParentHierarchy();
+      } else {
+        parentHierarchy = [];
       }
       
       // Load child items and hierarchy data
