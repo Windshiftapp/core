@@ -7,38 +7,53 @@
   import PageHeader from '../layout/PageHeader.svelte';
   import Spinner from '../components/Spinner.svelte';
   import AlertBox from '../components/AlertBox.svelte';
-  import { api } from '../api.js';
-  
-  let saving = false;
-  let error = '';
-  let successMessage = '';
-  
+  import { api, getSecuritySettings } from '../api.js';
+
+  let saving = $state(false);
+  let error = $state('');
+  let successMessage = $state('');
+
   // Plugin management
-  let plugins = [];
-  let loadingPlugins = false;
-  let uploadingPlugin = false;
-  let selectedFile = null;
-  let selectedManifest = null;
-  let dragActive = false;
+  let plugins = $state([]);
+  let loadingPlugins = $state(false);
+  let uploadingPlugin = $state(false);
+  let selectedFile = $state(null);
+  let selectedManifest = $state(null);
+  let dragActive = $state(false);
   let fileInput;
   let manifestInput;
 
   // Local toggle state
-  let testManagementEnabled = false;
-  let initialLoad = true;
+  let testManagementEnabled = $state(false);
+  let initialLoad = $state(true);
+
+  // Plugin system state (from server startup flag)
+  let pluginsDisabled = $state(false);
 
   // Sync toggle state with store when loaded
-  $: if ($moduleSettings.loaded && initialLoad) {
-    testManagementEnabled = $moduleSettings.test_management_enabled;
-    initialLoad = false;
-  }
+  $effect(() => {
+    if ($moduleSettings.loaded && initialLoad) {
+      testManagementEnabled = $moduleSettings.test_management_enabled;
+      initialLoad = false;
+    }
+  });
 
   onMount(() => {
     moduleSettings.load().then(() => {
       initialLoad = false; // Enable auto-save after initial load
     });
     loadPlugins();
+    loadSecuritySettings();
   });
+
+  async function loadSecuritySettings() {
+    try {
+      const settings = await getSecuritySettings();
+      pluginsDisabled = settings.plugins_disabled ?? false;
+    } catch (err) {
+      console.error('Failed to load security settings:', err);
+    }
+  }
   
   // Plugin management functions
   async function loadPlugins() {
@@ -291,83 +306,90 @@
         Plugin Management
       </h2>
       
-      <!-- Plugin Upload -->
-      <div class="border rounded p-6 mb-4" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-        <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">Upload Plugin</h3>
-        
-        <!-- Drag and Drop Area -->
-        <div
-          class="border-2 border-dashed rounded p-8 text-center transition-colors drop-zone"
-          class:drop-zone-active={dragActive}
-          ondrop={handleFileDrop}
-          ondragover={(e) => { e.preventDefault(); dragActive = true; }}
-          ondragleave={(e) => { e.preventDefault(); dragActive = false; }}
-        >
-          <Upload class="w-12 h-12 mx-auto mb-4" style="color: var(--ds-text-subtle);" />
-          <p class="text-sm mb-2" style="color: var(--ds-text);">
-            Drag and drop a plugin file here, or click to browse
-          </p>
-          <p class="text-xs mb-4" style="color: var(--ds-text-subtle);">
-            <strong>Recommended:</strong> Upload a .zip file containing both plugin.wasm and manifest.json<br>
-          </p>
-          <input
-            type="file"
-            accept=".wasm,.zip"
-            onchange={handleFileSelect}
-            class="hidden"
-            bind:this={fileInput}
-          />
-          <Button variant="primary" onclick={() => fileInput?.click()}>
-            Choose Plugin File
-          </Button>
-          
-          {#if selectedFile}
-            <p class="mt-4 text-sm" style="color: var(--ds-text-subtle);">
-              Selected: {selectedFile.name}
+      {#if pluginsDisabled}
+        <!-- Plugins Disabled Notice -->
+        <div class="mb-4">
+          <AlertBox variant="info" message="Plugin uploads are disabled on this server." />
+        </div>
+      {:else}
+        <!-- Plugin Upload -->
+        <div class="border rounded p-6 mb-4" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+          <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">Upload Plugin</h3>
+
+          <!-- Drag and Drop Area -->
+          <div
+            class="border-2 border-dashed rounded p-8 text-center transition-colors drop-zone"
+            class:drop-zone-active={dragActive}
+            ondrop={handleFileDrop}
+            ondragover={(e) => { e.preventDefault(); dragActive = true; }}
+            ondragleave={(e) => { e.preventDefault(); dragActive = false; }}
+          >
+            <Upload class="w-12 h-12 mx-auto mb-4" style="color: var(--ds-text-subtle);" />
+            <p class="text-sm mb-2" style="color: var(--ds-text);">
+              Drag and drop a plugin file here, or click to browse
             </p>
-          {/if}
-          
-          {#if selectedFile && selectedFile.name.endsWith('.wasm')}
-            <div class="mt-4">
-              <AlertBox type="warning">
-                <p class="text-sm mb-2 font-medium">
-                  Manifest Required for WASM Files
-                </p>
-                <p class="text-xs mb-3">
-                  WASM files must be accompanied by a manifest.json file that describes the plugin.
-                </p>
-                <input
-                  type="file"
-                  accept=".json"
-                  onchange={handleManifestSelect}
-                  class="hidden"
-                  bind:this={manifestInput}
-                />
-                <Button variant="primary" size="sm" onclick={() => manifestInput?.click()}>
-                  {selectedManifest ? 'Change' : 'Choose'} manifest.json
-                </Button>
-                {#if selectedManifest}
-                  <p class="mt-2 text-xs" style="color: var(--ds-text-success);">
-                    ✓ Manifest selected: {selectedManifest.name}
+            <p class="text-xs mb-4" style="color: var(--ds-text-subtle);">
+              <strong>Recommended:</strong> Upload a .zip file containing both plugin.wasm and manifest.json<br>
+            </p>
+            <input
+              type="file"
+              accept=".wasm,.zip"
+              onchange={handleFileSelect}
+              class="hidden"
+              bind:this={fileInput}
+            />
+            <Button variant="primary" onclick={() => fileInput?.click()}>
+              Choose Plugin File
+            </Button>
+
+            {#if selectedFile}
+              <p class="mt-4 text-sm" style="color: var(--ds-text-subtle);">
+                Selected: {selectedFile.name}
+              </p>
+            {/if}
+
+            {#if selectedFile && selectedFile.name.endsWith('.wasm')}
+              <div class="mt-4">
+                <AlertBox type="warning">
+                  <p class="text-sm mb-2 font-medium">
+                    Manifest Required for WASM Files
                   </p>
-                {/if}
-              </AlertBox>
+                  <p class="text-xs mb-3">
+                    WASM files must be accompanied by a manifest.json file that describes the plugin.
+                  </p>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onchange={handleManifestSelect}
+                    class="hidden"
+                    bind:this={manifestInput}
+                  />
+                  <Button variant="primary" size="sm" onclick={() => manifestInput?.click()}>
+                    {selectedManifest ? 'Change' : 'Choose'} manifest.json
+                  </Button>
+                  {#if selectedManifest}
+                    <p class="mt-2 text-xs" style="color: var(--ds-text-success);">
+                      ✓ Manifest selected: {selectedManifest.name}
+                    </p>
+                  {/if}
+                </AlertBox>
+              </div>
+            {/if}
+          </div>
+
+          {#if selectedFile}
+            <div class="mt-4">
+              <Button
+                variant="primary"
+                onclick={uploadPlugin}
+                disabled={uploadingPlugin}
+              >
+                {uploadingPlugin ? 'Uploading...' : 'Upload Plugin'}
+              </Button>
             </div>
           {/if}
         </div>
-        
-        {#if selectedFile}
-          <div class="mt-4">
-            <Button
-              variant="primary"
-              onclick={uploadPlugin}
-              disabled={uploadingPlugin}
-            >
-              {uploadingPlugin ? 'Uploading...' : 'Upload Plugin'}
-            </Button>
-          </div>
-        {/if}
-      </div>
+      {/if}
       
       <!-- Installed Plugins -->
       <div class="border rounded p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
@@ -414,35 +436,37 @@
                     {/if}
                   </div>
                   
-                  <div class="flex items-center gap-2 ml-4">
-                    <button
-                      onclick={() => togglePlugin(plugin)}
-                      class="p-2 rounded plugin-action-btn"
-                      title={plugin.enabled ? 'Disable plugin' : 'Enable plugin'}
-                    >
-                      {#if plugin.enabled}
-                        <ToggleRight class="w-5 h-5" style="color: var(--ds-text-success);" />
-                      {:else}
-                        <ToggleLeft class="w-5 h-5" style="color: var(--ds-icon-subtle);" />
-                      {/if}
-                    </button>
+                  {#if !pluginsDisabled}
+                    <div class="flex items-center gap-2 ml-4">
+                      <button
+                        onclick={() => togglePlugin(plugin)}
+                        class="p-2 rounded plugin-action-btn"
+                        title={plugin.enabled ? 'Disable plugin' : 'Enable plugin'}
+                      >
+                        {#if plugin.enabled}
+                          <ToggleRight class="w-5 h-5" style="color: var(--ds-text-success);" />
+                        {:else}
+                          <ToggleLeft class="w-5 h-5" style="color: var(--ds-icon-subtle);" />
+                        {/if}
+                      </button>
 
-                    <button
-                      onclick={() => reloadPlugin(plugin)}
-                      class="p-2 rounded plugin-action-btn"
-                      title="Reload plugin"
-                    >
-                      <RefreshCw class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-                    </button>
+                      <button
+                        onclick={() => reloadPlugin(plugin)}
+                        class="p-2 rounded plugin-action-btn"
+                        title="Reload plugin"
+                      >
+                        <RefreshCw class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+                      </button>
 
-                    <button
-                      onclick={() => deletePlugin(plugin)}
-                      class="p-2 rounded plugin-delete-btn"
-                      title="Delete plugin"
-                    >
-                      <Trash2 class="w-4 h-4" style="color: var(--ds-text-danger);" />
-                    </button>
-                  </div>
+                      <button
+                        onclick={() => deletePlugin(plugin)}
+                        class="p-2 rounded plugin-delete-btn"
+                        title="Delete plugin"
+                      >
+                        <Trash2 class="w-4 h-4" style="color: var(--ds-text-danger);" />
+                      </button>
+                    </div>
+                  {/if}
                 </div>
               </div>
             {/each}

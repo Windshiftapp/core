@@ -14,15 +14,17 @@ import (
 
 // PluginHandler handles plugin-related HTTP requests
 type PluginHandler struct {
-	db database.Database
-	manager *plugins.Manager
+	db              database.Database
+	manager         *plugins.Manager
+	pluginsDisabled bool
 }
 
 // NewPluginHandler creates a new plugin handler
-func NewPluginHandler(db database.Database, manager *plugins.Manager) *PluginHandler {
+func NewPluginHandler(db database.Database, manager *plugins.Manager, disabled bool) *PluginHandler {
 	return &PluginHandler{
-		db:      db,
-		manager: manager,
+		db:              db,
+		manager:         manager,
+		pluginsDisabled: disabled,
 	}
 }
 
@@ -84,35 +86,37 @@ func (h *PluginHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
 		pluginList = append(pluginList, p)
 	}
 
-	// Check for loaded plugins not in database
-	for _, loadedPlugin := range h.manager.ListPlugins() {
-		found := false
-		for _, dbPlugin := range pluginList {
-			if dbPlugin.Name == loadedPlugin.Manifest.Name {
-				found = true
-				break
+	// Check for loaded plugins not in database (skip if manager is nil)
+	if h.manager != nil {
+		for _, loadedPlugin := range h.manager.ListPlugins() {
+			found := false
+			for _, dbPlugin := range pluginList {
+				if dbPlugin.Name == loadedPlugin.Manifest.Name {
+					found = true
+					break
+				}
 			}
-		}
 
-		if !found {
-			// Add loaded plugin that's not in database
-			routes := make([]map[string]string, 0, len(loadedPlugin.Routes))
-			for _, r := range loadedPlugin.Routes {
-				routes = append(routes, map[string]string{
-					"method":      r.Method,
-					"path":        r.Path,
-					"description": r.Description,
+			if !found {
+				// Add loaded plugin that's not in database
+				routes := make([]map[string]string, 0, len(loadedPlugin.Routes))
+				for _, r := range loadedPlugin.Routes {
+					routes = append(routes, map[string]string{
+						"method":      r.Method,
+						"path":        r.Path,
+						"description": r.Description,
+					})
+				}
+
+				pluginList = append(pluginList, PluginInfo{
+					Name:        loadedPlugin.Manifest.Name,
+					Version:     loadedPlugin.Manifest.Version,
+					Description: loadedPlugin.Manifest.Description,
+					Author:      loadedPlugin.Manifest.Author,
+					Enabled:     loadedPlugin.Enabled,
+					Routes:      routes,
 				})
 			}
-
-			pluginList = append(pluginList, PluginInfo{
-				Name:        loadedPlugin.Manifest.Name,
-				Version:     loadedPlugin.Manifest.Version,
-				Description: loadedPlugin.Manifest.Description,
-				Author:      loadedPlugin.Manifest.Author,
-				Enabled:     loadedPlugin.Enabled,
-				Routes:      routes,
-			})
 		}
 	}
 
@@ -122,6 +126,11 @@ func (h *PluginHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
 
 // UploadPlugin handles plugin upload
 func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
+	if h.pluginsDisabled {
+		http.Error(w, "Plugin system is disabled on this server", http.StatusForbidden)
+		return
+	}
+
 	// Parse multipart form (32MB max)
 	err := r.ParseMultipartForm(32 << 20)
 	if err != nil {
@@ -185,14 +194,24 @@ func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
 
 // GetExtensions returns all extensions from enabled plugins
 func (h *PluginHandler) GetExtensions(w http.ResponseWriter, r *http.Request) {
-	extensions := h.manager.GetExtensions()
-
 	w.Header().Set("Content-Type", "application/json")
+
+	if h.manager == nil {
+		json.NewEncoder(w).Encode(map[string][]plugins.Extension{})
+		return
+	}
+
+	extensions := h.manager.GetExtensions()
 	json.NewEncoder(w).Encode(extensions)
 }
 
 // GetAsset serves a static asset from a plugin
 func (h *PluginHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
+	if h.manager == nil {
+		http.Error(w, "Plugin system is disabled", http.StatusNotFound)
+		return
+	}
+
 	pluginName := r.PathValue("name")
 	assetPath := r.PathValue("asset")
 
@@ -210,6 +229,11 @@ func (h *PluginHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
 
 // TogglePlugin enables or disables a plugin
 func (h *PluginHandler) TogglePlugin(w http.ResponseWriter, r *http.Request) {
+	if h.pluginsDisabled {
+		http.Error(w, "Plugin system is disabled on this server", http.StatusForbidden)
+		return
+	}
+
 	pluginName := r.PathValue("name")
 
 	var req struct {
@@ -245,6 +269,11 @@ func (h *PluginHandler) TogglePlugin(w http.ResponseWriter, r *http.Request) {
 
 // DeletePlugin removes a plugin
 func (h *PluginHandler) DeletePlugin(w http.ResponseWriter, r *http.Request) {
+	if h.pluginsDisabled {
+		http.Error(w, "Plugin system is disabled on this server", http.StatusForbidden)
+		return
+	}
+
 	pluginName := r.PathValue("name")
 
 	// Delete from manager and filesystem
@@ -266,6 +295,11 @@ func (h *PluginHandler) DeletePlugin(w http.ResponseWriter, r *http.Request) {
 
 // ReloadPlugin reloads a plugin
 func (h *PluginHandler) ReloadPlugin(w http.ResponseWriter, r *http.Request) {
+	if h.pluginsDisabled {
+		http.Error(w, "Plugin system is disabled on this server", http.StatusForbidden)
+		return
+	}
+
 	pluginName := r.PathValue("name")
 
 	if err := h.manager.ReloadPlugin(pluginName); err != nil {
@@ -282,6 +316,9 @@ func (h *PluginHandler) ReloadPlugin(w http.ResponseWriter, r *http.Request) {
 
 // syncPluginToDatabase syncs loaded plugins with database
 func (h *PluginHandler) syncPluginToDatabase() {
+	if h.manager == nil {
+		return
+	}
 	for _, p := range h.manager.ListPlugins() {
 		// Convert routes to JSON
 		routes := make([]map[string]string, 0, len(p.Routes))

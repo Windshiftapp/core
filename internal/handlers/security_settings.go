@@ -9,25 +9,28 @@ import (
 
 // SecuritySettingsHandler handles admin security settings
 type SecuritySettingsHandler struct {
-	db database.Database
+	db              database.Database
+	pluginsDisabled bool
 }
 
 // NewSecuritySettingsHandler creates a new security settings handler
-func NewSecuritySettingsHandler(db database.Database) *SecuritySettingsHandler {
-	return &SecuritySettingsHandler{db: db}
+func NewSecuritySettingsHandler(db database.Database, pluginsDisabled bool) *SecuritySettingsHandler {
+	return &SecuritySettingsHandler{db: db, pluginsDisabled: pluginsDisabled}
 }
 
 // SecuritySettings represents the security configuration
 type SecuritySettings struct {
-	CalendarFeedEnabled    bool `json:"calendar_feed_enabled"`
-	PluginCLIExecEnabled   bool `json:"plugin_cli_exec_enabled"`
+	CalendarFeedEnabled  bool `json:"calendar_feed_enabled"`
+	PluginCLIExecEnabled bool `json:"plugin_cli_exec_enabled"`
+	PluginsDisabled      bool `json:"plugins_disabled"`
 }
 
 // GetSecuritySettings returns current security settings
 func (h *SecuritySettingsHandler) GetSecuritySettings(w http.ResponseWriter, r *http.Request) {
 	settings := SecuritySettings{
-		CalendarFeedEnabled:  true,  // Default enabled
-		PluginCLIExecEnabled: false, // Default disabled for security
+		CalendarFeedEnabled:  true,                // Default enabled
+		PluginCLIExecEnabled: false,               // Default disabled for security
+		PluginsDisabled:      h.pluginsDisabled,   // Read-only, set by startup flag
 	}
 
 	// Get calendar_feed_enabled setting

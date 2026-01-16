@@ -356,6 +356,7 @@ func main() {
 	var logFormat string
 	var tlsCertPath string
 	var tlsKeyPath string
+	var disablePlugins bool
 	flag.StringVar(&port, "port", "8080", "Port to run the HTTP server on")
 	flag.StringVar(&port, "p", "8080", "Port to run the HTTP server on (shorthand)")
 	flag.StringVar(&dbPath, "db", "windshift.db", "Database file path (SQLite)")
@@ -377,6 +378,7 @@ func main() {
 	flag.StringVar(&logFormat, "log-format", "text", "Log format (text, json, logfmt)")
 	flag.StringVar(&tlsCertPath, "tls-cert", "", "Path to TLS certificate file (enables HTTPS)")
 	flag.StringVar(&tlsKeyPath, "tls-key", "", "Path to TLS key file (enables HTTPS)")
+	flag.BoolVar(&disablePlugins, "disable-plugins", false, "Disable the plugin system (prevents loading and uploading plugins)")
 	flag.Parse()
 
 	// Initialize logger early, before any other operations
@@ -477,6 +479,11 @@ func main() {
 	}
 	if envAdditionalProxies := os.Getenv("ADDITIONAL_PROXIES"); envAdditionalProxies != "" {
 		additionalProxies = envAdditionalProxies
+	}
+
+	// Plugin system environment variable
+	if os.Getenv("DISABLE_PLUGINS") == "true" {
+		disablePlugins = true
 	}
 
 	// Determine which database to use
@@ -830,7 +837,7 @@ func main() {
 	commentHandler := handlers.NewCommentHandler(db, permService, activityTracker, notificationService)
 	reviewHandler := handlers.NewReviewHandler(db)
 	calendarFeedHandler := handlers.NewCalendarFeedHandler(db, permService)
-	securitySettingsHandler := handlers.NewSecuritySettingsHandler(db)
+	securitySettingsHandler := handlers.NewSecuritySettingsHandler(db, disablePlugins)
 	themeHandler := handlers.NewThemeHandler(db)
 	userPreferencesHandler := handlers.NewUserPreferencesHandler(db)
 	homepageHandler := handlers.NewHomepageHandler(db, activityTracker)
@@ -956,44 +963,52 @@ func main() {
 	diagramHandler := handlers.NewDiagramHandler(db)
 
 	// Initialize plugin system
-	// PLUGIN_DIRS env var allows loading plugins from additional directories (opt-in)
-	var pluginOpts []plugins.Option
-	pluginOpts = append(pluginOpts, plugins.WithDatabase(db), plugins.WithSCMService(scmSyncService))
+	var pluginManager *plugins.Manager
+	var pluginRouter *plugins.Router
 
-	if pluginDirsEnv := os.Getenv("PLUGIN_DIRS"); pluginDirsEnv != "" {
-		var additionalDirs []string
-		for _, dir := range strings.Split(pluginDirsEnv, ",") {
-			dir = strings.TrimSpace(dir)
-			if dir != "" && dir != "plugins" {
-				additionalDirs = append(additionalDirs, dir)
+	if !disablePlugins {
+		// PLUGIN_DIRS env var allows loading plugins from additional directories (opt-in)
+		var pluginOpts []plugins.Option
+		pluginOpts = append(pluginOpts, plugins.WithDatabase(db), plugins.WithSCMService(scmSyncService))
+
+		if pluginDirsEnv := os.Getenv("PLUGIN_DIRS"); pluginDirsEnv != "" {
+			var additionalDirs []string
+			for _, dir := range strings.Split(pluginDirsEnv, ",") {
+				dir = strings.TrimSpace(dir)
+				if dir != "" && dir != "plugins" {
+					additionalDirs = append(additionalDirs, dir)
+				}
+			}
+			if len(additionalDirs) > 0 {
+				slog.Info("loading plugins from additional directories", "dirs", additionalDirs)
+				pluginOpts = append(pluginOpts, plugins.WithAdditionalPluginDirs(additionalDirs...))
 			}
 		}
-		if len(additionalDirs) > 0 {
-			slog.Info("loading plugins from additional directories", "dirs", additionalDirs)
-			pluginOpts = append(pluginOpts, plugins.WithAdditionalPluginDirs(additionalDirs...))
+
+		pluginManager = plugins.NewManager("plugins", pluginOpts...)
+		slog.Info("initializing plugin system")
+		if err := pluginManager.LoadPlugins(); err != nil {
+			slog.Warn("failed to load plugins", "error", err)
 		}
-	}
 
-	pluginManager := plugins.NewManager("plugins", pluginOpts...)
-	slog.Info("initializing plugin system")
-	if err := pluginManager.LoadPlugins(); err != nil {
-		slog.Warn("failed to load plugins", "error", err)
-	}
+		// Create webhook dispatcher and wire to webhook sender
+		webhookDispatcher := plugins.NewWebhookDispatcher(pluginManager, db)
+		webhookSender.SetPluginDispatcher(webhookDispatcher)
 
-	// Create webhook dispatcher and wire to webhook sender
-	webhookDispatcher := plugins.NewWebhookDispatcher(pluginManager, db)
-	webhookSender.SetPluginDispatcher(webhookDispatcher)
-
-	// Register webhooks for loaded plugins
-	ctx := context.Background()
-	for _, plugin := range pluginManager.ListPlugins() {
-		if err := pluginManager.RegisterPluginWebhooks(ctx, db, plugin); err != nil {
-			slog.Warn("failed to register plugin webhooks", "plugin", plugin.Manifest.Name, "error", err)
+		// Register webhooks for loaded plugins
+		ctx := context.Background()
+		for _, plugin := range pluginManager.ListPlugins() {
+			if err := pluginManager.RegisterPluginWebhooks(ctx, db, plugin); err != nil {
+				slog.Warn("failed to register plugin webhooks", "plugin", plugin.Manifest.Name, "error", err)
+			}
 		}
+
+		pluginRouter = plugins.NewRouter(pluginManager)
+	} else {
+		slog.Info("plugin system disabled via startup flag")
 	}
 
-	pluginRouter := plugins.NewRouter(pluginManager)
-	pluginHandler := handlers.NewPluginHandler(db, pluginManager)
+	pluginHandler := handlers.NewPluginHandler(db, pluginManager, disablePlugins)
 
 	// System handler for shutdown endpoint (created early but will use shutdown channel later)
 	shutdownChan := make(chan os.Signal, 1)
@@ -1157,7 +1172,9 @@ func main() {
 	routes.RegisterAll(routeDeps)
 
 	// Register dynamic plugin routes (uses /api/plugins/{plugin}/{path...} pattern)
-	pluginRouter.RegisterRoutes(mux)
+	if pluginRouter != nil {
+		pluginRouter.RegisterRoutes(mux)
+	}
 
 	// ============================================
 	// Public REST API v1
