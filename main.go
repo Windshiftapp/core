@@ -789,12 +789,7 @@ func main() {
 	workspaceRoleHandler := handlers.NewWorkspaceRoleHandlerWithPool(db, permService)
 
 	// Time tracking handlers
-	// Note: time_customers uses EnumService, but time_projects and time_project_categories
-	// have additional specialized methods (GetByCustomer, GetByWorkspace, ReorderCategories)
-	// that EnumHandler doesn't support, so they keep their original handlers
-	timeCustomerHandler := handlers.NewEnumHandler(
-		services.NewEnumService(db, services.NewTimeCustomerConfig()),
-		func() interface{} { return &models.CustomerOrganisation{} })
+	timeCustomerHandler := handlers.NewTimeCustomerHandler(db)
 	timeProjectHandler := handlers.NewTimeProjectHandler(db)
 	timeProjectCategoryHandler := handlers.NewTimeProjectCategoryHandler(db)
 	timeWorklogHandler := handlers.NewTimeWorklogHandler(db, permService)

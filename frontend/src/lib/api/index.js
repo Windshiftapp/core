@@ -9,7 +9,7 @@ import { time, timer } from './time.js';
 import { statusCategories, statuses, workflows } from './workflows.js';
 import { assetSets, assetRoles, assetTypes, assetCategories, assetStatuses, assets, itemLinkedAssets } from './assets.js';
 import { portal, portalCustomers, contactRoles, customerOrganisations } from './portal.js';
-import { scmProviders, workspaceSCM, itemSCMLinks } from './scm.js';
+import { scmProviders, workspaceSCM, itemSCMLinks, userSCM } from './scm.js';
 import { channels, channelCategories, requestTypes } from './channels.js';
 import { milestoneCategories, milestones, iterationTypes, iterations } from './milestones.js';
 import { permissions, groups } from './permissions.js';
@@ -273,6 +273,9 @@ export const api = {
 
   // Item SCM Links
   itemSCMLinks,
+
+  // User SCM connections (personal OAuth tokens)
+  userSCM,
 
   // Security Settings (admin only)
   securitySettings,

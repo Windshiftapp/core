@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher, tick } from 'svelte';
+  import { tick } from 'svelte';
   import Modal from './Modal.svelte';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
@@ -7,8 +7,7 @@
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import Label from '../components/Label.svelte';
   import { Camera, Trash2 } from 'lucide-svelte';
-
-  const dispatch = createEventDispatcher();
+  import { api } from '../api.js';
 
   // Props
   export let isOpen = false;
@@ -23,6 +22,8 @@
   export let customerOrgFields = [];
   export let attachmentsEnabled = false;
   export let isEditing = false;
+  export let onsave = () => {};
+  export let oncancel = () => {};
 
   let uploadingAvatar = false;
   let showAvatarUpload = false;
@@ -34,7 +35,7 @@
     if (!files || files.length === 0) return;
 
     if (!attachmentsEnabled) {
-      alert('Attachments must be enabled to upload customer avatars');
+      alert('Attachments must be enabled to upload organization avatars');
       return;
     }
 
@@ -51,21 +52,11 @@
       uploadFormData.append('item_id', '0');
       uploadFormData.append('category', 'customer_avatar');
 
-      const response = await fetch('/api/attachments/upload', {
-        method: 'POST',
-        body: uploadFormData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
-
-      const uploadResult = await response.json();
+      const uploadResult = await api.attachments.upload(uploadFormData);
 
       if (uploadResult && uploadResult.success && uploadResult.avatar_url) {
-        formData.avatar_url = uploadResult.avatar_url;
+        formData = { ...formData, avatar_url: uploadResult.avatar_url };
         showAvatarUpload = false;
-        alert('Avatar uploaded successfully');
       }
     } catch (err) {
       alert('Failed to upload avatar: ' + (err.message || err));
@@ -75,7 +66,7 @@
   }
 
   function removeAvatar() {
-    formData.avatar_url = null;
+    formData = { ...formData, avatar_url: null };
   }
 
   function getInitials(name) {
@@ -89,12 +80,12 @@
 
   function handleSubmit() {
     if (formData.name.trim()) {
-      dispatch('save');
+      onsave();
     }
   }
 
   function handleCancel() {
-    dispatch('cancel');
+    oncancel();
   }
 
   async function focusNameInput() {
@@ -125,12 +116,12 @@
   >
     <div class="p-6">
       <h3 class="text-xl font-semibold mb-6" style="color: var(--ds-text);">
-        {isEditing ? 'Edit Customer' : 'New Customer'}
+        {isEditing ? 'Edit Organization' : 'New Organization'}
       </h3>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <Label required class="mb-2">Customer Name</Label>
+          <Label required class="mb-2">Organization Name</Label>
           <Input id={nameInputId} bind:inputRef={nameInputRef} bind:value={formData.name} required />
         </div>
 
@@ -142,14 +133,14 @@
 
       <!-- Avatar Upload Section -->
       <div class="mt-6">
-        <Label class="mb-2">Customer Avatar</Label>
+        <Label class="mb-2">Organization Avatar</Label>
 
         <!-- Avatar Preview -->
         {#if formData.avatar_url}
           <div class="flex items-center gap-4 mb-3">
             <img
               src={formData.avatar_url}
-              alt="Customer avatar"
+              alt="Organization avatar"
               class="w-16 h-16 rounded object-cover"
             />
             <div class="flex-1">
@@ -190,7 +181,7 @@
           </Button>
           {#if !attachmentsEnabled}
             <p class="text-xs mt-1" style="color: var(--ds-text-warning);">
-              Attachments must be enabled to upload customer avatars
+              Attachments must be enabled to upload organization avatars
             </p>
           {/if}
         </div>
@@ -227,7 +218,7 @@
           id="active"
           class="mr-3 w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
         />
-        <label for="active" class="text-sm font-medium" style="color: var(--ds-text);">Active Customer</label>
+        <label for="active" class="text-sm font-medium" style="color: var(--ds-text);">Active Organization</label>
       </div>
 
       <!-- Custom Fields -->
@@ -257,7 +248,7 @@
           size="medium"
           keyboardHint={submitHint}
         >
-          {isEditing ? 'Update' : 'Create'} Customer
+          {isEditing ? 'Update' : 'Create'} Organization
         </Button>
         <Button
           variant="default"

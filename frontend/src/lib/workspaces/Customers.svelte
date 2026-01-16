@@ -1,11 +1,13 @@
 <script>
   import { onMount } from 'svelte';
+  import { navigate } from '../router.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { Users, Mail, Search, GripVertical, Plus, Edit2, Trash2, MoreHorizontal } from 'lucide-svelte';
   import { api } from '../api.js';
   import { confirm } from '../composables/useConfirm.js';
   import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
   import Button from '../components/Button.svelte';
+  import Avatar from '../components/Avatar.svelte';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import { errorToast } from '../stores/toasts.svelte.js';
@@ -386,7 +388,7 @@
     {customerCounts}
     {dragOverOrgId}
     onSelect={selectOrganisation}
-    onManageOrgs={() => {}}
+    onManageOrgs={() => navigate('/time/customers')}
   />
 
   <!-- Main Content -->
@@ -402,17 +404,31 @@
     {:else}
       <!-- Header -->
       <div class="flex justify-between items-start mb-6">
-        <div>
-          <h1 class="text-xl font-semibold" style="color: var(--ds-text);">
-            {#if selectedOrgId === null}
-              Unassigned Customers
-            {:else}
-              {customerOrganisations.find(o => o.id === selectedOrgId)?.name || 'Customers'}
+        <div class="flex items-center gap-4">
+          {#if selectedOrgId !== null}
+            {@const selectedOrg = customerOrganisations.find(o => o.id === selectedOrgId)}
+            {#if selectedOrg}
+              <Avatar
+                src={selectedOrg.avatar_url}
+                name={selectedOrg.name}
+                size="lg"
+                variant="blue"
+                rounded="md"
+              />
             {/if}
-          </h1>
-          <p class="text-sm" style="color: var(--ds-text-subtle);">
-            {filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''}
-          </p>
+          {/if}
+          <div>
+            <h1 class="text-xl font-semibold" style="color: var(--ds-text);">
+              {#if selectedOrgId === null}
+                Unassigned Customers
+              {:else}
+                {customerOrganisations.find(o => o.id === selectedOrgId)?.name || 'Customers'}
+              {/if}
+            </h1>
+            <p class="text-sm" style="color: var(--ds-text-subtle);">
+              {filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''}
+            </p>
+          </div>
         </div>
         <Button
           variant="primary"
@@ -525,7 +541,7 @@
   submitDisabled={!formData.name.trim() || !formData.email.trim()}
   onclose={closeModal}
 >
-  {#snippet children(submitHint)}
+  {#snippet children({ submitHint })}
     <ModalHeader title="Add Portal Customer" onClose={closeModal} />
 
     <div class="p-6 space-y-4">
@@ -606,7 +622,7 @@
   submitDisabled={!editFormData.name.trim() || !editFormData.email.trim()}
   onclose={closeDetailModal}
 >
-  {#snippet children(submitHint)}
+  {#snippet children({ submitHint })}
     <ModalHeader title="Edit Portal Customer" icon={Edit2} onClose={closeDetailModal} />
 
     <div class="p-6 space-y-4">

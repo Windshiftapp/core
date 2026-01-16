@@ -10,7 +10,7 @@
 
   const tabs = [
     { id: 'time-entry', label: 'Time Entry', icon: Clock, component: TimeEntry, route: '/time' },
-    { id: 'customers', label: 'Customers', icon: User, component: TimeCustomers, route: '/time/customers' },
+    { id: 'customers', label: 'Organizations', icon: User, component: TimeCustomers, route: '/time/customers' },
     { id: 'projects', label: 'Projects', icon: Briefcase, component: TimeProjects, route: '/time/projects' },
     { id: 'reports', label: 'Reports', icon: BarChart3, component: TimeReports, route: '/time/worklogs' }
   ];
@@ -43,7 +43,7 @@
     <div class="p-6">
       <div class="mb-6">
         <h1 class="text-xl font-semibold" style="color: var(--ds-text);">Time & Projects</h1>
-        <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">Manage customers, projects, and time tracking</p>
+        <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">Manage organizations, projects, and time tracking</p>
       </div>
       
       <!-- Navigation -->

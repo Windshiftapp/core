@@ -1,6 +1,7 @@
 <script>
-  import { Search, Building, Users, Plus } from 'lucide-svelte';
+  import { Search, Users, Plus } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
+  import Avatar from '../components/Avatar.svelte';
 
   let {
     organisations = [],
@@ -60,7 +61,9 @@
       onmouseenter={(e) => { if (selectedOrgId !== null && dragOverOrgId !== null) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
       onmouseleave={(e) => { if (selectedOrgId !== null && dragOverOrgId !== null) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
     >
-      <Users class="w-4 h-4 flex-shrink-0" />
+      <div class="w-6 h-6 flex items-center justify-center flex-shrink-0">
+        <Users class="w-4 h-4" />
+      </div>
       <span class="flex-1 truncate">Unassigned</span>
       <span class="text-xs px-1.5 py-0.5 rounded" style="background: var(--ds-interactive-subtle);">{unassignedCount}</span>
     </button>
@@ -77,7 +80,13 @@
         onmouseenter={(e) => { if (!isActive && !isDragOver) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
         onmouseleave={(e) => { if (!isActive && !isDragOver) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
       >
-        <Building class="w-4 h-4 flex-shrink-0" />
+        <Avatar
+          src={org.avatar_url}
+          name={org.name}
+          size="xs"
+          variant="blue"
+          rounded="md"
+        />
         <span class="flex-1 truncate">{org.name}</span>
         <span class="text-xs px-1.5 py-0.5 rounded" style="background: var(--ds-interactive-subtle);">{customerCounts[org.id] || 0}</span>
       </button>

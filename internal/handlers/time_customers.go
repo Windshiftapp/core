@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 	"windshift/internal/database"
@@ -19,7 +20,7 @@ func NewTimeCustomerHandler(db database.Database) *TimeCustomerHandler {
 
 func (h *TimeCustomerHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(`
-		SELECT id, name, email, description, active, custom_field_values, created_at, updated_at
+		SELECT id, name, email, description, active, avatar_url, custom_field_values, created_at, updated_at
 		FROM customer_organisations
 		ORDER BY name ASC
 	`)
@@ -33,10 +34,16 @@ func (h *TimeCustomerHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var c models.CustomerOrganisation
 		var customFieldValuesStr sql.NullString
-		err := rows.Scan(&c.ID, &c.Name, &c.Email, &c.Description, &c.Active, &customFieldValuesStr, &c.CreatedAt, &c.UpdatedAt)
+		var avatarURL sql.NullString
+		err := rows.Scan(&c.ID, &c.Name, &c.Email, &c.Description, &c.Active, &avatarURL, &customFieldValuesStr, &c.CreatedAt, &c.UpdatedAt)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
+		}
+
+		// Set avatar URL
+		if avatarURL.Valid {
+			c.AvatarURL = avatarURL.String
 		}
 
 		// Parse custom field values
@@ -61,11 +68,12 @@ func (h *TimeCustomerHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	var c models.CustomerOrganisation
 	var customFieldValuesStr sql.NullString
+	var avatarURL sql.NullString
 	err := h.db.QueryRow(`
-		SELECT id, name, email, description, active, custom_field_values, created_at, updated_at
+		SELECT id, name, email, description, active, avatar_url, custom_field_values, created_at, updated_at
 		FROM customer_organisations
 		WHERE id = ?
-	`, id).Scan(&c.ID, &c.Name, &c.Email, &c.Description, &c.Active, &customFieldValuesStr, &c.CreatedAt, &c.UpdatedAt)
+	`, id).Scan(&c.ID, &c.Name, &c.Email, &c.Description, &c.Active, &avatarURL, &customFieldValuesStr, &c.CreatedAt, &c.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		http.Error(w, "Customer not found", http.StatusNotFound)
@@ -74,6 +82,11 @@ func (h *TimeCustomerHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Set avatar URL
+	if avatarURL.Valid {
+		c.AvatarURL = avatarURL.String
 	}
 
 	// Parse custom field values
@@ -113,9 +126,9 @@ func (h *TimeCustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	var id int64
 	err := h.db.QueryRow(`
-		INSERT INTO customer_organisations (name, email, description, active, custom_field_values, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
-	`, c.Name, c.Email, c.Description, c.Active, customFieldValuesJSON, now, now).Scan(&id)
+		INSERT INTO customer_organisations (name, email, description, active, avatar_url, custom_field_values, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+	`, c.Name, c.Email, c.Description, c.Active, c.AvatarURL, customFieldValuesJSON, now, now).Scan(&id)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -141,6 +154,8 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("[DEBUG] Update customer %d - received: name=%q, avatar_url=%q", id, c.Name, c.AvatarURL)
+
 	// Serialize custom field values to JSON
 	var customFieldValuesJSON []byte
 	if c.CustomFieldValues != nil && len(c.CustomFieldValues) > 0 {
@@ -154,14 +169,17 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	_, err := h.db.ExecWrite(`
 		UPDATE customer_organisations
-		SET name = ?, email = ?, description = ?, active = ?, custom_field_values = ?, updated_at = ?
+		SET name = ?, email = ?, description = ?, active = ?, avatar_url = ?, custom_field_values = ?, updated_at = ?
 		WHERE id = ?
-	`, c.Name, c.Email, c.Description, c.Active, customFieldValuesJSON, time.Now(), id)
+	`, c.Name, c.Email, c.Description, c.Active, c.AvatarURL, customFieldValuesJSON, time.Now(), id)
 
 	if err != nil {
+		log.Printf("[DEBUG] Update customer %d - ERROR: %v", id, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	log.Printf("[DEBUG] Update customer %d - SUCCESS, avatar_url saved: %q", id, c.AvatarURL)
 
 	c.ID = id
 	c.UpdatedAt = time.Now()

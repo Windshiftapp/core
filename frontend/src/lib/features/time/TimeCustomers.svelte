@@ -98,6 +98,7 @@
 
   async function saveCustomer() {
     try {
+      console.log(formData)
       if (editingCustomer) {
         await api.time.customers.update(editingCustomer.id, formData);
       } else {
@@ -169,9 +170,9 @@
 <!-- Header -->
 <div class="mb-6 flex justify-between items-start">
   <div>
-    <Text as="h2" size="lg" weight="semibold">Customers</Text>
+    <Text as="h2" size="lg" weight="semibold">Organizations</Text>
     <Text as="div" size="xs" variant="subtle" class="mt-1">
-      Manage your clients and customer information
+      Manage your client organizations
     </Text>
   </div>
     <Button
@@ -181,7 +182,7 @@
       size="medium"
       keyboardHint={getShortcutDisplay('timeCustomers', 'addCustomer')}
     >
-      Add Customer
+      Add Organization
     </Button>
   </div>
 
@@ -200,7 +201,7 @@
     columns={customerColumns}
     data={customers}
     keyField="id"
-    emptyMessage="No customers found. Create your first customer to get started."
+    emptyMessage="No organizations found. Create your first organization to get started."
     emptyIcon={Users}
     actionItems={buildCustomerDropdownItems}
   >

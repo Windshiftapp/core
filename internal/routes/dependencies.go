@@ -143,7 +143,7 @@ type PlanningHandlers struct {
 
 // TimeTrackingHandlers groups time tracking handlers.
 type TimeTrackingHandlers struct {
-	Customer        *handlers.EnumHandler
+	Customer        *handlers.TimeCustomerHandler
 	ProjectCategory *handlers.TimeProjectCategoryHandler
 	Project         *handlers.TimeProjectHandler
 	Worklog         *handlers.TimeWorklogHandler
