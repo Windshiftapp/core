@@ -124,8 +124,8 @@ function createPermissionStore() {
     async loadAllPermissions(user) {
       loading.set(true);
 
-      // Only load all permissions if user is admin
-      if (!user || user.role !== 'admin') {
+      // Only load all permissions if user is system admin
+      if (!user || !user.is_system_admin) {
         permissions.set([]);
         loading.set(false);
         error.set(null);

@@ -325,7 +325,7 @@
                       <Lozenge color="blue" size="md">
                         <User class="w-3 h-3" />
                         {getUserDisplayName(user)}
-                        {#if user.role === 'admin'}
+                        {#if user.is_system_admin}
                           <Crown class="w-3 h-3" style="color: var(--ds-text-warning);" />
                         {/if}
                         <button

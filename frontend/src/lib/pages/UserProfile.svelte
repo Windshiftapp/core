@@ -593,12 +593,6 @@
 					<span class="block text-sm font-medium text-gray-700">Email</span>
 					<p class="mt-1 text-sm text-gray-900">{user.email}</p>
 				</div>
-				<div>
-					<span class="block text-sm font-medium text-gray-700">Role</span>
-					<span class="mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
-						{user.role}
-					</span>
-				</div>
 				{#if user.requires_password_reset}
 					<div>
 						<span class="block text-sm font-medium text-gray-700">Status</span>
