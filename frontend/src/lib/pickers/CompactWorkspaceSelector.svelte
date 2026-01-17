@@ -1,6 +1,7 @@
 <script>
   import { createPopover, melt } from '@melt-ui/svelte';
   import { ChevronDown, Building } from 'lucide-svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   // Generate unique IDs for ARIA attributes
   const listboxId = `listbox-${Math.random().toString(36).slice(2, 9)}`;
@@ -9,11 +10,13 @@
   let {
     value = $bindable(null),
     workspaces = [],
-    placeholder = 'Workspace',
+    placeholder = '',
     disabled = false,
     loading = false,
     onSelect = () => {}
   } = $props();
+
+  const resolvedPlaceholder = $derived(placeholder || t('workspaces.workspace'));
 
   const {
     elements: { trigger, content },
@@ -133,7 +136,7 @@
     <span class="truncate max-w-[100px]">{selectedWorkspace.key || selectedWorkspace.name}</span>
   {:else}
     <Building size={14} style="color: var(--ds-text-subtle);" />
-    <span style="color: var(--ds-text-subtle);">{placeholder}</span>
+    <span style="color: var(--ds-text-subtle);">{resolvedPlaceholder}</span>
   {/if}
   <ChevronDown size={12} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
 </button>
@@ -157,7 +160,7 @@
         bind:value={searchTerm}
         onkeydown={handleKeyDown}
         type="text"
-        placeholder="Search workspaces..."
+        placeholder={t('pickers.searchWorkspaces')}
         class="w-full px-3 py-2 rounded text-sm outline-none"
         style="
           background-color: var(--ds-background-input);
@@ -173,14 +176,14 @@
     </div>
 
     <!-- Workspaces List -->
-    <div class="max-h-64 overflow-y-auto" role="listbox" id={listboxId} aria-label="Workspaces">
+    <div class="max-h-64 overflow-y-auto" role="listbox" id={listboxId} aria-label={t('workspaces.title')}>
       {#if loading}
         <div class="p-4 text-center text-sm" style="color: var(--ds-text-subtle);">
-          Loading...
+          {t('common.loading')}
         </div>
       {:else if filteredWorkspaces.length === 0}
         <div class="p-4 text-center text-sm" style="color: var(--ds-text-subtle);">
-          No workspaces found
+          {t('pickers.noWorkspacesFound')}
         </div>
       {:else}
         {#each filteredWorkspaces as workspace, index}

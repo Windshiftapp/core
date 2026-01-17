@@ -1,8 +1,9 @@
 <script>
   import { Search } from 'lucide-svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let value = '';
-  export let placeholder = 'Search...';
+  export let placeholder = '';
   export let disabled = false;
   export let className = '';
   export let size = 'medium'; // 'small', 'medium', 'large'
@@ -49,7 +50,7 @@
   <input
     type="text"
     bind:value
-    {placeholder}
+    placeholder={placeholder || t('common.search')}
     {disabled}
     class="pl-10 pr-4 {sizeClasses[size]} rounded border w-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed {hasGradient ? 'placeholder-gray-600' : ''}"
     style={inputStyles}

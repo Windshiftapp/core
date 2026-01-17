@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { t } from '../../stores/i18n.svelte.js';
   import {
     Milestone, Calendar, CheckCircle, Clock, Plus, Edit, Trash2,
     MoreHorizontal, Tag, MessageSquare, Globe, Building2
@@ -44,12 +45,12 @@
     workspace_id: null
   });
 
-  const statusOptions = [
-    { value: 'planning', label: 'Planning', lozengeColor: 'grey', icon: Clock },
-    { value: 'in-progress', label: 'In Progress', lozengeColor: 'blue', icon: Milestone },
-    { value: 'completed', label: 'Completed', lozengeColor: 'green', icon: CheckCircle },
-    { value: 'cancelled', label: 'Cancelled', lozengeColor: 'red', icon: Milestone }
-  ];
+  let statusOptions = $derived([
+    { value: 'planning', label: t('milestones.status.planning'), lozengeColor: 'grey', icon: Clock },
+    { value: 'in-progress', label: t('milestones.status.inProgress'), lozengeColor: 'blue', icon: Milestone },
+    { value: 'completed', label: t('milestones.status.completed'), lozengeColor: 'green', icon: CheckCircle },
+    { value: 'cancelled', label: t('milestones.status.cancelled'), lozengeColor: 'red', icon: Milestone }
+  ]);
 
   // Get active category from URL params (only used in global view)
   let activeCategoryId = $derived($currentRoute.params?.categoryId || null);
@@ -170,21 +171,21 @@
         // Create new milestone
         await milestonesStore.add(formData);
       }
-      
+
       cancelForm();
     } catch (error) {
       console.error('Failed to save milestone:', error);
-      alert('Failed to save milestone: ' + (error.message || error));
+      alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
     }
   }
 
   async function deleteMilestone(milestone) {
-    if (confirm(`Are you sure you want to delete milestone "${milestone.name}"?`)) {
+    if (confirm(t('milestones.confirmDelete', { name: milestone.name }))) {
       try {
         await milestonesStore.delete(milestone.id);
       } catch (error) {
         console.error('Failed to delete milestone:', error);
-        alert('Failed to delete milestone: ' + (error.message || error));
+        alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
       }
     }
   }
@@ -199,7 +200,7 @@
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: () => startEdit(milestone)
       },
@@ -207,7 +208,7 @@
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50',
         onClick: () => deleteMilestone(milestone)
@@ -228,11 +229,11 @@
     const target = new Date(targetDate);
     const diffTime = target - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays < 0) return `${Math.abs(diffDays)} days overdue`;
-    if (diffDays === 0) return 'Due today';
-    if (diffDays === 1) return '1 day remaining';
-    return `${diffDays} days remaining`;
+
+    if (diffDays < 0) return t('milestones.daysOverdue', { count: Math.abs(diffDays) });
+    if (diffDays === 0) return t('milestones.dueToday');
+    if (diffDays === 1) return t('milestones.oneDayRemaining');
+    return t('milestones.daysRemaining', { count: diffDays });
   }
 
   function getCategoryById(categoryId, categories) {
@@ -314,12 +315,12 @@
             {#if isGlobalView}
               {#if activeCategoryId}
                 {@const category = getCategoryById(parseInt(activeCategoryId), $categoriesStore)}
-                {category ? category.name : 'Category'} Milestones
+                {category ? category.name : t('common.category')} {t('milestones.title')}
               {:else}
-                All Milestones
+                {t('milestones.allMilestones')}
               {/if}
             {:else}
-              Workspace Milestones
+              {t('milestones.workspaceMilestones')}
             {/if}
           </h1>
           <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">
@@ -334,7 +335,7 @@
           onclick={startCreate}
           keyboardHint="A"
         >
-          Add Milestone
+          {t('common.add')}
         </Button>
       </div>
 
@@ -343,12 +344,12 @@
       {#if filteredMilestones.length === 0}
         <div class="flex flex-col items-center justify-center p-12 border-2 border-dashed rounded" style="border-color: var(--ds-border);">
           <Milestone class="w-12 h-12 mb-4" style="color: var(--ds-text-subtle);" />
-          <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">No milestones yet</h3>
+          <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">{t('common.noItems')}</h3>
           <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">
             {#if isGlobalView && activeCategoryId}
-              No milestones in this category
+              {t('categories.noCategorizedWork')}
             {:else}
-              Create your first milestone to track releases and goals
+              {t('common.noItems')}
             {/if}
           </p>
           <Button
@@ -357,7 +358,7 @@
             onclick={startCreate}
             keyboardHint="A"
           >
-            Add Milestone
+            {t('common.add')}
           </Button>
         </div>
       {:else}
@@ -393,7 +394,7 @@
               {@const overdue = isOverdue(item.target_date, item.status)}
               <Lozenge color={statusInfo.lozengeColor} text={statusInfo.label} />
               {#if overdue}
-                <Lozenge color="red" text="Overdue" />
+                <Lozenge color="red" text={t('milestones.overdue')} />
               {/if}
             {/key}
           {/if}
@@ -408,7 +409,7 @@
                 <ColorDot color={category.color} size="md" />
                 <span class="text-sm">{category.name}</span>
               {:else}
-                <span class="text-sm text-gray-500">No category</span>
+                <span class="text-sm text-gray-500">{t('milestones.noCategory')}</span>
               {/if}
             {/key}
           {/if}
@@ -421,7 +422,7 @@
               {@const overdue = isOverdue(item.target_date, item.status)}
               {@const daysText = getDaysUntil(item.target_date)}
               <span class="text-sm font-medium {overdue ? 'text-red-600' : item.status === 'completed' ? 'text-green-600' : 'text-blue-600'}">
-                {item.status === 'completed' ? 'Completed' : item.status === 'cancelled' ? 'Cancelled' : daysText || 'Open-ended'}
+                {item.status === 'completed' ? t('milestones.status.completed') : item.status === 'cancelled' ? t('milestones.status.cancelled') : daysText || t('milestones.openEnded')}
               </span>
             {/key}
           {/if}
@@ -465,7 +466,7 @@
   <!-- Modal header -->
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-      {editingMilestone ? 'Edit Milestone' : 'New Milestone'}
+      {editingMilestone ? t('common.edit') : t('common.create')}
     </h3>
   </div>
 
@@ -474,20 +475,20 @@
     <form onsubmit={(e) => { e.preventDefault(); saveMilestone(); }}>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <Label for="milestone-name" required class="mb-2">Milestone Name</Label>
+          <Label for="milestone-name" required class="mb-2">{t('milestones.milestoneName')}</Label>
           <input
             id="milestone-name"
             type="text"
             bind:value={formData.name}
             class="w-full px-4 py-3 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
             style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-            placeholder="e.g., Q1 Release, Beta Launch"
+            placeholder={t('milestones.milestoneNamePlaceholder')}
             required
           />
         </div>
 
         <div>
-          <Label for="milestone-target-date" class="mb-2">Target Date</Label>
+          <Label for="milestone-target-date" class="mb-2">{t('milestones.targetDate')}</Label>
           <input
             id="milestone-target-date"
             type="date"
@@ -498,24 +499,24 @@
         </div>
 
         <div>
-          <Label for="milestone-category" class="mb-2">Category</Label>
+          <Label for="milestone-category" class="mb-2">{t('common.category')}</Label>
           <BasePicker
             bind:value={formData.category_id}
             items={$categoriesStore}
-            placeholder="No Category"
+            placeholder={t('milestones.noCategory')}
             showUnassigned={true}
-            unassignedLabel="No Category"
+            unassignedLabel={t('milestones.noCategory')}
             getValue={(item) => item.id}
             getLabel={(item) => item.name}
           />
         </div>
 
         <div>
-          <Label for="milestone-status" class="mb-2">Status</Label>
+          <Label for="milestone-status" class="mb-2">{t('common.status')}</Label>
           <BasePicker
             bind:value={formData.status}
             items={statusOptions}
-            placeholder="Select status"
+            placeholder={t('milestones.selectStatus')}
             getValue={(item) => item.value}
             getLabel={(item) => item.label}
           />
@@ -524,7 +525,7 @@
         <!-- Scope Toggle (only shown when editing existing milestone) -->
         {#if editingMilestone}
           <div>
-            <Label class="mb-2">Scope</Label>
+            <Label class="mb-2">{t('milestones.scope')}</Label>
             <div class="flex rounded-lg overflow-hidden border" style="border-color: var(--ds-border);">
               <button
                 type="button"
@@ -536,7 +537,7 @@
                 "
               >
                 <Globe class="w-4 h-4" />
-                Global
+                {t('milestones.global')}
               </button>
               <button
                 type="button"
@@ -548,7 +549,7 @@
                 "
               >
                 <Building2 class="w-4 h-4" />
-                Local
+                {t('milestones.local')}
               </button>
             </div>
           </div>
@@ -556,11 +557,11 @@
           <!-- Workspace Picker (only shown for local milestones when editing) -->
           {#if !formData.is_global}
             <div>
-              <Label required class="mb-2">Workspace</Label>
+              <Label required class="mb-2">{t('milestones.workspace')}</Label>
               <BasePicker
                 bind:value={formData.workspace_id}
                 items={workspaces}
-                placeholder="Select workspace"
+                placeholder={t('milestones.selectWorkspace')}
                 getValue={(item) => item.id}
                 getLabel={(item) => item.name}
               />
@@ -569,12 +570,12 @@
         {/if}
 
         <div class="md:col-span-2">
-          <Label for="milestone-description" class="mb-2">Description</Label>
+          <Label for="milestone-description" class="mb-2">{t('common.description')}</Label>
           <Textarea
             id="milestone-description"
             bind:value={formData.description}
             rows={3}
-            placeholder="Optional description of this milestone"
+            placeholder={t('milestones.descriptionPlaceholder')}
           />
         </div>
       </div>
@@ -584,7 +585,7 @@
   <DialogFooter
     onCancel={cancelForm}
     onConfirm={saveMilestone}
-    confirmLabel={editingMilestone ? 'Update Milestone' : 'Create Milestone'}
+    confirmLabel={editingMilestone ? t('common.update') : t('common.create')}
     disabled={!formData.name.trim()}
     showKeyboardHint={true}
     confirmKeyboardHint={submitHint}
@@ -595,7 +596,7 @@
 <CategoryModal
   isOpen={showCategoryForm}
   onClose={() => showCategoryForm = false}
-  title="Manage Milestone Categories"
+  title={t('milestones.manageMilestoneCategories')}
   categories={$categoriesStore}
   onAdd={handleAddCategory}
   onDelete={handleDeleteCategory}

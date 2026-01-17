@@ -1,14 +1,17 @@
 <script>
   import { createEventDispatcher, tick } from 'svelte';
   import { Check, X, Loader2 } from 'lucide-svelte';
-  
+  import { t } from '../stores/i18n.svelte.js';
+
   const dispatch = createEventDispatcher();
-  
+
   export let value = '';
-  export let placeholder = 'Enter text...';
+  export let placeholder = '';
   export let disabled = false;
   export let required = false;
   export let maxLength = 255;
+
+  $: effectivePlaceholder = placeholder || t('editors.enterText');
   export let className = '';
   export let editingClass = 'editing-input';
   export let displayClass = 'display-text cursor-text';
@@ -51,12 +54,12 @@
     
     // Validation
     if (required && !trimmedValue) {
-      error = 'This field is required';
+      error = t('validation.required');
       return;
     }
-    
+
     if (trimmedValue.length > maxLength) {
-      error = `Must be less than ${maxLength} characters`;
+      error = t('validation.maxLength', { max: maxLength });
       return;
     }
     
@@ -156,7 +159,7 @@
       <input
         bind:this={inputElement}
         bind:value={editValue}
-        {placeholder}
+        placeholder={effectivePlaceholder}
         {maxLength}
         class="w-full px-2 py-1 text-sm border rounded {editingClass} {className}"
         class:border-red-500={error}
@@ -180,7 +183,7 @@
           type="button"
           onclick={saveValue}
           class="p-1 rounded save-btn"
-          title="Save (Enter)"
+          title={t('editors.saveEnter')}
         >
           <Check class="w-4 h-4" />
         </button>
@@ -188,7 +191,7 @@
           type="button"
           onclick={cancelEditing}
           class="p-1 rounded cancel-btn"
-          title="Cancel (Escape)"
+          title={t('editors.cancelEscape')}
         >
           <X class="w-4 h-4" />
         </button>
@@ -206,7 +209,7 @@
     {disabled}
     style="color: var(--ds-text);"
   >
-    {value || placeholder}
+    {value || effectivePlaceholder}
   </button>
 {/if}
 

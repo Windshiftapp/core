@@ -8,6 +8,7 @@
   import { X, GitBranch, Loader2 } from 'lucide-svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let itemId;
   export let itemKey = '';
@@ -62,7 +63,7 @@
       }
     } catch (err) {
       console.error('Failed to load repositories:', err);
-      error = 'Failed to load repositories';
+      error = t('scm.failedToLoadRepos');
       repositories = [];
     } finally {
       loading = false;
@@ -71,7 +72,7 @@
 
   async function submit() {
     if (!selectedRepoId || !branchName) {
-      error = 'Please fill in all required fields';
+      error = t('scm.fillAllRequired');
       return;
     }
 
@@ -86,11 +87,11 @@
       };
 
       const result = await api.itemSCMLinks.createBranch(itemId, data);
-      successToast(`Branch created successfully`);
+      successToast(t('scm.branchCreatedSuccess'));
       dispatch('created', result);
     } catch (err) {
       console.error('Failed to create branch:', err);
-      error = err.message || 'Failed to create branch';
+      error = err.message || t('scm.failedToCreateBranch');
       errorToast(error);
     } finally {
       submitting = false;
@@ -120,10 +121,10 @@
     <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: var(--ds-border);">
       <div>
         <h2 id="create-branch-title" class="text-lg font-semibold" style="color: var(--ds-text);">
-          Create Branch
+          {t('scm.createBranch')}
         </h2>
         <p class="text-sm" style="color: var(--ds-text-subtle);">
-          Create a new branch for {itemKey || 'this item'}
+          {t('scm.createBranchFor', { itemKey: itemKey || 'this item' })}
         </p>
       </div>
       <button
@@ -144,19 +145,19 @@
       {:else if repositories.length === 0}
         <EmptyState
           icon={GitBranch}
-          title="No repositories linked to this workspace"
-          description="Link repositories in Workspace Settings → Source Control"
+          title={t('scm.noReposLinked')}
+          description={t('scm.linkReposHelp')}
         />
       {:else}
         <!-- Repository Selection -->
         <div>
-          <Label color="default" required class="mb-1.5">Repository</Label>
+          <Label color="default" required class="mb-1.5">{t('scm.repository')}</Label>
           <BasePicker
             bind:value={selectedRepoId}
             items={repositories}
-            placeholder="Select a repository..."
+            placeholder={t('scm.selectRepository')}
             showUnassigned={true}
-            unassignedLabel="Select a repository..."
+            unassignedLabel={t('scm.selectRepository')}
             getValue={(repo) => repo.id}
             getLabel={(repo) => `${repo.repository_name} (${repo.provider_name})`}
           />
@@ -164,7 +165,7 @@
 
         <!-- Branch Name -->
         <div>
-          <Label color="default" required class="mb-1.5">Branch Name</Label>
+          <Label color="default" required class="mb-1.5">{t('scm.branchName')}</Label>
           <div class="flex items-center gap-2">
             <GitBranch class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
             <input
@@ -179,7 +180,7 @@
 
         <!-- Base Branch -->
         <div>
-          <Label color="default" class="mb-1.5">Base Branch</Label>
+          <Label color="default" class="mb-1.5">{t('scm.baseBranch')}</Label>
           <input
             type="text"
             bind:value={baseBranch}
@@ -188,7 +189,7 @@
             style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
           />
           <p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">
-            The branch to create from. Defaults to the repository's default branch.
+            {t('scm.baseBranchHelp')}
           </p>
         </div>
 
@@ -203,9 +204,9 @@
     <DialogFooter
       onCancel={close}
       onConfirm={submit}
-      confirmLabel="Create Branch"
+      confirmLabel={t('scm.createBranch')}
       loading={submitting}
-      loadingLabel="Creating..."
+      loadingLabel={t('scm.creating')}
       disabled={loading || repositories.length === 0 || !selectedRepoId || !branchName}
     />
   </div>

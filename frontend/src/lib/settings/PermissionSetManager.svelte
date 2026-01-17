@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
+  import { t } from '../stores/i18n.svelte.js';
   import { navigate } from '../router.js';
   import { Plus, Edit, Trash2, Shield } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
@@ -11,15 +12,15 @@
   import { confirm } from '../composables/useConfirm.js';
   import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
 
-  let permissionSets = [];
-  let loading = true;
-  let showCreateModal = false;
+  let permissionSets = $state([]);
+  let loading = $state(true);
+  let showCreateModal = $state(false);
 
   // Form state for create modal
-  let formData = {
+  let formData = $state({
     name: '',
     description: ''
-  };
+  });
 
   onMount(async () => {
     await loadPermissionSets();
@@ -83,7 +84,7 @@
   async function createPermissionSet() {
     try {
       if (!formData.name.trim()) {
-        alert('Name is required');
+        alert(t('validation.requiredField', { field: t('common.name') }));
         return;
       }
 
@@ -96,16 +97,16 @@
       cancelCreate();
     } catch (error) {
       console.error('Failed to create permission set:', error);
-      alert('Failed to create permission set: ' + (error.message || error));
+      alert(t('settings.permissionSets.failedToCreate') + (error.message || error));
     }
   }
 
   async function deletePermissionSet(permSet) {
     const confirmed = await confirm({
-      title: 'Delete Permission Set',
-      message: `Are you sure you want to delete the permission set "${permSet.name}"? This action cannot be undone.`,
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
+      title: t('settings.permissionSets.deletePermissionSet'),
+      message: t('settings.permissionSets.confirmDelete') + ` "${permSet.name}"? ` + t('common.cannotUndo'),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
       variant: 'danger',
       icon: Trash2
     });
@@ -117,7 +118,7 @@
       permissionSets = permissionSets.filter(ps => ps.id !== permSet.id);
     } catch (error) {
       console.error('Failed to delete permission set:', error);
-      alert('Failed to delete permission set: ' + (error.message || error));
+      alert(t('settings.permissionSets.failedToDelete') + (error.message || error));
     }
   }
 
@@ -125,7 +126,7 @@
     const items = [
       {
         id: 'edit',
-        title: 'Edit',
+        title: t('common.edit'),
         icon: Edit,
         iconColor: '#3b82f6',
         onClick: () => startEdit(permSet)
@@ -135,7 +136,7 @@
     if (!permSet.is_system) {
       items.push({
         id: 'delete',
-        title: 'Delete',
+        title: t('common.delete'),
         icon: Trash2,
         iconColor: '#dc2626',
         onClick: () => deletePermissionSet(permSet),
@@ -146,31 +147,31 @@
     return items;
   }
 
-  const columns = [
-    { key: 'name', label: 'Name', sortable: true },
-    { key: 'description', label: 'Description' },
+  const columns = $derived([
+    { key: 'name', label: t('common.name'), sortable: true },
+    { key: 'description', label: t('common.description') },
     {
       key: 'is_system',
-      label: 'Type',
-      render: (item) => item.is_system ? 'System' : 'Custom',
+      label: t('common.type'),
+      render: (item) => item.is_system ? t('settings.permissionSets.system') : t('settings.permissionSets.custom'),
       sortable: true
     },
     { key: 'actions', label: '', width: 'w-16' }
-  ];
+  ]);
 </script>
 
 <svelte:window onkeydown={handleGlobalKeydown} />
 
 <div class="space-y-6">
   <PageHeader
-    title="Permission Sets"
-    subtitle="Manage bundles of permissions that can be assigned to configuration sets"
+    title={t('settings.permissionSets.title')}
+    subtitle={t('settings.permissionSets.subtitle')}
     icon={Shield}
   >
     {#snippet actions()}
       <Button onclick={startCreate} size="sm" variant="primary" keyboardHint="A">
         <Plus class="w-4 h-4 mr-2" />
-        Create Permission Set
+        {t('settings.permissionSets.createPermissionSet')}
       </Button>
     {/snippet}
   </PageHeader>
@@ -183,37 +184,37 @@
       onkeydown={handleModalKeydown}
     >
       <div class="rounded shadow-xl max-w-lg w-full p-6" style="background-color: var(--ds-surface-overlay)">
-        <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text)">Create Permission Set</h3>
+        <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text)">{t('settings.permissionSets.createPermissionSet')}</h3>
 
         <div class="space-y-4">
           <div>
-            <Label color="default" required class="mb-1">Name</Label>
+            <Label color="default" required class="mb-1">{t('common.name')}</Label>
             <input
               type="text"
               bind:value={formData.name}
               class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text)"
-              placeholder="e.g., Development Team Permissions"
+              placeholder={t('settings.permissionSets.namePlaceholder')}
               autofocus
             />
           </div>
 
           <div>
-            <Label color="default" class="mb-1">Description</Label>
+            <Label color="default" class="mb-1">{t('common.description')}</Label>
             <Textarea
               bind:value={formData.description}
               rows={2}
-              placeholder="Optional description of this permission set"
+              placeholder={t('settings.permissionSets.descriptionPlaceholder')}
             />
           </div>
         </div>
 
         <div class="flex justify-end space-x-3 mt-6">
           <Button variant="secondary" onclick={cancelCreate} keyboardHint="Esc">
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button variant="primary" onclick={createPermissionSet} keyboardHint="↵">
-            Create
+            {t('common.create')}
           </Button>
         </div>
       </div>
@@ -225,6 +226,6 @@
     {columns}
     {loading}
     actionItems={buildPermSetDropdownItems}
-    emptyMessage="No permission sets found. Create one to get started."
+    emptyMessage={t('settings.permissionSets.noPermissionSets')}
   />
 </div>

@@ -15,6 +15,7 @@
   import Label from '../../components/Label.svelte';
   import UserPicker from '../../pickers/UserPicker.svelte';
   import { renderStatusBadge, renderMilestoneBadge } from '../../utils/testStatusColors.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let { workspaceId = null } = $props();
 
@@ -104,7 +105,7 @@
 
   async function createRun() {
     if (!selectedSetId || !runName) {
-      alert('Please select a test plan and enter a run name');
+      alert(t('testing.selectPlanAndEnterName'));
       return;
     }
 
@@ -156,19 +157,19 @@
   const runColumns = $derived.by(() => [
     {
       key: 'name',
-      label: 'Run Name',
+      label: t('testing.runName'),
       html: true,
       render: (run) => `<a href="${workspaceTestBase}/runs/${run.id}?from=runs" style="color: var(--ds-text-link);" class="hover:underline">${run.name}</a>`
     },
     {
       key: 'testSetName',
-      label: 'Test Plan',
+      label: t('testing.testPlan'),
       html: true,
       render: (run) => `<a href="${workspaceTestBase}/sets?milestone=${run.milestoneId || ''}" style="color: var(--ds-text-link);" class="hover:underline">${run.testSetName}</a>`
     },
     {
       key: 'assignee',
-      label: 'Assignee',
+      label: t('common.assignee'),
       html: true,
       render: (run) => {
         if (run.assignee_id && run.assignee_name) {
@@ -181,37 +182,37 @@
             <span>${run.assignee_name}</span>
           </div>`;
         }
-        return `<span style="color: var(--ds-text-subtle);">Unassigned</span>`;
+        return `<span style="color: var(--ds-text-subtle);">${t('common.unassigned')}</span>`;
       }
     },
     {
       key: 'milestoneName',
-      label: 'Milestone',
+      label: t('milestones.milestone'),
       html: true,
       render: (run) => run.milestoneId
         ? `<a href="/milestones" style="color: var(--ds-text-link);" class="hover:underline">${run.milestoneName}</a>`
-        : `<span style="color: var(--ds-text-subtle);">No milestone</span>`
+        : `<span style="color: var(--ds-text-subtle);">${t('testing.noMilestone')}</span>`
     },
     {
       key: 'started_at',
-      label: 'Started',
+      label: t('testing.started'),
       render: (run) => run.started_at ? new Date(run.started_at).toLocaleString() : '-'
     },
     {
       key: 'ended_at',
-      label: 'Ended',
+      label: t('testing.ended'),
       render: (run) => run.ended_at ? new Date(run.ended_at).toLocaleString() : '-'
     },
     {
       key: 'status',
-      label: 'Status',
+      label: t('common.status'),
       html: true,
       render: (run) => {
         const status = run.ended_at ? 'completed' : 'in_progress';
         return renderStatusBadge(status);
       }
     },
-    { key: 'actions', label: 'Actions', width: 'w-16', align: 'text-right' }
+    { key: 'actions', label: t('common.actions'), width: 'w-16', align: 'text-right' }
   ]);
 
   function confirmDelete(run) {
@@ -228,7 +229,7 @@
       await loadData();
     } catch (error) {
       console.error('Failed to delete test run:', error);
-      alert('Failed to delete test run: ' + error.message);
+      alert(t('testing.failedToDeleteRun') + ': ' + error.message);
     }
   }
 
@@ -241,7 +242,7 @@
         id: 'continue',
         type: 'regular',
         icon: Play,
-        title: 'Continue Execution',
+        title: t('testing.continueExecution'),
         color: 'var(--ds-status-success-text)',
         onClick: () => continueExecution(run)
       });
@@ -252,7 +253,7 @@
       id: 'view',
       type: 'regular',
       icon: Eye,
-      title: run.ended_at ? 'View Results' : 'View Details',
+      title: run.ended_at ? t('testing.viewResults') : t('testing.viewDetails'),
       onClick: () => viewRunDetails(run)
     });
 
@@ -261,7 +262,7 @@
       id: 'delete',
       type: 'regular',
       icon: Trash2,
-      title: 'Delete',
+      title: t('common.delete'),
       color: 'var(--ds-text-danger)',
       onClick: () => setTimeout(() => confirmDelete(run), 0)
     });
@@ -308,15 +309,15 @@
 
 <div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface-raised);">
   <PageHeader
-    title="Test Runs"
-    subtitle="Execute and track test case results"
+    title={t('testing.testRuns')}
+    subtitle={t('testing.testRunsSubtitle')}
   >
     {#snippet actions()}
       <div class="flex items-center gap-3">
         <div class="w-40">
           <Select value={selectedAssigneeFilter} onchange={handleAssigneeFilterChange}>
-            <option value="">All assignees</option>
-            <option value="unassigned">Unassigned</option>
+            <option value="">{t('common.allAssignees')}</option>
+            <option value="unassigned">{t('common.unassigned')}</option>
             {#each $users as user}
               <option value={user.id}>{user.first_name} {user.last_name}</option>
             {/each}
@@ -325,7 +326,7 @@
         <div class="w-48">
           <MilestoneCombobox
             bind:value={selectedMilestoneFilter}
-            placeholder="All milestones"
+            placeholder={t('milestones.allMilestones')}
             onselect={handleMilestoneSelect}
           />
         </div>
@@ -335,7 +336,7 @@
           size="medium"
           keyboardHint="A"
         >
-          Create Test Run
+          {t('testing.createTestRun')}
         </Button>
       </div>
     {/snippet}
@@ -351,35 +352,35 @@
       <div class="p-6 space-y-6">
         <div class="flex items-start justify-between">
           <div>
-            <h3 class="text-xl font-semibold" style="color: var(--ds-text);">Create Test Run</h3>
-            <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">Select a plan and name this execution.</p>
+            <h3 class="text-xl font-semibold" style="color: var(--ds-text);">{t('testing.createTestRun')}</h3>
+            <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">{t('testing.createTestRunSubtitle')}</p>
           </div>
         </div>
 
         <div class="space-y-4">
           <div>
-            <Label for="set-select" color="default" class="mb-2">Select Test Plan</Label>
+            <Label for="set-select" color="default" class="mb-2">{t('testing.selectTestPlan')}</Label>
             <Select id="set-select" bind:value={selectedSetId}>
-              <option value="">-- Select a test plan --</option>
+              <option value="">{t('testing.selectTestPlanPlaceholder')}</option>
               {#each filteredTestSets as set}
                 <option value={set.id}>{set.name}</option>
               {/each}
             </Select>
           </div>
           <div>
-            <Label for="run-name" color="default" class="mb-2">Run Name</Label>
+            <Label for="run-name" color="default" class="mb-2">{t('testing.runName')}</Label>
             <Input
               id="run-name"
               bind:value={runName}
-              placeholder="e.g., Sprint 2 Build 123, UAT Testing"
+              placeholder={t('testing.runNamePlaceholder')}
             />
           </div>
           <div>
-            <Label color="default" class="mb-2">Assign To</Label>
+            <Label color="default" class="mb-2">{t('common.assignTo')}</Label>
             <UserPicker
               bind:value={selectedAssigneeId}
               showUnassigned={true}
-              placeholder="Select assignee (optional)"
+              placeholder={t('testing.selectAssigneeOptional')}
             />
           </div>
         </div>
@@ -391,7 +392,7 @@
             onclick={() => showForm = false}
             keyboardHint="Esc"
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             onclick={createRun}
@@ -399,7 +400,7 @@
             disabled={!selectedSetId || !runName}
             keyboardHint="↵"
           >
-            Create Run
+            {t('testing.createRun')}
           </Button>
         </div>
       </div>
@@ -413,8 +414,8 @@
       data={allTestRuns}
       keyField="id"
       actionItems={buildRunDropdownItems}
-      emptyMessage="No test runs yet"
-      emptyDescription="Create a test run to execute your test plans."
+      emptyMessage={t('testing.noTestRunsYet')}
+      emptyDescription={t('testing.createTestRunToExecute')}
       emptyIcon={Play}
     />
   </div>
@@ -426,8 +427,8 @@
   variant="danger"
   onconfirm={deleteRun}
   oncancel={() => { runToDelete = null; }}
-  title="Delete Test Run"
-  message="Are you sure you want to delete '{runToDelete?.name}'? This will permanently delete all test results and cannot be undone."
-  confirmText="Delete"
-  cancelText="Cancel"
+  title={t('testing.deleteTestRun')}
+  message={t('testing.deleteRunConfirm', { name: runToDelete?.name })}
+  confirmText={t('common.delete')}
+  cancelText={t('common.cancel')}
 />

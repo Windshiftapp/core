@@ -18,6 +18,7 @@
     Package
   } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let {
     workspaceId = null,
@@ -72,7 +73,7 @@
   const columns = $derived.by(() => [
     {
       key: 'id',
-      label: 'ID',
+      label: t('common.id'),
       width: '120px',
       html: true,
       render: (item) =>
@@ -80,12 +81,12 @@
     },
     {
       key: 'title',
-      label: 'Title',
+      label: t('common.title'),
       render: (item) => item.title || '—'
     },
     {
       key: 'item_type_name',
-      label: 'Type',
+      label: t('common.type'),
       width: '140px',
       html: true,
       render: (item) =>
@@ -93,23 +94,23 @@
     },
     {
       key: 'status_name',
-      label: 'Status',
+      label: t('common.status'),
       width: '120px',
       render: (item) => item.status_name || '—'
     },
     {
       key: 'is_covered',
-      label: 'Coverage',
+      label: t('testing.coverage'),
       width: '100px',
       html: true,
       render: (item) =>
         item.is_covered
-          ? `<span class="inline-flex items-center gap-1 text-xs font-medium" style="color: var(--ds-status-success-solid);"><svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>Covered</span>`
-          : `<span class="inline-flex items-center gap-1 text-xs font-medium" style="color: var(--ds-status-danger-solid);"><svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>Not Covered</span>`
+          ? `<span class="inline-flex items-center gap-1 text-xs font-medium" style="color: var(--ds-status-success-solid);"><svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>${t('testing.covered')}</span>`
+          : `<span class="inline-flex items-center gap-1 text-xs font-medium" style="color: var(--ds-status-danger-solid);"><svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>${t('testing.notCovered')}</span>`
     },
     {
       key: 'linked_test_count',
-      label: 'Tests',
+      label: t('testing.tests'),
       width: '80px',
       align: 'text-center',
       html: true,
@@ -275,7 +276,7 @@
       loading = false;
     } catch (error) {
       console.error('Failed to save config:', error);
-      alert('Failed to save configuration');
+      alert(t('testing.failedToSaveConfig'));
     } finally {
       configLoading = false;
     }
@@ -350,25 +351,25 @@
   {#if loading}
     <div class="loading-state">
       <RefreshCw class="w-8 h-8 animate-spin" style="color: var(--ds-text-subtle);" />
-      <p style="color: var(--ds-text-subtle);">Loading coverage data...</p>
+      <p style="color: var(--ds-text-subtle);">{t('testing.loadingCoverageData')}</p>
     </div>
   {:else if !config || selectedTypeIds.length === 0}
     <div class="empty-config-state">
       <ShieldX class="w-12 h-12" style="color: var(--ds-text-subtle); opacity: 0.5;" />
-      <p class="empty-title">No requirement types configured</p>
+      <p class="empty-title">{t('testing.noRequirementTypesConfigured')}</p>
       <p class="empty-copy">
-        Select which item types should be tracked as requirements to see coverage data.
+        {t('testing.selectItemTypesForCoverage')}
       </p>
       <Button variant="primary" onclick={openConfigModal}>
         <Settings class="w-4 h-4" />
-        Configure Requirements
+        {t('testing.configureRequirements')}
       </Button>
     </div>
   {:else if !summaryData || summaryData.total === 0}
     <EmptyState
       icon={ShieldX}
-      title="No requirements found"
-      description="No items matching the configured requirement types were found."
+      title={t('testing.noRequirementsFound')}
+      description={t('testing.noItemsMatchingRequirements')}
     />
   {:else}
     <div class="coverage-content">
@@ -400,7 +401,7 @@
               />
             {/each}
             <text class="pie-percent" x="70" y="68">{Math.round(coverageRate)}%</text>
-            <text class="pie-label" x="70" y="84">covered</text>
+            <text class="pie-label" x="70" y="84">{t('testing.covered').toLowerCase()}</text>
           </svg>
         </div>
 
@@ -409,21 +410,21 @@
           <div class="stat-card">
             <div class="stat-header">
               <span class="stat-dot total"></span>
-              <span class="stat-title">Total Requirements</span>
+              <span class="stat-title">{t('testing.totalRequirements')}</span>
             </div>
             <div class="stat-value">{summaryData.total}</div>
           </div>
           <div class="stat-card">
             <div class="stat-header">
               <span class="stat-dot covered"></span>
-              <span class="stat-title">Covered</span>
+              <span class="stat-title">{t('testing.covered')}</span>
             </div>
             <div class="stat-value">{summaryData.covered}</div>
           </div>
           <div class="stat-card">
             <div class="stat-header">
               <span class="stat-dot not-covered"></span>
-              <span class="stat-title">Not Covered</span>
+              <span class="stat-title">{t('testing.notCovered')}</span>
             </div>
             <div class="stat-value">{summaryData.not_covered}</div>
           </div>
@@ -436,7 +437,7 @@
           {columns}
           data={requirementsData?.items || []}
           keyField="item_id"
-          emptyMessage="No requirements found"
+          emptyMessage={t('testing.noRequirementsFound')}
           emptyIcon={ShieldX}
           pagination={true}
           pageSize={pageSize}
@@ -453,15 +454,15 @@
 <Modal isOpen={showConfigModal} onclose={closeConfigModal} maxWidth="max-w-xl">
   <div class="p-6">
     <h3 class="text-xl font-semibold mb-2" style="color: var(--ds-text);">
-      Configure Requirement Types
+      {t('testing.configureRequirementTypes')}
     </h3>
     <p class="text-sm mb-6" style="color: var(--ds-text-subtle);">
-      Select the item types that should be tracked as requirements for coverage analysis.
+      {t('testing.selectItemTypesForCoverageAnalysis')}
     </p>
 
     <div class="type-selection">
       {#if itemTypes.length === 0}
-        <p class="text-sm" style="color: var(--ds-text-subtle);">No item types available.</p>
+        <p class="text-sm" style="color: var(--ds-text-subtle);">{t('testing.noItemTypesAvailable')}</p>
       {:else}
         <div class="type-grid">
           {#each itemTypes as type (type.id)}
@@ -488,9 +489,9 @@
     </div>
 
     <div class="modal-footer">
-      <Button variant="default" onclick={closeConfigModal}>Cancel</Button>
+      <Button variant="default" onclick={closeConfigModal}>{t('common.cancel')}</Button>
       <Button variant="primary" onclick={saveConfig} disabled={configLoading}>
-        {configLoading ? 'Saving...' : 'Save Configuration'}
+        {configLoading ? t('common.saving') : t('testing.saveConfiguration')}
       </Button>
     </div>
   </div>

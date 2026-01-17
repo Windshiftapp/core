@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { currentRoute, navigate } from '../router.js';
+  import { t } from '../stores/i18n.svelte.js';
   import CustomFields from '../settings/CustomFields.svelte';
   import Workspaces from '../workspaces/Workspaces.svelte';
   import Screens from './Screens.svelte';
@@ -58,70 +59,70 @@
   let focusedIndex = $state(-1);
 
   // Define admin navigation groups
-  const adminGroups = [
+  const adminGroups = $derived([
     {
       id: 'content-structure',
-      label: 'Content & Structure',
+      label: t('settings.adminGroups.contentStructure'),
       icon: Layers,
       items: [
-        { id: 'custom-fields', label: 'Custom Fields', icon: Database, description: 'Manage custom field definitions' },
-        { id: 'screens', label: 'Screens', icon: Layout, description: 'Configure form screens and layouts' },
-        { id: 'hierarchy-levels', label: 'Hierarchy Levels', icon: Network, description: 'Configure work item hierarchy levels' },
-        { id: 'item-types', label: 'Item Types', icon: FileText, description: 'Manage work item types with icons and colors' },
-        { id: 'priorities', label: 'Priorities', icon: AlertCircle, description: 'Configure priority levels with icons and colors' },
-        { id: 'configuration-sets', label: 'Configuration Sets', icon: Settings, description: 'Manage configuration sets' },
+        { id: 'custom-fields', label: t('settings.adminItems.customFields.title'), icon: Database, description: t('settings.adminItems.customFields.description') },
+        { id: 'screens', label: t('settings.adminItems.screens.title'), icon: Layout, description: t('settings.adminItems.screens.description') },
+        { id: 'hierarchy-levels', label: t('settings.adminItems.hierarchyLevels.title'), icon: Network, description: t('settings.adminItems.hierarchyLevels.description') },
+        { id: 'item-types', label: t('settings.adminItems.itemTypes.title'), icon: FileText, description: t('settings.adminItems.itemTypes.description') },
+        { id: 'priorities', label: t('settings.adminItems.priorities.title'), icon: AlertCircle, description: t('settings.adminItems.priorities.description') },
+        { id: 'configuration-sets', label: t('settings.adminItems.configurationSets.title'), icon: Settings, description: t('settings.adminItems.configurationSets.description') },
       ]
     },
     {
       id: 'workflow-process',
-      label: 'Workflow & Process',
+      label: t('settings.adminGroups.workflowProcess'),
       icon: Cog,
       items: [
-        { id: 'statuses', label: 'Statuses', icon: GitBranch, description: 'Manage status categories and individual statuses' },
-        { id: 'workflows', label: 'Workflows', icon: Workflow, description: 'Design and manage workflow transitions' },
+        { id: 'statuses', label: t('settings.adminItems.statuses.title'), icon: GitBranch, description: t('settings.adminItems.statuses.description') },
+        { id: 'workflows', label: t('settings.adminItems.workflows.title'), icon: Workflow, description: t('settings.adminItems.workflows.description') },
       ]
     },
     {
       id: 'integration-links',
-      label: 'Integration & Links',
+      label: t('settings.adminGroups.integrationLinks'),
       icon: LinkIcon,
       items: [
-        { id: 'scm-providers', label: 'SCM Providers', icon: GitMerge, description: 'Configure GitHub, GitLab, Gitea, and Bitbucket integrations' },
-        { id: 'system-import', label: 'System Import', icon: CloudDownload, description: 'Import data from external systems' },
-        { id: 'link-types', label: 'Link Types', icon: Link, description: 'Manage link types between items' },
-        { id: 'attachments', label: 'Attachments', icon: Paperclip, description: 'Manage attachment settings' },
-        { id: 'modules', label: 'Modules', icon: Puzzle, description: 'Enable or disable system modules' },
-        { id: 'themes', label: 'Themes', icon: Palette, description: 'Manage application themes and appearance' },
+        { id: 'scm-providers', label: t('settings.adminItems.scmProviders.title'), icon: GitMerge, description: t('settings.adminItems.scmProviders.description') },
+        { id: 'system-import', label: t('settings.adminItems.systemImport.title'), icon: CloudDownload, description: t('settings.adminItems.systemImport.description') },
+        { id: 'link-types', label: t('settings.adminItems.linkTypes.title'), icon: Link, description: t('settings.adminItems.linkTypes.description') },
+        { id: 'attachments', label: t('settings.adminItems.attachments.title'), icon: Paperclip, description: t('settings.adminItems.attachments.description') },
+        { id: 'modules', label: t('settings.adminItems.modules.title'), icon: Puzzle, description: t('settings.adminItems.modules.description') },
+        { id: 'themes', label: t('settings.adminItems.themes.title'), icon: Palette, description: t('settings.adminItems.themes.description') },
       ]
     },
     {
       id: 'users-access',
-      label: 'Users & Access',
+      label: t('settings.adminGroups.usersAccess'),
       icon: UserCheck,
       items: [
-        { id: 'users', label: 'Users', icon: UsersRound, description: 'Manage user accounts and profiles' },
-        { id: 'groups', label: 'Groups', icon: UserStar, description: 'Manage user groups and memberships' },
-        { id: 'permissions', label: 'Permissions & Sets', icon: Shield, description: 'Manage permissions and permission sets' },
-        { id: 'workspace-roles', label: 'Workspace Roles', icon: BadgeCheck, description: 'View workspace roles and their permissions' },
-        { id: 'sso', label: 'Single Sign-On', icon: KeyRound, description: 'Configure OIDC identity providers for SSO' },
-        { id: 'security', label: 'Security', icon: Shield, description: 'Manage security settings and feature controls' },
-        { id: 'workspaces', label: 'Workspaces', icon: Grip, description: 'Manage workspaces and settings' },
+        { id: 'users', label: t('settings.adminItems.users.title'), icon: UsersRound, description: t('settings.adminItems.users.description') },
+        { id: 'groups', label: t('settings.adminItems.groups.title'), icon: UserStar, description: t('settings.adminItems.groups.description') },
+        { id: 'permissions', label: t('settings.adminItems.permissions.title'), icon: Shield, description: t('settings.adminItems.permissions.description') },
+        { id: 'workspace-roles', label: t('settings.adminItems.workspaceRoles.title'), icon: BadgeCheck, description: t('settings.adminItems.workspaceRoles.description') },
+        { id: 'sso', label: t('settings.adminItems.sso.title'), icon: KeyRound, description: t('settings.adminItems.sso.description') },
+        { id: 'security', label: t('settings.adminItems.security.title'), icon: Shield, description: t('settings.adminItems.security.description') },
+        { id: 'workspaces', label: t('settings.adminItems.workspaces.title'), icon: Grip, description: t('settings.adminItems.workspaces.description') },
       ]
     },
     {
       id: 'communication',
-      label: 'Communication',
+      label: t('settings.adminGroups.communication'),
       icon: MessageSquare,
       items: [
-        { id: 'notification-settings', label: 'Notification Settings', icon: Bell, description: 'Manage notification configurations' },
+        { id: 'notification-settings', label: t('settings.adminItems.notificationSettings.title'), icon: Bell, description: t('settings.adminItems.notificationSettings.description') },
       ]
     },
     {
       id: 'asset-management',
-      label: 'Asset Management',
+      label: t('settings.adminGroups.assetManagement'),
       icon: Package,
       items: [
-        { id: 'assets', label: 'Assets', icon: Package, description: 'Manage asset sets, types, categories, and assets' },
+        { id: 'assets', label: t('settings.adminItems.assets.title'), icon: Package, description: t('settings.adminItems.assets.description') },
       ]
     },
     // Core audit log hidden - will be provided by plugin
@@ -133,7 +134,7 @@
     //     { id: 'audit-log', label: 'Audit Log', icon: FileText, description: 'Track and review all administrative actions and security events' },
     //   ]
     // }
-  ];
+  ]);
 
   // Merge plugin extensions into admin groups
   const adminGroupsWithPlugins = $derived.by(() => {
@@ -327,8 +328,8 @@
   <div class="w-64 border-r flex-shrink-0" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
     <div class="p-6">
       <div class="mb-6">
-        <h1 class="text-xl font-semibold" style="color: var(--ds-text);">Admin Panel</h1>
-        <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">System administration and configuration</p>
+        <h1 class="text-xl font-semibold" style="color: var(--ds-text);">{t('settings.admin')}</h1>
+        <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">{t('settings.systemSettings')}</p>
       </div>
       
       <!-- Search -->
@@ -342,7 +343,7 @@
             bind:value={searchQuery}
             onkeydown={handleSearchKeydown}
             type="search"
-            placeholder="Search"
+            placeholder={t('common.search')}
             class="w-full pl-10 pr-8 py-2 text-sm border rounded-md focus:outline-none focus:ring-2"
             style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text); --tw-ring-color: var(--ds-interactive);"
             aria-describedby={searchQuery && filteredGroups.length === 0 ? 'search-no-results' : undefined}
@@ -354,7 +355,7 @@
               style="color: var(--ds-icon-subtle);"
               onmouseenter={(e) => e.currentTarget.style.color = 'var(--ds-icon)'}
               onmouseleave={(e) => e.currentTarget.style.color = 'var(--ds-icon-subtle)'}
-              aria-label="Clear search"
+              aria-label={t('search.clearSearch')}
             >
               <X class="w-3 h-3" aria-hidden="true" />
             </button>
@@ -398,7 +399,7 @@
         
         {#if filteredGroups.length === 0 && searchQuery}
           <div class="text-center py-4" role="status" id="search-no-results">
-            <p class="text-sm" style="color: var(--ds-text-subtle);">No admin functions found</p>
+            <p class="text-sm" style="color: var(--ds-text-subtle);">{t('search.noSearchResults')}</p>
             <button
               onclick={clearSearch}
               class="text-xs mt-1"
@@ -406,7 +407,7 @@
               onmouseenter={(e) => e.currentTarget.style.color = 'var(--ds-link-pressed)'}
               onmouseleave={(e) => e.currentTarget.style.color = 'var(--ds-link)'}
             >
-              Clear search
+              {t('search.clearSearch')}
             </button>
           </div>
         {/if}

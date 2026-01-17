@@ -2,6 +2,7 @@
   import { createPopover, melt } from '@melt-ui/svelte';
   import { ChevronDown, X, Settings } from 'lucide-svelte';
   import { createEventDispatcher } from 'svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -13,12 +14,14 @@
   let {
     value = $bindable(null),
     items = [],
-    placeholder = 'Select configuration set...',
+    placeholder = '',
     disabled = false,
     class: className = '',
     onSelect = () => {},
     onCancel = () => {}
   } = $props();
+
+  const resolvedPlaceholder = $derived(placeholder || t('pickers.selectConfigurationSet'));
 
   // State
   let searchTerm = $state('');
@@ -167,10 +170,10 @@
     {:else if value === null}
       <!-- Default Configuration selected -->
       <Settings size={16} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
-      <span class="truncate">Default Configuration</span>
+      <span class="truncate">{t('pickers.defaultConfiguration')}</span>
     {:else}
       <!-- Show placeholder -->
-      <span style="color: var(--ds-text-subtle);">{placeholder}</span>
+      <span style="color: var(--ds-text-subtle);">{resolvedPlaceholder}</span>
     {/if}
   </div>
 
@@ -181,7 +184,7 @@
         onclick={handleClear}
         class="p-0.5 rounded hover:bg-opacity-10"
         style="color: var(--ds-text-subtle);"
-        aria-label="Clear selection"
+        aria-label={t('pickers.clearSelection')}
       >
         <X size={14} />
       </button>
@@ -215,7 +218,7 @@
         bind:value={searchTerm}
         onkeydown={handleKeyDown}
         type="text"
-        placeholder="Search configuration sets..."
+        placeholder={t('pickers.searchConfigurationSets')}
         class="w-full px-3 py-2 rounded text-sm outline-none"
         style="
           background-color: var(--ds-background-input);
@@ -235,7 +238,7 @@
     </div>
 
     <!-- Items List -->
-    <div class="max-h-80 overflow-y-auto" role="listbox" id={listboxId} aria-label="Configuration sets">
+    <div class="max-h-80 overflow-y-auto" role="listbox" id={listboxId} aria-label={t('pickers.configurationSets')}>
       <!-- Default Configuration Option -->
       <button
         type="button"
@@ -266,8 +269,8 @@
             <Settings class="w-4 h-4" />
           </div>
           <div class="flex flex-col min-w-0">
-            <span class="font-medium" style="color: var(--ds-text);">Default Configuration</span>
-            <span class="text-xs" style="color: var(--ds-text-subtle);">Use the system default configuration set</span>
+            <span class="font-medium" style="color: var(--ds-text);">{t('pickers.defaultConfiguration')}</span>
+            <span class="text-xs" style="color: var(--ds-text-subtle);">{t('pickers.defaultConfigurationDescription')}</span>
           </div>
         </div>
       </button>
@@ -321,7 +324,7 @@
       <!-- No Results -->
       {#if filteredItems.length === 0 && searchTerm}
         <div class="p-4 text-center" style="color: var(--ds-text-subtle);">
-          No configuration sets found
+          {t('pickers.noConfigurationSetsFound')}
         </div>
       {/if}
     </div>

@@ -4,6 +4,7 @@
   import { GitMerge, GitBranch, GitCommit, ExternalLink, Plus, RefreshCw, Trash2, ChevronDown, ChevronRight, Loader2, GitBranchPlus, Link2 } from 'lucide-svelte';
   import Button from '../../components/Button.svelte';
   import Text from '../../components/Text.svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   export let itemId;
 
@@ -61,7 +62,7 @@
       }
     }).catch(err => {
       console.error('Failed to start OAuth:', err);
-      error = 'Failed to start connection flow';
+      error = t('scm.failedToStartConnection');
     });
   }
 
@@ -75,7 +76,7 @@
       links = await api.itemSCMLinks.get(itemId) || [];
     } catch (err) {
       console.error('Failed to load SCM links:', err);
-      error = 'Failed to load development links';
+      error = t('scm.failedToLoadLinks');
       links = [];
     } finally {
       loading = false;
@@ -96,7 +97,7 @@
   }
 
   async function deleteLink(linkId) {
-    if (!confirm('Remove this development link?')) return;
+    if (!confirm(t('scm.confirmRemoveLink'))) return;
 
     try {
       await api.itemSCMLinks.delete(linkId);
@@ -175,7 +176,7 @@
     onclick={() => expanded = !expanded}
   >
     <div class="flex items-center gap-2">
-      <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">Development</Text>
+      <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">{t('scm.development')}</Text>
       {#if links.length > 0}
         <span class="text-xs px-1.5 py-0.5 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
           {links.length}
@@ -188,7 +189,7 @@
           class="p-1 rounded transition-colors opacity-0 group-hover:opacity-100"
           class:invisible={!expanded}
           onclick={e => { e.stopPropagation(); openCreateBranchModal(); }}
-          title="Create branch"
+          title={t('scm.createBranch')}
         >
           <GitBranchPlus class="w-4 h-4" style="color: var(--ds-text-subtle);" />
         </button>
@@ -196,7 +197,7 @@
           class="p-1 rounded transition-colors opacity-0 group-hover:opacity-100"
           class:invisible={!expanded}
           onclick={e => { e.stopPropagation(); openAddLinkModal(); }}
-          title="Link existing PR, branch, or commit"
+          title={t('scm.linkExisting')}
         >
           <Plus class="w-4 h-4" style="color: var(--ds-text-subtle);" />
         </button>
@@ -217,25 +218,25 @@
         </div>
       {:else if !connectionStatus?.has_repositories}
         <!-- No SCM repositories configured for this workspace -->
-        <p class="text-xs py-2" style="color: var(--ds-text-subtle);">No repositories linked to this workspace</p>
+        <p class="text-xs py-2" style="color: var(--ds-text-subtle);">{t('scm.noRepositoriesLinked')}</p>
       {:else if !connectionStatus?.connected}
         <!-- User hasn't connected their SCM account -->
         <div class="py-3 px-3 rounded-md" style="background-color: var(--ds-background-neutral);">
           <div class="flex items-center gap-2 mb-2">
             <Link2 class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-            <Text size="sm" weight="medium">Connect your {connectionStatus?.provider_name || 'Git'} account</Text>
+            <Text size="sm" weight="medium">{t('scm.connectYourAccount', { provider: connectionStatus?.provider_name || 'Git' })}</Text>
           </div>
           <p class="text-xs mb-3" style="color: var(--ds-text-subtle);">
-            To create branches and pull requests, connect your personal account.
+            {t('scm.connectToCreate')}
           </p>
           <Button size="sm" variant="primary" onclick={startOAuthConnect}>
-            Connect {connectionStatus?.provider_name || 'Account'}
+            {t('scm.connect', { provider: connectionStatus?.provider_name || t('common.account') })}
           </Button>
         </div>
       {:else if error}
         <p class="text-xs py-2" style="color: var(--ds-text-danger);">{error}</p>
       {:else if links.length === 0}
-        <p class="text-xs py-2" style="color: var(--ds-text-subtle);">No PRs, branches, or commits linked</p>
+        <p class="text-xs py-2" style="color: var(--ds-text-subtle);">{t('scm.noLinksYet')}</p>
       {:else}
         {#each links as link}
           <div
@@ -306,7 +307,7 @@
                   class="p-1 rounded hover:bg-opacity-50"
                   style="color: var(--ds-text-subtle);"
                   onclick={() => openCreatePRModal(link)}
-                  title="Create Pull Request"
+                  title={t('scm.createPullRequest')}
                 >
                   <GitMerge class="w-3 h-3" />
                 </button>
@@ -315,7 +316,7 @@
                 class="p-1 rounded hover:bg-opacity-50"
                 style="color: var(--ds-text-subtle);"
                 onclick={() => refreshLink(link.id)}
-                title="Refresh"
+                title={t('common.refresh')}
                 disabled={refreshing}
               >
                 <RefreshCw class="w-3 h-3 {refreshing ? 'animate-spin' : ''}" />
@@ -326,7 +327,7 @@
                 rel="noopener noreferrer"
                 class="p-1 rounded hover:bg-opacity-50"
                 style="color: var(--ds-text-subtle);"
-                title="Open in new tab"
+                title={t('common.openInNewTab')}
               >
                 <ExternalLink class="w-3 h-3" />
               </a>
@@ -334,7 +335,7 @@
                 class="p-1 rounded hover:bg-opacity-50"
                 style="color: var(--ds-text-danger);"
                 onclick={() => deleteLink(link.id)}
-                title="Remove link"
+                title={t('items.removeLink')}
               >
                 <Trash2 class="w-3 h-3" />
               </button>

@@ -6,6 +6,7 @@
   import AttachmentDiagramList from '../assets/AttachmentDiagramList.svelte';
   import { createEventDispatcher } from 'svelte';
   import { getShortcut, matchesShortcut, getDisplayString } from '../../utils/keyboardShortcuts.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -101,7 +102,7 @@
 
 <div class="pt-2">
   <div class="mb-4">
-    <h3 class="text-sm font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle); font-size: 11px;">Description</h3>
+    <h3 class="text-sm font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle); font-size: 11px;">{t('common.description')}</h3>
   </div>
   
   {#if editingDescription}
@@ -109,17 +110,17 @@
       <MilkdownEditor
         bind:this={milkdownEditor}
         bind:content={editDescription}
-        placeholder="Enter description..."
+        placeholder={t('items.enterDescription')}
         showToolbar={true}
         itemId={item.id}
         onImageInsert={handleImageInsert}
       />
       <div class="flex items-center gap-2">
         <Button variant="primary" onclick={saveDescription} disabled={saving} keyboardHint={getDisplayString(saveShortcut)}>
-          Save
+          {t('common.save')}
         </Button>
         <Button variant="default" onclick={cancelEdit}>
-          Cancel
+          {t('common.cancel')}
         </Button>
       </div>
     </div>
@@ -131,7 +132,7 @@
       tabindex="0"
       class="description-hover text-left w-full rounded cursor-pointer transition-all duration-150"
       style="color: var(--ds-text);"
-      title="Click to edit description"
+      title={t('items.clickToEditDescription')}
     >
       <MilkdownEditor
         content={item.description}
@@ -146,9 +147,9 @@
       style="color: var(--ds-text-subtle);"
       onmouseenter={(e) => e.currentTarget.style.color = 'var(--ds-text)'}
       onmouseleave={(e) => e.currentTarget.style.color = 'var(--ds-text-subtle)'}
-      title="Click to add description"
+      title={t('items.clickToAddDescription')}
     >
-      No description provided - click to add one
+      {t('items.noDescriptionProvided')}
     </button>
   {/if}
   
@@ -159,10 +160,10 @@
         class="action-btn inline-flex items-center gap-1.5 px-2 py-1.5 rounded text-xs transition-all"
         style="color: var(--ds-text-subtle);"
         onclick={() => dispatch('show-add-link')}
-        title="Add Link"
+        title={t('items.addLink')}
       >
         <Link2 class="w-4 h-4 flex-shrink-0" />
-        <span class="action-label">Link</span>
+        <span class="action-label">{t('common.link')}</span>
       </button>
     {/if}
     {#if availableSubIssueTypes.length > 0}
@@ -170,20 +171,20 @@
         class="action-btn inline-flex items-center gap-1.5 px-2 py-1.5 rounded text-xs transition-all"
         style="color: var(--ds-text-subtle);"
         onclick={() => dispatch('create-sub-issue')}
-        title="Create Child"
+        title={t('items.createChild')}
       >
         <Plus class="w-4 h-4 flex-shrink-0" />
-        <span class="action-label">Child</span>
+        <span class="action-label">{t('items.child')}</span>
       </button>
     {/if}
     {#if attachmentSettings?.enabled}
       <label
         class="action-btn inline-flex items-center gap-1.5 px-2 py-1.5 rounded text-xs transition-all cursor-pointer"
         style="color: var(--ds-text-subtle);"
-        title="Attach File"
+        title={t('items.attachFile')}
       >
         <Paperclip class="w-4 h-4 flex-shrink-0" />
-        <span class="action-label">Attach</span>
+        <span class="action-label">{t('items.attach')}</span>
         <input
           type="file"
           class="hidden"
@@ -201,10 +202,10 @@
         class="action-btn inline-flex items-center gap-1.5 px-2 py-1.5 rounded text-xs transition-all"
         style="color: var(--ds-text-subtle);"
         onclick={handleNewDiagram}
-        title="New Diagram"
+        title={t('items.newDiagram')}
       >
         <PenTool class="w-4 h-4 flex-shrink-0" />
-        <span class="action-label">Diagram</span>
+        <span class="action-label">{t('items.diagram')}</span>
       </button>
     {/if}
   </div>

@@ -6,6 +6,7 @@
   import { api } from './lib/api.js';
   import { APP_NAME } from './lib/constants.js';
   import { themeStore } from './lib/stores/theme.svelte.js';
+  import { i18n, SUPPORTED_LOCALES } from './lib/stores/i18n.svelte.js';
   import LoginDialog from './lib/dialogs/LoginDialog.svelte';
   import WelcomeAssistant from './lib/pages/WelcomeAssistant.svelte';
   import Portal from './lib/layout/Portal.svelte';
@@ -19,6 +20,9 @@
 
   onMount(async () => {
     initRouter();
+
+    // Initialize i18n (loads user's preferred locale)
+    await i18n.init();
 
     // Check setup status first
     await checkSetupStatus();
@@ -67,6 +71,24 @@
     if ($authStore.isAuthenticated && setupCompleted) {
       showLoginDialog = false;
       appInitialized = true;
+    }
+  });
+
+  // Sync i18n locale with user's saved language preference
+  $effect(() => {
+    if ($authStore.isAuthenticated && authStore.currentUser?.language) {
+      const userLang = authStore.currentUser.language;
+      if (SUPPORTED_LOCALES.some(l => l.code === userLang) && i18n.locale !== userLang) {
+        i18n.setLocale(userLang);
+      }
+    }
+  });
+
+  // Update document direction when locale changes (for RTL support)
+  $effect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.dir = i18n.direction;
+      document.documentElement.lang = i18n.locale;
     }
   });
 

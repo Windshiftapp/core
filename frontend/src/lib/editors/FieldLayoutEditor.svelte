@@ -8,10 +8,11 @@
   import Modal from '../dialogs/Modal.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import DropIndicator from '../layout/DropIndicator.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     isOpen = $bindable(false),
-    title = 'Configure Fields',
+    title = '',
     subtitle = '',
     availableFields = [],            // Fields that can be selected: { identifier, name, type?, fieldType?, category?, description? }
     selectedFields = $bindable([]),  // Currently selected fields: { field_identifier, field_name, display_order, is_required?, ... }
@@ -21,6 +22,8 @@
     onSave = () => {},
     onCancel = () => {}
   } = $props();
+
+  const effectiveTitle = $derived(title || t('fields.configureFields'));
 
   // Search state
   let fieldSearchQuery = $state('');
@@ -269,18 +272,18 @@
 </script>
 
 <Modal {isOpen} onclose={handleClose} maxWidth="max-w-4xl">
-  <ModalHeader {title} {subtitle} icon={Settings} onClose={handleClose} />
+  <ModalHeader title={effectiveTitle} {subtitle} icon={Settings} onClose={handleClose} />
 
   <div class="p-6">
     <!-- Two-panel layout -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <!-- Available Fields (Left Panel) -->
       <div class="rounded-xl p-4 border" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
-        <h4 class="text-sm font-semibold mb-3" style="color: var(--ds-text);">Available Fields</h4>
-        <p class="text-xs mb-3" style="color: var(--ds-text-subtle);">Drag fields to add them</p>
+        <h4 class="text-sm font-semibold mb-3" style="color: var(--ds-text);">{t('editors.availableFields')}</h4>
+        <p class="text-xs mb-3" style="color: var(--ds-text-subtle);">{t('editors.dragFieldsToAdd')}</p>
 
         <Input
-          placeholder="Search fields..."
+          placeholder={t('fields.searchFields')}
           bind:value={fieldSearchQuery}
           class="mb-3"
         />
@@ -328,11 +331,11 @@
             <div class="text-center py-6">
               <p class="text-sm" style="color: var(--ds-text-subtle);">
                 {#if fieldSearchQuery.trim()}
-                  No fields match your search
+                  {t('editors.noFieldsMatchSearch')}
                 {:else if availableFields.length === 0}
-                  No fields available
+                  {t('editors.noFieldsAvailable')}
                 {:else}
-                  All available fields have been added
+                  {t('editors.allFieldsAdded')}
                 {/if}
               </p>
             </div>
@@ -342,8 +345,8 @@
 
       <!-- Selected Fields (Right Panel) -->
       <div class="rounded-xl p-4 border" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
-        <h4 class="text-sm font-semibold mb-3" style="color: var(--ds-text);">Selected Fields ({selectedFields.length})</h4>
-        <p class="text-xs mb-3" style="color: var(--ds-text-subtle);">Drag to reorder or drop fields here</p>
+        <h4 class="text-sm font-semibold mb-3" style="color: var(--ds-text);">{t('editors.selectedFields')} ({selectedFields.length})</h4>
+        <p class="text-xs mb-3" style="color: var(--ds-text-subtle);">{t('editors.dragToReorderOrDrop')}</p>
 
         <div
           data-drop-zone-editor
@@ -357,7 +360,7 @@
               <svg class="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
               </svg>
-              <p class="text-sm text-gray-500">Drop fields here to configure</p>
+              <p class="text-sm text-gray-500">{t('editors.dropFieldsHere')}</p>
             </div>
           {:else}
             {#each selectedFields as field, index (field.field_identifier)}
@@ -407,7 +410,7 @@
                         bind:checked={field.is_required}
                         class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                       />
-                      <span class="text-xs text-gray-600">Required</span>
+                      <span class="text-xs text-gray-600">{t('common.required')}</span>
                     </label>
                   {/if}
 
@@ -421,7 +424,7 @@
                     <button
                       onclick={() => removeField(index)}
                       class="text-red-500 hover:text-red-700 transition-colors p-1 rounded hover:bg-red-50 flex-shrink-0"
-                      title="Remove field"
+                      title={t('aria.removeField')}
                     >
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -438,8 +441,8 @@
 
     <!-- Footer -->
     <div class="flex justify-end gap-3 mt-6 pt-4 border-t" style="border-color: var(--ds-border);">
-      <Button variant="outline" onclick={handleClose}>Cancel</Button>
-      <Button onclick={handleSave}>Save</Button>
+      <Button variant="outline" onclick={handleClose}>{t('common.cancel')}</Button>
+      <Button onclick={handleSave}>{t('common.save')}</Button>
     </div>
   </div>
 </Modal>

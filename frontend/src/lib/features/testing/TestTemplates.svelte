@@ -15,6 +15,7 @@
   import Modal from '../../dialogs/Modal.svelte';
   import Label from '../../components/Label.svelte';
   import DataTable from '../../components/DataTable.svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let { workspaceId = null } = $props();
 
@@ -45,31 +46,31 @@
   const templateColumns = $derived.by(() => [
     {
       key: 'name',
-      label: 'Template Name',
+      label: t('testing.templateName'),
       html: true,
       render: (template) => `<a href="${workspaceTestBase}/templates/${template.id}" style="color: var(--ds-text-link);" class="hover:underline">${template.name}</a>`
     },
     {
       key: 'testSetName',
-      label: 'Test Plan',
+      label: t('testing.testPlan'),
       html: true,
       render: (template) => `<a href="${workspaceTestBase}/sets?milestone=${template.milestoneId || ''}" style="color: var(--ds-text-link);" class="hover:underline">${template.testSetName}</a>`
     },
     {
       key: 'milestoneName',
-      label: 'Milestone',
+      label: t('milestones.milestone'),
       html: true,
       render: (template) => template.milestoneId
         ? `<a href="/milestones" style="color: var(--ds-text-link);" class="hover:underline">${template.milestoneName}</a>`
-        : `<span style="color: var(--ds-text-subtle);">No milestone</span>`
+        : `<span style="color: var(--ds-text-subtle);">${t('testing.noMilestone')}</span>`
     },
-    { key: 'description', label: 'Description', render: (template) => template.description || '-' },
+    { key: 'description', label: t('common.description'), render: (template) => template.description || '-' },
     {
       key: 'created_at',
-      label: 'Created',
+      label: t('common.created'),
       render: (template) => template.created_at ? new Date(template.created_at).toLocaleString() : '-'
     },
-    { key: 'actions', label: 'Actions', width: 'w-20', align: 'text-right' }
+    { key: 'actions', label: t('common.actions'), width: 'w-20', align: 'text-right' }
   ]);
 
   onMount(async () => {
@@ -134,7 +135,7 @@
 
   async function createTemplate() {
     if (!selectedSetId || !templateName) {
-      errorToast('Please select a test plan and enter a template name');
+      errorToast(t('testing.selectPlanAndName'));
       return;
     }
 
@@ -148,20 +149,20 @@
       showForm = false;
     } catch (error) {
       console.error('Failed to create test template:', error);
-      errorToast('Failed to create template. Please try again.');
+      errorToast(t('testing.failedToCreateTemplate'));
     }
   }
 
   async function deleteTemplate(template) {
-    confirmTitle = 'Delete Template';
-    confirmMessage = `Are you sure you want to delete the template "${template.name}"? This will not delete any existing test runs created from this template.`;
+    confirmTitle = t('testing.deleteTemplate');
+    confirmMessage = t('testing.deleteTemplateConfirm', { name: template.name });
     confirmAction = async () => {
       try {
         await api.tests.testRunTemplates.delete(workspaceId, template.id);
         await loadData();
       } catch (error) {
         console.error('Failed to delete template:', error);
-        errorToast('Failed to delete template. Please try again.');
+        errorToast(t('testing.failedToDeleteTemplate'));
       }
     };
     showConfirmDialog = true;
@@ -174,7 +175,7 @@
       navigate(testPath(`/runs/${newRun.id}/execute`));
     } catch (error) {
       console.error('Failed to execute template:', error);
-      errorToast('Failed to start execution. Please try again.');
+      errorToast(t('testing.failedToStartExecution'));
     }
   }
 
@@ -197,18 +198,18 @@
     return [
       {
         id: 'execute',
-        title: 'Execute',
+        title: t('testing.execute'),
         color: 'var(--ds-status-success-text)',
         onClick: () => executeTemplate(template)
       },
       {
         id: 'view',
-        title: 'View Details',
+        title: t('testing.viewDetails'),
         onClick: () => viewTemplateDetails(template)
       },
       {
         id: 'delete',
-        title: 'Delete',
+        title: t('common.delete'),
         color: 'var(--ds-text-danger)',
         onClick: () => deleteTemplate(template)
       }
@@ -257,15 +258,15 @@
 
 <div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface-raised);">
   <PageHeader
-    title="Test Run Templates"
-    subtitle="Create reusable test run configurations"
+    title={t('testing.testRunTemplates')}
+    subtitle={t('testing.testRunTemplatesSubtitle')}
   >
     {#snippet actions()}
       <div class="flex items-center gap-3">
         <div class="w-48">
           <MilestoneCombobox
             bind:value={selectedMilestoneFilter}
-            placeholder="All milestones"
+            placeholder={t('milestones.allMilestones')}
             onselect={handleMilestoneSelect}
           />
         </div>
@@ -275,7 +276,7 @@
           size="medium"
           keyboardHint="A"
         >
-          Create Template
+          {t('testing.createTemplate')}
         </Button>
       </div>
     {/snippet}
@@ -287,31 +288,31 @@
     onclose={() => showForm = false}
   >
     <div class="p-6" style="background-color: var(--ds-surface-raised);">
-      <h3 class="text-xl font-semibold mb-4" style="color: var(--ds-text);">Create Test Run Template</h3>
+      <h3 class="text-xl font-semibold mb-4" style="color: var(--ds-text);">{t('testing.createTestRunTemplate')}</h3>
       <form class="space-y-4" onsubmit={(e) => { e.preventDefault(); createTemplate(); }}>
         <div>
-          <Label for="set-select" color="default" class="mb-2">Select Test Plan</Label>
+          <Label for="set-select" color="default" class="mb-2">{t('testing.selectTestPlan')}</Label>
           <Select id="set-select" bind:value={selectedSetId}>
-            <option value="">-- Select a test plan --</option>
+            <option value="">{t('testing.selectTestPlanPlaceholder')}</option>
             {#each filteredTestSets as set}
               <option value={set.id}>{set.name}</option>
             {/each}
           </Select>
         </div>
         <div>
-          <Label for="template-name" color="default" class="mb-2">Template Name</Label>
+          <Label for="template-name" color="default" class="mb-2">{t('testing.templateName')}</Label>
           <Input
             id="template-name"
             bind:value={templateName}
-            placeholder="e.g., Regression Tests, Smoke Tests"
+            placeholder={t('testing.templateNamePlaceholder')}
           />
         </div>
         <div>
-          <Label for="template-description" color="default" class="mb-2">Description (Optional)</Label>
+          <Label for="template-description" color="default" class="mb-2">{t('testing.descriptionOptional')}</Label>
           <Textarea
             id="template-description"
             bind:value={templateDescription}
-            placeholder="Add notes about this template..."
+            placeholder={t('testing.templateDescriptionPlaceholder')}
             rows={3}
           />
         </div>
@@ -322,14 +323,14 @@
             onclick={() => showForm = false}
             keyboardHint="Esc"
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             type="submit"
             variant="primary"
             keyboardHint="↵"
           >
-            Create Template
+            {t('testing.createTemplate')}
           </Button>
         </div>
       </form>
@@ -343,8 +344,8 @@
       data={filteredTemplates}
       keyField="id"
       actionItems={templateActions}
-      emptyMessage="No test templates yet"
-      emptyDescription="Create reusable templates to speed up test run creation."
+      emptyMessage={t('testing.noTemplatesYet')}
+      emptyDescription={t('testing.createTemplatesHint')}
       emptyIcon={FileStack}
     />
   </div>
@@ -355,8 +356,8 @@
   bind:show={showConfirmDialog}
   title={confirmTitle}
   message={confirmMessage}
-  confirmText={confirmAction ? "Confirm" : "OK"}
-  cancelText={confirmAction ? "Cancel" : ""}
+  confirmText={confirmAction ? t('common.confirm') : t('common.ok')}
+  cancelText={confirmAction ? t('common.cancel') : ""}
   variant={confirmAction ? "danger" : "info"}
   onconfirm={() => {
     if (confirmAction) {

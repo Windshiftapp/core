@@ -19,6 +19,7 @@
   import Modal from '../dialogs/Modal.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import TextField from '../components/TextField.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   // State
   let customerOrganisations = $state([]);
@@ -152,7 +153,7 @@
       customerOrganisations = result || [];
     } catch (err) {
       console.error('Failed to load customer organisations:', err);
-      error = 'Failed to load customer organisations';
+      error = t('workspaces.customers.failedToLoadOrganisations');
     }
   }
 
@@ -161,7 +162,7 @@
       portalCustomers = await api.portalCustomers.getAll();
     } catch (err) {
       console.error('Failed to load portal customers:', err);
-      error = 'Failed to load portal customers';
+      error = t('workspaces.customers.failedToLoadCustomers');
     }
   }
 
@@ -181,7 +182,7 @@
       await loadPortalCustomers();
     } catch (err) {
       console.error('Failed to update customer organisation:', err);
-      errorToast('Failed to assign customer to organisation');
+      errorToast(t('workspaces.customers.failedToAssignCustomer'));
     }
   }
 
@@ -331,10 +332,10 @@
 
   async function handleDeleteCustomer(customer) {
     const confirmed = await confirm({
-      title: 'Delete Portal Customer',
-      message: `Are you sure you want to delete "${customer.name}"? This action cannot be undone.`,
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
+      title: t('workspaces.customers.deleteCustomer'),
+      message: t('workspaces.customers.confirmDeleteCustomer', { name: customer.name }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
       variant: 'danger',
       icon: Trash2
     });
@@ -358,7 +359,7 @@
         id: 'edit',
         type: 'regular',
         icon: Edit2,
-        title: 'Edit',
+        title: t('common.edit'),
         onClick: () => openDetailModal(customer)
       },
       { type: 'divider' },
@@ -366,7 +367,7 @@
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50 hover:text-red-700',
         onClick: () => handleDeleteCustomer(customer)
@@ -420,13 +421,13 @@
           <div>
             <h1 class="text-xl font-semibold" style="color: var(--ds-text);">
               {#if selectedOrgId === null}
-                Unassigned Customers
+                {t('workspaces.customers.unassignedCustomers')}
               {:else}
-                {customerOrganisations.find(o => o.id === selectedOrgId)?.name || 'Customers'}
+                {customerOrganisations.find(o => o.id === selectedOrgId)?.name || t('workspaces.customers.title')}
               {/if}
             </h1>
             <p class="text-sm" style="color: var(--ds-text-subtle);">
-              {filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''}
+              {t('workspaces.customers.customerCount', { count: filteredCustomers.length })}
             </p>
           </div>
         </div>
@@ -436,7 +437,7 @@
           onclick={startCreate}
           keyboardHint="A"
         >
-          Add Customer
+          {t('workspaces.customers.addCustomer')}
         </Button>
       </div>
 
@@ -447,7 +448,7 @@
           <input
             type="text"
             bind:value={customerSearch}
-            placeholder="Search customers..."
+            placeholder={t('workspaces.customers.searchCustomers')}
             class="w-full pl-10 pr-4 py-2 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500"
             style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
           />
@@ -459,13 +460,13 @@
         {#if displayedCustomers.length === 0}
           <div class="p-8 text-center" style="color: var(--ds-text-subtle);">
             <Users class="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p>No customers found</p>
+            <p>{t('workspaces.customers.noCustomersFound')}</p>
             {#if customerSearch}
-              <p class="text-sm mt-1">Try adjusting your search</p>
+              <p class="text-sm mt-1">{t('workspaces.customers.tryAdjustingSearch')}</p>
             {:else if selectedOrgId === null}
-              <p class="text-sm mt-1">All portal customers are assigned to organisations</p>
+              <p class="text-sm mt-1">{t('workspaces.customers.allCustomersAssigned')}</p>
             {:else}
-              <p class="text-sm mt-1">Drag customers here to assign them to this organisation</p>
+              <p class="text-sm mt-1">{t('workspaces.customers.dragCustomersHere')}</p>
             {/if}
           </div>
         {:else}
@@ -500,7 +501,7 @@
                       <div class="flex items-center gap-2 mt-1">
                         <Users class="w-3.5 h-3.5 flex-shrink-0" style="color: var(--ds-text-subtle);" />
                         <span class="text-sm truncate" style="color: var(--ds-text-subtle);">
-                          Linked: {customer.user_name}
+                          {t('workspaces.customers.linked')}: {customer.user_name}
                         </span>
                       </div>
                     {/if}
@@ -523,7 +524,7 @@
           {#if hasMoreCustomers}
             <div class="p-4 border-t text-center" style="border-color: var(--ds-border);">
               <Button variant="default" onclick={loadMoreCustomers}>
-                Load more ({filteredCustomers.length - displayLimit} remaining)
+                {t('workspaces.customers.loadMore', { count: filteredCustomers.length - displayLimit })}
               </Button>
             </div>
           {/if}
@@ -542,42 +543,42 @@
   onclose={closeModal}
 >
   {#snippet children({ submitHint })}
-    <ModalHeader title="Add Portal Customer" onClose={closeModal} />
+    <ModalHeader title={t('workspaces.customers.addPortalCustomer')} onClose={closeModal} />
 
     <div class="p-6 space-y-4">
       <TextField
-        label="Name"
+        label={t('workspaces.customers.fields.name')}
         id="customer-name"
         bind:value={formData.name}
-        placeholder="Enter customer name"
+        placeholder={t('workspaces.customers.placeholders.name')}
         required
       />
 
       <TextField
-        label="Email"
+        label={t('workspaces.customers.fields.email')}
         id="customer-email"
         type="email"
         bind:value={formData.email}
-        placeholder="customer@example.com"
+        placeholder={t('workspaces.customers.placeholders.email')}
         required
       />
 
       <TextField
-        label="Phone"
+        label={t('workspaces.customers.fields.phone')}
         id="customer-phone"
         type="tel"
         bind:value={formData.phone}
-        placeholder="+1 (555) 123-4567"
+        placeholder={t('workspaces.customers.placeholders.phone')}
       />
 
       <div>
-        <Label for="customer-org" class="mb-2">Customer Organisation</Label>
+        <Label for="customer-org" class="mb-2">{t('workspaces.customers.fields.customerOrganisation')}</Label>
         <BasePicker
           bind:value={formData.customer_organisation_id}
           items={customerOrganisations}
-          placeholder="None (Unassigned)"
+          placeholder={t('workspaces.customers.noneUnassigned')}
           showUnassigned={true}
-          unassignedLabel="None (Unassigned)"
+          unassignedLabel={t('workspaces.customers.noneUnassigned')}
           getValue={(item) => item.id}
           getLabel={(item) => item.name}
         />
@@ -586,7 +587,7 @@
       <!-- Custom Fields -->
       {#if portalCustomerFields.length > 0}
         <div class="col-span-full pt-4 border-t" style="border-color: var(--ds-border);">
-          <h3 class="text-sm font-medium mb-3" style="color: var(--ds-text);">Custom Fields</h3>
+          <h3 class="text-sm font-medium mb-3" style="color: var(--ds-text);">{t('workspaces.customers.customFields')}</h3>
           <div class="space-y-4">
             {#each portalCustomerFields as field}
               <CustomFieldRenderer
@@ -606,7 +607,7 @@
     <DialogFooter
       onCancel={closeModal}
       onConfirm={handleCreateCustomer}
-      confirmLabel="Create Customer"
+      confirmLabel={t('workspaces.customers.createCustomer')}
       disabled={!formData.name.trim() || !formData.email.trim()}
       showKeyboardHint={true}
       confirmKeyboardHint={submitHint}
@@ -623,42 +624,42 @@
   onclose={closeDetailModal}
 >
   {#snippet children({ submitHint })}
-    <ModalHeader title="Edit Portal Customer" icon={Edit2} onClose={closeDetailModal} />
+    <ModalHeader title={t('workspaces.customers.editPortalCustomer')} icon={Edit2} onClose={closeDetailModal} />
 
     <div class="p-6 space-y-4">
       <TextField
-        label="Name"
+        label={t('workspaces.customers.fields.name')}
         id="edit-customer-name"
         bind:value={editFormData.name}
-        placeholder="Enter customer name"
+        placeholder={t('workspaces.customers.placeholders.name')}
         required
       />
 
       <TextField
-        label="Email"
+        label={t('workspaces.customers.fields.email')}
         id="edit-customer-email"
         type="email"
         bind:value={editFormData.email}
-        placeholder="customer@example.com"
+        placeholder={t('workspaces.customers.placeholders.email')}
         required
       />
 
       <TextField
-        label="Phone"
+        label={t('workspaces.customers.fields.phone')}
         id="edit-customer-phone"
         type="tel"
         bind:value={editFormData.phone}
-        placeholder="+1 (555) 123-4567"
+        placeholder={t('workspaces.customers.placeholders.phone')}
       />
 
       <div>
-        <Label for="edit-customer-org" class="mb-2">Customer Organisation</Label>
+        <Label for="edit-customer-org" class="mb-2">{t('workspaces.customers.fields.customerOrganisation')}</Label>
         <BasePicker
           bind:value={editFormData.customer_organisation_id}
           items={customerOrganisations}
-          placeholder="None (Unassigned)"
+          placeholder={t('workspaces.customers.noneUnassigned')}
           showUnassigned={true}
-          unassignedLabel="None (Unassigned)"
+          unassignedLabel={t('workspaces.customers.noneUnassigned')}
           getValue={(item) => item.id}
           getLabel={(item) => item.name}
         />
@@ -667,7 +668,7 @@
       <!-- Custom Fields -->
       {#if portalCustomerFields.length > 0}
         <div class="pt-4 border-t" style="border-color: var(--ds-border);">
-          <h3 class="text-sm font-medium mb-3" style="color: var(--ds-text);">Custom Fields</h3>
+          <h3 class="text-sm font-medium mb-3" style="color: var(--ds-text);">{t('workspaces.customers.customFields')}</h3>
           <div class="space-y-4">
             {#each portalCustomerFields as field}
               <CustomFieldRenderer
@@ -687,16 +688,16 @@
       {#if selectedCustomer?.created_at}
         <div class="pt-4 border-t space-y-2" style="border-color: var(--ds-border);">
           <div class="text-xs" style="color: var(--ds-text-subtle);">
-            <span class="font-medium">Created:</span> {new Date(selectedCustomer.created_at).toLocaleString()}
+            <span class="font-medium">{t('workspaces.customers.metadata.created')}:</span> {new Date(selectedCustomer.created_at).toLocaleString()}
           </div>
           {#if selectedCustomer.updated_at}
             <div class="text-xs" style="color: var(--ds-text-subtle);">
-              <span class="font-medium">Updated:</span> {new Date(selectedCustomer.updated_at).toLocaleString()}
+              <span class="font-medium">{t('workspaces.customers.metadata.updated')}:</span> {new Date(selectedCustomer.updated_at).toLocaleString()}
             </div>
           {/if}
           {#if selectedCustomer.user_name}
             <div class="text-xs" style="color: var(--ds-text-subtle);">
-              <span class="font-medium">Linked User:</span> {selectedCustomer.user_name} ({selectedCustomer.user_email})
+              <span class="font-medium">{t('workspaces.customers.metadata.linkedUser')}:</span> {selectedCustomer.user_name} ({selectedCustomer.user_email})
             </div>
           {/if}
         </div>
@@ -706,7 +707,7 @@
     <DialogFooter
       onCancel={closeDetailModal}
       onConfirm={handleUpdateCustomer}
-      confirmLabel="Save Changes"
+      confirmLabel={t('common.saveChanges')}
       disabled={!editFormData.name.trim() || !editFormData.email.trim()}
       showKeyboardHint={true}
       confirmKeyboardHint={submitHint}

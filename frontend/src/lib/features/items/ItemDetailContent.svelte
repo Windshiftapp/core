@@ -1,6 +1,7 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { AlertCircle, Workflow } from 'lucide-svelte';
+  import { t } from '../../stores/i18n.svelte.js';
   import ItemDetailBreadcrumbs from '../items/ItemDetailBreadcrumbs.svelte';
   import ItemDetailHeader from '../items/ItemDetailHeader.svelte';
   import ItemDetailDescription from '../items/ItemDetailDescription.svelte';
@@ -266,13 +267,13 @@
   <!-- Error State -->
   <div class="p-8 text-center" style="background-color: var(--ds-surface);">
     <AlertCircle class="w-12 h-12 text-red-500 mx-auto mb-4" />
-    <h1 class="text-xl font-semibold mb-2" style="color: var(--ds-text);">Error Loading Work Item</h1>
+    <h1 class="text-xl font-semibold mb-2" style="color: var(--ds-text);">{t('items.errorLoadingWorkItem')}</h1>
     <p class="mb-6" style="color: var(--ds-text-subtle);">{error}</p>
     <button
       onclick={() => dispatch('close')}
       class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
     >
-      Close
+      {t('common.close')}
     </button>
   </div>
 {:else if item && workspace}
@@ -428,12 +429,12 @@
 {:else}
   <!-- Not Found State -->
   <div class="p-8 text-center" style="background-color: var(--ds-surface);">
-    <h1 class="text-xl font-semibold mb-4" style="color: var(--ds-text);">Work item not found</h1>
+    <h1 class="text-xl font-semibold mb-4" style="color: var(--ds-text);">{t('items.workItemNotFound')}</h1>
     <button
       onclick={() => dispatch('close')}
       class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
     >
-      Close
+      {t('common.close')}
     </button>
   </div>
 {/if}

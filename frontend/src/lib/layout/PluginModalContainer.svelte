@@ -3,6 +3,7 @@
 	import Modal from '../dialogs/Modal.svelte';
 	import Button from '../components/Button.svelte';
 	import Label from '../components/Label.svelte';
+	import { t } from '../stores/i18n.svelte.js';
 
 	$: activeModals = $pluginModalRequests;
 </script>
@@ -66,7 +67,7 @@
 										{#if typeof value === 'object'}
 											<pre class="text-xs overflow-auto bg-gray-50 p-2 rounded">{JSON.stringify(value, null, 2)}</pre>
 										{:else}
-											{value || 'N/A'}
+											{value || t('common.noData')}
 										{/if}
 									</div>
 								</div>
@@ -80,7 +81,7 @@
 
 			<!-- Modal Footer -->
 			<div class="px-6 py-4 border-t flex justify-end" style="border-color: var(--ds-border);">
-				<Button onclick={() => modal.onClose(null)}>Close</Button>
+				<Button onclick={() => modal.onClose(null)}>{t('common.close')}</Button>
 			</div>
 		</Modal>
 	{/if}

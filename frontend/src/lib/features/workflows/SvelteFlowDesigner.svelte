@@ -1,9 +1,9 @@
 <script>
   import { onMount } from 'svelte';
-  import { 
-    SvelteFlow, 
-    Controls, 
-    MiniMap, 
+  import {
+    SvelteFlow,
+    Controls,
+    MiniMap,
     Background,
     ConnectionMode,
     addEdge
@@ -21,6 +21,7 @@
     positionPersistence,
     DEFAULT_WORKFLOW_POSITIONS
   } from '../../utils/dataTransformers.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   export let workflow;
   export let statuses = [];
@@ -342,7 +343,7 @@
       await onSave(allTransitions);
     } catch (error) {
       console.error('Failed to save workflow design:', error);
-      alert('Failed to save workflow design: ' + (error.message || error));
+      alert(t('workflows.failedToSaveDesign') + ': ' + (error.message || error));
     } finally {
       savingTransitions = false;
     }
@@ -399,13 +400,13 @@
 <div class="flex h-full">
   <!-- Status Palette -->
   <div class="w-80 workflow-sidebar border-r p-6 overflow-y-auto flex-shrink-0">
-    <h3 class="text-lg font-medium sidebar-title mb-2">Available Statuses</h3>
+    <h3 class="text-lg font-medium sidebar-title mb-2">{t('workflows.availableStatuses')}</h3>
     <div class="mb-4 p-3 sidebar-hint border rounded-md">
-      <div class="text-xs font-medium hint-heading">💡 How to create transitions:</div>
+      <div class="text-xs font-medium hint-heading">{t('workflows.transitionHintTitle')}</div>
       <div class="text-xs hint-body">
-        • Drag from one status to another to create a transition<br/>
-        • Arrows show the direction: FROM status → TO status<br/>
-        • Click and drag edges to reconnect them
+        {t('workflows.transitionHint1')}<br/>
+        {t('workflows.transitionHint2')}<br/>
+        {t('workflows.transitionHint3')}
       </div>
     </div>
     <div class="space-y-3">
@@ -429,16 +430,16 @@
       
       {#if availableStatuses.length === 0}
         <div class="text-center py-8 status-empty">
-          <p class="text-sm">All statuses have been added to the workflow</p>
+          <p class="text-sm">{t('workflows.allStatusesAdded')}</p>
         </div>
       {/if}
     </div>
-    
+
     <!-- Status Count Info -->
     <div class="mt-6 pt-4 border-t sidebar-footer">
       <div class="text-sm sidebar-counts">
-        <div>{nodes.length} statuses in workflow</div>
-        <div>{edges.length} transitions defined</div>
+        <div>{t('workflows.statusesInWorkflow', { count: nodes.length })}</div>
+        <div>{t('workflows.transitionsDefined', { count: edges.length })}</div>
       </div>
     </div>
   </div>
@@ -490,13 +491,13 @@
     {#if nodes.length === 0}
       <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div class="text-center workflow-hint">
-          <p class="text-lg mb-2">Start designing your workflow</p>
-          <p class="text-sm">Click statuses from the left panel to add them to the canvas</p>
-          <p class="text-sm">Connect statuses by dragging from connection points</p>
+          <p class="text-lg mb-2">{t('workflows.startDesigning')}</p>
+          <p class="text-sm">{t('workflows.clickStatusesToAdd')}</p>
+          <p class="text-sm">{t('workflows.connectByDragging')}</p>
         </div>
       </div>
     {/if}
-    
+
     <!-- Save/Cancel buttons overlay -->
     <div class="absolute top-4 right-4 flex gap-2 z-10">
       <button
@@ -504,14 +505,14 @@
         onclick={onCancel}
         disabled={savingTransitions}
       >
-        Cancel
+        {t('common.cancel')}
       </button>
       <button
         class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
         onclick={saveWorkflowDesign}
         disabled={savingTransitions || nodes.length === 0}
       >
-        {savingTransitions ? 'Saving...' : 'Save Workflow'}
+        {savingTransitions ? t('common.saving') : t('workflows.saveWorkflow')}
       </button>
     </div>
   </div>

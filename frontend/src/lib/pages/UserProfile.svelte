@@ -11,6 +11,7 @@
 	import BasePicker from '../pickers/BasePicker.svelte';
 	import ConnectedAccountsTab from '../settings/ConnectedAccountsTab.svelte';
 	import { formatDate } from '../utils/dateFormatter.js';
+	import { t, i18n, SUPPORTED_LOCALES } from '../stores/i18n.svelte.js';
 	import {
 		isWebAuthnSupported,
 		registerCredential,
@@ -70,22 +71,22 @@
 	$: tabs = [
 		...(attachmentsEnabled ? [{
 			id: 'avatar',
-			label: 'Avatar',
+			label: t('users.avatar'),
 			icon: Camera
 		}] : []),
 		{
 			id: 'regional-settings',
-			label: 'Regional Settings',
+			label: t('users.regionalSettings'),
 			icon: Globe
 		},
 		{
 			id: 'connected-accounts',
-			label: 'Connected Accounts',
+			label: t('users.connectedAccounts'),
 			icon: GitBranch
 		},
 		{
 			id: 'calendar-integration',
-			label: 'Calendar Integration',
+			label: t('users.calendarIntegration'),
 			icon: CalendarDays
 		}
 	];
@@ -121,7 +122,7 @@
 				selectedLanguage = user.language || 'en';
 			}
 		} catch (err) {
-			error = 'Failed to load user profile';
+			error = t('dialogs.alerts.failedToLoad', { error: 'user profile' });
 		}
 	}
 
@@ -130,7 +131,7 @@
 		try {
 			credentials = await api.getUserCredentials(currentUserId);
 		} catch (err) {
-			error = 'Failed to load credentials';
+			error = t('dialogs.alerts.failedToLoad', { error: 'credentials' });
 		}
 	}
 
@@ -147,7 +148,7 @@
 
 		const file = files[0];
 		if (!file.type.startsWith('image/')) {
-			error = 'Please select an image file';
+			error = t('dialogs.alerts.pleaseSelectImage');
 			return;
 		}
 
@@ -178,7 +179,7 @@
 				showAvatarUpload = false;
 			}
 		} catch (err) {
-			error = err.message || 'Failed to upload avatar';
+			error = err.message || t('dialogs.alerts.failedToUpload', { error: 'avatar' });
 		} finally {
 			uploadingAvatar = false;
 		}
@@ -186,13 +187,13 @@
 
 	async function removeAvatar() {
 		if (!currentUserId) return;
-		if (!confirm('Are you sure you want to remove your profile picture?')) return;
+		if (!confirm(t('dialogs.confirmations.removeAvatar'))) return;
 
 		try {
 			await api.updateUserAvatar(currentUserId, null);
 			await loadUserProfile();
 		} catch (err) {
-			error = err.message || 'Failed to remove avatar';
+			error = err.message || t('dialogs.alerts.failedToDelete', { error: 'avatar' });
 		}
 	}
 
@@ -201,19 +202,19 @@
 		try {
 			appTokens = await api.getUserAppTokens(currentUserId);
 		} catch (err) {
-			error = 'Failed to load app tokens';
+			error = t('dialogs.alerts.failedToLoad', { error: 'app tokens' });
 		}
 	}
 
 	async function enrollFIDOKey() {
 		if (!newCredentialName.trim()) {
-			error = 'Please enter a name for this security key';
+			error = t('security.enterSecurityKeyName');
 			return;
 		}
 
 		// Check if WebAuthn is supported
 		if (!isWebAuthnSupported()) {
-			error = 'WebAuthn is not supported in this browser';
+			error = t('security.webAuthnNotSupported');
 			return;
 		}
 
@@ -231,7 +232,7 @@
 			const publicKeyOptions = registrationResponse.publicKey || registrationResponse.options || registrationResponse;
 
 			if (!publicKeyOptions || !publicKeyOptions.challenge) {
-				throw new Error('Invalid registration challenge from server');
+				throw new Error(t('security.invalidRegistrationChallenge'));
 			}
 
 			// Use the utility function to create credential
@@ -257,13 +258,13 @@
 	}
 
 	async function removeCredential(credentialId, credentialName) {
-		if (!confirm(`Are you sure you want to remove "${credentialName}"?`)) return;
-		
+		if (!confirm(t('dialogs.confirmations.deleteItem', { name: credentialName }))) return;
+
 		try {
 			await api.removeUserCredential(currentUserId, credentialId);
 			await loadCredentials();
 		} catch (err) {
-			error = err.message || 'Failed to remove credential';
+			error = err.message || t('dialogs.alerts.failedToDelete', { error: 'credential' });
 		}
 	}
 
@@ -275,13 +276,13 @@
 		try {
 			// Check if WebAuthn is supported
 			if (!window.PublicKeyCredential) {
-				throw new Error('WebAuthn is not supported in this browser');
+				throw new Error(t('security.webAuthnNotSupported'));
 			}
 
 			// Check if user has any FIDO credentials
 			const fidoCredentials = credentials.filter(c => c.credential_type === 'fido' && c.is_active);
 			if (fidoCredentials.length === 0) {
-				throw new Error('No active FIDO credentials found. Please register a security key first.');
+				throw new Error(t('security.noActiveFidoCredentials'));
 			}
 
 			// Mock authentication challenge (in production this would come from your auth endpoint)
@@ -315,15 +316,15 @@
 			if (assertion) {
 				loginTestResult = 'success';
 			} else {
-				throw new Error('Authentication failed');
+				throw new Error(t('security.authenticationFailed'));
 			}
 
 		} catch (err) {
 			loginTestResult = 'error';
 			if (err.name === 'NotAllowedError') {
-				error = 'Authentication was cancelled or failed. Please try again.';
+				error = t('security.authenticationCancelled');
 			} else {
-				error = err.message || 'Failed to test FIDO login';
+				error = err.message || t('security.failedToTestFidoLogin');
 			}
 		} finally {
 			testingLogin = false;
@@ -332,7 +333,7 @@
 
 	async function createAppToken() {
 		if (!newTokenName.trim()) {
-			error = 'Please enter a name for this token';
+			error = t('security.enterTokenName');
 			return;
 		}
 
@@ -359,20 +360,20 @@
 			await loadAppTokens();
 			
 		} catch (err) {
-			error = err.message || 'Failed to create app token';
+			error = err.message || t('dialogs.alerts.failedToCreate', { error: 'app token' });
 		} finally {
 			creatingToken = false;
 		}
 	}
 
 	async function revokeAppToken(tokenId, tokenName) {
-		if (!confirm(`Are you sure you want to revoke "${tokenName}"? This action cannot be undone.`)) return;
-		
+		if (!confirm(t('security.confirmRevokeToken', { name: tokenName }))) return;
+
 		try {
 			await api.revokeAppToken(currentUserId, tokenId);
 			await loadAppTokens();
 		} catch (err) {
-			error = err.message || 'Failed to revoke token';
+			error = err.message || t('dialogs.alerts.failedToDelete', { error: 'token' });
 		}
 	}
 
@@ -411,11 +412,11 @@
 	function getCredentialTypeName(type) {
 		switch (type) {
 			case 'fido':
-				return 'Security Key (FIDO2)';
+				return t('security.securityKeyFido');
 			case 'totp':
-				return 'Authenticator App (TOTP)';
+				return t('security.authenticatorAppTotp');
 			default:
-				return 'Unknown';
+				return t('common.unknown');
 		}
 	}
 
@@ -434,6 +435,10 @@
 				timezone: selectedTimezone,
 				language: selectedLanguage
 			});
+
+			// Switch UI locale to match saved preference
+			await i18n.setLocale(selectedLanguage);
+
 			await loadUserProfile();
 
 			regionalSettingsSaved = true;
@@ -441,7 +446,7 @@
 				regionalSettingsSaved = false;
 			}, 3000);
 		} catch (err) {
-			error = err.message || 'Failed to save regional settings';
+			error = err.message || t('dialogs.alerts.failedToSave', { error: 'regional settings' });
 		} finally {
 			savingRegionalSettings = false;
 		}
@@ -455,9 +460,9 @@
 			calendarFeedInfo = await getCalendarFeedToken();
 		} catch (err) {
 			if (err.message?.includes('disabled')) {
-				calendarFeedError = 'Calendar feeds are disabled by your administrator.';
+				calendarFeedError = t('users.calendarFeedsDisabled');
 			} else {
-				calendarFeedError = err.message || 'Failed to load calendar feed info';
+				calendarFeedError = err.message || t('dialogs.alerts.failedToLoad', { error: 'calendar feed info' });
 			}
 		} finally {
 			loadingCalendarFeed = false;
@@ -475,9 +480,9 @@
 			showFullFeedUrl = true;
 		} catch (err) {
 			if (err.message?.includes('disabled')) {
-				calendarFeedError = 'Calendar feeds are disabled by your administrator.';
+				calendarFeedError = t('users.calendarFeedsDisabled');
 			} else {
-				calendarFeedError = err.message || 'Failed to generate calendar feed';
+				calendarFeedError = err.message || t('dialogs.alerts.failedToCreate', { error: 'calendar feed' });
 			}
 		} finally {
 			generatingFeed = false;
@@ -485,7 +490,7 @@
 	}
 
 	async function revokeCalendarFeed() {
-		if (!confirm('Are you sure you want to revoke your calendar feed URL? Any calendars using this URL will stop syncing.')) {
+		if (!confirm(t('dialogs.confirmations.revokeCalendarFeed'))) {
 			return;
 		}
 
@@ -496,7 +501,7 @@
 			calendarFeedInfo = { has_token: false };
 			showFullFeedUrl = false;
 		} catch (err) {
-			calendarFeedError = err.message || 'Failed to revoke calendar feed';
+			calendarFeedError = err.message || t('dialogs.alerts.failedToDelete', { error: 'calendar feed' });
 		} finally {
 			revokingFeed = false;
 		}
@@ -553,51 +558,42 @@
 		{ value: 'Pacific/Auckland', label: 'Auckland (NZDT/NZST)' }
 	];
 
-	// Common languages (ISO 639-1 codes)
-	const commonLanguages = [
-		{ value: 'en', label: 'English' },
-		{ value: 'de', label: 'Deutsch (German)' },
-		{ value: 'es', label: 'Español (Spanish)' },
-		{ value: 'fr', label: 'Français (French)' },
-		{ value: 'it', label: 'Italiano (Italian)' },
-		{ value: 'pt', label: 'Português (Portuguese)' },
-		{ value: 'nl', label: 'Nederlands (Dutch)' },
-		{ value: 'pl', label: 'Polski (Polish)' },
-		{ value: 'ru', label: 'Русский (Russian)' },
-		{ value: 'ja', label: '日本語 (Japanese)' },
-		{ value: 'zh', label: '中文 (Chinese)' },
-		{ value: 'ko', label: '한국어 (Korean)' },
-		{ value: 'ar', label: 'العربية (Arabic)' },
-		{ value: 'hi', label: 'हिन्दी (Hindi)' }
-	];
+	// Languages - only show those with UI translations
+	const commonLanguages = SUPPORTED_LOCALES.map(loc => ({
+		value: loc.code,
+		label: loc.code === 'en' ? 'English' :
+		       loc.code === 'de' ? 'Deutsch (German)' :
+		       loc.code === 'es' ? 'Español (Spanish)' :
+		       loc.code === 'ar' ? 'العربية (Arabic)' : loc.name
+	}));
 </script>
 
 <div class="max-w-4xl mx-auto px-6 py-8 space-y-6">
 	<!-- Page Header -->
 	<PageHeader
 		icon={User}
-		title="Profile"
-		subtitle="Manage your profile information, avatar, and regional settings"
+		title={t('users.profile')}
+		subtitle={t('users.profileSubtitle')}
 	/>
 
 	<!-- Profile Information -->
 	<div class="bg-white shadow rounded p-6" style="background-color: var(--ds-surface-raised);">
-		<h2 class="text-lg font-medium mb-4" style="color: var(--ds-text);">Profile Information</h2>
+		<h2 class="text-lg font-medium mb-4" style="color: var(--ds-text);">{t('users.profileInformation')}</h2>
 		{#if user}
 			<div class="grid grid-cols-2 gap-4">
 				<div>
-					<span class="block text-sm font-medium text-gray-700">Full Name</span>
+					<span class="block text-sm font-medium text-gray-700">{t('users.fullName')}</span>
 					<p class="mt-1 text-sm text-gray-900">{user.full_name}</p>
 				</div>
 				<div>
-					<span class="block text-sm font-medium text-gray-700">Email</span>
+					<span class="block text-sm font-medium text-gray-700">{t('common.email')}</span>
 					<p class="mt-1 text-sm text-gray-900">{user.email}</p>
 				</div>
 				{#if user.requires_password_reset}
 					<div>
-						<span class="block text-sm font-medium text-gray-700">Status</span>
+						<span class="block text-sm font-medium text-gray-700">{t('common.status')}</span>
 						<span class="mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-							Password Reset Required
+							{t('users.passwordResetRequired')}
 						</span>
 					</div>
 				{/if}
@@ -630,9 +626,9 @@
 				<div>
 					<h2 class="text-lg font-medium flex items-center gap-2" style="color: var(--ds-text);">
 						<Camera class="h-5 w-5" style="color: var(--ds-text-subtle);" />
-						Profile Picture
+						{t('users.profilePicture')}
 					</h2>
-					<p class="text-sm" style="color: var(--ds-text-subtle);">Upload and manage your avatar image</p>
+					<p class="text-sm" style="color: var(--ds-text-subtle);">{t('users.uploadAndManageAvatar')}</p>
 				</div>
 				<div class="flex items-center gap-2">
 					{#if user?.avatar_url}
@@ -642,7 +638,7 @@
 							icon={Trash2}
 							size="medium"
 						>
-							Remove
+							{t('common.remove')}
 						</Button>
 					{/if}
 					<Button
@@ -651,7 +647,7 @@
 						icon={Upload}
 						size="medium"
 					>
-						{user?.avatar_url ? 'Change Avatar' : 'Upload Avatar'}
+						{user?.avatar_url ? t('users.changeAvatar') : t('users.uploadAvatar')}
 					</Button>
 				</div>
 			</div>
@@ -668,12 +664,12 @@
 					{/if}
 				</div>
 				<div>
-					<h3 class="font-medium text-gray-900">Current Profile Picture</h3>
+					<h3 class="font-medium text-gray-900">{t('users.currentProfilePicture')}</h3>
 					<p class="text-sm text-gray-600 mt-1">
-						{user?.avatar_url ? 'Your custom avatar is active' : 'Using default avatar'}
+						{user?.avatar_url ? t('users.customAvatarActive') : t('users.usingDefaultAvatar')}
 					</p>
 					<p class="text-xs text-gray-500 mt-1">
-						Recommended: Square image, at least 200x200 pixels
+						{t('users.avatarRecommendation')}
 					</p>
 				</div>
 			</div>
@@ -681,8 +677,8 @@
 			<!-- Avatar Upload Interface -->
 			{#if showAvatarUpload}
 				<div class="bg-gray-50 border border-gray-200 rounded p-4">
-					<h3 class="text-sm font-medium text-gray-900 mb-3">Upload New Avatar</h3>
-					
+					<h3 class="text-sm font-medium text-gray-900 mb-3">{t('users.uploadNewAvatar')}</h3>
+
 					<div class="mb-4">
 						<input
 							type="file"
@@ -692,7 +688,7 @@
 							class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
 						/>
 						<p class="text-xs text-gray-500 mt-2">
-							Select an image file (JPEG, PNG, GIF, WebP). Maximum 50MB.
+							{t('users.avatarFileHint')}
 						</p>
 					</div>
 
@@ -700,11 +696,11 @@
 						<div class="mb-4">
 							<div class="flex items-center gap-2 text-sm text-gray-600">
 								<Spinner size="sm" />
-								Uploading avatar...
+								{t('users.uploadingAvatar')}
 							</div>
 						</div>
 					{/if}
-					
+
 					<div class="flex justify-end gap-2">
 						<Button
 							variant="default"
@@ -712,7 +708,7 @@
 							size="small"
 							disabled={uploadingAvatar}
 						>
-							Cancel
+							{t('common.cancel')}
 						</Button>
 					</div>
 				</div>
@@ -724,45 +720,45 @@
 			<div class="mb-6">
 				<h2 class="text-lg font-medium flex items-center gap-2" style="color: var(--ds-text);">
 					<Globe class="h-5 w-5" style="color: var(--ds-text-subtle);" />
-					Regional Settings
+					{t('users.regionalSettings')}
 				</h2>
-				<p class="text-sm" style="color: var(--ds-text-subtle);">Configure your timezone and language preferences</p>
+				<p class="text-sm" style="color: var(--ds-text-subtle);">{t('users.regionalSettingsDesc')}</p>
 			</div>
 
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 			<!-- Timezone Selection -->
 			<div>
 				<label for="timezone" class="block text-sm font-medium text-gray-700 mb-2">
-					Timezone
+					{t('users.timezone')}
 				</label>
 				<BasePicker
 					bind:value={selectedTimezone}
 					items={commonTimezones}
-					placeholder="Select timezone"
+					placeholder={t('users.timezone')}
 					disabled={!user || savingRegionalSettings}
 					getValue={(item) => item.value}
 					getLabel={(item) => item.label}
 				/>
 				<p class="text-xs text-gray-500 mt-2">
-					Used for displaying dates and times in your local timezone
+					{t('users.timezoneHint')}
 				</p>
 			</div>
 
 			<!-- Language Selection -->
 			<div>
 				<label for="language" class="block text-sm font-medium text-gray-700 mb-2">
-					Language
+					{t('users.language')}
 				</label>
 				<BasePicker
 					bind:value={selectedLanguage}
 					items={commonLanguages}
-					placeholder="Select language"
+					placeholder={t('users.language')}
 					disabled={!user || savingRegionalSettings}
 					getValue={(item) => item.value}
 					getLabel={(item) => item.label}
 				/>
 				<p class="text-xs text-gray-500 mt-2">
-					Your preferred language for the application interface
+					{t('users.languageHint')}
 				</p>
 			</div>
 		</div>
@@ -775,11 +771,11 @@
 				disabled={!user || savingRegionalSettings}
 				size="medium"
 			>
-				{savingRegionalSettings ? 'Saving...' : 'Save Settings'}
+				{savingRegionalSettings ? t('common.saving') : t('users.saveSettings')}
 			</Button>
 
 			{#if regionalSettingsSaved}
-				<AlertBox variant="success" message="Settings saved successfully" />
+				<AlertBox variant="success" message={t('users.settingsSaved')} />
 			{/if}
 		</div>
 		{/if}
@@ -789,10 +785,10 @@
 			<div class="mb-6">
 				<h2 class="text-lg font-medium flex items-center gap-2" style="color: var(--ds-text);">
 					<GitBranch class="h-5 w-5" style="color: var(--ds-text-subtle);" />
-					Connected Accounts
+					{t('users.connectedAccounts')}
 				</h2>
 				<p class="text-sm" style="color: var(--ds-text-subtle);">
-					Connect your source control accounts to create branches and pull requests
+					{t('users.connectedAccountsDesc')}
 				</p>
 			</div>
 
@@ -804,10 +800,10 @@
 			<div class="mb-6">
 				<h2 class="text-lg font-medium flex items-center gap-2" style="color: var(--ds-text);">
 					<CalendarDays class="h-5 w-5" style="color: var(--ds-text-subtle);" />
-					Calendar Integration
+					{t('users.calendarIntegration')}
 				</h2>
 				<p class="text-sm" style="color: var(--ds-text-subtle);">
-					Subscribe to your scheduled items in external calendar apps like Google Calendar, Outlook, or Apple Calendar
+					{t('users.calendarIntegrationDesc')}
 				</p>
 			</div>
 
@@ -823,7 +819,7 @@
 				<!-- Load feed info when tab becomes active -->
 				<div class="py-4">
 					<Button variant="default" onclick={loadCalendarFeedInfo}>
-						Load Calendar Feed Settings
+						{t('users.loadCalendarFeedSettings')}
 					</Button>
 				</div>
 			{:else if !calendarFeedInfo.has_token}
@@ -834,10 +830,9 @@
 							<Link2 class="w-6 h-6" style="color: var(--ds-icon);" />
 						</div>
 						<div class="flex-1">
-							<h3 class="text-base font-medium" style="color: var(--ds-text);">Enable Calendar Subscription</h3>
+							<h3 class="text-base font-medium" style="color: var(--ds-text);">{t('users.enableCalendarSubscription')}</h3>
 							<p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-								Generate a subscription URL to sync your scheduled work items with external calendar applications.
-								This creates a one-way feed that updates automatically.
+								{t('users.calendarSubscriptionDesc')}
 							</p>
 							<div class="mt-4">
 								<Button
@@ -846,7 +841,7 @@
 									disabled={generatingFeed}
 									icon={CalendarDays}
 								>
-									{generatingFeed ? 'Generating...' : 'Generate Calendar Feed URL'}
+									{generatingFeed ? t('common.generating') : t('users.generateCalendarFeedUrl')}
 								</Button>
 							</div>
 						</div>
@@ -858,7 +853,7 @@
 					<!-- Feed URL Display -->
 					<div class="border rounded-lg p-6" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
 						<div class="flex items-center justify-between mb-4">
-							<h3 class="text-base font-medium" style="color: var(--ds-text);">Your Calendar Feed URL</h3>
+							<h3 class="text-base font-medium" style="color: var(--ds-text);">{t('users.yourCalendarFeedUrl')}</h3>
 							<div class="flex items-center gap-2">
 								<button
 									class="text-sm px-2 py-1 rounded hover-bg"
@@ -867,10 +862,10 @@
 								>
 									{#if showFullFeedUrl}
 										<EyeOff class="w-4 h-4 inline mr-1" />
-										Hide
+										{t('common.hide')}
 									{:else}
 										<Eye class="w-4 h-4 inline mr-1" />
-										Show Full URL
+										{t('users.showFullUrl')}
 									{/if}
 								</button>
 							</div>
@@ -890,48 +885,48 @@
 								icon={Copy}
 								size="small"
 							>
-								{feedUrlCopied ? 'Copied!' : 'Copy'}
+								{feedUrlCopied ? t('toast.copied') : t('common.copy')}
 							</Button>
 						</div>
 
 						<p class="text-xs mt-3" style="color: var(--ds-text-subtle);">
-							Add this URL to your calendar app as a subscription/ICS feed. Do not share this URL as it provides access to your scheduled items.
+							{t('users.calendarFeedWarning')}
 						</p>
 
 						{#if calendarFeedInfo.feed?.last_accessed_at}
 							<p class="text-xs mt-2" style="color: var(--ds-text-subtle);">
-								Last synced: {formatDate(calendarFeedInfo.feed.last_accessed_at, { relative: true })}
+								{t('users.lastSynced')}: {formatDate(calendarFeedInfo.feed.last_accessed_at, { relative: true })}
 							</p>
 						{/if}
 					</div>
 
 					<!-- Instructions -->
 					<div class="border rounded-lg p-6" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-						<h3 class="text-base font-medium mb-4" style="color: var(--ds-text);">How to Subscribe</h3>
+						<h3 class="text-base font-medium mb-4" style="color: var(--ds-text);">{t('users.howToSubscribe')}</h3>
 						<div class="space-y-4 text-sm" style="color: var(--ds-text-subtle);">
 							<div class="flex items-start gap-3">
 								<span class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium" style="background-color: var(--ds-background-neutral); color: var(--ds-text);">1</span>
-								<p>Copy the feed URL above</p>
+								<p>{t('users.copyFeedUrlStep')}</p>
 							</div>
 							<div class="flex items-start gap-3">
 								<span class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium" style="background-color: var(--ds-background-neutral); color: var(--ds-text);">2</span>
 								<div>
-									<p class="font-medium" style="color: var(--ds-text);">Google Calendar</p>
-									<p>Settings &gt; Add calendar &gt; From URL &gt; Paste the URL</p>
+									<p class="font-medium" style="color: var(--ds-text);">{t('users.googleCalendar')}</p>
+									<p>{t('users.googleCalendarInstructions')}</p>
 								</div>
 							</div>
 							<div class="flex items-start gap-3">
 								<span class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium" style="background-color: var(--ds-background-neutral); color: var(--ds-text);">3</span>
 								<div>
-									<p class="font-medium" style="color: var(--ds-text);">Outlook</p>
-									<p>Add calendar &gt; Subscribe from web &gt; Paste the URL</p>
+									<p class="font-medium" style="color: var(--ds-text);">{t('users.outlook')}</p>
+									<p>{t('users.outlookInstructions')}</p>
 								</div>
 							</div>
 							<div class="flex items-start gap-3">
 								<span class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium" style="background-color: var(--ds-background-neutral); color: var(--ds-text);">4</span>
 								<div>
-									<p class="font-medium" style="color: var(--ds-text);">Apple Calendar</p>
-									<p>File &gt; New Calendar Subscription &gt; Paste the URL</p>
+									<p class="font-medium" style="color: var(--ds-text);">{t('users.appleCalendar')}</p>
+									<p>{t('users.appleCalendarInstructions')}</p>
 								</div>
 							</div>
 						</div>
@@ -945,7 +940,7 @@
 							disabled={generatingFeed}
 							icon={RefreshCw}
 						>
-							{generatingFeed ? 'Regenerating...' : 'Regenerate URL'}
+							{generatingFeed ? t('common.regenerating') : t('users.regenerateUrl')}
 						</Button>
 						<Button
 							variant="danger"
@@ -953,12 +948,12 @@
 							disabled={revokingFeed}
 							icon={Trash2}
 						>
-							{revokingFeed ? 'Revoking...' : 'Revoke Feed'}
+							{revokingFeed ? t('common.revoking') : t('users.revokeFeed')}
 						</Button>
 					</div>
 
 					<p class="text-xs" style="color: var(--ds-text-subtle);">
-						<strong>Note:</strong> Regenerating the URL will invalidate your current URL. Any calendars using the old URL will need to be updated.
+						<strong>{t('common.note')}:</strong> {t('users.regenerateUrlNote')}
 					</p>
 				</div>
 			{/if}

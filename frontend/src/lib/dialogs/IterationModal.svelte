@@ -7,6 +7,7 @@
   import Select from '../components/Select.svelte';
   import Textarea from '../components/Textarea.svelte';
   import Label from '../components/Label.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     iteration = null,
@@ -31,12 +32,12 @@
   let error = $state('');
   let saving = $state(false);
 
-  const statusOptions = [
-    { value: 'planned', label: 'Planned' },
-    { value: 'active', label: 'Active' },
-    { value: 'completed', label: 'Completed' },
-    { value: 'cancelled', label: 'Cancelled' }
-  ];
+  const statusOptions = $derived([
+    { value: 'planned', label: t('sprints.statusPlanned') },
+    { value: 'active', label: t('sprints.statusActive') },
+    { value: 'completed', label: t('sprints.statusCompleted') },
+    { value: 'cancelled', label: t('sprints.statusCancelled') }
+  ]);
 
   function handleCancel() {
     oncancel();
@@ -47,22 +48,22 @@
 
     // Validation
     if (!formData.name.trim()) {
-      error = 'Iteration name is required';
+      error = t('sprints.iterationNameRequired');
       return;
     }
 
     if (!formData.start_date) {
-      error = 'Start date is required';
+      error = t('sprints.startDateRequired');
       return;
     }
 
     if (!formData.end_date) {
-      error = 'End date is required';
+      error = t('sprints.endDateRequired');
       return;
     }
 
     if (new Date(formData.end_date) < new Date(formData.start_date)) {
-      error = 'End date must be after start date';
+      error = t('sprints.endDateMustBeAfterStart');
       return;
     }
 
@@ -78,7 +79,7 @@
       saving = true;
       onsave(dataToSave);
     } catch (err) {
-      error = err.message || 'Failed to save iteration';
+      error = err.message || t('sprints.failedToSaveIteration');
       saving = false;
     }
   }
@@ -106,7 +107,7 @@
   <!-- Modal header -->
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-      {iteration ? 'Edit Iteration' : 'Create Iteration'}
+      {iteration ? t('sprints.editIteration') : t('sprints.createIteration')}
     </h3>
   </div>
 
@@ -127,14 +128,14 @@
             {#if formData.is_global}
               <Globe class="w-5 h-5" style="color: var(--ds-interactive);" />
               <div>
-                <p class="font-medium text-sm" style="color: var(--ds-text);">Global Iteration</p>
-                <p class="text-xs" style="color: var(--ds-text-subtle);">Visible across all workspaces</p>
+                <p class="font-medium text-sm" style="color: var(--ds-text);">{t('sprints.globalIteration')}</p>
+                <p class="text-xs" style="color: var(--ds-text-subtle);">{t('sprints.globalIterationDescription')}</p>
               </div>
             {:else}
               <Building2 class="w-5 h-5" style="color: var(--ds-interactive);" />
               <div>
-                <p class="font-medium text-sm" style="color: var(--ds-text);">Local Iteration</p>
-                <p class="text-xs" style="color: var(--ds-text-subtle);">Only visible in this workspace</p>
+                <p class="font-medium text-sm" style="color: var(--ds-text);">{t('sprints.localIteration')}</p>
+                <p class="text-xs" style="color: var(--ds-text-subtle);">{t('sprints.localIterationDescription')}</p>
               </div>
             {/if}
           </div>
@@ -145,7 +146,7 @@
               style="border-color: var(--ds-border); color: var(--ds-interactive);"
               onclick={toggleScope}
             >
-              Switch to {formData.is_global ? 'Local' : 'Global'}
+              {t('sprints.switchTo', { scope: formData.is_global ? t('sprints.local') : t('sprints.global') })}
             </button>
           {/if}
         </div>
@@ -153,29 +154,29 @@
 
       <!-- Name -->
       <div>
-        <Label color="default" required class="mb-1.5">Name</Label>
+        <Label color="default" required class="mb-1.5">{t('common.name')}</Label>
         <Input
           bind:value={formData.name}
-          placeholder="e.g., Sprint 24, Q1 2025, Release 2.0"
+          placeholder={t('sprints.iterationNamePlaceholder')}
           required
         />
       </div>
 
       <!-- Description -->
       <div>
-        <Label color="default" class="mb-1.5">Description</Label>
+        <Label color="default" class="mb-1.5">{t('common.description')}</Label>
         <Textarea
           bind:value={formData.description}
-          placeholder="Optional description or goals for this iteration"
+          placeholder={t('sprints.iterationDescriptionPlaceholder')}
           rows={3}
         />
       </div>
 
       <!-- Type -->
       <div>
-        <Label color="default" class="mb-1.5"><Tag class="w-4 h-4 inline-block mr-1" />Type</Label>
+        <Label color="default" class="mb-1.5"><Tag class="w-4 h-4 inline-block mr-1" />{t('common.type')}</Label>
         <Select bind:value={formData.type_id}>
-          <option value={null}>No type</option>
+          <option value={null}>{t('sprints.noType')}</option>
           {#each iterationTypes as type}
             <option value={type.id}>{type.name}</option>
           {/each}
@@ -185,7 +186,7 @@
       <!-- Date Range -->
       <div class="grid grid-cols-2 gap-4">
         <div>
-          <Label color="default" required class="mb-1.5"><Calendar class="w-4 h-4 inline-block mr-1" />Start Date</Label>
+          <Label color="default" required class="mb-1.5"><Calendar class="w-4 h-4 inline-block mr-1" />{t('common.startDate')}</Label>
           <Input
             type="date"
             bind:value={formData.start_date}
@@ -193,7 +194,7 @@
           />
         </div>
         <div>
-          <Label color="default" required class="mb-1.5"><Calendar class="w-4 h-4 inline-block mr-1" />End Date</Label>
+          <Label color="default" required class="mb-1.5"><Calendar class="w-4 h-4 inline-block mr-1" />{t('common.endDate')}</Label>
           <Input
             type="date"
             bind:value={formData.end_date}
@@ -204,7 +205,7 @@
 
       <!-- Status -->
       <div>
-        <Label color="default" class="mb-1.5">Status</Label>
+        <Label color="default" class="mb-1.5">{t('common.status')}</Label>
         <Select bind:value={formData.status}>
           {#each statusOptions as status}
             <option value={status.value}>{status.label}</option>
@@ -217,7 +218,7 @@
     <DialogFooter
       onCancel={handleCancel}
       onConfirm={handleSave}
-      confirmLabel={iteration ? 'Update Iteration' : 'Create Iteration'}
+      confirmLabel={iteration ? t('sprints.updateIteration') : t('sprints.createIteration')}
       disabled={saving}
       loading={saving}
       showKeyboardHint={true}

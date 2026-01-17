@@ -3,6 +3,7 @@
   import { api } from '../api.js';
   import { formatDueDate, getDaysOverdue } from '../utils/dateFormatter.js';
   import WidgetState from './WidgetState.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let workspaceId = null;
   export let collectionFilter = null;
@@ -98,7 +99,7 @@
       console.error('Failed to load overdue items:', err);
       if (fetchId === activeFetchId) {
         overdueItems = [];
-        error = 'Unable to load overdue items';
+        error = t('widgets.overdueItems.loadError');
       }
     } finally {
       if (fetchId === activeFetchId) {
@@ -134,15 +135,15 @@
 
 <div class="overdue-items-widget">
   <div class="flex items-center justify-between mb-4 text-xs text-gray-500">
-    <span>{loading ? 'Loading overdue items…' : `${overdueItems.length} overdue item${overdueItems.length === 1 ? '' : 's'}`}</span>
+    <span>{loading ? t('widgets.overdueItems.loadingStatus') : t('widgets.overdueItems.itemCount', { count: overdueItems.length })}</span>
     <button
       class="flex items-center gap-1 text-gray-500 hover:text-red-600 transition-colors disabled:opacity-50"
       onclick={handleRefresh}
       disabled={loading || !workspaceId}
-      aria-label="Refresh overdue items"
+      aria-label={t('widgets.overdueItems.refreshAriaLabel')}
     >
       <RefreshCw class="h-3.5 w-3.5" />
-      Refresh
+      {t('common.refresh')}
     </button>
   </div>
 
@@ -150,10 +151,10 @@
     {loading}
     {error}
     isEmpty={overdueItems.length === 0}
-    loadingText="Loading overdue items..."
+    loadingText={t('widgets.overdueItems.loadingText')}
     emptyIcon={AlertCircle}
-    emptyTitle="No overdue items"
-    emptySubtitle="All caught up!"
+    emptyTitle={t('widgets.overdueItems.emptyTitle')}
+    emptySubtitle={t('widgets.overdueItems.emptySubtitle')}
     onRetry={handleRefresh}
   >
     {#snippet children()}
@@ -173,7 +174,7 @@
               </div>
             </div>
             {#if overdueDays > 0}
-              <span class="text-xs font-semibold text-red-600 whitespace-nowrap">{overdueDays}d overdue</span>
+              <span class="text-xs font-semibold text-red-600 whitespace-nowrap">{t('widgets.overdueItems.daysOverdue', { days: overdueDays })}</span>
             {/if}
           </div>
         {/each}

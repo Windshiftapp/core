@@ -2,6 +2,7 @@
   import { Menu, ArrowLeft, Palette, Edit3, Check, Sun, Moon, User, LogOut, List } from 'lucide-svelte';
   import { authStore } from '../stores';
   import { portalStore, gradients } from '../stores/portal.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   let hoveredMenuItem = $state(null);
 
@@ -24,7 +25,7 @@
     <button
       onclick={() => portalStore.showMainMenu = !portalStore.showMainMenu}
       class="w-10 h-10 rounded flex items-center justify-center text-white bg-white/10 backdrop-blur-sm hover:bg-white/20 transition-all shadow-lg border border-white/20"
-      title="Menu"
+      title={t('common.menu')}
     >
       <Menu class="w-5 h-5" />
     </button>
@@ -48,7 +49,7 @@
           class="w-full px-4 py-3 flex items-center gap-3 text-white transition-all hover:bg-white/20 text-left"
         >
           <ArrowLeft class="w-5 h-5" />
-          <span class="font-medium">Back to App</span>
+          <span class="font-medium">{t('portal.backToApp')}</span>
         </button>
 
         {#if authStore.isAuthenticated}
@@ -58,7 +59,7 @@
             class="w-full px-4 py-3 flex items-center gap-3 text-white transition-all hover:bg-white/20 text-left"
           >
             <Palette class="w-5 h-5" />
-            <span class="font-medium">Customize</span>
+            <span class="font-medium">{t('portal.customize')}</span>
           </button>
 
           <!-- Edit (only show when not editing) -->
@@ -68,7 +69,7 @@
               class="w-full px-4 py-3 flex items-center gap-3 text-white transition-all hover:bg-white/20 text-left"
             >
               <Edit3 class="w-5 h-5" />
-              <span class="font-medium">Edit</span>
+              <span class="font-medium">{t('common.edit')}</span>
             </button>
           {/if}
         {/if}
@@ -80,10 +81,10 @@
         >
           {#if portalStore.isDarkMode}
             <Sun class="w-5 h-5" />
-            <span class="font-medium">Light Mode</span>
+            <span class="font-medium">{t('portal.lightMode')}</span>
           {:else}
             <Moon class="w-5 h-5" />
-            <span class="font-medium">Dark Mode</span>
+            <span class="font-medium">{t('portal.darkMode')}</span>
           {/if}
         </button>
       </div>
@@ -151,7 +152,7 @@
               onclick={() => portalStore.toggleMyRequests()}
             >
               <List class="w-4 h-4" />
-              <span class="text-sm">{portalStore.showMyRequests ? 'Back to Portal' : 'My Requests'}</span>
+              <span class="text-sm">{portalStore.showMyRequests ? t('portal.backToPortal') : t('portal.myRequests')}</span>
             </button>
             <button
               class="w-full px-4 py-2 flex items-center gap-3 transition-colors text-left"
@@ -161,7 +162,7 @@
               onclick={handleLogout}
             >
               <LogOut class="w-4 h-4" />
-              <span class="text-sm">Sign Out</span>
+              <span class="text-sm">{t('portal.signOut')}</span>
             </button>
           </div>
         {:else}
@@ -172,8 +173,8 @@
                 <User class="w-5 h-5" style="color: var(--ds-text);" />
               </div>
               <div class="flex-1">
-                <div class="font-medium text-sm" style="color: var(--ds-text);">Guest User</div>
-                <div class="text-xs" style="color: var(--ds-text-subtle);">Not signed in</div>
+                <div class="font-medium text-sm" style="color: var(--ds-text);">{t('portal.guestUser')}</div>
+                <div class="text-xs" style="color: var(--ds-text-subtle);">{t('portal.notSignedIn')}</div>
               </div>
             </div>
           </div>
@@ -188,7 +189,7 @@
               onclick={handleLoginClick}
             >
               <User class="w-4 h-4" />
-              <span class="text-sm font-medium">Sign In</span>
+              <span class="text-sm font-medium">{t('portal.signIn')}</span>
             </button>
           </div>
         {/if}

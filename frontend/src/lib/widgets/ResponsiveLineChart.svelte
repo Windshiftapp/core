@@ -1,15 +1,16 @@
 <script>
   import { onMount } from 'svelte';
   import { timeFormat } from 'd3-time-format';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let chartData = [];
   export let color = '#10b981';
-  export let emptyMessage = 'No data available';
+  export let emptyMessage = t('widgets.chart.noDataAvailable');
   export let gradientPrefix = 'chart';
   export let minHeight = 110;
   export let maxHeight = 220;
   export let valueFormat = null; // Function to format tooltip value, e.g., (v) => `${v.toFixed(1)}%`
-  export let valueSuffix = 'items'; // Suffix for tooltip value (used if valueFormat is null)
+  export let valueSuffix = t('widgets.chart.items'); // Suffix for tooltip value (used if valueFormat is null)
   export let showYAxis = false; // Show Y-axis labels
   export let yAxisFormat = null; // Function to format Y-axis labels, e.g., (v) => `${v}%`
   export let minValue = null; // Optional minimum value for Y-axis (e.g., 0 for percentages)

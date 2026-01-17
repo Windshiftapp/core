@@ -3,12 +3,15 @@
   import { ChevronDown, X } from 'lucide-svelte';
   import SearchInput from '../components/SearchInput.svelte';
   import { api } from '../api.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
-  export let placeholder = 'Select field...';
+  export let placeholder = '';
   export let selectedField = null;
   export let disabled = false;
+
+  $: resolvedPlaceholder = placeholder || t('pickers.selectField');
 
   let isOpen = false;
   let searchQuery = '';
@@ -16,44 +19,44 @@
   let customFields = [];
   let dropdownElement;
 
-  // Standard fields grouped by category
-  const standardFields = [
+  // Standard fields grouped by category - using reactive to support i18n
+  $: standardFields = [
     {
-      category: 'Basic',
+      category: t('pickers.fieldCategories.basic'),
       fields: [
-        { id: 'title', name: 'Title', type: 'text', description: 'Item title' },
-        { id: 'description', name: 'Description', type: 'text', description: 'Item description' },
-        { id: 'key', name: 'Key', type: 'identifier', description: 'Item key (e.g., "WK-123")' },
-        { id: 'id', name: 'ID', type: 'identifier', description: 'Item ID' }
+        { id: 'title', name: t('pickers.fields.title'), type: 'text', description: t('pickers.fields.titleDesc') },
+        { id: 'description', name: t('pickers.fields.description'), type: 'text', description: t('pickers.fields.descriptionDesc') },
+        { id: 'key', name: t('pickers.fields.key'), type: 'identifier', description: t('pickers.fields.keyDesc') },
+        { id: 'id', name: t('pickers.fields.id'), type: 'identifier', description: t('pickers.fields.idDesc') }
       ]
     },
     {
-      category: 'Assignments',
+      category: t('pickers.fieldCategories.assignments'),
       fields: [
-        { id: 'assignee', name: 'Assignee', type: 'user', description: 'Assigned user ID' },
-        { id: 'creator', name: 'Creator', type: 'user', description: 'Creator user ID' }
+        { id: 'assignee', name: t('pickers.fields.assignee'), type: 'user', description: t('pickers.fields.assigneeDesc') },
+        { id: 'creator', name: t('pickers.fields.creator'), type: 'user', description: t('pickers.fields.creatorDesc') }
       ]
     },
     {
-      category: 'Projects & Milestones',
+      category: t('pickers.fieldCategories.projectsMilestones'),
       fields: [
-        { id: 'milestone', name: 'Milestone', type: 'enum', description: 'Associated milestone' },
-        { id: 'project', name: 'Project', type: 'enum', description: 'Associated project' },
-        { id: 'itemType', name: 'Item Type', type: 'enum', description: 'Work item type' }
+        { id: 'milestone', name: t('pickers.fields.milestone'), type: 'enum', description: t('pickers.fields.milestoneDesc') },
+        { id: 'project', name: t('pickers.fields.project'), type: 'enum', description: t('pickers.fields.projectDesc') },
+        { id: 'itemType', name: t('pickers.fields.itemType'), type: 'enum', description: t('pickers.fields.itemTypeDesc') }
       ]
     },
     {
-      category: 'Dates',
+      category: t('pickers.fieldCategories.dates'),
       fields: [
-        { id: 'created', name: 'Created Date', type: 'date', description: 'Creation date' },
-        { id: 'updated', name: 'Updated Date', type: 'date', description: 'Last update date' }
+        { id: 'created', name: t('pickers.fields.createdDate'), type: 'date', description: t('pickers.fields.createdDateDesc') },
+        { id: 'updated', name: t('pickers.fields.updatedDate'), type: 'date', description: t('pickers.fields.updatedDateDesc') }
       ]
     },
     {
-      category: 'Hierarchy',
+      category: t('pickers.fieldCategories.hierarchy'),
       fields: [
-        { id: 'parent', name: 'Parent ID', type: 'reference', description: 'Parent item ID' },
-        { id: 'isTask', name: 'Is Task', type: 'boolean', description: 'Is a task item' }
+        { id: 'parent', name: t('pickers.fields.parentId'), type: 'reference', description: t('pickers.fields.parentIdDesc') },
+        { id: 'isTask', name: t('pickers.fields.isTask'), type: 'boolean', description: t('pickers.fields.isTaskDesc') }
       ]
     },
   ];
@@ -70,7 +73,7 @@
         id: `cf_${field.name}`,
         name: field.name,
         type: field.field_type,
-        description: field.description || `Custom field: ${field.name}`,
+        description: field.description || t('pickers.customFieldDesc', { name: field.name }),
         isCustom: true,
         options: field.options ? JSON.parse(field.options) : null
       }));
@@ -104,7 +107,7 @@
     // Add custom fields as a separate category if any match
     if (filteredCustom.length > 0) {
       filteredFields.push({
-        category: 'Custom Fields',
+        category: t('pickers.customFields'),
         fields: filteredCustom
       });
     }
@@ -151,15 +154,16 @@
 
   function getFieldTypeLabel(type) {
     const labels = {
-      text: 'Text',
-      number: 'Number',
-      date: 'Date',
-      enum: 'Select',
-      boolean: 'Boolean',
-      user: 'User',
-      reference: 'Reference',
-      select: 'Select',
-      textarea: 'Text Area'
+      text: t('pickers.fieldTypes.text'),
+      number: t('pickers.fieldTypes.number'),
+      date: t('pickers.fieldTypes.date'),
+      enum: t('pickers.fieldTypes.select'),
+      boolean: t('pickers.fieldTypes.boolean'),
+      user: t('pickers.fieldTypes.user'),
+      reference: t('pickers.fieldTypes.reference'),
+      select: t('pickers.fieldTypes.select'),
+      textarea: t('pickers.fieldTypes.textArea'),
+      identifier: t('pickers.fieldTypes.identifier')
     };
     return labels[type] || type;
   }
@@ -203,7 +207,7 @@
           {getFieldTypeLabel(selectedField.type)}
         </span>
         {#if selectedField.isCustom}
-          <span class="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-800">Custom</span>
+          <span class="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-800">{t('pickers.custom')}</span>
         {/if}
       </div>
       <div class="flex items-center gap-1">
@@ -211,14 +215,14 @@
           type="button"
           onclick={(e) => { e.stopPropagation(); clearSelection(); }}
           class="p-1 hover:bg-gray-200 rounded transition-colors"
-          title="Clear selection"
+          title={t('pickers.clearSelection')}
         >
           <X class="w-4 h-4 text-gray-500" />
         </button>
         <ChevronDown class="w-4 h-4 text-gray-500" />
       </div>
     {:else}
-      <span class="text-gray-500">{placeholder}</span>
+      <span class="text-gray-500">{resolvedPlaceholder}</span>
       <ChevronDown class="w-4 h-4 text-gray-500" />
     {/if}
   </button>
@@ -230,7 +234,7 @@
       <div class="p-2 border-b border-gray-200">
         <SearchInput
           bind:value={searchQuery}
-          placeholder="Search fields..."
+          placeholder={t('pickers.searchFields')}
           size="small"
           on_input={handleSearchInput}
         />
@@ -240,7 +244,7 @@
       <div class="max-h-96 overflow-y-auto">
         {#if filteredFields.length === 0}
           <div class="p-4 text-center text-gray-500 text-sm">
-            No fields found matching "{searchQuery}"
+            {t('pickers.noFieldsFound', { query: searchQuery })}
           </div>
         {:else}
           {#each filteredFields as group}
@@ -265,7 +269,7 @@
                           {getFieldTypeLabel(field.type)}
                         </span>
                         {#if field.isCustom}
-                          <span class="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-800">Custom</span>
+                          <span class="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-800">{t('pickers.custom')}</span>
                         {/if}
                       </div>
                       {#if field.description}

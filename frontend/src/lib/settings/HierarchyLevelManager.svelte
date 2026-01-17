@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
+  import { t } from '../stores/i18n.svelte.js';
   import { Plus, Edit, Trash2, Move, ChevronUp, ChevronDown, Circle, MoreHorizontal, Network } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';
@@ -79,7 +80,7 @@
     event.preventDefault();
     try {
       if (!formData.name.trim()) {
-        error = 'Hierarchy level name is required';
+        error = t('settings.hierarchyLevels.nameRequired');
         return;
       }
 
@@ -99,10 +100,10 @@
 
   async function deleteHierarchyLevel(id, name) {
     const confirmed = await confirm({
-      title: 'Delete Hierarchy Level',
-      message: `Are you sure you want to delete "${name}"? This action cannot be undone.`,
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
+      title: t('common.delete'),
+      message: `${t('settings.hierarchyLevels.confirmDelete')} "${name}"?`,
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
       variant: 'danger',
       icon: Trash2
     });
@@ -159,25 +160,25 @@
   }
 
   // Column definitions for DataTable
-  const hierarchyColumns = [
+  const hierarchyColumns = $derived([
     {
       key: 'level',
-      label: 'Level',
+      label: t('settings.hierarchyLevels.level'),
       width: '60px'
     },
     {
       key: 'name',
-      label: 'Name'
+      label: t('settings.hierarchyLevels.name')
     },
     {
       key: 'description',
-      label: 'Description'
+      label: t('settings.hierarchyLevels.description')
     },
     {
       key: 'actions',
-      label: 'Actions'
+      label: t('common.actions')
     }
-  ];
+  ]);
 
   function buildHierarchyDropdownItems(hierarchyLevel) {
     return [
@@ -185,7 +186,7 @@
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: () => startEdit(hierarchyLevel)
       },
@@ -193,7 +194,7 @@
         id: 'move-up',
         type: 'regular',
         icon: ChevronUp,
-        title: 'Move Up',
+        title: t('common.moveUp'),
         hoverClass: 'hover-bg',
         disabled: hierarchyLevel.level === 0,
         onClick: () => moveLevel(hierarchyLevel.id, 'up')
@@ -202,7 +203,7 @@
         id: 'move-down',
         type: 'regular',
         icon: ChevronDown,
-        title: 'Move Down',
+        title: t('common.moveDown'),
         hoverClass: 'hover-bg',
         onClick: () => moveLevel(hierarchyLevel.id, 'down')
       },
@@ -210,7 +211,7 @@
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50',
         onClick: () => deleteHierarchyLevel(hierarchyLevel.id, hierarchyLevel.name)
@@ -223,8 +224,8 @@
 
 <PageHeader
   icon={Network}
-  title="Hierarchy Levels"
-  subtitle="Configure the hierarchy levels for work items. These levels apply globally across all workspaces."
+  title={t('settings.hierarchyLevels.title')}
+  subtitle={t('settings.hierarchyLevels.subtitle')}
 >
   {#snippet actions()}
     <Button
@@ -234,7 +235,7 @@
       disabled={isLoading}
       keyboardHint="A"
     >
-      Add Level
+      {t('settings.hierarchyLevels.addHierarchyLevel')}
     </Button>
   {/snippet}
 </PageHeader>
@@ -258,7 +259,7 @@
   <!-- Modal header -->
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-      {editingId ? 'Edit Hierarchy Level' : 'Create Hierarchy Level'}
+      {editingId ? t('common.edit') : t('common.create')} {t('settings.hierarchyLevels.level')}
     </h3>
   </div>
 
@@ -266,7 +267,7 @@
   <div class="px-6 py-4">
     <form onsubmit={saveHierarchyLevel}>
       <div class="form-group">
-        <label for="level">Level</label>
+        <label for="level">{t('settings.hierarchyLevels.level')}</label>
         <input
           type="number"
           id="level"
@@ -279,7 +280,7 @@
       </div>
 
       <div class="form-group">
-        <label for="name">Name</label>
+        <label for="name">{t('settings.hierarchyLevels.name')}</label>
         <input
           type="text"
           id="name"
@@ -290,7 +291,7 @@
       </div>
 
       <div class="form-group">
-        <label for="description">Description</label>
+        <label for="description">{t('settings.hierarchyLevels.description')}</label>
         <Textarea
           id="description"
           placeholder="Brief description of this hierarchy level"
@@ -305,7 +306,7 @@
   <DialogFooter
     onCancel={cancelEdit}
     onConfirm={saveHierarchyLevel}
-    confirmLabel={editingId ? 'Update Level' : 'Create Level'}
+    confirmLabel={editingId ? t('common.update') : t('common.create')}
     showKeyboardHint={true}
     confirmKeyboardHint={submitHint}
   />

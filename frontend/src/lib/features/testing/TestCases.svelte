@@ -18,6 +18,7 @@
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { createShortcutHandler, getShortcutDisplay, matchesShortcut, isTypingInField } from '../../utils/keyboardShortcuts.js';
   import { currentRoute, navigate } from '../../router.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let { workspaceId = null } = $props();
 
@@ -71,19 +72,19 @@
   });
 
   // Priority options for test cases
-  const priorityOptions = [
-    { value: 'low', label: 'Low', color: '#6B7280' },
-    { value: 'medium', label: 'Medium', color: '#3B82F6' },
-    { value: 'high', label: 'High', color: '#F59E0B' },
-    { value: 'critical', label: 'Critical', color: '#EF4444' }
-  ];
+  const priorityOptions = $derived([
+    { value: 'low', label: t('testing.priorityLow'), color: '#6B7280' },
+    { value: 'medium', label: t('testing.priorityMedium'), color: '#3B82F6' },
+    { value: 'high', label: t('testing.priorityHigh'), color: '#F59E0B' },
+    { value: 'critical', label: t('testing.priorityCritical'), color: '#EF4444' }
+  ]);
 
   // Status options for test cases
-  const statusOptions = [
-    { value: 'active', label: 'Active' },
-    { value: 'inactive', label: 'Inactive' },
-    { value: 'draft', label: 'Draft' }
-  ];
+  const statusOptions = $derived([
+    { value: 'active', label: t('common.active') },
+    { value: 'inactive', label: t('common.inactive') },
+    { value: 'draft', label: t('testing.draft') }
+  ]);
 
   // Helper to get priority color
   function getPriorityColor(priority) {
@@ -477,20 +478,20 @@
       {
         id: 'labels',
         icon: Tags,
-        title: 'Labels',
+        title: t('common.labels'),
         onClick: () => openLabelsModal(testCase)
       },
       {
         id: 'edit',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         onClick: () => showEditCaseForm(testCase)
       },
       { type: 'divider' },
       {
         id: 'delete',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: '#dc2626',
         onClick: () => deleteTestCase(testCase.id)
       }
@@ -679,10 +680,10 @@
       return a.name.localeCompare(b.name);
     }));
   const folderSubtitle = $derived.by(() => selectedFolder === null
-    ? 'Showing test cases with no folder assignment'
+    ? t('testing.showingNoFolderCases')
     : selectedFolder
-      ? `Showing test cases in folder "${getFolderPath(selectedFolder, $testFolders) || 'Selected folder'}"`
-      : 'Showing all test cases');
+      ? t('testing.showingFolderCases', { folder: getFolderPath(selectedFolder, $testFolders) || t('testing.selectedFolder') })
+      : t('testing.showingAllCases'));
   $effect(() => {
     if ($currentRoute.path && $currentRoute.path.includes('/tests')) {
       const folderFromRoute = getFolderIdFromRoute($currentRoute);
@@ -785,7 +786,7 @@
 
 <div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface-raised);">
   <PageHeader
-    title="Test Cases"
+    title={t('testing.testCases')}
     subtitle={folderSubtitle}
   >
     {#snippet actions()}
@@ -793,7 +794,7 @@
         <div class="w-48">
           <LabelCombobox
             bind:value={selectedLabelFilterId}
-            placeholder="All labels"
+            placeholder={t('testing.allLabels')}
             {workspaceId}
           />
         </div>
@@ -804,7 +805,7 @@
           size="medium"
           keyboardHint={getShortcutDisplay('testCases', 'addTestCase')}
         >
-          Add Test Case
+          {t('testing.addTestCase')}
         </Button>
       </div>
     {/snippet}
@@ -825,7 +826,7 @@
             use:makeDropTarget={{ folderId: null }}
           >
             <Folder size="16" class="mr-2 flex-shrink-0" />
-            <span class="flex-1 text-left">No Folder</span>
+            <span class="flex-1 text-left">{t('testing.noFolder')}</span>
             <span class="text-xs min-w-[20px] text-right" style="color: var(--ds-text-subtle);">
               {noFolderCount}
             </span>
@@ -849,7 +850,7 @@
                   type="button"
                   class="mr-1 inline-flex h-5 w-5 items-center justify-center cursor-pointer bg-transparent border-0 p-0"
                   style="color: var(--ds-icon-subtle);"
-                  aria-label={isFolderCollapsed(folder.id) ? 'Expand folder' : 'Collapse folder'}
+                  aria-label={isFolderCollapsed(folder.id) ? t('testing.expandFolder') : t('testing.collapseFolder')}
                   onclick={(e) => { e.stopPropagation(); toggleFolderCollapse(folder.id); }}
                 >
                   {#if isFolderCollapsed(folder.id)}
@@ -915,7 +916,7 @@
             style="color: var(--ds-text-subtle);"
           >
             <Plus size="16" class="mr-2 flex-shrink-0" />
-            <span class="flex-1 text-left">Add folder</span>
+            <span class="flex-1 text-left">{t('testing.addFolder')}</span>
             <kbd class="ml-auto px-1.5 py-0.5 text-xs rounded border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border-bold); color: var(--ds-text-subtle);">
               {getShortcutDisplay('testCases', 'addFolder')}
             </kbd>
@@ -930,9 +931,9 @@
       <thead style="border-bottom: 1px solid var(--ds-border);">
             <tr>
               <th class="px-2 py-3 w-10"></th>
-              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--ds-text-subtle);">Title</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--ds-text-subtle);">Labels</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide" style="color: var(--ds-text-subtle);">Actions</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('common.title')}</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('common.labels')}</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -961,7 +962,7 @@
                     <!-- Status badge for draft -->
                     {#if testCase.status === 'draft'}
                       <span class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
-                        Draft
+                        {t('testing.draft')}
                       </span>
                     {/if}
                     <span class={testCase.status === 'inactive' ? 'line-through' : ''}>{testCase.title}</span>
@@ -974,7 +975,7 @@
                   </div>
                   {#if testCase.preconditions}
                     <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-                      Preconditions: {testCase.preconditions}
+                      {t('testing.preconditions')}: {testCase.preconditions}
                     </div>
                   {/if}
                 </td>
@@ -982,7 +983,7 @@
                   <div class="flex flex-wrap gap-1">
                     {#if testCase.labels && testCase.labels.length > 0}
                       {#each testCase.labels as label}
-                        <span 
+                        <span
                           class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full text-white"
                           style="background-color: {label.color};"
                         >
@@ -990,7 +991,7 @@
                         </span>
                       {/each}
                     {:else}
-                      <span class="text-xs" style="color: var(--ds-text-subtle);">No labels</span>
+                      <span class="text-xs" style="color: var(--ds-text-subtle);">{t('testing.noLabels')}</span>
                     {/if}
                   </div>
                 </td>
@@ -1003,7 +1004,7 @@
                       onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
                       onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral)'}
                     >
-                      Steps
+                      {t('testing.steps')}
                       <kbd class="px-1 py-0.5 text-[10px] rounded" style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border); color: var(--ds-text-subtle);">
                         {stepsShortcutMode && index < 9 ? index + 1 : 'S'}
                       </kbd>
@@ -1025,10 +1026,10 @@
                 <td colspan="4">
                   <EmptyState
                     icon={FileCheck}
-                    title="No test cases found"
+                    title={t('testing.noTestCasesFound')}
                     description={selectedLabelFilterId
-                      ? "No test cases found with the selected label filter."
-                      : "Click 'Add Test Case' to create your first test case in this folder."}
+                      ? t('testing.noTestCasesWithLabel')
+                      : t('testing.createFirstTestCase')}
                   />
                 </td>
               </tr>
@@ -1043,23 +1044,23 @@
 {#if stepsShortcutMode}
   <div class="fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg shadow-lg z-50"
        style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);">
-    <span style="color: var(--ds-text);">Press <kbd class="px-1.5 py-0.5 mx-1 text-xs rounded" style="background-color: var(--ds-background-neutral); border: 1px solid var(--ds-border);">1-9</kbd> to open steps</span>
+    <span style="color: var(--ds-text);">{t('testing.pressToOpenSteps')}</span>
   </div>
 {/if}
 
 <!-- Folder Form Modal -->
-<Modal 
-  isOpen={showFolderForm} 
+<Modal
+  isOpen={showFolderForm}
   on:close={() => showFolderForm = false}
   maxWidth="max-w-md"
 >
   <div class="p-6">
     <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">
-      {editingFolder ? 'Edit' : 'Add'} Folder
+      {editingFolder ? t('testing.editFolder') : t('testing.addFolder')}
     </h3>
     <form onsubmit={(e) => { e.preventDefault(); handleFolderSubmit(); }}>
       <div class="mb-4">
-        <Label color="default" class="mb-2">Name</Label>
+        <Label color="default" class="mb-2">{t('common.name')}</Label>
         <Input
           bind:value={folderFormData.name}
           required
@@ -1067,9 +1068,9 @@
         />
       </div>
       <div class="mb-4">
-        <Label color="default" class="mb-2">Parent folder (optional)</Label>
+        <Label color="default" class="mb-2">{t('testing.parentFolderOptional')}</Label>
         <Select bind:value={folderFormData.parent_id} size="small">
-          <option value="">Top-level folder</option>
+          <option value="">{t('testing.topLevelFolder')}</option>
           {#each rootFolderOptions as option}
             <option value={option.id} disabled={editingFolder && option.id === editingFolder.id}>
               {option.name}
@@ -1077,11 +1078,11 @@
           {/each}
         </Select>
         <p class="mt-1 text-xs" style="color: var(--ds-text-subtle);">
-          Subfolders can only be nested one level deep.
+          {t('testing.subfoldersNestingNote')}
         </p>
       </div>
       <div class="mb-6">
-        <Label color="default" class="mb-2">Description</Label>
+        <Label color="default" class="mb-2">{t('common.description')}</Label>
         <Textarea
           bind:value={folderFormData.description}
           rows={3}
@@ -1095,7 +1096,7 @@
           variant="default"
           keyboardHint={getShortcutDisplay('testCases', 'cancelForm')}
         >
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button
           type="submit"
@@ -1103,7 +1104,7 @@
           size="medium"
           keyboardHint={getShortcutDisplay('testCases', 'submitForm')}
         >
-          Save
+          {t('common.save')}
         </Button>
       </div>
     </form>
@@ -1119,11 +1120,11 @@
 >
   <div class="p-6">
     <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">
-      {editingCase ? 'Edit' : 'Add'} Test Case
+      {editingCase ? t('testing.editTestCase') : t('testing.addTestCase')}
     </h3>
     <form onsubmit={(e) => { e.preventDefault(); handleCaseSubmit(); }}>
       <div class="mb-4">
-        <Label color="default" class="mb-2">Title</Label>
+        <Label color="default" class="mb-2">{t('common.title')}</Label>
         <Input
           bind:value={caseFormData.title}
           required
@@ -1134,7 +1135,7 @@
       <!-- Priority, Status, and Duration row -->
       <div class="grid grid-cols-3 gap-4 mb-4">
         <div>
-          <Label color="default" class="mb-2">Priority</Label>
+          <Label color="default" class="mb-2">{t('common.priority')}</Label>
           <Select bind:value={caseFormData.priority} size="small">
             {#each priorityOptions as option}
               <option value={option.value}>{option.label}</option>
@@ -1142,7 +1143,7 @@
           </Select>
         </div>
         <div>
-          <Label color="default" class="mb-2">Status</Label>
+          <Label color="default" class="mb-2">{t('common.status')}</Label>
           <Select bind:value={caseFormData.status} size="small">
             {#each statusOptions as option}
               <option value={option.value}>{option.label}</option>
@@ -1150,7 +1151,7 @@
           </Select>
         </div>
         <div>
-          <Label color="default" class="mb-2">Estimated Duration</Label>
+          <Label color="default" class="mb-2">{t('testing.estimatedDuration')}</Label>
           <div class="flex items-center gap-2">
             <Input
               type="number"
@@ -1174,11 +1175,11 @@
       </div>
 
       <div class="mb-6">
-        <Label color="default" class="mb-2">Preconditions</Label>
+        <Label color="default" class="mb-2">{t('testing.preconditions')}</Label>
         <Textarea
           bind:value={caseFormData.preconditions}
           rows={3}
-          placeholder="Describe the conditions that must be met before running this test case..."
+          placeholder={t('testing.preconditionsPlaceholder')}
           size="small"
         />
       </div>
@@ -1187,7 +1188,7 @@
       {#if !editingCase}
         <div class="mb-6">
           <p class="text-sm" style="color: var(--ds-text-subtle);">
-            After creating this test case, you can add individual test steps with specific actions, data, and expected results for precise test execution.
+            {t('testing.testCaseStepsInfo')}
           </p>
         </div>
       {/if}
@@ -1198,14 +1199,14 @@
           onclick={() => showCaseForm = false}
           keyboardHint="Esc"
         >
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button
           type="submit"
           variant="primary"
           keyboardHint="↵"
         >
-          {editingCase ? 'Save' : 'Create'}
+          {editingCase ? t('common.save') : t('common.create')}
         </Button>
       </div>
     </form>
@@ -1216,10 +1217,10 @@
 <!-- Delete Test Case Confirmation Dialog -->
 <ConfirmDialog
   bind:show={showDeleteTestCaseConfirmation}
-  title="Delete Test Case"
-  message="Are you sure you want to delete this test case? This action cannot be undone."
-  confirmText="Delete Test Case"
-  cancelText="Cancel"
+  title={t('testing.deleteTestCase')}
+  message={t('testing.deleteTestCaseConfirm')}
+  confirmText={t('testing.deleteTestCase')}
+  cancelText={t('common.cancel')}
   variant="danger"
   on:confirm={confirmDeleteTestCase}
   on:cancel={() => {
@@ -1231,10 +1232,10 @@
 <!-- Delete Folder Confirmation Dialog -->
 <ConfirmDialog
   bind:show={showDeleteFolderConfirmation}
-  title="Delete Folder"
-  message="Are you sure you want to delete this folder? This action cannot be undone."
-  confirmText="Delete Folder"
-  cancelText="Cancel"
+  title={t('testing.deleteFolder')}
+  message={t('testing.deleteFolderConfirm')}
+  confirmText={t('testing.deleteFolder')}
+  cancelText={t('common.cancel')}
   variant="danger"
   on:confirm={confirmDeleteFolder}
   on:cancel={() => {
@@ -1254,16 +1255,16 @@
     <div class="flex items-center justify-between p-6 border-b shrink-0" style="border-color: var(--ds-border);">
       <div>
         <h3 class="text-xl font-semibold" style="color: var(--ds-text);">
-          Manage Labels: {selectedTestCase?.title}
+          {t('testing.manageLabels')}: {selectedTestCase?.title}
         </h3>
         <div class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-          Click labels to assign/remove them from this test case
+          {t('testing.clickLabelsToAssign')}
         </div>
       </div>
       <button
         onclick={closeLabelsModal}
         class="p-2 hover:bg-[var(--ds-background-neutral-hovered)] rounded-full transition-colors"
-        aria-label="Close labels modal"
+        aria-label={t('testing.closeLabelsModal')}
       >
         <X class="w-6 h-6" style="color: var(--ds-text-subtle);" />
       </button>
@@ -1275,15 +1276,15 @@
           <!-- Search and create new label -->
           <div class="mb-6 space-y-2">
             <Label class="block text-xs font-medium" color="subtle">
-              Search existing labels
+              {t('testing.searchExistingLabels')}
             </Label>
             <Input
-              placeholder="Search labels..."
+              placeholder={t('testing.searchLabelsPlaceholder')}
               bind:value={labelSearchQuery}
               size="small"
             />
             <div class="flex items-center justify-between pt-2 text-sm" style="color: var(--ds-text-subtle);">
-              <span>Can't find what you need?</span>
+              <span>{t('testing.cantFindLabel')}</span>
               <Button
                 variant="ghost"
                 onclick={showCreateLabelFormModal}
@@ -1291,7 +1292,7 @@
                 size="small"
                 style="color: var(--ds-interactive);"
               >
-                New Label
+                {t('testing.newLabel')}
               </Button>
             </div>
           </div>
@@ -1299,27 +1300,27 @@
           <!-- Create New Label Form -->
           {#if showCreateLabelForm}
             <div class="bg-gray-50 rounded p-4 border" style="background-color: var(--ds-background-neutral); border-color: var(--ds-border);">
-              <h4 class="font-medium mb-3" style="color: var(--ds-text);">Create New Label</h4>
+              <h4 class="font-medium mb-3" style="color: var(--ds-text);">{t('testing.createNewLabel')}</h4>
               <form onsubmit={(e) => { e.preventDefault(); handleCreateLabel(); }} class="space-y-3">
                 <div>
-                  <Label class="block text-xs font-medium mb-1">Name</Label>
+                  <Label class="block text-xs font-medium mb-1">{t('common.name')}</Label>
                   <Input
                     bind:value={newLabelData.name}
                     required
-                    placeholder="Enter label name..."
+                    placeholder={t('testing.enterLabelName')}
                     size="small"
                   />
                 </div>
                 <div class="flex gap-3">
                   <div class="flex-1">
-                    <Label class="block text-xs font-medium mb-1">Color</Label>
+                    <Label class="block text-xs font-medium mb-1">{t('common.color')}</Label>
                     <div class="flex items-center gap-3">
                       <!-- Color Preview Circle -->
                       <div
                         class="w-8 h-8 rounded-full border-2 flex-shrink-0"
                         style="background-color: {newLabelData.color}; border-color: var(--ds-border-bold);"
                       ></div>
-                      
+
                       <!-- Color Palette -->
                       <div class="flex flex-wrap gap-1.5">
                         {#each ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#6B7280', '#DC2626', '#F97316', '#059669', '#0EA5E9', '#7C3AED', '#DB2777', '#4B5563'] as color}
@@ -1328,10 +1329,10 @@
                             onclick={() => newLabelData.color = color}
                             class="w-6 h-6 rounded-full border-2 transition-all hover:scale-110 {newLabelData.color === color ? 'ring-2' : ''}"
                             style="background-color: {color}; border-color: {newLabelData.color === color ? 'var(--ds-border-bold)' : 'var(--ds-border)'}; {newLabelData.color === color ? '--tw-ring-color: var(--ds-border);' : ''}"
-                            aria-label="Select color {color}"
+                            aria-label={t('testing.selectColor', { color })}
                           ></button>
                         {/each}
-                        
+
                         <!-- Custom Color Input -->
                         <div class="relative">
                           <input
@@ -1339,7 +1340,7 @@
                             bind:value={newLabelData.color}
                             class="w-6 h-6 rounded-full border-2 cursor-pointer opacity-0 absolute inset-0"
                             style="border-color: var(--ds-border);"
-                            aria-label="Custom color picker"
+                            aria-label={t('testing.customColorPicker')}
                           />
                           <div class="w-6 h-6 rounded-full border-2 cursor-pointer flex items-center justify-center text-xs font-bold" style="border-color: var(--ds-border); color: var(--ds-text-subtle); background: linear-gradient(45deg, #ff0000 25%, #ffff00 25%, #ffff00 50%, #00ff00 50%, #00ff00 75%, #0000ff 75%);">
                             +
@@ -1349,10 +1350,10 @@
                     </div>
                   </div>
                   <div class="flex-2">
-                    <Label class="block text-xs font-medium mb-1">Description</Label>
+                    <Label class="block text-xs font-medium mb-1">{t('common.description')}</Label>
                     <Input
                       bind:value={newLabelData.description}
-                      placeholder="Optional description..."
+                      placeholder={t('testing.optionalDescription')}
                       size="small"
                     />
                   </div>
@@ -1363,7 +1364,7 @@
                     variant="primary"
                     size="small"
                   >
-                    Create
+                    {t('common.create')}
                   </Button>
                   <Button
                     type="button"
@@ -1371,7 +1372,7 @@
                     onclick={() => showCreateLabelForm = false}
                     size="small"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                 </div>
               </form>
@@ -1406,11 +1407,11 @@
                     </div>
                     {#if isAssigned}
                       <div class="text-xs px-2 py-1 rounded" style="background: var(--ds-status-success-bg); color: var(--ds-status-success-text);">
-                        Assigned
+                        {t('testing.assigned')}
                       </div>
                     {:else}
                       <div class="text-xs px-2 py-1 rounded" style="color: var(--ds-text-subtle); background-color: var(--ds-background-neutral);">
-                        Click to assign
+                        {t('testing.clickToAssign')}
                       </div>
                     {/if}
                   </button>
@@ -1419,15 +1420,15 @@
             {:else}
               <EmptyState
                 icon={Tags}
-                title="No labels match your search"
-                description="Try adjusting your search or create a new label."
+                title={t('testing.noLabelsMatchSearch')}
+                description={t('testing.adjustSearchOrCreate')}
               />
             {/if}
           {:else}
             <EmptyState
               icon={Tags}
-              title="No labels available"
-              description="Create your first label to get started with organizing your test cases."
+              title={t('testing.noLabelsAvailable')}
+              description={t('testing.createFirstLabel')}
             />
           {/if}
         </div>
@@ -1437,14 +1438,14 @@
     <div class="border-t p-4 shrink-0" style="border-color: var(--ds-border); background-color: var(--ds-background-neutral);">
       <div class="flex justify-between items-center">
         <div class="text-sm" style="color: var(--ds-text-subtle);">
-          {selectedTestCaseLabels.length} label{selectedTestCaseLabels.length !== 1 ? 's' : ''} assigned
+          {t('testing.labelsAssigned', { count: selectedTestCaseLabels.length })}
         </div>
         <Button
           onclick={closeLabelsModal}
           variant="primary"
           size="medium"
         >
-          Done
+          {t('common.done')}
         </Button>
       </div>
     </div>

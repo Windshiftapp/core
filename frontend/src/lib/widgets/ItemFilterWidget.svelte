@@ -1,6 +1,7 @@
 <script>
   import { Filter } from 'lucide-svelte';
   import WidgetState from './WidgetState.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let workspaceId = null;
   export let config = {};
@@ -13,8 +14,8 @@
   error={null}
   isEmpty={filteredItems.length === 0}
   emptyIcon={Filter}
-  emptyTitle="No items match filter"
-  emptySubtitle="Configure filter to see items"
+  emptyTitle={t('widgets.itemFilter.emptyTitle')}
+  emptySubtitle={t('widgets.itemFilter.emptySubtitle')}
 >
   {#snippet children()}
     <div class="space-y-2">

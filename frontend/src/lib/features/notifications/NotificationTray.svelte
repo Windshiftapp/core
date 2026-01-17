@@ -7,6 +7,7 @@
   import { quintOut } from 'svelte/easing';
   import { navigate } from '../../router.js';
   import { onClickOutside } from 'runed';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let showDropdown = $state(false);
   let unreadCount = $state(0);
@@ -78,8 +79,8 @@
     bind:this={buttonElement}
     onclick={toggleDropdown}
     class="relative p-2 rounded-full nav-button {showDropdown ? 'nav-button-selected' : ''}"
-    title="Notifications"
-    aria-label="Notifications"
+    title={t('notifications.title')}
+    aria-label={t('notifications.title')}
     aria-expanded={showDropdown}
   >
     <Bell class="w-5 h-5" />
@@ -106,23 +107,23 @@
     >
       <!-- Header -->
       <div class="p-4 flex items-center justify-between" style="border-bottom: 1px solid var(--ds-border); background-color: var(--ds-interactive-subtle);">
-        <h3 class="text-lg font-semibold" style="color: var(--ds-text);">Notifications</h3>
+        <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{t('notifications.title')}</h3>
         <div class="flex items-center gap-2">
           {#if unreadCount > 0}
             <button
               onclick={handleMarkAllRead}
               class="text-sm font-medium flex items-center gap-1"
               style="color: var(--ds-link);"
-              title="Mark all as read"
+              title={t('notifications.markAllAsRead')}
             >
               <Check class="w-3 h-3" />
-              Mark all read
+              {t('notifications.markAllRead')}
             </button>
           {/if}
           <button
             onclick={closeDropdown}
             class="p-1 rounded transition-colors close-btn"
-            title="Close notifications"
+            title={t('notifications.closeNotifications')}
           >
             <X class="w-4 h-4" style="color: var(--ds-text-subtle);" />
           </button>
@@ -134,8 +135,8 @@
         {#if $notifications.length === 0}
           <div class="p-8 text-center" style="color: var(--ds-text-subtle);">
             <Bell class="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p class="text-sm">No notifications</p>
-            <p class="text-xs mt-1">You're all caught up!</p>
+            <p class="text-sm">{t('notifications.noNotifications')}</p>
+            <p class="text-xs mt-1">{t('notifications.allCaughtUp')}</p>
           </div>
         {:else}
           {#each $notifications as notification (notification.id)}
@@ -162,7 +163,7 @@
               closeDropdown();
             }}
           >
-            View all notifications
+            {t('notifications.viewAll')}
           </button>
         </div>
       {/if}

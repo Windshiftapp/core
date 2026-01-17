@@ -1,28 +1,31 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import { t } from '../stores/i18n.svelte.js';
   import { FileText } from 'lucide-svelte';
   import { itemTypeIconMap } from '../utils/icons.js';
   import ConfigurationSetEntityPicker from '../pickers/ConfigurationSetEntityPicker.svelte';
   import ScreenPicker from '../pickers/ScreenPicker.svelte';
   import WorkflowPicker from '../pickers/WorkflowPicker.svelte';
 
-  export let itemTypes = [];
-  export let workflows = [];
-  export let screens = [];
-  export let itemTypeConfigs = [];
-  export let defaultWorkflowId = null;
-  export let defaultCreateScreenId = null;
-  export let defaultEditScreenId = null;
-  export let defaultViewScreenId = null;
-  export let showOverrides = false;
+  let {
+    itemTypes = [],
+    workflows = [],
+    screens = [],
+    itemTypeConfigs = [],
+    defaultWorkflowId = null,
+    defaultCreateScreenId = null,
+    defaultEditScreenId = null,
+    defaultViewScreenId = null,
+    showOverrides = false
+  } = $props();
 
   const dispatch = createEventDispatcher();
 
   // Get currently selected item type IDs from configs
-  $: selectedItemTypeIds = itemTypeConfigs.map(c => c.item_type_id);
+  const selectedItemTypeIds = $derived(itemTypeConfigs.map(c => c.item_type_id));
 
   // Get assigned item types (those with configs)
-  $: assignedItemTypes = itemTypes.filter(it => selectedItemTypeIds.includes(it.id));
+  const assignedItemTypes = $derived(itemTypes.filter(it => selectedItemTypeIds.includes(it.id)));
 
   // Handle picker changes (add/remove item types)
   function handlePickerChange(event) {
@@ -90,7 +93,7 @@
   <!-- Item Type Picker -->
   <div>
     <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">
-      Select which item types are available in workspaces using this configuration set.
+      {t('settings.configSets.selectItemTypes')}
     </p>
 
     <ConfigurationSetEntityPicker
@@ -105,21 +108,21 @@
   {#if showOverrides && assignedItemTypes.length > 0}
     <div>
       <h4 class="text-sm font-medium mb-3" style="color: var(--ds-text);">
-        Workflow & Screen Overrides
+        {t('settings.configSets.workflowScreenOverrides')}
       </h4>
       <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">
-        Configure custom workflows and screens per item type. Use "Default" to inherit from the General tab.
+        {t('settings.configSets.overridesDesc')}
       </p>
 
       <div class="border rounded-lg" style="border-color: var(--ds-border);">
         <table class="w-full text-sm">
           <thead>
             <tr style="background-color: var(--ds-surface);">
-              <th class="text-left px-4 py-3 font-medium rounded-tl-lg w-40" style="color: var(--ds-text);">Item Type</th>
-              <th class="text-left px-4 py-3 font-medium" style="color: var(--ds-text);">Workflow</th>
-              <th class="text-left px-4 py-3 font-medium" style="color: var(--ds-text);">Create Screen</th>
-              <th class="text-left px-4 py-3 font-medium" style="color: var(--ds-text);">Edit Screen</th>
-              <th class="text-left px-4 py-3 font-medium rounded-tr-lg" style="color: var(--ds-text);">View Screen</th>
+              <th class="text-left px-4 py-3 font-medium rounded-tl-lg w-40" style="color: var(--ds-text);">{t('settings.configSets.itemType')}</th>
+              <th class="text-left px-4 py-3 font-medium" style="color: var(--ds-text);">{t('settings.configSets.workflow')}</th>
+              <th class="text-left px-4 py-3 font-medium" style="color: var(--ds-text);">{t('settings.configSets.createScreen')}</th>
+              <th class="text-left px-4 py-3 font-medium" style="color: var(--ds-text);">{t('settings.configSets.editScreen')}</th>
+              <th class="text-left px-4 py-3 font-medium rounded-tr-lg" style="color: var(--ds-text);">{t('settings.configSets.viewScreen')}</th>
             </tr>
           </thead>
           <tbody>

@@ -5,6 +5,7 @@
   import Input from '../components/Input.svelte';
   import Textarea from '../components/Textarea.svelte';
   import Label from '../components/Label.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -38,25 +39,25 @@
   >
     <div class="p-6">
       <h3 class="text-xl font-semibold mb-6" style="color: var(--ds-text);">
-        {isEditing ? 'Edit Category' : 'New Category'}
+        {isEditing ? t('timeProjectCategory.editCategory') : t('timeProjectCategory.newCategory')}
       </h3>
 
       <div class="space-y-4">
         <div>
-          <Label required class="mb-2">Category Name</Label>
+          <Label required class="mb-2">{t('timeProjectCategory.categoryName')}</Label>
           <Input
             bind:value={formData.name}
-            placeholder="Development, Marketing, Operations..."
+            placeholder={t('timeProjectCategory.categoryNamePlaceholder')}
             required
           />
         </div>
 
         <div>
-          <Label class="mb-2">Description</Label>
+          <Label class="mb-2">{t('common.description')}</Label>
           <Textarea
             bind:value={formData.description}
             rows={3}
-            placeholder="Optional description..."
+            placeholder={t('timeProjectCategory.optionalDescription')}
           />
         </div>
       </div>
@@ -69,7 +70,7 @@
           size="medium"
           keyboardHint={submitHint}
         >
-          {isEditing ? 'Update' : 'Create'} Category
+          {isEditing ? t('timeProjectCategory.updateCategory') : t('timeProjectCategory.createCategory')}
         </Button>
         <Button
           variant="default"
@@ -77,7 +78,7 @@
           size="medium"
           keyboardHint="Esc"
         >
-          Cancel
+          {t('common.cancel')}
         </Button>
       </div>
     </div>

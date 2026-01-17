@@ -1,6 +1,7 @@
 <script>
   import { permissionStore } from '../stores';
   import UnauthorizedAccess from '../pages/UnauthorizedAccess.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let permissionKey = null;
   export let permissionId = null;
@@ -31,8 +32,8 @@
 {:else}
   <slot name="fallback" {requiredPermissionDisplay}>
     <!-- Default fallback if no custom fallback provided -->
-    <UnauthorizedAccess 
-      message="You do not have permission to access this page."
+    <UnauthorizedAccess
+      message={t('permissions.noAccessMessage')}
       requiredPermission={requiredPermissionDisplay}
     />
   </slot>

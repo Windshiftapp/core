@@ -5,23 +5,24 @@
   import DataTable from '../components/DataTable.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import AlertBox from '../components/AlertBox.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
-  let roles = [];
-  let loading = true;
-  let selectedRole = null;
-  let rolePermissions = [];
+  let roles = $state([]);
+  let loading = $state(true);
+  let selectedRole = $state(null);
+  let rolePermissions = $state([]);
 
-  const columns = [
-    { key: 'name', label: 'Role Name', sortable: true },
-    { key: 'description', label: 'Description' },
+  const columns = $derived([
+    { key: 'name', label: t('roles.roleName'), sortable: true },
+    { key: 'description', label: t('common.description') },
     {
       key: 'is_system',
-      label: 'Type',
-      render: (item) => item.is_system ? 'System' : 'Custom',
+      label: t('common.type'),
+      render: (item) => item.is_system ? t('common.default') : t('common.custom'),
       sortable: true
     },
     { key: 'actions', label: '', width: 'w-16' }
-  ];
+  ]);
 
   onMount(async () => {
     await loadRoles();
@@ -47,7 +48,7 @@
       rolePermissions = fullRole.permissions || [];
     } catch (error) {
       console.error('Failed to load role details:', error);
-      alert('Failed to load role details: ' + (error.message || error));
+      alert(t('dialogs.alerts.failedToLoad', { error: error.message || error }));
     }
   }
 
@@ -60,7 +61,7 @@
     return [
       {
         id: 'view',
-        label: 'View Permissions',
+        label: t('common.view'),
         icon: Eye,
         action: () => viewRoleDetails(role)
       }
@@ -70,8 +71,8 @@
 
 <div class="space-y-6">
   <PageHeader
-    title="Workspace Roles"
-    description="System-defined roles that bundle permissions for common access patterns"
+    title={t('roles.title')}
+    description={t('roles.subtitle')}
     icon={BadgeCheck}
   />
 
@@ -94,7 +95,7 @@
       </div>
 
       <div class="border-t pt-4" style="border-color: var(--ds-border);">
-        <h4 class="font-medium mb-3" style="color: var(--ds-text);">Included Permissions</h4>
+        <h4 class="font-medium mb-3" style="color: var(--ds-text);">{t('roles.permissions')}</h4>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           {#each rolePermissions as permission}
             <div class="flex items-start space-x-2 p-3 rounded-md" style="background-color: var(--ds-interactive-subtle);">
@@ -116,21 +117,13 @@
     {columns}
     {loading}
     actionItems={buildRoleDropdownItems}
-    emptyMessage="No roles found."
+    emptyMessage={t('roles.noRoles')}
   />
 
   <AlertBox type="info">
-    <h4 class="font-semibold mb-2">About Workspace Roles</h4>
+    <h4 class="font-semibold mb-2">{t('roles.title')}</h4>
     <p class="text-sm mb-2">
-      Workspace roles are predefined permission bundles that make it easy to grant common access levels:
-    </p>
-    <ul class="text-sm space-y-1 ml-4 list-disc">
-      <li><strong>Viewer:</strong> Can view items and add comments</li>
-      <li><strong>Editor:</strong> Can view, create, edit items and change their status</li>
-      <li><strong>Administrator:</strong> Full workspace administration including permission management</li>
-    </ul>
-    <p class="text-sm mt-3">
-      To assign roles to users, go to Workspace Settings → Members.
+      {t('roles.subtitle')}
     </p>
   </AlertBox>
 </div>

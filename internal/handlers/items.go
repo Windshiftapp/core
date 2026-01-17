@@ -718,6 +718,13 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	commitTime := time.Since(commitStart)
 	txTime := time.Since(txStart) // Time for TX operations (Begin -> Commit)
 
+	// Record item creation history
+	updateService := services.NewItemUpdateService(h.db)
+	if err := updateService.RecordItemCreationHistory(h.db, int(id), user.ID); err != nil {
+		slog.Warn("failed to record item creation history", slog.Int64("item_id", id), slog.Any("error", err))
+		// Don't fail the request, just log the error
+	}
+
 	// Profiling: post-insert query
 	postQueryStart := time.Now()
 
@@ -1291,6 +1298,13 @@ func (h *ItemHandler) Copy(w http.ResponseWriter, r *http.Request) {
 	if err := tx.Commit(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Record item creation history for the copied item
+	updateService := services.NewItemUpdateService(h.db)
+	if err := updateService.RecordItemCreationHistory(h.db, int(copiedItemID), user.ID); err != nil {
+		slog.Warn("failed to record copied item creation history", slog.Int64("item_id", copiedItemID), slog.Any("error", err))
+		// Don't fail request, just log the error
 	}
 
 	// Return the copied item

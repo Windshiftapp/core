@@ -3,6 +3,7 @@
   import { api } from '../api.js';
   import { formatRelativeCompact } from '../utils/dateFormatter.js';
   import WidgetState from './WidgetState.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let workspaceId = null;
   export let maxItems = 10;
@@ -58,7 +59,7 @@
     } catch (err) {
       if (currentVersion !== fetchVersion) return;
       console.error('Failed to load recent items widget:', err);
-      error = 'Unable to load recent items';
+      error = t('widgets.recentItems.loadError');
       items = [];
     } finally {
       if (currentVersion === fetchVersion) {
@@ -72,10 +73,10 @@
   {loading}
   {error}
   isEmpty={items.length === 0}
-  loadingText="Loading recent items..."
+  loadingText={t('widgets.recentItems.loadingText')}
   emptyIcon={Clock}
-  emptyTitle="No recent activity"
-  emptySubtitle="Items you update will appear here."
+  emptyTitle={t('widgets.recentItems.emptyTitle')}
+  emptySubtitle={t('widgets.recentItems.emptySubtitle')}
   onRetry={loadRecentActivity}
 >
   {#snippet children()}

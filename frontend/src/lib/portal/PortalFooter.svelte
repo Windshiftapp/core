@@ -2,6 +2,7 @@
   import { Plus, X } from 'lucide-svelte';
   import { APP_NAME } from '../constants.js';
   import { portalStore } from '../stores/portal.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
 </script>
 
 <!-- Footer -->
@@ -54,7 +55,7 @@
                     <button
                       onclick={() => portalStore.removeFooterLink(columnIndex, linkIndex)}
                       class="p-1 rounded transition-all hover:bg-red-100"
-                      title="Remove link"
+                      title={t('portal.removeLink')}
                     >
                       <X class="w-3 h-3 text-red-600" />
                     </button>
@@ -80,7 +81,7 @@
                   style="border-color: var(--ds-border); color: var(--ds-text-subtle);"
                 >
                   <Plus class="w-3 h-3" />
-                  <span>Add link</span>
+                  <span>{t('portal.addLink')}</span>
                 </button>
               {/if}
             </div>

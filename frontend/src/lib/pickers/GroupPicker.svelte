@@ -4,16 +4,19 @@
   import { api } from '../api.js';
   import { onMount, createEventDispatcher } from 'svelte';
   import { Users } from 'lucide-svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
   let {
     value = $bindable(null),
-    placeholder = 'Select group...',
+    placeholder = '',
     label = '',
     disabled = false,
     class: className = ''
   } = $props();
+
+  const resolvedPlaceholder = $derived(placeholder || t('pickers.selectGroup'));
 
   const groups = createAsyncLoader(() => api.get('/groups'));
 
@@ -33,7 +36,7 @@
   items={groups.data}
   loading={groups.loading}
   error={groups.error}
-  {placeholder}
+  placeholder={resolvedPlaceholder}
   {label}
   {disabled}
   class={className}

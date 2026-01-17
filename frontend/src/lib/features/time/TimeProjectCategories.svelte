@@ -5,6 +5,7 @@
   import TimeProjectCategoryModal from '../../dialogs/TimeProjectCategoryModal.svelte';
   import { Plus, GripVertical, Edit, Trash2 } from 'lucide-svelte';
   import { createShortcutHandler, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let categories = [];
   let showCreateForm = false;
@@ -78,18 +79,18 @@
       cancelForm();
     } catch (error) {
       console.error('Failed to save category:', error);
-      alert('Failed to save category: ' + (error.message || error));
+      alert(t('time.categories.failedToSave') + ': ' + (error.message || error));
     }
   }
 
   async function deleteCategory(category) {
-    if (confirm(`Are you sure you want to delete "${category.name}"?`)) {
+    if (confirm(t('time.categories.confirmDelete', { name: category.name }))) {
       try {
         await api.time.projectCategories.delete(category.id);
         await loadCategories();
       } catch (error) {
         console.error('Failed to delete category:', error);
-        alert('Failed to delete category: ' + (error.message || error));
+        alert(t('time.categories.failedToDelete') + ': ' + (error.message || error));
       }
     }
   }
@@ -154,9 +155,9 @@
 <!-- Header -->
 <div class="mb-6 flex justify-between items-start">
   <div>
-    <h2 class="text-lg font-semibold" style="color: var(--ds-text);">Project Categories</h2>
+    <h2 class="text-lg font-semibold" style="color: var(--ds-text);">{t('time.categories.title')}</h2>
     <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-      Organize projects into categories for better management
+      {t('time.categories.subtitle')}
     </div>
   </div>
   <Button
@@ -166,7 +167,7 @@
     size="medium"
     keyboardHint={getShortcutDisplay('timeProjects', 'addCategory')}
   >
-    New Category
+    {t('time.categories.newCategory')}
   </Button>
 </div>
 
@@ -174,8 +175,8 @@
 <div class="space-y-2">
   {#if categories.length === 0}
     <div class="text-center py-12" style="color: var(--ds-text-subtle);">
-      <p class="text-sm">No categories yet</p>
-      <p class="text-xs mt-1">Create your first category to organize projects</p>
+      <p class="text-sm">{t('time.categories.noCategories')}</p>
+      <p class="text-xs mt-1">{t('time.categories.createFirstHint')}</p>
     </div>
   {:else}
     {#each categories as category (category.id)}
@@ -215,14 +216,14 @@
           <button
             onclick={() => startEdit(category)}
             class="p-1.5 rounded hover-bg transition-colors"
-            title="Edit"
+            title={t('common.edit')}
           >
             <Edit class="w-4 h-4" style="color: var(--ds-text-subtle);" />
           </button>
           <button
             onclick={() => deleteCategory(category)}
             class="p-1.5 rounded hover:bg-red-50 transition-colors"
-            title="Delete"
+            title={t('common.delete')}
           >
             <Trash2 class="w-4 h-4 text-red-600" />
           </button>

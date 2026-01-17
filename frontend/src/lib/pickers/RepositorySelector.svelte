@@ -4,6 +4,7 @@
   import Button from '../components/Button.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { X, Search, Loader2, Check, GitBranch, Lock, Globe, ChevronLeft, ChevronRight } from 'lucide-svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let workspaceId;
   export let connection;
@@ -147,10 +148,10 @@
     <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: var(--ds-border);">
       <div>
         <h2 id="repo-selector-title" class="text-lg font-semibold" style="color: var(--ds-text);">
-          Link Repositories
+          {t('pickers.linkRepositories')}
         </h2>
         <p class="text-sm" style="color: var(--ds-text-subtle);">
-          Select repositories from {connection.provider_name} ({getProviderLabel(connection.provider_type)})
+          {t('pickers.selectRepositoriesFrom', { provider: connection.provider_name, type: getProviderLabel(connection.provider_type) })}
         </p>
       </div>
       <button
@@ -169,7 +170,7 @@
         <input
           type="text"
           bind:value={searchQuery}
-          placeholder="Search repositories..."
+          placeholder={t('pickers.searchRepositories')}
           class="w-full pl-10 pr-4 py-2 rounded-lg border text-sm"
           style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
         />
@@ -181,20 +182,20 @@
       {#if loading && repositories.length === 0}
         <div class="flex items-center justify-center py-12">
           <Loader2 class="w-6 h-6 animate-spin" style="color: var(--ds-text-subtle);" />
-          <span class="ml-2 text-sm" style="color: var(--ds-text-subtle);">Loading repositories...</span>
+          <span class="ml-2 text-sm" style="color: var(--ds-text-subtle);">{t('pickers.loadingRepositories')}</span>
         </div>
       {:else if error}
         <div class="text-center py-12">
           <p class="text-sm" style="color: var(--ds-text-danger);">{error}</p>
           <Button size="sm" variant="secondary" class="mt-3" onclick={() => loadRepositories()}>
-            Try Again
+            {t('common.tryAgain')}
           </Button>
         </div>
       {:else if filteredRepos.length === 0}
         <div class="text-center py-12">
           <GitBranch class="w-8 h-8 mx-auto mb-2" style="color: var(--ds-text-subtlest);" />
           <p class="text-sm" style="color: var(--ds-text-subtle);">
-            {searchQuery ? 'No repositories match your search' : 'No repositories available'}
+            {searchQuery ? t('pickers.noRepositoriesMatchSearch') : t('pickers.noRepositoriesAvailable')}
           </p>
         </div>
       {:else}
@@ -235,7 +236,7 @@
                   {/if}
                   {#if repo.is_linked}
                     <span class="text-xs px-1.5 py-0.5 rounded" style="background-color: var(--ds-background-success); color: var(--ds-text-success);">
-                      Already linked
+                      {t('pickers.alreadyLinked')}
                     </span>
                   {/if}
                 </div>
@@ -260,7 +261,7 @@
               <Loader2 class="w-5 h-5 animate-spin" style="color: var(--ds-text-subtle);" />
             {:else}
               <Button size="sm" variant="secondary" onclick={loadMore}>
-                Load More
+                {t('common.loadMore')}
               </Button>
             {/if}
           </div>
@@ -272,14 +273,14 @@
     <DialogFooter
       onCancel={close}
       onConfirm={linkSelectedRepos}
-      confirmLabel="Link Selected"
-      loadingLabel="Linking..."
+      confirmLabel={t('pickers.linkSelected')}
+      loadingLabel={t('pickers.linking')}
       loading={linking}
       disabled={selectedRepos.size === 0}
     >
       {#snippet extra()}
         <span class="text-sm" style="color: var(--ds-text-subtle);">
-          {selectedRepos.size} {selectedRepos.size === 1 ? 'repository' : 'repositories'} selected
+          {t('pickers.repositoriesSelected', { count: selectedRepos.size })}
         </span>
       {/snippet}
     </DialogFooter>

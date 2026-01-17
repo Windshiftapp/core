@@ -6,6 +6,7 @@
   import Select from '../components/Select.svelte';
   import Textarea from '../components/Textarea.svelte';
   import Label from '../components/Label.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -61,17 +62,17 @@
   >
     <div class="p-6">
       <h3 class="text-xl font-semibold mb-6" style="color: var(--ds-text);">
-        {isEditing ? 'Edit Project' : 'New Project'}
+        {isEditing ? t('timeProject.editProject') : t('timeProject.newProject')}
       </h3>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <Label required class="mb-2">Project Name</Label>
+          <Label required class="mb-2">{t('timeProject.projectName')}</Label>
           <Input bind:value={formData.name} required />
         </div>
 
         <div>
-          <Label class="mb-2">Status</Label>
+          <Label class="mb-2">{t('timeProject.status')}</Label>
           <Select bind:value={formData.status}>
             {#each statusOptions as status}
               <option value={status}>{status}</option>
@@ -80,9 +81,9 @@
         </div>
 
         <div>
-          <Label class="mb-2">Customer (Optional)</Label>
+          <Label class="mb-2">{t('timeProject.customerOptional')}</Label>
           <Select bind:value={formData.customer_id}>
-            <option value="">None</option>
+            <option value="">{t('timeProject.none')}</option>
             {#each customers.filter(c => c.active) as customer}
               <option value={customer.id}>{customer.name}</option>
             {/each}
@@ -90,9 +91,9 @@
         </div>
 
         <div>
-          <Label class="mb-2">Category (Optional)</Label>
+          <Label class="mb-2">{t('timeProject.categoryOptional')}</Label>
           <Select bind:value={formData.category_id}>
-            <option value="">None</option>
+            <option value="">{t('timeProject.none')}</option>
             {#each categories as category}
               <option value={category.id}>{category.name}</option>
             {/each}
@@ -101,13 +102,13 @@
       </div>
 
       <div class="mt-6">
-        <Label class="mb-2">Hourly Rate ($)</Label>
+        <Label class="mb-2">{t('timeProject.hourlyRate')}</Label>
         <Input type="number" bind:value={formData.hourly_rate} min="0" step="0.01" />
       </div>
 
       <!-- Color Picker -->
       <div class="mt-6">
-        <Label class="mb-2">Project Color</Label>
+        <Label class="mb-2">{t('timeProject.projectColor')}</Label>
 
         <!-- Color Preview -->
         {#if formData.color}
@@ -122,7 +123,7 @@
               style="color: var(--ds-text-subtle);"
               type="button"
             >
-              Clear
+              {t('common.clear')}
             </button>
           </div>
         {/if}
@@ -143,7 +144,7 @@
       </div>
 
       <div class="mt-6">
-        <Label class="mb-2">Description</Label>
+        <Label class="mb-2">{t('common.description')}</Label>
         <Textarea bind:value={formData.description} rows={3} />
       </div>
 
@@ -154,7 +155,7 @@
           id="active"
           class="mr-3 w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
         />
-        <label for="active" class="text-sm font-medium" style="color: var(--ds-text);">Active Project</label>
+        <label for="active" class="text-sm font-medium" style="color: var(--ds-text);">{t('timeProject.activeProject')}</label>
       </div>
 
       <div class="mt-8 flex gap-3">
@@ -165,7 +166,7 @@
           size="medium"
           keyboardHint={submitHint}
         >
-          {isEditing ? 'Update' : 'Create'} Project
+          {isEditing ? t('timeProject.updateProject') : t('timeProject.createProject')}
         </Button>
         <Button
           variant="default"
@@ -173,7 +174,7 @@
           size="medium"
           keyboardHint="Esc"
         >
-          Cancel
+          {t('common.cancel')}
         </Button>
       </div>
     </div>

@@ -1,5 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
+  import { t } from '../../stores/i18n.svelte.js';
   import { LifeBuoy, Plus, Webhook, Globe, Trash2, Settings, Search, Mail } from 'lucide-svelte';
   import { api } from '../../api.js';
   import { currentRoute, navigate } from '../../router.js';
@@ -309,12 +310,12 @@
       <div>
         <h1 class="text-2xl font-semibold" style="color: var(--ds-text);">
           {#if activeTypeFilter}
-            {activeTypeFilter === 'portal' ? 'Portal' : activeTypeFilter === 'webhook' ? 'Webhook' : activeTypeFilter} Channels
+            {activeTypeFilter === 'portal' ? 'Portal' : activeTypeFilter === 'webhook' ? 'Webhook' : activeTypeFilter} {t('channels.title')}
           {:else if activeCategoryId}
             {@const category = $channelCategoriesStore.find(c => c.id === parseInt(activeCategoryId))}
-            {category?.name || 'Category'}
+            {category?.name || t('common.category')}
           {:else}
-            All Channels
+            {t('channels.title')}
           {/if}
         </h1>
         <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">
@@ -328,7 +329,7 @@
         size="medium"
         keyboardHint={getShortcutDisplay('channels', 'addChannel')}
       >
-        Add Channel
+        {t('channels.createChannel')}
       </Button>
     </div>
 
@@ -339,7 +340,7 @@
         <input
           type="text"
           bind:value={channelSearch}
-          placeholder="Search channels..."
+          placeholder={t('channels.searchChannels')}
           class="w-full pl-9 pr-3 py-2 text-sm rounded-lg border"
           style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
         />
@@ -355,7 +356,7 @@
       <div class="text-center py-16">
         <div class="text-red-600 text-sm font-medium mb-2">{error}</div>
         <Button onclick={loadChannels} variant="default" size="small">
-          Retry
+          {t('common.retry')}
         </Button>
       </div>
     {:else}
@@ -363,8 +364,8 @@
         columns={channelColumns}
         data={filteredChannels()}
         keyField="id"
-        emptyMessage="No channels found"
-        emptyDescription={channelSearch ? `No channels match "${channelSearch}"` : 'Create a channel to get started'}
+        emptyMessage={t('channels.noChannels')}
+        emptyDescription={channelSearch ? t('channels.noChannels') : t('channels.noChannels')}
         emptyIcon={LifeBuoy}
         actionItems={getChannelActionItems}
         onRowClick={handleRowClick}
@@ -417,7 +418,7 @@
   <!-- Header -->
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-      Add New Channel
+      {t('channels.createChannel')}
     </h3>
   </div>
 
@@ -483,7 +484,7 @@
   <DialogFooter
     onCancel={cancelChannelForm}
     onConfirm={handleChannelSubmit}
-    confirmLabel="Create Channel"
+    confirmLabel={t('channels.createChannel')}
     disabled={!channelFormData.name.trim()}
     showKeyboardHint={true}
     confirmKeyboardHint={submitHint}

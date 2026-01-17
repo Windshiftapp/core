@@ -4,6 +4,7 @@
   import { navigate, currentRoute } from '../../router.js';
   import { api } from '../../api.js';
   import { getHexFromColorName } from '../../utils/colors.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let iterationTypes = $state([]);
 
@@ -44,9 +45,9 @@
   <!-- Header -->
   <div class="mb-6">
     <div class="flex items-center gap-3 mb-2">
-      <h2 class="text-xl font-semibold" style="color: var(--ds-text);">Iterations</h2>
+      <h2 class="text-xl font-semibold" style="color: var(--ds-text);">{t('iterations.title')}</h2>
     </div>
-    <p class="text-sm" style="color: var(--ds-text-subtle);">Manage sprints and releases</p>
+    <p class="text-sm" style="color: var(--ds-text-subtle);">{t('iterations.subtitle')}</p>
   </div>
 
   <!-- Navigation -->
@@ -60,7 +61,7 @@
       onmouseleave={(e) => { if (!isAllActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
     >
       <div class="w-4 h-4 rounded bg-gradient-to-br from-teal-400 to-teal-600 flex-shrink-0"></div>
-      <span>All Types</span>
+      <span>{t('iterations.allTypes')}</span>
     </button>
 
     <!-- Type List -->
@@ -93,7 +94,7 @@
       onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
     >
       <Target class="w-4 h-4" />
-      Manage Types
+      {t('iterations.manageTypes')}
     </button>
   </div>
 </div>

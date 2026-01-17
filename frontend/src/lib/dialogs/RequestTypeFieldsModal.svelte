@@ -6,6 +6,7 @@
   import BasePicker from '../pickers/BasePicker.svelte';
   import Spinner from '../components/Spinner.svelte';
   import PortalModal from './PortalModal.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -84,7 +85,7 @@
       ];
     } catch (err) {
       console.error('Failed to load request type fields:', err);
-      error = err.message || 'Failed to load fields';
+      error = err.message || t('requestTypeFields.failedToLoadFields');
     } finally {
       loading = false;
     }
@@ -132,12 +133,12 @@
 
   function addField() {
     if (!newFieldIdentifier) {
-      error = 'Please select a field';
+      error = t('requestTypeFields.pleaseSelectField');
       return;
     }
 
     if (fields.some(f => f.field_identifier === newFieldIdentifier && (f.step_number || 1) === currentStep)) {
-      error = 'This field is already added to this step';
+      error = t('requestTypeFields.fieldAlreadyAdded');
       return;
     }
 
@@ -159,7 +160,7 @@
 
   function addVirtualField() {
     if (!virtualFieldName.trim()) {
-      error = 'Please enter a field name';
+      error = t('requestTypeFields.pleaseEnterFieldName');
       return;
     }
 
@@ -170,7 +171,7 @@
     if (virtualFieldType === 'select') {
       const validOptions = virtualFieldOptions.filter(o => o.value.trim() && o.label.trim());
       if (validOptions.length === 0) {
-        error = 'Please add at least one option for select field';
+        error = t('requestTypeFields.addAtLeastOneOption');
         return;
       }
       optionsJson = JSON.stringify(validOptions);
@@ -331,7 +332,7 @@
       dispatch('saved');
     } catch (err) {
       console.error('Failed to save fields:', err);
-      error = err.message || 'Failed to save fields';
+      error = err.message || t('requestTypeFields.failedToSaveFields');
     } finally {
       saving = false;
     }
@@ -344,10 +345,15 @@
 
   function getFieldTypeLabel(field) {
     if (field.field_type === 'virtual') {
-      const typeLabels = { text: 'Text', textarea: 'Multi-line', select: 'Select', checkbox: 'Checkbox' };
-      return `Virtual - ${typeLabels[field.virtual_field_type] || field.virtual_field_type}`;
+      const typeLabels = {
+        text: t('requestTypeFields.text'),
+        textarea: t('requestTypeFields.multiLine'),
+        select: t('requestTypeFields.select'),
+        checkbox: t('requestTypeFields.checkbox')
+      };
+      return `${t('requestTypeFields.virtualField')} - ${typeLabels[field.virtual_field_type] || field.virtual_field_type}`;
     }
-    return field.field_type === 'default' ? 'Default Field' : 'Custom Field';
+    return field.field_type === 'default' ? t('requestTypeFields.defaultField') : t('requestTypeFields.customField');
   }
 </script>
 
@@ -356,7 +362,7 @@
     isOpen={isOpen}
     isDarkMode={isDarkMode}
     maxWidth="max-w-3xl"
-    title={`Configure Fields: ${requestTypeName}`}
+    title={`${t('requestTypeFields.configureFields')}: ${requestTypeName}`}
     onClose={handleClose}
     bodyClass="px-6 py-4 max-h-[70vh] overflow-y-auto"
   >
@@ -384,14 +390,14 @@
             class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
             style="background-color: {currentStep === step ? (isDarkMode ? '#3b82f6' : '#3b82f6') : (isDarkMode ? '#334155' : '#f3f4f6')}; color: {currentStep === step ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#6b7280')};"
           >
-            Step {step}
+            {t('requestTypeFields.step')} {step}
           </button>
         {/each}
         <button
           onclick={addStep}
           class="px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-1"
           style="background-color: {isDarkMode ? '#334155' : '#f3f4f6'}; color: {isDarkMode ? '#94a3b8' : '#6b7280'};"
-          title="Add new step"
+          title={t('requestTypeFields.addNewStep')}
         >
           <Plus class="w-4 h-4" />
         </button>
@@ -400,7 +406,7 @@
             onclick={() => removeStep(currentStep)}
             class="px-3 py-2 rounded-lg text-sm transition-all"
             style="color: {isDarkMode ? '#fca5a5' : '#dc2626'};"
-            title="Remove current step"
+            title={t('requestTypeFields.removeCurrentStep')}
           >
             <Trash2 class="w-4 h-4" />
           </button>
@@ -459,7 +465,7 @@
                 onclick={() => startEditingField(field)}
                 class="p-2 rounded transition-all"
                 style="color: {isDarkMode ? '#94a3b8' : '#6b7280'};"
-                title="Edit display settings"
+                title={t('layout.editDisplaySettings')}
               >
                 <Pencil class="w-4 h-4" />
               </button>
@@ -472,14 +478,14 @@
                 {#if field.is_required}
                   <Check class="w-3 h-3" />
                 {/if}
-                <span>Required</span>
+                <span>{t('requestTypeFields.required')}</span>
               </button>
 
               <button
                 onclick={() => removeField(field)}
                 class="p-2 rounded transition-all"
                 style="color: {isDarkMode ? '#fca5a5' : '#dc2626'}; background-color: {isDarkMode ? 'rgba(220, 38, 38, 0.1)' : 'transparent'};"
-                title="Remove field"
+                title={t('requestTypeFields.removeField')}
               >
                 <Trash2 class="w-4 h-4" />
               </button>
@@ -490,7 +496,7 @@
         {#if currentStepFields.length === 0 && !addingField && !addingVirtualField}
           <div class="text-center py-8">
             <p class="text-sm" style="color: {isDarkMode ? '#94a3b8' : '#6b7280'};">
-              No fields in Step {currentStep}. Add fields below.
+              {t('requestTypeFields.noFieldsInStep', { step: currentStep })}
             </p>
           </div>
         {/if}
@@ -503,18 +509,18 @@
           style="background-color: {isDarkMode ? '#334155' : '#f9fafb'}; border-color: {isDarkMode ? '#475569' : '#e5e7eb'};"
         >
           <div class="text-sm font-medium mb-2" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
-            Add Existing Field
+            {t('requestTypeFields.addExistingField')}
           </div>
           <div>
             <label class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
-              Field
+              {t('requestTypeFields.field')}
             </label>
             <BasePicker
               bind:value={newFieldIdentifier}
               items={availableFields}
-              placeholder="Select a field..."
+              placeholder={t('requestTypeFields.selectField')}
               showUnassigned={true}
-              unassignedLabel="Select a field..."
+              unassignedLabel={t('requestTypeFields.selectField')}
               getValue={(field) => field.id}
               getLabel={(field) => `${field.name} (${field.type})`}
               onSelect={(field) => {
@@ -531,7 +537,7 @@
               class="h-4 w-4 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
             />
             <label for="newFieldRequired" class="text-sm" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
-              Required field
+              {t('requestTypeFields.requiredField')}
             </label>
           </div>
 
@@ -542,14 +548,14 @@
               size="medium"
               class="flex-1"
             >
-              Add Field
+              {t('requestTypeFields.addField')}
             </Button>
             <Button
               onclick={cancelAddingField}
               variant="default"
               size="medium"
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
           </div>
         </div>
@@ -561,17 +567,17 @@
           style="background-color: {isDarkMode ? '#334155' : '#f9fafb'}; border-color: {isDarkMode ? '#475569' : '#e5e7eb'};"
         >
           <div class="text-sm font-medium mb-2" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
-            Add Virtual Field
+            {t('requestTypeFields.addVirtualField')}
           </div>
 
           <div>
             <label class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
-              Field Name
+              {t('requestTypeFields.fieldName')}
             </label>
             <input
               type="text"
               bind:value={virtualFieldName}
-              placeholder="e.g., Urgency Level"
+              placeholder={t('requestTypeFields.fieldNamePlaceholder')}
               class="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500"
               style="background-color: {isDarkMode ? '#1e293b' : '#ffffff'}; color: {isDarkMode ? '#e2e8f0' : '#111827'}; border-color: {isDarkMode ? '#475569' : '#d1d5db'};"
             />
@@ -579,14 +585,14 @@
 
           <div>
             <label class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
-              Field Type
+              {t('requestTypeFields.fieldType')}
             </label>
             <div class="grid grid-cols-4 gap-2">
               {#each [
-                { value: 'text', label: 'Text', icon: Type },
-                { value: 'textarea', label: 'Multi-line', icon: AlignLeft },
-                { value: 'select', label: 'Select', icon: ListChecks },
-                { value: 'checkbox', label: 'Checkbox', icon: ToggleLeft }
+                { value: 'text', label: t('requestTypeFields.text'), icon: Type },
+                { value: 'textarea', label: t('requestTypeFields.multiLine'), icon: AlignLeft },
+                { value: 'select', label: t('requestTypeFields.select'), icon: ListChecks },
+                { value: 'checkbox', label: t('requestTypeFields.checkbox'), icon: ToggleLeft }
               ] as type}
                 <button
                   onclick={() => virtualFieldType = type.value}
@@ -603,7 +609,7 @@
           {#if virtualFieldType === 'select'}
             <div>
               <label class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
-                Options
+                {t('requestTypeFields.options')}
               </label>
               <div class="space-y-2">
                 {#each virtualFieldOptions as option, i}
@@ -611,14 +617,14 @@
                     <input
                       type="text"
                       bind:value={option.value}
-                      placeholder="Value"
+                      placeholder={t('requestTypeFields.value')}
                       class="flex-1 px-3 py-2 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                       style="background-color: {isDarkMode ? '#1e293b' : '#ffffff'}; color: {isDarkMode ? '#e2e8f0' : '#111827'}; border-color: {isDarkMode ? '#475569' : '#d1d5db'};"
                     />
                     <input
                       type="text"
                       bind:value={option.label}
-                      placeholder="Label"
+                      placeholder={t('requestTypeFields.label')}
                       class="flex-1 px-3 py-2 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                       style="background-color: {isDarkMode ? '#1e293b' : '#ffffff'}; color: {isDarkMode ? '#e2e8f0' : '#111827'}; border-color: {isDarkMode ? '#475569' : '#d1d5db'};"
                     />
@@ -637,7 +643,7 @@
                   class="text-sm flex items-center gap-1"
                   style="color: {isDarkMode ? '#60a5fa' : '#2563eb'};"
                 >
-                  <Plus class="w-4 h-4" /> Add option
+                  <Plus class="w-4 h-4" /> {t('requestTypeFields.addOption')}
                 </button>
               </div>
             </div>
@@ -651,7 +657,7 @@
               class="h-4 w-4 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
             />
             <label for="virtualFieldRequired" class="text-sm" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
-              Required field
+              {t('requestTypeFields.requiredField')}
             </label>
           </div>
 
@@ -662,14 +668,14 @@
               size="medium"
               class="flex-1"
             >
-              Add Virtual Field
+              {t('requestTypeFields.addVirtualField')}
             </Button>
             <Button
               onclick={cancelAddingField}
               variant="default"
               size="medium"
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
           </div>
         </div>
@@ -683,7 +689,7 @@
             style="border-color: {isDarkMode ? '#475569' : '#d1d5db'}; color: {isDarkMode ? '#94a3b8' : '#6b7280'};"
           >
             <Plus class="w-5 h-5" />
-            <span class="font-medium">Add Field</span>
+            <span class="font-medium">{t('requestTypeFields.addField')}</span>
           </button>
           <button
             onclick={startAddingVirtualField}
@@ -691,7 +697,7 @@
             style="border-color: {isDarkMode ? '#475569' : '#d1d5db'}; color: {isDarkMode ? '#94a3b8' : '#6b7280'};"
           >
             <Type class="w-5 h-5" />
-            <span class="font-medium">Add Virtual Field</span>
+            <span class="font-medium">{t('requestTypeFields.addVirtualField')}</span>
           </button>
         </div>
       {/if}
@@ -705,10 +711,10 @@
         {#if saving}
           <div class="flex items-center gap-2">
             <Spinner size="sm" />
-            <span>Saving...</span>
+            <span>{t('requestTypeFields.saving')}</span>
           </div>
         {:else}
-          Changes are saved automatically
+          {t('requestTypeFields.changesSavedAuto')}
         {/if}
       </div>
       <Button
@@ -716,7 +722,7 @@
         variant="primary"
         size="medium"
       >
-        Done
+        {t('common.done')}
       </Button>
     </div>
   </PortalModal>
@@ -728,14 +734,14 @@
     isOpen={true}
     isDarkMode={isDarkMode}
     maxWidth="max-w-md"
-    title="Edit Field Display"
+    title={t('requestTypeFields.editFieldDisplay')}
     onClose={cancelFieldEdit}
     bodyClass="px-6 py-4"
   >
     <div class="space-y-4">
       <div>
         <label class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
-          Display Name
+          {t('requestTypeFields.displayName')}
         </label>
         <input
           type="text"
@@ -745,17 +751,17 @@
           style="background-color: {isDarkMode ? '#1e293b' : '#ffffff'}; color: {isDarkMode ? '#e2e8f0' : '#111827'}; border-color: {isDarkMode ? '#475569' : '#d1d5db'};"
         />
         <p class="text-xs mt-1" style="color: {isDarkMode ? '#64748b' : '#9ca3af'};">
-          Override the label shown in the portal form
+          {t('requestTypeFields.overrideLabel')}
         </p>
       </div>
 
       <div>
         <label class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
-          Description / Help Text
+          {t('requestTypeFields.descriptionHelpText')}
         </label>
         <textarea
           bind:value={editDescription}
-          placeholder="Enter help text to show below the field..."
+          placeholder={t('requestTypeFields.helpTextPlaceholder')}
           rows="3"
           class="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500"
           style="background-color: {isDarkMode ? '#1e293b' : '#ffffff'}; color: {isDarkMode ? '#e2e8f0' : '#111827'}; border-color: {isDarkMode ? '#475569' : '#d1d5db'};"
@@ -769,14 +775,14 @@
           size="medium"
           class="flex-1"
         >
-          Save
+          {t('common.save')}
         </Button>
         <Button
           onclick={cancelFieldEdit}
           variant="default"
           size="medium"
         >
-          Cancel
+          {t('common.cancel')}
         </Button>
       </div>
     </div>

@@ -4,6 +4,7 @@
   import ItemKey from '../items/ItemKey.svelte';
   import { createEventDispatcher } from 'svelte';
   import { api } from '../../api.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
   
@@ -122,7 +123,7 @@
       closeParentSelector();
     } catch (error) {
       console.error('Failed to update parent:', error);
-      alert('Failed to update parent: ' + (error.message || error));
+      alert(t('items.failedToUpdateParent') + ': ' + (error.message || error));
     } finally {
       saving = false;
     }
@@ -142,7 +143,7 @@
       closeParentSelector();
     } catch (error) {
       console.error('Failed to remove parent:', error);
-      alert('Failed to remove parent: ' + (error.message || error));
+      alert(t('items.failedToRemoveParent') + ': ' + (error.message || error));
     } finally {
       saving = false;
     }
@@ -155,7 +156,7 @@
     onclick={() => navigate('/workspaces')}
     class="transition-colors hover:underline"
   >
-    Workspaces
+    {t('workspaces.title')}
   </button>
   <span>/</span>
   <button
@@ -169,17 +170,17 @@
     onclick={() => navigate(`/workspaces/${workspaceId}/collections/default/list`)}
     class="transition-colors hover:underline"
   >
-    Work Items
+    {t('items.workItems')}
   </button>
   <span>/</span>
   <!-- Related Work Item link (for personal tasks) -->
   {#if workspace?.is_personal && item.related_work_item_id}
     <div class="flex items-center gap-1.5">
-      <span class="text-xs italic" style="color: var(--ds-text-subtlest);">linked to</span>
+      <span class="text-xs italic" style="color: var(--ds-text-subtlest);">{t('items.linkedTo')}</span>
       <button
         onclick={() => navigate(`/workspaces/${item.related_work_item_workspace_id}/items/${item.related_work_item_id}`)}
         class="transition-colors flex items-center gap-1.5 hover:underline"
-        title="Go to linked work item"
+        title={t('items.goToLinkedWorkItem')}
       >
         <span class="text-xs px-1.5 py-0.5 rounded font-mono" style="background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue);">
           {item.related_work_item_workspace_key}-{item.related_work_item_number}
@@ -208,7 +209,7 @@
         <button
           onclick={() => navigate(`/workspaces/${parent.workspace_id}/items/${parent.id}`)}
           class="transition-colors hover:underline"
-          title="Go to {parent.title}"
+          title={t('items.goTo', { title: parent.title })}
         >
           {parent.title}
         </button>
@@ -221,9 +222,9 @@
       onclick={openParentSelector}
       class="italic transition-colors hover:underline"
       style="color: var(--ds-text-subtlest);"
-      title="Set parent"
+      title={t('items.setParent')}
     >
-      No parent
+      {t('items.noParent')}
     </button>
     <span>/</span>
   {/if}
@@ -236,7 +237,7 @@
         onclick={openParentSelector}
         class="w-4 h-4 rounded transition-colors flex items-center justify-center"
         style="color: var(--ds-text-subtlest);"
-        title={parentHierarchy.length > 0 ? "Change parent" : "Set parent"}
+        title={parentHierarchy.length > 0 ? t('items.changeParent') : t('items.setParent')}
         disabled={saving}
       >
         <Edit3 class="w-3 h-3" />
@@ -252,7 +253,7 @@
         <!-- Header -->
         <div class="flex items-center justify-between p-3 border-b" style="border-color: var(--ds-border);">
           <h3 class="font-medium" style="color: var(--ds-text);">
-            {parentHierarchy.length > 0 ? 'Change Parent' : 'Set Parent'}
+            {parentHierarchy.length > 0 ? t('items.changeParent') : t('items.setParent')}
           </h3>
           <button
             onclick={closeParentSelector}
@@ -270,21 +271,21 @@
             <input
               type="text"
               bind:value={searchQuery}
-              placeholder="Search for parent item..."
+              placeholder={t('items.searchForParentItem')}
               class="w-full pl-9 pr-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
             />
           </div>
           {#if validParentHierarchyLevel !== null}
             <div class="mt-2 text-xs" style="color: var(--ds-text-subtle);">
-              Only showing items from hierarchy level {validParentHierarchyLevel}
+              {t('items.showingItemsFromLevel', { level: validParentHierarchyLevel })}
               {#if currentHierarchyLevel}
-                (one level above {currentHierarchyLevel.name})
+                ({t('items.oneLevelAbove', { name: currentHierarchyLevel.name })})
               {/if}
             </div>
           {:else}
             <div class="mt-2 text-xs" style="color: var(--ds-text-subtle);">
-              Search for parent item across workspaces
+              {t('items.searchParentAcrossWorkspaces')}
             </div>
           {/if}
         </div>
@@ -301,26 +302,26 @@
             >
               <div class="flex items-center gap-2">
                 <X class="w-4 h-4" />
-                <span class="text-sm">Remove parent</span>
+                <span class="text-sm">{t('items.removeParent')}</span>
               </div>
             </button>
           {/if}
 
           {#if searching}
             <div class="p-3 text-center text-sm" style="color: var(--ds-text-subtle);">
-              Searching...
+              {t('common.searching')}
             </div>
           {:else if searchQuery.length >= 2 && searchResults.length === 0}
             <div class="p-3 text-center text-sm" style="color: var(--ds-text-subtle);">
               {#if validParentHierarchyLevel !== null}
-                No items found at hierarchy level {validParentHierarchyLevel}
+                {t('items.noItemsAtLevel', { level: validParentHierarchyLevel })}
               {:else}
-                No items found
+                {t('common.noItemsFound')}
               {/if}
             </div>
           {:else if searchQuery.length < 2}
             <div class="p-3 text-center text-sm" style="color: var(--ds-text-subtle);">
-              Type at least 2 characters to search
+              {t('common.typeToSearch')}
             </div>
           {:else}
             {#each searchResults as result}
@@ -374,7 +375,7 @@
         {/snippet}
       </Tooltip>
     {/if}
-    <Tooltip content="Click to copy key to clipboard">
+    <Tooltip content={t('items.clickToCopyKey')}>
       {#snippet children()}
         <button
           onclick={() => dispatch('copy-key')}

@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
+  import { t } from '../stores/i18n.svelte.js';
   import {
     GitBranch, Plus, Edit, Trash2, X, Check, RefreshCw,
     AlertCircle, Settings, Power, PowerOff, Link, ExternalLink,
@@ -22,31 +23,31 @@
   import SectionHeader from '../layout/SectionHeader.svelte';
 
   // Workspace access options
-  const workspaceAccessOptions = [
-    { value: 'unrestricted', label: 'All workspaces can use this provider' },
-    { value: 'restricted', label: 'Restrict to specific workspaces' }
-  ];
+  const workspaceAccessOptions = $derived([
+    { value: 'unrestricted', label: t('settings.scmProviders.allWorkspaces') },
+    { value: 'restricted', label: t('settings.scmProviders.restrictToWorkspaces') }
+  ]);
 
-  let providers = [];
-  let loading = true;
-  let error = null;
-  let showCreateModal = false;
-  let showEditModal = false;
-  let showDeleteModal = false;
-  let editingProvider = null;
-  let deletingProvider = null;
-  let testResult = null;
-  let testLoading = false;
-  let saving = false;
-  let oauthLoading = false;
+  let providers = $state([]);
+  let loading = $state(true);
+  let error = $state(null);
+  let showCreateModal = $state(false);
+  let showEditModal = $state(false);
+  let showDeleteModal = $state(false);
+  let editingProvider = $state(null);
+  let deletingProvider = $state(null);
+  let testResult = $state(null);
+  let testLoading = $state(false);
+  let saving = $state(false);
+  let oauthLoading = $state(false);
 
   // Workspace restriction state
-  let allowedWorkspaceIds = [];
+  let allowedWorkspaceIds = $state([]);
 
 
   // Check for OAuth callback status in URL
-  let oauthStatus = null;
-  let oauthMessage = null;
+  let oauthStatus = $state(null);
+  let oauthMessage = $state(null);
 
   // Provider types (only GitHub and Gitea supported)
   const providerTypes = [
@@ -62,14 +63,16 @@
   ];
 
   // Filter auth methods based on provider type (GitHub App only for GitHub)
-  $: availableAuthMethods = authMethods.filter(m =>
+  const availableAuthMethods = $derived(authMethods.filter(m =>
     m.value !== 'github_app' || formData.provider_type === 'github'
-  );
+  ));
 
   // Reset auth method if it becomes invalid for the selected provider
-  $: if (formData.auth_method === 'github_app' && formData.provider_type !== 'github') {
-    formData.auth_method = 'oauth';
-  }
+  $effect(() => {
+    if (formData.auth_method === 'github_app' && formData.provider_type !== 'github') {
+      formData.auth_method = 'oauth';
+    }
+  });
 
   // Default OAuth scopes per provider type
   const defaultScopes = {
@@ -78,7 +81,7 @@
   };
 
   // Form state
-  let formData = {
+  let formData = $state({
     slug: '',
     name: '',
     provider_type: 'github',
@@ -95,22 +98,24 @@
     github_org_id: null,
     scopes: defaultScopes.github,
     workspace_restriction_mode: 'unrestricted',
-  };
+  });
 
-  let formErrors = {};
+  let formErrors = $state({});
 
   // GitHub App discovery state
-  let discoveredInstallations = [];
-  let discoveringInstallations = false;
-  let discoveryError = null;
+  let discoveredInstallations = $state([]);
+  let discoveringInstallations = $state(false);
+  let discoveryError = $state(null);
 
   // Update scopes when provider type changes (only if scopes is a default value)
-  $: if (formData.provider_type) {
-    const currentIsDefault = Object.values(defaultScopes).includes(formData.scopes);
-    if (currentIsDefault) {
-      formData.scopes = defaultScopes[formData.provider_type] || defaultScopes.github;
+  $effect(() => {
+    if (formData.provider_type) {
+      const currentIsDefault = Object.values(defaultScopes).includes(formData.scopes);
+      if (currentIsDefault) {
+        formData.scopes = defaultScopes[formData.provider_type] || defaultScopes.github;
+      }
     }
-  }
+  });
 
   onMount(async () => {
     // Check for OAuth callback status
@@ -137,7 +142,7 @@
       providers = response || [];
     } catch (err) {
       console.error('Failed to load SCM providers:', err);
-      error = 'Failed to load SCM providers';
+      error = t('settings.scmProviders.failedToLoad');
     } finally {
       loading = false;
     }
@@ -281,7 +286,7 @@
       closeModals();
     } catch (err) {
       console.error('Failed to save provider:', err);
-      formErrors.submit = err.message || 'Failed to save provider';
+      formErrors.submit = err.message || t('settings.scmProviders.failedToSave');
     } finally {
       saving = false;
     }
@@ -311,7 +316,7 @@
       closeModals();
     } catch (err) {
       console.error('Failed to delete provider:', err);
-      error = 'Failed to delete provider';
+      error = t('settings.scmProviders.failedToDelete');
     } finally {
       saving = false;
     }
@@ -326,9 +331,9 @@
       // If testing from list (not modal), show result as toast
       if (providerId && !showEditModal) {
         if (result.success) {
-          successToast(result.message || 'Connection successful', 'Test Result');
+          successToast(result.message || t('settings.scmProviders.connectionSuccessful'), 'Test Result');
         } else {
-          errorToast(result.error || 'Connection failed', 'Test Result');
+          errorToast(result.error || t('settings.scmProviders.connectionFailed'), 'Test Result');
         }
       }
     } catch (err) {
@@ -414,11 +419,11 @@
   }
 
   // Compute OAuth callback URL based on slug
-  $: oauthCallbackUrl = formData.slug
+  const oauthCallbackUrl = $derived(formData.slug
     ? `${window.location.origin}/api/scm/oauth/${formData.slug}/callback`
-    : '';
+    : '');
 
-  let callbackCopied = false;
+  let callbackCopied = $state(false);
   async function copyCallbackUrl() {
     if (!oauthCallbackUrl) return;
     try {
@@ -445,11 +450,11 @@
 
 <div class="space-y-6">
   <!-- Header -->
-  <SectionHeader title="SCM Providers" subtitle="Configure GitHub and Gitea integrations for repository linking.">
+  <SectionHeader title={t('settings.scmProviders.title')} subtitle={t('settings.scmProviders.subtitle')}>
     {#snippet actions()}
       <Button variant="primary" onclick={openCreateModal} keyboardHint={getShortcutDisplay('scmProviders', 'addProvider')}>
         <Plus class="w-4 h-4 mr-2" />
-        Add Provider
+        {t('settings.scmProviders.addProvider')}
       </Button>
     {/snippet}
   </SectionHeader>
@@ -481,14 +486,14 @@
     <!-- Empty State -->
     <div class="text-center py-12 rounded-lg border border-dashed" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
       <GitBranch class="mx-auto h-12 w-12" style="color: var(--ds-text-subtlest);" />
-      <h3 class="mt-2 text-sm font-medium" style="color: var(--ds-text);">No SCM providers</h3>
+      <h3 class="mt-2 text-sm font-medium" style="color: var(--ds-text);">{t('settings.scmProviders.noProviders')}</h3>
       <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">
-        Get started by adding a GitHub or Gitea provider.
+        {t('settings.scmProviders.getStarted')}
       </p>
       <div class="mt-4">
         <Button variant="primary" onclick={openCreateModal} keyboardHint={getShortcutDisplay('scmProviders', 'addProvider')}>
           <Plus class="w-4 h-4 mr-2" />
-          Add Provider
+          {t('settings.scmProviders.addProvider')}
         </Button>
       </div>
     </div>
@@ -505,15 +510,15 @@
               <div class="flex items-center space-x-2">
                 <h3 class="text-sm font-medium" style="color: var(--ds-text);">{provider.name}</h3>
                 {#if provider.enabled}
-                  <Lozenge color="green">Enabled</Lozenge>
+                  <Lozenge color="green">{t('settings.scmProviders.enabled')}</Lozenge>
                 {:else}
-                  <Lozenge color="gray">Disabled</Lozenge>
+                  <Lozenge color="gray">{t('settings.scmProviders.disabled')}</Lozenge>
                 {/if}
                 {#if provider.is_default}
-                  <Lozenge color="blue">Default</Lozenge>
+                  <Lozenge color="blue">{t('settings.scmProviders.default')}</Lozenge>
                 {/if}
                 {#if provider.workspace_restriction_mode === 'restricted'}
-                  <Lozenge color="purple">Restricted</Lozenge>
+                  <Lozenge color="purple">{t('settings.scmProviders.restricted')}</Lozenge>
                 {/if}
               </div>
               <div class="flex items-center space-x-2 mt-1 text-sm" style="color: var(--ds-text-subtle);">
@@ -531,24 +536,24 @@
                   {#if provider.has_oauth_token}
                     <span class="flex items-center" style="color: var(--ds-text-success);">
                       <CheckCircle class="w-3 h-3 mr-1" />
-                      OAuth Connected
+                      {t('settings.scmProviders.oauthConnected')}
                     </span>
                   {:else}
                     <span class="flex items-center" style="color: var(--ds-text-warning);">
                       <AlertCircle class="w-3 h-3 mr-1" />
-                      OAuth Not Connected
+                      {t('settings.scmProviders.oauthNotConnected')}
                     </span>
                   {/if}
                 {:else if provider.auth_method === 'pat'}
                   {#if provider.has_pat}
                     <span class="flex items-center" style="color: var(--ds-text-success);">
                       <CheckCircle class="w-3 h-3 mr-1" />
-                      PAT Configured
+                      {t('settings.scmProviders.patConfigured')}
                     </span>
                   {:else}
                     <span class="flex items-center" style="color: var(--ds-text-danger);">
                       <XCircle class="w-3 h-3 mr-1" />
-                      PAT Not Configured
+                      {t('settings.scmProviders.patNotConfigured')}
                     </span>
                   {/if}
                 {/if}
@@ -568,7 +573,7 @@
                 {:else}
                   <Link class="w-4 h-4 mr-1" />
                 {/if}
-                Connect
+                {t('settings.scmProviders.connect')}
               </Button>
             {/if}
             <Button variant="ghost" size="sm" onclick={() => testConnection(provider.id)} disabled={testLoading}>
@@ -589,7 +594,7 @@
 
 <!-- Create/Edit Modal -->
 <Modal isOpen={showCreateModal || showEditModal} onclose={closeModals} maxWidth="max-w-2xl">
-    <ModalHeader title={showCreateModal ? 'Add SCM Provider' : 'Edit SCM Provider'} onClose={closeModals} />
+    <ModalHeader title={showCreateModal ? t('settings.scmProviders.addSCMProvider') : t('settings.scmProviders.editSCMProvider')} onClose={closeModals} />
 
     <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="p-4 space-y-4">
       {#if formErrors.submit}
@@ -598,17 +603,17 @@
 
       <!-- Basic Info -->
       <div class="grid grid-cols-2 gap-4">
-        <FormField label="Slug" error={formErrors.slug} helper="URL-safe identifier (lowercase, hyphens allowed)">
+        <FormField label={t('settings.scmProviders.slug')} error={formErrors.slug} helper={t('settings.scmProviders.slugHelp')}>
           <Input
             bind:value={formData.slug}
             placeholder="github-main"
             disabled={!!editingProvider}
           />
         </FormField>
-        <FormField label="Name" error={formErrors.name}>
+        <FormField label={t('settings.scmProviders.name')} error={formErrors.name}>
           <Input
             bind:value={formData.name}
-            placeholder="GitHub - Main Organization"
+            placeholder={t('settings.scmProviders.namePlaceholder')}
           />
         </FormField>
       </div>
@@ -616,7 +621,7 @@
       <!-- Provider Type & Auth Method -->
       <div class="grid grid-cols-2 gap-4">
         <div>
-          <Label color="default" class="mb-1">Provider Type</Label>
+          <Label color="default" class="mb-1">{t('settings.scmProviders.providerType')}</Label>
           <BasePicker
             bind:value={formData.provider_type}
             items={providerTypes}
@@ -626,7 +631,7 @@
           />
         </div>
         <div>
-          <Label color="default" class="mb-1">Authentication Method</Label>
+          <Label color="default" class="mb-1">{t('settings.scmProviders.authMethod')}</Label>
           <BasePicker
             bind:value={formData.auth_method}
             items={availableAuthMethods}
@@ -639,7 +644,7 @@
 
       <!-- Base URL (for self-hosted Gitea/Forgejo) -->
       {#if formData.provider_type === 'gitea'}
-        <FormField label="Base URL" error={formErrors.base_url} helper="Enter your self-hosted Gitea/Forgejo instance URL">
+        <FormField label={t('settings.scmProviders.baseUrl')} error={formErrors.base_url} helper={t('settings.scmProviders.baseUrlPlaceholder')}>
           <Input
             bind:value={formData.base_url}
             placeholder="https://gitea.example.com"
@@ -652,7 +657,7 @@
         <!-- Callback URL -->
         <div class="p-3 rounded-lg border" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
           <div class="flex items-center justify-between mb-1">
-            <label class="text-sm font-medium" style="color: var(--ds-text);">Callback URL</label>
+            <label class="text-sm font-medium" style="color: var(--ds-text);">{t('settings.scmProviders.callbackUrl')}</label>
             {#if oauthCallbackUrl}
               <button
                 type="button"
@@ -662,10 +667,10 @@
               >
                 {#if callbackCopied}
                   <Check class="w-3 h-3 mr-1" style="color: var(--ds-text-success);" />
-                  Copied!
+                  {t('settings.scmProviders.copied')}
                 {:else}
                   <Copy class="w-3 h-3 mr-1" />
-                  Copy
+                  {t('settings.scmProviders.copy')}
                 {/if}
               </button>
             {/if}
@@ -675,18 +680,18 @@
               {oauthCallbackUrl}
             </code>
           {:else}
-            <p class="text-xs" style="color: var(--ds-text-subtle);">Enter a slug above to generate the callback URL</p>
+            <p class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.scmProviders.enterSlugForCallback')}</p>
           {/if}
           <p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">
-            Use this URL when configuring your OAuth App in {formData.provider_type === 'github' ? 'GitHub' : 'Gitea'}
+            {t('settings.scmProviders.useThisUrl')} {formData.provider_type === 'github' ? 'GitHub' : 'Gitea'}
           </p>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
-          <FormField label="OAuth Client ID" error={formErrors.oauth_client_id}>
+          <FormField label={t('settings.scmProviders.oauthClientId')} error={formErrors.oauth_client_id}>
             <Input bind:value={formData.oauth_client_id} />
           </FormField>
-          <FormField label="OAuth Client Secret" error={formErrors.oauth_client_secret} helper={editingProvider ? 'Leave empty to keep existing secret' : ''}>
+          <FormField label={t('settings.scmProviders.oauthClientSecret')} error={formErrors.oauth_client_secret} helper={editingProvider ? t('settings.scmProviders.leaveEmptyToKeep') : ''}>
             <Input type="password" bind:value={formData.oauth_client_secret} />
           </FormField>
         </div>
@@ -694,18 +699,18 @@
 
       <!-- PAT Settings -->
       {#if formData.auth_method === 'pat'}
-        <FormField label="Personal Access Token" error={formErrors.personal_access_token} helper={editingProvider ? 'Leave empty to keep existing token' : ''}>
+        <FormField label={t('settings.scmProviders.personalAccessToken')} error={formErrors.personal_access_token} helper={editingProvider ? t('settings.scmProviders.leaveEmptyToKeep') : ''}>
           <Input type="password" bind:value={formData.personal_access_token} />
         </FormField>
       {/if}
 
       <!-- GitHub App Settings -->
       {#if formData.auth_method === 'github_app'}
-        <FormField label="GitHub App ID" error={formErrors.github_app_id}>
+        <FormField label={t('settings.scmProviders.githubAppId')} error={formErrors.github_app_id}>
           <Input bind:value={formData.github_app_id} />
         </FormField>
 
-        <FormField label="Private Key (PEM)" error={formErrors.github_app_private_key} helper={editingProvider ? 'Leave empty to keep existing key' : ''}>
+        <FormField label={t('settings.scmProviders.privateKeyPem')} error={formErrors.github_app_private_key} helper={editingProvider ? t('settings.scmProviders.leaveEmptyToKeep') : ''}>
           <textarea
             bind:value={formData.github_app_private_key}
             rows="4"
@@ -719,9 +724,9 @@
         <div class="space-y-3 p-3 rounded-lg border" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
           <div class="flex items-center justify-between">
             <div>
-              <h4 class="text-sm font-medium" style="color: var(--ds-text);">Organization Installation</h4>
+              <h4 class="text-sm font-medium" style="color: var(--ds-text);">{t('settings.scmProviders.orgInstallation')}</h4>
               <p class="text-xs mt-0.5" style="color: var(--ds-text-subtle);">
-                Discover where your GitHub App is installed
+                {t('settings.scmProviders.discoverInstallations')}
               </p>
             </div>
             <Button
@@ -736,7 +741,7 @@
               {:else}
                 <RefreshCw class="w-4 h-4 mr-2" />
               {/if}
-              Discover Installations
+              {t('settings.scmProviders.discoverButton')}
             </Button>
           </div>
 
@@ -776,7 +781,7 @@
             <div class="flex items-center p-2 rounded" style="background-color: var(--ds-background-success-subtle);">
               <CheckCircle class="w-4 h-4 mr-2" style="color: var(--ds-text-success);" />
               <span class="text-sm" style="color: var(--ds-text);">
-                Installation configured (ID: {formData.github_app_installation_id})
+                {t('settings.scmProviders.orgInstallationId')} {formData.github_app_installation_id})
               </span>
             </div>
           {/if}
@@ -785,7 +790,7 @@
 
       <!-- Scopes (only for OAuth/PAT - GitHub Apps use permissions configured in GitHub) -->
       {#if formData.auth_method !== 'github_app'}
-        <FormField label="Scopes" helper="Space-separated list of OAuth scopes">
+        <FormField label={t('settings.scmProviders.scopes')} helper={t('settings.scmProviders.scopesHelp')}>
           <Input bind:value={formData.scopes} placeholder="repo read:user user:email" />
         </FormField>
       {/if}
@@ -793,7 +798,7 @@
       <!-- Workspace Restrictions -->
       <div class="space-y-3">
         <div>
-          <Label color="default" class="mb-1">Workspace Access</Label>
+          <Label color="default" class="mb-1">{t('settings.scmProviders.workspaceAccess')}</Label>
           <BasePicker
             bind:value={formData.workspace_restriction_mode}
             items={workspaceAccessOptions}
@@ -808,11 +813,11 @@
             <WorkspacePicker
               bind:value={allowedWorkspaceIds}
               placeholder="Select allowed workspaces..."
-              label="Allowed Workspaces"
+              label={t('settings.scmProviders.allowedWorkspaces')}
             />
             {#if allowedWorkspaceIds.length === 0}
               <div class="text-xs p-2 rounded" style="background-color: var(--ds-background-warning-subtle); color: var(--ds-text-warning);">
-                Warning: No workspaces selected. This provider will not be usable by any workspace.
+                {t('settings.scmProviders.noWorkspacesWarning')}
               </div>
             {/if}
           </div>
@@ -828,7 +833,7 @@
             class="h-4 w-4 text-blue-600 focus:ring-blue-500 rounded"
             style="border-color: var(--ds-border);"
           />
-          <span class="ml-2 text-sm" style="color: var(--ds-text);">Enabled</span>
+          <span class="ml-2 text-sm" style="color: var(--ds-text);">{t('settings.scmProviders.enabled')}</span>
         </label>
         <label class="flex items-center">
           <input
@@ -837,14 +842,14 @@
             class="h-4 w-4 text-blue-600 focus:ring-blue-500 rounded"
             style="border-color: var(--ds-border);"
           />
-          <span class="ml-2 text-sm" style="color: var(--ds-text);">Default Provider</span>
+          <span class="ml-2 text-sm" style="color: var(--ds-text);">{t('settings.scmProviders.default')}</span>
         </label>
       </div>
 
       <!-- Test Result -->
       {#if testResult}
         <AlertBox type={testResult.success ? 'success' : 'error'}>
-          {testResult.success ? testResult.message || 'Connection successful' : testResult.error}
+          {testResult.success ? testResult.message || t('settings.scmProviders.connectionSuccessful') : testResult.error}
         </AlertBox>
       {/if}
 
@@ -869,13 +874,13 @@
         </div>
         <div class="flex space-x-2">
           <Button type="button" variant="secondary" onclick={closeModals}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button type="submit" variant="primary" disabled={saving} keyboardHint="⏎">
             {#if saving}
               <Spinner size="sm" class="mr-2" />
             {/if}
-            {showCreateModal ? 'Create' : 'Save'}
+            {showCreateModal ? t('common.create') : t('common.save')}
           </Button>
         </div>
       </div>
@@ -884,21 +889,20 @@
 
 <!-- Delete Confirmation Modal -->
 <Modal isOpen={showDeleteModal && deletingProvider} onclose={closeModals} maxWidth="max-w-md">
-    <ModalHeader title="Delete Provider" onClose={closeModals} />
+    <ModalHeader title={t('common.delete')} onClose={closeModals} />
     <div class="p-4">
       <p class="text-sm" style="color: var(--ds-text-subtle);">
-        Are you sure you want to delete the provider <strong style="color: var(--ds-text);">{deletingProvider?.name}</strong>?
-        This will also remove all workspace connections using this provider.
+        {t('common.confirmDelete')} <strong style="color: var(--ds-text);">{deletingProvider?.name}</strong>?
       </p>
       <div class="mt-4 flex justify-end space-x-2">
         <Button variant="secondary" onclick={closeModals}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button variant="danger" onclick={handleDelete} disabled={saving}>
           {#if saving}
             <Spinner size="sm" class="mr-2" />
           {/if}
-          Delete
+          {t('common.delete')}
         </Button>
       </div>
     </div>

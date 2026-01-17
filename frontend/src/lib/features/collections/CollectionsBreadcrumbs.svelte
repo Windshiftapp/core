@@ -1,5 +1,6 @@
 <script>
   import { navigate } from '../../router.js';
+  import { t } from '../../stores/i18n.svelte.js';
   import { SquareKanban, Save, Tag } from 'lucide-svelte';
   import Button from '../../components/Button.svelte';
   import Select from '../../components/Select.svelte';
@@ -72,7 +73,7 @@
           class="hover:underline transition-colors"
           style="color: var(--ds-text-subtle);"
         >
-          Workspaces
+          {t('workspaces.title')}
         </button>
         <span>/</span>
         <button
@@ -85,7 +86,7 @@
         <span>/</span>
       {:else}
         <!-- Global collection breadcrumb -->
-        <span>Global Collection</span>
+        <span>{t('collections.globalCollection')}</span>
         <span>/</span>
       {/if}
 
@@ -97,12 +98,12 @@
           oninput={handleNameChange}
           class="text-sm font-medium bg-transparent border-none p-0 focus:outline-none focus:ring-0"
           style="color: var(--ds-text); min-width: 150px;"
-          placeholder="Collection name"
+          placeholder={t('collections.collectionName')}
         />
       {:else if collection}
         <span style="color: var(--ds-text);" class="font-medium">{collection.name}</span>
       {:else}
-        <span style="color: var(--ds-text);" class="font-medium">New Collection</span>
+        <span style="color: var(--ds-text);" class="font-medium">{t('collections.newCollection')}</span>
       {/if}
     </div>
 
@@ -115,14 +116,14 @@
           size="sm"
         >
           <SquareKanban class="w-4 h-4 mr-2" />
-          {workspace ? 'Change Workspace' : 'Associate Workspace'}
+          {workspace ? t('collections.changeWorkspace') : t('collections.associateWorkspace')}
         </Button>
         <Button
           onclick={handleCancel}
           variant="default"
           size="sm"
         >
-          Cancel
+          {t('common.cancel')}
         </Button>
       {/if}
       <Button
@@ -133,9 +134,9 @@
       >
         <Save class="w-4 h-4 mr-2" />
         {#if isEditing && collection}
-          Update Collection
+          {t('collections.updateCollection')}
         {:else}
-          Save Collection
+          {t('collections.saveCollection')}
         {/if}
       </Button>
     </div>
@@ -150,7 +151,7 @@
         oninput={handleDescriptionChange}
         class="text-sm bg-transparent border-none p-0 focus:outline-none focus:ring-0 flex-1"
         style="color: var(--ds-text-subtle);"
-        placeholder="Add description..."
+        placeholder={t('collections.collectionDescription')}
       />
 
       <!-- Category selector for global collections -->
@@ -163,7 +164,7 @@
             class="text-xs py-0.5 px-1 rounded border bg-transparent"
             style="border-color: var(--ds-border); color: var(--ds-text-subtle);"
           >
-            <option value="">No Category</option>
+            <option value="">{t('collections.noCategory')}</option>
             {#each categories as category}
               <option value={category.id}>{category.name}</option>
             {/each}
@@ -176,7 +177,7 @@
         {#if workspace}
           <span>{workspaceName}</span>
         {:else}
-          <span>Global</span>
+          <span>{t('collections.globalCollection')}</span>
         {/if}
       </div>
     </div>

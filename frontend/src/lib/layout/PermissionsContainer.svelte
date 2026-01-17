@@ -2,6 +2,7 @@
   import { currentRoute, navigate } from '../router.js';
   import PermissionManager from '../settings/PermissionManager.svelte';
   import PermissionSetManager from '../settings/PermissionSetManager.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   // Get active subtab from URL query params, default to 'permissions'
   $: subtab = $currentRoute.query?.subtab || 'permissions';
@@ -10,9 +11,9 @@
     navigate(`/admin/permissions?subtab=${newSubtab}`);
   }
 
-  const tabs = [
-    { id: 'permissions', label: 'Permissions' },
-    { id: 'permission-sets', label: 'Permission Sets' }
+  $: tabs = [
+    { id: 'permissions', label: t('permissions.title') },
+    { id: 'permission-sets', label: t('permissions.permissionSet') + 's' }
   ];
 </script>
 

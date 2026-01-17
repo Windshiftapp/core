@@ -4,6 +4,7 @@
   import { navigate } from '../../router.js';
   import { getCollection } from '../collections/collectionService.js';
   import { getStatusColor, getStatusInlineStyle, getTextColorForBackground } from '../../utils/statusColors.js';
+  import { t } from '../../stores/i18n.svelte.js';
   import { workspaceGradientIndex, applyToAllViews, loadWorkspaceGradient, getGradientStyle } from '../../stores/workspaceGradient.js';
   import { gradients } from '../../utils/gradients.js';
   import { ChevronRight, ChevronDown, GitBranch, Circle, AlertCircle, Calendar, FileCheck, Minus } from 'lucide-svelte';
@@ -475,7 +476,7 @@
 
 {#if loading}
   <div class="p-6">
-    <div class="animate-pulse">Loading...</div>
+    <div class="animate-pulse">{t('collectionTree.loading')}</div>
   </div>
 {:else if workspace}
   <div class="min-h-screen" style="{backgroundStyle}">
@@ -486,7 +487,7 @@
         <ViewHeader
           workspaceName={workspace.name}
           collection={currentCollectionName}
-          viewName="Tree"
+          viewName={t('collectionTree.tree')}
           itemCount={allItems.length}
           hasGradient={hasGradient}
           textStyle={textStyle}
@@ -498,8 +499,8 @@
       {#if allItems.length === 0}
         <div class="text-center py-12">
           <GitBranch class="w-12 h-12 mx-auto mb-4" style="{subtleTextStyle}" />
-          <h3 class="text-lg font-medium mb-2" style="{textStyle}">No work items yet</h3>
-          <p style="{subtleTextStyle}">Create your first work item to see the hierarchy tree.</p>
+          <h3 class="text-lg font-medium mb-2" style="{textStyle}">{t('collectionTree.noWorkItemsYet')}</h3>
+          <p style="{subtleTextStyle}">{t('collectionTree.createFirstWorkItem')}</p>
         </div>
       {:else}
         <!-- Tree Controls -->
@@ -512,10 +513,10 @@
             >
               {#if expandedItems.size === 0}
                 <ChevronDown class="w-4 h-4" />
-                Expand All
+                {t('collectionTree.expandAll')}
               {:else}
                 <Minus class="w-4 h-4" />
-                Collapse All
+                {t('collectionTree.collapseAll')}
               {/if}
             </button>
 
@@ -532,7 +533,7 @@
                 {:else}
                   <FileCheck class="w-4 h-4" />
                 {/if}
-                {showTestCases ? 'Hide' : 'Show'} Tests
+                {showTestCases ? t('collectionTree.hideTests') : t('collectionTree.showTests')}
               </button>
             {/if}
           </div>
@@ -541,7 +542,7 @@
           {#if getTotalPages() > 1}
             <div class="flex items-center gap-4">
               <span class="text-sm" style="{textStyle}">
-                Showing {paginationInfo.start}-{paginationInfo.end} of {paginationInfo.total} root items
+                {t('collectionTree.showingRootItems', { start: paginationInfo.start, end: paginationInfo.end, total: paginationInfo.total })}
               </span>
 
               <div class="flex items-center gap-2">
@@ -551,11 +552,11 @@
                   onclick={() => goToPage(currentPage - 1)}
                   disabled={currentPage === 1}
                 >
-                  Previous
+                  {t('common.previous')}
                 </button>
 
                 <span class="px-3 py-1 text-sm" style="{textStyle}">
-                  Page {currentPage} of {getTotalPages()}
+                  {t('collectionTree.pageOfTotal', { current: currentPage, total: getTotalPages() })}
                 </span>
 
                 <button
@@ -564,7 +565,7 @@
                   onclick={() => goToPage(currentPage + 1)}
                   disabled={currentPage === getTotalPages()}
                 >
-                  Next
+                  {t('common.next')}
                 </button>
               </div>
             </div>
@@ -577,11 +578,11 @@
           <div class="border-b px-4 py-3" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
             <div class="flex items-center gap-4 text-xs font-semibold uppercase tracking-wider" style="{glassSubtleTextStyle}">
               <div class="w-12"></div> <!-- Expand + Icon space -->
-              <div class="min-w-24">Issue</div>
-              <div class="flex-1">Summary</div>
-              <div class="w-24">Status</div>
-              <div class="w-20">Priority</div>
-              <div class="w-20">Created</div>
+              <div class="min-w-24">{t('collectionTree.issue')}</div>
+              <div class="flex-1">{t('common.summary')}</div>
+              <div class="w-24">{t('common.status')}</div>
+              <div class="w-20">{t('common.priority')}</div>
+              <div class="w-20">{t('common.created')}</div>
             </div>
           </div>
 
@@ -627,7 +628,7 @@
                 </div>
 
                 <!-- Empty columns for alignment -->
-                <div class="w-24 text-xs text-green-600">Test Case</div>
+                <div class="w-24 text-xs text-green-600">{t('testing.testCase')}</div>
                 <div class="w-20"></div>
                 <div class="w-20"></div>
               </div>
@@ -707,7 +708,7 @@
                 <!-- Status -->
                 <div class="w-24">
                   <Lozenge
-                    text={selectedStatus ? selectedStatus.name : 'No status'}
+                    text={selectedStatus ? selectedStatus.name : t('collectionTree.noStatus')}
                     customBg={statusCategory?.color || '#6b7280'}
                   />
                 </div>
@@ -746,11 +747,11 @@
                 onclick={() => goToPage(currentPage - 1)}
                 disabled={currentPage === 1}
               >
-                Previous
+                {t('common.previous')}
               </button>
 
               <span class="px-4 py-2 text-sm" style="{textStyle}">
-                Page {currentPage} of {getTotalPages()}
+                {t('collectionTree.pageOfTotal', { current: currentPage, total: getTotalPages() })}
               </span>
 
               <button
@@ -759,7 +760,7 @@
                 onclick={() => goToPage(currentPage + 1)}
                 disabled={currentPage === getTotalPages()}
               >
-                Next
+                {t('common.next')}
               </button>
             </div>
           </div>
@@ -770,7 +771,7 @@
 {:else}
   <div class="p-6">
     <div class="text-center" style="color: var(--ds-text-subtle);">
-      Workspace not found.
+      {t('collectionTree.workspaceNotFound')}
     </div>
   </div>
 {/if}

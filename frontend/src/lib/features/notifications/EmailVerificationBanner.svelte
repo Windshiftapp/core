@@ -1,6 +1,7 @@
 <script>
   import { Mail, RefreshCw, X } from 'lucide-svelte';
   import { api } from '../../api.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let { show = false, ondismiss } = $props();
 
@@ -20,7 +21,7 @@
         resendSuccess = false;
       }, 5000);
     } catch (err) {
-      resendError = err.message || 'Failed to send verification email';
+      resendError = err.message || t('notifications.failedToSendVerification');
     } finally {
       resending = false;
     }
@@ -41,16 +42,16 @@
           </div>
           <div class="text-sm text-amber-800">
             <p class="font-medium">
-              Please verify your email address
+              {t('notifications.verifyEmail')}
             </p>
             <p class="text-amber-700">
-              We've sent a verification link to your email. Click the link to complete your account setup.
+              {t('notifications.verifyEmailDescription')}
             </p>
           </div>
         </div>
         <div class="flex items-center gap-3">
           {#if resendSuccess}
-            <span class="text-sm" style="color: var(--ds-text-success);">Verification email sent!</span>
+            <span class="text-sm" style="color: var(--ds-text-success);">{t('notifications.verificationEmailSent')}</span>
           {:else if resendError}
             <span class="text-sm" style="color: var(--ds-text-danger);">{resendError}</span>
           {/if}
@@ -61,16 +62,16 @@
           >
             {#if resending}
               <RefreshCw class="h-4 w-4 animate-spin" />
-              Sending...
+              {t('notifications.sending')}
             {:else}
               <RefreshCw class="h-4 w-4" />
-              Resend email
+              {t('notifications.resendEmail')}
             {/if}
           </button>
           <button
             onclick={handleDismiss}
             class="p-1.5 text-amber-600 hover:text-amber-800 hover:bg-amber-100 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
-            title="Dismiss"
+            title={t('notifications.dismiss')}
           >
             <X class="h-4 w-4" />
           </button>

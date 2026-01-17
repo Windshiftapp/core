@@ -2,11 +2,12 @@
   import { MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-svelte';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import EmptyState from './EmptyState.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let columns = []; // Array of column definitions: { key, label, width?, align?, sortable? }
   export let data = []; // Array of data objects
   export let keyField = 'id'; // Field to use as unique key
-  export let emptyMessage = 'No data found';
+  export let emptyMessage = '';
   export let emptyDescription = ''; // Optional description for empty state
   export let emptyIcon = null; // Lucide icon component
   export let actionItems = null; // Function that takes (item) => dropdownItems array
@@ -116,7 +117,7 @@
   {#if displayData.length === 0}
     <EmptyState
       icon={emptyIcon}
-      title={emptyMessage}
+      title={emptyMessage || t('common.noData')}
       description={emptyDescription}
     />
   {:else}
@@ -277,7 +278,7 @@
     {#if showPagination}
       <div class="flex items-center justify-between px-4 py-3 border-t" style="border-color: var(--ds-border);">
         <span class="text-sm" style="color: var(--ds-text-subtle);">
-          Showing {startItem}–{endItem} of {totalCount}
+          {t('components.dataTable.showingRange', { start: startItem, end: endItem, total: totalCount })}
         </span>
         <div class="flex items-center gap-2">
           <button
@@ -289,7 +290,7 @@
             <ChevronLeft class="w-4 h-4" />
           </button>
           <span class="text-sm px-2" style="color: var(--ds-text-subtle);">
-            Page {currentPage} of {totalPages}
+            {t('components.pagination.pageOf', { current: currentPage, total: totalPages })}
           </span>
           <button
             onclick={nextPage}

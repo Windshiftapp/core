@@ -3,6 +3,7 @@
   import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-svelte';
   import Button from './Button.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
+  import { t } from '../stores/i18n.svelte.js';
   
   const dispatch = createEventDispatcher();
   
@@ -71,15 +72,15 @@
     <!-- Items info and page size selector -->
     <div class="flex items-center justify-between gap-4 mb-4">
       <div class="text-sm" style={textStyle}>
-        Showing {startItem}-{endItem} of {Math.min(totalItems, maxItems)}
+        {t('components.pagination.showingRange', { start: startItem, end: endItem, total: Math.min(totalItems, maxItems) })}
         {#if totalItems > maxItems}
-          <span style={warningStyle}>(limited to {maxItems} items)</span>
+          <span style={warningStyle}>({t('components.pagination.limitedTo', { max: maxItems })})</span>
         {/if}
       </div>
 
       {#if showPageSizes && !compact}
         <div class="flex items-center gap-2 text-sm" style={textStyle}>
-          <label>Items per page:</label>
+          <label>{t('components.pagination.itemsPerPage')}</label>
           <div style="min-width: 100px;">
             <BasePicker
               value={itemsPerPage}
@@ -111,7 +112,7 @@
           onclick={() => goToPage(currentPage - 1)}
           disabled={isFirstPage}
           class="px-2"
-          title="Previous page"
+          title={t('components.pagination.previousPage')}
         />
         
         <!-- Page numbers -->
@@ -127,7 +128,7 @@
                 size="small"
                 onclick={() => goToPage(page)}
                 class="min-w-[32px] px-2"
-                title="Go to page {page}"
+                title={t('components.pagination.goToPage', { page })}
               >
                 {page}
               </Button>
@@ -143,7 +144,7 @@
           onclick={() => goToPage(currentPage + 1)}
           disabled={isLastPage}
           class="px-2"
-          title="Next page"
+          title={t('components.pagination.nextPage')}
         />
       </div>
     {/if}

@@ -12,6 +12,7 @@
   import Label from '../../components/Label.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import { getStatusBadgeCSS, getStatusLabel, getStatusButtonStyle, getStatusButtonHoverStyle } from '../../utils/testStatusColors.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let testRun = null;
   let testCases = [];
@@ -351,7 +352,7 @@
       }
     } catch (error) {
       console.error('Failed to finish test execution:', error);
-      errorMessage = 'Failed to finish test execution. Please try again.';
+      errorMessage = t('testing.failedToFinish');
       showErrorDialog = true;
     }
   }
@@ -440,7 +441,7 @@
               <ArrowLeft class="w-4 h-4" />
             </button>
             <div class="min-w-0">
-              <h2 class="font-semibold text-sm truncate" style="color: var(--ds-text);">Test Execution</h2>
+              <h2 class="font-semibold text-sm truncate" style="color: var(--ds-text);">{t('testing.testExecution')}</h2>
               <div class="text-xs truncate" style="color: var(--ds-text-subtle);">
                 {testRun.name}
               </div>
@@ -451,7 +452,7 @@
           onclick={() => sidebarCollapsed = !sidebarCollapsed}
           class="p-1 rounded cursor-pointer flex-shrink-0"
           style="color: var(--ds-icon);"
-          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={sidebarCollapsed ? t('testing.expandSidebar') : t('testing.collapseSidebar')}
           onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
           onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
         >
@@ -502,7 +503,7 @@
                 {testCase.title}
               </div>
               <div class="text-xs mb-2" style="color: var(--ds-text-subtle);">
-                {progress.completed}/{progress.total} steps ({progress.percent}%)
+                {t('testing.stepsProgress', { completed: progress.completed, total: progress.total, percent: progress.percent })}
               </div>
               <div class="w-full rounded-full h-1" style="background-color: var(--ds-progress-track);">
                 <div
@@ -523,7 +524,7 @@
             variant="primary"
             size="small"
             class="w-full"
-            title="Finish Execution"
+            title={t('testing.finishExecution')}
           >
             <Check class="w-4 h-4" />
           </Button>
@@ -534,7 +535,7 @@
             size="medium"
             class="w-full"
           >
-            Finish Execution
+            {t('testing.finishExecution')}
           </Button>
         {/if}
       </div>
@@ -551,15 +552,15 @@
             </h1>
             {#if currentCase.preconditions}
               <div class="text-sm mt-2 px-3 py-2 rounded border-l-4" style="background-color: var(--ds-background-neutral); border-left-color: var(--ds-status-info-solid);">
-                <strong style="color: var(--ds-text);">Preconditions:</strong> <span style="color: var(--ds-text-subtle);">{currentCase.preconditions}</span>
+                <strong style="color: var(--ds-text);">{t('testing.preconditions')}</strong> <span style="color: var(--ds-text-subtle);">{currentCase.preconditions}</span>
               </div>
             {/if}
           </div>
           <div class="text-sm" style="color: var(--ds-text-subtle);">
             {#if currentCase.test_steps && currentCase.test_steps.length > 0}
-              Step {currentStepIndex + 1} of {currentCase.test_steps.length}
+              {t('testing.stepOfTotal', { current: currentStepIndex + 1, total: currentCase.test_steps.length })}
             {:else}
-              No steps defined
+              {t('testing.noStepsDefined')}
             {/if}
           </div>
         </div>
@@ -572,7 +573,7 @@
             variant="default"
             size="small"
           >
-            Previous
+            {t('common.previous')}
           </Button>
           
           <div class="flex-1 flex gap-1">
@@ -597,7 +598,7 @@
             variant="default"
             size="small"
           >
-            Next
+            {t('common.next')}
           </Button>
         </div>
       </div>
@@ -609,7 +610,7 @@
             <!-- Step Details -->
             <div class="grid grid-cols-3 gap-6 mb-8">
               <div>
-                <h3 class="font-medium mb-2" style="color: var(--ds-status-info-text);">Action</h3>
+                <h3 class="font-medium mb-2" style="color: var(--ds-status-info-text);">{t('testing.action')}</h3>
                 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
                 <div class="p-4 border rounded test-step-rendered" style="border-color: var(--ds-border); background-color: var(--ds-background-neutral);" onclick={handleRenderedContentClick}>
                   <MilkdownEditor content={currentStep.action || ''} readonly={true} showToolbar={false} />
@@ -617,15 +618,15 @@
               </div>
 
               <div>
-                <h3 class="font-medium mb-2" style="color: var(--ds-accent-purple);">Data</h3>
+                <h3 class="font-medium mb-2" style="color: var(--ds-accent-purple);">{t('testing.data')}</h3>
                 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
                 <div class="p-4 border rounded test-step-rendered" style="border-color: var(--ds-border); background-color: var(--ds-background-neutral);" onclick={handleRenderedContentClick}>
-                  <MilkdownEditor content={currentStep.data || 'No data specified'} readonly={true} showToolbar={false} />
+                  <MilkdownEditor content={currentStep.data || t('testing.noDataSpecified')} readonly={true} showToolbar={false} />
                 </div>
               </div>
 
               <div>
-                <h3 class="font-medium mb-2" style="color: var(--ds-status-success-text);">Expected Result</h3>
+                <h3 class="font-medium mb-2" style="color: var(--ds-status-success-text);">{t('testing.expected')}</h3>
                 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
                 <div class="p-4 border rounded test-step-rendered" style="border-color: var(--ds-border); background-color: var(--ds-background-neutral);" onclick={handleRenderedContentClick}>
                   <MilkdownEditor content={currentStep.expected || ''} readonly={true} showToolbar={false} />
@@ -635,7 +636,7 @@
 
             <!-- Result Recording -->
             <div class="mb-6">
-              <h3 class="font-medium mb-4" style="color: var(--ds-text);">Record Result</h3>
+              <h3 class="font-medium mb-4" style="color: var(--ds-text);">{t('testing.recordResult')}</h3>
               
               <!-- Status Buttons -->
               <div class="flex gap-3 mb-4">
@@ -647,7 +648,7 @@
                   onmouseleave={(e) => { if (stepResults[currentStep.id]?.status !== 'passed') e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
                   <Check class="w-4 h-4" />
-                  Pass
+                  {t('testing.pass')}
                 </button>
 
                 <button
@@ -658,7 +659,7 @@
                   onmouseleave={(e) => { if (stepResults[currentStep.id]?.status !== 'failed') e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
                   <X class="w-4 h-4" />
-                  Fail
+                  {t('testing.fail')}
                 </button>
 
                 <button
@@ -669,7 +670,7 @@
                   onmouseleave={(e) => { if (stepResults[currentStep.id]?.status !== 'blocked') e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
                   <Bug class="w-4 h-4" />
-                  Blocked
+                  {t('testing.blocked')}
                 </button>
 
                 <button
@@ -680,29 +681,29 @@
                   onmouseleave={(e) => { if (stepResults[currentStep.id]?.status !== 'skipped') e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
                   <SkipForward class="w-4 h-4" />
-                  Skip
+                  {t('testing.skip')}
                 </button>
               </div>
 
               <!-- Actual Result -->
               <div class="mb-4">
-                <Label color="default" class="mb-2">Actual Result</Label>
+                <Label color="default" class="mb-2">{t('testing.actual')}</Label>
                 <Textarea
                   value={stepResults[currentStep.id]?.actual_result || ''}
                   on:input={(e) => updateStepResult(currentStep.id, 'actual_result', e.target.value)}
                   rows={3}
-                  placeholder="What actually happened?"
+                  placeholder={t('testing.actualResultPlaceholder')}
                 />
               </div>
 
               <!-- Notes -->
               <div class="mb-4">
-                <Label color="default" class="mb-2">Notes</Label>
+                <Label color="default" class="mb-2">{t('common.notes')}</Label>
                 <Textarea
                   value={stepResults[currentStep.id]?.notes || ''}
                   on:input={(e) => updateStepResult(currentStep.id, 'notes', e.target.value)}
                   rows={2}
-                  placeholder="Additional notes or observations..."
+                  placeholder={t('testing.notesPlaceholder')}
                 />
               </div>
 
@@ -711,7 +712,7 @@
                 <div class="mb-4 p-4 rounded" style="background-color: var(--ds-status-danger-bg); border: 1px solid var(--ds-status-danger-border);">
                   <div class="flex items-center gap-2 mb-3">
                     <AlertTriangle class="w-4 h-4" style="color: var(--ds-status-danger-text);" />
-                    <h4 class="font-medium" style="color: var(--ds-status-danger-text);">Link Issue</h4>
+                    <h4 class="font-medium" style="color: var(--ds-status-danger-text);">{t('testing.linkIssue')}</h4>
                   </div>
 
                   {#if stepResults[currentStep.id]?.item_id}
@@ -719,7 +720,7 @@
                     <div class="p-3 rounded border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
                       <div class="flex items-center justify-between">
                         <div>
-                          <div class="font-medium text-sm" style="color: var(--ds-text);">{linkedItem?.name || linkedItem?.title || 'Unknown Item'}</div>
+                          <div class="font-medium text-sm" style="color: var(--ds-text);">{linkedItem?.name || linkedItem?.title || t('testing.unknownItem')}</div>
                           {#if linkedItem?.workspace_item_number}
                             <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
                               #{linkedItem.workspace_item_number}
@@ -728,20 +729,20 @@
                         </div>
                         <span class="px-2 py-1 text-xs rounded flex items-center gap-1" style="background-color: var(--ds-status-success-bg); color: var(--ds-status-success-text);">
                           <Link class="w-3 h-3" />
-                          Linked
+                          {t('testing.linked')}
                         </span>
                       </div>
                     </div>
                   {:else}
                     <div class="space-y-3">
-                      <div class="text-sm" style="color: var(--ds-status-danger-text);">This step failed but no issue is linked.</div>
+                      <div class="text-sm" style="color: var(--ds-status-danger-text);">{t('testing.stepFailedNoIssue')}</div>
 
                       <!-- Link existing item -->
                       <div>
-                        <label class="block text-sm font-medium mb-1" style="color: var(--ds-status-danger-text);">Link existing item</label>
+                        <label class="block text-sm font-medium mb-1" style="color: var(--ds-status-danger-text);">{t('testing.linkExistingItem')}</label>
                         <ItemPicker
                           items={workspaceItems}
-                          placeholder="Search items to link..."
+                          placeholder={t('testing.searchItemsToLink')}
                           config={{
                             primary: { text: (item) => item.name || item.title || '' },
                             secondary: { text: (item) => item.workspace_item_number ? `#${item.workspace_item_number}` : '' },
@@ -752,14 +753,14 @@
                       </div>
 
                       <!-- Or create new -->
-                      <div class="text-center text-sm" style="color: var(--ds-text-subtle);">or</div>
+                      <div class="text-center text-sm" style="color: var(--ds-text-subtle);">{t('testing.or')}</div>
                       <Button
                         onclick={() => openCreateModalForStep(currentStep.id)}
                         variant="default"
                         size="small"
                         icon={Plus}
                       >
-                        Create New Issue
+                        {t('testing.createNewIssue')}
                       </Button>
                     </div>
                   {/if}
@@ -769,7 +770,7 @@
               <!-- Quick Navigation -->
               <div class="flex justify-between items-center pt-4 border-t" style="border-color: var(--ds-border);">
                 <span class="text-sm px-2 py-1 rounded" style={getStatusBadgeCSS(stepResults[currentStep.id]?.status || 'not_run')}>
-                  Status: {getStatusLabel(stepResults[currentStep.id]?.status || 'not_run')}
+                  {t('common.status')}: {getStatusLabel(stepResults[currentStep.id]?.status || 'not_run')}
                 </span>
                 
                 {#if currentCaseIndex < testCases.length - 1 || (currentCase.test_steps?.length && currentStepIndex < currentCase.test_steps.length - 1)}
@@ -778,7 +779,7 @@
                     variant="primary"
                     size="medium"
                   >
-                    Next Step
+                    {t('testing.nextStep')}
                     <ChevronRight slot="icon-right" class="w-4 h-4" />
                   </Button>
                 {:else}
@@ -787,7 +788,7 @@
                     variant="primary"
                     size="medium"
                   >
-                    Finish Execution
+                    {t('testing.finishExecution')}
                     <ChevronRight slot="icon-right" class="w-4 h-4" />
                   </Button>
                 {/if}
@@ -800,9 +801,9 @@
         <div class="flex-1 p-6 overflow-y-auto flex items-center justify-center">
           <div class="max-w-md text-center">
             <div class="text-6xl mb-4">📝</div>
-            <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">No Test Steps</h3>
+            <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">{t('testing.noTestSteps')}</h3>
             <p class="text-sm mb-6" style="color: var(--ds-text-subtle);">
-              This test case doesn't have any defined steps yet. You can add steps to make it executable.
+              {t('testing.noTestStepsDescription')}
             </p>
               
             <!-- Navigation for cases without steps -->
@@ -813,20 +814,20 @@
                 variant="default"
                 size="medium"
               >
-                Previous Case
+                {t('testing.previousCase')}
               </Button>
-              
+
               <span class="px-4 py-2 rounded text-sm" style="background-color: var(--ds-background-neutral); color: var(--ds-text);">
-                Case {currentCaseIndex + 1} of {testCases.length}
+                {t('testing.caseOfTotal', { current: currentCaseIndex + 1, total: testCases.length })}
               </span>
-              
+
               {#if currentCaseIndex < testCases.length - 1}
                 <Button
                   onclick={nextStep}
                   variant="primary"
                   size="medium"
                 >
-                  Next Case
+                  {t('testing.nextCase')}
                   <ChevronRight slot="icon-right" class="w-4 h-4" />
                 </Button>
               {:else}
@@ -835,7 +836,7 @@
                   variant="primary"
                   size="medium"
                 >
-                  Finish Execution
+                  {t('testing.finishExecution')}
                   <ChevronRight slot="icon-right" class="w-4 h-4" />
                 </Button>
               {/if}
@@ -847,14 +848,14 @@
   </div>
 {:else}
   <div class="text-center py-12">
-    <div style="color: var(--ds-text-subtle);">Test run not found or no test cases available</div>
+    <div style="color: var(--ds-text-subtle);">{t('testing.testRunNotFound')}</div>
     <Button
       onclick={goBack}
       variant="primary"
       size="medium"
       class="mt-4"
     >
-      Back to Test Runs
+      {t('testing.backToTestRuns')}
     </Button>
   </div>
 {/if}
@@ -869,10 +870,10 @@
 <!-- Finish Execution Confirmation Dialog -->
 <ConfirmDialog
   bind:show={showFinishConfirmation}
-  title="Finish Test Execution"
-  message="Are you sure you want to finish this test execution? This will mark the test run as complete."
-  confirmText="Finish Execution"
-  cancelText="Cancel"
+  title={t('testing.finishTestExecution')}
+  message={t('testing.finishConfirmMessage')}
+  confirmText={t('testing.finishExecution')}
+  cancelText={t('common.cancel')}
   variant="info"
   on:confirm={confirmFinishExecution}
   on:cancel={() => showFinishConfirmation = false}
@@ -881,9 +882,9 @@
 <!-- Error Dialog -->
 <ConfirmDialog
   bind:show={showErrorDialog}
-  title="Error"
+  title={t('notifications.error')}
   message={errorMessage}
-  confirmText="OK"
+  confirmText={t('common.ok')}
   cancelText=""
   variant="danger"
   on:confirm={() => showErrorDialog = false}

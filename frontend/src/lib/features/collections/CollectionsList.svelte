@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { api } from '../../api.js';
   import { navigate, currentRoute } from '../../router.js';
+  import { t } from '../../stores/i18n.svelte.js';
   import { FolderOpen, Plus, Eye, Trash2 } from 'lucide-svelte';
   import Button from '../../components/Button.svelte';
   import DataTable from '../../components/DataTable.svelte';
@@ -48,50 +49,50 @@
   // Dynamic page title
   $: pageTitle = (() => {
     if (isWorkspaceView) {
-      return 'Workspace Collections';
+      return t('collections.workspaceCollectionsTitle');
     } else if (activeCategoryId) {
       const category = collectionCategoriesStore.getById(parseInt(activeCategoryId), $collectionCategoriesStore);
-      return category ? `${category.name} Collections` : 'Category Collections';
+      return category ? t('collections.categoryCollections', { category: category.name }) : t('collections.categoryCollections', { category: '' });
     }
-    return 'All Global Collections';
+    return t('collections.allGlobalCollections');
   })();
 
   const getWorkspaceId = (workspaceId) =>
     typeof workspaceId === 'string' ? parseInt(workspaceId, 10) : workspaceId;
 
   // Column definitions for DataTable
-  const baseCollectionColumns = [
+  $: baseCollectionColumns = [
     {
       key: 'name',
-      label: 'Collection',
+      label: t('collections.collection'),
       slot: 'name'
     },
     {
       key: 'cql_query',
-      label: 'Query',
+      label: t('collections.queryColumn'),
       slot: 'query'
     },
     {
       key: 'created_at',
-      label: 'Created',
+      label: t('collections.created'),
       render: (collection) => formatDate(collection.created_at) || '-',
       textColor: 'var(--ds-text-subtle)'
     },
     {
       key: 'actions',
-      label: 'Actions'
+      label: t('collections.actions')
     }
   ];
 
-  const workspaceColumn = {
+  $: workspaceColumn = {
     key: 'workspace',
-    label: 'Workspace',
+    label: t('workspaces.workspace'),
     render: (collection) => getWorkspaceName(collection.workspace_id) || '—'
   };
 
-  const categoryColumn = {
+  $: categoryColumn = {
     key: 'category',
-    label: 'Category',
+    label: t('common.category'),
     slot: 'category'
   };
 
@@ -151,7 +152,7 @@
   }
 
   async function deleteCollection(collection) {
-    if (!confirm(`Are you sure you want to delete the collection "${collection.name}"? This action cannot be undone.`)) {
+    if (!confirm(t('collections.confirmDeleteCollection', { name: collection.name }))) {
       return;
     }
 
@@ -170,7 +171,7 @@
         id: 'view',
         type: 'regular',
         icon: Eye,
-        title: 'View Collection',
+        title: t('collections.viewCollection'),
         onClick: () => viewCollection(collection)
       },
       { type: 'divider' },
@@ -178,7 +179,7 @@
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50 hover:text-red-700',
         onClick: () => deleteCollection(collection)
@@ -209,7 +210,7 @@
             {pageTitle}
           </h1>
           <p class="text-base" style="color: var(--ds-text-subtle);">
-            {filteredCollections.length} collection{filteredCollections.length !== 1 ? 's' : ''}
+            {filteredCollections.length === 1 ? t('collections.collectionCount', { count: filteredCollections.length }) : t('collections.collectionCountPlural', { count: filteredCollections.length })}
           </p>
         </div>
         <div class="flex-shrink-0">
@@ -219,7 +220,7 @@
             icon={Plus}
             keyboardHint="A"
           >
-            New Collection
+            {t('collections.newCollection')}
           </Button>
         </div>
       </div>
@@ -227,12 +228,12 @@
       <!-- Workspace filter (only shown in workspace view) -->
       {#if isWorkspaceView}
         <div class="flex flex-wrap items-center gap-3 mb-6">
-          <label class="text-sm font-medium" style="color: var(--ds-text-subtle);">Workspace Filter</label>
+          <label class="text-sm font-medium" style="color: var(--ds-text-subtle);">{t('collections.workspaceFilter')}</label>
           <div class="min-w-[260px]">
             <WorkspaceSelector
               value={selectedWorkspaceFilter}
               workspaces={workspaceOptions}
-              placeholder="All workspaces"
+              placeholder={t('collections.allWorkspaces')}
               allowClear={true}
               on:select={(event) => {
                 selectedWorkspaceFilter = event.detail?.id || null;
@@ -249,7 +250,7 @@
         data={filteredCollections}
         keyField="id"
         loading={loading}
-        emptyMessage="No collections found. Create your first collection to save and reuse work item queries."
+        emptyMessage={t('collections.noCollectionsFound')}
         emptyIcon={FolderOpen}
         actionItems={buildCollectionActions}
         onRowClick={(collection) => viewCollection(collection)}
@@ -260,7 +261,7 @@
               <div class="font-semibold" style="color: var(--ds-text);">{collection.name}</div>
               {#if collection.is_public}
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  Public
+                  {t('collections.public')}
                 </span>
               {/if}
             </div>
@@ -283,7 +284,7 @@
 
         <div slot="query" let:item={collection}>
           <div class="font-mono text-sm" style="color: var(--ds-text-subtle);">
-            {collection.cql_query || 'No query'}
+            {collection.cql_query || t('collections.noQuery')}
           </div>
         </div>
       </DataTable>
@@ -295,7 +296,7 @@
 <CategoryModal
   isOpen={showCategoryModal}
   onClose={() => showCategoryModal = false}
-  title="Manage Collection Categories"
+  title={t('collections.manageCategories')}
   categories={$collectionCategoriesStore}
   onAdd={handleAddCategory}
   onDelete={handleDeleteCategory}

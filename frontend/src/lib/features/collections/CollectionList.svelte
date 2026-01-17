@@ -1,5 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
+  import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { getCollection } from '../collections/collectionService.js';
@@ -292,23 +293,23 @@
   }
 
   async function deleteItem(item) {
-    if (!confirm(`Are you sure you want to delete "${item.title}"? This action cannot be undone.`)) {
+    if (!confirm(t('collections.confirmDeleteItem', { title: item.title }))) {
       return;
     }
-    
+
     try {
       await api.items.delete(item.id);
       // Refresh the work items list
       await loadWorkItems();
     } catch (error) {
       console.error('Failed to delete item:', error);
-      alert('Failed to delete item: ' + (error.message || error));
+      alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
     }
   }
 
   async function toggleTaskStatus(item, isCompleted) {
     const newStatus = isCompleted ? 'completed' : 'open';
-    
+
     try {
       await api.items.update(item.id, { status: newStatus });
       // Update local state
@@ -317,23 +318,23 @@
       workItems = [...workItems];
     } catch (error) {
       console.error('Failed to update task status:', error);
-      alert('Failed to update task status: ' + (error.message || error));
+      alert(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
     }
   }
 
   async function handleStatusChange(item, newStatus) {
     if (newStatus === item.status) return;
-    
+
     try {
       await api.items.update(item.id, { status: newStatus });
-      
+
       // Update the item in the local workItems array
       const index = workItems.findIndex(workItem => workItem.id === item.id);
       if (index !== -1) {
         workItems[index].status = newStatus;
         workItems = [...workItems]; // Trigger reactivity
       }
-      
+
       // Also update in allItems if we're in search mode
       if (searchQuery.trim() && allItems.length > 0) {
         const allIndex = allItems.findIndex(workItem => workItem.id === item.id);
@@ -344,7 +345,7 @@
       }
     } catch (error) {
       console.error('Failed to update status:', error);
-      alert('Failed to update status: ' + (error.message || error));
+      alert(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
     }
   }
 
@@ -354,14 +355,14 @@
         id: 'view',
         type: 'regular',
         icon: Eye,
-        title: 'View Details',
+        title: t('items.viewItem'),
         onClick: () => viewItem(item)
       },
       {
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         onClick: () => editItem(item)
       },
       { type: 'divider' },
@@ -369,7 +370,7 @@
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50 hover:text-red-700',
         onClick: () => deleteItem(item)
@@ -406,7 +407,7 @@
     const { error, field, value } = event.detail;
     console.error(`Failed to update ${field}:`, error);
     // You could show a toast notification here
-    alert(`Failed to update ${field}: ${error}`);
+    alert(t('dialogs.alerts.failedToUpdate', { error: `${field}: ${error}` }));
   }
 
   // Throttled status transition loader
@@ -477,7 +478,7 @@
 
 {#if loading}
   <div class="p-6">
-    <div class="animate-pulse">Loading...</div>
+    <div class="animate-pulse">{t('common.loading')}</div>
   </div>
 {:else if workspace}
   <div class="min-h-screen" style="{backgroundStyle}">
@@ -501,7 +502,7 @@
           <!-- Search -->
           <SearchInput
             bind:value={searchQuery}
-            placeholder="Search work items..."
+            placeholder={t('items.noItemsInFilter')}
             hasGradient={hasGradient}
           />
 
@@ -512,18 +513,18 @@
       <!-- Work Items Table -->
       {#if loadingItems}
         <div class="rounded-xl border shadow-sm p-8 text-center" style="{tableBgStyle} {hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
-          <div class="animate-pulse " style="{subtleTextStyle}">Loading work items...</div>
+          <div class="animate-pulse " style="{subtleTextStyle}">{t('common.loading')}</div>
         </div>
       {:else if filteredItems.length === 0}
         <div class="rounded-xl border shadow-sm p-12 text-center" style="{tableBgStyle} {hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
           {#if workItems.length === 0}
             <AlertCircle class="w-12 h-12  mx-auto mb-4" style="{subtleTextStyle}" />
-            <h3 class="text-lg font-medium  mb-2" style="{textStyle}">No work items yet</h3>
-            <p class="" style="{subtleTextStyle}">Get started by creating your first work item in this workspace.</p>
+            <h3 class="text-lg font-medium  mb-2" style="{textStyle}">{t('items.noItems')}</h3>
+            <p class="" style="{subtleTextStyle}">{t('items.createToStart')}</p>
           {:else}
             <AlertCircle class="w-12 h-12  mx-auto mb-4" style="{subtleTextStyle}" />
-            <h3 class="text-lg font-medium  mb-2" style="{textStyle}">No items match your search</h3>
-            <p class="" style="{subtleTextStyle}">Try adjusting your search terms or filters.</p>
+            <h3 class="text-lg font-medium  mb-2" style="{textStyle}">{t('items.noItemsInFilter')}</h3>
+            <p class="" style="{subtleTextStyle}">{t('items.noItemsInFilter')}</p>
           {/if}
         </div>
       {:else}
@@ -531,11 +532,11 @@
           <!-- Table Header -->
           <div class="px-4 py-3 border-b" style="{tableHeaderBgStyle} {hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
             <div class="grid grid-cols-12 gap-4 text-xs font-semibold uppercase tracking-wider" style="{glassSubtleTextStyle}">
-              <div class="col-span-6">Title</div>
-              <div class="col-span-2">Status</div>
-              <div class="col-span-2">Priority</div>
-              <div class="col-span-1">Created</div>
-              <div class="col-span-1">Actions</div>
+              <div class="col-span-6">{t('common.title')}</div>
+              <div class="col-span-2">{t('common.status')}</div>
+              <div class="col-span-2">{t('common.priority')}</div>
+              <div class="col-span-1">{t('common.created')}</div>
+              <div class="col-span-1">{t('common.actions')}</div>
             </div>
           </div>
 
@@ -702,7 +703,7 @@
                           class="w-full flex items-center justify-start gap-2 text-sm text-left cursor-pointer"
                           style="color: var(--ds-text-subtle);"
                         >
-                          Select priority
+                          {t('pickers.selectPriority')}
                         </span>
                       {/if}
                     {/snippet}
@@ -749,7 +750,7 @@
         {:else}
           <!-- Results Summary for legacy/non-paginated responses -->
           <div class="mt-4 text-sm  text-center" style="{subtleTextStyle}">
-            Showing {filteredItems.length} work items
+            {t('collections.showingWorkItems', { count: filteredItems.length })}
           </div>
         {/if}
       {/if}
@@ -758,7 +759,7 @@
 {:else}
   <div class="p-6">
     <div class="text-center " style="{subtleTextStyle}">
-      Workspace not found.
+      {t('workspaces.noWorkspaces')}
     </div>
   </div>
 {/if}

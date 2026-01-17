@@ -1,5 +1,6 @@
 <script>
   import { Flag } from 'lucide-svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let milestones = [];
 
@@ -26,7 +27,7 @@
     return breakdown.map((segment, index) => {
       const label = typeof segment?.category_name === 'string' && segment.category_name.trim().length > 0
         ? segment.category_name.trim()
-        : 'No Status';
+        : t('widgets.milestoneProgress.noStatus');
       const color = segment?.category_color || fallbackColors[index % fallbackColors.length];
       const count = typeof segment?.item_count === 'number' && Number.isFinite(segment.item_count)
         ? segment.item_count
@@ -80,7 +81,7 @@
               <div class="title-text">
                 <p class="milestone-name">{milestone.milestone_name}</p>
                 {#if milestone.target_date}
-                  <p class="milestone-date">Due {formatDate(milestone.target_date)}</p>
+                  <p class="milestone-date">{t('widgets.milestoneProgress.due')} {formatDate(milestone.target_date)}</p>
                 {/if}
               </div>
             </div>
@@ -116,21 +117,21 @@
                     />
                   {/each}
                   <text class="pie-total" x="70" y="68">{milestone.total_items || 0}</text>
-                  <text class="pie-label" x="70" y="84">items</text>
+                  <text class="pie-label" x="70" y="84">{t('widgets.milestoneProgress.items')}</text>
                 </svg>
               {:else}
                 <div class="pie-empty">
-                  <p>No items</p>
+                  <p>{t('widgets.milestoneProgress.noItems')}</p>
                 </div>
               {/if}
             </div>
 
             <div class="summary">
               <p class="summary-value">
-                {milestone.completed_items || 0}/{milestone.total_items || 0} done
+                {milestone.completed_items || 0}/{milestone.total_items || 0} {t('widgets.milestoneProgress.done')}
               </p>
               <p class="summary-subtle">
-                {milestone.status ? milestone.status.replace(/_/g, ' ') : 'Active milestone'}
+                {milestone.status ? milestone.status.replace(/_/g, ' ') : t('widgets.milestoneProgress.activeMilestone')}
               </p>
             </div>
 
@@ -141,12 +142,12 @@
                     <span class="legend-dot" style={`background-color:${segment.color};`}></span>
                     <div>
                       <p class="legend-label">{segment.label}</p>
-                      <p class="legend-value">{segment.count} {segment.count === 1 ? 'item' : 'items'}</p>
+                      <p class="legend-value">{segment.count} {segment.count === 1 ? t('widgets.milestoneProgress.item') : t('widgets.milestoneProgress.items')}</p>
                     </div>
                   </li>
                 {/each}
               {:else}
-                <li class="legend-empty">No categorized work yet</li>
+                <li class="legend-empty">{t('widgets.milestoneProgress.noCategorizedWork')}</li>
               {/if}
             </ul>
           </div>
@@ -156,9 +157,9 @@
   {:else}
     <div class="empty-state">
       <Flag class="empty-icon" />
-      <p class="empty-title">No in-progress milestones</p>
+      <p class="empty-title">{t('widgets.milestoneProgress.emptyTitle')}</p>
       <p class="empty-copy">
-        Assign items to a milestone to see status distribution and progress.
+        {t('widgets.milestoneProgress.emptySubtitle')}
       </p>
     </div>
   {/if}

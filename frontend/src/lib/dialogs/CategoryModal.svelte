@@ -4,6 +4,7 @@
   import Button from '../components/Button.svelte';
   import ColorPicker from '../editors/ColorPicker.svelte';
   import EmptyState from '../components/EmptyState.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     isOpen = false,
@@ -39,7 +40,7 @@
   }
 
   async function deleteCategory(category) {
-    if (!confirm(`Delete category "${category.name}"? Items in this category will become uncategorized.`)) {
+    if (!confirm(t('categories.confirmDeleteCategory', { name: category.name }))) {
       return;
     }
 
@@ -48,7 +49,7 @@
       await onDelete(category.id);
     } catch (error) {
       console.error('Failed to delete category:', error);
-      alert('Failed to delete category. It may still be in use.');
+      alert(t('categories.failedToDeleteCategory'));
     } finally {
       loading = false;
     }
@@ -73,7 +74,7 @@
 
     <!-- Add New Category Form -->
     <div class="mb-6 p-4 rounded border" style="background-color: var(--ds-background-neutral); border-color: var(--ds-border);">
-      <h4 class="text-sm font-medium mb-3" style="color: var(--ds-text);">Add New Category</h4>
+      <h4 class="text-sm font-medium mb-3" style="color: var(--ds-text);">{t('categories.addNewCategory')}</h4>
       <div class="flex gap-3 items-center">
         <div class="flex-1">
           <input
@@ -81,7 +82,7 @@
             bind:value={newCategoryName}
             class="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500"
             style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-            placeholder="Category name..."
+            placeholder={t('categories.categoryNamePlaceholder')}
             onkeydown={(e) => e.key === 'Enter' && addCategory()}
             disabled={loading}
           />
@@ -94,7 +95,7 @@
           onclick={addCategory}
           disabled={!newCategoryName.trim() || loading}
         >
-          Add Category
+          {t('categories.addCategory')}
         </Button>
       </div>
     </div>
@@ -102,7 +103,7 @@
     <!-- Existing Categories List -->
     <div>
       <h4 class="text-sm font-medium mb-3" style="color: var(--ds-text);">
-        Existing Categories ({categories.length})
+        {t('categories.existingCategories')} ({categories.length})
       </h4>
 
       {#if categories.length > 0}
@@ -125,7 +126,7 @@
                 onclick={() => deleteCategory(category)}
                 disabled={loading}
               >
-                Delete
+                {t('common.delete')}
               </Button>
             </div>
           {/each}
@@ -133,8 +134,8 @@
       {:else}
         <EmptyState
           icon={Tag}
-          title="No categories yet"
-          description="Add your first category above."
+          title={t('categories.noCategoriesYet')}
+          description={t('categories.addFirstCategoryHint')}
         />
       {/if}
     </div>
@@ -145,7 +146,7 @@
         variant="default"
         onclick={handleClose}
       >
-        Close
+        {t('common.close')}
       </Button>
     </div>
   </div>

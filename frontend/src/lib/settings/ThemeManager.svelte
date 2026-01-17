@@ -12,24 +12,25 @@
   import ColorPicker from '../editors/ColorPicker.svelte';
   import Label from '../components/Label.svelte';
   import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   // State management
-  let themes = [];
-  let activeTheme = null;
-  let loading = true;
-  let error = null;
-  let showCreateForm = false;
-  let editingTheme = null;
-  
+  let themes = $state([]);
+  let activeTheme = $state(null);
+  let loading = $state(true);
+  let error = $state(null);
+  let showCreateForm = $state(false);
+  let editingTheme = $state(null);
+
   // Form data
-  let newTheme = {
+  let newTheme = $state({
     name: '',
     description: '',
     nav_background_color_light: '#ffffff',
     nav_text_color_light: '#374151',
     nav_background_color_dark: '#1f2937',
     nav_text_color_dark: '#f3f4f6'
-  };
+  });
 
   // Load themes and active theme
   onMount(async () => {
@@ -105,7 +106,7 @@
   }
 
   async function deleteTheme(id) {
-    if (!confirm('Are you sure you want to delete this theme? This action cannot be undone.')) {
+    if (!confirm(t('dialogs.confirmations.deleteTheme'))) {
       return;
     }
 
@@ -184,8 +185,8 @@
 <div class="theme-manager">
   <PageHeader
     icon={Palette}
-    title="Theme Management"
-    description="Manage application themes and appearance settings. Themes control the visual styling of the navigation bar and other interface elements."
+    title={t('settings.theme')}
+    description={t('settings.appearance')}
   >
     {#snippet actions()}
       <Button
@@ -194,7 +195,7 @@
         onclick={() => showCreateForm = !showCreateForm}
         keyboardHint="A"
       >
-        Create Theme
+        {t('common.create')}
       </Button>
     {/snippet}
   </PageHeader>
@@ -202,7 +203,7 @@
   {#if activeTheme}
     <div class="mb-6 flex items-center space-x-2 text-sm" style="color: var(--ds-text-subtle);">
       <Palette class="w-4 h-4" />
-      <span>Active Theme: <strong style="color: var(--ds-text);">{activeTheme.name}</strong></span>
+      <span>{t('common.active')}: <strong style="color: var(--ds-text);">{activeTheme.name}</strong></span>
     </div>
   {/if}
 
@@ -214,7 +215,7 @@
 
 <Modal isOpen={showCreateForm} onclose={() => showCreateForm = false} maxWidth="max-w-2xl">
   <ModalHeader
-    title={editingTheme ? 'Edit Theme' : 'Create Theme'}
+    title={editingTheme ? t('common.edit') : t('common.create')}
     onClose={() => showCreateForm = false}
   />
 
@@ -223,24 +224,24 @@
     <form onsubmit={(e) => { e.preventDefault(); createTheme(); }}>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div>
-          <Label for="name" color="default" class="mb-2">Name</Label>
+          <Label for="name" color="default" class="mb-2">{t('common.name')}</Label>
           <input
             type="text"
             id="name"
             bind:value={newTheme.name}
-            placeholder="Theme name"
+            placeholder={t('common.name')}
             required
             class="w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2" style="border: 1px solid var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
           />
         </div>
 
         <div>
-          <Label for="description" color="default" class="mb-2">Description</Label>
+          <Label for="description" color="default" class="mb-2">{t('common.description')}</Label>
           <input
             type="text"
             id="description"
             bind:value={newTheme.description}
-            placeholder="Theme description"
+            placeholder={t('placeholders.optionalDescription')}
             class="w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2" style="border: 1px solid var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
           />
         </div>
@@ -250,16 +251,16 @@
       <div class="mb-4">
         <h4 class="text-sm font-semibold mb-3 flex items-center gap-2" style="color: var(--ds-text);">
           <span class="w-3 h-3 rounded-full bg-yellow-400"></span>
-          Light Mode Colors
+          {t('settings.lightMode')}
         </h4>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label color="default" class="mb-2">Background</Label>
+            <Label color="default" class="mb-2">{t('common.color')}</Label>
             <ColorPicker bind:value={newTheme.nav_background_color_light} compact={true} />
           </div>
 
           <div>
-            <Label color="default" class="mb-2">Text</Label>
+            <Label color="default" class="mb-2">{t('common.color')}</Label>
             <ColorPicker bind:value={newTheme.nav_text_color_light} compact={true} />
           </div>
         </div>
@@ -269,16 +270,16 @@
       <div class="mb-4">
         <h4 class="text-sm font-semibold mb-3 flex items-center gap-2" style="color: var(--ds-text);">
           <span class="w-3 h-3 rounded-full bg-gray-700"></span>
-          Dark Mode Colors
+          {t('settings.darkMode')}
         </h4>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label color="default" class="mb-2">Background</Label>
+            <Label color="default" class="mb-2">{t('common.color')}</Label>
             <ColorPicker bind:value={newTheme.nav_background_color_dark} compact={true} />
           </div>
 
           <div>
-            <Label color="default" class="mb-2">Text</Label>
+            <Label color="default" class="mb-2">{t('common.color')}</Label>
             <ColorPicker bind:value={newTheme.nav_text_color_dark} compact={true} />
           </div>
         </div>
@@ -287,7 +288,7 @@
   </div>
 
   <DialogFooter
-    confirmLabel={editingTheme ? 'Update Theme' : 'Create Theme'}
+    confirmLabel={editingTheme ? t('common.update') : t('common.create')}
     disabled={!newTheme.name}
     onCancel={() => showCreateForm = false}
     onConfirm={createTheme}
@@ -393,7 +394,7 @@
                     style="color: var(--ds-text-subtle); background-color: var(--ds-surface-secondary);"
                   >
                     <X class="w-3 h-3" />
-                    <span>Cancel</span>
+                    <span>{t('common.cancel')}</span>
                   </button>
                   <button
                     type="submit"
@@ -401,7 +402,7 @@
                     style="background-color: var(--ds-background-brand); color: white;"
                   >
                     <Check class="w-3 h-3" />
-                    <span>Save</span>
+                    <span>{t('common.save')}</span>
                   </button>
                 </div>
               </form>
@@ -412,10 +413,10 @@
                   <h3 class="text-lg font-semibold flex items-center space-x-2" style="color: var(--ds-text);">
                     <span>{theme.name}</span>
                     {#if theme.is_default}
-                      <span class="px-2 py-1 text-xs rounded" style="background-color: var(--ds-surface-secondary); color: var(--ds-text-subtle);">Default</span>
+                      <span class="px-2 py-1 text-xs rounded" style="background-color: var(--ds-surface-secondary); color: var(--ds-text-subtle);">{t('common.default')}</span>
                     {/if}
                     {#if theme.is_active}
-                      <span class="px-2 py-1 text-xs rounded" style="background-color: var(--ds-surface-success); color: var(--ds-text-success);">Active</span>
+                      <span class="px-2 py-1 text-xs rounded" style="background-color: var(--ds-surface-success); color: var(--ds-text-success);">{t('common.active')}</span>
                     {/if}
                   </h3>
                   {#if theme.description}
@@ -464,16 +465,16 @@
               <div class="flex justify-between items-center">
                 <div class="flex space-x-2">
                   {#if !theme.is_active}
-                    <Button 
+                    <Button
                       variant="primary"
                       size="sm"
                       icon={Check}
                       onclick={() => activateTheme(theme.id)}
                     >
-                      Activate
+                      {t('common.enable')}
                     </Button>
                   {/if}
-                  
+
                   {#if !theme.is_default}
                     <button
                       onclick={() => startEdit(theme)}
@@ -481,7 +482,7 @@
                       style="color: var(--ds-text-subtle); background-color: var(--ds-surface-secondary);"
                     >
                       <Edit class="w-3 h-3" />
-                      <span>Edit</span>
+                      <span>{t('common.edit')}</span>
                     </button>
                   {/if}
                 </div>
@@ -493,7 +494,7 @@
                     style="color: var(--ds-text-danger); background-color: var(--ds-danger-subtle);"
                   >
                     <Trash2 class="w-3 h-3" />
-                    <span>Delete</span>
+                    <span>{t('common.delete')}</span>
                   </button>
                 {/if}
               </div>
@@ -506,14 +507,14 @@
     {#if themes.length === 0}
       <div class="text-center py-12">
         <Palette class="w-12 h-12 mx-auto mb-4" style="color: var(--ds-text-subtle);" />
-        <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">No themes found</h3>
-        <p class="mb-4" style="color: var(--ds-text-subtle);">Create your first theme to customize the application appearance.</p>
-        <Button 
+        <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">{t('common.noData')}</h3>
+        <p class="mb-4" style="color: var(--ds-text-subtle);">{t('settings.appearance')}</p>
+        <Button
           variant="primary"
           icon={Plus}
           onclick={() => showCreateForm = true}
         >
-          Create Theme
+          {t('common.create')}
         </Button>
       </div>
     {/if}

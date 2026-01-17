@@ -14,25 +14,26 @@
 	import AlertBox from '../components/AlertBox.svelte';
 	import Lozenge from '../components/Lozenge.svelte';
 	import { matchesShortcut } from '../utils/keyboardShortcuts.js';
+	import { t } from '../stores/i18n.svelte.js';
 
-	let groups = [];
-	let users = [];
-	let loading = false;
-	let error = '';
-	let showCreateForm = false;
-	let editingGroup = null;
-	let showMemberModal = false;
-	let selectedGroup = null;
-	let availableUsers = [];
-	let selectedUserIds = [];
-	let selectedUserId = null;
-	let selectedUsersToAdd = [];
+	let groups = $state([]);
+	let users = $state([]);
+	let loading = $state(false);
+	let error = $state('');
+	let showCreateForm = $state(false);
+	let editingGroup = $state(null);
+	let showMemberModal = $state(false);
+	let selectedGroup = $state(null);
+	let availableUsers = $state([]);
+	let selectedUserIds = $state([]);
+	let selectedUserId = $state(null);
+	let selectedUsersToAdd = $state([]);
 
 	// Form data
-	let formData = {
+	let formData = $state({
 		name: '',
 		description: ''
-	};
+	});
 
 	async function loadGroups() {
 		loading = true;
@@ -40,7 +41,7 @@
 			groups = await api.groups.getAll();
 			error = '';
 		} catch (err) {
-			error = err.message || 'Failed to load groups';
+			error = err.message || t('settings.groups.failedToLoad');
 		} finally {
 			loading = false;
 		}
@@ -68,18 +69,18 @@
 			resetForm();
 			await loadGroups();
 		} catch (err) {
-			error = err.message || 'Failed to save group';
+			error = err.message || t('settings.groups.failedToSave');
 		}
 	}
 
 	async function deleteGroup(groupId) {
-		if (!confirm('Are you sure you want to delete this group? All memberships will be removed.')) return;
-		
+		if (!confirm(t('settings.groups.confirmDelete'))) return;
+
 		try {
 			await api.groups.delete(groupId);
 			await loadGroups();
 		} catch (err) {
-			error = err.message || 'Failed to delete group';
+			error = err.message || t('settings.groups.failedToDelete');
 		}
 	}
 
@@ -95,7 +96,7 @@
 			
 			showMemberModal = true;
 		} catch (err) {
-			error = err.message || 'Failed to load group details';
+			error = err.message || t('settings.groups.failedToLoadDetails');
 		}
 	}
 
@@ -136,12 +137,12 @@
 			// Refresh groups list
 			await loadGroups();
 		} catch (err) {
-			error = err.message || 'Failed to add members';
+			error = err.message || t('settings.groups.failedToAddMembers');
 		}
 	}
 
 	async function removeMember(userId) {
-		if (!confirm('Are you sure you want to remove this member from the group?')) return;
+		if (!confirm(t('settings.groups.confirmRemoveMember'))) return;
 		
 		try {
 			await api.groups.removeMembers(selectedGroup.id, [userId]);
@@ -153,7 +154,7 @@
 			// Refresh groups list
 			await loadGroups();
 		} catch (err) {
-			error = err.message || 'Failed to remove member';
+			error = err.message || t('settings.groups.failedToRemoveMember');
 		}
 	}
 
@@ -172,7 +173,7 @@
 				id: 'edit',
 				type: 'regular',
 				icon: Edit,
-				title: 'Edit',
+				title: t('settings.groups.edit'),
 				hoverClass: 'hover-bg',
 				onClick: () => editGroup(group)
 			},
@@ -180,7 +181,7 @@
 				id: 'members',
 				type: 'regular',
 				icon: UserStar,
-				title: 'Manage Members',
+				title: t('settings.groups.manageMembers'),
 				hoverClass: 'hover-bg',
 				onClick: () => manageMembers(group)
 			}
@@ -192,7 +193,7 @@
 				id: 'delete',
 				type: 'regular',
 				icon: Trash2,
-				title: 'Delete',
+				title: t('settings.groups.delete'),
 				color: '#dc2626',
 				hoverClass: 'hover:bg-red-50',
 				onClick: () => deleteGroup(group.id)
@@ -202,41 +203,41 @@
 		return items;
 	}
 
-	// Table column definitions
-	const groupColumns = [
+	// Table column definitions (reactive for i18n)
+	const groupColumns = $derived([
 		{
 			key: 'name',
-			label: 'Group Name'
+			label: t('settings.groups.groupName')
 		},
 		{
 			key: 'description',
-			label: 'Description',
+			label: t('settings.groups.description'),
 			textColor: 'var(--ds-text-subtle)'
 		},
 		{
 			key: 'member_count',
-			label: 'Members',
+			label: t('settings.groups.members'),
 			textColor: 'var(--ds-text-subtle)',
 			render: (group) => {
 				const count = group.member_count || 0;
-				return count === 0 ? 'No members' : `${count} member${count !== 1 ? 's' : ''}`;
+				return count === 0 ? t('settings.groups.noMembers') : t('settings.groups.membersCount', { count });
 			}
 		},
 		{
 			key: 'ldap_sync_enabled',
-			label: 'LDAP Sync',
+			label: t('settings.groups.ldapSync'),
 			slot: 'ldap_sync'
 		},
 		{
 			key: 'is_active',
-			label: 'Status',
+			label: t('settings.groups.status'),
 			slot: 'status'
 		},
 		{
 			key: 'actions',
-			label: 'Actions'
+			label: t('settings.groups.actions')
 		}
-	];
+	]);
 
 	function resetForm() {
 		formData = {
@@ -278,10 +279,10 @@
 </script>
 
 <div class="space-y-6">
-	<PageHeader 
-		icon={UserStar} 
-		title="Group Management" 
-		subtitle="Manage user groups and memberships for access control"
+	<PageHeader
+		icon={UserStar}
+		title={t('settings.groups.title')}
+		subtitle={t('settings.groups.subtitle')}
 	>
 		{#snippet actions()}
 			<Button
@@ -293,7 +294,7 @@
 				}}
 				keyboardHint="A"
 			>
-				Add Group
+				{t('settings.groups.addGroup')}
 			</Button>
 		{/snippet}
 	</PageHeader>
@@ -304,7 +305,7 @@
 
 	<Modal isOpen={showCreateForm} onclose={resetForm} maxWidth="max-w-lg">
 		<ModalHeader
-			title={editingGroup ? 'Edit Group' : 'Create New Group'}
+			title={editingGroup ? t('settings.groups.editGroup') : t('settings.groups.createGroup')}
 			onClose={resetForm}
 		/>
 
@@ -313,32 +314,32 @@
 			<form onsubmit={(e) => { e.preventDefault(); saveGroup(); }} class="space-y-4">
 				<div>
 					<label for="name" class="block text-sm font-medium" style="color: var(--ds-text)">
-						Group Name
+						{t('settings.groups.groupName')}
 					</label>
 					<Input
 						id="name"
 						bind:value={formData.name}
 						required
-						placeholder="e.g., Developers, Managers, Support Team"
+						placeholder={t('settings.groups.groupNamePlaceholder')}
 					/>
 				</div>
 
 				<div>
 					<label for="description" class="block text-sm font-medium" style="color: var(--ds-text)">
-						Description (optional)
+						{t('settings.groups.descriptionOptional')}
 					</label>
 					<Textarea
 						id="description"
 						bind:value={formData.description}
 						rows={3}
-						placeholder="Describe the purpose and responsibilities of this group"
+						placeholder={t('settings.groups.descriptionPlaceholder')}
 					/>
 				</div>
 			</form>
 		</div>
 
 		<DialogFooter
-			confirmLabel={editingGroup ? 'Update Group' : 'Create Group'}
+			confirmLabel={editingGroup ? t('settings.groups.updateGroup') : t('settings.groups.createGroup')}
 			onCancel={resetForm}
 			onConfirm={saveGroup}
 		/>
@@ -346,8 +347,8 @@
 
 	<Modal isOpen={showMemberModal && selectedGroup} onclose={closeMemberModal} maxWidth="max-w-2xl">
 		<ModalHeader
-			title="Manage Members: {selectedGroup?.name}"
-			subtitle="{selectedGroup?.member_count} member{selectedGroup?.member_count !== 1 ? 's' : ''}"
+			title="{t('settings.groups.manageMembers')}: {selectedGroup?.name}"
+			subtitle={t('settings.groups.membersCount', { count: selectedGroup?.member_count || 0 })}
 			onClose={closeMemberModal}
 		/>
 
@@ -356,7 +357,7 @@
 					<!-- Current Members -->
 					{#if selectedGroup.members && selectedGroup.members.length > 0}
 						<div>
-							<h4 class="text-sm font-medium mb-3" style="color: var(--ds-text)">Current Members</h4>
+							<h4 class="text-sm font-medium mb-3" style="color: var(--ds-text)">{t('settings.groups.currentMembers')}</h4>
 							<div class="space-y-2">
 								{#each selectedGroup.members as member}
 									<div class="flex items-center justify-between p-3 rounded border" style="background-color: var(--ds-surface); border-color: var(--ds-border)">
@@ -368,10 +369,10 @@
 											</div>
 											<div>
 												<div class="text-sm font-medium" style="color: var(--ds-text)">
-													{member.user_name || 'Unknown User'}
+													{member.user_name || t('settings.groups.unknownUser')}
 												</div>
 												<div class="text-xs" style="color: var(--ds-text-subtle)">
-													{member.user_email} • Added {new Date(member.added_at).toLocaleDateString()}
+													{member.user_email} • {t('settings.groups.added')} {new Date(member.added_at).toLocaleDateString()}
 													{#if member.ldap_sync_enabled}
 														<span class="ml-2 inline-flex px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded">
 															LDAP
@@ -387,10 +388,10 @@
 												icon={UserMinus}
 												onclick={() => removeMember(member.user_id)}
 											>
-												Remove
+												{t('settings.groups.remove')}
 											</Button>
 										{:else}
-											<span class="text-xs" style="color: var(--ds-text-subtlest)">LDAP Managed</span>
+											<span class="text-xs" style="color: var(--ds-text-subtlest)">{t('settings.groups.ldapManaged')}</span>
 										{/if}
 									</div>
 								{/each}
@@ -400,21 +401,21 @@
 
 					<!-- Add Members -->
 					<div>
-						<h4 class="text-sm font-medium mb-3" style="color: var(--ds-text)">Add Members</h4>
+						<h4 class="text-sm font-medium mb-3" style="color: var(--ds-text)">{t('settings.groups.addMembers')}</h4>
 						<div class="space-y-4">
 							<!-- User Picker -->
 							<div>
 								<UserPicker
 									bind:value={selectedUserId}
-									placeholder="Search and select a user to add..."
+									placeholder={t('settings.groups.searchAndSelectUser')}
 									onSelect={onUserSelected}
 								/>
 							</div>
-							
+
 							<!-- Selected Users to Add -->
 							{#if selectedUsersToAdd.length > 0}
 								<div>
-									<p class="text-sm mb-2" style="color: var(--ds-text-subtle)">Users to add ({selectedUsersToAdd.length}):</p>
+									<p class="text-sm mb-2" style="color: var(--ds-text-subtle)">{t('settings.groups.usersToAdd')} ({selectedUsersToAdd.length}):</p>
 									<div class="space-y-2 max-h-32 overflow-y-auto">
 										{#each selectedUsersToAdd as user}
 											<div class="flex items-center justify-between p-2 bg-blue-50 rounded border dark:bg-blue-900/20">
@@ -437,14 +438,14 @@
 													class="p-1 rounded"
 													style="color: var(--ds-text-subtle)"
 													onclick={() => removeUserFromAddList(user.id)}
-													title="Remove from list"
+													title={t('settings.groups.remove')}
 												>
 													<X class="w-4 h-4" />
 												</button>
 											</div>
 										{/each}
 									</div>
-									
+
 									<div class="flex justify-end mt-3">
 										<Button
 											variant="primary"
@@ -452,7 +453,7 @@
 											icon={UserPlus}
 											onclick={addSelectedMembers}
 										>
-											Add {selectedUsersToAdd.length} Member{selectedUsersToAdd.length !== 1 ? 's' : ''}
+											{t('common.add')} {selectedUsersToAdd.length === 1 ? t('settings.groups.memberCount', { count: selectedUsersToAdd.length }) : t('settings.groups.membersCount', { count: selectedUsersToAdd.length })}
 										</Button>
 									</div>
 								</div>
@@ -463,7 +464,7 @@
 
 		<DialogFooter
 			showCancel={false}
-			confirmLabel="Close"
+			confirmLabel={t('common.close')}
 			variant="secondary"
 			onConfirm={closeMemberModal}
 		/>
@@ -471,20 +472,20 @@
 
 	{#if loading}
 		<div class="text-center py-8">
-			<div style="color: var(--ds-text-subtle)">Loading groups...</div>
+			<div style="color: var(--ds-text-subtle)">{t('settings.groups.loadingGroups')}</div>
 		</div>
 	{:else}
 		<DataTable
 			columns={groupColumns}
 			data={groups}
 			keyField="id"
-			emptyMessage="No groups found"
+			emptyMessage={t('settings.groups.noGroupsFound')}
 			emptyIcon={Circle}
 			actionItems={buildGroupDropdownItems}
 		>
-			<Lozenge slot="ldap_sync" let:item={group} color={group.ldap_sync_enabled ? 'blue' : 'gray'} text={group.ldap_sync_enabled ? 'Enabled' : 'Manual'} />
+			<Lozenge slot="ldap_sync" let:item={group} color={group.ldap_sync_enabled ? 'blue' : 'gray'} text={group.ldap_sync_enabled ? t('settings.groups.enabled') : t('settings.groups.manual')} />
 
-			<Lozenge slot="status" let:item={group} color={group.is_active ? 'green' : 'red'} text={group.is_active ? 'Active' : 'Inactive'} />
+			<Lozenge slot="status" let:item={group} color={group.is_active ? 'green' : 'red'} text={group.is_active ? t('settings.groups.active') : t('settings.groups.inactive')} />
 		</DataTable>
 	{/if}
 </div>

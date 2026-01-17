@@ -3,6 +3,7 @@
   import { ChevronDown, X } from 'lucide-svelte';
   import { createEventDispatcher } from 'svelte';
   import { getVisibleColor } from '../utils/colorUtils.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -15,9 +16,9 @@
     value = $bindable(null),
     items = [],
     config = {},
-    placeholder = 'Select...',
+    placeholder = '',
     showUnassigned = false,
-    unassignedLabel = 'None',
+    unassignedLabel = '',
     disabled = false,
     allowClear = true,
     loading = false,
@@ -26,6 +27,9 @@
     class: className = '',
     children = null  // Optional custom trigger snippet
   } = $props();
+
+  const resolvedPlaceholder = $derived(placeholder || t('pickers.select'));
+  const resolvedUnassignedLabel = $derived(unassignedLabel || t('common.none'));
 
   // Default config values
   const defaultConfig = {
@@ -245,7 +249,7 @@
         <span class="truncate">{finalConfig.getLabel(selectedItem)}</span>
       {:else}
         <!-- Show placeholder -->
-        <span style="color: var(--ds-text-subtle);">{placeholder}</span>
+        <span style="color: var(--ds-text-subtle);">{resolvedPlaceholder}</span>
       {/if}
     </div>
 
@@ -256,7 +260,7 @@
           onclick={handleClear}
           class="p-0.5 rounded hover:bg-opacity-10"
           style="color: var(--ds-text-subtle);"
-          aria-label="Clear selection"
+          aria-label={t('pickers.clearSelection')}
         >
           <X size={14} />
         </button>
@@ -291,7 +295,7 @@
         bind:value={searchTerm}
         onkeydown={handleKeyDown}
         type="text"
-        placeholder="Search..."
+        placeholder={t('pickers.search')}
         class="w-full px-3 py-2 rounded text-sm outline-none"
         style="
           background-color: var(--ds-background-input);
@@ -311,10 +315,10 @@
     </div>
 
     <!-- Items List -->
-    <div class="max-h-80 overflow-y-auto" role="listbox" id={listboxId} aria-label="Options">
+    <div class="max-h-80 overflow-y-auto" role="listbox" id={listboxId} aria-label={t('pickers.options')}>
       {#if loading}
         <div class="p-4 text-center" style="color: var(--ds-text-subtle);">
-          Loading...
+          {t('common.loading')}
         </div>
       {:else}
         <!-- Unassigned Option -->
@@ -340,7 +344,7 @@
               }
             }}
           >
-            <span style="color: var(--ds-text-subtle);">{unassignedLabel}</span>
+            <span style="color: var(--ds-text-subtle);">{resolvedUnassignedLabel}</span>
           </button>
         {/if}
 
@@ -465,7 +469,7 @@
         <!-- No Results -->
         {#if filteredItems.length === 0 && !showUnassigned}
           <div class="p-4 text-center" style="color: var(--ds-text-subtle);">
-            {searchTerm ? 'No items found' : 'No items available'}
+            {searchTerm ? t('pickers.noItemsFound') : t('pickers.noItemsAvailable')}
           </div>
         {/if}
       {/if}

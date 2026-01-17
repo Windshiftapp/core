@@ -5,6 +5,7 @@
   import Input from '../../components/Input.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import { Filter, Download, FileText } from 'lucide-svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   // Escape HTML to prevent XSS in print templates
   function escapeHtml(text) {
@@ -363,9 +364,9 @@
 <!-- Header -->
 <div class="mb-6 flex justify-between items-start">
   <div>
-    <h2 class="text-lg font-semibold" style="color: var(--ds-text);">Reports</h2>
+    <h2 class="text-lg font-semibold" style="color: var(--ds-text);">{t('time.reports.title')}</h2>
     <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-      Analyze your time tracking data and export reports
+      {t('time.reports.subtitle')}
     </div>
   </div>
     <div class="flex gap-3">
@@ -377,7 +378,7 @@
         icon={Download}
         size="medium"
       >
-        Export CSV
+        {t('time.reports.exportCSV')}
       </Button>
       <Button
         variant="default"
@@ -387,51 +388,51 @@
         icon={FileText}
         size="medium"
       >
-        Export PDF
+        {t('time.reports.exportPDF')}
       </Button>
     </div>
   </div>
 
   <!-- Filters -->
   <div class="rounded-xl p-6 mb-8 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-    <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">Filters</h3>
+    <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">{t('time.reports.filters')}</h3>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
       <div>
-        <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">Customer</label>
+        <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.customer')}</label>
         <BasePicker
           bind:value={filters.customer_id}
           items={customers}
-          placeholder="All customers"
+          placeholder={t('time.reports.allCustomers')}
           showUnassigned={true}
-          unassignedLabel="All customers"
+          unassignedLabel={t('time.reports.allCustomers')}
           getValue={(item) => item.id}
           getLabel={(item) => item.name}
         />
       </div>
       <div>
-        <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">Project</label>
+        <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.project')}</label>
         <BasePicker
           bind:value={filters.project_id}
           items={filteredProjects}
-          placeholder="All projects"
+          placeholder={t('time.reports.allProjects')}
           showUnassigned={true}
-          unassignedLabel="All projects"
+          unassignedLabel={t('time.reports.allProjects')}
           getValue={(item) => item.id}
           getLabel={(item) => item.name}
         />
       </div>
       <div>
-        <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">Description Filter</label>
-        <Input bind:value={filters.description_filter} placeholder="Search descriptions..." size="small" />
+        <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.descriptionFilter')}</label>
+        <Input bind:value={filters.description_filter} placeholder={t('time.reports.searchDescriptions')} size="small" />
       </div>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
       <div>
-        <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">From Date</label>
+        <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.fromDate')}</label>
         <Input type="date" bind:value={filters.date_from} size="small" />
       </div>
       <div>
-        <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">To Date</label>
+        <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.toDate')}</label>
         <Input type="date" bind:value={filters.date_to} size="small" />
       </div>
     </div>
@@ -444,14 +445,14 @@
         icon={Filter}
         size="medium"
       >
-        Apply Filters
+        {t('time.reports.applyFilters')}
       </Button>
       <Button
         variant="default"
         onclick={clearFilters}
         size="medium"
       >
-        Clear
+        {t('common.clear')}
       </Button>
     </div>
   </div>
@@ -460,24 +461,24 @@
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     <div class="rounded-xl p-6 border shadow-sm text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
       <div class="text-3xl font-bold text-blue-600 mb-2">{summary.totalHours}h</div>
-      <div class="text-sm" style="color: var(--ds-text-subtle);">Total Hours</div>
+      <div class="text-sm" style="color: var(--ds-text-subtle);">{t('time.reports.totalHours')}</div>
     </div>
     <div class="rounded-xl p-6 border shadow-sm text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
       <div class="text-3xl font-bold text-green-600 mb-2">{summary.totalEntries}</div>
-      <div class="text-sm" style="color: var(--ds-text-subtle);">Total Entries</div>
+      <div class="text-sm" style="color: var(--ds-text-subtle);">{t('time.reports.totalEntries')}</div>
     </div>
     <div class="rounded-xl p-6 border shadow-sm text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
       <div class="text-3xl font-bold text-purple-600 mb-2">{summary.averageHoursPerDay}h</div>
-      <div class="text-sm" style="color: var(--ds-text-subtle);">Average per Day</div>
+      <div class="text-sm" style="color: var(--ds-text-subtle);">{t('time.reports.averagePerDay')}</div>
     </div>
     <div class="rounded-xl p-6 border shadow-sm text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
       {#if summary.topProject}
         <div class="text-lg font-semibold mb-1" style="color: var(--ds-text);">{summary.topProject.name}</div>
         <div class="text-sm text-orange-600 font-medium">{summary.topProject.hours}h</div>
-        <div class="text-xs" style="color: var(--ds-text-subtle);">Top Project</div>
+        <div class="text-xs" style="color: var(--ds-text-subtle);">{t('time.reports.topProject')}</div>
       {:else}
-        <div class="text-lg" style="color: var(--ds-text-subtle);">No data</div>
-        <div class="text-xs" style="color: var(--ds-text-subtle);">Top Project</div>
+        <div class="text-lg" style="color: var(--ds-text-subtle);">{t('common.noData')}</div>
+        <div class="text-xs" style="color: var(--ds-text-subtle);">{t('time.reports.topProject')}</div>
       {/if}
     </div>
   </div>
@@ -487,9 +488,9 @@
     {#if filteredWorklogs.length === 0}
       <div class="p-8 text-center" style="color: var(--ds-text-subtle);">
         {#if loading}
-          Loading reports...
+          {t('time.reports.loadingReports')}
         {:else}
-          No time entries found for the selected filters.
+          {t('time.reports.noEntriesFound')}
         {/if}
       </div>
     {:else}
@@ -497,12 +498,12 @@
         <table class="w-full">
           <thead style="background-color: var(--ds-background-neutral);">
             <tr>
-              <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">Date</th>
-              <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">Customer</th>
-              <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">Project</th>
-              <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">Description</th>
-              <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">Time</th>
-              <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">Duration</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('common.date')}</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('time.reports.customer')}</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('time.reports.project')}</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('common.description')}</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('common.time')}</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('time.duration')}</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
@@ -535,8 +536,8 @@
       <!-- Summary Footer -->
       <div class="px-6 py-4 border-t" style="background-color: var(--ds-background-neutral); border-color: var(--ds-border);">
         <div class="text-sm font-semibold" style="color: var(--ds-text);">
-          Total Time: {summary.totalHours}h
-          <span class="ml-2 font-normal" style="color: var(--ds-text-subtle);">({filteredWorklogs.length} entries shown)</span>
+          {t('time.reports.totalTime')}: {summary.totalHours}h
+          <span class="ml-2 font-normal" style="color: var(--ds-text-subtle);">({t('time.reports.entriesShown', { count: filteredWorklogs.length })})</span>
         </div>
       </div>
     {/if}

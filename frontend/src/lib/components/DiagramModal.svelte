@@ -4,6 +4,7 @@
   import Button from './Button.svelte';
   import { api } from '../api.js';
   import { themeStore } from '../stores/theme.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let itemId;
   export let diagram = null; // null for new diagram, object for editing
@@ -11,7 +12,7 @@
   export let onSave = () => {};
 
   let editorComponent;
-  let diagramName = diagram ? diagram.name : 'Untitled Diagram';
+  let diagramName = diagram ? diagram.name : t('components.diagram.untitled');
   let initialData = null;
   let saving = false;
   let hasChanges = false;
@@ -30,7 +31,7 @@
 
   async function handleSave() {
     if (!diagramName.trim()) {
-      alert('Please enter a diagram name');
+      alert(t('components.diagram.nameRequired'));
       return;
     }
 
@@ -53,14 +54,14 @@
       onClose();
     } catch (err) {
       console.error('Failed to save diagram:', err);
-      alert('Failed to save diagram');
+      alert(t('components.diagram.saveError'));
     } finally {
       saving = false;
     }
   }
 
   function handleClose() {
-    if (hasChanges && !confirm('You have unsaved changes. Are you sure you want to close?')) {
+    if (hasChanges && !confirm(t('components.diagram.unsavedChangesConfirm'))) {
       return;
     }
     onClose();
@@ -93,20 +94,20 @@
         <input
           type="text"
           bind:value={diagramName}
-          placeholder="Diagram name"
+          placeholder={t('components.diagram.namePlaceholder')}
           class="px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-md"
           style="background-color: var(--ds-surface-raised); border-color: var(--ds-border); color: var(--ds-text);"
         />
         {#if hasChanges}
-          <span class="text-sm text-orange-600">Unsaved changes</span>
+          <span class="text-sm text-orange-600">{t('components.diagram.unsavedChanges')}</span>
         {/if}
       </div>
       <div class="flex items-center space-x-2">
         <Button variant="default" disabled={saving} onclick={handleClose}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button variant="primary" disabled={saving} loading={saving} onclick={handleSave}>
-          {saving ? 'Saving...' : 'Save'}
+          {saving ? t('common.saving') : t('common.save')}
         </Button>
       </div>
     </div>

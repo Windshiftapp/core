@@ -3,6 +3,7 @@
   import { useTimer } from '../../composables/useTimer.svelte.js';
   import { Clock, Square, Maximize2, Minimize2, ExternalLink } from 'lucide-svelte';
   import { navigate } from '../../router.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   // Initialize timer composable with reactive stores
   const timer = useTimer();
@@ -207,7 +208,7 @@
             <button
               on:click|stopPropagation={navigateToItem}
               class="text-xs font-mono bg-blue-400 bg-opacity-30 text-blue-100 px-1.5 py-0.5 rounded hover:bg-opacity-50 transition-colors flex items-center gap-1"
-              title="Go to work item: {$activeTimer.item_title || 'Work Item'}"
+              title={t('time.timer.goToWorkItem', { title: $activeTimer.item_title || t('items.workItem') })}
               type="button"
             >
               {getWorkItemKey()}
@@ -220,7 +221,7 @@
           <button
             on:click|stopPropagation={toggleCollapsed}
             class="p-1 rounded hover:bg-blue-400 hover:bg-opacity-50 transition-colors text-white"
-            title={collapsed ? 'Expand timer' : 'Collapse timer'}
+            title={collapsed ? t('time.timer.expandTimer') : t('time.timer.collapseTimer')}
             type="button"
           >
             {#if collapsed}
@@ -229,11 +230,11 @@
               <Minimize2 class="w-3 h-3" />
             {/if}
           </button>
-          
+
           <button
             on:click|stopPropagation={handleStopTimer}
             class="p-1 rounded hover:bg-red-500 hover:bg-opacity-80 text-white transition-colors"
-            title="Stop timer"
+            title={t('time.stopTimer')}
             disabled={$timerSyncing}
             type="button"
           >
@@ -248,7 +249,7 @@
           <div class="space-y-1.5 text-xs">
             {#if $activeTimer.project_name}
               <div class="text-blue-100">
-                <span class="font-medium">Project:</span> {$activeTimer.project_name}
+                <span class="font-medium">{t('time.timer.project')}:</span> {$activeTimer.project_name}
                 {#if $activeTimer.customer_name}
                   ({$activeTimer.customer_name})
                 {/if}
@@ -257,10 +258,10 @@
 
             {#if $activeTimer.workspace_name}
               <div class="text-blue-100">
-                <span class="font-medium">Workspace:</span> {$activeTimer.workspace_name}
+                <span class="font-medium">{t('time.timer.workspace')}:</span> {$activeTimer.workspace_name}
               </div>
             {/if}
-            
+
             <!-- Remove duplicate task name since it's already shown in header -->
           </div>
         </div>

@@ -1,6 +1,7 @@
 <script>
   import { X } from 'lucide-svelte';
-    import Button from '../components/Button.svelte';
+  import Button from '../components/Button.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     title,
@@ -26,6 +27,7 @@
   {#if showCloseButton && onClose}
     <Button
       onclick={onClose}
+      aria-label={t('aria.close')}
     >
       <X class="w-5 h-5" style="color: var(--ds-text-subtle);" />
     </Button>

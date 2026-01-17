@@ -177,6 +177,15 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 		return 0, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
+	// Record item creation history if a creator is specified
+	if params.CreatorID != nil {
+		updateService := NewItemUpdateService(db)
+		if err := updateService.recordItemCreationHistory(db, int(itemID), *params.CreatorID); err != nil {
+			// Log error but don't fail the request
+			// This is a non-critical operation
+		}
+	}
+
 	return itemID, nil
 }
 

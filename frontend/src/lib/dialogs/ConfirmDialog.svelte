@@ -3,20 +3,27 @@
   import { fade } from 'svelte/transition';
   import { AlertTriangle, X, Trash2, Check } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();  // Keep for backward compatibility
 
   let {
     show = $bindable(false),
-    title = 'Confirm Action',
-    message = 'Are you sure you want to proceed?',
-    confirmText = 'Confirm',
-    cancelText = 'Cancel',
+    title = null,
+    message = null,
+    confirmText = null,
+    cancelText = null,
     variant = 'danger',  // 'danger', 'warning', 'info'
     icon = AlertTriangle,
     onconfirm = null,
     oncancel = null
   } = $props();
+
+  // Use translations for defaults
+  const resolvedTitle = $derived(title ?? t('common.areYouSure'));
+  const resolvedMessage = $derived(message ?? t('common.confirmAction'));
+  const resolvedConfirmText = $derived(confirmText ?? t('common.confirm'));
+  const resolvedCancelText = $derived(cancelText ?? t('common.cancel'));
 
   // Auto-close on escape key
   function handleKeydown(event) {
@@ -102,33 +109,33 @@
               style="color: {styles.iconColor};"
             />
           </div>
-          <h3 
+          <h3
             id="dialog-title"
-            class="text-lg font-medium flex-1" 
+            class="text-lg font-medium flex-1"
             style="color: var(--ds-text);"
           >
-            {title}
+            {resolvedTitle}
           </h3>
           <Button
             variant="ghost"
             icon={X}
             onclick={cancel}
-            title="Close"
+            title={t('common.close')}
           />
         </div>
       </div>
       
       <!-- Body -->
       <div class="px-6 py-4">
-        <p 
+        <p
           id="dialog-description"
-          class="text-sm leading-relaxed" 
+          class="text-sm leading-relaxed"
           style="color: var(--ds-text-subtle);"
         >
-          {message}
+          {resolvedMessage}
         </p>
       </div>
-      
+
       <!-- Footer -->
       <div class="px-6 py-4 border-t flex justify-end gap-3" style="border-color: var(--ds-border);">
         <Button
@@ -136,7 +143,7 @@
           onclick={cancel}
           size="small"
         >
-          {cancelText}
+          {resolvedCancelText}
         </Button>
 
         <Button
@@ -144,7 +151,7 @@
           onclick={confirm}
           size="small"
         >
-          {confirmText}
+          {resolvedConfirmText}
         </Button>
       </div>
     </div>

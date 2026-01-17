@@ -1,4 +1,6 @@
 <script>
+  import { t } from '../../stores/i18n.svelte.js';
+
   // Props - all readonly (controlled component pattern)
   let {
     show = false,
@@ -125,7 +127,7 @@
           class="flex-shrink-0 transition-colors duration-150 p-2 mt-1"
           style="color: var(--ds-text-subtle);"
           onclick={handleClose}
-          aria-label="Close toast"
+          aria-label={t('notifications.closeToast')}
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>

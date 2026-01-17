@@ -6,6 +6,7 @@
     Position
   } from '@xyflow/svelte';
   import { createEventDispatcher } from 'svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -78,7 +79,7 @@
     <div class="edge-toolbar">
       <button
         class="edge-swap-btn"
-        title="Swap direction"
+        title={t('workflows.swapDirection')}
         on:click|stopPropagation={(evt) => {
           const customId = id || data?.transitionId || data?.id;
           if (customId) {

@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import { t } from '../../stores/i18n.svelte.js';
   import Button from '../../components/Button.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import { getShortcut, matchesShortcut, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
@@ -42,20 +43,20 @@
   <!-- Query display - subtle inline style -->
   <div class="flex items-center gap-3 text-xs" style="color: var(--ds-text-subtle);">
     <div class="flex items-center gap-2 min-w-0">
-      <span class="font-medium shrink-0">Query:</span>
-      <code class="font-mono truncate" title={query || 'No query'}>
-        {query || 'No filters applied'}
+      <span class="font-medium shrink-0">{t('collections.query')}:</span>
+      <code class="font-mono truncate" title={query || t('collections.noQuery')}>
+        {query || t('collections.noFiltersApplied')}
       </code>
       <Button
         variant="ghost"
         size="sm"
         onclick={handleToggleEdit}
       >
-        {isEditing ? 'Hide' : 'Edit'}
+        {isEditing ? t('collections.hide') : t('collections.edit')}
       </Button>
     </div>
     {#if error && !isEditing}
-      <span style="color: var(--ds-text-danger);">Error</span>
+      <span style="color: var(--ds-text-danger);">{t('collections.error')}</span>
     {/if}
   </div>
 
@@ -63,13 +64,13 @@
   {#if isEditing}
     <div class="mt-3 p-3 rounded-lg border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
       <label for="ql-editor" class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">
-        Query Language
+        {t('collections.queryLanguage')}
       </label>
       <Textarea
         id="ql-editor"
         value={query}
         oninput={handleQueryChange}
-        placeholder='Example: workspace = "My Project" AND status = "open"'
+        placeholder={t('collections.queryPlaceholder')}
         class="font-mono text-sm"
         rows={2}
         onkeydown={handleKeydown}
@@ -81,11 +82,11 @@
       {/if}
       <div class="mt-2 flex items-center justify-between">
         <span class="text-xs" style="color: var(--ds-text-subtlest);">
-          {getShortcutDisplay('ql', 'execute')} to execute
+          {t('collections.executeShortcut', { shortcut: getShortcutDisplay('ql', 'execute') })}
         </span>
         <div class="flex gap-2">
-          <Button variant="ghost" size="sm" onclick={handleClear}>Clear</Button>
-          <Button variant="primary" size="sm" onclick={handleExecute}>Execute</Button>
+          <Button variant="ghost" size="sm" onclick={handleClear}>{t('collections.clear')}</Button>
+          <Button variant="primary" size="sm" onclick={handleExecute}>{t('collections.execute')}</Button>
         </div>
       </div>
     </div>

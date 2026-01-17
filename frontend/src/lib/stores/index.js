@@ -50,3 +50,9 @@ export { ssoStore } from './sso.svelte.js';
 // Access via: backlogStore.count, backlogStore.loading, backlogStore.workspaceId
 // Methods: backlogStore.load(wsId), backlogStore.setCount(wsId, count), increment(), decrement()
 export { backlogStore } from './backlogStore.svelte.js';
+
+// i18n store
+// Access via: i18n.locale, i18n.direction, i18n.isRTL, i18n.loading
+// Methods: i18n.init(), i18n.setLocale(code), t(key, params), translateError(error)
+// Provides internationalization with support for multiple locales including RTL languages
+export { i18n, t, translateError, SUPPORTED_LOCALES } from './i18n.svelte.js';

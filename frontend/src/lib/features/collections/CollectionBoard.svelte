@@ -1,5 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
+  import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { getCollection } from '../collections/collectionService.js';
@@ -693,7 +694,7 @@
 
 {#if loading}
   <div class="p-6">
-    <div class="animate-pulse">Loading...</div>
+    <div class="animate-pulse">{t('common.loading')}</div>
   </div>
 {:else if workspace}
   <div class="min-h-screen" style="{backgroundStyle}">
@@ -726,15 +727,15 @@
           <div class="mb-4" style={emptyStateStyle}>
             <Plus class="w-16 h-16 mx-auto" />
           </div>
-          <h3 class="text-lg font-medium mb-2" style={textStyle}>No Statuses Found</h3>
+          <h3 class="text-lg font-medium mb-2" style={textStyle}>{t('items.noItemsInFilter')}</h3>
           <p class="text-sm mb-4" style={subtleTextStyle}>
-            Create statuses in the admin panel to organize your work items.
+            {t('items.createToStart')}
           </p>
           <button
             onclick={() => navigate('/admin/workflows')}
             class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
           >
-            Set up Statuses
+            {t('statuses.createStatus')}
           </button>
         </div>
       {:else}
@@ -753,7 +754,7 @@
               <div class="p-4 border-b border-l-4" style="border-bottom-color: {hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'}; border-left-color: {column.color};">
                 <h3 class="font-semibold" style={glassTextStyle}>{column.name}</h3>
                 <div class="flex items-center justify-between">
-                  <span class="text-sm" style={glassSubtleTextStyle}>{columnItems.length} items</span>
+                  <span class="text-sm" style={glassSubtleTextStyle}>{columnItems.length} {t('items.item')}</span>
                   {#if column.wip_limit}
                     <span class="text-xs px-2 py-0.5 rounded"
                           style={isOverWip
@@ -769,7 +770,7 @@
                   <!-- Empty column state -->
                   <div class="text-center py-8" style={glassSubtleTextStyle}>
                     <Plus class="w-8 h-8 mx-auto mb-2" />
-                    <p class="text-sm">No items in {column.name}</p>
+                    <p class="text-sm">{t('items.noItems')}</p>
                   </div>
                 {:else}
                   <div class="space-y-1">
@@ -834,7 +835,7 @@
         <!-- Summary -->
         <div class="mt-8 text-center">
           <p class="text-sm" style={subtleTextStyle}>
-            Total: {totalVisibleItems} work items across {displayColumns.length} {displayColumns.length === 1 ? 'column' : 'columns'}
+            {t('collections.boardSummary', { itemCount: totalVisibleItems, columnCount: displayColumns.length })}
           </p>
         </div>
       {/if}
@@ -843,7 +844,7 @@
 {:else}
   <div class="p-6">
     <div class="text-center" style="color: var(--ds-text-subtle);">
-      Workspace not found.
+      {t('workspaces.noWorkspaces')}
     </div>
   </div>
 {/if}

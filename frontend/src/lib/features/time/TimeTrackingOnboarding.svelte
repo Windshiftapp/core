@@ -6,6 +6,7 @@
   import Textarea from '../../components/Textarea.svelte';
   import AlertBox from '../../components/AlertBox.svelte';
   import Label from '../../components/Label.svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let { oncancel, oncompleted } = $props();
 
@@ -34,7 +35,7 @@
 
   async function createCustomer() {
     if (!customerData.name.trim()) {
-      error = 'Organization name is required';
+      error = t('time.onboarding.organizationNameRequired');
       return false;
     }
 
@@ -67,7 +68,7 @@
       return true;
     } catch (err) {
       console.error('Failed to create customer:', err);
-      error = 'Failed to create customer organization. Please try again.';
+      error = t('time.onboarding.failedToCreateCustomer');
       return false;
     } finally {
       loading = false;
@@ -76,7 +77,7 @@
 
   async function createProject() {
     if (!projectData.name.trim()) {
-      error = 'Project name is required';
+      error = t('time.onboarding.projectNameRequired');
       return false;
     }
 
@@ -87,7 +88,7 @@
       return true;
     } catch (err) {
       console.error('Failed to create project:', err);
-      error = 'Failed to create project. Please try again.';
+      error = t('time.onboarding.failedToCreateProject');
       return false;
     } finally {
       loading = false;
@@ -153,7 +154,7 @@
           onclick={handleCancel}
           class="absolute right-0 top-0 p-2 transition-colors rounded"
           style="color: var(--ds-text-subtlest);"
-          title="Cancel (Esc)"
+          title={t('common.cancel')}
         >
           <X class="w-5 h-5" />
         </button>
@@ -163,15 +164,15 @@
             <Clock class="w-8 h-8" style="color: var(--ds-icon-accent-blue);" />
           </div>
         </div>
-        <h1 class="text-2xl font-bold mb-2" style="color: var(--ds-text);">Set Up Time Tracking</h1>
-        <p style="color: var(--ds-text-subtle);">Let's create your first customer organization and project to get started</p>
+        <h1 class="text-2xl font-bold mb-2" style="color: var(--ds-text);">{t('time.onboarding.title')}</h1>
+        <p style="color: var(--ds-text-subtle);">{t('time.onboarding.subtitle')}</p>
       </div>
 
       <!-- Progress Bar -->
       <div class="mb-8">
         <div class="flex items-center justify-between mb-2">
-          <span class="text-sm font-medium" style="color: var(--ds-text-subtle);">Setup Progress</span>
-          <span class="text-sm" style="color: var(--ds-text-subtlest);">Step {currentStep} of {totalSteps}</span>
+          <span class="text-sm font-medium" style="color: var(--ds-text-subtle);">{t('time.onboarding.setupProgress')}</span>
+          <span class="text-sm" style="color: var(--ds-text-subtlest);">{t('time.onboarding.stepOf', { current: currentStep, total: totalSteps })}</span>
         </div>
         <div class="w-full rounded-full h-2" style="background-color: var(--ds-background-neutral);">
           <div
@@ -195,45 +196,45 @@
             <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style="background-color: var(--ds-accent-blue-subtle);">
               <User class="w-6 h-6" style="color: var(--ds-icon-accent-blue);" />
             </div>
-            <h2 class="text-xl font-semibold mb-2" style="color: var(--ds-text);">Create Your First Customer Organization</h2>
-            <p style="color: var(--ds-text-subtle);">A customer organization represents the company or entity you're doing work for. This could be a client organization, your employer, or your own company.</p>
+            <h2 class="text-xl font-semibold mb-2" style="color: var(--ds-text);">{t('time.onboarding.createCustomerTitle')}</h2>
+            <p style="color: var(--ds-text-subtle);">{t('time.onboarding.createCustomerDescription')}</p>
           </div>
 
           <div class="space-y-4">
             <div>
-              <Label for="customer_name" required class="mb-2">Organization Name</Label>
+              <Label for="customer_name" required class="mb-2">{t('time.organizations.name')}</Label>
               <input
                 id="customer_name"
                 type="text"
                 bind:value={customerData.name}
                 class="w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: var(--ds-text);"
-                placeholder="e.g., Acme Corporation, TechStart Inc, Freelance Work"
+                placeholder={t('time.onboarding.organizationNamePlaceholder')}
                 required
               />
             </div>
 
             <div>
-              <Label for="customer_email" class="mb-2">Email (Optional)</Label>
+              <Label for="customer_email" class="mb-2">{t('time.organizations.emailOptional')}</Label>
               <input
                 id="customer_email"
                 type="email"
                 bind:value={customerData.email}
                 class="w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: var(--ds-text);"
-                placeholder="billing@customer.com"
+                placeholder={t('time.onboarding.emailPlaceholder')}
               />
             </div>
 
             <div>
-              <Label for="contact_person" class="mb-2">Contact Person (Optional)</Label>
+              <Label for="contact_person" class="mb-2">{t('time.organizations.contactPersonOptional')}</Label>
               <input
                 id="contact_person"
                 type="text"
                 bind:value={customerData.contact_person}
                 class="w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: var(--ds-text);"
-                placeholder="John Smith"
+                placeholder={t('time.onboarding.contactPersonPlaceholder')}
               />
             </div>
           </div>
@@ -247,41 +248,41 @@
             <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style="background-color: var(--ds-accent-green-subtle);">
               <Briefcase class="w-6 h-6" style="color: var(--ds-icon-accent-green);" />
             </div>
-            <h2 class="text-xl font-semibold mb-2" style="color: var(--ds-text);">Create Your First Project</h2>
-            <p style="color: var(--ds-text-subtle);">Projects help organize your work within a customer. You can track time against specific projects.</p>
+            <h2 class="text-xl font-semibold mb-2" style="color: var(--ds-text);">{t('time.onboarding.createProjectTitle')}</h2>
+            <p style="color: var(--ds-text-subtle);">{t('time.onboarding.createProjectDescription')}</p>
           </div>
 
           <!-- Show created customer -->
           {#if createdCustomer}
-            <AlertBox variant="success" message={`Customer organization "${createdCustomer.name}" created successfully!`} />
+            <AlertBox variant="success" message={t('time.onboarding.customerCreatedSuccess', { name: createdCustomer.name })} />
           {/if}
 
           <div class="space-y-4">
             <div>
-              <Label for="project_name" required class="mb-2">Project Name</Label>
+              <Label for="project_name" required class="mb-2">{t('time.projects.projectName')}</Label>
               <input
                 id="project_name"
                 type="text"
                 bind:value={projectData.name}
                 class="w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: var(--ds-text);"
-                placeholder="e.g., Website Development, Consulting, General Work"
+                placeholder={t('time.onboarding.projectNamePlaceholder')}
                 required
               />
             </div>
 
             <div>
-              <Label for="project_description" class="mb-2">Description (Optional)</Label>
+              <Label for="project_description" class="mb-2">{t('time.projects.descriptionOptional')}</Label>
               <Textarea
                 id="project_description"
                 bind:value={projectData.description}
                 rows={3}
-                placeholder="Brief description of the project..."
+                placeholder={t('time.onboarding.projectDescriptionPlaceholder')}
               />
             </div>
 
             <div>
-              <Label for="hourly_rate" class="mb-2">Hourly Rate (Optional)</Label>
+              <Label for="hourly_rate" class="mb-2">{t('time.projects.hourlyRateOptional')}</Label>
               <div class="relative">
                 <span class="absolute left-3 top-1/2 transform -translate-y-1/2" style="color: var(--ds-text-subtle);">$</span>
                 <input
@@ -295,7 +296,7 @@
                   placeholder="0.00"
                 />
               </div>
-              <p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">You can set this later if you're not sure</p>
+              <p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">{t('time.onboarding.hourlyRateHint')}</p>
             </div>
           </div>
         </div>
@@ -310,7 +311,7 @@
               onclick={handleBack}
               disabled={loading}
             >
-              Back
+              {t('common.back')}
             </Button>
           {:else}
             <Button
@@ -319,7 +320,7 @@
               disabled={loading}
               keyboardHint="Esc"
             >
-              Skip for now
+              {t('time.onboarding.skipForNow')}
             </Button>
           {/if}
         </div>
@@ -332,7 +333,7 @@
             loading={loading}
             keyboardHint="↵"
           >
-            {currentStep === totalSteps ? 'Complete Setup' : 'Next'}
+            {currentStep === totalSteps ? t('time.onboarding.completeSetup') : t('common.next')}
           </Button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import Button from '../components/Button.svelte';
+  import { t } from '../stores/i18n.svelte.js';
   import {
     Check,
     Circle,
@@ -105,8 +106,8 @@
       onclick={dismissOnboarding}
       class="absolute top-4 right-4 p-2 rounded transition-all hover-bg z-10"
       style="color: var(--ds-text-subtle);"
-      title="Dismiss onboarding"
-      aria-label="Dismiss onboarding"
+      title={t('onboarding.dismissOnboarding')}
+      aria-label={t('onboarding.dismissOnboarding')}
     >
       <X class="w-4 h-4" />
     </button>
@@ -119,10 +120,10 @@
         </div>
         <div class="flex-1">
           <h1 class="text-2xl font-semibold mb-1" style="color: var(--ds-text);">
-            Welcome to Windshift, {userName}!
+            {t('onboarding.welcomeTo')}, {userName}!
           </h1>
           <p class="text-sm" style="color: var(--ds-text-subtle);">
-            Let's get you started by creating your first workspace and work item
+            {t('onboarding.getStartedMessage')}
           </p>
         </div>
       </div>
@@ -130,8 +131,8 @@
       <!-- Progress Section -->
       <div class="mb-6 pb-6 border-b" style="border-color: var(--ds-border);">
         <div class="flex items-center justify-between mb-2">
-          <span class="text-sm font-medium" style="color: var(--ds-text);">Progress</span>
-          <span class="text-sm" style="color: var(--ds-text-subtle);">{completedCount} of {TOTAL_STEPS} completed</span>
+          <span class="text-sm font-medium" style="color: var(--ds-text);">{t('onboarding.progress')}</span>
+          <span class="text-sm" style="color: var(--ds-text-subtle);">{completedCount} {t('onboarding.of')} {TOTAL_STEPS} {t('onboarding.completed')}</span>
         </div>
         <div class="w-full rounded-full h-2" style="background-color: var(--ds-surface);">
           <div
@@ -172,12 +173,12 @@
             <div class="flex-1">
               {#if workspaceCount > 0}
                 <!-- Completed state: strikethrough -->
-                <h3 class="text-sm line-through" style="color: var(--ds-text-subtle);">Create your workspace</h3>
+                <h3 class="text-sm line-through" style="color: var(--ds-text-subtle);">{t('onboarding.createWorkspace')}</h3>
               {:else}
-                <h3 class="text-sm font-semibold" style="color: var(--ds-text);">Create your workspace</h3>
+                <h3 class="text-sm font-semibold" style="color: var(--ds-text);">{t('onboarding.createWorkspace')}</h3>
                 {#if activeStep === 1}
                   <p class="text-sm mt-1 mb-3" style="color: var(--ds-text-subtle);">
-                    Workspaces help you organize projects and teams
+                    {t('onboarding.workspacesHelp')}
                   </p>
                   <Button
                     variant="primary"
@@ -185,7 +186,7 @@
                     keyboardHint="W"
                     onclick={createWorkspace}
                   >
-                    Create Workspace
+                    {t('onboarding.createWorkspaceBtn')}
                   </Button>
                 {/if}
               {/if}
@@ -222,11 +223,11 @@
             <div class="flex-1">
               {#if itemCount > 0}
                 <!-- Completed state: strikethrough -->
-                <h3 class="text-sm line-through" style="color: var(--ds-text-subtle);">Create your first work item</h3>
+                <h3 class="text-sm line-through" style="color: var(--ds-text-subtle);">{t('onboarding.createFirstWorkItem')}</h3>
               {:else if activeStep === 2}
-                <h3 class="text-sm font-semibold" style="color: var(--ds-text);">Create your first work item</h3>
+                <h3 class="text-sm font-semibold" style="color: var(--ds-text);">{t('onboarding.createFirstWorkItem')}</h3>
                 <p class="text-sm mt-1 mb-3" style="color: var(--ds-text-subtle);">
-                  Track tasks, bugs, features, and more
+                  {t('onboarding.trackTasks')}
                 </p>
                 <Button
                   variant="primary"
@@ -234,11 +235,11 @@
                   keyboardHint="I"
                   onclick={createWorkItem}
                 >
-                  Create Work Item
+                  {t('onboarding.createWorkItemBtn')}
                 </Button>
               {:else}
                 <!-- Pending state -->
-                <h3 class="text-sm" style="color: var(--ds-text-subtle);">Create your first work item</h3>
+                <h3 class="text-sm" style="color: var(--ds-text-subtle);">{t('onboarding.createFirstWorkItem')}</h3>
               {/if}
             </div>
           </div>
@@ -252,7 +253,7 @@
           class="text-sm transition-colors hover:underline"
           style="color: var(--ds-text-subtle);"
         >
-          Dismiss Assistant
+          {t('onboarding.dismissAssistant')}
         </button>
       </div>
     </div>

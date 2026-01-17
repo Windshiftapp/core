@@ -3,13 +3,14 @@
   import TabNav from '../../components/TabNav.svelte';
   import StatusCategoryManager from '../../settings/StatusCategoryManager.svelte';
   import StatusManager from '../../settings/StatusManager.svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   // Get active subtab from URL query params, default to 'statuses'
   $: subtab = $currentRoute.query?.subtab || 'statuses';
 
-  const tabs = [
-    { id: 'statuses', label: 'Statuses' },
-    { id: 'status-categories', label: 'Status Categories' }
+  $: tabs = [
+    { id: 'statuses', label: t('statuses.statuses') },
+    { id: 'status-categories', label: t('statuses.statusCategories') }
   ];
 </script>
 

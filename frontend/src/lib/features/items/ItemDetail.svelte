@@ -3,6 +3,7 @@
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { workspacePermissions } from '../../stores';
+  import { t } from '../../stores/i18n.svelte.js';
   import { Trash2, FileText, AlertCircle, X, Maximize2, Minimize2, Copy } from 'lucide-svelte';
   import { scale, fly } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
@@ -205,7 +206,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     }
 
     // Return loading state or empty array
-    return loadingStatusTransitions ? [{ value: '', label: 'Loading...' }] : [];
+    return loadingStatusTransitions ? [{ value: '', label: t('common.loading') }] : [];
   });
 
   // Modal control functions
@@ -376,11 +377,11 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 
   function showCopySuccess(key) {
     console.log('[showCopySuccess] Showing copy toast for key:', key);
-    successToast(`${workspace?.key || 'WORK'}-${item?.workspace_item_number}`, 'Copied to clipboard');
+    successToast(`${workspace?.key || 'WORK'}-${item?.workspace_item_number}`, t('toast.copied'));
   }
 
   function showCopyError() {
-    errorToast('Failed to copy to clipboard', 'Copy Error');
+    errorToast(t('items.failedToCopyToClipboard'), t('items.copyError'));
   }
   
   async function handleSaveField(event) {
@@ -770,9 +771,9 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     // Guard: Use reactive store values
     if (!$canStartTimer) {
       if (timer.syncing) {
-        showError('Timer busy', 'Timer is currently syncing, please wait a moment and try again.');
+        showError(t('items.timerBusy'), t('items.timerSyncingMessage'));
       } else if ($activeTimer) {
-        showError('Timer already running', 'Please stop the current timer before starting a new one.');
+        showError(t('items.timerAlreadyRunning'), t('items.stopTimerFirst'));
       }
       return;
     }
@@ -793,7 +794,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
       }
 
       if (!projectId) {
-        showError('No time tracking project configured', 'Please set a project in workspace or item settings.');
+        showError(t('items.noProjectConfigured'), t('items.setDefaultProject'));
         return;
       }
 
@@ -801,7 +802,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
         workspace_id: parseInt(workspaceId),
         item_id: parseInt(itemId),
         project_id: projectId,
-        description: `Working on ${item.title}`
+        description: t('items.workingOn', { title: item.title })
       };
 
       await timer.start(timerData);
@@ -809,7 +810,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
       console.error('Failed to start timer:', error);
       // Only show error if it's not a 409 conflict (already running)
       if (!error.message?.includes('already running')) {
-        showError('Failed to start timer', error.message || 'Unknown error');
+        showError(t('items.failedToStartTimer'), error.message || t('errors.UNKNOWN'));
       }
     } finally {
       // Always reset the guard flag
@@ -833,7 +834,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
       showTimeLogModal = false;
     } catch (error) {
       console.error('Failed to save worklog:', error);
-      showError('Failed to save time entry', error.message || 'Unknown error');
+      showError(t('items.failedToSaveTimeEntry'), error.message || t('errors.UNKNOWN'));
     }
   }
 
@@ -862,8 +863,8 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
       // Show clickable success toast that navigates to the copied item
       const itemKey = workspace?.key ? `${workspace.key}-${copiedItem.workspace_item_number}` : `ITEM-${copiedItem.workspace_item_number}`;
       addToast({
-        title: `Work item copied successfully as ${itemKey}`,
-        message: 'Click to view copied item',
+        title: t('items.itemCopiedAs', { key: itemKey }),
+        message: t('items.clickToViewCopied'),
         variant: 'success',
         duration: 15000,
         clickable: true,
@@ -874,7 +875,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 
     } catch (err) {
       console.error('Failed to copy item:', err);
-      showError('Failed to copy item', err.message || String(err));
+      showError(t('items.failedToCopy'), err.message || String(err));
     }
   }
 
@@ -889,10 +890,10 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 
   async function handleDeleteItem() {
     const confirmed = await confirm({
-      title: 'Delete Work Item',
-      message: `Are you sure you want to delete "${item.title}"? This action cannot be undone.`,
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
+      title: t('items.deleteWorkItem'),
+      message: t('items.confirmDeleteItem', { title: item.title }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
       variant: 'danger',
       icon: Trash2
     });
@@ -910,7 +911,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 
     } catch (err) {
       console.error('Failed to delete item:', err);
-      showError('Failed to delete item', err.message || String(err));
+      showError(t('items.failedToDelete'), err.message || String(err));
     }
   }
 
@@ -946,7 +947,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 
     } catch (err) {
       console.error('Failed to toggle watch:', err);
-      showError('Failed to update watch status', err.message || String(err));
+      showError(t('items.failedToUpdateWatchStatus'), err.message || String(err));
     }
   }
 
@@ -958,14 +959,14 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
         id: 'copy',
         type: 'regular',
         icon: Copy,
-        title: 'Copy Work Item',
+        title: t('items.copyWorkItem'),
         onClick: handleCopyItem
       },
       {
         id: 'watch',
         type: 'regular',
         icon: isWatching ? BookmarkCheck : Bookmark,
-        title: isWatching ? 'Unwatch Work Item' : 'Watch Work Item',
+        title: isWatching ? t('items.unwatchWorkItem') : t('items.watchWorkItem'),
         onClick: toggleWatch
       }
     ];
@@ -983,7 +984,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
           id: 'delete',
           type: 'regular',
           icon: Trash2,
-          title: 'Delete Work Item',
+          title: t('items.deleteWorkItem'),
           color: '#dc2626',
           hoverClass: 'hover:bg-red-50 hover:text-red-700',
           onClick: handleDeleteItem
@@ -1145,10 +1146,10 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
         const url = `${window.location.origin}/workspaces/${workspaceId}/items/${itemId}`;
         try {
           await navigator.clipboard.writeText(url);
-          successToast('Item link copied to clipboard');
+          successToast(t('items.itemLinkCopied'));
         } catch (error) {
           console.error('Failed to copy to clipboard:', error);
-          errorToast('Failed to copy to clipboard');
+          errorToast(t('items.failedToCopyToClipboard'));
         }
       },
       priority: COMMAND_PRIORITIES.NORMAL,
@@ -1509,7 +1510,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   function startCreateSubIssue() {
 
     if (availableSubIssueTypes.length === 0) {
-      showError('No sub-issue types available', 'Cannot create child work items for this item level.');
+      showError(t('items.noSubIssueTypes'), t('items.cannotCreateChildItems'));
       return;
     }
     
@@ -1661,7 +1662,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
           <!-- Modal Header -->
           <div class="flex items-center justify-between p-4 border-b" style="border-color: var(--ds-border); background-color: var(--ds-surface);">
             <div class="flex items-center gap-3">
-              <h1 class="text-lg font-semibold" style="color: var(--ds-text);">Work Item Details</h1>
+              <h1 class="text-lg font-semibold" style="color: var(--ds-text);">{t('items.workItemDetails')}</h1>
               <span class="px-2 py-1 text-sm font-mono rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
                 {workspace.key}-{item.workspace_item_number}
               </span>
@@ -1673,7 +1674,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
                 title="Open full details (F)"
               >
                 <ExternalLink class="w-4 h-4" />
-                Full Details
+                {t('items.fullDetails')}
                 <span class="ml-1 px-1.5 py-0.5 bg-[var(--ds-interactive-hovered)] bg-opacity-50 rounded text-xs font-mono">F</span>
               </button>
               <button

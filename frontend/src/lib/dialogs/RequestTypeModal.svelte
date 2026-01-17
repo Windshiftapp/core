@@ -8,6 +8,7 @@
   import AlertBox from '../components/AlertBox.svelte';
   import PortalModal from './PortalModal.svelte';
   import DialogFooter from './DialogFooter.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -81,12 +82,12 @@
   async function handleSubmit() {
     try {
       if (!formData.name.trim()) {
-        error = 'Name is required';
+        error = t('portal.nameRequired');
         return;
       }
 
       if (!formData.item_type_id) {
-        error = 'Item type is required';
+        error = t('portal.itemTypeRequired');
         return;
       }
 
@@ -118,7 +119,7 @@
       dispatch('saved');
     } catch (err) {
       console.error('Failed to save request type:', err);
-      error = err.message || 'Failed to save request type';
+      error = err.message || t('portal.failedToSaveRequestType');
     } finally {
       submitting = false;
     }
@@ -134,14 +135,14 @@
     isOpen={isOpen}
     isDarkMode={isDarkMode}
     maxWidth="max-w-2xl"
-    title={mode === 'create' ? 'Create Request Type' : 'Edit Request Type'}
-    subtitle={mode === 'create' ? 'Add a new type of request for your portal' : 'Update request type details'}
+    title={mode === 'create' ? t('portal.createRequestType') : t('portal.editRequestType')}
+    subtitle={mode === 'create' ? t('portal.addRequestTypeSubtitle') : t('portal.editRequestTypeSubtitle')}
     onClose={handleClose}
     bodyClass="px-6 py-4 max-h-[60vh] overflow-y-auto"
   >
     {#if success}
       <div class="mb-4">
-        <AlertBox variant="success" message={mode === 'create' ? 'Request type created successfully!' : 'Request type updated successfully!'} />
+        <AlertBox variant="success" message={mode === 'create' ? t('portal.requestTypeCreated') : t('portal.requestTypeUpdated')} />
       </div>
     {:else}
       {#if error}
@@ -158,7 +159,7 @@
       <div class="space-y-4">
         <div>
           <label for="rt-name" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
-            Name <span class="text-red-500">*</span>
+            {t('common.name')} <span class="text-red-500">*</span>
           </label>
           <input
             id="rt-name"
@@ -166,20 +167,20 @@
             type="text"
             class="w-full px-4 py-3 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500"
             style="background-color: {isDarkMode ? '#1e293b' : '#ffffff'}; color: {isDarkMode ? '#e2e8f0' : '#111827'}; border-color: {isDarkMode ? '#475569' : '#d1d5db'};"
-            placeholder="e.g., Bug Report, Feature Request"
+            placeholder={t('portal.requestTypeNamePlaceholder')}
             required
           />
         </div>
 
         <div>
           <label for="rt-description" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
-            Description (optional)
+            {t('portal.descriptionOptional')}
           </label>
           <Textarea
             id="rt-description"
             bind:value={formData.description}
             rows={3}
-            placeholder="Brief description of this request type"
+            placeholder={t('portal.requestTypeDescriptionPlaceholder')}
           />
         </div>
 
@@ -187,23 +188,23 @@
           <IconSelector
             bind:selectedIcon={formData.icon}
             bind:selectedColor={formData.color}
-            label="Icon & Color"
+            label={t('portal.iconAndColor')}
           />
         </div>
 
         <div>
           <label for="rt-itemtype" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
-            Creates Item Type <span class="text-red-500">*</span>
+            {t('portal.createsItemType')} <span class="text-red-500">*</span>
           </label>
           <BasePicker
             bind:value={formData.item_type_id}
             items={availableItemTypes}
-            placeholder="Select item type..."
+            placeholder={t('portal.selectItemType')}
             getValue={(item) => item.id}
             getLabel={(item) => item.name}
           />
           <p class="text-xs mt-1" style="color: {isDarkMode ? '#94a3b8' : '#6b7280'};">
-            Submissions will create this type of work item
+            {t('portal.submissionsCreateItemType')}
           </p>
         </div>
       </div>
@@ -211,9 +212,9 @@
       <DialogFooter
         onCancel={handleClose}
         onConfirm={handleSubmit}
-        confirmLabel={mode === 'create' ? 'Create Request Type' : 'Save Changes'}
+        confirmLabel={mode === 'create' ? t('portal.createRequestType') : t('common.saveChanges')}
         loading={submitting}
-        loadingLabel={mode === 'create' ? 'Creating...' : 'Saving...'}
+        loadingLabel={mode === 'create' ? t('portal.creating') : t('common.saving')}
         class="mt-6 -mx-6 -mb-4"
       />
     {/if}

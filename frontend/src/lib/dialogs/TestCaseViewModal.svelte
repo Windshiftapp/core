@@ -16,6 +16,7 @@
   import Button from '../components/Button.svelte';
   import { api } from '../api.js';
   import { formatDateTimeLocale } from '../utils/dateFormatter.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     isOpen = $bindable(false),
@@ -180,13 +181,13 @@
   <div class="p-6 space-y-6">
     <div class="flex items-start justify-between gap-4">
       <div>
-        <p class="text-xs uppercase tracking-wide text-gray-400 mb-1">Test Case Preview</p>
+        <p class="text-xs uppercase tracking-wide text-gray-400 mb-1">{t('testCase.preview')}</p>
         <h2 class="text-2xl font-semibold" style="color: var(--ds-text);">
-          {testCase ? testCase.title : 'Loading...'}
+          {testCase ? testCase.title : t('common.loading')}
         </h2>
         {#if testCase?.folder_name}
           <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-            Folder: {testCase.folder_name}
+            {t('testCase.folder')}: {testCase.folder_name}
           </p>
         {/if}
         <!-- Metadata badges -->
@@ -197,7 +198,7 @@
               class="inline-flex items-center px-2 py-1 text-xs font-medium rounded text-white capitalize"
               style="background-color: {getPriorityColor(testCase.priority || 'medium')};"
             >
-              {testCase.priority || 'medium'} priority
+              {testCase.priority || 'medium'} {t('testCase.priority')}
             </span>
             <!-- Status badge -->
             <span
@@ -225,7 +226,7 @@
           onclick={handleClose}
         >
           <ArrowLeft class="w-4 h-4" />
-          Back to Item
+          {t('testCase.backToItem')}
         </button>
       {/if}
     </div>
@@ -254,7 +255,7 @@
             size="medium"
             onclick={() => window.location.href = `${workspaceTestsBasePath}/cases/${testCase.id}/steps`}
           >
-            Edit Test Steps
+            {t('testCase.editTestSteps')}
           </Button>
           <Button
             variant="default"
@@ -262,7 +263,7 @@
             size="medium"
             onclick={() => window.location.href = `${workspaceTestsBasePath}/runs`}
           >
-            View Test Runs
+            {t('testCase.viewTestRuns')}
           </Button>
         </div>
 
@@ -275,7 +276,7 @@
               class="text-xs font-semibold uppercase tracking-widest mb-2"
               style="color: var(--ds-interactive);"
             >
-              Preconditions
+              {t('testCase.preconditions')}
             </p>
             <p class="text-sm" style="color: var(--ds-text);">
               {testCase.preconditions}
@@ -291,7 +292,7 @@
           <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: var(--ds-border);">
             <h2 class="text-lg font-semibold flex items-center gap-2" style="color: var(--ds-text);">
               <ListOrdered class="w-5 h-5" style="color: var(--ds-interactive);" />
-              Test Steps ({testSteps.length})
+              {t('testCase.testSteps')} ({testSteps.length})
             </h2>
           </div>
           <div class="p-6">
@@ -308,10 +309,10 @@
                 </div>
                 <div>
                   <div class="text-lg font-medium mb-1" style="color: var(--ds-text);">
-                    No Steps Defined
+                    {t('testCase.noStepsDefined')}
                   </div>
                   <div class="text-sm mb-4" style="color: var(--ds-text-subtle);">
-                    This test case doesn't have any steps yet.
+                    {t('testCase.noStepsHelp')}
                   </div>
                   <Button
                     variant="primary"
@@ -319,7 +320,7 @@
                     size="medium"
                     onclick={() => window.location.href = `${workspaceTestsBasePath}/cases/${testCase.id}/steps`}
                   >
-                    Add Steps
+                    {t('testCase.addSteps')}
                   </Button>
                 </div>
               </div>
@@ -340,7 +341,7 @@
                       <div class="flex-1 space-y-4">
                         <div>
                           <p class="text-xs font-semibold uppercase tracking-wider mb-1" style="color: var(--ds-interactive);">
-                            Action
+                            {t('testCase.action')}
                           </p>
                           <p class="text-sm" style="color: var(--ds-text);">
                             {step.action || '—'}
@@ -353,7 +354,7 @@
                               class="text-xs font-semibold uppercase tracking-wider mb-1"
                               style="color: var(--ds-icon-accent-purple);"
                             >
-                              Data
+                              {t('testCase.data')}
                             </p>
                             <p class="text-sm" style="color: var(--ds-text);">
                               {step.data}
@@ -366,7 +367,7 @@
                             class="text-xs font-semibold uppercase tracking-wider mb-1"
                             style="color: var(--ds-icon-accent-green);"
                           >
-                            Expected Result
+                            {t('testCase.expectedResult')}
                           </p>
                           <p class="text-sm" style="color: var(--ds-text);">
                             {step.expected || '—'}
@@ -389,7 +390,7 @@
           <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: var(--ds-border);">
             <h2 class="text-lg font-semibold flex items-center gap-2" style="color: var(--ds-text);">
               <Play class="w-5 h-5" style="color: var(--ds-icon-accent-green);" />
-              Recent Executions ({executions.length})
+              {t('testCase.recentExecutions')} ({executions.length})
             </h2>
           </div>
           <div class="p-6">
@@ -405,7 +406,7 @@
                   <History class="w-6 h-6" />
                 </div>
                 <div class="text-sm" style="color: var(--ds-text-subtle);">
-                  This test case hasn't been executed in any recent test runs.
+                  {t('testCase.noExecutions')}
                 </div>
               </div>
             {:else}
@@ -441,10 +442,10 @@
                           {formatDateTimeLocale(execution.started_at) || '—'}
                         </span>
                         {#if execution.set_name}
-                          <span>• Set: {execution.set_name}</span>
+                          <span>• {t('testCase.set')}: {execution.set_name}</span>
                         {/if}
                         {#if execution.template_name}
-                          <span>• Template: {execution.template_name}</span>
+                          <span>• {t('testCase.template')}: {execution.template_name}</span>
                         {/if}
                       </div>
                     </div>

@@ -1,12 +1,15 @@
 <script>
   import { Search, X } from 'lucide-svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     value = $bindable(''),
-    placeholder = 'Search...',
+    placeholder = '',
     autofocus = false,
     class: className = ''
   } = $props();
+
+  const effectivePlaceholder = $derived(placeholder || t('common.search') + '...');
 
   let inputElement = $state(null);
 
@@ -32,7 +35,7 @@
       bind:this={inputElement}
       bind:value
       type="text"
-      {placeholder}
+      placeholder={effectivePlaceholder}
       class="w-full pl-10 pr-8 py-2 text-sm rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500"
       style="border-color: var(--ds-border); background: var(--ds-surface); color: var(--ds-text);"
     />
@@ -44,7 +47,7 @@
         onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered, rgba(0,0,0,0.05))'}
         onmouseleave={(e) => e.currentTarget.style.background = 'transparent'}
         type="button"
-        aria-label="Clear search"
+        aria-label={t('aria.clearSearch')}
       >
         <X class="w-4 h-4" style="color: var(--ds-text-subtle);" />
       </button>

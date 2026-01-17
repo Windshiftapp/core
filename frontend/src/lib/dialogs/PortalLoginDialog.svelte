@@ -11,6 +11,7 @@
     getBaseLoginState,
     performFidoLogin
   } from '../utils/loginUtils.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -68,12 +69,12 @@
   // Attempt FIDO authentication
   async function handleFidoLogin() {
     if (!emailOrUsername.trim()) {
-      validationError = 'Email or username is required';
+      validationError = t('portalLogin.emailRequired');
       return;
     }
 
     if (!isWebAuthnSupported()) {
-      validationError = 'WebAuthn is not supported by this browser';
+      validationError = t('portalLogin.webAuthnNotSupported');
       return;
     }
 
@@ -108,12 +109,12 @@
 
     // Basic validation
     if (!emailOrUsername.trim()) {
-      validationError = 'Email or username is required';
+      validationError = t('portalLogin.emailRequired');
       return;
     }
 
     if (!password) {
-      validationError = 'Password is required';
+      validationError = t('portalLogin.passwordRequired');
       return;
     }
 
@@ -184,8 +185,8 @@
           <User class="w-8 h-8 text-white" />
         </div>
       </div>
-      <h2 class="text-2xl font-bold">Welcome Back</h2>
-      <p class="text-white/80 mt-2">Sign in to customize this portal</p>
+      <h2 class="text-2xl font-bold">{t('portalLogin.welcomeBack')}</h2>
+      <p class="text-white/80 mt-2">{t('portalLogin.signInToCustomize')}</p>
     </div>
 
     <!-- Form Content -->
@@ -214,7 +215,7 @@
         <!-- Email/Username Field -->
         <div>
           <label for="emailOrUsername" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
-            Email or Username
+            {t('portalLogin.emailOrUsername')}
           </label>
           <div class="relative">
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -230,7 +231,7 @@
               disabled={authStore.loading}
               class="block w-full pl-10 pr-3 py-2.5 rounded leading-5 focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
               style="background-color: {isDarkMode ? '#334155' : '#f9fafb'}; color: {isDarkMode ? '#e2e8f0' : '#111827'}; border: 1px solid {isDarkMode ? '#475569' : '#e5e7eb'};"
-              placeholder="Enter email or username"
+              placeholder={t('portalLogin.enterEmailOrUsername')}
               autocomplete="username"
               required
             />
@@ -240,7 +241,7 @@
         <!-- Password Field -->
         <div>
           <label for="password" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
-            Password
+            {t('portalLogin.password')}
           </label>
           <div class="relative">
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -254,7 +255,7 @@
               disabled={authStore.loading}
               class="block w-full pl-10 pr-10 py-2.5 rounded leading-5 focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
               style="background-color: {isDarkMode ? '#334155' : '#f9fafb'}; color: {isDarkMode ? '#e2e8f0' : '#111827'}; border: 1px solid {isDarkMode ? '#475569' : '#e5e7eb'};"
-              placeholder="Enter password"
+              placeholder={t('portalLogin.enterPassword')}
               autocomplete="current-password"
               required
             />
@@ -284,7 +285,7 @@
             class="h-4 w-4 rounded border-gray-300 focus:ring-2 focus:ring-offset-0"
           />
           <label for="rememberMe" class="ml-2 block text-sm" style="color: {isDarkMode ? '#cbd5e1' : '#4b5563'};">
-            Keep me signed in for 30 days
+            {t('portalLogin.keepMeSignedIn')}
           </label>
         </div>
 
@@ -295,7 +296,7 @@
               <div class="w-full border-t" style="border-color: {isDarkMode ? '#475569' : '#e5e7eb'};"></div>
             </div>
             <div class="relative flex justify-center text-sm">
-              <span class="px-2" style="background-color: {isDarkMode ? '#1e293b' : '#ffffff'}; color: {isDarkMode ? '#94a3b8' : '#6b7280'};">or</span>
+              <span class="px-2" style="background-color: {isDarkMode ? '#1e293b' : '#ffffff'}; color: {isDarkMode ? '#94a3b8' : '#6b7280'};">{t('portalLogin.or')}</span>
             </div>
           </div>
 
@@ -311,7 +312,7 @@
                 <path fill-rule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-2 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z" clip-rule="evenodd" />
               </svg>
             {/if}
-            {tryingFido ? 'Touch your security key...' : 'Sign in with Security Key'}
+            {tryingFido ? t('portalLogin.touchSecurityKey') : t('portalLogin.signInWithSecurityKey')}
           </Button>
         {/if}
 
@@ -323,7 +324,7 @@
           loading={authStore.loading}
           disabled={authStore.loading || !emailOrUsername.trim() || !password}
         >
-          {authStore.loading ? 'Signing in...' : 'Sign In'}
+          {authStore.loading ? t('portalLogin.signingIn') : t('portalLogin.signIn')}
         </Button>
       </form>
     </div>

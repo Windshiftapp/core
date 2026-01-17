@@ -11,6 +11,7 @@
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import { portalStore, gradients, iconMap } from '../stores/portal.svelte.js';
   import { api } from '../api.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     onOpenFieldsModal = () => {},
@@ -68,7 +69,7 @@
   }
 
   async function deleteRequestType(id) {
-    if (!confirm('Are you sure you want to delete this request type?')) return;
+    if (!confirm(t('portal.customize.confirmDeleteRequestType'))) return;
 
     try {
       await api.requestTypes.delete(id);
@@ -159,7 +160,7 @@
   <!-- Vertical Navigation Sidebar -->
   <div class="w-16 border-r flex flex-col items-center py-4" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
     <!-- Hero Gradient Section -->
-    <Tooltip content="Hero Gradient" placement="right">
+    <Tooltip content={t('portal.customize.heroGradient')} placement="right">
       {#snippet children()}
         <button
           onclick={() => portalStore.activeSection = 'hero-gradient'}
@@ -172,7 +173,7 @@
     </Tooltip>
 
     <!-- Navigation Section -->
-    <Tooltip content="Navigation" placement="right">
+    <Tooltip content={t('portal.customize.navigation')} placement="right">
       {#snippet children()}
         <button
           onclick={() => portalStore.activeSection = 'navigation'}
@@ -186,7 +187,7 @@
 
 
     <!-- Request Types Section -->
-    <Tooltip content="Request Types" placement="right">
+    <Tooltip content={t('portal.customize.requestTypes')} placement="right">
       {#snippet children()}
         <button
           onclick={() => portalStore.activeSection = 'request-types'}
@@ -199,7 +200,7 @@
     </Tooltip>
 
     <!-- Knowledge Base Section -->
-    <Tooltip content="Knowledge Base" placement="right">
+    <Tooltip content={t('portal.customize.knowledgeBase')} placement="right">
       {#snippet children()}
         <button
           onclick={() => portalStore.activeSection = 'knowledge-base'}
@@ -219,16 +220,16 @@
       <div class="flex items-center gap-3">
         {#if portalStore.activeSection === 'hero-gradient'}
           <Palette class="w-5 h-5" style="color: var(--ds-text);" />
-          <h2 class="text-lg font-semibold" style="color: var(--ds-text);">Hero Gradient</h2>
+          <h2 class="text-lg font-semibold" style="color: var(--ds-text);">{t('portal.customize.heroGradient')}</h2>
         {:else if portalStore.activeSection === 'navigation'}
           <Navigation class="w-5 h-5" style="color: var(--ds-text);" />
-          <h2 class="text-lg font-semibold" style="color: var(--ds-text);">Navigation</h2>
+          <h2 class="text-lg font-semibold" style="color: var(--ds-text);">{t('portal.customize.navigation')}</h2>
         {:else if portalStore.activeSection === 'request-types'}
           <TextCursorInput class="w-5 h-5" style="color: var(--ds-text);" />
-          <h2 class="text-lg font-semibold" style="color: var(--ds-text);">Request Types</h2>
+          <h2 class="text-lg font-semibold" style="color: var(--ds-text);">{t('portal.customize.requestTypes')}</h2>
         {:else if portalStore.activeSection === 'knowledge-base'}
           <BookOpen class="w-5 h-5" style="color: var(--ds-text);" />
-          <h2 class="text-lg font-semibold" style="color: var(--ds-text);">Knowledge Base</h2>
+          <h2 class="text-lg font-semibold" style="color: var(--ds-text);">{t('portal.customize.knowledgeBase')}</h2>
         {/if}
       </div>
       <button
@@ -246,8 +247,8 @@
     <div class="flex-1 overflow-y-auto p-6">
       {#if portalStore.activeSection === 'hero-gradient'}
         <div class="mb-6">
-          <h3 class="text-sm font-medium mb-3" style="color: var(--ds-text);">Gradient Style</h3>
-          <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">Choose a color scheme for your portal hero section</p>
+          <h3 class="text-sm font-medium mb-3" style="color: var(--ds-text);">{t('portal.customize.gradientStyle')}</h3>
+          <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">{t('portal.customize.gradientDescription')}</p>
         </div>
 
         <!-- Gradient Grid -->
@@ -282,14 +283,14 @@
         </div>
       {:else if portalStore.activeSection === 'navigation'}
         <div class="text-sm" style="color: var(--ds-text-subtle);">
-          Navigation customization coming soon...
+          {t('portal.customize.navigationComingSoon')}
         </div>
       {:else if portalStore.activeSection === 'request-types'}
         <!-- Request Types Management -->
         <div class="mb-6">
-          <h3 class="text-sm font-medium mb-3" style="color: var(--ds-text);">Request Types</h3>
+          <h3 class="text-sm font-medium mb-3" style="color: var(--ds-text);">{t('portal.customize.requestTypes')}</h3>
           <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">
-            Configure different types of requests that visitors can submit through your portal
+            {t('portal.customize.requestTypesDescription')}
           </p>
         </div>
 
@@ -344,7 +345,7 @@
                             class="px-1.5 py-0.5 text-[10px] font-medium rounded"
                             style="background-color: {portalStore.isDarkMode ? 'rgba(156, 163, 175, 0.2)' : '#f3f4f6'}; color: {portalStore.isDarkMode ? '#9ca3af' : '#6b7280'};"
                           >
-                            INACTIVE
+                            {t('common.inactive').toUpperCase()}
                           </span>
                         {/if}
                       </div>
@@ -356,7 +357,7 @@
                     {/if}
                     <div class="flex items-center gap-2">
                       <div class="text-xs" style="color: {portalStore.isDarkMode ? '#94a3b8' : '#6b7280'};">
-                        Creates: {requestType.item_type_name || 'Unknown'}
+                        {t('portal.customize.creates')}: {requestType.item_type_name || t('common.unknown')}
                       </div>
                       <span style="color: {portalStore.isDarkMode ? '#475569' : '#e5e7eb'};">•</span>
                       <button
@@ -364,7 +365,7 @@
                         class="text-xs hover:underline"
                         style="color: {portalStore.isDarkMode ? '#60a5fa' : '#2563eb'};"
                       >
-                        Fields
+                        {t('portal.customize.fields')}
                       </button>
                     </div>
                   </div>
@@ -380,24 +381,24 @@
                       placement="bottom-end"
                       items={[
                         {
-                          title: 'Edit',
+                          title: t('common.edit'),
                           icon: Edit,
                           onClick: () => onOpenRequestTypeModal('edit', requestType)
                         },
                         {
-                          title: 'Rename',
+                          title: t('portal.customize.rename'),
                           icon: Pencil,
                           onClick: () => startRenaming(requestType)
                         },
                         { type: 'divider' },
                         {
-                          title: requestType.is_active ? 'Mark as Inactive' : 'Mark as Active',
+                          title: requestType.is_active ? t('portal.customize.markAsInactive') : t('portal.customize.markAsActive'),
                           icon: requestType.is_active ? EyeOff : Eye,
                           onClick: () => toggleRequestTypeActive(requestType)
                         },
                         { type: 'divider' },
                         {
-                          title: 'Delete',
+                          title: t('common.delete'),
                           icon: Trash2,
                           color: '#dc2626',
                           onClick: () => deleteRequestType(requestType.id)
@@ -412,7 +413,7 @@
             {#if portalStore.requestTypes.length === 0}
               <div class="text-center py-8">
                 <p class="text-sm mb-4" style="color: {portalStore.isDarkMode ? '#94a3b8' : '#6b7280'};">
-                  No request types configured yet
+                  {t('portal.customize.noRequestTypes')}
                 </p>
               </div>
             {/if}
@@ -425,22 +426,22 @@
             style="border-color: {portalStore.isDarkMode ? '#475569' : '#d1d5db'}; color: {portalStore.isDarkMode ? '#94a3b8' : '#6b7280'};"
           >
             <Plus class="w-5 h-5" />
-            <span class="font-medium">Add Request Type</span>
+            <span class="font-medium">{t('portal.customize.addRequestType')}</span>
           </button>
         {/if}
       {:else if portalStore.activeSection === 'knowledge-base'}
         <!-- Knowledge Base Configuration -->
         <div class="mb-6">
-          <h3 class="text-sm font-medium mb-3" style="color: var(--ds-text);">Docmost Knowledge Base</h3>
+          <h3 class="text-sm font-medium mb-3" style="color: var(--ds-text);">{t('portal.customize.docmostKnowledgeBase')}</h3>
           <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">
-            Connect your Docmost knowledge base to enable search functionality in the portal
+            {t('portal.customize.docmostDescription')}
           </p>
         </div>
 
         <div class="space-y-4">
           <div>
             <label class="block text-xs font-medium mb-2" style="color: var(--ds-text);">
-              Docmost Share Link
+              {t('portal.customize.docmostShareLink')}
             </label>
             <input
               type="text"
@@ -449,10 +450,10 @@
               onblur={() => portalStore.saveKnowledgeBaseConfig()}
               class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               style="background-color: var(--ds-surface); color: var(--ds-text); border-color: var(--ds-border);"
-              placeholder="https://wiki.example.com/share/abc123xyz"
+              placeholder={t('portal.customize.docmostShareLinkPlaceholder')}
             />
             <p class="text-xs mt-2" style="color: var(--ds-text-subtle);">
-              Enter the full Docmost share link (e.g., https://wiki.example.com/share/u1gkl0jk1u)
+              {t('portal.customize.docmostShareLinkHelp')}
             </p>
           </div>
 
@@ -461,31 +462,31 @@
             {#if parsed.baseURL && parsed.shareID}
               <div class="p-3 rounded" style="background-color: var(--ds-surface-raised);">
                 <div class="text-xs font-medium mb-2" style="color: var(--ds-text);">
-                  Parsed Configuration:
+                  {t('portal.customize.parsedConfiguration')}
                 </div>
                 <div class="space-y-1 text-xs" style="color: var(--ds-text-subtle);">
                   <div>
-                    <span class="font-medium">Base URL:</span>
+                    <span class="font-medium">{t('portal.customize.baseURL')}</span>
                     <span class="ml-1">{parsed.baseURL}</span>
                   </div>
                   <div>
-                    <span class="font-medium">Share ID:</span>
+                    <span class="font-medium">{t('portal.customize.shareID')}</span>
                     <span class="ml-1">{parsed.shareID}</span>
                   </div>
                 </div>
                 <div class="mt-2 flex items-center gap-1 text-xs" style="color: #10b981;">
                   <Check class="w-3 h-3" />
-                  <span>Configuration valid</span>
+                  <span>{t('portal.customize.configurationValid')}</span>
                 </div>
               </div>
             {:else}
               <div class="p-3 rounded" style="background-color: {portalStore.isDarkMode ? 'rgba(220, 38, 38, 0.1)' : '#fee2e2'};">
                 <div class="flex items-center gap-1 text-xs" style="color: #dc2626;">
                   <X class="w-3 h-3" />
-                  <span>Invalid share link format</span>
+                  <span>{t('portal.customize.invalidShareLinkFormat')}</span>
                 </div>
                 <div class="text-xs mt-1" style="color: #dc2626;">
-                  Expected format: https://your-domain.com/share/share-id
+                  {t('portal.customize.expectedFormat')}
                 </div>
               </div>
             {/if}
@@ -493,14 +494,14 @@
 
           <div class="pt-4 border-t" style="border-color: var(--ds-border);">
             <h4 class="text-xs font-medium mb-2" style="color: var(--ds-text);">
-              How to get a Docmost share link:
+              {t('portal.customize.howToGetShareLink')}
             </h4>
             <ol class="text-xs space-y-1 list-decimal list-inside" style="color: var(--ds-text-subtle);">
-              <li>Open your Docmost space</li>
-              <li>Click the Share button</li>
-              <li>Enable public sharing</li>
-              <li>Copy the share link</li>
-              <li>Paste it above</li>
+              <li>{t('portal.customize.docmostStep1')}</li>
+              <li>{t('portal.customize.docmostStep2')}</li>
+              <li>{t('portal.customize.docmostStep3')}</li>
+              <li>{t('portal.customize.docmostStep4')}</li>
+              <li>{t('portal.customize.docmostStep5')}</li>
             </ol>
           </div>
         </div>

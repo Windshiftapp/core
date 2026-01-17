@@ -1,4 +1,6 @@
 <script>
+  import { t } from '../stores/i18n.svelte.js';
+
   let {
     src = null,          // Image URL
     alt = '',            // Alt text for image
@@ -59,7 +61,7 @@
   };
 
   const initials = $derived(getInitials());
-  const computedAlt = $derived(alt || name || `${firstName} ${lastName}`.trim() || 'Avatar');
+  const computedAlt = $derived(alt || name || `${firstName} ${lastName}`.trim() || t('components.avatar.defaultAlt'));
 
   const baseClasses = $derived([
     sizeClasses[size],

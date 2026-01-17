@@ -1,0 +1,130 @@
+/**
+ * Arabic (ar) - Authentication and User-related translations
+ * RTL language
+ *
+ * This module contains translations for:
+ * - auth: Login, logout, password reset, and authentication flows
+ * - users: User management, profiles, and account settings
+ * - security: Security settings, API tokens, and credentials
+ * - portalLogin: Portal-specific login interface
+ */
+
+export default {
+  auth: {
+    login: 'تسجيل الدخول',
+    logout: 'تسجيل الخروج',
+    signIn: 'تسجيل الدخول',
+    signOut: 'تسجيل الخروج',
+    signUp: 'إنشاء حساب',
+    register: 'تسجيل',
+    forgotPassword: 'هل نسيت كلمة المرور؟',
+    resetPassword: 'إعادة تعيين كلمة المرور',
+    changePassword: 'تغيير كلمة المرور',
+    currentPassword: 'كلمة المرور الحالية',
+    newPassword: 'كلمة المرور الجديدة',
+    confirmPassword: 'تأكيد كلمة المرور',
+    rememberMe: 'تذكرني',
+    staySignedIn: 'البقاء مسجل الدخول',
+    emailOrUsername: 'البريد الإلكتروني أو اسم المستخدم',
+    welcomeBack: 'مرحباً بعودتك',
+    loginTitle: 'تسجيل الدخول إلى حسابك',
+    loginSubtitle: 'أدخل بيانات الاعتماد للمتابعة',
+    loggingIn: 'جاري تسجيل الدخول...',
+    logoutConfirm: 'هل أنت متأكد من رغبتك في تسجيل الخروج؟',
+    sessionExpired: 'انتهت صلاحية جلستك. يرجى تسجيل الدخول مرة أخرى.',
+    accountLocked: 'تم قفل حسابك. يرجى الاتصال بالدعم.',
+    twoFactor: 'المصادقة الثنائية',
+    enterCode: 'أدخل رمز التحقق',
+    resendCode: 'إعادة إرسال الرمز',
+    verificationSent: 'تم إرسال رمز التحقق إلى بريدك الإلكتروني',
+    sso: 'تسجيل الدخول الموحد',
+    continueWith: 'المتابعة باستخدام {provider}'
+  },
+
+  users: {
+    title: 'المستخدمون',
+    subtitle: 'إدارة حسابات المستخدمين والصلاحيات',
+    user: 'مستخدم',
+    users_one: 'مستخدم واحد',
+    users_other: '{count} مستخدمين',
+    addUser: 'إضافة مستخدم',
+    createUser: 'إنشاء مستخدم',
+    editUser: 'تعديل المستخدم',
+    deleteUser: 'حذف المستخدم',
+    inviteUser: 'دعوة مستخدم',
+    profile: 'الملف الشخصي',
+    myProfile: 'ملفي الشخصي',
+    account: 'الحساب',
+    firstName: 'الاسم الأول',
+    lastName: 'اسم العائلة',
+    fullName: 'الاسم الكامل',
+    displayName: 'اسم العرض',
+    email: 'البريد الإلكتروني',
+    phone: 'الهاتف',
+    avatar: 'الصورة الرمزية',
+    role: 'الدور',
+    roles: 'الأدوار',
+    permissions: 'الصلاحيات',
+    groups: 'المجموعات',
+    lastLogin: 'آخر تسجيل دخول',
+    lastActive: 'آخر نشاط',
+    createdAt: 'عضو منذ',
+    status: 'الحالة',
+    active: 'نشط',
+    inactive: 'غير نشط',
+    pending: 'معلق',
+    suspended: 'موقوف',
+    searchUsers: 'البحث عن مستخدمين...',
+    noUsers: 'لم يتم العثور على مستخدمين',
+    userCreated: 'تم إنشاء المستخدم بنجاح',
+    userUpdated: 'تم تحديث المستخدم بنجاح',
+    userDeleted: 'تم حذف المستخدم بنجاح',
+    inviteSent: 'تم إرسال الدعوة بنجاح',
+    cannotDeleteSelf: 'لا يمكنك حذف حسابك الخاص',
+    activateUser: 'تفعيل المستخدم',
+    deactivateUser: 'إلغاء تفعيل المستخدم',
+    confirmDelete: 'هل أنت متأكد من حذف {name}؟ لا يمكن التراجع عن هذا الإجراء.',
+    confirmActivate: 'هل أنت متأكد من تفعيل {name}؟ سيتمكنون من الوصول إلى النظام.',
+    confirmDeactivate: 'هل أنت متأكد من إلغاء تفعيل {name}؟ لن يتمكنوا بعد الآن من الوصول إلى النظام.',
+    failedToLoad: 'فشل في تحميل المستخدمين',
+    failedToSave: 'فشل في حفظ المستخدم',
+    failedToDelete: 'فشل في حذف المستخدم',
+    failedToActivate: 'فشل في تفعيل المستخدم',
+    failedToDeactivate: 'فشل في إلغاء تفعيل المستخدم',
+    failedToResetPassword: 'فشل في إعادة تعيين كلمة المرور'
+  },
+
+  security: {
+    title: 'الأمان',
+    subtitle: 'إدارة إعدادات الأمان',
+    credentials: 'بيانات اعتماد الأمان',
+    credentialsSubtitle: 'إدارة طرق المصادقة',
+    apiTokens: 'رموز API',
+    apiTokensSubtitle: 'إنشاء رموز للوصول إلى حسابك برمجياً',
+    createToken: 'إنشاء رمز',
+    revokeToken: 'إلغاء الرمز',
+    tokenName: 'اسم الرمز',
+    tokenCreated: 'تم إنشاء الرمز بنجاح',
+    tokenRevoked: 'تم إلغاء الرمز بنجاح',
+    copyToken: 'نسخ الرمز',
+    tokenWarning: 'تأكد من نسخ الرمز الآن. لن تتمكن من رؤيته مرة أخرى.'
+  },
+
+  portalLogin: {
+    welcomeBack: 'مرحباً بعودتك',
+    signInToCustomize: 'سجل الدخول لتخصيص هذه البوابة',
+    emailOrUsername: 'البريد الإلكتروني أو اسم المستخدم',
+    enterEmailOrUsername: 'أدخل البريد الإلكتروني أو اسم المستخدم',
+    password: 'كلمة المرور',
+    enterPassword: 'أدخل كلمة المرور',
+    keepMeSignedIn: 'إبقائي مسجل الدخول لمدة 30 يوماً',
+    or: 'أو',
+    touchSecurityKey: 'المس مفتاح الأمان...',
+    signInWithSecurityKey: 'تسجيل الدخول بمفتاح الأمان',
+    signingIn: 'جاري تسجيل الدخول...',
+    signIn: 'تسجيل الدخول',
+    emailRequired: 'البريد الإلكتروني أو اسم المستخدم مطلوب',
+    passwordRequired: 'كلمة المرور مطلوبة',
+    webAuthnNotSupported: 'WebAuthn غير مدعوم في هذا المتصفح'
+  }
+};

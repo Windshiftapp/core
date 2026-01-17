@@ -2,16 +2,19 @@
   import { BasePicker } from '.';
   import { createEventDispatcher, onMount } from 'svelte';
   import { api } from '../api.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
   let {
     value = null,
-    placeholder = "All labels",
+    placeholder = '',
     class: className = '',
     disabled = false,
     workspaceId = null
   } = $props();
+
+  const resolvedPlaceholder = $derived(placeholder || t('pickers.allLabels'));
 
   let labels = $state([]);
   let loading = $state(false);
@@ -61,7 +64,7 @@
   items={labels}
   {loading}
   {error}
-  {placeholder}
+  placeholder={resolvedPlaceholder}
   {disabled}
   class={className}
   allowClear={true}

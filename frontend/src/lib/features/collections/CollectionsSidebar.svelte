@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { ChevronLeft, Filter, Search, Plus, X } from 'lucide-svelte';
+  import { t } from '../../stores/i18n.svelte.js';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import DynamicFieldFilter from '../items/DynamicFieldFilter.svelte';
   import Button from '../../components/Button.svelte';
@@ -134,13 +135,13 @@
   <!-- Header with collapse toggle -->
   <div class="flex items-center p-4 border-b" class:justify-center={collapsed} class:justify-between={!collapsed} style="border-color: var(--ds-border);">
     {#if !collapsed}
-      <h3 class="text-sm font-semibold" style="color: var(--ds-text);">Filters</h3>
+      <h3 class="text-sm font-semibold" style="color: var(--ds-text);">{t('collections.filters')}</h3>
     {/if}
     <button
       onclick={toggleCollapse}
       class="p-1.5 rounded transition-colors hover:bg-opacity-10"
       style="color: var(--ds-text-subtle);"
-      title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      title={collapsed ? t('collections.expandSidebar') : t('collections.collapseSidebar')}
     >
       <ChevronLeft class="w-4 h-4 transition-transform duration-200 {collapsed ? 'rotate-180' : ''}" />
     </button>
@@ -164,12 +165,12 @@
               onclick={(e) => { e.stopPropagation(); clearSearch(); }}
               class="p-0.5 rounded transition-colors flex-shrink-0"
               style="color: var(--ds-text-subtle);"
-              title="Clear search"
+              title={t('collections.clearSearch')}
             >
               <X class="w-3 h-3" />
             </button>
           {:else}
-            <span class="text-left flex-1">Search items...</span>
+            <span class="text-left flex-1">{t('collections.searchItems')}</span>
           {/if}
         </button>
       </div>
@@ -179,13 +180,13 @@
         <!-- Workspace Picker -->
         <div>
           <label class="block text-xs font-medium mb-1.5" style="color: var(--ds-text-subtle);">
-            Workspaces
+            {t('collections.workspaces')}
           </label>
           <BasePicker
             items={workspaces}
             value={selectedWorkspaces}
             multiple={true}
-            placeholder="Select workspaces..."
+            placeholder={t('collections.selectWorkspaces')}
             getValue={(item) => item?.id}
             getLabel={(item) => item?.name ?? ''}
             onChange={handleWorkspacesChange}
@@ -195,13 +196,13 @@
         <!-- Status Picker -->
         <div>
           <label class="block text-xs font-medium mb-1.5" style="color: var(--ds-text-subtle);">
-            Status
+            {t('collections.status')}
           </label>
           <BasePicker
             items={allStatuses}
             value={selectedStatuses}
             multiple={true}
-            placeholder="Select statuses..."
+            placeholder={t('collections.selectStatuses')}
             getValue={(item) => item?.id}
             getLabel={(item) => item?.name ?? ''}
             onChange={handleStatusesChange}
@@ -211,13 +212,13 @@
         <!-- Priority Picker -->
         <div>
           <label class="block text-xs font-medium mb-1.5" style="color: var(--ds-text-subtle);">
-            Priority
+            {t('collections.priority')}
           </label>
           <BasePicker
             items={allPriorities}
             value={selectedPriorities}
             multiple={true}
-            placeholder="Select priorities..."
+            placeholder={t('collections.selectPriorities')}
             getValue={(item) => item?.id}
             getLabel={(item) => item?.name ?? ''}
             onChange={handlePrioritiesChange}
@@ -243,7 +244,7 @@
           onclick={addDynamicFilter}
           class="w-full justify-start"
         >
-          Add Field Filter
+          {t('collections.addFieldFilter')}
         </Button>
       </div>
     </div>
@@ -254,7 +255,7 @@
         onclick={toggleCollapse}
         class="p-2 rounded transition-colors"
         style="color: var(--ds-icon-subtle);"
-        title="Filters"
+        title={t('collections.filters')}
       >
         <Filter class="w-5 h-5" />
       </button>
@@ -262,7 +263,7 @@
         onclick={toggleCollapse}
         class="p-2 rounded transition-colors"
         style="color: var(--ds-icon-subtle);"
-        title="Search"
+        title={t('common.search')}
       >
         <Search class="w-5 h-5" />
       </button>
@@ -273,18 +274,18 @@
 <!-- Search Modal -->
 <Modal bind:isOpen={showSearchModal} maxWidth="max-w-md" onclose={closeSearchModal} onSubmit={applySearch}>
   <div class="p-4">
-    <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">Search Items</h3>
+    <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">{t('collections.searchItemsTitle')}</h3>
     <input
       type="text"
       bind:value={tempSearchQuery}
-      placeholder="Enter search text..."
+      placeholder={t('collections.enterSearchText')}
       class="w-full px-3 py-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
       style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);"
     />
     <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" size="sm" onclick={clearSearch}>Clear</Button>
-      <Button variant="ghost" size="sm" onclick={closeSearchModal}>Cancel</Button>
-      <Button variant="primary" size="sm" onclick={applySearch}>Apply</Button>
+      <Button variant="ghost" size="sm" onclick={clearSearch}>{t('collections.clear')}</Button>
+      <Button variant="ghost" size="sm" onclick={closeSearchModal}>{t('common.cancel')}</Button>
+      <Button variant="primary" size="sm" onclick={applySearch}>{t('collections.apply')}</Button>
     </div>
   </div>
 </Modal>

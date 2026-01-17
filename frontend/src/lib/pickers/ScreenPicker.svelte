@@ -1,11 +1,12 @@
 <script>
   import { BasePicker } from '.';
   import { Layout } from 'lucide-svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     value = $bindable(null),
     items = [],
-    placeholder = 'Select screen...',
+    placeholder = '',
     defaultScreenId = null,
     unassignedLabel: customUnassignedLabel = null,
     disabled = false,
@@ -13,6 +14,8 @@
     onSelect = () => {},
     onCancel = () => {}
   } = $props();
+
+  const resolvedPlaceholder = $derived(placeholder || t('pickers.selectScreen'));
 
   // Get the default screen name for the "Default" option label
   const defaultScreenName = $derived(() => {
@@ -26,15 +29,15 @@
     customUnassignedLabel
       ? customUnassignedLabel
       : defaultScreenId && defaultScreenName()
-        ? `Default (${defaultScreenName()})`
-        : 'Default'
+        ? `${t('common.default')} (${defaultScreenName()})`
+        : t('common.default')
   );
 </script>
 
 <BasePicker
   bind:value
   {items}
-  {placeholder}
+  placeholder={resolvedPlaceholder}
   {disabled}
   class={className}
   showUnassigned={true}

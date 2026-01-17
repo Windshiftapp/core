@@ -1,6 +1,7 @@
 <script>
   import { Search } from 'lucide-svelte';
   import WidgetState from './WidgetState.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let workspaceId = null;
   export let config = {};
@@ -13,8 +14,8 @@
   error={null}
   isEmpty={searchResults.length === 0}
   emptyIcon={Search}
-  emptyTitle="No search results"
-  emptySubtitle="Configure saved search to see results"
+  emptyTitle={t('widgets.savedSearch.emptyTitle')}
+  emptySubtitle={t('widgets.savedSearch.emptySubtitle')}
 >
   {#snippet children()}
     <div class="space-y-2">

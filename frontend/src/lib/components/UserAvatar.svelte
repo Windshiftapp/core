@@ -6,6 +6,7 @@
   import { api } from '../api.js';
   import { User, Home, Shield, Camera, Sun, Moon, Monitor } from 'lucide-svelte';
   import { themeStore } from '../stores/theme.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   // Local state
   let loadingPersonalWorkspace = $state(false);
@@ -96,9 +97,9 @@
   // Reactive theme label based on current mode
   const themeLabel = $derived.by(() => {
     switch (themeStore.colorMode) {
-      case 'light': return 'Light';
-      case 'dark': return 'Dark';
-      default: return 'System';
+      case 'light': return t('components.userAvatar.themeLight');
+      case 'dark': return t('components.userAvatar.themeDark');
+      default: return t('components.userAvatar.themeSystem');
     }
   });
 </script>
@@ -120,8 +121,8 @@
       type: 'regular',
       icon: Home,
       iconColor: '#3b82f6',
-      title: 'My Workspace',
-      subtitle: 'Personal workspace for todos and notes',
+      title: t('components.userAvatar.myWorkspace'),
+      subtitle: t('components.userAvatar.myWorkspaceSubtitle'),
       onClick: navigateToPersonalWorkspace
     }, { type: 'divider' }] : []),
     ...(attachmentsEnabled ? [{
@@ -129,8 +130,8 @@
       type: 'regular',
       icon: User,
       iconColor: '#3b82f6',
-      title: 'Profile',
-      subtitle: 'Manage your profile and settings',
+      title: t('users.profile'),
+      subtitle: t('components.userAvatar.profileSubtitle'),
       onClick: handleAvatarClick
     }, { type: 'divider' }] : []),
     {
@@ -138,8 +139,8 @@
       type: 'regular',
       icon: Shield,
       iconColor: '#3b82f6',
-      title: 'Security',
-      subtitle: 'Manage passwords, 2FA, and API tokens',
+      title: t('components.userAvatar.security'),
+      subtitle: t('components.userAvatar.securitySubtitle'),
       onClick: () => navigate('/security')
     },
     { type: 'divider' },
@@ -148,8 +149,8 @@
       type: 'regular',
       icon: themeIcon,
       iconColor: '#8b5cf6',
-      title: 'Theme: ' + themeLabel,
-      subtitle: 'Click to cycle: Light → Dark → System',
+      title: t('components.userAvatar.themeTitle', { mode: themeLabel }),
+      subtitle: t('components.userAvatar.themeCycle'),
       onClick: handleThemeToggle
     },
     { type: 'divider' },
@@ -158,7 +159,7 @@
       type: 'regular',
       icon: User,
       iconColor: '#3b82f6',
-      title: 'Sign Out',
+      title: t('auth.signOut'),
       hoverClass: 'hover:bg-red-50 hover:text-red-700',
       onClick: handleLogout
     }

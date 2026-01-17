@@ -22,6 +22,7 @@
   import { getHexFromColorName } from '../utils/colors.js';
   import Toggle from '../components/Toggle.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
   
   export let workspaceId;
   export let activeTab = 'general'; // 'general', 'configuration', or 'danger'
@@ -137,12 +138,12 @@
   
   async function saveWorkspace() {
     if (!formData.name.trim()) {
-      showToastError('Workspace name is required');
+      showToastError(t('workspaceSettings.workspaceNameRequired'));
       return;
     }
-    
+
     if (!formData.key.trim()) {
-      showToastError('Workspace key is required');
+      showToastError(t('workspaceSettings.workspaceKeyRequired'));
       return;
     }
     
@@ -157,10 +158,10 @@
       workspace = { ...workspace, ...formData };
 
       // Show success toast
-      showToastSuccess('Workspace settings saved successfully');
+      showToastSuccess(t('workspaceSettings.savedSuccessfully'));
     } catch (error) {
       console.error('Failed to save workspace:', error);
-      showToastError('Failed to save workspace settings: ' + (error.message || error));
+      showToastError(t('workspaceSettings.failedToSave', { error: error.message || error }));
     } finally {
       saving = false;
     }
@@ -181,20 +182,20 @@
   
   async function deleteWorkspace() {
     if (deleteConfirmText !== workspace.name) {
-      showToastError('Please enter the workspace name exactly as shown to confirm deletion');
+      showToastError(t('workspaceSettings.pleaseConfirmDeletion'));
       return;
     }
-    
+
     try {
       await api.workspaces.delete(workspaceId);
-      showToastSuccess(`Workspace "${workspace.name}" deleted successfully`);
+      showToastSuccess(t('workspaceSettings.deletedSuccessfully', { name: workspace.name }));
       // Navigate after showing the toast
       setTimeout(() => {
         navigate('/workspaces');
       }, 1000);
     } catch (error) {
       console.error('Failed to delete workspace:', error);
-      showToastError('Failed to delete workspace: ' + (error.message || error));
+      showToastError(t('workspaceSettings.failedToDelete', { error: error.message || error }));
     }
   }
   
@@ -231,13 +232,13 @@
     if (!files || files.length === 0) return;
 
     if (!attachmentsEnabled) {
-      showToastError('Attachments must be enabled to upload workspace icons');
+      showToastError(t('workspaceSettings.attachmentsRequired'));
       return;
     }
 
     const file = files[0];
     if (!file.type.startsWith('image/')) {
-      showToastError('Please select an image file');
+      showToastError(t('workspaceSettings.pleaseSelectImage'));
       return;
     }
 
@@ -262,10 +263,10 @@
       if (uploadResult && uploadResult.success && uploadResult.avatar_url) {
         formData.avatar_url = uploadResult.avatar_url;
         showAvatarUpload = false;
-        showToastSuccess('Avatar uploaded successfully');
+        showToastSuccess(t('workspaceSettings.avatarUploadedSuccess'));
       }
     } catch (err) {
-      showToastError('Failed to upload avatar: ' + (err.message || err));
+      showToastError(t('workspaceSettings.failedToUploadAvatar', { error: err.message || err }));
     } finally {
       uploadingAvatar = false;
     }
@@ -295,10 +296,10 @@
   <div class="rounded-xl p-8 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
     <div class="text-center py-8">
       <Shield class="w-12 h-12 mx-auto mb-4 text-amber-500" />
-      <h2 class="text-lg font-semibold mb-2" style="color: var(--ds-text);">Access Denied</h2>
-      <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">You need workspace administrator permissions to access settings.</p>
+      <h2 class="text-lg font-semibold mb-2" style="color: var(--ds-text);">{t('workspaceSettings.accessDenied')}</h2>
+      <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">{t('workspaceSettings.accessDeniedDescription')}</p>
       <Button onclick={() => navigate(`/workspaces/${workspaceId}`)} variant="primary">
-        Back to Workspace
+        {t('workspaceSettings.backToWorkspace')}
       </Button>
     </div>
   </div>
@@ -312,7 +313,7 @@
           on:click={goBackToWorkspaceList}
           class="breadcrumb-link transition-colors"
         >
-          Workspaces
+          {t('workspaceSettings.breadcrumbs.workspaces')}
         </button>
         <span>/</span>
         <button
@@ -324,14 +325,14 @@
         <span>/</span>
         <span class="flex items-center gap-1" style="color: var(--ds-text);">
           <Settings class="w-4 h-4" style="color: #3b82f6;" />
-          Settings
+          {t('workspaceSettings.breadcrumbs.settings')}
         </span>
       </div>
 
       <PageHeader
         icon={Settings}
-        title="Settings"
-        subtitle="Configure settings for {workspace?.name || 'workspace'}"
+        title={t('workspaceSettings.title')}
+        subtitle={t('workspaceSettings.subtitle', { name: workspace?.name || 'workspace' })}
       />
     </div>
 
@@ -343,49 +344,49 @@
           style="color: {activeTab === 'general' ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; {activeTab === 'general' ? 'margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : ''}"
           on:click={() => switchTab('general')}
         >
-          General
+          {t('workspaceSettings.tabs.general')}
         </button>
         <button
           class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative settings-tab"
           style="color: {activeTab === 'appearance' ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; {activeTab === 'appearance' ? 'margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : ''}"
           on:click={() => switchTab('appearance')}
         >
-          Appearance
+          {t('workspaceSettings.tabs.appearance')}
         </button>
         <button
           class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative settings-tab"
           style="color: {activeTab === 'categories' ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; {activeTab === 'categories' ? 'margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : ''}"
           on:click={() => switchTab('categories')}
         >
-          Categories
+          {t('workspaceSettings.tabs.categories')}
         </button>
         <button
           class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative settings-tab"
           style="color: {activeTab === 'members' ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; {activeTab === 'members' ? 'margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : ''}"
           on:click={() => switchTab('members')}
         >
-          Members
+          {t('workspaceSettings.tabs.members')}
         </button>
         <button
           class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative settings-tab"
           style="color: {activeTab === 'configuration' ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; {activeTab === 'configuration' ? 'margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : ''}"
           on:click={() => switchTab('configuration')}
         >
-          Configuration Sets
+          {t('workspaceSettings.tabs.configurationSets')}
         </button>
         <button
           class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative settings-tab"
           style="color: {activeTab === 'source-control' ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; {activeTab === 'source-control' ? 'margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : ''}"
           on:click={() => switchTab('source-control')}
         >
-          Source Control
+          {t('workspaceSettings.tabs.sourceControl')}
         </button>
         <button
           class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative settings-tab-danger"
           style="color: {activeTab === 'danger' ? 'var(--ds-text-danger)' : 'var(--ds-text-subtle)'}; {activeTab === 'danger' ? 'margin-bottom: -1px; border-bottom: 2px solid var(--ds-text-danger);' : ''}"
           on:click={() => switchTab('danger')}
         >
-          Remove Workspace
+          {t('workspaceSettings.tabs.removeWorkspace')}
         </button>
       </div>
     </div>
@@ -394,87 +395,87 @@
     {#if activeTab === 'general'}
       <!-- Basic Information -->
       <div class="rounded-xl p-8 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-        <h3 class="text-lg font-medium mb-6" style="color: var(--ds-text);">Basic Information</h3>
-      
+        <h3 class="text-lg font-medium mb-6" style="color: var(--ds-text);">{t('workspaceSettings.basicInformation')}</h3>
+
       <div class="space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label for="workspace-name" required class="mb-2">Workspace Name</Label>
+            <Label for="workspace-name" required class="mb-2">{t('workspaceSettings.workspaceName')}</Label>
             <Input
               id="workspace-name"
               bind:value={formData.name}
-              placeholder="Enter workspace name"
+              placeholder={t('workspaceSettings.workspaceNamePlaceholder')}
               required
             />
           </div>
 
           <div>
-            <Label for="workspace-key" required class="mb-2">Workspace Key</Label>
+            <Label for="workspace-key" required class="mb-2">{t('workspaceSettings.workspaceKey')}</Label>
             <Input
               id="workspace-key"
               bind:value={formData.key}
-              placeholder="e.g., DEV, TEST, PROD"
+              placeholder={t('workspaceSettings.workspaceKeyPlaceholder')}
               required
             />
             <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-              Used for item prefixes (e.g., DEV-123). Uppercase letters and numbers only.
+              {t('workspaceSettings.workspaceKeyHelp')}
             </p>
           </div>
         </div>
 
         <div>
-          <Label for="workspace-description" class="mb-2">Description</Label>
+          <Label for="workspace-description" class="mb-2">{t('workspaceSettings.description')}</Label>
           <Textarea
             id="workspace-description"
             bind:value={formData.description}
             rows={3}
-            placeholder="Optional description for this workspace"
+            placeholder={t('workspaceSettings.descriptionPlaceholder')}
           />
         </div>
 
         {#if $moduleSettings.time_tracking_enabled}
           <div>
-            <Label for="workspace-project" class="mb-2">Default Time Tracking Project</Label>
+            <Label for="workspace-project" class="mb-2">{t('workspaceSettings.defaultTimeProject')}</Label>
             <Select
               id="workspace-project"
               bind:value={formData.time_project_id}
             >
-              <option value={null}>No default project</option>
+              <option value={null}>{t('workspaceSettings.noDefaultProject')}</option>
               {#each timeProjects as project}
                 <option value={project.id}>{project.name} ({project.customer_name})</option>
               {/each}
             </Select>
             <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-              Default project used when logging time from work items in this workspace. Can be overridden per work item.
+              {t('workspaceSettings.defaultTimeProjectHelp')}
             </p>
           </div>
         {/if}
 
         <div>
-          <Label for="workspace-view" class="mb-2">Default Workspace View</Label>
+          <Label for="workspace-view" class="mb-2">{t('workspaceSettings.defaultView')}</Label>
           <Select
             id="workspace-view"
             bind:value={formData.default_view}
           >
-            <option value="board">Board</option>
-            <option value="backlog">Backlog</option>
-            <option value="list">List</option>
-            <option value="tree">Tree</option>
-            <option value="map">Map</option>
-            <option value="overview">Overview</option>
+            <option value="board">{t('workspaceSettings.views.board')}</option>
+            <option value="backlog">{t('workspaceSettings.views.backlog')}</option>
+            <option value="list">{t('workspaceSettings.views.list')}</option>
+            <option value="tree">{t('workspaceSettings.views.tree')}</option>
+            <option value="map">{t('workspaceSettings.views.map')}</option>
+            <option value="overview">{t('workspaceSettings.views.overview')}</option>
           </Select>
           <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-            Default view displayed when entering this workspace.
+            {t('workspaceSettings.defaultViewHelp')}
           </p>
         </div>
 
         <div class="flex items-center justify-between">
           <div>
             <div class="text-sm font-medium mb-1" style="color: var(--ds-text);">
-              Active Workspace
+              {t('workspaceSettings.activeWorkspace')}
             </div>
             <p class="text-xs" style="color: var(--ds-text-subtle);">
-              When inactive, only system admins and workspace admins can access this workspace. All data is preserved.
+              {t('workspaceSettings.activeWorkspaceHelp')}
             </p>
           </div>
 <Toggle bind:checked={formData.active} />
@@ -489,14 +490,14 @@
           on:click={saveWorkspace}
           disabled={saving || !formData.name.trim() || !formData.key.trim()}
         >
-          {#if saving}Saving...{:else}Save Changes{/if}
+          {#if saving}{t('workspaceSettings.saving')}{:else}{t('workspaceSettings.saveChanges')}{/if}
         </Button>
         <Button
           variant="secondary"
           size="medium"
           on:click={loadWorkspace}
         >
-          Reset
+          {t('workspaceSettings.reset')}
         </Button>
       </div>
     {:else if activeTab === 'appearance'}
@@ -504,11 +505,11 @@
       <div class="rounded-xl p-8 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
         <div class="flex items-center gap-3 mb-6">
           <Palette class="w-5 h-5" style="color: var(--ds-text-subtle);" />
-          <h3 class="text-lg font-medium" style="color: var(--ds-text);">Visual Identity</h3>
+          <h3 class="text-lg font-medium" style="color: var(--ds-text);">{t('workspaceSettings.visualIdentity')}</h3>
         </div>
-        
+
         <p class="text-sm mb-6" style="color: var(--ds-text-subtle);">
-          Customize the visual appearance of your workspace with icons, colors, and avatars.
+          {t('workspaceSettings.visualIdentityDescription')}
         </p>
         
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -517,7 +518,7 @@
             <IconSelector
               selectedIcon={formData.icon}
               selectedColor={formData.color}
-              label="Workspace Icon & Color"
+              label={t('workspaceSettings.workspaceIconColor')}
               compact={true}
               on:change={handleIconChange}
             />
@@ -525,16 +526,16 @@
 
           <!-- Avatar Upload -->
           <div>
-            <Label class="mb-2">Workspace Avatar</Label>
-            
+            <Label class="mb-2">{t('workspaceSettings.workspaceAvatar')}</Label>
+
             <div class="space-y-4">
               <!-- Current Avatar Display -->
               {#if formData.avatar_url}
                 <div class="flex items-center gap-4 p-4 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
                   <img src={formData.avatar_url} alt="Workspace avatar" class="w-16 h-16 rounded object-cover" />
                   <div class="flex-1">
-                    <div class="text-sm font-medium" style="color: var(--ds-text);">Custom Avatar</div>
-                    <div class="text-xs" style="color: var(--ds-text-subtle);">Image uploaded successfully</div>
+                    <div class="text-sm font-medium" style="color: var(--ds-text);">{t('workspaceSettings.customAvatar')}</div>
+                    <div class="text-xs" style="color: var(--ds-text-subtle);">{t('workspaceSettings.imageUploadedSuccessfully')}</div>
                   </div>
                   <Button
                     variant="default"
@@ -542,7 +543,7 @@
                     on:click={removeAvatar}
                     icon={Trash2}
                   >
-                    Remove
+                    {t('workspaceSettings.remove')}
                   </Button>
                 </div>
               {:else}
@@ -551,8 +552,8 @@
                     <svelte:component this={iconMap[formData.icon] || Package} size={32} color="white" />
                   </div>
                   <div class="flex-1">
-                    <div class="text-sm font-medium" style="color: var(--ds-text);">Default Icon</div>
-                    <div class="text-xs" style="color: var(--ds-text-subtle);">Using selected icon and color</div>
+                    <div class="text-sm font-medium" style="color: var(--ds-text);">{t('workspaceSettings.defaultIcon')}</div>
+                    <div class="text-xs" style="color: var(--ds-text-subtle);">{t('workspaceSettings.usingSelectedIconColor')}</div>
                   </div>
                 </div>
               {/if}
@@ -566,11 +567,11 @@
                   icon={Camera}
                   disabled={!attachmentsEnabled}
                 >
-                  {formData.avatar_url ? 'Change Avatar' : 'Upload Avatar'}
+                  {formData.avatar_url ? t('workspaceSettings.changeAvatar') : t('workspaceSettings.uploadAvatar')}
                 </Button>
                 {#if !attachmentsEnabled}
                   <p class="text-xs mt-1" style="color: var(--ds-text-warning);">
-                    Attachments must be enabled to upload workspace icons
+                    {t('workspaceSettings.attachmentsRequired')}
                   </p>
                 {/if}
               </div>
@@ -586,17 +587,17 @@
                     class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
                   />
                   {#if uploadingAvatar}
-                    <div class="mt-2 text-sm text-blue-600">Uploading...</div>
+                    <div class="mt-2 text-sm text-blue-600">{t('workspaceSettings.uploading')}</div>
                   {/if}
                   <p class="text-xs mt-2" style="color: var(--ds-text-subtle);">
-                    Recommended: Square images, at least 256x256 pixels for best quality
+                    {t('workspaceSettings.uploadRecommendation')}
                   </p>
                 </div>
               {/if}
             </div>
-            
+
             <p class="text-xs mt-3" style="color: var(--ds-text-subtle);">
-              You can either use a custom avatar image or the icon & color combination above.
+              {t('workspaceSettings.avatarOrIconNote')}
             </p>
           </div>
         </div>
@@ -609,14 +610,14 @@
           on:click={saveWorkspace}
           disabled={saving || !formData.name.trim() || !formData.key.trim()}
         >
-          {#if saving}Saving...{:else}Save Changes{/if}
+          {#if saving}{t('workspaceSettings.saving')}{:else}{t('workspaceSettings.saveChanges')}{/if}
         </Button>
         <Button
           variant="secondary"
           size="medium"
           on:click={loadWorkspace}
         >
-          Reset
+          {t('workspaceSettings.reset')}
         </Button>
       </div>
     {:else if activeTab === 'categories'}
@@ -624,18 +625,18 @@
       <div class="rounded-xl border shadow-sm p-8" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
         <div class="flex items-center gap-3 mb-6">
           <Clock class="w-5 h-5" style="color: var(--ds-text-subtle);" />
-          <h3 class="text-lg font-medium" style="color: var(--ds-text);">Project Category Restrictions</h3>
+          <h3 class="text-lg font-medium" style="color: var(--ds-text);">{t('workspaceSettings.projectCategoryRestrictions')}</h3>
         </div>
 
         <CategoryMultiSelect
           categories={timeProjectCategories}
           bind:selectedIds={selectedTimeProjectCategories}
-          placeholder="Select project categories..."
-          helperText="Optionally restrict project selection to specific categories for this workspace. When set, users can only select projects from the chosen categories."
+          placeholder={t('workspaceSettings.selectProjectCategories')}
+          helperText={t('workspaceSettings.categoryRestrictionsHelp')}
         />
 
         <p class="text-xs mt-3" style="color: var(--ds-text-subtle);">
-          Note: Leave empty to allow selection from all project categories.
+          {t('workspaceSettings.leaveEmptyNote')}
         </p>
       </div>
 
@@ -646,14 +647,14 @@
           on:click={saveWorkspace}
           disabled={saving || !formData.name.trim() || !formData.key.trim()}
         >
-          {#if saving}Saving...{:else}Save Changes{/if}
+          {#if saving}{t('workspaceSettings.saving')}{:else}{t('workspaceSettings.saveChanges')}{/if}
         </Button>
         <Button
           variant="secondary"
           size="medium"
           on:click={loadWorkspace}
         >
-          Reset
+          {t('workspaceSettings.reset')}
         </Button>
       </div>
     {:else if activeTab === 'members'}
@@ -669,7 +670,7 @@
 
       <!-- Active Configuration Preview -->
       <div class="rounded-xl border shadow-sm p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-        <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">Active Configuration</h3>
+        <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">{t('workspaceSettings.activeConfiguration')}</h3>
         {#key configurationRefreshKey}
           <WorkspaceConfigurationPreview {workspaceId} />
         {/key}
@@ -686,18 +687,18 @@
       <div class="rounded-xl p-8 border border-red-200 shadow-sm" style="background-color: #fef2f2;">
         <div class="flex items-center gap-3 mb-6">
           <AlertTriangle class="w-5 h-5 text-red-600" />
-          <h3 class="text-lg font-medium text-red-900">Permanent Removal</h3>
+          <h3 class="text-lg font-medium text-red-900">{t('workspaceSettings.permanentRemoval')}</h3>
         </div>
-        
+
         <div class="text-sm text-red-700 mb-6">
-          <p class="mb-4">Removing this workspace will permanently delete:</p>
+          <p class="mb-4">{t('workspaceSettings.removeWarningIntro')}</p>
           <ul class="list-disc list-inside space-y-2 ml-4">
-            <li>All work items and projects in this workspace</li>
-            <li>All custom field configurations</li>
-            <li>All screen configurations</li>
-            <li>All uploaded files associated with work items</li>
+            <li>{t('workspaceSettings.removeWarningItems')}</li>
+            <li>{t('workspaceSettings.removeWarningFields')}</li>
+            <li>{t('workspaceSettings.removeWarningScreens')}</li>
+            <li>{t('workspaceSettings.removeWarningFiles')}</li>
           </ul>
-          <p class="mt-4 font-medium">This action cannot be undone.</p>
+          <p class="mt-4 font-medium">{t('workspaceSettings.removeWarningFinal')}</p>
         </div>
 
         {#if !showDeleteConfirm}
@@ -706,36 +707,36 @@
             class="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 transition-colors"
           >
             <Trash2 class="w-4 h-4" />
-            Remove Workspace
+            {t('workspaceSettings.removeWorkspaceButton')}
           </button>
         {:else}
           <div class="space-y-4">
             <div>
               <label for="delete-confirm" class="block text-sm font-medium text-red-900 mb-2">
-                Type <strong>{workspace.name}</strong> to confirm removal:
+                {t('workspaceSettings.typeToConfirm', { name: workspace.name })}
               </label>
               <input
                 id="delete-confirm"
                 type="text"
                 bind:value={deleteConfirmText}
                 class="w-full px-4 py-2 rounded border border-red-300 text-red-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-500"
-                placeholder="Type '{workspace.name}' here"
+                placeholder={t('workspaceSettings.typeNameHere', { name: workspace.name })}
               />
             </div>
-            
+
             <div class="flex items-center gap-3">
               <button
                 on:click={deleteWorkspace}
                 disabled={deleteConfirmText !== workspace.name}
                 class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Yes, Remove Workspace
+                {t('workspaceSettings.yesRemoveWorkspace')}
               </button>
               <button
                 on:click={cancelDeleteWorkspace}
                 class="px-4 py-2 text-sm font-medium rounded border border-red-300 text-red-700 hover:bg-red-50 transition-colors"
               >
-                Cancel
+                {t('workspaceSettings.cancel')}
               </button>
             </div>
           </div>
@@ -746,7 +747,7 @@
   </div>
 {:else}
   <div class="rounded-xl p-6 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-    <p class="text-center" style="color: var(--ds-text-subtle);">Workspace not found.</p>
+    <p class="text-center" style="color: var(--ds-text-subtle);">{t('workspaceSettings.workspaceNotFound')}</p>
   </div>
 {/if}
 

@@ -4,6 +4,7 @@
   import { Workflow, Pencil, Trash2 } from 'lucide-svelte';
   import Tooltip from './Tooltip.svelte';
   import Spinner from './Spinner.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let itemId;
   export let onEdit = () => {};
@@ -20,14 +21,14 @@
       diagrams = await api.getDiagrams(itemId);
     } catch (err) {
       console.error('Failed to load diagrams:', err);
-      error = 'Failed to load diagrams';
+      error = t('components.diagram.loadError');
     } finally {
       loading = false;
     }
   }
 
   async function handleDelete(diagramId) {
-    if (!confirm('Are you sure you want to delete this diagram?')) {
+    if (!confirm(t('components.diagram.confirmDelete'))) {
       return;
     }
 
@@ -37,7 +38,7 @@
       onDelete(diagramId);
     } catch (err) {
       console.error('Failed to delete diagram:', err);
-      alert('Failed to delete diagram');
+      alert(t('components.diagram.deleteError'));
     }
   }
 
@@ -58,7 +59,7 @@
 {#if loading}
   <div class="text-center py-8">
     <Spinner class="mx-auto" />
-    <p class="text-sm text-gray-500 mt-2">Loading diagrams...</p>
+    <p class="text-sm text-gray-500 mt-2">{t('components.diagram.loading')}</p>
   </div>
 {:else if diagrams && diagrams.length > 0}
   <div class="attachment-list space-y-1">
@@ -98,7 +99,7 @@
 
             <!-- Actions -->
             <div class="flex items-center gap-1 flex-shrink-0">
-              <Tooltip content="Edit diagram">
+              <Tooltip content={t('components.diagram.edit')}>
                 {#snippet children()}
                   <button
                     onclick={() => onEdit(diagram)}
@@ -109,7 +110,7 @@
                 {/snippet}
               </Tooltip>
 
-              <Tooltip content="Delete">
+              <Tooltip content={t('common.delete')}>
                 {#snippet children()}
                   <button
                     onclick={() => handleDelete(diagram.id)}

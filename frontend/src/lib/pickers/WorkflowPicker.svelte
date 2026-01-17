@@ -1,11 +1,12 @@
 <script>
   import { BasePicker } from '.';
   import { GitBranch } from 'lucide-svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     value = $bindable(null),
     items = [],
-    placeholder = 'Select workflow...',
+    placeholder = '',
     defaultWorkflowId = null,
     unassignedLabel: customUnassignedLabel = null,
     disabled = false,
@@ -13,6 +14,8 @@
     onSelect = () => {},
     onCancel = () => {}
   } = $props();
+
+  const resolvedPlaceholder = $derived(placeholder || t('pickers.selectWorkflow'));
 
   // Get the default workflow name for the "Default" option label
   const defaultWorkflowName = $derived(() => {
@@ -26,15 +29,15 @@
     customUnassignedLabel
       ? customUnassignedLabel
       : defaultWorkflowId && defaultWorkflowName()
-        ? `Default (${defaultWorkflowName()})`
-        : 'Default'
+        ? `${t('common.default')} (${defaultWorkflowName()})`
+        : t('common.default')
   );
 </script>
 
 <BasePicker
   bind:value
   {items}
-  {placeholder}
+  placeholder={resolvedPlaceholder}
   {disabled}
   class={className}
   showUnassigned={true}

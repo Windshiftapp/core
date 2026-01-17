@@ -3,6 +3,7 @@
   import { X, MessageCircle, UserPlus, Activity, Clock, Target } from 'lucide-svelte';
   import { notificationActions } from '../../stores/notifications.js';
   import { navigate } from '../../router.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   export let notification;
 
@@ -91,7 +92,7 @@
         <button
           onclick={handleDismiss}
           class="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded dismiss-btn"
-          title="Dismiss notification"
+          title={t('notifications.dismiss')}
           tabindex="-1"
         >
           <X class="w-3 h-3" style="color: var(--ds-text-subtle);" />

@@ -4,16 +4,19 @@
   import { api } from '../api.js';
   import { Briefcase, Package } from 'lucide-svelte';
   import { workspaceIconMap } from '../utils/icons.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
   let {
     value = $bindable([]),
-    placeholder = 'Select workspaces...',
+    placeholder = '',
     label = '',
     disabled = false,
     class: className = ''
   } = $props();
+
+  const resolvedPlaceholder = $derived(placeholder || t('pickers.selectWorkspaces'));
 
   let workspaces = $state([]);
   let loading = $state(false);
@@ -62,7 +65,7 @@
   items={workspaces}
   {loading}
   {error}
-  {placeholder}
+  placeholder={resolvedPlaceholder}
   {label}
   {disabled}
   class={className}

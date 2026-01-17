@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
+  import { t } from '../stores/i18n.svelte.js';
   import { Plus, Edit, Trash2, Palette, Circle, Folder } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';
@@ -9,19 +10,19 @@
   import Lozenge from '../components/Lozenge.svelte';
   import { createShortcutHandler, getShortcutDisplay } from '../utils/keyboardShortcuts.js';
 
-  let statusCategories = [];
-  let loading = true;
-  let showModal = false;
-  let editingId = null;
+  let statusCategories = $state([]);
+  let loading = $state(true);
+  let showModal = $state(false);
+  let editingId = $state(null);
 
   // Form state
-  let formData = {
+  let formData = $state({
     name: '',
     color: '#3b82f6',
     description: '',
     is_default: false,
     is_completed: false
-  };
+  });
 
   onMount(async () => {
     await loadStatusCategories();
@@ -96,7 +97,7 @@
   async function saveCategory() {
     try {
       if (!formData.name.trim()) {
-        alert('Name is required');
+        alert(t('settings.statusCategories.nameRequired'));
         return;
       }
 
@@ -113,7 +114,7 @@
       cancelForm();
     } catch (error) {
       console.error('Failed to save status category:', error);
-      alert('Failed to save status category: ' + (error.message || error));
+      alert(t('settings.statusCategories.failedToSave') + ' ' + (error.message || error));
     }
   }
 
@@ -148,7 +149,7 @@
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: () => startEdit(category)
       },
@@ -156,7 +157,7 @@
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50',
         onClick: () => deleteCategory(category),
@@ -166,34 +167,34 @@
   }
 
   // Table column definitions
-  const categoryColumns = [
+  const categoryColumns = $derived([
     {
       key: 'category_info',
-      label: 'Category',
+      label: t('common.name'),
       slot: 'category'
     },
     {
       key: 'color',
-      label: 'Color',
+      label: t('settings.statusCategories.color'),
       slot: 'color'
     },
     {
       key: 'description',
-      label: 'Description',
+      label: t('settings.statusCategories.description'),
       render: (category) => category.description || '—',
       textColor: 'var(--ds-text-subtle)'
     },
     {
       key: 'status_count',
-      label: 'Statuses',
+      label: t('statuses.title'),
       render: (category) => `${category.statusCount || 0} status${category.statusCount === 1 ? '' : 'es'}`,
       textColor: 'var(--ds-text-subtle)'
     },
     {
       key: 'actions',
-      label: 'Actions'
+      label: t('common.actions')
     }
-  ];
+  ]);
 </script>
 
 <!-- Keyboard shortcuts -->
@@ -202,13 +203,13 @@
 <div style="background-color: var(--ds-surface); min-height: 100vh;">
   <PageHeader
     icon={Folder}
-    title="Status Categories"
-    subtitle="Manage status categories and their colors. Categories group related statuses together."
+    title={t('settings.statusCategories.title')}
+    subtitle={t('settings.statusCategories.subtitle')}
     count="{statusCategories.length} categories"
   >
     {#snippet actions()}
       <Button variant="primary" icon={Plus} onclick={startCreate} keyboardHint={getShortcutDisplay('statusCategories', 'addCategory')}>
-        Add Category
+        {t('settings.statusCategories.addStatusCategory')}
       </Button>
     {/snippet}
   </PageHeader>
@@ -224,10 +225,10 @@
     <div slot="category" let:item={category} class="flex items-center gap-3">
       <h3 class="font-medium" style="color: var(--ds-text);">{category.name}</h3>
       {#if category.is_default}
-        <Lozenge color="blue" text="Default" />
+        <Lozenge color="blue" text={t('settings.statusCategories.default')} />
       {/if}
       {#if category.is_completed}
-        <Lozenge color="emerald" text="Marks completion" />
+        <Lozenge color="emerald" text={t('settings.statusCategories.completed')} />
       {/if}
     </div>
     

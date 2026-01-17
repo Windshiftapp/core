@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { t } from '../../stores/i18n.svelte.js';
   import { ArrowLeft, Calendar, Flag, Edit, Trash2, ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import { api } from '../../api.js';
@@ -30,12 +31,12 @@
     category_id: null
   });
 
-  const statusOptions = [
-    { value: 'planning', label: 'Planning', lozengeColor: 'grey' },
-    { value: 'in-progress', label: 'In Progress', lozengeColor: 'blue' },
-    { value: 'completed', label: 'Completed', lozengeColor: 'green' },
-    { value: 'cancelled', label: 'Cancelled', lozengeColor: 'red' }
-  ];
+  let statusOptions = $derived([
+    { value: 'planning', label: t('milestones.status.planning'), lozengeColor: 'grey' },
+    { value: 'in-progress', label: t('milestones.status.inProgress'), lozengeColor: 'blue' },
+    { value: 'completed', label: t('milestones.status.completed'), lozengeColor: 'green' },
+    { value: 'cancelled', label: t('milestones.status.cancelled'), lozengeColor: 'red' }
+  ]);
 
   const radius = 48;
   const circumference = 2 * Math.PI * radius;
@@ -58,7 +59,7 @@
       }
     } catch (err) {
       console.error('Failed to load milestone progress:', err);
-      error = err.message || 'Failed to load milestone progress';
+      error = err.message || t('dialogs.alerts.failedToLoad', { error: 'milestone progress' });
     } finally {
       loading = false;
     }
@@ -86,10 +87,10 @@
     const diffTime = target - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffDays < 0) return { text: `${Math.abs(diffDays)} days overdue`, overdue: true };
-    if (diffDays === 0) return { text: 'Due today', overdue: false };
-    if (diffDays === 1) return { text: '1 day remaining', overdue: false };
-    return { text: `${diffDays} days remaining`, overdue: false };
+    if (diffDays < 0) return { text: t('milestones.daysOverdue', { count: Math.abs(diffDays) }), overdue: true };
+    if (diffDays === 0) return { text: t('milestones.dueToday'), overdue: false };
+    if (diffDays === 1) return { text: t('milestones.oneDayRemaining'), overdue: false };
+    return { text: t('milestones.daysRemaining', { count: diffDays }), overdue: false };
   }
 
   function buildSegments(breakdown, totalItems) {
@@ -140,18 +141,18 @@
       await loadProgress();
     } catch (err) {
       console.error('Failed to update milestone:', err);
-      alert('Failed to update milestone: ' + (err.message || err));
+      alert(t('dialogs.alerts.failedToUpdate', { error: err.message || err }));
     }
   }
 
   async function deleteMilestone() {
-    if (confirm(`Are you sure you want to delete milestone "${progress?.milestone_name}"?`)) {
+    if (confirm(t('milestones.confirmDelete', { name: progress?.milestone_name }))) {
       try {
         await milestonesStore.delete(milestoneId);
         navigate('/milestones');
       } catch (err) {
         console.error('Failed to delete milestone:', err);
-        alert('Failed to delete milestone: ' + (err.message || err));
+        alert(t('dialogs.alerts.failedToDelete', { error: err.message || err }));
       }
     }
   }
@@ -165,7 +166,7 @@
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: startEdit
       },
@@ -173,7 +174,7 @@
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50',
         onClick: deleteMilestone
@@ -192,7 +193,7 @@
         style="color: var(--ds-text-subtle);"
       >
         <ArrowLeft class="w-4 h-4" />
-        Back to Milestones
+        {t('common.back')}
       </button>
 
       {#if progress}
@@ -215,7 +216,7 @@
     {:else if error}
       <div class="text-center py-20">
         <p class="text-red-500">{error}</p>
-        <Button onclick={loadProgress} class="mt-4">Retry</Button>
+        <Button onclick={loadProgress} class="mt-4">{t('common.retry')}</Button>
       </div>
     {:else if progress}
       <!-- Milestone Header Card -->
@@ -288,12 +289,12 @@
                   {formatPercent(progress.percent_complete)}%
                 </text>
                 <text class="text-xs uppercase" x="70" y="86" text-anchor="middle" fill="var(--ds-text-subtle)">
-                  complete
+                  {t('milestones.complete')}
                 </text>
               </svg>
             {:else}
               <div class="w-36 h-36 rounded-full border-2 border-dashed flex items-center justify-center" style="border-color: var(--ds-border);">
-                <span class="text-sm" style="color: var(--ds-text-subtlest);">No items</span>
+                <span class="text-sm" style="color: var(--ds-text-subtlest);">{t('milestones.noItems')}</span>
               </div>
             {/if}
           </div>
@@ -301,18 +302,18 @@
 
         <!-- Summary Stats -->
         <div class="rounded-xl border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-          <h3 class="text-sm font-medium mb-4" style="color: var(--ds-text-subtle);">Summary</h3>
+          <h3 class="text-sm font-medium mb-4" style="color: var(--ds-text-subtle);">{t('common.summary')}</h3>
           <div class="space-y-3">
             <div class="flex justify-between items-center">
-              <span style="color: var(--ds-text-subtle);">Total Items</span>
+              <span style="color: var(--ds-text-subtle);">{t('common.total')}</span>
               <span class="font-semibold" style="color: var(--ds-text);">{progress.total_items}</span>
             </div>
             <div class="flex justify-between items-center">
-              <span style="color: var(--ds-text-subtle);">Completed</span>
+              <span style="color: var(--ds-text-subtle);">{t('common.done')}</span>
               <span class="font-semibold text-green-600">{progress.completed_items}</span>
             </div>
             <div class="flex justify-between items-center">
-              <span style="color: var(--ds-text-subtle);">Remaining</span>
+              <span style="color: var(--ds-text-subtle);">{t('time.remaining')}</span>
               <span class="font-semibold" style="color: var(--ds-text);">{progress.total_items - progress.completed_items}</span>
             </div>
           </div>
@@ -320,7 +321,7 @@
 
         <!-- Status Breakdown Legend -->
         <div class="rounded-xl border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-          <h3 class="text-sm font-medium mb-4" style="color: var(--ds-text-subtle);">By Status Category</h3>
+          <h3 class="text-sm font-medium mb-4" style="color: var(--ds-text-subtle);">{t('milestones.byStatusCategory')}</h3>
           <div class="space-y-2">
             {#if progress.status_breakdown && progress.status_breakdown.length > 0}
               {#each progress.status_breakdown as breakdown}
@@ -336,7 +337,7 @@
                 </div>
               {/each}
             {:else}
-              <p class="text-sm" style="color: var(--ds-text-subtlest);">No status data</p>
+              <p class="text-sm" style="color: var(--ds-text-subtlest);">{t('milestones.noStatusData')}</p>
             {/if}
           </div>
         </div>
@@ -344,7 +345,7 @@
 
       <!-- Items Grouped by Category -->
       <div class="space-y-4">
-        <h2 class="text-lg font-semibold" style="color: var(--ds-text);">Work Items</h2>
+        <h2 class="text-lg font-semibold" style="color: var(--ds-text);">{t('milestones.workItems')}</h2>
 
         {#if progress.status_breakdown && progress.status_breakdown.length > 0}
           {#each progress.status_breakdown as category}
@@ -407,8 +408,8 @@
           <div class="rounded-xl border p-8" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
             <EmptyState
               icon={Flag}
-              title="No items assigned"
-              description="Assign work items to this milestone to track progress"
+              title={t('milestones.noItemsAssigned')}
+              description={t('milestones.assignItemsHint')}
             />
           </div>
         {/if}
@@ -427,27 +428,27 @@
   let:submitHint
 >
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-    <h3 class="text-lg font-semibold" style="color: var(--ds-text);">Edit Milestone</h3>
+    <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{t('common.edit')}</h3>
   </div>
 
   <div class="px-6 py-4">
     <form onsubmit={(e) => { e.preventDefault(); saveMilestone(); }}>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <Label for="milestone-name" required class="mb-2">Milestone Name</Label>
+          <Label for="milestone-name" required class="mb-2">{t('milestones.milestoneName')}</Label>
           <input
             id="milestone-name"
             type="text"
             bind:value={formData.name}
             class="w-full px-4 py-3 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
             style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-            placeholder="e.g., Q1 Release"
+            placeholder={t('milestones.milestoneNamePlaceholder')}
             required
           />
         </div>
 
         <div>
-          <Label for="milestone-target-date" class="mb-2">Target Date</Label>
+          <Label for="milestone-target-date" class="mb-2">{t('milestones.targetDate')}</Label>
           <input
             id="milestone-target-date"
             type="date"
@@ -458,23 +459,23 @@
         </div>
 
         <div>
-          <Label for="milestone-status" class="mb-2">Status</Label>
+          <Label for="milestone-status" class="mb-2">{t('common.status')}</Label>
           <BasePicker
             bind:value={formData.status}
             items={statusOptions}
-            placeholder="Select status..."
+            placeholder={t('milestones.selectStatus')}
             getValue={(item) => item.value}
             getLabel={(item) => item.label}
           />
         </div>
 
         <div class="md:col-span-2">
-          <Label for="milestone-description" class="mb-2">Description</Label>
+          <Label for="milestone-description" class="mb-2">{t('common.description')}</Label>
           <Textarea
             id="milestone-description"
             bind:value={formData.description}
             rows={3}
-            placeholder="Optional description"
+            placeholder={t('milestones.descriptionPlaceholder')}
           />
         </div>
       </div>
@@ -484,7 +485,7 @@
   <DialogFooter
     onCancel={() => showEditModal = false}
     onConfirm={saveMilestone}
-    confirmLabel="Update Milestone"
+    confirmLabel={t('common.update')}
     disabled={!formData.name.trim()}
     showKeyboardHint={true}
     confirmKeyboardHint={submitHint}

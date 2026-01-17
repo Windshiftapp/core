@@ -7,6 +7,7 @@
   import { api } from '../api.js';
   import { formatDateTimeLocale } from '../utils/dateFormatter.js';
   import Spinner from '../components/Spinner.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   // Props
   let { channelId = null, channelName = '', isDefault = false } = $props();
@@ -56,7 +57,7 @@
       toggleAddManager();
     } catch (err) {
       console.error('Failed to add manager:', err);
-      alert('Failed to add manager: ' + (err.message || err));
+      alert(t('dialogs.alerts.failedToAddManager', { error: err.message || err }));
     } finally {
       saving = false;
     }
@@ -73,7 +74,7 @@
       await loadManagers();
     } catch (err) {
       console.error('Failed to remove manager:', err);
-      alert('Failed to remove manager: ' + (err.message || err));
+      alert(t('dialogs.alerts.failedToRemoveManager', { error: err.message || err }));
     } finally {
       showRemoveConfirmation = false;
       managerToRemove = null;
@@ -87,16 +88,16 @@
   <div class="flex items-center justify-between">
     <div>
       <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-        Channel Managers
+        {t('settings.channelManagers.title')}
       </h3>
       <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
         {#if isDefault}
           <span class="flex items-center gap-2">
             <Shield class="w-4 h-4 text-amber-500" />
-            This is a system channel. Only administrators can manage it.
+            {t('settings.channelManagers.systemChannelNote')}
           </span>
         {:else}
-          Users and groups who can configure and manage this channel
+          {t('settings.channelManagers.description')}
         {/if}
       </p>
     </div>
@@ -108,7 +109,7 @@
         size="medium"
         icon={Plus}
       >
-        Add Manager
+        {t('settings.channelManagers.addManager')}
       </Button>
     {/if}
   </div>
@@ -120,15 +121,15 @@
       style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
     >
       <h4 class="text-sm font-medium mb-4" style="color: var(--ds-text);">
-        Add Channel Manager
+        {t('settings.channelManagers.addChannelManager')}
       </h4>
 
       <AssigneePicker
         bind:type={addManagerType}
         bind:userId={selectedUserId}
         bind:groupId={selectedGroupId}
-        confirmText="Add Manager"
-        cancelText="Cancel"
+        confirmText={t('settings.channelManagers.addManager')}
+        cancelText={t('common.cancel')}
         on_confirm={handleAddManager}
         on_cancel={toggleAddManager}
       />
@@ -154,10 +155,10 @@
           {/if}
         </div>
         <p class="text-sm font-medium" style="color: var(--ds-text);">
-          {isDefault ? 'System administrators can manage this channel' : 'No managers assigned'}
+          {isDefault ? t('settings.channelManagers.systemAdminsCanManage') : t('settings.channelManagers.noManagersAssigned')}
         </p>
         <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-          {isDefault ? 'Default channels are automatically managed by admins' : 'Add users or groups to manage this channel'}
+          {isDefault ? t('settings.channelManagers.defaultChannelsManaged') : t('settings.channelManagers.addUsersOrGroups')}
         </p>
       </div>
     {:else}
@@ -188,7 +189,7 @@
                 class="px-2 py-0.5 text-xs font-medium rounded"
                 style="background-color: {manager.manager_type === 'user' ? 'var(--ds-interactive-subtle)' : 'var(--ds-surface)'}; color: {manager.manager_type === 'user' ? 'var(--ds-interactive-pressed)' : 'var(--ds-text-subtle)'};"
               >
-                {manager.manager_type === 'user' ? 'User' : 'Group'}
+                {manager.manager_type === 'user' ? t('settings.channelManagers.user') : t('settings.channelManagers.group')}
               </span>
             </div>
             {#if manager.manager_email}
@@ -197,7 +198,7 @@
               </p>
             {/if}
             <p class="text-xs mt-1" style="color: var(--ds-text-disabled);">
-              Added by {manager.added_by_name} on {formatDateTimeLocale(manager.created_at) || '-'}
+              {t('settings.channelManagers.addedBy')} {manager.added_by_name} {t('settings.channelManagers.on')} {formatDateTimeLocale(manager.created_at) || '-'}
             </p>
           </div>
 
@@ -206,7 +207,7 @@
             <button
               onclick={() => removeManager(manager)}
               class="flex-shrink-0 p-2 rounded hover:bg-red-50 transition-colors"
-              title="Remove manager"
+              title={t('settings.channelManagers.removeManager')}
               style="color: var(--ds-text-subtle);"
             >
               <X class="w-4 h-4" />
@@ -224,7 +225,7 @@
       style="background-color: var(--ds-surface);"
     >
       <p class="text-sm" style="color: var(--ds-text-subtle);">
-        <strong style="color: var(--ds-text);">Note:</strong> Channel managers can configure channel settings, test connections, and manage channel-specific settings. Global administrators always have access to all channels.
+        <strong style="color: var(--ds-text);">{t('settings.channelManagers.note')}</strong> {t('settings.channelManagers.noteText')}
       </p>
     </div>
   {/if}
@@ -233,10 +234,10 @@
 <!-- Remove Manager Confirmation Dialog -->
 <ConfirmDialog
   bind:show={showRemoveConfirmation}
-  title="Remove Manager"
-  message="Are you sure you want to remove {managerToRemove?.manager_name} as a channel manager? They will no longer be able to configure or manage this channel."
-  confirmText="Remove Manager"
-  cancelText="Cancel"
+  title={t('settings.channelManagers.removeManager')}
+  message={t('settings.channelManagers.confirmRemoveMessage', { name: managerToRemove?.manager_name })}
+  confirmText={t('settings.channelManagers.removeManager')}
+  cancelText={t('common.cancel')}
   variant="danger"
   on:confirm={confirmRemoveManager}
   on:cancel={() => {

@@ -1,13 +1,16 @@
 <script>
   import { createEventDispatcher, tick } from 'svelte';
   import { Check, X, Loader2, Calendar } from 'lucide-svelte';
-  
+  import { t } from '../stores/i18n.svelte.js';
+
   const dispatch = createEventDispatcher();
-  
+
   export let value = '';
-  export let placeholder = 'Select date...';
+  export let placeholder = '';
   export let disabled = false;
   export let required = false;
+
+  $: effectivePlaceholder = placeholder || t('editors.selectDate');
   export let className = '';
   export let editingClass = 'border-blue-500 ring-1 ring-blue-500';
   export let displayClass = 'hover:bg-gray-50 cursor-text';
@@ -74,7 +77,7 @@
     
     // Validation
     if (required && !editValue) {
-      error = 'This field is required';
+      error = t('validation.required');
       return;
     }
     
@@ -197,7 +200,7 @@
           type="button"
           onclick={saveValue}
           class="p-1 text-green-600 hover:bg-green-50 rounded"
-          title="Save (Enter)"
+          title={t('editors.saveEnter')}
         >
           <Check class="w-4 h-4" />
         </button>
@@ -205,7 +208,7 @@
           type="button"
           onclick={cancelEditing}
           class="p-1 text-gray-400 hover:bg-gray-50 rounded"
-          title="Cancel (Escape)"
+          title={t('editors.cancelEscape')}
         >
           <X class="w-4 h-4" />
         </button>
@@ -223,6 +226,6 @@
     {disabled}
   >
     <Calendar class="w-4 h-4 text-gray-400" />
-    {displayValue || placeholder}
+    {displayValue || effectivePlaceholder}
   </button>
 {/if}

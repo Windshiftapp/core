@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
+  import { t } from '../../stores/i18n.svelte.js';
   import { getCollection, checkItemVisibility } from '../collections/collectionService.js';
   import { workspaceGradientIndex, applyToAllViews, loadWorkspaceGradient, getGradientStyle } from '../../stores/workspaceGradient.js';
   import { gradients } from '../../utils/gradients.js';
@@ -188,7 +189,7 @@ async function loadStatuses() {
       // At root level
       newBreadcrumbs.push({
         id: null,
-        title: 'Root Level',
+        title: t('collections.rootLevel'),
         level: 'root',
         itemType: null
       });
@@ -208,7 +209,7 @@ async function loadStatuses() {
         // Add root level first
         newBreadcrumbs.push({
           id: null,
-          title: 'Root Level',
+          title: t('collections.rootLevel'),
           level: 'root',
           itemType: null
         });
@@ -231,13 +232,13 @@ async function loadStatuses() {
         // Fallback to simple breadcrumb
         newBreadcrumbs.push({
           id: null,
-          title: 'Root Level',
+          title: t('collections.rootLevel'),
           level: 'root',
           itemType: null
         });
         newBreadcrumbs.push({
           id: currentParentId,
-          title: 'Current Level',
+          title: t('collections.currentLevel'),
           level: 'current',
           itemType: null,
           isCurrent: true
@@ -675,7 +676,7 @@ async function loadStatuses() {
 
 {#if loading}
   <div class="p-6">
-    <div class="animate-pulse">Loading story map...</div>
+    <div class="animate-pulse">{t('collections.loadingStoryMap')}</div>
   </div>
 {:else if workspace}
   <div style="{backgroundStyle} min-height: 100vh;">
@@ -801,7 +802,7 @@ async function loadStatuses() {
 
                     <!-- Drill Down Arrow (only show if item has children) -->
                     {#if childItemsByParent[backboneItem.id]?.length > 0}
-                      <Tooltip content="Drill down to show children as backbone">
+                      <Tooltip content={t('collections.drillDown')}>
                         {#snippet children()}
                           <button
                             onclick={() => drillDown(backboneItem.id)}
@@ -827,7 +828,7 @@ async function loadStatuses() {
                 data-testid="drop-zone-{backboneItem.id}"
               >
                 <h3 class="text-sm font-medium mb-3 text-center" style={glassTextStyle}>
-                  Child Work Items ({childItemsByParent[backboneItem.id]?.length || 0})
+                  {t('collections.childWorkItems', { count: childItemsByParent[backboneItem.id]?.length || 0 })}
                 </h3>
 
                 <!-- Child Items Column -->
@@ -909,7 +910,7 @@ async function loadStatuses() {
                       }}
                     >
                       <Plus class="w-4 h-4" />
-                      Add card
+                      {t('collections.addCard')}
                     </button>
                   {/if}
 
@@ -918,9 +919,9 @@ async function loadStatuses() {
                     <div class="text-center py-8">
                       <div class="text-sm mb-3" style={glassSubtleTextStyle}>
                         {#if canAddChildren(backboneItem.id)}
-                          No child items yet
+                          {t('collections.noChildItems')}
                         {:else}
-                          No child items (lowest hierarchy level)
+                          {t('collections.noChildItemsLowest')}
                         {/if}
                       </div>
                       {#if canAddChildren(backboneItem.id)}
@@ -932,7 +933,7 @@ async function loadStatuses() {
                           onmouseleave={(e) => e.currentTarget.style.borderColor = hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'}
                         >
                           <Plus class="w-4 h-4" />
-                          Add card
+                          {t('collections.addCard')}
                         </button>
                       {/if}
                     </div>
@@ -959,7 +960,7 @@ async function loadStatuses() {
                               cancelQuickAdd(backboneItem.id);
                             }
                           }}
-                          placeholder="Enter a summary..."
+                          placeholder={t('collections.enterSummary')}
                           rows="2"
                           class="w-full px-0 py-0 text-sm resize-none border-0 focus:outline-none focus:ring-0"
                           style="background-color: transparent; color: var(--ds-text); caret-color: var(--ds-text);"
@@ -1086,7 +1087,7 @@ async function loadStatuses() {
                                     </button>
                                   {/each}
                                 {:else}
-                                  <div class="px-3 py-2 text-sm" style="color: var(--ds-text-subtle);">No types available</div>
+                                  <div class="px-3 py-2 text-sm" style="color: var(--ds-text-subtle);">{t('collections.noTypesAvailable')}</div>
                                 {/if}
                               </div>
                             </div>
@@ -1099,14 +1100,14 @@ async function loadStatuses() {
                             style="background-color: var(--ds-background-accent-blue); color: white;"
                             disabled={!state.workspaceId || !state.itemTypeId || !state.title?.trim()}
                           >
-                            Create
+                            {t('collections.create')}
                           </button>
                           <button
                             onclick={() => cancelQuickAdd(backboneItem.id)}
                             class="px-2.5 py-1.5 text-sm font-medium rounded transition-colors hover:bg-gray-50"
                             style="color: var(--ds-text-subtle);"
                           >
-                            Cancel
+                            {t('common.cancel')}
                           </button>
                         </div>
 
@@ -1129,8 +1130,8 @@ async function loadStatuses() {
             <div class="flex items-center justify-center w-full min-h-[400px]">
               <EmptyState
                 icon={MapPin}
-                title="No top-level items found"
-                description="Create some work items to see your story map"
+                title={t('collections.noTopLevelItems')}
+                description={t('collections.noTopLevelItemsDesc')}
               />
             </div>
           {/if}
@@ -1143,7 +1144,7 @@ async function loadStatuses() {
   <div class="p-6">
     <EmptyState
       icon={null}
-      title="Workspace not found"
+      title={t('collections.workspaceNotFound')}
     />
   </div>
 {/if}

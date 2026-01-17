@@ -1,5 +1,6 @@
 <script>
   import Button from '../components/Button.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   /**
    * DialogFooter - Standard footer for modal dialogs with cancel/confirm buttons
@@ -19,8 +20,8 @@
    * </DialogFooter>
    */
   let {
-    cancelLabel = 'Cancel',
-    confirmLabel = 'Confirm',
+    cancelLabel = null,
+    confirmLabel = null,
     variant = 'primary', // 'primary' | 'danger'
     loading = false,
     disabled = false,
@@ -54,7 +55,7 @@
         disabled={loading}
         keyboardHint={showKeyboardHint ? cancelKeyboardHint : undefined}
       >
-        {cancelLabel}
+        {cancelLabel ?? t('dialogs.cancel')}
       </Button>
     {/if}
     {#if onConfirm}
@@ -66,7 +67,7 @@
         disabled={disabled || loading}
         keyboardHint={showKeyboardHint ? confirmKeyboardHint : undefined}
       >
-        {loading && loadingLabel ? loadingLabel : confirmLabel}
+        {loading && loadingLabel ? loadingLabel : (confirmLabel ?? t('dialogs.confirm'))}
       </Button>
     {/if}
   </div>

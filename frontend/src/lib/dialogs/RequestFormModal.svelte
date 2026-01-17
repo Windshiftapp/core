@@ -10,6 +10,7 @@
   import PortalModal from './PortalModal.svelte';
   import { ChevronLeft, ChevronRight } from 'lucide-svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -86,7 +87,7 @@
       });
     } catch (err) {
       console.error('Failed to load request type fields:', err);
-      error = err.message || 'Failed to load form fields';
+      error = err.message || t('requestForm.failedToLoadFields');
     } finally {
       loading = false;
     }
@@ -196,11 +197,11 @@
       // Validate name and email only for anonymous users
       if (!authStore.isAuthenticated) {
         if (!formData.name.trim()) {
-          error = 'Name is required';
+          error = t('requestForm.nameRequired');
           return;
         }
         if (!formData.email.trim()) {
-          error = 'Email is required';
+          error = t('requestForm.emailRequired');
           return;
         }
       }
@@ -233,7 +234,7 @@
       }, 1500);
     } catch (err) {
       console.error('Failed to submit request:', err);
-      error = err.message || 'Failed to submit request';
+      error = err.message || t('requestForm.failedToSubmit');
     } finally {
       submitting = false;
     }
@@ -269,7 +270,7 @@
       </div>
     {:else if success}
       <div class="mb-4">
-        <AlertBox variant="success" message="Request submitted successfully! We'll get back to you soon." />
+        <AlertBox variant="success" message={t('requestForm.requestSubmittedSuccess')} />
       </div>
     {:else}
       {#if error}
@@ -320,7 +321,7 @@
               type="text"
               class="w-full px-4 py-3 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500"
               style="background-color: {isDarkMode ? '#1e293b' : '#ffffff'}; color: {isDarkMode ? '#e2e8f0' : '#111827'}; border-color: {isDarkMode ? '#475569' : '#d1d5db'};"
-              placeholder="Enter a title for your request"
+              placeholder={t('requestForm.enterTitle')}
               required={titleField.is_required}
             />
             {#if titleField.description}
@@ -344,7 +345,7 @@
               rows={4}
               class="w-full"
               style="background-color: {isDarkMode ? '#1e293b' : '#ffffff'}; color: {isDarkMode ? '#e2e8f0' : '#111827'}; border-color: {isDarkMode ? '#475569' : '#d1d5db'};"
-              placeholder="Please describe your request"
+              placeholder={t('requestForm.describeRequest')}
               required={descField.is_required}
             />
             {#if descField.description}
@@ -425,9 +426,9 @@
               <BasePicker
                 bind:value={customFieldValues[field.field_identifier]}
                 items={parseSelectOptions(field.virtual_field_options)}
-                placeholder="Select an option..."
+                placeholder={t('requestForm.selectOption')}
                 showUnassigned={true}
-                unassignedLabel="Select an option..."
+                unassignedLabel={t('requestForm.selectOption')}
                 getValue={(option) => option.value}
                 getLabel={(option) => option.label}
               />
@@ -450,7 +451,7 @@
         {#if isLastStep && !authStore.isAuthenticated}
           <div>
             <label for="request-name" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
-              Name
+              {t('requestForm.yourName')}
               <span class="text-red-500">*</span>
             </label>
             <input
@@ -459,14 +460,14 @@
               type="text"
               class="w-full px-4 py-3 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500"
               style="background-color: {isDarkMode ? '#1e293b' : '#ffffff'}; color: {isDarkMode ? '#e2e8f0' : '#111827'}; border-color: {isDarkMode ? '#475569' : '#d1d5db'};"
-              placeholder="Your name"
+              placeholder={t('requestForm.yourName')}
               required
             />
           </div>
 
           <div>
             <label for="request-email" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
-              Email
+              {t('requestForm.yourEmail')}
               <span class="text-red-500">*</span>
             </label>
             <input
@@ -479,13 +480,13 @@
               required
             />
             <p class="text-xs mt-1" style="color: {isDarkMode ? '#94a3b8' : '#6b7280'};">
-              We'll use this to follow up on your request
+              {t('requestForm.emailFollowUp')}
             </p>
           </div>
         {:else if isLastStep && authStore.isAuthenticated}
           <div class="p-3 rounded border" style="background-color: {isDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff'}; border-color: {isDarkMode ? 'rgba(59, 130, 246, 0.3)' : '#bfdbfe'};">
             <p class="text-sm" style="color: {isDarkMode ? '#93c5fd' : '#1e40af'};">
-              Submitting as {authStore.currentUser?.first_name} {authStore.currentUser?.last_name} ({authStore.currentUser?.email})
+              {t('requestForm.submittingAs', { name: `${authStore.currentUser?.first_name} ${authStore.currentUser?.last_name}`, email: authStore.currentUser?.email })}
             </p>
           </div>
         {/if}
@@ -502,7 +503,7 @@
               disabled={submitting}
             >
               <ChevronLeft class="w-4 h-4 mr-1" />
-              Back
+              {t('common.back')}
             </Button>
           {/if}
         </div>
@@ -514,7 +515,7 @@
             size="medium"
             disabled={submitting}
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           {#if isLastStep}
             <Button
@@ -523,7 +524,7 @@
               size="medium"
               disabled={submitting || loading}
             >
-              {submitting ? 'Submitting...' : 'Submit Request'}
+              {submitting ? t('requestForm.submitting') : t('requestForm.submitRequest')}
             </Button>
           {:else}
             <Button
@@ -531,7 +532,7 @@
               variant="primary"
               size="medium"
             >
-              Next
+              {t('common.next')}
               <ChevronRight class="w-4 h-4 ml-1" />
             </Button>
           {/if}

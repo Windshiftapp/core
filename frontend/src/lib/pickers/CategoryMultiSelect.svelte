@@ -2,17 +2,20 @@
   import { X, ChevronDown } from 'lucide-svelte';
   import { onClickOutside } from 'runed';
   import Label from '../components/Label.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     categories = [],
     selectedIds = $bindable([]),
-    placeholder = 'Select categories...',
+    placeholder = '',
     label = '',
     helperText = '',
     disabled = false,
     on_change = () => {},
     class: className = ''
   } = $props();
+
+  const resolvedPlaceholder = $derived(placeholder || t('pickers.selectCategories'));
 
   let showDropdown = $state(false);
   let searchInput = $state('');
@@ -87,7 +90,7 @@
             <button
               onclick={() => removeCategory(categoryId)}
               class="ml-1 hover:bg-gray-200 rounded-full p-0.5 transition-colors"
-              title="Remove category"
+              title={t('pickers.removeCategory')}
             >
               <X class="w-3 h-3" />
             </button>
@@ -107,9 +110,9 @@
   >
     <span>
       {#if selectedCount === 0}
-        {placeholder}
+        {resolvedPlaceholder}
       {:else}
-        {selectedCount} categor{selectedCount === 1 ? 'y' : 'ies'} selected
+        {t('pickers.categoriesSelected', { count: selectedCount })}
       {/if}
     </span>
     <ChevronDown class="w-4 h-4 transition-transform {showDropdown ? 'rotate-180' : ''}" />
@@ -125,7 +128,7 @@
         <input
           type="text"
           bind:value={searchInput}
-          placeholder="Search categories..."
+          placeholder={t('pickers.searchCategories')}
           class="w-full px-3 py-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
         />
@@ -158,7 +161,7 @@
         
         {#if filteredCategories.length === 0}
           <div class="px-3 py-4 text-center text-sm" style="color: var(--ds-text-subtle);">
-            No categories found
+            {t('pickers.noCategoriesFound')}
           </div>
         {/if}
       </div>

@@ -18,6 +18,7 @@
     BarChart3 as DashboardIcon
   } from 'lucide-svelte';
   import PageHeader from '../layout/PageHeader.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let stats = {
     workspaces: 0,
@@ -138,13 +139,13 @@
 <div class="min-h-screen" style="background-color: var(--ds-surface);">
     <PageHeader
       icon={DashboardIcon}
-      title="Dashboard"
-      subtitle="Overview of your work items and projects"
+      title={t('dashboard.title')}
+      subtitle={t('dashboard.subtitle')}
     />
 
   {#if loading}
     <div class="flex justify-center items-center h-64">
-      <div class="text-lg" style="color: var(--ds-text-subtle);">Loading dashboard...</div>
+      <div class="text-lg" style="color: var(--ds-text-subtle);">{t('common.loading')}</div>
     </div>
   {:else}
     <!-- Stats Cards -->
@@ -158,7 +159,7 @@
           </div>
           <div class="ml-3 w-0 flex-1">
             <dl>
-              <dt class="text-xs font-medium truncate" style="color: var(--ds-text-subtle);">Workspaces</dt>
+              <dt class="text-xs font-medium truncate" style="color: var(--ds-text-subtle);">{t('workspaces.title')}</dt>
               <dd class="text-xl font-semibold" style="color: var(--ds-text);">{stats.workspaces}</dd>
             </dl>
           </div>
@@ -174,7 +175,7 @@
           </div>
           <div class="ml-3 w-0 flex-1">
             <dl>
-              <dt class="text-xs font-medium truncate" style="color: var(--ds-text-subtle);">Milestones</dt>
+              <dt class="text-xs font-medium truncate" style="color: var(--ds-text-subtle);">{t('nav.milestones')}</dt>
               <dd class="text-xl font-semibold" style="color: var(--ds-text);">{stats.milestones}</dd>
             </dl>
           </div>
@@ -190,7 +191,7 @@
           </div>
           <div class="ml-3 w-0 flex-1">
             <dl>
-              <dt class="text-xs font-medium truncate" style="color: var(--ds-text-subtle);">Work Items</dt>
+              <dt class="text-xs font-medium truncate" style="color: var(--ds-text-subtle);">{t('items.title')}</dt>
               <dd class="text-xl font-semibold" style="color: var(--ds-text);">{stats.items}</dd>
             </dl>
           </div>
@@ -207,7 +208,7 @@
             </div>
             <div class="ml-3 w-0 flex-1">
               <dl>
-                <dt class="text-xs font-medium truncate" style="color: var(--ds-text-subtle);">Test Plans</dt>
+                <dt class="text-xs font-medium truncate" style="color: var(--ds-text-subtle);">{t('testing.testPlans')}</dt>
                 <dd class="text-xl font-semibold" style="color: var(--ds-text);">{stats.testSets}</dd>
               </dl>
             </div>
@@ -221,11 +222,11 @@
       <div class="rounded p-5 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
         <div class="flex items-center mb-4">
           <BarChart3 class="w-4 h-4 mr-2" style="color: var(--ds-text-subtle);" />
-          <h3 class="text-base font-semibold" style="color: var(--ds-text);">Work Item Status Overview</h3>
+          <h3 class="text-base font-semibold" style="color: var(--ds-text);">{t('dashboard.workItemStatusOverview')}</h3>
         </div>
         <div class="space-y-3">
           <div class="flex justify-between items-center">
-            <span class="text-sm font-medium" style="color: var(--ds-text);">Open</span>
+            <span class="text-sm font-medium" style="color: var(--ds-text);">{t('dashboard.statusOpen')}</span>
             <div class="flex items-center">
               <div class="w-32 bg-gray-200 rounded-full h-2 mr-3">
                 <div class="bg-blue-500 h-2 rounded-full" style="width: {stats.items > 0 ? (stats.openItems / stats.items * 100) : 0}%"></div>
@@ -234,7 +235,7 @@
             </div>
           </div>
           <div class="flex justify-between items-center">
-            <span class="text-sm font-medium" style="color: var(--ds-text);">In Progress</span>
+            <span class="text-sm font-medium" style="color: var(--ds-text);">{t('dashboard.statusInProgress')}</span>
             <div class="flex items-center">
               <div class="w-32 bg-gray-200 rounded-full h-2 mr-3">
                 <div class="bg-yellow-500 h-2 rounded-full" style="width: {stats.items > 0 ? (stats.inProgressItems / stats.items * 100) : 0}%"></div>
@@ -243,7 +244,7 @@
             </div>
           </div>
           <div class="flex justify-between items-center">
-            <span class="text-sm font-medium" style="color: var(--ds-text);">Closed</span>
+            <span class="text-sm font-medium" style="color: var(--ds-text);">{t('dashboard.statusClosed')}</span>
             <div class="flex items-center">
               <div class="w-32 bg-gray-200 rounded-full h-2 mr-3">
                 <div class="bg-green-500 h-2 rounded-full" style="width: {stats.items > 0 ? (stats.closedItems / stats.items * 100) : 0}%"></div>
@@ -257,7 +258,7 @@
       <div class="rounded p-5 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
         <div class="flex items-center mb-4">
           <Plus class="w-4 h-4 mr-2" style="color: var(--ds-text-subtle);" />
-          <h3 class="text-base font-semibold" style="color: var(--ds-text);">Quick Actions</h3>
+          <h3 class="text-base font-semibold" style="color: var(--ds-text);">{t('dashboard.quickActions')}</h3>
         </div>
         <div class="space-y-2">
           <button
@@ -275,8 +276,8 @@
             <div class="flex items-center">
               <Plus class="w-3.5 h-3.5 mr-2 opacity-60 group-hover:opacity-100" style="color: var(--ds-text-subtle);" />
               <div class="flex-1">
-                <div class="text-sm font-medium" style="color: var(--ds-text);">Create Work Item</div>
-                <div class="text-xs mt-0.5" style="color: var(--ds-text-subtle);">Start tracking a new work item</div>
+                <div class="text-sm font-medium" style="color: var(--ds-text);">{t('dashboard.createWorkItem')}</div>
+                <div class="text-xs mt-0.5" style="color: var(--ds-text-subtle);">{t('dashboard.createWorkItemDesc')}</div>
               </div>
             </div>
           </button>
@@ -288,8 +289,8 @@
             <div class="flex items-center">
               <Target class="w-3.5 h-3.5 mr-2 opacity-60 group-hover:opacity-100" style="color: var(--ds-text-subtle);" />
               <div class="flex-1">
-                <div class="text-sm font-medium" style="color: var(--ds-text);">Manage Milestones</div>
-                <div class="text-xs mt-0.5" style="color: var(--ds-text-subtle);">View and organize milestones</div>
+                <div class="text-sm font-medium" style="color: var(--ds-text);">{t('dashboard.manageMilestones')}</div>
+                <div class="text-xs mt-0.5" style="color: var(--ds-text-subtle);">{t('dashboard.manageMilestonesDesc')}</div>
               </div>
             </div>
           </button>
@@ -301,8 +302,8 @@
             <div class="flex items-center">
               <Settings class="w-3.5 h-3.5 mr-2 opacity-60 group-hover:opacity-100" style="color: var(--ds-text-subtle);" />
               <div class="flex-1">
-                <div class="text-sm font-medium" style="color: var(--ds-text);">Manage Workspaces</div>
-                <div class="text-xs mt-0.5" style="color: var(--ds-text-subtle);">Set up workspaces</div>
+                <div class="text-sm font-medium" style="color: var(--ds-text);">{t('dashboard.manageWorkspaces')}</div>
+                <div class="text-xs mt-0.5" style="color: var(--ds-text-subtle);">{t('dashboard.manageWorkspacesDesc')}</div>
               </div>
             </div>
           </button>
@@ -316,18 +317,18 @@
         <div class="px-5 py-3 border-b" style="border-color: var(--ds-border);">
           <div class="flex items-center">
             <Clock class="w-4 h-4 mr-2" style="color: var(--ds-text-subtle);" />
-            <h3 class="text-base font-semibold" style="color: var(--ds-text);">Recent Work Items</h3>
+            <h3 class="text-base font-semibold" style="color: var(--ds-text);">{t('dashboard.recentWorkItems')}</h3>
           </div>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full">
             <thead style="background-color: var(--ds-background-neutral);">
               <tr>
-                <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">Item</th>
-                <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">Workspace</th>
-                <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">Status</th>
-                <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">Priority</th>
-                <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">Created</th>
+                <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('items.item')}</th>
+                <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('workspaces.workspace')}</th>
+                <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('common.status')}</th>
+                <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('common.priority')}</th>
+                <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('common.created')}</th>
               </tr>
             </thead>
             <tbody class="divide-y" style="divide-color: var(--ds-border);">

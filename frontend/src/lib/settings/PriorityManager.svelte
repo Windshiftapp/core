@@ -16,24 +16,25 @@
   import ColorPicker from '../editors/ColorPicker.svelte';
   import Toggle from '../components/Toggle.svelte';
   import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
-  let priorities = [];
-  let isLoading = true;
-  let error = null;
-  let editingId = null;
-  let showCreateForm = false;
+  let priorities = $state([]);
+  let isLoading = $state(true);
+  let error = $state(null);
+  let editingId = $state(null);
+  let showCreateForm = $state(false);
 
   // Form data
-  let formData = {
+  let formData = $state({
     name: '',
     description: '',
     icon: 'AlertCircle',
     color: '#dc2626',
     sort_order: 1,
     is_default: false
-  };
+  });
 
   onMount(async () => {
     await loadPriorities();
@@ -138,7 +139,7 @@
   }
 
   // Column definitions for DataTable
-  const priorityColumns = [
+  const priorityColumns = $derived([
     {
       key: 'icon',
       label: '',
@@ -147,28 +148,28 @@
     },
     {
       key: 'name',
-      label: 'NAME'
+      label: t('common.name')
     },
     {
       key: 'is_default',
-      label: 'DEFAULT',
+      label: t('common.default'),
       width: '80px',
       slot: 'is_default'
     },
     {
       key: 'sort_order',
-      label: 'SORT'
+      label: t('common.order')
     },
     {
       key: 'configuration_set_names',
-      label: 'USED IN CONFIG SETS',
+      label: t('configuration.title'),
       slot: 'configuration_set_names'
     },
     {
       key: 'actions',
-      label: 'Actions'
+      label: t('common.actions')
     }
-  ];
+  ]);
 
   function buildPriorityDropdownItems(priority) {
     return [
@@ -176,7 +177,7 @@
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: () => startEdit(priority)
       },
@@ -184,7 +185,7 @@
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50',
         onClick: () => deletePriority(priority.id, priority.name)
@@ -197,8 +198,8 @@
 
 <PageHeader
   icon={AlertCircle}
-  title="Priorities"
-  subtitle="Configure priority levels with icons and colors"
+  title={t('priorities.title')}
+  subtitle={t('priorities.subtitle')}
 >
   {#snippet actions()}
     <Button
@@ -208,7 +209,7 @@
       disabled={isLoading}
       keyboardHint="A"
     >
-      Add Priority
+      {t('priorities.createPriority')}
     </Button>
   {/snippet}
 </PageHeader>
@@ -223,7 +224,7 @@
     columns={priorityColumns}
     data={priorities}
     keyField="id"
-    emptyMessage="No priorities configured yet."
+    emptyMessage={t('priorities.noPriorities')}
     emptyIcon={AlertCircle}
     actionItems={buildPriorityDropdownItems}
   >
@@ -235,7 +236,7 @@
 
     <div slot="is_default" let:item={priority} class="flex items-center">
       {#if priority.is_default}
-        <Lozenge color="green" text="Default" />
+        <Lozenge color="green" text={t('common.default')} />
       {/if}
     </div>
 
@@ -245,7 +246,7 @@
           <Lozenge color="gray" text={configSetName} />
         {/each}
       {:else}
-        <span class="text-xs text-gray-500">No configuration sets</span>
+        <span class="text-xs text-gray-500">{t('common.noData')}</span>
       {/if}
     </div>
   </DataTable>
@@ -254,7 +255,7 @@
     <!-- Modal header -->
     <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
       <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-        {editingId ? 'Edit Priority' : 'Create Priority'}
+        {editingId ? t('priorities.editPriority') : t('priorities.createPriority')}
       </h3>
     </div>
 
@@ -262,7 +263,7 @@
     <div class="px-6 py-4">
       <form onsubmit={(e) => { e.preventDefault(); savePriority(); }}>
         <div class="form-group">
-          <label for="name">Name</label>
+          <label for="name">{t('common.name')}</label>
           <input
             type="text"
             id="name"
@@ -273,17 +274,17 @@
         </div>
 
         <div class="form-group">
-          <label for="description">Description</label>
+          <label for="description">{t('common.description')}</label>
           <Textarea
             id="description"
-            placeholder="Brief description of this priority level"
+            placeholder={t('placeholders.optionalDescription')}
             bind:value={formData.description}
             rows={2}
           />
         </div>
 
         <div class="form-group">
-          <label for="sort_order">Sort Order</label>
+          <label for="sort_order">{t('common.order')}</label>
           <Input
             type="number"
             id="sort_order"
@@ -295,7 +296,7 @@
 
         <div class="form-row">
           <div class="form-group">
-            <label for="icon">Icon</label>
+            <label for="icon">{t('common.icon')}</label>
             <Select id="icon" bind:value={formData.icon} required>
               {#each priorityIconOptions as icon}
                 <option value={icon}>{icon}</option>
@@ -305,19 +306,19 @@
               <div class="preview-icon" style="background-color: {formData.color}">
                 <svelte:component this={priorityIconMap[formData.icon] || AlertCircle} size={16} color="white" />
               </div>
-              Preview
+              {t('common.preview')}
             </div>
           </div>
 
           <div class="form-group">
-            <ColorPicker bind:value={formData.color} label="Color" />
+            <ColorPicker bind:value={formData.color} label={t('common.color')} />
           </div>
         </div>
 
         <div class="form-group">
           <Toggle
             bind:checked={formData.is_default}
-            label="Set as default priority for new items"
+            label={t('common.default')}
             size="small"
           />
         </div>
@@ -328,7 +329,7 @@
     <DialogFooter
       onCancel={cancelEdit}
       onConfirm={savePriority}
-      confirmLabel={editingId ? 'Update Priority' : 'Create Priority'}
+      confirmLabel={editingId ? t('common.update') : t('common.create')}
       showKeyboardHint={true}
       confirmKeyboardHint={submitHint}
     />

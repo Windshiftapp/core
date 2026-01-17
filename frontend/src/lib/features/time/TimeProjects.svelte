@@ -12,6 +12,7 @@
   import SearchInput from '../../components/SearchInput.svelte';
   import ColorDot from '../../components/ColorDot.svelte';
   import { createShortcutHandler, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let activeTab = 'projects';
   let projects = [];
@@ -129,12 +130,12 @@
       cancelForm();
     } catch (error) {
       console.error('Failed to save project:', error);
-      alert('Failed to save project: ' + (error.message || error));
+      alert(t('time.projects.failedToSave') + ': ' + (error.message || error));
     }
   }
 
   async function deleteProject(project) {
-    if (confirm(`Are you sure you want to delete "${project.name}"?`)) {
+    if (confirm(t('time.projects.confirmDelete', { name: project.name }))) {
       try {
         await api.time.projects.delete(project.id);
         await loadProjects();
@@ -146,14 +147,14 @@
 
   function getCustomerName(customerId) {
     const customer = customers.find(c => c.id === customerId);
-    return customer ? customer.name : 'Unknown Customer';
+    return customer ? customer.name : t('time.projects.unknownCustomer');
   }
 
   // Build dropdown items for filters
-  $: categoryDropdownItems = [
+  const categoryDropdownItems = $derived([
     {
       id: 'all',
-      title: 'All Categories',
+      title: t('time.projects.allCategories'),
       checked: selectedCategoryId === null,
       onClick: () => { selectedCategoryId = null; }
     },
@@ -164,9 +165,9 @@
       checked: selectedCategoryId === cat.id,
       onClick: () => { selectedCategoryId = cat.id; }
     }))
-  ];
+  ]);
 
-  $: statusDropdownItems = statusOptions.map(status => ({
+  const statusDropdownItems = $derived(statusOptions.map(status => ({
     id: status,
     type: 'checkbox',
     title: status,
@@ -178,24 +179,26 @@
         selectedStatuses = selectedStatuses.filter(s => s !== status);
       }
     }
-  }));
+  })));
 
   // Reactive statement to get selected category name
-  $: selectedCategoryName = (() => {
-    if (selectedCategoryId === null) return 'All Categories';
-    const category = categories.find(c => c.id === selectedCategoryId);
-    return category ? category.name : 'All Categories';
-  })();
+  const selectedCategoryName = $derived(
+    selectedCategoryId === null 
+      ? t('time.projects.allCategories')
+      : (categories.find(c => c.id === selectedCategoryId)?.name || t('time.projects.allCategories'))
+  );
 
   // Reactive statement to get status filter label
-  $: statusFilterLabel = (() => {
-    if (selectedStatuses.length === 0) return 'All Statuses';
-    if (selectedStatuses.length === 1) return selectedStatuses[0];
-    return `${selectedStatuses.length} statuses`;
-  })();
+  const statusFilterLabel = $derived(
+    selectedStatuses.length === 0
+      ? t('time.projects.allStatuses')
+      : selectedStatuses.length === 1
+        ? selectedStatuses[0]
+        : t('time.projects.statusCount', { count: selectedStatuses.length })
+  );
 
   // Filter projects by all criteria
-  $: filteredProjects = projects.filter(p => {
+  const filteredProjects = $derived(projects.filter(p => {
     // Category filter
     if (selectedCategoryId !== null && p.category_id !== selectedCategoryId) {
       return false;
@@ -216,7 +219,7 @@
     }
 
     return true;
-  });
+  }));
 
   // Keyboard shortcut handler
   const handleGlobalKeydown = createShortcutHandler({
@@ -227,15 +230,15 @@
     }
   }, 'timeProjects');
 
-  // DataTable columns configuration
-  const projectColumns = [
-    { key: 'name', label: 'Project', slot: 'project' },
-    { key: 'category', label: 'Category', slot: 'category' },
-    { key: 'customer', label: 'Customer', slot: 'customer' },
-    { key: 'status', label: 'Status', slot: 'status' },
-    { key: 'hourly_rate', label: 'Rate', slot: 'rate' },
-    { key: 'actions', label: 'Actions' }
-  ];
+  // DataTable columns configuration - use $derived for reactivity
+  const projectColumns = $derived([
+    { key: 'name', label: t('time.projects.project'), slot: 'project' },
+    { key: 'category', label: t('common.category'), slot: 'category' },
+    { key: 'customer', label: t('time.projects.customer'), slot: 'customer' },
+    { key: 'status', label: t('common.status'), slot: 'status' },
+    { key: 'hourly_rate', label: t('time.projects.rate'), slot: 'rate' },
+    { key: 'actions', label: t('common.actions') }
+  ]);
 
   // Build dropdown action items for each project
   function buildProjectDropdownItems(project) {
@@ -244,7 +247,7 @@
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: () => startEdit(project)
       },
@@ -252,7 +255,7 @@
         id: 'delete',
         type: 'danger',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         hoverClass: 'hover:bg-red-50',
         onClick: () => deleteProject(project)
       }
@@ -266,8 +269,8 @@
 <div class="mb-6">
   <PageHeader
     icon={Briefcase}
-    title="Projects"
-    subtitle="Manage global projects for time tracking across workspaces"
+    title={t('time.projects.title')}
+    subtitle={t('time.projects.subtitle')}
   >
     {#snippet actions()}
       {#if activeTab === 'projects'}
@@ -278,7 +281,7 @@
           size="medium"
           keyboardHint={getShortcutDisplay('timeProjects', 'addProject')}
         >
-          Add Project
+          {t('time.projects.addProject')}
         </Button>
       {/if}
     {/snippet}
@@ -292,14 +295,14 @@
         style="{activeTab !== 'projects' ? 'color: var(--ds-text-subtle);' : ''}"
         onclick={() => activeTab = 'projects'}
       >
-        Projects
+        {t('time.projects.projectsTab')}
       </button>
       <button
         class="px-1 py-3 text-sm font-medium transition-colors border-b-2 {activeTab === 'categories' ? 'border-blue-500 text-blue-600' : 'border-transparent'}"
         style="{activeTab !== 'categories' ? 'color: var(--ds-text-subtle);' : ''}"
         onclick={() => activeTab = 'categories'}
       >
-        Categories
+        {t('time.projects.categoriesTab')}
       </button>
     </div>
   </div>
@@ -312,7 +315,7 @@
         <!-- Search -->
         <SearchInput
           bind:value={searchQuery}
-          placeholder="Search projects..."
+          placeholder={t('time.projects.searchProjects')}
           class="flex-1 min-w-[200px] max-w-md"
         />
 
@@ -347,7 +350,7 @@
     columns={projectColumns}
     data={filteredProjects}
     keyField="id"
-    emptyMessage={selectedCategoryId !== null ? 'No projects in this category.' : 'No projects found. Create your first project to start tracking time.'}
+    emptyMessage={selectedCategoryId !== null ? t('time.projects.noProjectsInCategory') : t('time.projects.noProjects')}
     emptyIcon={Briefcase}
     actionItems={buildProjectDropdownItems}
   >

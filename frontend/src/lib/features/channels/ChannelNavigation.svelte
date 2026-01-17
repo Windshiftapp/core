@@ -5,19 +5,20 @@
   import { channelCategoriesStore } from '../../stores/channelCategories.js';
   import Button from '../../components/Button.svelte';
   import { getHexFromColorName } from '../../utils/colors.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   // Get active filters from URL params
   let activeCategoryId = $derived($currentRoute.params?.categoryId || null);
   let activeTypeFilter = $derived($currentRoute.params?.type || null);
   let isAllCategoriesActive = $derived(activeCategoryId === null && activeTypeFilter === null);
 
-  // Channel type definitions
-  const channelTypes = [
-    { id: null, label: 'All Types', icon: Layers, color: 'from-gray-400 to-gray-600' },
-    { id: 'portal', label: 'Portal', icon: Globe, color: 'from-green-400 to-green-600' },
-    { id: 'webhook', label: 'Webhook', icon: Webhook, color: 'from-purple-400 to-purple-600' },
-    { id: 'email', label: 'Email', icon: Mail, color: 'from-blue-400 to-blue-600' }
-  ];
+  // Channel type definitions (use $derived for reactive translations)
+  let channelTypes = $derived([
+    { id: null, label: t('channels.allTypes'), icon: Layers, color: 'from-gray-400 to-gray-600' },
+    { id: 'portal', label: t('channels.portal'), icon: Globe, color: 'from-green-400 to-green-600' },
+    { id: 'webhook', label: t('channels.webhook'), icon: Webhook, color: 'from-purple-400 to-purple-600' },
+    { id: 'email', label: t('channels.email'), icon: Mail, color: 'from-blue-400 to-blue-600' }
+  ]);
 
   onMount(async () => {
     // Load categories when component mounts
@@ -52,9 +53,9 @@
   <!-- Header -->
   <div class="mb-6">
     <div class="flex items-center gap-3 mb-2">
-      <h2 class="text-xl font-semibold" style="color: var(--ds-text);">Channels</h2>
+      <h2 class="text-xl font-semibold" style="color: var(--ds-text);">{t('channels.title')}</h2>
     </div>
-    <p class="text-sm" style="color: var(--ds-text-subtle);">Manage integrations</p>
+    <p class="text-sm" style="color: var(--ds-text-subtle);">{t('channels.subtitle')}</p>
   </div>
 
   <!-- Navigation -->
@@ -62,7 +63,7 @@
     <!-- Channel Types Section -->
     <div class="space-y-1">
       <div class="px-3 mb-2">
-        <span class="text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">Types</span>
+        <span class="text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('channels.types')}</span>
       </div>
       {#each channelTypes as type (type.id)}
         {@const isTypeActive = activeTypeFilter === type.id}
@@ -84,7 +85,7 @@
     <!-- Categories Section -->
     <div class="space-y-1">
       <div class="px-3 mb-2">
-        <span class="text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">Categories</span>
+        <span class="text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('channels.categories')}</span>
       </div>
       <!-- All Channels -->
       <button
@@ -95,7 +96,7 @@
         onmouseleave={(e) => { if (!isAllCategoriesActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
       >
         <div class="w-4 h-4 rounded bg-gradient-to-br from-blue-400 to-blue-600 flex-shrink-0"></div>
-        <span>All Channels</span>
+        <span>{t('channels.allChannels')}</span>
       </button>
 
       <!-- Category List -->
@@ -127,7 +128,7 @@
       onclick={handleManageCategories}
       class="w-full justify-center"
     >
-      Manage Categories
+      {t('channels.manageCategories')}
     </Button>
   </div>
 </div>

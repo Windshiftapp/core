@@ -1,6 +1,7 @@
 <script>
 	import { api } from '../api.js';
 	import { authStore } from '../stores';
+	import { t } from '../stores/i18n.svelte.js';
 	import { User, Shield, Key, Smartphone, Plus, Trash2, Calendar, CheckCircle, PlayCircle, Code, Copy, Eye, EyeOff, Terminal } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
 	import SectionHeader from '../layout/SectionHeader.svelte';
@@ -352,14 +353,14 @@
 	<div class="mb-6">
 		<h1 class="text-3xl font-bold flex items-center gap-3" style="color: var(--ds-text);">
 			<Shield class="h-8 w-8" style="color: var(--ds-interactive);" />
-			Security
+			{t('security.title')}
 		</h1>
-		<p class="mt-2" style="color: var(--ds-text-subtle);">Manage your account security, authentication methods, and API access.</p>
+		<p class="mt-2" style="color: var(--ds-text-subtle);">{t('security.subtitle')}</p>
 	</div>
 
 	<!-- Security Credentials -->
 	<div class="shadow rounded-lg border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-		<SectionHeader title="Security Credentials" subtitle="Manage your authentication methods" class="mb-6">
+		<SectionHeader title={t('security.credentials')} subtitle={t('security.credentialsSubtitle')} class="mb-6">
 			{#snippet actions()}
 				<Button
 					variant="primary"
@@ -368,7 +369,7 @@
 					size="medium"
 					keyboardHint="A"
 				>
-					Add Credential
+					{t('common.add')}
 				</Button>
 			{/snippet}
 		</SectionHeader>
@@ -392,7 +393,7 @@
 						icon={Trash2}
 						onclick={() => confirmRemoveCredential(credential.id, credential.name)}
 					>
-						Remove
+						{t('common.remove')}
 					</Button>
 				</div>
 			{:else}
@@ -423,7 +424,7 @@
 
 	<!-- App Tokens -->
 	<div class="shadow rounded-lg border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-		<SectionHeader title="API Tokens" subtitle="Create tokens to access your account programmatically" class="mb-6">
+		<SectionHeader title={t('security.apiTokens')} subtitle={t('security.apiTokensSubtitle')} class="mb-6">
 			{#snippet actions()}
 				<Button
 					variant="primary"
@@ -432,7 +433,7 @@
 					size="medium"
 					keyboardHint="A"
 				>
-					Create Token
+					{t('security.createToken')}
 				</Button>
 			{/snippet}
 		</SectionHeader>
@@ -440,9 +441,9 @@
 		<!-- Show New Token -->
 		{#if showNewToken}
 			<div class="p-4 rounded mb-6" style="background-color: var(--ds-background-success-subtle); border: 1px solid var(--ds-border-success);">
-				<h3 class="text-lg font-medium mb-2" style="color: var(--ds-text-success);">Token Created Successfully</h3>
+				<h3 class="text-lg font-medium mb-2" style="color: var(--ds-text-success);">{t('security.tokenCreated')}</h3>
 				<p class="text-sm mb-4" style="color: var(--ds-text);">
-					Copy this token now - you won't be able to see it again!
+					{t('security.tokenWarning')}
 				</p>
 				<div class="flex items-center space-x-2">
 					<input
@@ -458,7 +459,7 @@
 						icon={Copy}
 						onclick={() => copyToClipboard(newTokenValue)}
 					>
-						Copy
+						{t('common.copy')}
 					</Button>
 				</div>
 				<div class="mt-3">
@@ -467,7 +468,7 @@
 						size="small"
 						onclick={() => { showNewToken = false; newTokenValue = ''; }}
 					>
-						Done
+						{t('common.done')}
 					</Button>
 				</div>
 			</div>
@@ -492,7 +493,7 @@
 						icon={Trash2}
 						onclick={() => confirmRevokeApiToken(token.id, token.name)}
 					>
-						Revoke
+						{t('security.revokeToken')}
 					</Button>
 				</div>
 			{:else}
@@ -520,7 +521,7 @@
 
 <!-- Change Password Modal -->
 <Modal isOpen={showChangePassword} onclose={cancelChangePassword} maxWidth="max-w-md">
-	<ModalHeader title="Change Password" onClose={cancelChangePassword} />
+	<ModalHeader title={t('auth.changePassword')} onClose={cancelChangePassword} />
 
 	<div class="px-6 py-4">
 		{#if changePasswordError}
@@ -534,38 +535,38 @@
 		{:else}
 			<div class="space-y-4">
 				<div>
-					<Label for="current-password" color="default" class="mb-1">Current Password</Label>
+					<Label for="current-password" color="default" class="mb-1">{t('auth.currentPassword')}</Label>
 					<input
 						id="current-password"
 						type="password"
 						bind:value={changePasswordData.current_password}
 						class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 						style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-						placeholder="Enter current password"
+						placeholder={t('placeholders.enterPassword')}
 					/>
 				</div>
 
 				<div>
-					<Label for="new-password" color="default" class="mb-1">New Password</Label>
+					<Label for="new-password" color="default" class="mb-1">{t('auth.newPassword')}</Label>
 					<input
 						id="new-password"
 						type="password"
 						bind:value={changePasswordData.new_password}
 						class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 						style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-						placeholder="Enter new password (min 8 characters)"
+						placeholder={t('placeholders.enterNewPassword')}
 					/>
 				</div>
 
 				<div>
-					<Label for="confirm-password" color="default" class="mb-1">Confirm New Password</Label>
+					<Label for="confirm-password" color="default" class="mb-1">{t('auth.confirmPassword')}</Label>
 					<input
 						id="confirm-password"
 						type="password"
 						bind:value={changePasswordData.confirm_password}
 						class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 						style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-						placeholder="Confirm new password"
+						placeholder={t('placeholders.confirmNewPassword')}
 					/>
 				</div>
 
@@ -587,8 +588,8 @@
 
 	{#if !changePasswordSuccess}
 		<DialogFooter
-			cancelLabel="Cancel"
-			confirmLabel="Change Password"
+			cancelLabel={t('common.cancel')}
+			confirmLabel={t('auth.changePassword')}
 			onCancel={cancelChangePassword}
 			onConfirm={handleChangePassword}
 			confirmDisabled={changePasswordLoading || !changePasswordData.current_password || !changePasswordData.new_password || !changePasswordData.confirm_password}
@@ -679,9 +680,9 @@
 				keyboardHint="⏎"
 			>
 				{#if credentialType === 'fido'}
-					{enrollingFIDO ? 'Registering...' : 'Register Security Key'}
+					{enrollingFIDO ? t('common.processing') : 'Register Security Key'}
 				{:else}
-					{loading ? 'Adding...' : 'Add SSH Key'}
+					{loading ? t('common.processing') : 'Add SSH Key'}
 				{/if}
 			</Button>
 			<Button
@@ -689,7 +690,7 @@
 				onclick={resetCredentialForm}
 				keyboardHint="Esc"
 			>
-				Cancel
+				{t('common.cancel')}
 			</Button>
 		</div>
 	</div>
@@ -699,12 +700,12 @@
 <Modal isOpen={showAddToken} onclose={resetTokenForm} maxWidth="max-w-md">
 	<div class="p-6">
 		<h3 class="text-xl font-semibold mb-6" style="color: var(--ds-text);">
-			Create New API Token
+			{t('security.createToken')}
 		</h3>
 
 		<div class="space-y-4">
 			<div>
-				<Label for="token-name" color="default" class="mb-1">Token Name</Label>
+				<Label for="token-name" color="default" class="mb-1">{t('security.tokenName')}</Label>
 				<input
 					id="token-name"
 					type="text"
@@ -736,14 +737,14 @@
 				disabled={!newTokenName.trim() || creatingToken}
 				keyboardHint="⏎"
 			>
-				{creatingToken ? 'Creating...' : 'Create Token'}
+				{creatingToken ? t('common.processing') : t('security.createToken')}
 			</Button>
 			<Button
 				variant="default"
 				onclick={resetTokenForm}
 				keyboardHint="Esc"
 			>
-				Cancel
+				{t('common.cancel')}
 			</Button>
 		</div>
 	</div>

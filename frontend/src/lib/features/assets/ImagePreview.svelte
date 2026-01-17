@@ -1,6 +1,7 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { X, Download, ZoomIn, ZoomOut, RotateCw, Maximize2 } from 'lucide-svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
   
@@ -66,7 +67,7 @@
       
     } catch (error) {
       console.error('Download failed:', error);
-      alert('Failed to download file: ' + error.message);
+      alert(t('assets.failedToDownload') + ': ' + error.message);
     }
   }
   
@@ -209,7 +210,7 @@
           <p class="text-sm text-gray-300">
             {formatFileSize(attachment.file_size)} • {attachment.mime_type}
             {#if attachment.uploader_name}
-              • Uploaded by {attachment.uploader_name}
+              • {t('assets.uploadedBy', { name: attachment.uploader_name })}
             {/if}
           </p>
         </div>
@@ -218,51 +219,51 @@
         <div class="flex items-center gap-2 ml-4">
           <button
             onclick={zoomOut}
-            title="Zoom Out (-)"
+            title={t('assets.zoomOut')}
             class="dark-button"
           >
             <ZoomOut class="w-4 h-4" />
           </button>
-          
+
           <span class="text-sm text-gray-300 min-w-[4rem] text-center">
             {Math.round(scale * 100)}%
           </span>
-          
+
           <button
             onclick={zoomIn}
-            title="Zoom In (+)"
+            title={t('assets.zoomIn')}
             class="dark-button"
           >
             <ZoomIn class="w-4 h-4" />
           </button>
-          
+
           <button
             onclick={rotate}
-            title="Rotate (R)"
+            title={t('assets.rotate')}
             class="dark-button"
           >
             <RotateCw class="w-4 h-4" />
           </button>
-          
+
           <button
             onclick={fitToScreen}
-            title="Fit to Screen (F)"
+            title={t('assets.fitToScreen')}
             class="dark-button"
           >
             <Maximize2 class="w-4 h-4" />
           </button>
-          
+
           <button
             onclick={download}
-            title="Download"
+            title={t('common.download')}
             class="dark-button"
           >
             <Download class="w-4 h-4" />
           </button>
-          
+
           <button
             onclick={close}
-            title="Close (Esc)"
+            title={t('common.close')}
             class="dark-button"
           >
             <X class="w-4 h-4" />
@@ -291,12 +292,12 @@
       <!-- Footer with shortcuts -->
       <div class="p-2 bg-black bg-opacity-50 text-center">
         <p class="text-xs text-gray-400">
-          <span class="inline-block mx-2">Scroll: Zoom</span>
-          <span class="inline-block mx-2">Drag: Pan</span>
-          <span class="inline-block mx-2">R: Rotate</span>
-          <span class="inline-block mx-2">F: Fit</span>
-          <span class="inline-block mx-2">0: Reset</span>
-          <span class="inline-block mx-2">Esc: Close</span>
+          <span class="inline-block mx-2">{t('assets.shortcutScroll')}</span>
+          <span class="inline-block mx-2">{t('assets.shortcutDrag')}</span>
+          <span class="inline-block mx-2">{t('assets.shortcutRotate')}</span>
+          <span class="inline-block mx-2">{t('assets.shortcutFit')}</span>
+          <span class="inline-block mx-2">{t('assets.shortcutReset')}</span>
+          <span class="inline-block mx-2">{t('assets.shortcutClose')}</span>
         </p>
       </div>
     </div>

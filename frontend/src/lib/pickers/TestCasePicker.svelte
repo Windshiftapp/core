@@ -3,6 +3,7 @@
   import { createEventDispatcher, untrack } from 'svelte';
   import { api } from '../api.js';
   import { FileText } from 'lucide-svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -10,12 +11,14 @@
     workspaceId,
     value = $bindable(null),
     excludeIds = [],
-    placeholder = 'Search test cases...',
+    placeholder = '',
     label = '',
     disabled = false,
     autoOpen = false,
     class: className = ''
   } = $props();
+
+  const resolvedPlaceholder = $derived(placeholder || t('pickers.searchTestCases'));
 
   let testCases = $state([]);
   let loading = $state(false);
@@ -64,7 +67,7 @@
   items={filteredTestCases}
   {loading}
   {error}
-  {placeholder}
+  placeholder={resolvedPlaceholder}
   {label}
   {disabled}
   class={className}
@@ -80,7 +83,7 @@
       <div class="flex-1 min-w-0">
         <div class="font-medium truncate">{testCase.title}</div>
         <div class="text-xs truncate" style="color: var(--ds-text-subtle);">
-          {testCase.folder_name || 'Root'}
+          {testCase.folder_name || t('common.root')}
         </div>
       </div>
     </div>

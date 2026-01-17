@@ -10,6 +10,7 @@
   import { formatDate } from '../../utils/dateFormatter.js';
   import { navigate } from '../../router.js';
   import ItemDetailBreadcrumbs from '../items/ItemDetailBreadcrumbs.svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   // Use centralized icon map for work item types
   const iconMap = itemTypeIconMap;
@@ -340,7 +341,7 @@
 
 {#snippet taskContent()}
   {#if loading}
-    <div class="p-8 text-center" style="color: var(--ds-text-subtle);">Loading...</div>
+    <div class="p-8 text-center" style="color: var(--ds-text-subtle);">{t('nav.loading')}</div>
   {:else if error && !item}
     <div class="p-8 text-center text-red-600">{error}</div>
   {:else if item}
@@ -402,7 +403,7 @@
       </div>
 
       {#if isModal}
-        <Button variant="ghost" icon={X} onclick={closeModal} title="Close" />
+        <Button variant="ghost" icon={X} onclick={closeModal} title={t('common.close')} />
       {/if}
     </div>
 
@@ -433,7 +434,7 @@
               style="color: {item.due_date ? 'var(--ds-text)' : 'var(--ds-text-subtle)'}; background: none; border: none; padding: 0;"
             >
               <Calendar class="w-4 h-4" />
-              {item.due_date ? formatDate(item.due_date) : 'Set due date'}
+              {item.due_date ? formatDate(item.due_date) : t('personal.setDueDate')}
             </button>
             {#if item.due_date}
               <button
@@ -472,7 +473,7 @@
       <div class="border-b mb-4 pb-2" style="border-color: var(--ds-border);">
         <div class="flex items-center gap-1.5 text-sm font-medium" style="color: var(--ds-text-subtle);">
           <MessageSquare class="w-4 h-4" />
-          Comments
+          {t('personal.comments')}
           {#if commentCount > 0}
             <span class="text-xs px-1.5 py-0.5 rounded-full" style="background-color: var(--ds-surface-raised);">{commentCount}</span>
           {/if}

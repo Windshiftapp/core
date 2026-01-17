@@ -189,6 +189,12 @@ func (s *ItemCRUDService) Copy(itemID int, opts CopyOptions) (*CopyResult, error
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
+	// Record item creation history for the copied item
+	updateService := NewItemUpdateService(s.db)
+	if err := updateService.recordItemCreationHistory(s.db, newID, opts.CreatorID); err != nil {
+		// Log error but don't fail the request
+	}
+
 	return &CopyResult{
 		NewItemID: newID,
 		CopyCount: copyCount,

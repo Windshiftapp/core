@@ -7,6 +7,7 @@
   import { authStore, workspacesStore } from '../../stores';
   import Tooltip from '../../components/Tooltip.svelte';
   import Text from '../../components/Text.svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let {
     itemId,
@@ -236,7 +237,7 @@
     onclick={toggleExpanded}
   >
     <div class="flex items-center gap-2">
-      <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">Personal Tasks</Text>
+      <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">{t('personal.personalTasks')}</Text>
       {#if openTasks.length > 0}
         <span class="px-1.5 py-0.5 text-xs font-medium rounded-full" style="background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue);">
           {openTasks.length}
@@ -259,7 +260,7 @@
         class="p-1 rounded transition-colors opacity-0 group-hover:opacity-100"
         class:invisible={showAddForm || !expanded || !personalWorkspace}
         onclick={(e) => { e.stopPropagation(); showAddForm = true; }}
-        title="Add personal task"
+        title={t('personal.addPersonalTask')}
       >
         <Plus size={14} style="color: var(--ds-text-subtle);" />
       </button>
@@ -276,7 +277,7 @@
     <div transition:slide={{ duration: 200 }} class="mt-1">
       {#if loading}
         <div class="py-2 text-xs" style="color: var(--ds-text-subtle);">
-          Loading...
+          {t('nav.loading')}
         </div>
       {:else if error}
         <div class="py-2 text-xs text-red-600">
@@ -284,7 +285,7 @@
         </div>
       {:else if !personalWorkspace}
         <div class="py-2 text-xs" style="color: var(--ds-text-subtle);">
-          No personal workspace found
+          {t('personal.noPersonalWorkspace')}
         </div>
       {:else}
         <!-- Add task form -->
@@ -295,7 +296,7 @@
                 type="text"
                 bind:this={addTaskInput}
                 bind:value={newTaskTitle}
-                placeholder="Task title..."
+                placeholder={t('personal.taskTitlePlaceholder')}
                 class="px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
                 disabled={adding}
@@ -308,7 +309,7 @@
                   onclick={() => { showAddForm = false; newTaskTitle = ''; }}
                   disabled={adding}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
@@ -316,7 +317,7 @@
                   style="background-color: var(--ds-interactive); color: var(--ds-text-inverse);"
                   disabled={adding || !newTaskTitle.trim()}
                 >
-                  Add
+                  {t('common.add')}
                 </button>
               </div>
             </form>
@@ -327,9 +328,9 @@
         {#if displayedTasks.length === 0 && !showAddForm}
           <div class="py-2 text-xs" style="color: var(--ds-text-subtle);">
             {#if personalTasks.length === 0}
-              No tasks yet
+              {t('personal.noTasksYet')}
             {:else}
-              No {showCompleted ? '' : 'open '}tasks
+              {t('personal.noOpenTasks')}
             {/if}
           </div>
         {:else if displayedTasks.length > 0}
@@ -340,7 +341,7 @@
                 <button
                   class="mt-0.5 flex-shrink-0"
                   onclick={() => handleToggleComplete(task)}
-                  title={isTaskCompleted(task) ? 'Mark incomplete' : 'Mark complete'}
+                  title={isTaskCompleted(task) ? t('personal.markIncomplete') : t('personal.markComplete')}
                 >
                   {#if isTaskCompleted(task)}
                     <div class="w-4 h-4 bg-green-500 rounded flex items-center justify-center">
@@ -366,14 +367,14 @@
                   <button
                     class="p-0.5 rounded action-btn"
                     onclick={() => handleNavigateToTask(task)}
-                    title="Open task"
+                    title={t('personal.openTask')}
                   >
                     <ExternalLink size={12} style="color: var(--ds-text-subtle);" />
                   </button>
                   <button
                     class="p-0.5 rounded action-btn-danger"
                     onclick={() => handleUnlink(task)}
-                    title="Unlink task"
+                    title={t('personal.unlinkTask')}
                   >
                     <X size={12} class="text-red-600" />
                   </button>

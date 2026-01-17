@@ -5,6 +5,7 @@
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
   import { Plus, Edit, Trash2, Settings, MoreHorizontal, Circle, Layout } from 'lucide-svelte';
   import { SYSTEM_FIELDS, getSystemFieldName } from '../stores/fieldConfig.js';
+  import { t } from '../stores/i18n.svelte.js';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import Textarea from '../components/Textarea.svelte';
@@ -31,10 +32,10 @@
 
 
   const fieldWidths = [
-    { value: 'full', label: 'Full Width' },
-    { value: 'half', label: 'Half Width' },
-    { value: 'third', label: 'One Third' },
-    { value: 'quarter', label: 'One Quarter' }
+    { value: 'full', label: t('screensPage.fieldWidths.full') },
+    { value: 'half', label: t('screensPage.fieldWidths.half') },
+    { value: 'third', label: t('screensPage.fieldWidths.third') },
+    { value: 'quarter', label: t('screensPage.fieldWidths.quarter') }
   ];
 
   onMount(async () => {
@@ -170,7 +171,7 @@
       cancelForm();
     } catch (error) {
       console.error('Failed to save screen:', error);
-      alert('Failed to save screen: ' + (error.message || error));
+      alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
     }
   }
 
@@ -180,24 +181,24 @@
       cancelFieldEditor();
     } catch (error) {
       console.error('Failed to save screen fields:', error);
-      alert('Failed to save screen fields: ' + (error.message || error));
+      alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
     }
   }
 
   async function deleteScreen(screen) {
     // Prevent deletion of default screen (ID 1)
     if (screen.id === 1) {
-      alert('Cannot delete the default screen. This screen is required for workspaces without a configuration set.');
+      alert(t('dialogs.alerts.cannotDeleteDefaultScreen'));
       return;
     }
 
-    if (confirm(`Are you sure you want to delete screen "${screen.name}"? This will affect all workspaces using this screen.`)) {
+    if (confirm(t('dialogs.confirmations.deleteScreen', { name: screen.name }))) {
       try {
         await api.screens.delete(screen.id);
         await loadScreens();
       } catch (error) {
         console.error('Failed to delete screen:', error);
-        alert('Failed to delete screen: ' + (error.message || error));
+        alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
       }
     }
   }
@@ -466,7 +467,7 @@
         id: 'fields',
         type: 'regular',
         icon: Settings,
-        title: 'Fields',
+        title: t('screensPage.fields'),
         hoverClass: 'hover-bg',
         onClick: () => startEditFields(screen)
       },
@@ -474,7 +475,7 @@
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: () => startEdit(screen)
       }
@@ -486,7 +487,7 @@
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50',
         onClick: () => deleteScreen(screen)
@@ -500,18 +501,18 @@
   const screenColumns = [
     {
       key: 'name',
-      label: 'Screen',
+      label: t('screensPage.screen'),
       slot: 'name'
     },
     {
       key: 'created_at',
-      label: 'Created',
+      label: t('common.created'),
       render: (screen) => new Date(screen.created_at).toLocaleDateString(),
       textColor: 'var(--ds-text-subtle)'
     },
     {
       key: 'actions',
-      label: 'Actions'
+      label: t('common.actions')
     }
   ];
 </script>
@@ -521,8 +522,8 @@
 {#if !showFieldEditor}
   <PageHeader
     icon={Layout}
-    title="Screens"
-    subtitle="Define field layouts for issues and projects"
+    title={t('screens.title')}
+    subtitle={t('screens.subtitle')}
   >
     {#snippet actions()}
       <Button
@@ -531,7 +532,7 @@
         onclick={startCreate}
         keyboardHint="A"
       >
-        Add Screen
+        {t('screensPage.addScreen')}
       </Button>
     {/snippet}
   </PageHeader>
@@ -541,7 +542,7 @@
       <!-- Modal header -->
       <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
         <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-          {editingScreen ? 'Edit Screen' : 'Create Screen'}
+          {editingScreen ? t('screensPage.editScreen') : t('screensPage.createScreen')}
         </h3>
       </div>
 
@@ -550,22 +551,22 @@
         <form onsubmit={(e) => { e.preventDefault(); saveScreen(); }}>
           <div class="grid grid-cols-1 gap-6">
             <div>
-              <Label for="screen-name" required class="mb-2">Screen Name</Label>
+              <Label for="screen-name" required class="mb-2">{t('screensPage.screenName')}</Label>
               <Input
                 id="screen-name"
                 bind:value={formData.name}
-                placeholder="e.g., Standard Issue Form, Bug Report Form"
+                placeholder={t('screensPage.screenNamePlaceholder')}
                 required
               />
             </div>
 
             <div>
-              <Label for="screen-description" class="mb-2">Description</Label>
+              <Label for="screen-description" class="mb-2">{t('screensPage.description')}</Label>
               <Textarea
                 id="screen-description"
                 bind:value={formData.description}
                 rows={3}
-                placeholder="Optional description for this screen"
+                placeholder={t('screensPage.optionalDescription')}
               />
             </div>
           </div>
@@ -575,7 +576,7 @@
       <DialogFooter
         onCancel={cancelForm}
         onConfirm={saveScreen}
-        confirmLabel={editingScreen ? 'Update Screen' : 'Create Screen'}
+        confirmLabel={editingScreen ? t('screensPage.updateScreen') : t('screensPage.createScreen')}
         disabled={!formData.name.trim()}
       />
     </Modal>
@@ -584,7 +585,7 @@
       columns={screenColumns}
       data={screens}
       keyField="id"
-      emptyMessage="No screens found. Create your first screen to get started."
+      emptyMessage={t('screensPage.noScreens')}
       emptyIcon={Circle}
       actionItems={buildScreenDropdownItems}
     >
@@ -598,8 +599,8 @@
   {:else}
     <PageHeader
       icon={Settings}
-      title="Configure Fields"
-      subtitle="Screen: {editingScreenFields?.name}"
+      title={t('screensPage.configureFields')}
+      subtitle={t('screensPage.screenSubtitle', { name: editingScreenFields?.name })}
     >
       {#snippet actions()}
         <div class="flex gap-3">
@@ -607,13 +608,13 @@
             variant="primary"
             onclick={saveScreenFields}
           >
-            Save Fields
+            {t('screensPage.saveFields')}
           </Button>
           <Button
             variant="default"
             onclick={cancelFieldEditor}
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
         </div>
       {/snippet}
@@ -623,11 +624,11 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
       <!-- Available Fields -->
       <div class="rounded-xl p-6 border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-        <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">Available Fields</h3>
-        <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">Drag fields to the screen configuration on the right</p>
+        <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">{t('screensPage.availableFields')}</h3>
+        <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">{t('screensPage.dragFieldsHint')}</p>
 
         <Input
-          placeholder="Search fields..."
+          placeholder={t('screensPage.searchFields')}
           bind:value={fieldSearchQuery}
           class="mb-4"
         />
@@ -636,7 +637,7 @@
           {#each searchFilteredFields as field, index}
             {#if index === 0 || field.category !== searchFilteredFields[index - 1].category}
               <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mt-4 mb-2 first:mt-0">
-                {field.category}
+                {field.category === 'System Fields' ? t('screensPage.systemFields') : field.category === 'Custom Fields' ? t('screensPage.customFields') : field.category}
               </div>
             {/if}
             
@@ -662,10 +663,10 @@
                 <div class="text-sm" style="color: var(--ds-text-subtle);">
                   {#if field.type === 'system'}
                     {SYSTEM_FIELDS.find(sf => sf.identifier === field.identifier)?.type || field.identifier}
-                    • System
+                    • {t('screensPage.system')}
                   {:else}
                     {field.fieldType}
-                    • Custom
+                    • {t('screensPage.custom')}
                   {/if}
                 </div>
               </div>
@@ -676,9 +677,9 @@
             <div class="text-center py-8">
               <p class="text-sm" style="color: var(--ds-text-subtle);">
                 {#if fieldSearchQuery.trim()}
-                  No fields match your search
+                  {t('screensPage.noFieldsMatch')}
                 {:else}
-                  All available fields have been added to the screen
+                  {t('screensPage.allFieldsAdded')}
                 {/if}
               </p>
             </div>
@@ -688,8 +689,8 @@
 
       <!-- Screen Fields Configuration -->
       <div class="rounded-xl p-6 border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-        <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">Screen Fields ({screenFields.length})</h3>
-        <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">Drag to reorder fields or drop available fields here</p>
+        <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">{t('screensPage.screenFields')} ({screenFields.length})</h3>
+        <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">{t('screensPage.dragToReorder')}</p>
         
         <div
           data-drop-zone
@@ -702,7 +703,7 @@
               <svg class="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
               </svg>
-              <p class="text-sm text-gray-500">Drop fields here to configure the screen</p>
+              <p class="text-sm text-gray-500">{t('screensPage.dropFieldsHere')}</p>
             </div>
           {:else}
             {#each screenFields as field, index (field.field_identifier)}
@@ -736,11 +737,11 @@
                   <div class="font-medium flex items-center gap-2" style="color: var(--ds-text);">
                     {getFieldDisplayName(field)}
                     <span class="text-xs px-1.5 py-0.5 rounded text-gray-500 bg-gray-100">
-                      {field.field_type === 'system' ? 'system' : 'custom'}
+                      {field.field_type === 'system' ? t('screensPage.system') : t('screensPage.custom')}
                     </span>
                   </div>
                 </div>
-                
+
                 <div class="flex items-center gap-3 flex-shrink-0">
                   <label class="flex items-center gap-1">
                     <input
@@ -748,7 +749,7 @@
                       bind:checked={field.is_required}
                       class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
-                    <span class="text-xs text-gray-600">Required</span>
+                    <span class="text-xs text-gray-600">{t('screensPage.required')}</span>
                   </label>
                   
                   {#if field.field_type === 'system' && (field.field_identifier === 'title' || field.field_identifier === 'status')}
@@ -761,7 +762,7 @@
                     <button
                       onclick={() => removeField(index)}
                       class="text-red-500 hover:text-red-700 transition-colors p-1 rounded hover:bg-red-50 flex-shrink-0"
-                      title="Remove field"
+                      title={t('screensPage.removeField')}
                     >
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>

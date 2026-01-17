@@ -381,6 +381,134 @@ func (s *ItemUpdateService) compareAndGenerateHistory(original, updated *models.
 	return history
 }
 
+// RecordItemCreationHistory records the initial values when an item is created
+// This ensures that the item history shows the creation event with initial values
+func (s *ItemUpdateService) RecordItemCreationHistory(db database.Database, itemID int, userID int) error {
+	return s.recordItemCreationHistory(db, itemID, userID)
+}
+
+// recordItemCreationHistory records the initial values when an item is created
+func (s *ItemUpdateService) recordItemCreationHistory(db database.Database, itemID int, userID int) error {
+	// Load the newly created item to get all its initial values
+	var item models.Item
+	var customFieldValuesJSON sql.NullString
+	var itemTypeID, parentID, statusID, milestoneID, iterationID, projectID, priorityID sql.NullInt64
+	var assigneeID, creatorID sql.NullInt64
+	var dueDate sql.NullTime
+
+	err := db.QueryRow(`
+		SELECT id, workspace_id, workspace_item_number, item_type_id, title, description, status_id,
+		       priority_id, due_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
+		       assignee_id, creator_id, custom_field_values, parent_id, related_work_item_id,
+		       created_at, updated_at
+		FROM items WHERE id = ?
+	`, itemID).Scan(
+		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
+		&statusID, &priorityID, &dueDate, &item.IsTask, &milestoneID, &iterationID,
+		&projectID, &item.InheritProject, &assigneeID, &creatorID, &customFieldValuesJSON, &parentID,
+		&item.RelatedWorkItemID, &item.CreatedAt, &item.UpdatedAt,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to load created item: %w", err)
+	}
+
+	// Handle nullable fields
+	if itemTypeID.Valid {
+		val := int(itemTypeID.Int64)
+		item.ItemTypeID = &val
+	}
+	if parentID.Valid {
+		val := int(parentID.Int64)
+		item.ParentID = &val
+	}
+	if milestoneID.Valid {
+		val := int(milestoneID.Int64)
+		item.MilestoneID = &val
+	}
+	if iterationID.Valid {
+		val := int(iterationID.Int64)
+		item.IterationID = &val
+	}
+	if statusID.Valid {
+		val := int(statusID.Int64)
+		item.StatusID = &val
+	}
+	if priorityID.Valid {
+		val := int(priorityID.Int64)
+		item.PriorityID = &val
+	}
+	if dueDate.Valid {
+		item.DueDate = &dueDate.Time
+	}
+	if projectID.Valid {
+		val := int(projectID.Int64)
+		item.ProjectID = &val
+	}
+	if assigneeID.Valid {
+		val := int(assigneeID.Int64)
+		item.AssigneeID = &val
+	}
+	if creatorID.Valid {
+		val := int(creatorID.Int64)
+		item.CreatorID = &val
+	}
+
+	// Parse custom field values
+	if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
+		if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &item.CustomFieldValues); err != nil {
+			item.CustomFieldValues = make(map[string]interface{})
+		}
+	} else {
+		item.CustomFieldValues = make(map[string]interface{})
+	}
+
+	// Generate history entries for all initial values
+	var history []HistoryEntry
+	now := time.Now()
+
+	// Helper to add history entry (old_value is always empty for creation)
+	addHistory := func(fieldName, newValue string) {
+		if newValue != "" {
+			history = append(history, HistoryEntry{
+				ItemID:    itemID,
+				UserID:    userID,
+				FieldName: fieldName,
+				OldValue:  "",
+				NewValue:  newValue,
+				ChangedAt: now,
+			})
+		}
+	}
+
+	// Add entries for all fields
+	addHistory("title", item.Title)
+	addHistory("description", item.Description)
+	addHistory("status_id", intPtrToString(item.StatusID))
+	addHistory("priority_id", intPtrToString(item.PriorityID))
+	addHistory("milestone_id", intPtrToString(item.MilestoneID))
+	addHistory("iteration_id", intPtrToString(item.IterationID))
+	addHistory("project_id", intPtrToString(item.ProjectID))
+	addHistory("assignee_id", intPtrToString(item.AssigneeID))
+	addHistory("creator_id", intPtrToString(item.CreatorID))
+	addHistory("parent_id", intPtrToString(item.ParentID))
+	addHistory("due_date", timePtrToString(item.DueDate))
+	addHistory("workspace_id", fmt.Sprintf("%d", item.WorkspaceID))
+
+	// Record history entries directly (no transaction needed here, caller should manage)
+	for _, entry := range history {
+		_, err := db.Exec(`
+			INSERT INTO item_history (item_id, user_id, field_name, old_value, new_value, changed_at)
+			VALUES (?, ?, ?, ?, ?, ?)
+		`, entry.ItemID, entry.UserID, entry.FieldName, entry.OldValue, entry.NewValue, entry.ChangedAt)
+		if err != nil {
+			return fmt.Errorf("failed to record creation history: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // recordItemHistory records history entries in the database
 func (s *ItemUpdateService) recordItemHistory(tx database.Tx, history []HistoryEntry) error {
 	for _, entry := range history {

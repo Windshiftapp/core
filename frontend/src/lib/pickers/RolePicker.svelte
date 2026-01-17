@@ -4,16 +4,19 @@
   import { api } from '../api.js';
   import { onMount, createEventDispatcher } from 'svelte';
   import { Shield } from 'lucide-svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
   let {
     value = $bindable(null),
-    placeholder = 'Select role...',
+    placeholder = '',
     label = '',
     disabled = false,
     class: className = ''
   } = $props();
+
+  const resolvedPlaceholder = $derived(placeholder || t('pickers.selectRole'));
 
   const roles = createAsyncLoader(() => api.get('/workspace-roles'));
 
@@ -33,7 +36,7 @@
   items={roles.data}
   loading={roles.loading}
   error={roles.error}
-  {placeholder}
+  placeholder={resolvedPlaceholder}
   {label}
   {disabled}
   class={className}

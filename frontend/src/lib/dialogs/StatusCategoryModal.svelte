@@ -5,6 +5,7 @@
   import Textarea from '../components/Textarea.svelte';
   import ColorPicker from '../editors/ColorPicker.svelte';
   import Label from '../components/Label.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -41,15 +42,15 @@
   >
     <div class="p-6">
       <h3 class="text-xl font-semibold mb-6" style="color: var(--ds-text);">
-        {isEditing ? 'Edit Status Category' : 'Create Status Category'}
+        {isEditing ? t('statusCategory.editStatusCategory') : t('statusCategory.createStatusCategory')}
       </h3>
 
       <div class="mb-6">
-        <Label required class="mb-2">Name</Label>
+        <Label required class="mb-2">{t('common.name')}</Label>
         <input
           type="text"
           bind:value={formData.name}
-          placeholder="e.g. To Do, In Progress, Done"
+          placeholder={t('statusCategory.namePlaceholder')}
           class="w-full px-4 py-3 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
           style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
           required
@@ -57,16 +58,15 @@
       </div>
 
       <div class="mb-6">
-        <Label required class="mb-2">Color</Label>
+        <Label required class="mb-2">{t('statusCategory.color')}</Label>
         <ColorPicker bind:value={formData.color} />
       </div>
 
       <div class="mb-6">
-        <Label class="mb-2">Description</Label>
+        <Label class="mb-2">{t('common.description')}</Label>
         <Textarea
           bind:value={formData.description}
           rows={2}
-          placeholder="Optional description for this category"
         />
       </div>
 
@@ -78,7 +78,7 @@
             id="is-default"
             class="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
           />
-          <span>Set as default category</span>
+          <span>{t('statusCategory.setAsDefault')}</span>
         </label>
 
         <div class="flex items-start gap-3">
@@ -90,10 +90,10 @@
           />
           <div>
             <label for="is-completed" class="text-sm font-medium" style="color: var(--ds-text);">
-              Marks work as completed
+              {t('statusCategory.marksWorkCompleted')}
             </label>
             <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-              Items moved into statuses within this category will be treated as completed in reports and reviews.
+              {t('statusCategory.marksWorkCompletedHelp')}
             </p>
           </div>
         </div>
@@ -107,7 +107,7 @@
           size="medium"
           keyboardHint={submitHint}
         >
-          {isEditing ? 'Update' : 'Create'} Category
+          {isEditing ? t('statusCategory.updateCategory') : t('statusCategory.createCategory')}
         </Button>
         <Button
           variant="default"
@@ -115,7 +115,7 @@
           size="medium"
           keyboardHint="Esc"
         >
-          Cancel
+          {t('common.cancel')}
         </Button>
       </div>
     </div>

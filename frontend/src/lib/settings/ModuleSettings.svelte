@@ -8,6 +8,7 @@
   import Spinner from '../components/Spinner.svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import { api, getSecuritySettings } from '../api.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   let saving = $state(false);
   let error = $state('');
@@ -107,45 +108,45 @@
   
   async function uploadPlugin() {
     if (!selectedFile) {
-      error = 'Please select a plugin file';
+      error = t('settings.modules.pleaseSelectPlugin');
       return;
     }
-    
+
     if (selectedFile.name.endsWith('.wasm') && !selectedManifest) {
-      error = 'WASM files require a manifest.json file. Please select a manifest.json or upload a .zip file containing both files.';
+      error = t('settings.modules.wasmNeedsManifest');
       return;
     }
-    
+
     uploadingPlugin = true;
     error = '';
-    
+
     const formData = new FormData();
     formData.append('plugin', selectedFile);
     if (selectedManifest) {
       formData.append('manifest', selectedManifest);
     }
-    
+
     try {
       const response = await fetch('/api/plugins/upload', {
         method: 'POST',
         body: formData
       });
-      
+
       if (response.ok) {
-        successMessage = 'Plugin uploaded successfully!';
+        successMessage = t('settings.modules.pluginUploadedSuccess');
         selectedFile = null;
         selectedManifest = null;
         await loadPlugins();
-        
+
         setTimeout(() => {
           successMessage = '';
         }, 3000);
       } else {
         const errorData = await response.text();
-        error = `Upload failed: ${errorData}`;
+        error = t('settings.modules.failedToUpload', { error: errorData });
       }
     } catch (err) {
-      error = `Upload failed: ${err.message}`;
+      error = t('settings.modules.failedToUpload', { error: err.message });
     } finally {
       uploadingPlugin = false;
     }
@@ -172,34 +173,34 @@
       const response = await fetch(`/api/plugins/${plugin.name}/reload`, {
         method: 'POST'
       });
-      
+
       if (response.ok) {
-        successMessage = `Plugin ${plugin.name} reloaded successfully`;
+        successMessage = t('settings.modules.pluginReloadedSuccess', { name: plugin.name });
         await loadPlugins();
         setTimeout(() => successMessage = '', 3000);
       }
     } catch (err) {
-      error = `Failed to reload plugin: ${err.message}`;
+      error = t('settings.modules.failedToReload', { error: err.message });
     }
   }
-  
+
   async function deletePlugin(plugin) {
-    if (!confirm(`Are you sure you want to delete the plugin "${plugin.name}"?`)) {
+    if (!confirm(t('settings.modules.confirmDeletePlugin', { name: plugin.name }))) {
       return;
     }
-    
+
     try {
       const response = await fetch(`/api/plugins/${plugin.name}`, {
         method: 'DELETE'
       });
-      
+
       if (response.ok) {
-        successMessage = `Plugin ${plugin.name} deleted successfully`;
+        successMessage = t('settings.modules.pluginDeletedSuccess', { name: plugin.name });
         await loadPlugins();
         setTimeout(() => successMessage = '', 3000);
       }
     } catch (err) {
-      error = `Failed to delete plugin: ${err.message}`;
+      error = t('settings.modules.failedToDelete', { error: err.message });
     }
   }
 
@@ -215,7 +216,7 @@
       };
 
       await moduleSettings.update(newSettings);
-      successMessage = 'Module settings saved successfully!';
+      successMessage = t('settings.modules.settingsSavedSuccess');
 
       // Clear success message after 3 seconds
       setTimeout(() => {
@@ -223,7 +224,7 @@
       }, 3000);
     } catch (err) {
       console.error('Failed to save module settings:', err);
-      error = 'Failed to save module settings. Please try again.';
+      error = t('settings.modules.failedToSave');
     } finally {
       saving = false;
     }
@@ -244,7 +245,7 @@
       await moduleSettings.update(newSettings);
     } catch (err) {
       console.error('Failed to auto-save module settings:', err);
-      error = 'Failed to save module settings. Please try again.';
+      error = t('settings.modules.failedToSave');
     } finally {
       saving = false;
     }
@@ -252,10 +253,10 @@
 
 </script>
 
-<PageHeader 
-  icon={Puzzle} 
-  title="Module Settings" 
-  subtitle="Configure which modules are enabled in your Windshift installation"
+<PageHeader
+  icon={Puzzle}
+  title={t('settings.modules.title')}
+  subtitle={t('settings.modules.subtitle')}
 />
 
   {#if $moduleSettings.loading}
@@ -284,9 +285,9 @@
           <div class="flex items-center gap-3">
             <CheckSquare class="w-5 h-5" style="color: var(--ds-text-subtle);" />
             <div>
-              <h3 class="text-lg font-medium" style="color: var(--ds-text);">Test Management</h3>
+              <h3 class="text-lg font-medium" style="color: var(--ds-text);">{t('testing.title')}</h3>
               <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-                Manage test cases, test runs, test sets, and quality assurance workflows
+                {t('testing.subtitle')}
               </p>
             </div>
           </div>
@@ -303,18 +304,18 @@
     <div class="mt-8">
       <h2 class="text-xl font-semibold mb-4 flex items-center gap-2" style="color: var(--ds-text);">
         <Package class="w-5 h-5" />
-        Plugin Management
+        {t('settings.modules.plugins')}
       </h2>
-      
+
       {#if pluginsDisabled}
         <!-- Plugins Disabled Notice -->
         <div class="mb-4">
-          <AlertBox variant="info" message="Plugin uploads are disabled on this server." />
+          <AlertBox variant="info" message={t('settings.modules.pluginsDisabledMessage')} />
         </div>
       {:else}
         <!-- Plugin Upload -->
         <div class="border rounded p-6 mb-4" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-          <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">Upload Plugin</h3>
+          <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">{t('settings.modules.uploadPlugin')}</h3>
 
           <!-- Drag and Drop Area -->
           <div
@@ -326,10 +327,10 @@
           >
             <Upload class="w-12 h-12 mx-auto mb-4" style="color: var(--ds-text-subtle);" />
             <p class="text-sm mb-2" style="color: var(--ds-text);">
-              Drag and drop a plugin file here, or click to browse
+              {t('settings.modules.dropOrSelect')}
             </p>
             <p class="text-xs mb-4" style="color: var(--ds-text-subtle);">
-              <strong>Recommended:</strong> Upload a .zip file containing both plugin.wasm and manifest.json<br>
+              {t('settings.modules.supportedFormats')}
             </p>
             <input
               type="file"
@@ -339,7 +340,7 @@
               bind:this={fileInput}
             />
             <Button variant="primary" onclick={() => fileInput?.click()}>
-              Choose Plugin File
+              {t('common.select')}
             </Button>
 
             {#if selectedFile}
@@ -352,10 +353,10 @@
               <div class="mt-4">
                 <AlertBox type="warning">
                   <p class="text-sm mb-2 font-medium">
-                    Manifest Required for WASM Files
+                    {t('settings.modules.wasmManifestRequired')}
                   </p>
                   <p class="text-xs mb-3">
-                    WASM files must be accompanied by a manifest.json file that describes the plugin.
+                    {t('settings.modules.wasmManifestRequiredDesc')}
                   </p>
                   <input
                     type="file"
@@ -365,11 +366,11 @@
                     bind:this={manifestInput}
                   />
                   <Button variant="primary" size="sm" onclick={() => manifestInput?.click()}>
-                    {selectedManifest ? 'Change' : 'Choose'} manifest.json
+                    {selectedManifest ? t('settings.modules.changeManifest') : t('settings.modules.chooseManifest')}
                   </Button>
                   {#if selectedManifest}
                     <p class="mt-2 text-xs" style="color: var(--ds-text-success);">
-                      ✓ Manifest selected: {selectedManifest.name}
+                      ✓ {t('settings.modules.manifestSelected', { name: selectedManifest.name })}
                     </p>
                   {/if}
                 </AlertBox>
@@ -384,7 +385,7 @@
                 onclick={uploadPlugin}
                 disabled={uploadingPlugin}
               >
-                {uploadingPlugin ? 'Uploading...' : 'Upload Plugin'}
+                {uploadingPlugin ? t('common.uploading') : t('common.upload')}
               </Button>
             </div>
           {/if}
@@ -393,15 +394,15 @@
       
       <!-- Installed Plugins -->
       <div class="border rounded p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-        <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">Installed Plugins</h3>
-        
+        <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">{t('settings.modules.installedPlugins')}</h3>
+
         {#if loadingPlugins}
           <div class="flex items-center justify-center py-8">
             <Spinner />
           </div>
         {:else if plugins.length === 0}
           <p class="text-center py-8" style="color: var(--ds-text-subtle);">
-            No plugins installed yet
+            {t('settings.modules.noPluginsInstalled')}
           </p>
         {:else}
           <div class="space-y-4">
@@ -416,12 +417,12 @@
                       <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">{plugin.description}</p>
                     {/if}
                     {#if plugin.author}
-                      <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">By {plugin.author}</p>
+                      <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('settings.modules.by')} {plugin.author}</p>
                     {/if}
-                    
+
                     {#if plugin.routes && plugin.routes.length > 0}
                       <div class="mt-3">
-                        <p class="text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Registered Routes:</p>
+                        <p class="text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('settings.modules.registeredRoutes')}:</p>
                         <div class="space-y-1">
                           {#each plugin.routes as route}
                             <div class="text-xs font-mono rounded px-2 py-1" style="background-color: var(--ds-interactive-subtle); color: var(--ds-text);">
@@ -441,7 +442,7 @@
                       <button
                         onclick={() => togglePlugin(plugin)}
                         class="p-2 rounded plugin-action-btn"
-                        title={plugin.enabled ? 'Disable plugin' : 'Enable plugin'}
+                        title={plugin.enabled ? t('common.disable') : t('common.enable')}
                       >
                         {#if plugin.enabled}
                           <ToggleRight class="w-5 h-5" style="color: var(--ds-text-success);" />
@@ -453,7 +454,7 @@
                       <button
                         onclick={() => reloadPlugin(plugin)}
                         class="p-2 rounded plugin-action-btn"
-                        title="Reload plugin"
+                        title={t('common.reload')}
                       >
                         <RefreshCw class="w-4 h-4" style="color: var(--ds-text-subtle);" />
                       </button>
@@ -461,7 +462,7 @@
                       <button
                         onclick={() => deletePlugin(plugin)}
                         class="p-2 rounded plugin-delete-btn"
-                        title="Delete plugin"
+                        title={t('common.delete')}
                       >
                         <Trash2 class="w-4 h-4" style="color: var(--ds-text-danger);" />
                       </button>
@@ -479,8 +480,7 @@
     <!-- Information Notice -->
     <div class="mt-6">
       <AlertBox type="info">
-        <strong>Note:</strong> Module changes will affect navigation and available features.
-        Some UI elements may require a page refresh to reflect the new settings.
+        {t('settings.modules.moduleSettingsNote')}
       </AlertBox>
     </div>
   {/if}

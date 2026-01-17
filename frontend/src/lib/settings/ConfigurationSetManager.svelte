@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { t } from '../stores/i18n.svelte.js';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
   import {
@@ -36,29 +37,29 @@
     Scissors, Paperclip, Link, ExternalLink, Circle, Layers
   };
 
-  let configurationSets = [];
-  let workspaces = [];
-  let workflows = [];
-  let screens = [];
-  let notificationSettings = [];
-  let loading = true;
-  let creating = false;
-  let editingId = null;
-  let showEditModal = false;
+  let configurationSets = $state([]);
+  let workspaces = $state([]);
+  let workflows = $state([]);
+  let screens = $state([]);
+  let notificationSettings = $state([]);
+  let loading = $state(true);
+  let creating = $state(false);
+  let editingId = $state(null);
+  let showEditModal = $state(false);
 
   // Search and pagination state
-  let searchQuery = '';
-  let currentPage = 1;
-  let itemsPerPage = 10;
-  let totalConfigSets = 0;
+  let searchQuery = $state('');
+  let currentPage = $state(1);
+  let itemsPerPage = $state(10);
+  let totalConfigSets = $state(0);
   let searchTimeout;
 
   // Migration assistant state
-  let showMigrationAssistant = false;
-  let migrationConfigSet = null;
+  let showMigrationAssistant = $state(false);
+  let migrationConfigSet = $state(null);
 
   // Form state
-  let newConfigSet = {
+  let newConfigSet = $state({
     name: '',
     description: '',
     workspace_ids: [],
@@ -68,9 +69,9 @@
     view_screen_id: null,
     notification_setting_id: null,
     is_default: false
-  };
+  });
 
-  let editConfigSet = {
+  let editConfigSet = $state({
     name: '',
     description: '',
     workspace_ids: [],
@@ -80,7 +81,7 @@
     view_screen_id: null,
     notification_setting_id: null,
     is_default: false
-  };
+  });
 
   onMount(async () => {
     await loadData(currentPage, itemsPerPage, searchQuery);
@@ -177,7 +178,7 @@
   async function createConfigurationSet() {
     try {
       if (!newConfigSet.name.trim()) {
-        alert('Name is required');
+        alert(t('dialogs.alerts.nameRequired'));
         return;
       }
 
@@ -199,7 +200,7 @@
       cancelCreating();
     } catch (error) {
       console.error('Failed to create configuration set:', error);
-      alert('Failed to create configuration set: ' + (error.message || error));
+      alert(t('dialogs.alerts.failedToCreate', { error: error.message || error }));
     }
   }
 
@@ -230,7 +231,7 @@
   async function updateConfigurationSet() {
     try {
       if (!editConfigSet.name.trim()) {
-        alert('Name is required');
+        alert(t('dialogs.alerts.nameRequired'));
         return;
       }
 
@@ -271,14 +272,14 @@
           showMigrationAssistant = true;
         } else {
           // No migration needed - just show success message
-          alert('Configuration set updated successfully. All work items are already using statuses from the new workflow.');
+          alert(t('dialogs.alerts.configUpdatedSuccess'));
         }
       }
 
       cancelEditing();
     } catch (error) {
       console.error('Failed to update configuration set:', error);
-      alert('Failed to update configuration set: ' + (error.message || error));
+      alert(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
     }
   }
 
@@ -287,8 +288,8 @@
       console.error('deleteConfigurationSet called with null/undefined configuration set');
       return;
     }
-    
-    if (!confirm(`Are you sure you want to delete the configuration set "${configSet.name}"? This action cannot be undone.`)) {
+
+    if (!confirm(t('dialogs.confirmations.deleteItem', { name: configSet.name }))) {
       return;
     }
 
@@ -297,7 +298,7 @@
       configurationSets = configurationSets.filter(cs => cs.id !== configSet.id);
     } catch (error) {
       console.error('Failed to delete configuration set:', error);
-      alert('Failed to delete configuration set: ' + (error.message || error));
+      alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
     }
   }
 
@@ -388,14 +389,14 @@
 
 {#snippet headerActions()}
   <Button variant="primary" icon={Plus} onclick={startCreating} keyboardHint="A">
-    Add Configuration Set
+    {t('settings.configSets.addConfigSet')}
   </Button>
 {/snippet}
 
 <PageHeader
   icon={Settings}
-  title="Configuration Sets"
-  subtitle="Manage configuration sets that combine workflows and screens for different workspace contexts."
+  title={t('settings.configSets.title')}
+  subtitle={t('settings.configSets.subtitle')}
   actions={headerActions}
 />
 
@@ -405,7 +406,7 @@
     <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style="color: var(--ds-icon-subtle);" />
     <input
       type="text"
-      placeholder="Search configuration sets..."
+      placeholder={t('settings.configSets.searchPlaceholder')}
       value={searchQuery}
       oninput={handleSearch}
       class="w-full pl-9 pr-4 py-2 border rounded text-sm focus:outline-none focus:ring-2"
@@ -416,7 +417,7 @@
 
   {#if loading}
     <div class="rounded-xl border shadow-sm p-8 text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-      <div class="animate-pulse" style="color: var(--ds-text-subtle);">Loading configuration sets...</div>
+      <div class="animate-pulse" style="color: var(--ds-text-subtle);">{t('settings.configSets.loading')}</div>
     </div>
   {:else}
     <!-- Create Form -->
@@ -424,7 +425,7 @@
       <!-- Modal header -->
       <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
         <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-          Create Configuration Set
+          {t('settings.configSets.createConfigSet')}
         </h3>
       </div>
 
@@ -433,18 +434,18 @@
         <form onsubmit={(e) => { e.preventDefault(); createConfigurationSet(); }}>
           <div class="space-y-4">
             <div>
-              <Label color="default" required class="mb-2">Name</Label>
+              <Label color="default" required class="mb-2">{t('settings.configSets.name')}</Label>
               <input
                 type="text"
                 bind:value={newConfigSet.name}
-                placeholder="e.g., Development Config, Production Config"
+                placeholder={t('settings.configSets.namePlaceholder')}
                 class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2"
                 style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);"
               />
             </div>
 
             <div>
-              <Label color="default" class="mb-3">Workspaces</Label>
+              <Label color="default" class="mb-3">{t('settings.configSets.workspaces')}</Label>
               <div class="space-y-2 max-h-48 overflow-y-auto border rounded p-3" style="border-color: var(--ds-border);">
                 {#each workspaces as workspace}
                   <label class="flex items-center gap-3 p-2 rounded cursor-pointer workspace-option">
@@ -459,7 +460,7 @@
                   </label>
                 {/each}
                 {#if workspaces.length === 0}
-                  <p class="text-sm italic" style="color: var(--ds-text-subtle);">No workspaces available</p>
+                  <p class="text-sm italic" style="color: var(--ds-text-subtle);">{t('settings.configSets.noWorkspacesAvailable')}</p>
                 {/if}
               </div>
               {#if newConfigSet.workspace_ids && newConfigSet.workspace_ids.length > 0}
@@ -470,26 +471,26 @@
             </div>
 
             <div>
-              <Label color="default" class="mb-2">Workflow</Label>
+              <Label color="default" class="mb-2">{t('settings.configSets.workflow')}</Label>
               <BasePicker
                 bind:value={newConfigSet.workflow_id}
                 items={workflows}
-                placeholder="No workflow"
+                placeholder={t('settings.configSets.noWorkflow')}
                 showUnassigned={true}
-                unassignedLabel="No workflow"
+                unassignedLabel={t('settings.configSets.noWorkflow')}
                 getValue={(item) => item.id}
                 getLabel={(item) => item.name}
               />
             </div>
 
             <div>
-              <Label color="default" class="mb-2">Notification Settings</Label>
+              <Label color="default" class="mb-2">{t('settings.configSets.notificationSettings')}</Label>
               <BasePicker
                 bind:value={newConfigSet.notification_setting_id}
                 items={notificationSettings.filter(s => s.is_active)}
-                placeholder="No notification settings"
+                placeholder={t('settings.configSets.notificationSettings')}
                 showUnassigned={true}
-                unassignedLabel="No notification settings"
+                unassignedLabel={t('settings.configSets.notificationSettings')}
                 getValue={(item) => item.id}
                 getLabel={(item) => item.name}
               />
@@ -497,39 +498,39 @@
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label color="default" class="mb-2">Create Screen</Label>
+                <Label color="default" class="mb-2">{t('settings.configSets.createScreen')}</Label>
                 <BasePicker
                   bind:value={newConfigSet.create_screen_id}
                   items={screens}
-                  placeholder="No screen"
+                  placeholder={t('settings.configSets.none')}
                   showUnassigned={true}
-                  unassignedLabel="No screen"
+                  unassignedLabel={t('settings.configSets.none')}
                   getValue={(item) => item.id}
                   getLabel={(item) => item.name}
                 />
               </div>
 
               <div>
-                <Label color="default" class="mb-2">Edit Screen</Label>
+                <Label color="default" class="mb-2">{t('settings.configSets.editScreen')}</Label>
                 <BasePicker
                   bind:value={newConfigSet.edit_screen_id}
                   items={screens}
-                  placeholder="No screen"
+                  placeholder={t('settings.configSets.none')}
                   showUnassigned={true}
-                  unassignedLabel="No screen"
+                  unassignedLabel={t('settings.configSets.none')}
                   getValue={(item) => item.id}
                   getLabel={(item) => item.name}
                 />
               </div>
 
               <div>
-                <Label color="default" class="mb-2">View Screen</Label>
+                <Label color="default" class="mb-2">{t('settings.configSets.viewScreen')}</Label>
                 <BasePicker
                   bind:value={newConfigSet.view_screen_id}
                   items={screens}
-                  placeholder="No screen"
+                  placeholder={t('settings.configSets.none')}
                   showUnassigned={true}
-                  unassignedLabel="No screen"
+                  unassignedLabel={t('settings.configSets.none')}
                   getValue={(item) => item.id}
                   getLabel={(item) => item.name}
                 />
@@ -537,10 +538,10 @@
             </div>
 
             <div>
-              <Label color="default" class="mb-2">Description</Label>
+              <Label color="default" class="mb-2">{t('settings.configSets.description')}</Label>
               <Textarea
                 bind:value={newConfigSet.description}
-                placeholder="Optional description for this configuration set"
+                placeholder={t('settings.configSets.description')}
                 rows={2}
               />
             </div>
@@ -553,7 +554,7 @@
                 class="rounded"
                 style="border-color: var(--ds-border);"
               />
-              <label for="new-default" class="text-sm" style="color: var(--ds-text);">Set as default configuration set for workspace</label>
+              <label for="new-default" class="text-sm" style="color: var(--ds-text);">{t('settings.configSets.setAsDefault')}</label>
             </div>
           </div>
         </form>
@@ -562,7 +563,7 @@
       <DialogFooter
         onCancel={cancelCreating}
         onConfirm={createConfigurationSet}
-        confirmLabel="Create Configuration Set"
+        confirmLabel={t('settings.configSets.createConfigSet')}
         showKeyboardHint={true}
         confirmKeyboardHint={submitHint}
       />
@@ -573,12 +574,12 @@
       <div class="rounded-xl border shadow-sm p-12" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
         <EmptyState
           icon={Settings}
-          title="No configuration sets yet"
-          description="Get started by creating your first configuration set."
+          title={t('settings.configSets.noConfigSets')}
+          description={t('settings.configSets.getStarted')}
         >
           {#snippet action()}
             <Button variant="primary" icon={Plus} onclick={startCreating}>
-              Create First Configuration Set
+              {t('settings.configSets.createFirst')}
             </Button>
           {/snippet}
         </EmptyState>
@@ -603,7 +604,7 @@
                     <div>
                       <div class="flex items-center gap-2 mb-2">
                         <Layers class="w-4 h-4" style="color: var(--ds-icon-subtle);" />
-                        <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">Workspaces</span>
+                        <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('settings.configSets.workspaces')}</span>
                       </div>
                       {#if configSet.workspaces && configSet.workspaces.length > 0}
                         <div class="flex flex-wrap gap-2">
@@ -612,7 +613,7 @@
                           {/each}
                         </div>
                       {:else}
-                        <span class="text-sm italic" style="color: var(--ds-text-disabled);">No workspaces assigned</span>
+                        <span class="text-sm italic" style="color: var(--ds-text-disabled);">{t('settings.configSets.noWorkspacesAssigned')}</span>
                       {/if}
                     </div>
 
@@ -620,7 +621,7 @@
                     <div>
                       <div class="flex items-center gap-2 mb-2">
                         <FileText class="w-4 h-4" style="color: var(--ds-icon-subtle);" />
-                        <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">Item Types</span>
+                        <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('settings.configSets.itemTypes')}</span>
                       </div>
                       {#if configSet.item_types_detailed && configSet.item_types_detailed.length > 0}
                         <div class="flex flex-wrap gap-2">
@@ -634,7 +635,7 @@
                           {/each}
                         </div>
                       {:else}
-                        <span class="text-sm italic" style="color: var(--ds-text-disabled);">No item types assigned</span>
+                        <span class="text-sm italic" style="color: var(--ds-text-disabled);">{t('settings.configSets.noItemTypesAssigned')}</span>
                       {/if}
                     </div>
 
@@ -643,24 +644,24 @@
                       <div>
                         <div class="flex items-center gap-2 mb-2">
                           <Workflow class="w-4 h-4" style="color: var(--ds-icon-subtle);" />
-                          <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">Workflow</span>
+                          <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('settings.configSets.workflow')}</span>
                         </div>
                         {#if configSet.workflow_id}
                           <span class="text-sm font-medium" style="color: var(--ds-text);">{configSet.workflow_name || getWorkflowName(configSet.workflow_id)}</span>
                         {:else}
-                          <span class="text-sm italic" style="color: var(--ds-text-disabled);">None assigned</span>
+                          <span class="text-sm italic" style="color: var(--ds-text-disabled);">{t('settings.configSets.noneAssigned')}</span>
                         {/if}
                       </div>
 
                       <div>
                         <div class="flex items-center gap-2 mb-2">
                           <AlertCircle class="w-4 h-4" style="color: var(--ds-icon-subtle);" />
-                          <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">Notifications</span>
+                          <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('settings.configSets.notifications')}</span>
                         </div>
                         {#if configSet.notification_setting_id}
                           <span class="text-sm font-medium" style="color: var(--ds-text);">{configSet.notification_setting_name || getNotificationSettingName(configSet.notification_setting_id)}</span>
                         {:else}
-                          <span class="text-sm italic" style="color: var(--ds-text-disabled);">None assigned</span>
+                          <span class="text-sm italic" style="color: var(--ds-text-disabled);">{t('settings.configSets.noneAssigned')}</span>
                         {/if}
                       </div>
                     </div>
@@ -669,20 +670,20 @@
                     <div>
                       <div class="flex items-center gap-2 mb-2">
                         <Copy class="w-4 h-4" style="color: var(--ds-icon-subtle);" />
-                        <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">Screens</span>
+                        <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('settings.configSets.screens')}</span>
                       </div>
                       <div class="flex flex-wrap gap-4 text-sm">
                         <div>
-                          <span class="text-xs" style="color: var(--ds-text-subtle);">Create:</span>
-                          <span class="ml-1 font-medium" style="color: var(--ds-text);">{configSet.create_screen_name || 'None'}</span>
+                          <span class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.configSets.createScreen')}</span>
+                          <span class="ml-1 font-medium" style="color: var(--ds-text);">{configSet.create_screen_name || t('settings.configSets.none')}</span>
                         </div>
                         <div>
-                          <span class="text-xs" style="color: var(--ds-text-subtle);">Edit:</span>
-                          <span class="ml-1 font-medium" style="color: var(--ds-text);">{configSet.edit_screen_name || 'None'}</span>
+                          <span class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.configSets.editScreen')}</span>
+                          <span class="ml-1 font-medium" style="color: var(--ds-text);">{configSet.edit_screen_name || t('settings.configSets.none')}</span>
                         </div>
                         <div>
-                          <span class="text-xs" style="color: var(--ds-text-subtle);">View:</span>
-                          <span class="ml-1 font-medium" style="color: var(--ds-text);">{configSet.view_screen_name || 'None'}</span>
+                          <span class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.configSets.viewScreen')}</span>
+                          <span class="ml-1 font-medium" style="color: var(--ds-text);">{configSet.view_screen_name || t('settings.configSets.none')}</span>
                         </div>
                       </div>
                     </div>
@@ -690,7 +691,7 @@
 
                   <!-- Footer with metadata -->
                   <div class="mt-5 pt-4 border-t" style="border-color: var(--ds-border);">
-                    <span class="text-xs" style="color: var(--ds-text-subtle);">Created {new Date(configSet.created_at).toLocaleDateString()}</span>
+                    <span class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.configSets.created')} {new Date(configSet.created_at).toLocaleDateString()}</span>
                   </div>
 
                   {#if configSet.description}
@@ -705,7 +706,7 @@
                     icon={Edit}
                     onclick={() => startEditing(configSet)}
                   >
-                    Edit
+                    {t('common.edit')}
                   </Button>
                   <Button
                     variant="default"
@@ -713,7 +714,7 @@
                     icon={Trash2}
                     onclick={() => deleteConfigurationSet(configSet)}
                   >
-                    Delete
+                    {t('common.delete')}
                   </Button>
                 </div>
               </div>
@@ -742,7 +743,7 @@
   <!-- Modal header -->
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-      Edit Configuration Set
+      {t('settings.configSets.editConfigSet')}
     </h3>
   </div>
 
@@ -751,7 +752,7 @@
     <form onsubmit={(e) => { e.preventDefault(); updateConfigurationSet(); }}>
       <div class="space-y-4">
         <div>
-          <Label color="default" required class="mb-2">Name</Label>
+          <Label color="default" required class="mb-2">{t('settings.configSets.name')}</Label>
           <input
             type="text"
             bind:value={editConfigSet.name}
@@ -761,7 +762,7 @@
         </div>
 
         <div>
-          <Label color="default" class="mb-3">Workspaces</Label>
+          <Label color="default" class="mb-3">{t('settings.configSets.workspaces')}</Label>
           <div class="space-y-2 max-h-48 overflow-y-auto border rounded p-3" style="border-color: var(--ds-border);">
             {#each workspaces as workspace}
               <label class="flex items-center gap-3 p-2 rounded cursor-pointer workspace-option">
@@ -776,7 +777,7 @@
               </label>
             {/each}
             {#if workspaces.length === 0}
-              <p class="text-sm italic" style="color: var(--ds-text-subtle);">No workspaces available</p>
+              <p class="text-sm italic" style="color: var(--ds-text-subtle);">{t('settings.configSets.noWorkspacesAvailable')}</p>
             {/if}
           </div>
           {#if editConfigSet.workspace_ids && editConfigSet.workspace_ids.length > 0}
@@ -787,26 +788,26 @@
         </div>
 
         <div>
-          <Label color="default" class="mb-2">Workflow</Label>
+          <Label color="default" class="mb-2">{t('settings.configSets.workflow')}</Label>
           <BasePicker
             bind:value={editConfigSet.workflow_id}
             items={workflows}
-            placeholder="No workflow"
+            placeholder={t('settings.configSets.noWorkflow')}
             showUnassigned={true}
-            unassignedLabel="No workflow"
+            unassignedLabel={t('settings.configSets.noWorkflow')}
             getValue={(item) => item.id}
             getLabel={(item) => item.name}
           />
         </div>
 
         <div>
-          <Label color="default" class="mb-2">Notification Settings</Label>
+          <Label color="default" class="mb-2">{t('settings.configSets.notificationSettings')}</Label>
           <BasePicker
             bind:value={editConfigSet.notification_setting_id}
             items={notificationSettings.filter(s => s.is_active)}
-            placeholder="No notification settings"
+            placeholder={t('settings.configSets.notificationSettings')}
             showUnassigned={true}
-            unassignedLabel="No notification settings"
+            unassignedLabel={t('settings.configSets.notificationSettings')}
             getValue={(item) => item.id}
             getLabel={(item) => item.name}
           />
@@ -814,39 +815,39 @@
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <Label color="default" class="mb-2">Create Screen</Label>
+            <Label color="default" class="mb-2">{t('settings.configSets.createScreen')}</Label>
             <BasePicker
               bind:value={editConfigSet.create_screen_id}
               items={screens}
-              placeholder="No screen"
+              placeholder={t('settings.configSets.none')}
               showUnassigned={true}
-              unassignedLabel="No screen"
+              unassignedLabel={t('settings.configSets.none')}
               getValue={(item) => item.id}
               getLabel={(item) => item.name}
             />
           </div>
 
           <div>
-            <Label color="default" class="mb-2">Edit Screen</Label>
+            <Label color="default" class="mb-2">{t('settings.configSets.editScreen')}</Label>
             <BasePicker
               bind:value={editConfigSet.edit_screen_id}
               items={screens}
-              placeholder="No screen"
+              placeholder={t('settings.configSets.none')}
               showUnassigned={true}
-              unassignedLabel="No screen"
+              unassignedLabel={t('settings.configSets.none')}
               getValue={(item) => item.id}
               getLabel={(item) => item.name}
             />
           </div>
 
           <div>
-            <Label color="default" class="mb-2">View Screen</Label>
+            <Label color="default" class="mb-2">{t('settings.configSets.viewScreen')}</Label>
             <BasePicker
               bind:value={editConfigSet.view_screen_id}
               items={screens}
-              placeholder="No screen"
+              placeholder={t('settings.configSets.none')}
               showUnassigned={true}
-              unassignedLabel="No screen"
+              unassignedLabel={t('settings.configSets.none')}
               getValue={(item) => item.id}
               getLabel={(item) => item.name}
             />
@@ -854,7 +855,7 @@
         </div>
 
         <div>
-          <Label color="default" class="mb-2">Description</Label>
+          <Label color="default" class="mb-2">{t('settings.configSets.description')}</Label>
           <Textarea
             bind:value={editConfigSet.description}
             rows={2}
@@ -869,7 +870,7 @@
             class="rounded"
             style="border-color: var(--ds-border);"
           />
-          <label for="edit-default" class="text-sm" style="color: var(--ds-text);">Set as default configuration set for workspace</label>
+          <label for="edit-default" class="text-sm" style="color: var(--ds-text);">{t('settings.configSets.setAsDefault')}</label>
         </div>
       </div>
     </form>
@@ -878,7 +879,7 @@
   <DialogFooter
     onCancel={cancelEditing}
     onConfirm={updateConfigurationSet}
-    confirmLabel="Save Changes"
+    confirmLabel={t('common.saveChanges')}
     showKeyboardHint={true}
     confirmKeyboardHint={submitHint}
   />

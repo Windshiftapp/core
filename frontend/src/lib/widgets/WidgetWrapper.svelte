@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let title = "";
   export let widgetId = "";
@@ -32,7 +33,7 @@
           class="drag-handle cursor-grab hover:cursor-grabbing"
           style="color: var(--ds-text-subtlest);"
           data-drag-handle
-          aria-label="Drag to reorder"
+          aria-label={t('aria.dragToReorder')}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -62,7 +63,7 @@
             class="px-2 py-1 text-xs"
             style={width === 1 ? 'background-color: var(--ds-background-selected); color: var(--ds-text-selected);' : 'color: var(--ds-text-subtle);'}
             onclick={() => (width = 1)}
-            title="Narrow (1/3 width)"
+            title={t('widgets.narrowWidth')}
           >
             1
           </button>
@@ -70,7 +71,7 @@
             class="px-2 py-1 text-xs"
             style={width === 2 ? 'background-color: var(--ds-background-selected); color: var(--ds-text-selected);' : 'color: var(--ds-text-subtle);'}
             onclick={() => (width = 2)}
-            title="Medium (2/3 width)"
+            title={t('widgets.mediumWidth')}
           >
             2
           </button>
@@ -78,7 +79,7 @@
             class="px-2 py-1 text-xs"
             style={width === 3 ? 'background-color: var(--ds-background-selected); color: var(--ds-text-selected);' : 'color: var(--ds-text-subtle);'}
             onclick={() => (width = 3)}
-            title="Full width"
+            title={t('widgets.fullWidth')}
           >
             3
           </button>
@@ -89,7 +90,7 @@
           class="hover:text-red-600 p-1"
           style="color: var(--ds-text-subtlest);"
           onclick={handleRemove}
-          title="Remove widget"
+          title={t('widgets.removeWidget')}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

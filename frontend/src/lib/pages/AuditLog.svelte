@@ -16,6 +16,7 @@
 	import Lozenge from '../components/Lozenge.svelte';
 	import Label from '../components/Label.svelte';
 	import { formatDate, formatDateTimeLocale } from '../utils/dateFormatter.js';
+	import { t } from '../stores/i18n.svelte.js';
 
 	let logs = $state([]);
 	let pagination = $state({
@@ -44,46 +45,46 @@
 
 	// Common action types for filter
 	const actionTypes = [
-		{ value: '', label: 'All Actions' },
-		{ value: 'user.create', label: 'User Created' },
-		{ value: 'user.update', label: 'User Updated' },
-		{ value: 'user.delete', label: 'User Deleted' },
-		{ value: 'user.activate', label: 'User Activated' },
-		{ value: 'user.deactivate', label: 'User Deactivated' },
-		{ value: 'user.password_reset', label: 'Password Reset' },
-		{ value: 'api_token.create', label: 'API Token Created' },
-		{ value: 'api_token.revoke', label: 'API Token Revoked' },
-		{ value: 'workspace.create', label: 'Workspace Created' },
-		{ value: 'workspace.update', label: 'Workspace Updated' },
-		{ value: 'workspace.delete', label: 'Workspace Deleted' },
-		{ value: 'group.create', label: 'Group Created' },
-		{ value: 'group.update', label: 'Group Updated' },
-		{ value: 'group.delete', label: 'Group Deleted' },
-		{ value: 'group.add_member', label: 'Group Member Added' },
-		{ value: 'group.remove_member', label: 'Group Member Removed' },
-		{ value: 'custom_field.create', label: 'Custom Field Created' },
-		{ value: 'custom_field.update', label: 'Custom Field Updated' },
-		{ value: 'custom_field.delete', label: 'Custom Field Deleted' },
-		{ value: 'item_type.create', label: 'Item Type Created' },
-		{ value: 'item_type.update', label: 'Item Type Updated' },
-		{ value: 'item_type.delete', label: 'Item Type Deleted' },
-		{ value: 'permission.grant', label: 'Permission Granted' },
-		{ value: 'permission.revoke', label: 'Permission Revoked' },
-		{ value: 'role.assign', label: 'Role Assigned' },
-		{ value: 'role.revoke', label: 'Role Revoked' },
+		{ value: '', label: t('auditLog.allActions') },
+		{ value: 'user.create', label: t('auditLog.userCreated') },
+		{ value: 'user.update', label: t('auditLog.userUpdated') },
+		{ value: 'user.delete', label: t('auditLog.userDeleted') },
+		{ value: 'user.activate', label: t('auditLog.userActivated') },
+		{ value: 'user.deactivate', label: t('auditLog.userDeactivated') },
+		{ value: 'user.password_reset', label: t('auditLog.passwordReset') },
+		{ value: 'api_token.create', label: t('auditLog.apiTokenCreated') },
+		{ value: 'api_token.revoke', label: t('auditLog.apiTokenRevoked') },
+		{ value: 'workspace.create', label: t('auditLog.workspaceCreated') },
+		{ value: 'workspace.update', label: t('auditLog.workspaceUpdated') },
+		{ value: 'workspace.delete', label: t('auditLog.workspaceDeleted') },
+		{ value: 'group.create', label: t('auditLog.groupCreated') },
+		{ value: 'group.update', label: t('auditLog.groupUpdated') },
+		{ value: 'group.delete', label: t('auditLog.groupDeleted') },
+		{ value: 'group.add_member', label: t('auditLog.groupMemberAdded') },
+		{ value: 'group.remove_member', label: t('auditLog.groupMemberRemoved') },
+		{ value: 'custom_field.create', label: t('auditLog.customFieldCreated') },
+		{ value: 'custom_field.update', label: t('auditLog.customFieldUpdated') },
+		{ value: 'custom_field.delete', label: t('auditLog.customFieldDeleted') },
+		{ value: 'item_type.create', label: t('auditLog.itemTypeCreated') },
+		{ value: 'item_type.update', label: t('auditLog.itemTypeUpdated') },
+		{ value: 'item_type.delete', label: t('auditLog.itemTypeDeleted') },
+		{ value: 'permission.grant', label: t('auditLog.permissionGranted') },
+		{ value: 'permission.revoke', label: t('auditLog.permissionRevoked') },
+		{ value: 'role.assign', label: t('auditLog.roleAssigned') },
+		{ value: 'role.revoke', label: t('auditLog.roleRevoked') },
 	];
 
 	// Common resource types
 	const resourceTypes = [
-		{ value: '', label: 'All Resources' },
-		{ value: 'user', label: 'User' },
-		{ value: 'api_token', label: 'API Token' },
-		{ value: 'workspace', label: 'Workspace' },
-		{ value: 'custom_field', label: 'Custom Field' },
-		{ value: 'item_type', label: 'Item Type' },
-		{ value: 'permission', label: 'Permission' },
-		{ value: 'role', label: 'Role' },
-		{ value: 'group', label: 'Group' },
+		{ value: '', label: t('auditLog.allResources') },
+		{ value: 'user', label: t('auditLog.user') },
+		{ value: 'api_token', label: t('auditLog.apiToken') },
+		{ value: 'workspace', label: t('auditLog.workspace') },
+		{ value: 'custom_field', label: t('auditLog.customField') },
+		{ value: 'item_type', label: t('auditLog.itemType') },
+		{ value: 'permission', label: t('auditLog.permission') },
+		{ value: 'role', label: t('auditLog.role') },
+		{ value: 'group', label: t('auditLog.group') },
 	];
 
 	async function loadAuditLogs() {
@@ -159,38 +160,38 @@
 	const auditColumns = [
 		{
 			key: 'timestamp',
-			label: 'Timestamp',
+			label: t('auditLog.timestamp'),
 			render: (log) => formatDateTimeLocale(log.timestamp) || '-'
 		},
 		{
 			key: 'username',
-			label: 'User',
+			label: t('auditLog.user'),
 			slot: 'user'
 		},
 		{
 			key: 'action_type',
-			label: 'Action',
+			label: t('auditLog.action'),
 			slot: 'action'
 		},
 		{
 			key: 'resource_name',
-			label: 'Resource',
+			label: t('auditLog.resource'),
 			slot: 'resource'
 		},
 		{
 			key: 'ip_address',
-			label: 'IP Address',
+			label: t('auditLog.ipAddress'),
 			render: (log) => log.ip_address || '—',
 			textColor: 'var(--ds-text-subtle)'
 		},
 		{
 			key: 'success',
-			label: 'Status',
+			label: t('auditLog.status'),
 			slot: 'status'
 		},
 		{
 			key: 'details',
-			label: 'Details',
+			label: t('auditLog.details'),
 			slot: 'details',
 			width: 'w-24'
 		}
@@ -204,8 +205,8 @@
 <div class="space-y-6">
 	<PageHeader
 		icon={FileText}
-		title="Audit Log"
-		subtitle="Track and review all administrative actions and security events"
+		title={t('audit.title')}
+		subtitle={t('audit.subtitle')}
 	>
 		{#snippet actions()}
 			<div class="flex gap-2">
@@ -214,14 +215,14 @@
 					icon={Download}
 					onclick={() => exportLogs('csv')}
 				>
-					Export CSV
+					{t('auditLog.exportCsv')}
 				</Button>
 				<Button
 					variant="secondary"
 					icon={Download}
 					onclick={() => exportLogs('json')}
 				>
-					Export JSON
+					{t('auditLog.exportJson')}
 				</Button>
 			</div>
 		{/snippet}
@@ -235,12 +236,12 @@
 	<div class="bg-white rounded shadow p-4" style="border: 1px solid var(--ds-border);">
 		<div class="flex items-center gap-2 mb-4">
 			<Filter class="w-5 h-5" style="color: var(--ds-text-subtle);" />
-			<h3 class="text-sm font-medium" style="color: var(--ds-text);">Filters</h3>
+			<h3 class="text-sm font-medium" style="color: var(--ds-text);">{t('auditLog.filters')}</h3>
 		</div>
 
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 			<div>
-				<Label for="action_type" class="mb-1">Action Type</Label>
+				<Label for="action_type" class="mb-1">{t('auditLog.actionType')}</Label>
 				<Select id="action_type" bind:value={filters.action_type} size="small">
 					{#each actionTypes as actionType}
 						<option value={actionType.value}>{actionType.label}</option>
@@ -249,7 +250,7 @@
 			</div>
 
 			<div>
-				<Label for="resource_type" class="mb-1">Resource Type</Label>
+				<Label for="resource_type" class="mb-1">{t('auditLog.resourceType')}</Label>
 				<Select id="resource_type" bind:value={filters.resource_type} size="small">
 					{#each resourceTypes as resourceType}
 						<option value={resourceType.value}>{resourceType.label}</option>
@@ -258,16 +259,16 @@
 			</div>
 
 			<div>
-				<Label for="success" class="mb-1">Status</Label>
+				<Label for="success" class="mb-1">{t('auditLog.status')}</Label>
 				<Select id="success" bind:value={filters.success} size="small">
-					<option value="">All</option>
-					<option value="true">Success</option>
-					<option value="false">Failed</option>
+					<option value="">{t('auditLog.all')}</option>
+					<option value="true">{t('auditLog.success')}</option>
+					<option value="false">{t('auditLog.failed')}</option>
 				</Select>
 			</div>
 
 			<div>
-				<Label for="search" class="mb-1">Search</Label>
+				<Label for="search" class="mb-1">{t('auditLog.search')}</Label>
 				<SearchInput
 					bind:value={filters.search}
 					placeholder="Username, resource..."
@@ -276,22 +277,22 @@
 			</div>
 
 			<div>
-				<Label for="start_date" class="mb-1">Start Date</Label>
+				<Label for="start_date" class="mb-1">{t('auditLog.startDate')}</Label>
 				<Input id="start_date" type="date" bind:value={filters.start_date} size="small" />
 			</div>
 
 			<div>
-				<Label for="end_date" class="mb-1">End Date</Label>
+				<Label for="end_date" class="mb-1">{t('auditLog.endDate')}</Label>
 				<Input id="end_date" type="date" bind:value={filters.end_date} size="small" />
 			</div>
 		</div>
 
 		<div class="flex gap-2 mt-4">
 			<Button variant="primary" onclick={applyFilters}>
-				Apply Filters
+				{t('auditLog.applyFilters')}
 			</Button>
 			<Button variant="secondary" onclick={clearFilters}>
-				Clear Filters
+				{t('auditLog.clearFilters')}
 			</Button>
 		</div>
 	</div>
@@ -299,7 +300,7 @@
 	<!-- Audit Log Table -->
 	{#if loading}
 		<div class="text-center py-8">
-			<div style="color: var(--ds-text-subtle);">Loading audit logs...</div>
+			<div style="color: var(--ds-text-subtle);">{t('auditLog.loadingAuditLogs')}</div>
 		</div>
 	{:else}
 		<div class="space-y-0">
@@ -307,7 +308,7 @@
 				columns={auditColumns}
 				data={logs}
 				keyField="id"
-				emptyMessage="No audit logs found"
+				emptyMessage={t('auditLog.noAuditLogs')}
 				emptyIcon={FileText}
 			>
 				<div slot="user" let:item={log}>
@@ -324,9 +325,9 @@
 					<div class="text-xs" style="color: var(--ds-text-subtle);">{log.resource_type}</div>
 				</div>
 
-				<Lozenge slot="status" let:item={log} color={log.success ? 'green' : 'red'} text={log.success ? 'Success' : 'Failed'} />
+				<Lozenge slot="status" let:item={log} color={log.success ? 'green' : 'red'} text={log.success ? t('auditLog.success') : t('auditLog.failed')} />
 
-				<Button slot="details" let:item={log} variant="ghost" icon={Eye} size="small" onclick={() => viewDetails(log)} title="View details" />
+				<Button slot="details" let:item={log} variant="ghost" icon={Eye} size="small" onclick={() => viewDetails(log)} title={t('common.viewDetails')} />
 			</DataTable>
 
 			<!-- Pagination -->
@@ -351,7 +352,7 @@
 <Modal isOpen={showDetailModal} onclose={() => showDetailModal = false} maxWidth="max-w-3xl">
 	{#if selectedLog}
 		<ModalHeader
-			title="Audit Log Details"
+			title={t('auditLog.auditLogDetails')}
 			onClose={() => showDetailModal = false}
 		/>
 
@@ -359,35 +360,35 @@
 		<div class="px-6 py-4 space-y-4">
 			<div class="grid grid-cols-2 gap-4">
 				<div>
-					<Label class="mb-1">Timestamp</Label>
+					<Label class="mb-1">{t('auditLog.timestamp')}</Label>
 					<div class="text-sm" style="color: var(--ds-text);">{formatDateTimeLocale(selectedLog.timestamp) || '-'}</div>
 				</div>
 				<div>
-					<Label class="mb-1">User</Label>
+					<Label class="mb-1">{t('auditLog.user')}</Label>
 					<div class="text-sm" style="color: var(--ds-text);">{selectedLog.username} (ID: {selectedLog.user_id || 'N/A'})</div>
 				</div>
 				<div>
-					<Label class="mb-1">Action</Label>
+					<Label class="mb-1">{t('auditLog.action')}</Label>
 					<Lozenge color={getActionBadgeColor(selectedLog.action_type)} text={selectedLog.action_type} />
 				</div>
 				<div>
-					<Label class="mb-1">Status</Label>
-					<Lozenge color={selectedLog.success ? 'green' : 'red'} text={selectedLog.success ? 'Success' : 'Failed'} />
+					<Label class="mb-1">{t('auditLog.status')}</Label>
+					<Lozenge color={selectedLog.success ? 'green' : 'red'} text={selectedLog.success ? t('auditLog.success') : t('auditLog.failed')} />
 				</div>
 				<div>
-					<Label class="mb-1">Resource Type</Label>
+					<Label class="mb-1">{t('auditLog.resourceType')}</Label>
 					<div class="text-sm" style="color: var(--ds-text);">{selectedLog.resource_type}</div>
 				</div>
 				<div>
-					<Label class="mb-1">Resource Name</Label>
+					<Label class="mb-1">{t('auditLog.resourceName')}</Label>
 					<div class="text-sm" style="color: var(--ds-text);">{selectedLog.resource_name || 'N/A'}</div>
 				</div>
 				<div>
-					<Label class="mb-1">IP Address</Label>
+					<Label class="mb-1">{t('auditLog.ipAddress')}</Label>
 					<div class="text-sm" style="color: var(--ds-text);">{selectedLog.ip_address || 'N/A'}</div>
 				</div>
 				<div>
-					<Label class="mb-1">User Agent</Label>
+					<Label class="mb-1">{t('auditLog.userAgent')}</Label>
 					<div class="text-sm truncate" style="color: var(--ds-text);" title={selectedLog.user_agent}>
 						{selectedLog.user_agent || 'N/A'}
 					</div>
@@ -396,7 +397,7 @@
 
 			{#if !selectedLog.success && selectedLog.error_message}
 				<div>
-					<label class="block text-sm font-medium mb-1 text-red-700">Error Message</label>
+					<label class="block text-sm font-medium mb-1 text-red-700">{t('auditLog.errorMessage')}</label>
 					<div class="text-sm bg-red-50 p-3 rounded border border-red-200 text-red-700">
 						{selectedLog.error_message}
 					</div>
@@ -405,7 +406,7 @@
 
 			{#if selectedLog.details && Object.keys(selectedLog.details).length > 0}
 				<div>
-					<Label class="mb-2">Additional Details</Label>
+					<Label class="mb-2">{t('auditLog.additionalDetails')}</Label>
 					<div class="bg-gray-50 p-4 rounded border" style="border-color: var(--ds-border);">
 						<pre class="text-xs overflow-auto" style="color: var(--ds-text);">{JSON.stringify(selectedLog.details, null, 2)}</pre>
 					</div>
@@ -415,7 +416,7 @@
 
 		<DialogFooter
 			showCancel={false}
-			confirmLabel="Close"
+			confirmLabel={t('auditLog.close')}
 			onConfirm={() => showDetailModal = false}
 		/>
 	{/if}

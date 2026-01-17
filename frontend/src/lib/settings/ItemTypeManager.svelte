@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
+  import { t } from '../stores/i18n.svelte.js';
   import { createEventDispatcher } from 'svelte';
   import { Plus, Edit, Trash2, FileText } from 'lucide-svelte';
   import { itemTypeIconMap, itemTypeIconOptions } from '../utils/icons.js';
@@ -18,22 +19,22 @@
 
   const dispatch = createEventDispatcher();
 
-  let itemTypes = [];
-  let hierarchyLevels = [];
-  let isLoading = true;
-  let error = null;
-  let editingId = null;
-  let showCreateForm = false;
+  let itemTypes = $state([]);
+  let hierarchyLevels = $state([]);
+  let isLoading = $state(true);
+  let error = $state(null);
+  let editingId = $state(null);
+  let showCreateForm = $state(false);
 
   // Form data
-  let formData = {
+  let formData = $state({
     name: '',
     description: '',
     icon: 'FileText',
     color: '#3b82f6',
     hierarchy_level: 0, // Default to level 0 (Initiative level)
     sort_order: 1
-  };
+  });
 
   onMount(async () => {
     await Promise.all([
@@ -128,7 +129,7 @@
   async function saveItemType() {
     try {
       if (!formData.name.trim()) {
-        error = 'Item type name is required';
+        error = t('settings.itemTypes.nameRequired');
         return;
       }
 
@@ -142,7 +143,7 @@
       cancelEdit();
       error = null;
     } catch (err) {
-      error = err.message;
+      error = t('settings.itemTypes.failedToSave') + ' ' + err.message;
     }
   }
 
@@ -166,7 +167,7 @@
   }
 
   // Column definitions for DataTable
-  const itemTypeColumns = [
+  const itemTypeColumns = $derived([
     {
       key: 'icon',
       label: '',
@@ -175,27 +176,27 @@
     },
     {
       key: 'name',
-      label: 'NAME'
+      label: t('settings.itemTypes.name')
     },
     {
       key: 'hierarchy_level',
-      label: 'LEVEL',
+      label: t('settings.itemTypes.hierarchyLevel'),
       slot: 'hierarchy_level'
     },
     {
       key: 'sort_order',
-      label: 'SORT'
+      label: t('common.order')
     },
     {
       key: 'configuration_set_names',
-      label: 'USED IN CONFIG SETS',
+      label: t('settings.configSets.title'),
       slot: 'configuration_set_names'
     },
     {
       key: 'actions',
-      label: 'Actions'
+      label: t('common.actions')
     }
-  ];
+  ]);
 
   function buildItemTypeDropdownItems(itemType) {
     return [
@@ -203,7 +204,7 @@
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: () => startEdit(itemType)
       },
@@ -211,7 +212,7 @@
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50',
         onClick: () => deleteItemType(itemType.id, itemType.name)
@@ -223,9 +224,9 @@
 <svelte:window onkeydown={handleGlobalKeydown} />
 
 <PageHeader
-  icon={FileText} 
-  title="Work Item Types" 
-  subtitle="Configure work item types with icons, colors, and hierarchy levels"
+  icon={FileText}
+  title={t('settings.itemTypes.title')}
+  subtitle={t('settings.itemTypes.subtitle')}
 >
   {#snippet actions()}
     <Button
@@ -235,7 +236,7 @@
       disabled={isLoading}
       keyboardHint="A"
     >
-      Add Item Type
+      {t('settings.itemTypes.addItemType')}
     </Button>
   {/snippet}
 </PageHeader>
@@ -250,7 +251,8 @@
     columns={itemTypeColumns}
     data={itemTypes}
     keyField="id"
-    emptyMessage="No work item types configured yet."
+    loading={isLoading}
+    emptyMessage={t('settings.itemTypes.noItemTypes') || 'No work item types configured yet.'}
     emptyIcon={FileText}
     actionItems={buildItemTypeDropdownItems}
   >
@@ -277,7 +279,7 @@
     <!-- Modal header -->
     <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
       <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-        {editingId ? 'Edit Item Type' : 'Create Item Type'}
+        {editingId ? t('itemTypes.editItemType') : t('itemTypes.createItemType')}
       </h3>
     </div>
 
@@ -285,7 +287,7 @@
     <div class="px-6 py-4">
       <form onsubmit={(e) => { e.preventDefault(); saveItemType(); }}>
         <div class="form-group">
-          <label for="name">Name</label>
+          <label for="name">{t('settings.itemTypes.name')}</label>
           <input
             type="text"
             id="name"
@@ -296,7 +298,7 @@
         </div>
 
         <div class="form-group">
-          <label for="description">Description</label>
+          <label for="description">{t('settings.itemTypes.description')}</label>
           <Textarea
             id="description"
             placeholder="Brief description of this item type"
@@ -307,7 +309,7 @@
 
         <div class="form-row">
           <div class="form-group">
-            <label for="hierarchy_level">Hierarchy Level</label>
+            <label for="hierarchy_level">{t('settings.itemTypes.hierarchyLevel')}</label>
             <Select
               id="hierarchy_level"
               bind:value={formData.hierarchy_level}
@@ -321,7 +323,7 @@
           </div>
 
           <div class="form-group">
-            <label for="sort_order">Sort Order</label>
+            <label for="sort_order">{t('common.order')}</label>
             <Input
               type="number"
               id="sort_order"
@@ -334,7 +336,7 @@
 
         <div class="form-row">
           <div class="form-group">
-            <label for="icon">Icon</label>
+            <label for="icon">{t('settings.itemTypes.icon')}</label>
             <Select id="icon" bind:value={formData.icon} required>
               {#each itemTypeIconOptions as icon}
                 <option value={icon}>{icon}</option>
@@ -344,12 +346,12 @@
               <div class="preview-icon" style="background-color: {formData.color}">
                 <svelte:component this={itemTypeIconMap[formData.icon] || FileText} size={16} color="white" />
               </div>
-              Preview
+              {t('common.preview')}
             </div>
           </div>
 
           <div class="form-group">
-            <ColorPicker bind:value={formData.color} label="Color" />
+            <ColorPicker bind:value={formData.color} label={t('settings.itemTypes.color')} />
           </div>
         </div>
 
@@ -359,7 +361,7 @@
     <DialogFooter
       onCancel={cancelEdit}
       onConfirm={saveItemType}
-      confirmLabel={editingId ? 'Update Item Type' : 'Create Item Type'}
+      confirmLabel={editingId ? t('common.update') : t('common.create')}
     />
   </Modal>
 

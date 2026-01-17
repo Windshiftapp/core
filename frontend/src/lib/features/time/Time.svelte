@@ -5,18 +5,19 @@
   import TimeReports from './TimeReports.svelte';
   import { User, Briefcase, Clock, BarChart3 } from 'lucide-svelte';
   import { currentRoute, navigate } from '../../router.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
-  let activeTab = 'time-entry';
+  let activeTab = $state('time-entry');
 
-  const tabs = [
-    { id: 'time-entry', label: 'Time Entry', icon: Clock, component: TimeEntry, route: '/time' },
-    { id: 'customers', label: 'Organizations', icon: User, component: TimeCustomers, route: '/time/customers' },
-    { id: 'projects', label: 'Projects', icon: Briefcase, component: TimeProjects, route: '/time/projects' },
-    { id: 'reports', label: 'Reports', icon: BarChart3, component: TimeReports, route: '/time/worklogs' }
-  ];
+  const tabs = $derived([
+    { id: 'time-entry', label: t('time.entry.title'), icon: Clock, component: TimeEntry, route: '/time' },
+    { id: 'customers', label: t('time.organizations.title'), icon: User, component: TimeCustomers, route: '/time/customers' },
+    { id: 'projects', label: t('time.projects.title'), icon: Briefcase, component: TimeProjects, route: '/time/projects' },
+    { id: 'reports', label: t('time.reports.title'), icon: BarChart3, component: TimeReports, route: '/time/worklogs' }
+  ]);
 
   // Update active tab based on current route
-  $: {
+  $effect(() => {
     const path = $currentRoute.path;
     if (path === '/time') {
       activeTab = 'time-entry';
@@ -29,7 +30,7 @@
     } else if (path === '/time/worklogs') {
       activeTab = 'reports';
     }
-  }
+  });
 
   function handleTabClick(tab) {
     navigate(tab.route);
@@ -42,8 +43,8 @@
   <div class="w-64 border-r flex-shrink-0" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
     <div class="p-6">
       <div class="mb-6">
-        <h1 class="text-xl font-semibold" style="color: var(--ds-text);">Time & Projects</h1>
-        <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">Manage organizations, projects, and time tracking</p>
+        <h1 class="text-xl font-semibold" style="color: var(--ds-text);">{t('time.title')}</h1>
+        <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">{t('time.subtitle')}</p>
       </div>
       
       <!-- Navigation -->

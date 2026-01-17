@@ -1,10 +1,13 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import { t } from '../stores/i18n.svelte.js';
   import ConfigurationSetEntityPicker from '../pickers/ConfigurationSetEntityPicker.svelte';
 
-  export let priorities = [];
-  export let selectedPriorityIds = [];
-  export let configurationSetId = null;
+  let {
+    priorities = [],
+    selectedPriorityIds = [],
+    configurationSetId = null
+  } = $props();
 
   const dispatch = createEventDispatcher();
 
@@ -15,7 +18,7 @@
 
 <div>
   <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">
-    Select which priorities are available in workspaces using this configuration set.
+    {t('settings.configSets.selectPriorities')}
   </p>
 
   <ConfigurationSetEntityPicker

@@ -3,6 +3,7 @@
   import { createEventDispatcher, onMount } from 'svelte';
   import { createPopover, melt } from '@melt-ui/svelte';
   import { api } from '../api.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -12,14 +13,17 @@
 
   let {
     value = $bindable(null),
-    placeholder = "Select milestone...",
+    placeholder = '',
     class: className = '',
     disabled = false,
     workspaceId = null,
     showUnassigned = true,
-    unassignedLabel = 'No milestone',
+    unassignedLabel = '',
     children = null  // Custom trigger snippet
   } = $props();
+
+  const resolvedPlaceholder = $derived(placeholder || t('pickers.selectMilestone'));
+  const resolvedUnassignedLabel = $derived(unassignedLabel || t('pickers.noMilestone'));
 
   let milestones = $state([]);
   let loading = $state(false);
@@ -188,7 +192,7 @@
           type="text"
           bind:value={searchTerm}
           onkeydown={handleKeyDown}
-          placeholder="Search..."
+          placeholder={t('pickers.search')}
           class="w-full px-3 py-2 text-sm rounded border"
           style="
             background-color: var(--ds-background-input);
@@ -202,7 +206,7 @@
       </div>
 
       <!-- Options list -->
-      <div class="max-h-60 overflow-y-auto" role="listbox" id={listboxId} aria-label="Milestones">
+      <div class="max-h-60 overflow-y-auto" role="listbox" id={listboxId} aria-label={t('pickers.milestones')}>
         {#if showUnassigned}
           <button
             type="button"
@@ -217,7 +221,7 @@
             onmouseenter={() => highlightedIndex = 0}
             onclick={() => handlePopoverSelect(null)}
           >
-            {unassignedLabel}
+            {resolvedUnassignedLabel}
           </button>
         {/if}
 
@@ -248,7 +252,7 @@
 
         {#if filteredMilestones.length === 0 && !showUnassigned}
           <div class="px-3 py-2 text-sm" style="color: var(--ds-text-subtle);">
-            No milestones found
+            {t('pickers.noMilestonesFound')}
           </div>
         {/if}
       </div>
@@ -261,7 +265,7 @@
     items={milestones}
     {loading}
     {error}
-    {placeholder}
+    placeholder={resolvedPlaceholder}
     {disabled}
     class={className}
     allowClear={true}

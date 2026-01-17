@@ -2,6 +2,7 @@
   import { Check, X } from "lucide-svelte";
   import Button from "../../components/Button.svelte";
   import { errorToast } from '../../stores/toasts.svelte.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   export let item;
   export let workspace;
@@ -24,7 +25,7 @@
 
     if (!trimmedTitle) {
       // Show error toast
-      errorToast('Previous value remains unchanged', 'Title cannot be empty');
+      errorToast(t('items.previousValueRemains'), t('items.titleCannotBeEmpty'));
 
       // Revert to original title
       editTitle = item.title;
@@ -61,7 +62,7 @@
               onkeydown={handleKeydown}
               class="w-full text-2xl font-medium bg-transparent border-0 py-1 focus:outline-none break-words"
               style="color: var(--ds-text); word-wrap: break-word; overflow-wrap: break-word;"
-              placeholder="Enter title..."
+              placeholder={t('items.enterTitle')}
               autofocus
             />
           </div>
@@ -88,7 +89,7 @@
           onclick={startEditingTitle}
           class="text-2xl font-medium pr-4 py-1 rounded transition-colors text-left cursor-pointer w-full title-button break-words"
           style="color: var(--ds-text); word-wrap: break-word; overflow-wrap: break-word;"
-          title="Click to edit title"
+          title={t('items.clickToEditTitle')}
         >
           {item.title}
         </button>

@@ -8,6 +8,7 @@
   import { contextCommands } from '../utils/contextCommands.js';
   import { isSystemAdmin } from '../stores';
   import { useTimer } from '../composables/useTimer.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
   const timer = useTimer();
@@ -387,9 +388,9 @@
         // Start a timer directly using the timer composable
         if ($canStartTimer) {
           // Show error - need a workspace and project context
-          alert('Please start a timer from within a work item to provide context.');
+          alert(t('dialogs.alerts.startTimerFromItem'));
         } else if ($activeTimer) {
-          alert('A timer is already running. Please stop it before starting a new one.');
+          alert(t('dialogs.alerts.timerAlreadyRunning'));
         }
       } else if (command.action === 'stop-timer') {
         // Stop the timer directly using the timer composable
@@ -398,12 +399,12 @@
             await timer.stop();
           } catch (error) {
             console.error('Failed to stop timer:', error);
-            alert('Failed to stop timer: ' + error.message);
+            alert(t('dialogs.alerts.stopTimerFailed', { error: error.message }));
           }
         } else if (!$activeTimer) {
-          alert('No timer is currently running.');
+          alert(t('dialogs.alerts.noTimerRunning'));
         } else if ($timerSyncing) {
-          alert('Timer is currently syncing. Please wait and try again.');
+          alert(t('dialogs.alerts.timerSyncing'));
         }
       }
       close();
@@ -411,14 +412,14 @@
       // Handle system commands
       if (command.action === 'quit') {
         // Confirm before quitting
-        if (confirm('Are you sure you want to quit the application? The server will shut down.')) {
+        if (confirm(t('dialogs.confirmations.quitApplication'))) {
           try {
             await api.system.shutdown();
             // Show a message that the server is shutting down
-            alert('Application is shutting down...');
+            alert(t('dialogs.alerts.applicationShuttingDown'));
           } catch (error) {
             console.error('Failed to shutdown:', error);
-            alert('Failed to shutdown the application. Please try again or close manually.');
+            alert(t('dialogs.alerts.shutdownFailed'));
           }
         }
       }
@@ -557,7 +558,7 @@
             bind:this={searchInputRef}
             use:melt={$input}
             type="text"
-            placeholder="Search everything..."
+            placeholder={t('commandPalette.searchPlaceholder')}
             class="w-full text-lg border-none outline-none bg-transparent"
             style="color: var(--ds-text);"
           />
@@ -573,7 +574,7 @@
             <!-- Menu Items -->
             {#if filteredCommands.length === 0}
               <div class="p-4 text-center" style="color: var(--ds-text-subtle);">
-                No commands found
+                {t('commandPalette.noCommandsFound')}
               </div>
             {:else}
               <div class="max-h-80 overflow-y-auto">
@@ -589,7 +590,7 @@
                           <div class="font-medium" style="color: var(--ds-text);">{command.label}</div>
                           {#if command._isContextCommand}
                             <span class="px-1.5 py-0.5 text-xs rounded font-medium" style="background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue);">
-                              Context
+                              {t('commandPalette.context')}
                             </span>
                           {/if}
                         </div>
@@ -610,11 +611,11 @@
             <div class="p-3 border-t" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
               <div class="flex justify-between text-xs mb-2" style="color: var(--ds-text-subtle);">
                 <div>
-                  <kbd class="kbd px-1 py-0.5 rounded text-xs">↵</kbd> to select
-                  <kbd class="kbd px-1 py-0.5 rounded text-xs ml-2">↑↓</kbd> to navigate
+                  <kbd class="kbd px-1 py-0.5 rounded text-xs">↵</kbd> {t('commandPalette.toSelect')}
+                  <kbd class="kbd px-1 py-0.5 rounded text-xs ml-2">↑↓</kbd> {t('commandPalette.toNavigate')}
                 </div>
                 <div>
-                  <kbd class="kbd px-1 py-0.5 rounded text-xs">ESC</kbd> to close
+                  <kbd class="kbd px-1 py-0.5 rounded text-xs">ESC</kbd> {t('commandPalette.toClose')}
                 </div>
               </div>
               <div class="flex justify-between items-center">
@@ -623,10 +624,10 @@
                   class="text-xs underline"
                   style="color: var(--ds-interactive);"
                 >
-                  Advanced Search
+                  {t('commandPalette.advancedSearch')}
                 </button>
                 <div class="text-xs" style="color: var(--ds-text-subtlest);">
-                  Press <kbd class="kbd px-1 py-0.5 rounded">⎵⎵</kbd> to open
+                  {t('commandPalette.pressToOpen', { shortcut: '⎵⎵' })}
                 </div>
               </div>
             </div>

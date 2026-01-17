@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { notifications, notificationActions } from '../stores/notifications.js';
   import { Bell, Check, Filter, Calendar, MoreHorizontal, X } from 'lucide-svelte';
+  import { t } from '../stores/i18n.svelte.js';
   import NotificationCard from '../features/notifications/NotificationCard.svelte';
   import Button from '../components/Button.svelte';
   import Select from '../components/Select.svelte';
@@ -18,18 +19,18 @@
 
   // Filter options
   const typeOptions = [
-    { value: 'all', label: 'All Types' },
-    { value: 'assignment', label: 'Assignments' },
-    { value: 'comment', label: 'Comments' },
-    { value: 'status_change', label: 'Status Changes' },
-    { value: 'reminder', label: 'Reminders' },
-    { value: 'milestone', label: 'Milestones' }
+    { value: 'all', label: t('notifications.filters.allTypes') },
+    { value: 'assignment', label: t('notifications.filters.assignments') },
+    { value: 'comment', label: t('notifications.filters.comments') },
+    { value: 'status_change', label: t('notifications.filters.statusChanges') },
+    { value: 'reminder', label: t('notifications.filters.reminders') },
+    { value: 'milestone', label: t('notifications.filters.milestones') }
   ];
 
   const statusOptions = [
-    { value: 'all', label: 'All' },
-    { value: 'unread', label: 'Unread Only' },
-    { value: 'read', label: 'Read Only' }
+    { value: 'all', label: t('notifications.filters.all') },
+    { value: 'unread', label: t('notifications.filters.unreadOnly') },
+    { value: 'read', label: t('notifications.filters.readOnly') }
   ];
 
   // Subscribe to notifications store
@@ -75,7 +76,7 @@
   }
 
   function handleClearAll() {
-    if (confirm('Are you sure you want to dismiss all notifications? This action cannot be undone.')) {
+    if (confirm(t('dialogs.confirmations.dismissAllNotifications'))) {
       notifications.set([]);
     }
   }
@@ -98,7 +99,7 @@
         id: 'mark-all-read',
         type: 'regular',
         icon: Check,
-        title: 'Mark All as Read',
+        title: t('notifications.markAllAsRead'),
         onClick: handleMarkAllRead,
         disabled: unreadCount === 0
       },
@@ -107,7 +108,7 @@
         id: 'clear-all',
         type: 'regular',
         icon: X,
-        title: 'Clear All Notifications',
+        title: t('notifications.clearAll'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50 hover:text-red-700',
         onClick: handleClearAll,
@@ -130,10 +131,10 @@
     <div class="mb-6 flex items-start justify-between">
       <div>
         <h1 class="text-2xl font-bold mb-2" style="color: var(--ds-text);">
-          Notifications
+          {t('notifications.title')}
         </h1>
         <p class="text-base" style="color: var(--ds-text-subtle);">
-          Stay updated with your work items, comments, and activities
+          {t('notifications.subtitle')}
           {#if unreadCount > 0}
             • <span class="font-medium text-blue-600">{unreadCount} unread</span>
           {/if}
@@ -165,7 +166,7 @@
           <!-- Search -->
           <SearchInput
             bind:value={searchQuery}
-            placeholder="Search notifications..."
+            placeholder={t('notifications.searchNotifications')}
             class="w-full"
           />
 
@@ -223,7 +224,7 @@
               variant="secondary"
               size="xs"
             >
-              Clear All
+              {t('common.clear')}
             </Button>
           </div>
         {/if}
@@ -244,15 +245,15 @@
       <div class="rounded-xl border shadow-sm p-12 text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
         <Bell class="w-12 h-12 text-gray-400 mx-auto mb-4 opacity-50" />
         <h3 class="text-lg font-medium text-gray-900 mb-2">
-          {$notifications.length === 0 ? 'No notifications' : 'No matching notifications'}
+          {$notifications.length === 0 ? t('notifications.noNotifications') : t('common.noResults')}
         </h3>
         <p class="text-gray-500">
           {#if $notifications.length === 0}
-            You're all caught up! New notifications will appear here.
+            {t('dashboard.allCaughtUp')}
           {:else if searchQuery || selectedType !== 'all' || selectedStatus !== 'all'}
-            Try adjusting your filters to see more notifications.
+            {t('search.configureFilter')}
           {:else}
-            Check back later for new notifications.
+            {t('notifications.noNotifications')}
           {/if}
         </p>
         {#if searchQuery || selectedType !== 'all' || selectedStatus !== 'all'}
@@ -262,7 +263,7 @@
             size="sm"
             class="mt-4"
           >
-            Clear Filters
+            {t('common.clear')}
           </Button>
         {/if}
       </div>
@@ -292,7 +293,7 @@
               size="sm"
             >
               <Check class="w-4 h-4 mr-2" />
-              Mark All as Read ({unreadCount})
+              {t('notifications.markAllAsRead')} ({unreadCount})
             </Button>
           {/if}
         </div>

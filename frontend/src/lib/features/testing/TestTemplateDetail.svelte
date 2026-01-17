@@ -8,6 +8,7 @@
   import Spinner from '../../components/Spinner.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import SectionHeader from '../../layout/SectionHeader.svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let template = null;
   let executions = [];
@@ -69,8 +70,8 @@
 
   async function saveEdit() {
     if (!editName.trim()) {
-      confirmTitle = 'Validation Error';
-      confirmMessage = 'Template name cannot be empty';
+      confirmTitle = t('validation.required');
+      confirmMessage = t('testing.templateNameRequired');
       confirmAction = null;
       showConfirmDialog = true;
       return;
@@ -88,24 +89,24 @@
       editMode = false;
     } catch (error) {
       console.error('Failed to update template:', error);
-      confirmTitle = 'Error';
-      confirmMessage = 'Failed to update template. Please try again.';
+      confirmTitle = t('common.error');
+      confirmMessage = t('testing.failedToUpdateTemplate');
       confirmAction = null;
       showConfirmDialog = true;
     }
   }
 
   async function deleteTemplate() {
-    confirmTitle = 'Delete Template';
-    confirmMessage = `Are you sure you want to delete "${template.name}"? This will not delete existing test runs created from this template.`;
+    confirmTitle = t('testing.deleteTemplate');
+    confirmMessage = t('testing.deleteTemplateConfirm', { name: template.name });
     confirmAction = async () => {
       try {
         await api.tests.testRunTemplates.delete(workspaceId, templateId);
         navigate(testPath('/templates'));
       } catch (error) {
         console.error('Failed to delete template:', error);
-        confirmTitle = 'Error';
-        confirmMessage = 'Failed to delete template. Please try again.';
+        confirmTitle = t('common.error');
+        confirmMessage = t('testing.failedToDeleteTemplate');
         confirmAction = null;
         showConfirmDialog = true;
       }
@@ -120,8 +121,8 @@
       navigate(testPath(`/runs/${newRun.id}/execute`));
     } catch (error) {
       console.error('Failed to execute template:', error);
-      confirmTitle = 'Error';
-      confirmMessage = 'Failed to start execution. Please try again.';
+      confirmTitle = t('common.error');
+      confirmMessage = t('testing.failedToStartExecution');
       confirmAction = null;
       showConfirmDialog = true;
     }
@@ -137,9 +138,9 @@
 
   function getRunStatus(run) {
     if (run.ended_at) {
-      return { text: 'Completed', style: 'background: var(--ds-status-success-bg); color: var(--ds-status-success-text);' };
+      return { text: t('testing.completed'), style: 'background: var(--ds-status-success-bg); color: var(--ds-status-success-text);' };
     }
-    return { text: 'In Progress', style: 'background: var(--ds-status-info-bg); color: var(--ds-status-info-text);' };
+    return { text: t('testing.inProgress'), style: 'background: var(--ds-status-info-bg); color: var(--ds-status-info-text);' };
   }
 
   // Keyboard shortcuts
@@ -202,13 +203,13 @@
               variant="primary"
               onclick={saveEdit}
             >
-              Save
+              {t('common.save')}
             </Button>
             <Button
               variant="default"
               onclick={toggleEditMode}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
           {:else}
             <Button
@@ -216,14 +217,14 @@
               onclick={toggleEditMode}
               icon={Edit2}
             >
-              Edit
+              {t('common.edit')}
             </Button>
             <Button
               variant="danger"
               onclick={deleteTemplate}
               icon={Trash2}
             >
-              Delete
+              {t('common.delete')}
             </Button>
             <Button
               variant="primary"
@@ -231,7 +232,7 @@
               icon={Play}
               size="medium"
             >
-              Execute Template
+              {t('testing.executeTemplate')}
             </Button>
           {/if}
         </div>
@@ -243,32 +244,32 @@
         <div class="lg:col-span-2 space-y-6">
           <!-- Template Information -->
           <div class="p-6" style="background-color: var(--ds-surface-raised);">
-            <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">Template Information</h2>
+            <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">{t('testing.templateInformation')}</h2>
 
             <div class="space-y-4">
               <div>
-                <div class="text-sm font-medium mb-1" style="color: var(--ds-text-subtle);">Test Plan</div>
+                <div class="text-sm font-medium mb-1" style="color: var(--ds-text-subtle);">{t('testing.testPlan')}</div>
                 {#if testSet}
                   <a href={`/workspaces/${workspaceId}/tests/sets/${testSet.id}`} class="hover:underline" style="color: var(--ds-text-link);">
                     {testSet.name}
                   </a>
                 {:else}
-                  <div style="color: var(--ds-text);">Loading...</div>
+                  <div style="color: var(--ds-text);">{t('common.loading')}</div>
                 {/if}
               </div>
 
               <div>
-                <div class="text-sm font-medium mb-1" style="color: var(--ds-text-subtle);">Description</div>
+                <div class="text-sm font-medium mb-1" style="color: var(--ds-text-subtle);">{t('common.description')}</div>
                 {#if editMode}
                   <Textarea
                     bind:value={editDescription}
                     onkeydown={handleEditKeydown}
                     rows={4}
-                    placeholder="Add a description for this template..."
+                    placeholder={t('testing.templateDescriptionPlaceholder')}
                   />
                 {:else}
                   <div class="text-sm" style="color: var(--ds-text);">
-                    {template.description || 'No description provided'}
+                    {template.description || t('testing.noDescription')}
                   </div>
                 {/if}
               </div>
@@ -277,7 +278,7 @@
 
           <!-- Executions List -->
           <div class="p-6" style="background-color: var(--ds-surface-raised);">
-            <SectionHeader title="Executions ({executions.length})">
+            <SectionHeader title={t('testing.executionsCount', { count: executions.length })}>
               {#snippet actions()}
                 <Button
                   variant="primary"
@@ -285,7 +286,7 @@
                   icon={Play}
                   size="small"
                 >
-                  New Execution
+                  {t('testing.newExecution')}
                 </Button>
               {/snippet}
             </SectionHeader>
@@ -301,9 +302,9 @@
                           {execution.name}
                         </div>
                         <div class="text-sm" style="color: var(--ds-text-subtle);">
-                          Started: {new Date(execution.started_at).toLocaleString()}
+                          {t('testing.started')}: {new Date(execution.started_at).toLocaleString()}
                           {#if execution.ended_at}
-                            • Ended: {new Date(execution.ended_at).toLocaleString()}
+                            • {t('testing.ended')}: {new Date(execution.ended_at).toLocaleString()}
                           {/if}
                         </div>
                       </div>
@@ -318,7 +319,7 @@
                               class="cursor-pointer text-sm font-medium"
                               style="color: var(--ds-text-success);"
                             >
-                              Continue
+                              {t('common.continue')}
                             </button>
                           {/if}
                           <button
@@ -326,7 +327,7 @@
                             class="cursor-pointer text-sm"
                             style="color: var(--ds-text-link);"
                           >
-                            {execution.ended_at ? 'Results' : 'Progress'}
+                            {execution.ended_at ? t('testing.results') : t('testing.progress')}
                           </button>
                         </div>
                       </div>
@@ -337,9 +338,9 @@
             {:else}
               <div class="text-center py-8">
                 <div class="text-6xl mb-4">🚀</div>
-                <div class="text-lg font-medium mb-2" style="color: var(--ds-text);">No executions yet</div>
+                <div class="text-lg font-medium mb-2" style="color: var(--ds-text);">{t('testing.noExecutionsYet')}</div>
                 <div class="text-sm mb-4" style="color: var(--ds-text-subtle);">
-                  Click "Execute Template" to create your first test run from this template
+                  {t('testing.clickExecuteTemplate')}
                 </div>
                 <Button
                   variant="primary"
@@ -347,7 +348,7 @@
                   icon={Play}
                   size="medium"
                 >
-                  Execute Template
+                  {t('testing.executeTemplate')}
                 </Button>
               </div>
             {/if}
@@ -358,21 +359,21 @@
         <div class="space-y-6">
           <!-- Quick Stats -->
           <div class="p-6" style="background-color: var(--ds-surface-raised);">
-            <h3 class="font-semibold mb-4" style="color: var(--ds-text);">Quick Stats</h3>
+            <h3 class="font-semibold mb-4" style="color: var(--ds-text);">{t('testing.quickStats')}</h3>
 
             <div class="space-y-3">
               <div class="flex justify-between">
-                <span class="text-sm" style="color: var(--ds-text-subtle);">Total Executions</span>
+                <span class="text-sm" style="color: var(--ds-text-subtle);">{t('testing.totalExecutions')}</span>
                 <span class="text-sm font-medium" style="color: var(--ds-text);">{executions.length}</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-sm" style="color: var(--ds-text-subtle);">Completed</span>
+                <span class="text-sm" style="color: var(--ds-text-subtle);">{t('testing.completed')}</span>
                 <span class="text-sm font-medium" style="color: var(--ds-text-success);">
                   {executions.filter(e => e.ended_at).length}
                 </span>
               </div>
               <div class="flex justify-between">
-                <span class="text-sm" style="color: var(--ds-text-subtle);">In Progress</span>
+                <span class="text-sm" style="color: var(--ds-text-subtle);">{t('testing.inProgress')}</span>
                 <span class="text-sm font-medium" style="color: var(--ds-text-info);">
                   {executions.filter(e => !e.ended_at).length}
                 </span>
@@ -383,18 +384,18 @@
           <!-- Test Set Info -->
           {#if testSet}
             <div class="p-6" style="background-color: var(--ds-surface-raised);">
-              <h3 class="font-semibold mb-4" style="color: var(--ds-text);">Test Plan Details</h3>
+              <h3 class="font-semibold mb-4" style="color: var(--ds-text);">{t('testing.testPlanDetails')}</h3>
 
               <div class="space-y-3">
                 <div>
-                  <div class="text-sm font-medium" style="color: var(--ds-text-subtle);">Name</div>
+                  <div class="text-sm font-medium" style="color: var(--ds-text-subtle);">{t('common.name')}</div>
                   <a href={`/workspaces/${workspaceId}/tests/sets/${testSet.id}`} class="text-sm hover:underline" style="color: var(--ds-text-link);">
                     {testSet.name}
                   </a>
                 </div>
                 {#if testSet.description}
                   <div>
-                    <div class="text-sm font-medium" style="color: var(--ds-text-subtle);">Description</div>
+                    <div class="text-sm font-medium" style="color: var(--ds-text-subtle);">{t('common.description')}</div>
                     <div class="text-sm" style="color: var(--ds-text);">
                       {testSet.description}
                     </div>
@@ -407,13 +408,13 @@
       </div>
     {:else}
       <div class="text-center py-12">
-        <div style="color: var(--ds-text-subtle);">Template not found</div>
+        <div style="color: var(--ds-text-subtle);">{t('testing.templateNotFound')}</div>
         <div class="mt-4">
           <Button
             variant="primary"
             onclick={goBack}
           >
-            Back to Templates
+            {t('testing.backToTemplates')}
           </Button>
         </div>
       </div>

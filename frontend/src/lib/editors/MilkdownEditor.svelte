@@ -14,9 +14,11 @@
   import { api } from '../api.js';
   import MentionPicker from '../pickers/MentionPicker.svelte';
   import { mentionDecorationPlugin } from './milkdown-mention-mark.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let content = '';
-  export let placeholder = 'Enter text...';
+  export let placeholder = '';
+  $: effectivePlaceholder = placeholder || t('editors.enterText');
   export let readonly = false;
   export let showToolbar = false; // Show formatting toolbar
   export let itemId = null; // Item ID for attachment uploads (backwards compatibility)
@@ -341,7 +343,7 @@
             editable: () => !readonly,
             attributes: {
               class: 'milkdown-editor-content',
-              'data-placeholder': placeholder
+              'data-placeholder': effectivePlaceholder
             },
             // Handle DOM events for mention detection
             handleDOMEvents: {
@@ -517,26 +519,26 @@
 <div class="milkdown-wrapper" class:has-toolbar={showToolbar && !readonly}>
   {#if showToolbar && !readonly}
     <div class="milkdown-toolbar" tabindex="-1" aria-hidden="true">
-      <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleBold} title="Bold (Ctrl+B)">
+      <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleBold} title={t('editors.bold')}>
         <Bold size={14} />
       </button>
-      <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleItalic} title="Italic (Ctrl+I)">
+      <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleItalic} title={t('editors.italic')}>
         <Italic size={14} />
       </button>
-      <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleStrikethrough} title="Strikethrough">
+      <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleStrikethrough} title={t('editors.strikethrough')}>
         <Strikethrough size={14} />
       </button>
-      <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleCode} title="Inline Code">
+      <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleCode} title={t('editors.inlineCode')}>
         <Code size={14} />
       </button>
       <div class="toolbar-divider"></div>
-      <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleBulletList} title="Bullet List">
+      <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleBulletList} title={t('editors.bulletList')}>
         <List size={14} />
       </button>
-      <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleOrderedList} title="Numbered List">
+      <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleOrderedList} title={t('editors.numberedList')}>
         <ListOrdered size={14} />
       </button>
-      <button type="button" class="toolbar-btn" tabindex="-1" onclick={openFilePicker} title="Insert Image">
+      <button type="button" class="toolbar-btn" tabindex="-1" onclick={openFilePicker} title={t('editors.insertImage')}>
         <ImageIcon size={14} />
       </button>
     </div>
@@ -571,7 +573,7 @@
     onmouseleave={hoverCardMouseLeave}
   >
     {#if hoverCardLoading}
-      <div class="hc-loading">Loading...</div>
+      <div class="hc-loading">{t('common.loading')}</div>
     {:else if hoverCardUser}
       <div class="hc-user-card">
         <div class="hc-avatar">
@@ -592,7 +594,7 @@
         </div>
       </div>
     {:else}
-      <div class="hc-not-found">User not found</div>
+      <div class="hc-not-found">{t('editors.userNotFound')}</div>
     {/if}
   </div>
 {/if}

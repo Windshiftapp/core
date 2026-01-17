@@ -7,6 +7,7 @@
   import { Box, Globe, Building2, Calendar, User, Target } from 'lucide-svelte';
   import ColorDot from '../../components/ColorDot.svelte';
   import { api } from '../../api.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   // Helper to parse field options
   function parseOptions(optionsStr) {
@@ -264,9 +265,9 @@
               </div>
               <span style="color: var(--ds-text);">{userData.name}</span>
             {:else if usersLoading}
-              <span style="color: var(--ds-text-subtle);">Loading...</span>
+              <span style="color: var(--ds-text-subtle);">{t('common.loading')}</span>
             {:else}
-              <span style="color: var(--ds-text-subtle);">Unknown user</span>
+              <span style="color: var(--ds-text-subtle);">{t('common.unknownUser')}</span>
             {/if}
           {:else if field.field_type === 'milestone'}
             <!-- Display milestone with color dot -->
@@ -275,7 +276,7 @@
               <span style="color: var(--ds-text);">{milestoneData.name}</span>
             {:else}
               <Target class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-              <span style="color: var(--ds-text-subtle);">Set {field.name.toLowerCase()}</span>
+              <span style="color: var(--ds-text-subtle);">{t('items.setField', { field: field.name.toLowerCase() })}</span>
             {/if}
           {:else if field.field_type === 'iteration'}
             <!-- Display iteration with icon -->
@@ -315,7 +316,7 @@
           {:else if field.field_type === 'asset'}
             <Box class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
           {/if}
-          <span style="color: var(--ds-text-subtle);">Set {field.name.toLowerCase()}</span>
+          <span style="color: var(--ds-text-subtle);">{t('items.setField', { field: field.name.toLowerCase() })}</span>
         {/if}
       </button>
     {:else}
@@ -331,9 +332,9 @@
                 <span style="color: var(--ds-text);">{userData.name}</span>
               </div>
             {:else if usersLoading}
-              <span style="color: var(--ds-text-subtle);">Loading...</span>
+              <span style="color: var(--ds-text-subtle);">{t('common.loading')}</span>
             {:else}
-              <span style="color: var(--ds-text-subtle);">Unknown user</span>
+              <span style="color: var(--ds-text-subtle);">{t('common.unknownUser')}</span>
             {/if}
           {:else if field.field_type === 'milestone'}
             <div class="flex items-center gap-2">
@@ -341,7 +342,7 @@
                 <ColorDot color={milestoneData.category_color || '#9CA3AF'} />
                 <span style="color: var(--ds-text);">{milestoneData.name}</span>
               {:else}
-                <span style="color: var(--ds-text-subtle);">Not set</span>
+                <span style="color: var(--ds-text-subtle);">{t('items.notSet')}</span>
               {/if}
             </div>
           {:else if field.field_type === 'iteration'}
@@ -376,7 +377,7 @@
             <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
           {/if}
         {:else}
-          <span style="color: var(--ds-text-subtle);">Not set</span>
+          <span style="color: var(--ds-text-subtle);">{t('items.notSet')}</span>
         {/if}
       </div>
     {/if}
@@ -389,9 +390,9 @@
         {value}
         items={milestones}
         config={milestoneConfig}
-        placeholder="Select milestone..."
+        placeholder={t('pickers.selectMilestone')}
         showUnassigned={true}
-        unassignedLabel="No milestone"
+        unassignedLabel={t('pickers.noMilestone')}
         autoOpen={autoOpenPickers}
         class="w-full"
         {disabled}
@@ -402,7 +403,7 @@
       {@const userValue = value && typeof value === 'object' ? value.id : value}
       <UserPicker
         value={userValue}
-        placeholder="Select user..."
+        placeholder={t('pickers.selectUser')}
         showUnassigned={true}
         {showSelectedInTrigger}
         autoOpen={autoOpenPickers}
@@ -421,9 +422,9 @@
         {value}
         items={iterations}
         config={iterationConfig}
-        placeholder="Select iteration..."
+        placeholder={t('items.selectIteration')}
         showUnassigned={true}
-        unassignedLabel="No iteration"
+        unassignedLabel={t('items.noIteration')}
         autoOpen={autoOpenPickers}
         class="w-full"
         {disabled}
@@ -437,7 +438,7 @@
         value={assetValue}
         assetSetId={assetConfig.asset_set_id}
         cqlQuery={assetConfig.cql_query}
-        placeholder="Select asset..."
+        placeholder={t('pickers.selectAsset')}
         showUnassigned={true}
         autoOpen={autoOpenPickers}
         class="w-full"
@@ -454,7 +455,7 @@
     {:else if field.field_type === 'combobox'}
       <PersonalLabelCombobox
         {value}
-        placeholder="Select or create labels..."
+        placeholder={t('items.selectOrCreateLabels')}
         class="w-full"
         userId={null}
         {disabled}
@@ -468,9 +469,9 @@
       <BasePicker
         {value}
         items={parseOptions(field.options)}
-        placeholder="Select {field.name.toLowerCase()}..."
+        placeholder={t('items.selectField', { field: field.name.toLowerCase() })}
         showUnassigned={true}
-        unassignedLabel="Select {field.name.toLowerCase()}..."
+        unassignedLabel={t('items.selectField', { field: field.name.toLowerCase() })}
         getValue={(item) => item}
         getLabel={(item) => item}
         {disabled}
@@ -480,7 +481,7 @@
       <BasePicker
         value={value ? value.split(',').filter(v => v) : []}
         items={parseOptions(field.options)}
-        placeholder="Select {field.name.toLowerCase()}..."
+        placeholder={t('items.selectField', { field: field.name.toLowerCase() })}
         getValue={(item) => item}
         getLabel={(item) => item}
         multiple={true}
@@ -508,7 +509,7 @@
           oninput={(e) => onChange(e.target.value)}
           class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded"
           style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
-          placeholder="Enter {field.name.toLowerCase()}..."
+          placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
           rows="3"
           {disabled}
           required={isRequired}
@@ -523,7 +524,7 @@
           oninput={(e) => onChange(e.target.value)}
           class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded tabular-nums"
           style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
-          placeholder="Enter {field.name.toLowerCase()}..."
+          placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
           onkeydown={handleKeydown}
           {disabled}
           required={isRequired}
@@ -539,7 +540,7 @@
           oninput={(e) => onChange(e.target.value)}
           class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded"
           style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
-          placeholder="Enter {field.name.toLowerCase()}..."
+          placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
           onkeydown={handleKeydown}
           {disabled}
           required={isRequired}

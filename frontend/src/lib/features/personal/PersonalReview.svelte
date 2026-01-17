@@ -7,6 +7,7 @@
   import { scale } from 'svelte/transition';
   import PageHeader from '../../layout/PageHeader.svelte';
   import Textarea from '../../components/Textarea.svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   // Props
   export let currentUser = null;
@@ -49,15 +50,15 @@
   function getPrompts() {
     if (reviewType === 'daily') {
       return {
-        accomplishments: "What did I accomplish today?",
-        went_well: "What went well today?",
-        improvements: "What could I improve tomorrow?"
+        accomplishments: t('personal.whatAccomplished'),
+        went_well: t('personal.whatWentWell'),
+        improvements: t('personal.whatImprove')
       };
     } else {
       return {
-        accomplishments: "What were my key achievements this week?",
-        went_well: "What challenges did I overcome this week?",
-        improvements: "What are my priorities for next week?"
+        accomplishments: t('personal.weeklyAccomplishments'),
+        went_well: t('personal.weeklyChallenges'),
+        improvements: t('personal.weeklyPriorities')
       };
     }
   }
@@ -275,9 +276,9 @@
 </script>
 
 <div class="p-6" style="background-color: var(--ds-surface); min-height: 100vh;" onclick={handleClickOutside}>
-  <PageHeader 
-    icon={FileEdit} 
-    title="Personal Review" 
+  <PageHeader
+    icon={FileEdit}
+    title={t('personal.personalReview')}
     subtitle="{displayDate}"
   >
     {#snippet actions()}
@@ -310,7 +311,7 @@
             style="color: var(--ds-text-subtle); hover:background-color: var(--ds-background-neutral-hovered); hover:color: var(--ds-text);"
             onclick={goToToday}
           >
-            today
+            {t('personal.today')}
           </button>
         </div>
 
@@ -322,7 +323,7 @@
             style="background-color: {reviewType === 'daily' ? 'var(--ds-surface)' : 'transparent'}; color: var(--ds-text);"
             onclick={() => { reviewType = 'daily'; handleTypeChange(); }}
           >
-            Daily
+            {t('personal.daily')}
           </button>
           <button
             class="px-3 py-1 text-sm font-medium rounded-md transition-colors"
@@ -330,7 +331,7 @@
             style="background-color: {reviewType === 'weekly' ? 'var(--ds-surface)' : 'transparent'}; color: var(--ds-text);"
             onclick={() => { reviewType = 'weekly'; handleTypeChange(); }}
           >
-            Weekly
+            {t('personal.weekly')}
           </button>
         </div>
 
@@ -352,11 +353,11 @@
             >
               <div class="flex items-center space-x-3 mb-4">
                 <Clock class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-                <h3 class="text-sm font-medium" style="color: var(--ds-text);">Recent Reviews</h3>
+                <h3 class="text-sm font-medium" style="color: var(--ds-text);">{t('personal.recentReviews')}</h3>
               </div>
 
               {#if reviewHistory.length === 0}
-                <p class="text-sm" style="color: var(--ds-text-subtle);">No previous reviews found</p>
+                <p class="text-sm" style="color: var(--ds-text-subtle);">{t('personal.noPreviousReviews')}</p>
               {:else}
                 <div class="space-y-1 max-h-64 overflow-y-auto">
                   {#each reviewHistory as historyItem (historyItem.id)}
@@ -372,7 +373,7 @@
                         {new Date(historyItem.review_date).toLocaleDateString()}
                       </div>
                       <div class="text-xs capitalize mt-1" style="color: var(--ds-text-subtle);">
-                        {historyItem.review_type} review
+                        {historyItem.review_type === 'daily' ? t('personal.dailyReview') : t('personal.weeklyReview')}
                       </div>
                     </button>
                   {/each}
@@ -386,7 +387,7 @@
           class="p-2 rounded transition-colors"
           style="color: var(--ds-text-subtle); hover:background-color: var(--ds-background-neutral-hovered);"
           onclick={toggleFullscreen}
-          title="{$uiStore.reviewFullscreen ? 'Exit focus mode' : 'Enter focus mode'}"
+          title={$uiStore.reviewFullscreen ? t('personal.exitFocusMode') : t('personal.enterFocusMode')}
         >
           {#if $uiStore.reviewFullscreen}
             <Minimize class="w-4 h-4" />
@@ -406,7 +407,7 @@
         <div class="flex items-center space-x-3 mb-8">
           <BookOpenCheck class="w-5 h-5" style="color: var(--ds-text-success);" />
           <h2 class="text-xl font-light" style="color: var(--ds-text);">
-            Completed {reviewType === 'daily' ? 'Today' : 'This Week'}
+            {reviewType === 'daily' ? t('personal.completedToday') : t('personal.completedThisWeek')}
           </h2>
           <span class="text-sm" style="color: var(--ds-text-subtle);">
             {completedItems.length}
@@ -416,12 +417,12 @@
         {#if loading}
           <div class="text-center py-8">
             <div class="animate-spin w-6 h-6 border-2 border-t-transparent rounded-full mx-auto" style="border-color: var(--ds-background-brand); border-top-color: transparent;"></div>
-            <p class="mt-2" style="color: var(--ds-text-subtle);">Loading completed items...</p>
+            <p class="mt-2" style="color: var(--ds-text-subtle);">{t('personal.loadingCompletedItems')}</p>
           </div>
         {:else if completedItems.length === 0}
           <EmptyState
             icon={BookOpenCheck}
-            title="No completed items for this {reviewType === 'daily' ? 'day' : 'week'}"
+            title={reviewType === 'daily' ? t('personal.noCompletedItemsDay') : t('personal.noCompletedItemsWeek')}
           />
         {:else}
           <div class="space-y-4">
@@ -444,11 +445,11 @@
         <div>
           <div class="flex items-center space-x-3 mb-8">
             <Lightbulb class="w-5 h-5" style="color: var(--ds-text-warning);" />
-            <h2 class="text-xl font-light" style="color: var(--ds-text);">Reflection</h2>
+            <h2 class="text-xl font-light" style="color: var(--ds-text);">{t('personal.reflection')}</h2>
             {#if saving}
               <div class="flex items-center space-x-2 text-sm" style="color: var(--ds-text-subtle);">
                 <div class="animate-spin w-4 h-4 border-2 border-t-transparent rounded-full" style="border-color: var(--ds-text-subtle); border-top-color: transparent;"></div>
-                <span>saving...</span>
+                <span>{t('common.saving')}</span>
               </div>
             {/if}
           </div>
@@ -463,7 +464,7 @@
                 bind:value={reviewData.accomplishments}
                 oninput={scheduleAutoSave}
                 class="h-32 border-0"
-                placeholder="Describe your key accomplishments..."
+                placeholder={t('personal.placeholderAccomplishments')}
               />
             </div>
 
@@ -476,7 +477,7 @@
                 bind:value={reviewData.went_well}
                 oninput={scheduleAutoSave}
                 class="h-32 border-0"
-                placeholder="What went well and why..."
+                placeholder={t('personal.placeholderWentWell')}
               />
             </div>
 
@@ -489,7 +490,7 @@
                 bind:value={reviewData.improvements}
                 oninput={scheduleAutoSave}
                 class="h-32 border-0"
-                placeholder="Areas for improvement and next steps..."
+                placeholder={t('personal.placeholderImprovements')}
               />
             </div>
 
@@ -501,7 +502,7 @@
                 class="px-8 py-3 rounded font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                 style="background-color: var(--ds-background-brand); color: var(--ds-text-on-brand);"
               >
-                {saving ? 'saving...' : 'save review'}
+                {saving ? t('common.saving') : t('personal.saveReview')}
               </button>
             </div>
           </div>

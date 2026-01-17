@@ -1,4 +1,6 @@
 <script>
+  import { t } from '../stores/i18n.svelte.js';
+
   let {
     size = 'md', // 'sm', 'md', 'lg'
     class: className = ''
@@ -15,5 +17,5 @@
   class="animate-spin rounded-full border-b-2 {sizeClasses} {className}"
   style="border-color: var(--ds-interactive);"
   role="status"
-  aria-label="Loading"
+  aria-label={t('common.loading')}
 ></div>

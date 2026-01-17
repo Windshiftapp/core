@@ -4,6 +4,7 @@
   import { api } from '../api.js';
   import { formatDueDate, getDueBadgeClass } from '../utils/dateFormatter.js';
   import WidgetState from './WidgetState.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let workspaceId = null;
   export let maxItems = 8;
@@ -67,7 +68,7 @@
     } catch (err) {
       if (currentVersion !== fetchVersion) return;
       console.error('Failed to load My Tasks widget:', err);
-      error = 'Unable to load tasks';
+      error = t('widgets.myTasks.loadError');
       tasks = [];
     } finally {
       if (currentVersion === fetchVersion) {
@@ -81,10 +82,10 @@
   {loading}
   {error}
   isEmpty={tasks.length === 0}
-  loadingText="Loading your tasks..."
+  loadingText={t('widgets.myTasks.loadingText')}
   emptyIcon={CheckSquare}
-  emptyTitle="No open tasks assigned to you"
-  emptySubtitle="You're all caught up!"
+  emptyTitle={t('widgets.myTasks.emptyTitle')}
+  emptySubtitle={t('widgets.myTasks.emptySubtitle')}
   onRetry={() => fetchKey && loadAssignedTasks(currentUserId)}
 >
   {#snippet children()}

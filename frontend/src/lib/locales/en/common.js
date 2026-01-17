@@ -1,0 +1,286 @@
+/**
+ * English (en) - Common translations
+ * Includes: common, toast, errors, validation, placeholders, emptyStates
+ */
+export default {
+  // Common UI elements
+  common: {
+    save: 'Save',
+    saveChanges: 'Save Changes',
+    cancel: 'Cancel',
+    close: 'Close',
+    delete: 'Delete',
+    remove: 'Remove',
+    edit: 'Edit',
+    create: 'Create',
+    add: 'Add',
+    update: 'Update',
+    search: 'Search',
+    filter: 'Filter',
+    clear: 'Clear',
+    reset: 'Reset',
+    confirm: 'Confirm',
+    done: 'Done',
+    ok: 'OK',
+    yes: 'Yes',
+    no: 'No',
+    back: 'Back',
+    next: 'Next',
+    previous: 'Previous',
+    finish: 'Finish',
+    continue: 'Continue',
+    submit: 'Submit',
+    apply: 'Apply',
+    refresh: 'Refresh',
+    reload: 'Reload',
+    retry: 'Retry',
+    copy: 'Copy',
+    or: 'or',
+    menu: 'Menu',
+    paste: 'Paste',
+    duplicate: 'Duplicate',
+    move: 'Move',
+    moveUp: 'Move Up',
+    moveDown: 'Move Down',
+    select: 'Select',
+    selectAll: 'Select All',
+    deselectAll: 'Deselect All',
+    all: 'All',
+    none: 'None',
+    enable: 'Enable',
+    disable: 'Disable',
+    show: 'Show',
+    hide: 'Hide',
+    expand: 'Expand',
+    collapse: 'Collapse',
+    view: 'View',
+    preview: 'Preview',
+    download: 'Download',
+    upload: 'Upload',
+    import: 'Import',
+    export: 'Export',
+    print: 'Print',
+    share: 'Share',
+
+    // Common labels
+    id: 'ID',
+    name: 'Name',
+    title: 'Title',
+    description: 'Description',
+    type: 'Type',
+    status: 'Status',
+    priority: 'Priority',
+    category: 'Category',
+    date: 'Date',
+    time: 'Time',
+    created: 'Created',
+    createdAt: 'Created At',
+    updated: 'Updated',
+    updatedAt: 'Updated At',
+    modified: 'Modified',
+    owner: 'Owner',
+    author: 'Author',
+    assigned: 'Assigned',
+    assignedTo: 'Assigned To',
+    assignTo: 'Assign To',
+    assign: 'Assign',
+    assignee: 'Assignee',
+    allAssignees: 'All Assignees',
+    unassigned: 'Unassigned',
+    members: 'Members',
+    user: 'User',
+    users: 'Users',
+    group: 'Group',
+    groups: 'Groups',
+    action: 'Action',
+    actions: 'Actions',
+    options: 'Options',
+    configure: 'Configure',
+    settings: 'Settings',
+    profile: 'Profile',
+    details: 'Details',
+    summary: 'Summary',
+    notes: 'Notes',
+    comments: 'Comments',
+    attachments: 'Attachments',
+    tags: 'Tags',
+    labels: 'Labels',
+    dueDate: 'Due Date',
+    startDate: 'Start Date',
+    endDate: 'End Date',
+    email: 'Email',
+    username: 'Username',
+    password: 'Password',
+    url: 'URL',
+    link: 'Link',
+    color: 'Color',
+    icon: 'Icon',
+    order: 'Order',
+    position: 'Position',
+    count: 'Count',
+    total: 'Total',
+    active: 'Active',
+    inactive: 'Inactive',
+    activate: 'Activate',
+    deactivate: 'Deactivate',
+    default: 'Default',
+    custom: 'Custom',
+
+    // Status indicators
+    loading: 'Loading...',
+    saving: 'Saving...',
+    deleting: 'Deleting...',
+    processing: 'Processing...',
+    uploading: 'Uploading...',
+    downloading: 'Downloading...',
+    generating: 'Generating...',
+    regenerating: 'Regenerating...',
+    revoking: 'Revoking...',
+
+    // Misc labels
+    note: 'Note',
+    unknown: 'Unknown',
+
+    // Results
+    noResults: 'No results found',
+    noData: 'No data',
+    noItems: 'No items',
+    empty: 'Empty',
+
+    // Requirements
+    required: 'Required',
+    optional: 'Optional',
+
+    // Confirmations
+    areYouSure: 'Are you sure?',
+    confirmDelete: 'Are you sure you want to delete this?',
+    confirmAction: 'Are you sure you want to proceed?',
+    cannotUndo: 'This action cannot be undone.',
+
+    // Time
+    today: 'Today',
+    yesterday: 'Yesterday',
+    tomorrow: 'Tomorrow',
+    now: 'Now',
+    never: 'Never',
+    always: 'Always',
+
+    // Additional common terms
+    none: 'None',
+    unknownUser: 'Unknown User',
+    selected: 'Selected',
+    searching: 'Searching...',
+    noItemsFound: 'No items found',
+    typeToSearch: 'Type to search...',
+    pressEscapeToCancel: 'Press Escape to cancel',
+    viewDetails: 'View Details',
+    openInNewTab: 'Open in new tab',
+    account: 'Account',
+    project: 'Project',
+    noProject: 'No Project',
+    global: 'Global',
+    root: 'Root'
+  },
+
+  // Toast notifications
+  toast: {
+    success: 'Success',
+    error: 'Error',
+    warning: 'Warning',
+    info: 'Info',
+    saved: 'Saved successfully',
+    deleted: 'Deleted successfully',
+    created: 'Created successfully',
+    updated: 'Updated successfully',
+    copied: 'Copied to clipboard',
+    failed: 'Operation failed'
+  },
+
+  // Backend error codes
+  errors: {
+    // Authentication errors
+    UNAUTHORIZED: 'Authentication required. Please log in.',
+    AUTHENTICATION_REQUIRED: 'Authentication required. Please log in.',
+    INVALID_TOKEN: 'Your session is invalid. Please log in again.',
+    TOKEN_EXPIRED: 'Your session has expired. Please log in again.',
+    INSUFFICIENT_PERMISSION: 'You do not have permission to perform this action.',
+
+    // Validation errors
+    VALIDATION_FAILED: 'Please check your input and try again.',
+    INVALID_INPUT: 'The provided input is invalid.',
+    MISSING_FIELD: 'Required field is missing: {field}',
+
+    // Resource errors
+    NOT_FOUND: 'The requested resource was not found.',
+    ITEM_NOT_FOUND: 'The item was not found.',
+    WORKSPACE_NOT_FOUND: 'The workspace was not found.',
+    USER_NOT_FOUND: 'The user was not found.',
+    CONFLICT: 'This resource already exists.',
+    ALREADY_EXISTS: 'A resource with this identifier already exists.',
+
+    // Rate limiting
+    RATE_LIMITED: 'Too many requests. Please wait and try again.',
+
+    // Server errors
+    INTERNAL_ERROR: 'An unexpected error occurred. Please try again later.',
+    SERVICE_UNAVAILABLE: 'The service is temporarily unavailable.',
+
+    // Network errors
+    NETWORK_ERROR: 'Network error. Please check your connection.',
+    TIMEOUT: 'The request timed out. Please try again.',
+
+    // Generic
+    UNKNOWN: 'An unknown error occurred.',
+    generic: 'Something went wrong. Please try again.'
+  },
+
+  // Validation messages
+  validation: {
+    required: 'This field is required',
+    requiredField: '{field} is required',
+    invalidEmail: 'Please enter a valid email address',
+    invalidUrl: 'Please enter a valid URL',
+    minLength: 'Must be at least {min} characters',
+    maxLength: 'Must be no more than {max} characters',
+    minValue: 'Must be at least {min}',
+    maxValue: 'Must be no more than {max}',
+    pattern: 'Invalid format',
+    passwordMismatch: 'Passwords do not match',
+    passwordTooWeak: 'Password is too weak',
+    invalidCredentials: 'Invalid email or password',
+    emailTaken: 'This email is already in use',
+    usernameTaken: 'This username is already taken',
+    slugInvalid: 'Only lowercase letters, numbers, and hyphens allowed',
+    fillRequired: 'Please fill in all required fields'
+  },
+
+  // Placeholders
+  placeholders: {
+    search: 'Search...',
+    searchUsers: 'Search users...',
+    searchChannels: 'Search channels...',
+    searchProjects: 'Search projects...',
+    searchFields: 'Search fields...',
+    searchIcons: 'Search icons...',
+    enterEmailOrUsername: 'Enter email or username',
+    enterPassword: 'Enter current password',
+    enterNewPassword: 'Enter new password',
+    confirmNewPassword: 'Confirm new password',
+    optionalDescription: 'Optional description...',
+    channelDescription: "Brief description of this channel's purpose",
+    columnName: 'Column name',
+    typeName: "Type '{name}' here",
+    searchWorkItems: 'Search work items...'
+  },
+
+  // Empty States
+  emptyStates: {
+    noData: 'No data',
+    noResults: 'No results found',
+    noItemsMatch: 'No items match filter',
+    noFieldChanges: 'No field changes detected',
+    noRequirements: 'No requirements configured',
+    configureFilter: 'Configure filter to see items',
+    createToStart: 'Create {item} to get started'
+  }
+};

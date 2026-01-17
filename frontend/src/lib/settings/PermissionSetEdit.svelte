@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { currentRoute, navigate } from '../router.js';
   import { api } from '../api.js';
+  import { t } from '../stores/i18n.svelte.js';
   import { ArrowLeft, Save, X, UserPlus } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
   import Modal from '../dialogs/Modal.svelte';
@@ -12,42 +13,43 @@
   import Label from '../components/Label.svelte';
   import { confirm } from '../composables/useConfirm.js';
 
-  let permissionSetId = null;
-  let permissionSet = null;
-  let permissions = [];
-  let loading = true;
-  let showAssignmentPicker = false;
-  let assignmentPickerPermissionId = null;
+  let permissionSetId = $state(null);
+  let permissionSet = $state(null);
+  let permissions = $state([]);
+  let loading = $state(true);
+  let showAssignmentPicker = $state(false);
+  let assignmentPickerPermissionId = $state(null);
 
   // Form state
-  let formData = {
+  let formData = $state({
     name: '',
     description: ''
-  };
+  });
 
   // Original form data for change tracking
-  let originalFormData = {
+  let originalFormData = $state({
     name: '',
     description: ''
-  };
+  });
 
   // Assignment data
-  let assignments = {
+  let assignments = $state({
     role_assignments: [],
     group_assignments: [],
     user_assignments: []
-  };
+  });
 
   // Reactive variable to force UI updates
-  let assignmentsVersion = 0;
+  let assignmentsVersion = $state(0);
 
   // Reactive: Check if name/description have unsaved changes
-  $: hasUnsavedChanges =
+  const hasUnsavedChanges = $derived(
     formData.name !== originalFormData.name ||
-    formData.description !== originalFormData.description;
+    formData.description !== originalFormData.description
+  );
 
   // Create a reactive derived state that combines permissions with their assignments
-  $: permissionsWithAssignments = permissions.map(permission => {
+  const permissionsWithAssignments = $derived(permissions.map(permission => {
     // Force re-evaluation when assignmentsVersion changes
     const _ = assignmentsVersion;
 
@@ -59,16 +61,18 @@
       ...permission,
       assigns: { roleAssigns, groupAssigns, userAssigns }
     };
-  });
+  }));
 
   // Subscribe to route changes
-  $: if ($currentRoute.params?.id) {
-    const newId = parseInt($currentRoute.params.id);
-    if (newId && newId !== permissionSetId) {
-      permissionSetId = newId;
-      loadData();
+  $effect(() => {
+    if ($currentRoute.params?.id) {
+      const newId = parseInt($currentRoute.params.id);
+      if (newId && newId !== permissionSetId) {
+        permissionSetId = newId;
+        loadData();
+      }
     }
-  }
+  });
 
   onMount(() => {
     loadPermissions();
@@ -107,7 +111,7 @@
       assignmentsVersion++;
     } catch (error) {
       console.error('Failed to load permission set:', error);
-      alert('Failed to load permission set: ' + (error.message || JSON.stringify(error)));
+      alert(t('settings.permissionSets.failedToLoad') + (error.message || JSON.stringify(error)));
     } finally {
       loading = false;
     }
@@ -154,7 +158,7 @@
   async function updateMetadata() {
     try {
       if (!formData.name.trim()) {
-        alert('Name is required');
+        alert(t('validation.requiredField', { field: t('common.name') }));
         return;
       }
 
@@ -173,7 +177,7 @@
       };
     } catch (error) {
       console.error('Failed to update permission set:', error);
-      alert('Failed to update permission set: ' + (error.message || error));
+      alert(t('settings.permissionSets.failedToUpdate') + (error.message || error));
     }
   }
 
@@ -217,17 +221,17 @@
         showAssignmentPicker = false;
         assignmentPickerPermissionId = null;
       } else {
-        alert('Failed to add assignment: ' + (error.message || error));
+        alert(t('settings.permissionSets.failedToAddAssignment') + (error.message || error));
       }
     }
   }
 
   async function removeAssignment(assignmentId, type) {
     const confirmed = await confirm({
-      title: 'Remove Assignment',
-      message: 'Are you sure you want to remove this assignment?',
-      confirmText: 'Remove',
-      cancelText: 'Cancel',
+      title: t('settings.permissionSets.removeAssignment'),
+      message: t('settings.permissionSets.confirmRemoveAssignment'),
+      confirmText: t('common.remove'),
+      cancelText: t('common.cancel'),
       variant: 'danger',
       icon: X
     });
@@ -249,7 +253,7 @@
       assignmentsVersion++;
     } catch (error) {
       console.error('Failed to remove assignment:', error);
-      alert('Failed to remove assignment: ' + (error.message || error));
+      alert(t('settings.permissionSets.failedToRemoveAssignment') + (error.message || error));
     }
   }
 
@@ -265,16 +269,16 @@
       onclick={goBack}
       class="transition-colors"
       style="color: var(--ds-text-subtle);"
-      title="Back to Permission Sets"
+      title={t('settings.permissionSets.backToPermissionSets')}
     >
       <ArrowLeft class="w-5 h-5" />
     </button>
     <div>
       <h1 class="text-xl font-semibold" style="color: var(--ds-text);">
-        {loading ? 'Loading...' : permissionSet?.name || 'Permission Set'}
+        {loading ? t('common.loading') : permissionSet?.name || t('settings.permissionSets.title')}
       </h1>
       <p class="text-sm mt-0.5" style="color: var(--ds-text-subtle);">
-        Manage permission set details and assignments
+        {t('settings.permissionSets.manageSubtitle')}
       </p>
     </div>
   </div>
@@ -284,31 +288,31 @@
 <div class="flex-1 overflow-y-auto p-6" style="background-color: var(--ds-surface);">
   {#if loading}
     <div class="flex items-center justify-center h-64">
-      <div style="color: var(--ds-text-subtle);">Loading permission set...</div>
+      <div style="color: var(--ds-text-subtle);">{t('settings.permissionSets.loadingPermissionSet')}</div>
     </div>
   {:else}
       <div class="max-w-5xl mx-auto space-y-6">
       <!-- Basic Information Section -->
       <div class="rounded-lg border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-        <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">Basic Information</h2>
+        <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">{t('settings.permissionSets.basicInfo')}</h2>
         <div class="space-y-4">
           <div>
-            <Label color="default" required class="mb-1">Name</Label>
+            <Label color="default" required class="mb-1">{t('common.name')}</Label>
             <input
               type="text"
               bind:value={formData.name}
               class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);"
-              placeholder="e.g., Development Team Permissions"
+              placeholder={t('settings.permissionSets.namePlaceholder')}
             />
           </div>
 
           <div>
-            <Label color="default" class="mb-1">Description</Label>
+            <Label color="default" class="mb-1">{t('common.description')}</Label>
             <Textarea
               bind:value={formData.description}
               rows={3}
-              placeholder="Optional description of this permission set"
+              placeholder={t('settings.permissionSets.descriptionPlaceholder')}
             />
           </div>
 
@@ -316,7 +320,7 @@
             <div class="flex justify-end pt-2 border-t" style="border-color: var(--ds-border);">
               <Button variant="primary" size="sm" onclick={updateMetadata}>
                 <Save class="w-4 h-4 mr-2" />
-                Save Changes
+                {t('settings.permissionSets.saveChanges')}
               </Button>
             </div>
           {/if}
@@ -325,7 +329,7 @@
 
       <!-- Permission Assignments Section -->
       <div class="rounded-lg border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-        <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">Permission Assignments</h2>
+        <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">{t('settings.permissionSets.permissionAssignments')}</h2>
           <div class="space-y-3">
           {#each permissionsWithAssignments as permission (permission.id)}
             <div class="border rounded p-4 transition-colors" style="border-color: var(--ds-border);">
@@ -339,7 +343,7 @@
                     <div class="flex flex-wrap gap-2 mt-3">
                       {#each permission.assigns.roleAssigns as roleAssign}
                         <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs bg-blue-100 text-blue-800 font-medium">
-                          <span class="mr-1.5">Role:</span> {roleAssign.role?.name || 'Unknown'}
+                          <span class="mr-1.5">{t('settings.permissionSets.role')}:</span> {roleAssign.role?.name || t('settings.permissionSets.unknown')}
                           <button
                             onclick={() => removeAssignment(roleAssign.id, 'role')}
                             class="ml-1.5 hover:text-blue-900"
@@ -351,7 +355,7 @@
 
                       {#each permission.assigns.groupAssigns as groupAssign}
                         <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs bg-green-100 text-green-800 font-medium">
-                          <span class="mr-1.5">Group:</span> {groupAssign.group?.group_name || 'Unknown'}
+                          <span class="mr-1.5">{t('settings.permissionSets.group')}:</span> {groupAssign.group?.group_name || t('settings.permissionSets.unknown')}
                           <button
                             onclick={() => removeAssignment(groupAssign.id, 'group')}
                             class="ml-1.5 hover:text-green-900"
@@ -363,7 +367,7 @@
 
                       {#each permission.assigns.userAssigns as userAssign}
                         <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs bg-purple-100 text-purple-800 font-medium">
-                          <span class="mr-1.5">User:</span> {userAssign.user?.username || 'Unknown'}
+                          <span class="mr-1.5">{t('settings.permissionSets.user')}:</span> {userAssign.user?.username || t('settings.permissionSets.unknown')}
                           <button
                             onclick={() => removeAssignment(userAssign.id, 'user')}
                             class="ml-1.5 hover:text-purple-900"
@@ -379,7 +383,7 @@
                       style="border-color: var(--ds-border); color: var(--ds-text-subtle);"
                     >
                       <UserPlus class="w-3 h-3 mr-1" />
-                      Add
+                      {t('common.add')}
                     </button>
                     </div>
                   </div>
@@ -402,17 +406,17 @@
   }}
 >
   <div class="p-6">
-    <h3 class="text-lg font-semibold mb-2" style="color: var(--ds-text);">Add Assignment</h3>
+    <h3 class="text-lg font-semibold mb-2" style="color: var(--ds-text);">{t('settings.permissionSets.addAssignment')}</h3>
     <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">
-      Select a role, group, or user below to add them to this permission. The assignment will be added immediately when selected.
+      {t('settings.permissionSets.addAssignmentDesc')}
     </p>
 
     <div class="space-y-4 mb-6">
       <!-- Role Selection -->
       <div>
         <RolePicker
-          label="Add by Role"
-          placeholder="Search and select a role..."
+          label={t('settings.permissionSets.addByRole')}
+          placeholder={t('settings.permissionSets.searchAndSelectRole')}
           onselect={(e) => addAssignment('role', e.detail.id)}
         />
       </div>
@@ -420,8 +424,8 @@
       <!-- Group Selection -->
       <div>
         <GroupPicker
-          label="Add by Group"
-          placeholder="Search and select a group..."
+          label={t('settings.permissionSets.addByGroup')}
+          placeholder={t('settings.permissionSets.searchAndSelectGroup')}
           onselect={(e) => addAssignment('group', e.detail.id)}
         />
       </div>
@@ -429,8 +433,8 @@
       <!-- User Selection -->
       <div>
         <UserPicker
-          label="Add by User"
-          placeholder="Search and select a user..."
+          label={t('settings.permissionSets.addByUser')}
+          placeholder={t('settings.permissionSets.searchAndSelectUser')}
           onselect={(e) => addAssignment('user', e.detail.id)}
         />
       </div>
@@ -441,7 +445,7 @@
         showAssignmentPicker = false;
         assignmentPickerPermissionId = null;
       }}>
-        Done
+        {t('common.done')}
       </Button>
     </div>
   </div>

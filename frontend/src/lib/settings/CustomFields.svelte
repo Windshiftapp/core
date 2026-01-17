@@ -16,25 +16,26 @@
   import Label from '../components/Label.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
+  import { t } from '../stores/i18n.svelte.js';
 
-  let customFields = [];
-  let screens = [];
-  let showCreateForm = false;
-  let editingField = null;
-  let formData = {
+  let customFields = $state([]);
+  let screens = $state([]);
+  let showCreateForm = $state(false);
+  let editingField = $state(null);
+  let formData = $state({
     field_name: '',
     field_type: 'text',
     field_config: { max_length: '' },
     applies_to_portal_customers: false,
     applies_to_customer_organisations: false
-  };
+  });
 
-  let optionsText = ''; // For managing select/multiselect options
+  let optionsText = $state(''); // For managing select/multiselect options
 
   // Search and pagination state
-  let searchQuery = '';
-  let currentPage = 1;
-  let itemsPerPage = 25;
+  let searchQuery = $state('');
+  let currentPage = $state(1);
+  let itemsPerPage = $state(25);
 
   const fieldTypes = [
     { value: 'text', label: 'Single Line Text' },
@@ -50,9 +51,9 @@
   ];
 
   // Asset field configuration
-  let assetSetId = null;
-  let assetQlQuery = '';
-  let assetSets = [];
+  let assetSetId = $state(null);
+  let assetQlQuery = $state('');
+  let assetSets = $state([]);
 
   onMount(async () => {
     await loadCustomFields();
@@ -245,18 +246,18 @@
       cancelForm();
     } catch (error) {
       console.error('Failed to save custom field:', error);
-      alert('Failed to save custom field: ' + (error.message || error));
+      alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
     }
   }
 
   async function deleteField(field) {
-    if (confirm(`Are you sure you want to delete the custom field "${field.name}"? This will remove it from all projects.`)) {
+    if (confirm(t('dialogs.confirmations.deleteCustomField', { name: field.name }))) {
       try {
         await api.customFields.delete(field.id);
         await loadCustomFields();
       } catch (error) {
         console.error('Failed to delete custom field:', error);
-        alert('Failed to delete custom field: ' + (error.message || error));
+        alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
       }
     }
   }
@@ -296,27 +297,27 @@
     return count;
   }
 
-  $: needsOptions = formData.field_type === 'select' || formData.field_type === 'multiselect';
-  $: needsMaxLength = formData.field_type === 'text' || formData.field_type === 'textarea';
-  $: isMilestoneField = formData.field_type === 'milestone';
-  $: isDateField = formData.field_type === 'date';
-  $: isAssetField = formData.field_type === 'asset';
-  
+  const needsOptions = $derived(formData.field_type === 'select' || formData.field_type === 'multiselect');
+  const needsMaxLength = $derived(formData.field_type === 'text' || formData.field_type === 'textarea');
+  const isMilestoneField = $derived(formData.field_type === 'milestone');
+  const isDateField = $derived(formData.field_type === 'date');
+  const isAssetField = $derived(formData.field_type === 'asset');
+
   // Reactive statement to trigger re-calculation when screens data changes
-  $: screensLoaded = screens && screens.length > 0;
-  
+  const screensLoaded = $derived(screens && screens.length > 0);
+
   // Reactive computed screen counts for all fields - triggers when screens or customFields change
-  $: fieldScreenCounts = customFields.reduce((acc, field) => {
+  const fieldScreenCounts = $derived(customFields.reduce((acc, field) => {
     if (screensLoaded) {
       acc[field.id] = getScreenCount(field.id);
     } else {
       acc[field.id] = 0;
     }
     return acc;
-  }, {});
+  }, {}));
 
   // Search filtering - filters custom fields by name, type, or description
-  $: filteredCustomFields = customFields.filter(field => {
+  const filteredCustomFields = $derived(customFields.filter(field => {
     if (!searchQuery.trim()) return true;
 
     const query = searchQuery.toLowerCase();
@@ -326,19 +327,21 @@
       field.description?.toLowerCase().includes(query) ||
       getFieldTypeLabel(field.field_type)?.toLowerCase().includes(query)
     );
-  });
+  }));
 
   // Reset to page 1 when search query changes
-  $: if (searchQuery) {
-    currentPage = 1;
-  }
+  $effect(() => {
+    if (searchQuery) {
+      currentPage = 1;
+    }
+  });
 
   // Pagination logic - slice filtered results based on current page
-  $: totalPages = Math.ceil(filteredCustomFields.length / itemsPerPage);
-  $: paginatedCustomFields = filteredCustomFields.slice(
+  const totalPages = $derived(Math.ceil(filteredCustomFields.length / itemsPerPage));
+  const paginatedCustomFields = $derived(filteredCustomFields.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
-  );
+  ));
 
   // Handle page change
   function handlePageChange(event) {
@@ -357,7 +360,7 @@
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: () => startEdit(field)
       }
@@ -369,7 +372,7 @@
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50',
         onClick: () => deleteField(field)
@@ -380,26 +383,26 @@
   }
 
   // Table column definitions
-  const fieldColumns = [
+  const fieldColumns = $derived([
     {
       key: 'id',
-      label: 'Field ID',
+      label: 'ID',
       render: (field) => field.id,
       textColor: '#3b82f6'
     },
     {
       key: 'name',
-      label: 'Field Name',
+      label: t('fields.fieldName'),
       slot: 'name'
     },
     {
       key: 'field_type',
-      label: 'Type',
+      label: t('common.type'),
       slot: 'type'
     },
     {
       key: 'options',
-      label: 'Configuration',
+      label: t('common.options'),
       render: (field) => {
         if (field.options) {
           try {
@@ -422,34 +425,34 @@
     },
     {
       key: 'screen_usage',
-      label: 'Used in Screens',
+      label: t('screens.title'),
       slot: 'usage'
     },
     {
       key: 'created_at',
-      label: 'Created',
+      label: t('common.created'),
       render: (field) => new Date(field.created_at).toLocaleDateString(),
       textColor: 'var(--ds-text-subtle)'
     },
     {
       key: 'actions',
-      label: 'Actions'
+      label: t('common.actions')
     }
-  ];
+  ]);
 </script>
 
 <svelte:window onkeydown={handleGlobalKeydown} />
 
 <PageHeader
   icon={Database}
-  title="Custom Fields"
-  subtitle="Define custom fields for issues and projects"
+  title={t('fields.title')}
+  subtitle={t('fields.subtitle')}
 >
   {#snippet actions()}
     <div class="flex items-center gap-3">
       <SearchInput
         bind:value={searchQuery}
-        placeholder="Search custom fields..."
+        placeholder={t('fields.searchFields')}
         class="w-64"
       />
       <Button
@@ -458,7 +461,7 @@
         onclick={startCreate}
         keyboardHint="A"
       >
-        Add Custom Field
+        {t('fields.createField')}
       </Button>
     </div>
   {/snippet}
@@ -469,7 +472,7 @@
   <!-- Modal header -->
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-      {editingField ? 'Edit Custom Field' : 'Create Custom Field'}
+      {editingField ? t('fields.editField') : t('fields.createField')}
     </h3>
   </div>
 
@@ -479,7 +482,7 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
         <div>
-          <Label for="field-name" required class="mb-2">Field Name</Label>
+          <Label for="field-name" required class="mb-2">{t('fields.fieldName')}</Label>
           <Input
             id="field-name"
             bind:value={formData.field_name}
@@ -489,7 +492,7 @@
         </div>
 
         <div>
-          <Label for="field-type" required class="mb-2">Field Type</Label>
+          <Label for="field-type" required class="mb-2">{t('fields.fieldType')}</Label>
           <Select
             id="field-type"
             bind:value={formData.field_type}
@@ -594,7 +597,7 @@
   <DialogFooter
     onCancel={cancelForm}
     onConfirm={saveField}
-    confirmLabel={editingField ? 'Update Field' : 'Create Field'}
+    confirmLabel={editingField ? t('common.update') : t('common.create')}
     disabled={!formData.field_name.trim() || (needsOptions && !optionsText.trim()) || (isAssetField && !assetSetId)}
   />
 </Modal>
@@ -604,7 +607,7 @@
       columns={fieldColumns}
       data={paginatedCustomFields}
       keyField="id"
-      emptyMessage="No custom fields found. Create your first custom field to get started."
+      emptyMessage={t('fields.noFields')}
       emptyIcon={Circle}
       actionItems={buildFieldDropdownItems}
     >
@@ -618,10 +621,10 @@
         {#if screensLoaded}
           {(() => {
             const count = fieldScreenCounts[field.id] || 0;
-            return count === 0 ? 'Not used' : `${count} screen${count === 1 ? '' : 's'}`;
+            return count === 0 ? t('common.noData') : t('screens.screens', { count });
           })()}
         {:else}
-          <span class="text-gray-400">Loading...</span>
+          <span class="text-gray-400">{t('common.loading')}</span>
         {/if}
       </div>
     </DataTable>

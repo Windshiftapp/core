@@ -1,14 +1,17 @@
 <script>
   import { createEventDispatcher, tick } from 'svelte';
   import { ChevronDown, Check, X, Loader2 } from 'lucide-svelte';
-  
+  import { t } from '../stores/i18n.svelte.js';
+
   const dispatch = createEventDispatcher();
-  
+
   export let value = null;
   export let options = []; // Array of {value, label, color?, icon?}
-  export let placeholder = 'Select...';
+  export let placeholder = '';
   export let disabled = false;
   export let required = false;
+
+  $: effectivePlaceholder = placeholder || t('common.select') + '...';
   export let className = '';
   export let displayClass = 'hover:bg-gray-50 cursor-pointer';
   export let allowClear = false;
@@ -45,7 +48,7 @@
     
     // Validation
     if (required && (selectedValue === null || selectedValue === undefined || selectedValue === '')) {
-      error = 'This field is required';
+      error = t('validation.required');
       return;
     }
     
@@ -110,7 +113,7 @@
   
   // Get display info for current value
   $: currentOption = options.find(opt => opt.value === value);
-  $: displayText = currentOption?.label || placeholder;
+  $: displayText = currentOption?.label || effectivePlaceholder;
   $: displayColor = currentOption?.color;
 </script>
 
@@ -129,7 +132,7 @@
       >
         {#if allowClear || !required}
           <option value={null}>
-            {placeholder}
+            {effectivePlaceholder}
           </option>
         {/if}
         {#each options as option}
@@ -154,7 +157,7 @@
           type="button"
           onclick={saveValue}
           class="p-1 text-green-600 hover:bg-green-50 rounded"
-          title="Save (Enter)"
+          title={t('editors.saveEnter')}
         >
           <Check class="w-4 h-4" />
         </button>
@@ -162,7 +165,7 @@
           type="button"
           onclick={cancelEditing}
           class="p-1 text-gray-400 hover:bg-gray-50 rounded"
-          title="Cancel (Escape)"
+          title={t('editors.cancelEscape')}
         >
           <X class="w-4 h-4" />
         </button>

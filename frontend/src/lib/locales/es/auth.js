@@ -1,0 +1,126 @@
+/**
+ * Spanish (es) - Authentication and User-related translations
+ *
+ * This module contains translations for:
+ * - auth: Login, logout, password reset, and authentication flows
+ * - users: User management, profiles, and account settings
+ * - security: Security settings, API tokens, and credentials
+ * - portalLogin: Portal-specific login interface
+ */
+
+export default {
+  auth: {
+    login: 'Iniciar sesion',
+    logout: 'Cerrar sesion',
+    signIn: 'Iniciar sesion',
+    signOut: 'Cerrar sesion',
+    signUp: 'Registrarse',
+    register: 'Registrarse',
+    forgotPassword: 'Olvido su contrasena?',
+    resetPassword: 'Restablecer contrasena',
+    changePassword: 'Cambiar contrasena',
+    currentPassword: 'Contrasena actual',
+    newPassword: 'Nueva contrasena',
+    confirmPassword: 'Confirmar contrasena',
+    rememberMe: 'Recordarme',
+    staySignedIn: 'Mantener sesion iniciada',
+    emailOrUsername: 'Correo electronico o nombre de usuario',
+    welcomeBack: 'Bienvenido de nuevo',
+    loginTitle: 'Inicie sesion en su cuenta',
+    loginSubtitle: 'Ingrese sus credenciales para continuar',
+    loggingIn: 'Iniciando sesion...',
+    logoutConfirm: 'Esta seguro de que desea cerrar sesion?',
+    sessionExpired: 'Su sesion ha expirado. Por favor, inicie sesion de nuevo.',
+    accountLocked: 'Su cuenta ha sido bloqueada. Por favor, contacte al soporte.',
+    twoFactor: 'Autenticacion de dos factores',
+    enterCode: 'Ingrese el codigo de verificacion',
+    resendCode: 'Reenviar codigo',
+    verificationSent: 'Codigo de verificacion enviado a su correo',
+    sso: 'Inicio de sesion unico',
+    continueWith: 'Continuar con {provider}'
+  },
+
+  users: {
+    title: 'Usuarios',
+    subtitle: 'Administrar cuentas de usuario y permisos',
+    user: 'Usuario',
+    users_one: '{count} usuario',
+    users_other: '{count} usuarios',
+    addUser: 'Agregar usuario',
+    createUser: 'Crear usuario',
+    editUser: 'Editar usuario',
+    deleteUser: 'Eliminar usuario',
+    inviteUser: 'Invitar usuario',
+    profile: 'Perfil',
+    myProfile: 'Mi perfil',
+    account: 'Cuenta',
+    firstName: 'Nombre',
+    lastName: 'Apellido',
+    fullName: 'Nombre completo',
+    displayName: 'Nombre para mostrar',
+    email: 'Correo electronico',
+    phone: 'Telefono',
+    avatar: 'Avatar',
+    role: 'Rol',
+    roles: 'Roles',
+    permissions: 'Permisos',
+    groups: 'Grupos',
+    lastLogin: 'Ultimo acceso',
+    lastActive: 'Ultima actividad',
+    createdAt: 'Miembro desde',
+    status: 'Estado',
+    active: 'Activo',
+    inactive: 'Inactivo',
+    pending: 'Pendiente',
+    suspended: 'Suspendido',
+    searchUsers: 'Buscar usuarios...',
+    noUsers: 'No se encontraron usuarios',
+    userCreated: 'Usuario creado correctamente',
+    userUpdated: 'Usuario actualizado correctamente',
+    userDeleted: 'Usuario eliminado correctamente',
+    inviteSent: 'Invitacion enviada correctamente',
+    cannotDeleteSelf: 'No puede eliminar su propia cuenta',
+    activateUser: 'Activar usuario',
+    deactivateUser: 'Desactivar usuario',
+    confirmDelete: 'Esta seguro de que desea eliminar a {name}? Esta accion no se puede deshacer.',
+    confirmActivate: 'Esta seguro de que desea activar a {name}? Podran acceder al sistema.',
+    confirmDeactivate: 'Esta seguro de que desea desactivar a {name}? Ya no podran acceder al sistema.',
+    failedToLoad: 'Error al cargar usuarios',
+    failedToSave: 'Error al guardar usuario',
+    failedToDelete: 'Error al eliminar usuario',
+    failedToActivate: 'Error al activar usuario',
+    failedToDeactivate: 'Error al desactivar usuario',
+    failedToResetPassword: 'Error al restablecer contrasena'
+  },
+
+  security: {
+    title: 'Seguridad',
+    subtitle: 'Administrar su configuracion de seguridad',
+    credentials: 'Credenciales de seguridad',
+    credentialsSubtitle: 'Administrar sus metodos de autenticacion',
+    apiTokens: 'Tokens de API',
+    apiTokensSubtitle: 'Crear tokens para acceder a su cuenta programaticamente',
+    createToken: 'Crear token',
+    revokeToken: 'Revocar token',
+    tokenName: 'Nombre del token',
+    tokenCreated: 'Token creado correctamente',
+    tokenRevoked: 'Token revocado correctamente',
+    copyToken: 'Copiar token',
+    tokenWarning: 'Asegurese de copiar su token ahora. No podra verlo de nuevo.'
+  },
+
+  portalLogin: {
+    welcomeBack: 'Bienvenido de nuevo',
+    signInToCustomize: 'Inicie sesion para personalizar este portal',
+    emailOrUsername: 'Correo electronico o nombre de usuario',
+    enterEmailOrUsername: 'Ingrese correo o nombre de usuario',
+    password: 'Contrasena',
+    enterPassword: 'Ingrese contrasena',
+    keepMeSignedIn: 'Mantenerme conectado por 30 dias',
+    or: 'o',
+    signingIn: 'Iniciando sesion...',
+    signIn: 'Iniciar sesion',
+    emailRequired: 'Se requiere correo electronico o nombre de usuario',
+    passwordRequired: 'Se requiere contrasena'
+  }
+};

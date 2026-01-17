@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
+  import { t } from '../stores/i18n.svelte.js';
   import { Shield, Users as UsersIcon, Plus, X, AlertCircle, Check, User, Crown } from 'lucide-svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import AssigneePicker from '../pickers/AssigneePicker.svelte';
@@ -40,7 +41,7 @@
       await loadAllUserPermissions();
       await loadAllGroupPermissions();
     } catch (err) {
-      error = 'Failed to load data: ' + err.message;
+      error = t('settings.permissions.failedToLoadData') + err.message;
     } finally {
       loading = false;
     }
@@ -155,7 +156,7 @@
           permission_id: permissionId,
         });
 
-        success = 'Permission granted to user successfully';
+        success = t('settings.permissions.permissionGrantedToUser');
 
         // Update local state
         if (!userPermissions.has(userId)) {
@@ -169,7 +170,7 @@
           permission_id: permissionId,
         });
 
-        success = 'Permission granted to group successfully';
+        success = t('settings.permissions.permissionGrantedToGroup');
 
         // Update local state
         if (!groupPermissions.has(groupId)) {
@@ -185,7 +186,7 @@
       setTimeout(() => success = '', 3000);
       toggleAddAssignee(permissionId);
     } catch (err) {
-      error = 'Failed to grant permission: ' + err.message;
+      error = t('settings.permissions.failedToGrantPermission') + err.message;
       setTimeout(() => error = '', 5000);
     }
   }
@@ -195,7 +196,7 @@
     if (permissionKey === 'system.admin') {
       const admins = getUsersWithPermission(permissionId);
       if (admins.length <= 1) {
-        error = 'Cannot revoke system admin from the last administrator';
+        error = t('settings.permissions.cannotRevokeLastAdmin');
         setTimeout(() => error = '', 5000);
         return;
       }
@@ -204,7 +205,7 @@
     try {
       await api.permissions.revokeGlobal(userId, permissionId);
 
-      success = 'Permission revoked from user successfully';
+      success = t('settings.permissions.permissionRevokedFromUser');
       setTimeout(() => success = '', 3000);
 
       // Update local state
@@ -213,7 +214,7 @@
         userPermissions = new Map(userPermissions);
       }
     } catch (err) {
-      error = 'Failed to revoke permission: ' + err.message;
+      error = t('settings.permissions.failedToRevokePermission') + err.message;
       setTimeout(() => error = '', 5000);
     }
   }
@@ -222,7 +223,7 @@
     try {
       await api.permissions.revokeGlobalFromGroup(groupId, permissionId);
 
-      success = 'Permission revoked from group successfully';
+      success = t('settings.permissions.permissionRevokedFromGroup');
       setTimeout(() => success = '', 3000);
 
       // Update local state
@@ -234,7 +235,7 @@
       // Refresh user permissions to update inherited permissions
       await loadAllUserPermissions();
     } catch (err) {
-      error = 'Failed to revoke permission from group: ' + err.message;
+      error = t('settings.permissions.failedToRevokePermissionFromGroup') + err.message;
       setTimeout(() => error = '', 5000);
     }
   }
@@ -251,8 +252,8 @@
 <div>
   <PageHeader
     icon={Shield}
-    title="Permission Management"
-    subtitle="Manage global permissions for users and groups"
+    title={t('settings.permissions.title')}
+    subtitle={t('settings.permissions.subtitle')}
   />
 
   {#if error}
@@ -270,13 +271,13 @@
   {#if loading}
     <div class="flex items-center justify-center py-12">
       <Spinner size="lg" />
-      <span class="ml-3" style="color: var(--ds-text-subtle);">Loading permissions...</span>
+      <span class="ml-3" style="color: var(--ds-text-subtle);">{t('settings.permissions.loadingPermissions')}</span>
     </div>
   {:else}
     <!-- Global Permissions Table -->
     <div class="rounded shadow overflow-hidden" style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);">
       <div class="px-6 py-4" style="border-bottom: 1px solid var(--ds-border); background-color: var(--ds-interactive-subtle);">
-        <h2 class="text-xl font-semibold" style="color: var(--ds-text);">Global Permissions</h2>
+        <h2 class="text-xl font-semibold" style="color: var(--ds-text);">{t('settings.permissions.globalPermissions')}</h2>
       </div>
 
       <div class="overflow-x-auto">
@@ -284,19 +285,19 @@
           <thead style="background-color: var(--ds-interactive-subtle);">
             <tr>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle); border-bottom: 1px solid var(--ds-border);">
-                Permission
+                {t('settings.permissions.permission')}
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle); border-bottom: 1px solid var(--ds-border);">
-                Description
+                {t('common.description')}
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle); border-bottom: 1px solid var(--ds-border);">
-                Assigned Users
+                {t('settings.permissions.assignedUsers')}
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle); border-bottom: 1px solid var(--ds-border);">
-                Assigned Groups
+                {t('settings.permissions.assignedGroups')}
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle); border-bottom: 1px solid var(--ds-border);">
-                Actions
+                {t('common.actions')}
               </th>
             </tr>
           </thead>
@@ -309,7 +310,7 @@
                       <div class="text-sm font-medium flex items-center gap-2" style="color: var(--ds-text);">
                         {permission.permission_name}
                         {#if permission.is_system}
-                          <Crown class="w-4 h-4" style="color: var(--ds-text-warning);" title="System Permission" />
+                          <Crown class="w-4 h-4" style="color: var(--ds-text-warning);" title={t('settings.permissions.systemPermission')} />
                         {/if}
                       </div>
                       <div class="text-xs" style="color: var(--ds-text-subtle);">{permission.permission_key}</div>
@@ -331,14 +332,14 @@
                         <button
                           class="ml-1 revoke-btn"
                           onclick={() => revokePermissionFromUser(user.id, permission.id, permission.permission_key)}
-                          title="Revoke permission"
+                          title={t('settings.permissions.revokePermission')}
                           disabled={permission.permission_key === 'system.admin' && getUsersWithPermission(permission.id).length <= 1}
                         >
                           <X class="w-3 h-3" />
                         </button>
                       </Lozenge>
                     {:else}
-                      <span class="text-sm italic" style="color: var(--ds-text-subtle);">No users assigned</span>
+                      <span class="text-sm italic" style="color: var(--ds-text-subtle);">{t('settings.permissions.noUsersAssigned')}</span>
                     {/each}
                   </div>
                 </td>
@@ -351,13 +352,13 @@
                         <button
                           class="ml-1 revoke-btn"
                           onclick={() => revokePermissionFromGroup(group.id, permission.id)}
-                          title="Revoke permission from group"
+                          title={t('settings.permissions.revokePermissionFromGroup')}
                         >
                           <X class="w-3 h-3" />
                         </button>
                       </Lozenge>
                     {:else}
-                      <span class="text-sm italic" style="color: var(--ds-text-subtle);">No groups assigned</span>
+                      <span class="text-sm italic" style="color: var(--ds-text-subtle);">{t('settings.permissions.noGroupsAssigned')}</span>
                     {/each}
                   </div>
                 </td>
@@ -369,10 +370,10 @@
                   >
                     {#if permissionState[permission.id]?.showForm}
                       <X class="w-3 h-3 mr-1" />
-                      Cancel
+                      {t('common.cancel')}
                     {:else}
                       <Plus class="w-3 h-3 mr-1" />
-                      Assign
+                      {t('settings.permissions.assign')}
                     {/if}
                   </button>
                 </td>
@@ -384,15 +385,15 @@
                   <td colspan="5" class="px-6 py-4" style="border-bottom: 1px solid var(--ds-border);">
                     <div class="max-w-2xl">
                       <h4 class="text-sm font-medium mb-3" style="color: var(--ds-text);">
-                        Assign "{permission.permission_name}" Permission
+                        {t('settings.permissions.assignPermission', { permission: permission.permission_name })}
                       </h4>
 
                       <AssigneePicker
                         bind:type={permissionState[permission.id].type}
                         bind:userId={permissionState[permission.id].selectedUserId}
                         bind:groupId={permissionState[permission.id].selectedGroupId}
-                        confirmText="Grant Permission"
-                        cancelText="Cancel"
+                        confirmText={t('settings.permissions.grantPermission')}
+                        cancelText={t('common.cancel')}
                         on_confirm={() => grantPermission(permission.id)}
                         on_cancel={() => toggleAddAssignee(permission.id)}
                       />

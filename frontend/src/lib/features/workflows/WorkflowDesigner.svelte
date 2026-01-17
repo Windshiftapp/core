@@ -4,6 +4,7 @@
   import { api } from '../../api.js';
   import { ArrowLeft, Save, X, Plus, Trash2 } from 'lucide-svelte';
   import Button from '../../components/Button.svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let workflow = null;
   let statuses = [];
@@ -49,7 +50,7 @@
       SvelteFlowDesigner = module.default;
     } catch (error) {
       console.error('Failed to load Svelte Flow designer:', error);
-      alert('Failed to load the workflow designer. Please refresh the page and try again.');
+      alert(t('workflows.failedToLoadDesigner'));
     } finally {
       loadingFlow = false;
     }
@@ -81,14 +82,14 @@
             icon={ArrowLeft}
             onclick={() => navigate('/admin/workflows')}
           >
-            Back to Workflows
+            {t('workflows.backToWorkflows')}
           </Button>
           <div>
             <h1 class="text-xl font-medium" style="color: var(--ds-text);">
-              {workflow?.name || 'Loading...'} - Workflow Designer
+              {workflow?.name || t('nav.loading')} - {t('workflows.workflowDesigner')}
             </h1>
             <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-              Drag statuses from the left panel, connect them by dragging from connection points
+              {t('workflows.designerHint')}
             </p>
           </div>
         </div>
@@ -98,18 +99,18 @@
 
   {#if loading}
     <div class="flex items-center justify-center h-64">
-      <div class="animate-pulse loading-message">Loading workflow data...</div>
+      <div class="animate-pulse loading-message">{t('workflows.loadingWorkflowData')}</div>
     </div>
   {:else if loadingFlow}
     <div class="flex items-center justify-center h-64">
-      <div class="animate-pulse loading-message">Loading workflow designer...</div>
+      <div class="animate-pulse loading-message">{t('workflows.loadingDesigner')}</div>
     </div>
   {:else if SvelteFlowDesigner && workflow && statuses.length > 0}
     <div class="h-[calc(100vh-120px)]">
-      <svelte:component 
-        this={SvelteFlowDesigner} 
-        {workflow} 
-        {statuses} 
+      <svelte:component
+        this={SvelteFlowDesigner}
+        {workflow}
+        {statuses}
         onSave={handleSave}
         onCancel={handleCancel}
       />
@@ -117,8 +118,8 @@
   {:else}
     <div class="flex items-center justify-center h-64">
       <div class="text-center loading-message">
-        <p class="text-lg mb-2">Failed to load workflow designer</p>
-        <p class="text-sm">Please refresh the page and try again</p>
+        <p class="text-lg mb-2">{t('workflows.failedToLoadDesignerTitle')}</p>
+        <p class="text-sm">{t('workflows.refreshAndTryAgain')}</p>
       </div>
     </div>
   {/if}

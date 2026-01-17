@@ -3,6 +3,7 @@
   import { writable } from 'svelte/store';
   import { api } from '../api.js';
   import { authStore } from '../stores/auth.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
   import {
     Bell, Plus, Edit, Trash2, Save, X, Check,
     AlertCircle, Settings, Power, PowerOff
@@ -22,21 +23,21 @@
 
   const dispatch = createEventDispatcher();
 
-  let notificationSettings = [];
-  let availableEvents = [];
-  let loading = true;
-  let error = null;
-  let showCreateModal = false;
-  let showEditModal = false;
-  let editingSetting = null;
+  let notificationSettings = $state([]);
+  let availableEvents = $state([]);
+  let loading = $state(true);
+  let error = $state(null);
+  let showCreateModal = $state(false);
+  let showEditModal = $state(false);
+  let editingSetting = $state(null);
 
   // Form state
-  let formData = {
+  let formData = $state({
     name: '',
     description: '',
     is_active: true,
     event_rules: []
-  };
+  });
 
   // Load notification settings and available events
   onMount(async () => {
@@ -57,7 +58,7 @@
       notificationSettings = data || [];
     } catch (err) {
       console.error('Failed to load notification settings:', err);
-      error = 'Failed to load notification settings';
+      error = t('settings.notifications.failedToLoad');
     } finally {
       loading = false;
     }
@@ -107,7 +108,7 @@
 
   async function handleSubmit() {
     if (!formData.name.trim()) {
-      alert('Name is required');
+      alert(t('settings.notifications.nameRequired'));
       return;
     }
 
@@ -119,17 +120,17 @@
         formData.created_by = authStore.currentUser?.id;
         await api.notificationSettings.create(formData);
       }
-      
+
       await loadNotificationSettings();
       closeModals();
     } catch (err) {
       console.error('Failed to save notification setting:', err);
-      alert('Failed to save notification setting: ' + err.message);
+      alert(t('settings.notifications.failedToSave') + ': ' + err.message);
     }
   }
 
   async function handleDelete(setting) {
-    if (!confirm(`Are you sure you want to delete "${setting.name}"? This action cannot be undone.`)) {
+    if (!confirm(t('settings.notifications.confirmDelete', { name: setting.name }))) {
       return;
     }
 
@@ -138,7 +139,7 @@
       await loadNotificationSettings();
     } catch (err) {
       console.error('Failed to delete notification setting:', err);
-      alert('Failed to delete notification setting: ' + err.message);
+      alert(t('settings.notifications.failedToDelete') + ': ' + err.message);
     }
   }
 
@@ -152,7 +153,7 @@
       await loadNotificationSettings();
     } catch (err) {
       console.error('Failed to toggle notification setting:', err);
-      alert('Failed to update notification setting: ' + err.message);
+      alert(t('settings.notifications.failedToUpdate') + ': ' + err.message);
     }
   }
 
@@ -196,7 +197,7 @@
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: () => openEditModal(setting)
       },
@@ -204,7 +205,7 @@
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50',
         onClick: () => handleDelete(setting)
@@ -212,37 +213,37 @@
     ];
   }
 
-  // Table column definitions
-  const notificationColumns = [
+  // Table column definitions - reactive for i18n
+  const notificationColumns = $derived([
     {
       key: 'setting_info',
-      label: 'Setting',
+      label: t('settings.notifications.setting'),
       render: (setting) => setting.name + (setting.description ? ` - ${setting.description}` : '')
     },
     {
       key: 'status_info',
-      label: 'Status',
+      label: t('common.status'),
       slot: 'status'
     },
     {
       key: 'event_rules_info',
-      label: 'Event Rules',
+      label: t('settings.notifications.eventRules'),
       render: (setting) => {
         const rulesCount = setting.event_rules?.length || 0;
         const enabledCount = setting.event_rules?.filter(rule => rule.is_enabled).length || 0;
-        return rulesCount > 0 ? `${rulesCount} rules configured (${enabledCount} enabled)` : '0 rules configured';
+        return rulesCount > 0 ? t('settings.notifications.rulesConfigured', { count: rulesCount, enabled: enabledCount }) : t('settings.notifications.noRules');
       }
     },
     {
       key: 'created_by_name',
-      label: 'Created By',
+      label: t('settings.notifications.createdBy'),
       render: (setting) => setting.created_by_name || `User ${setting.created_by}`
     },
     {
       key: 'actions',
-      label: 'Actions'
+      label: t('common.actions')
     }
-  ];
+  ]);
 
   // Handle keyboard shortcuts
   function handleKeydown(event) {
@@ -266,8 +267,8 @@
 <div class="space-y-6">
   <PageHeader
     icon={Bell}
-    title="Notification Settings"
-    subtitle="Create and manage notification configurations that can be assigned to configuration sets"
+    title={t('settings.notifications.title')}
+    subtitle={t('settings.notifications.subtitle')}
   >
     {#snippet actions()}
       <Button
@@ -276,7 +277,7 @@
         onclick={openCreateModal}
         keyboardHint="A"
       >
-        Create Notification Setting
+        {t('settings.notifications.createSetting')}
       </Button>
     {/snippet}
   </PageHeader>
@@ -295,7 +296,7 @@
       columns={notificationColumns}
       data={notificationSettings}
       keyField="id"
-      emptyMessage="No notification settings found. Create your first notification setting to get started."
+      emptyMessage={t('settings.notifications.noSettingsFound')}
       emptyIcon={Bell}
       actionItems={buildNotificationDropdownItems}
     >
@@ -304,16 +305,16 @@
         <button
           onclick={() => toggleActive(setting)}
           class="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium transition-colors
-                 {setting.is_active 
-                   ? 'bg-green-100 text-green-800 hover:bg-green-200' 
+                 {setting.is_active
+                   ? 'bg-green-100 text-green-800 hover:bg-green-200'
                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}"
         >
           {#if setting.is_active}
             <Power class="w-3 h-3" />
-            Active
+            {t('common.active')}
           {:else}
             <PowerOff class="w-3 h-3" />
-            Inactive
+            {t('common.inactive')}
           {/if}
         </button>
       </div>
@@ -327,7 +328,7 @@
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold flex items-center gap-2" style="color: var(--ds-text);">
       <Bell class="w-5 h-5" />
-      {editingSetting ? 'Edit Notification Setting' : 'Create Notification Setting'}
+      {editingSetting ? t('settings.notifications.editSetting') : t('settings.notifications.createSetting')}
     </h3>
   </div>
 
@@ -338,12 +339,12 @@
         <!-- Basic Information -->
         <div class="grid grid-cols-1 gap-4">
           <div>
-            <Label for="name" color="default" required class="mb-1">Name</Label>
+            <Label for="name" color="default" required class="mb-1">{t('settings.notifications.name')}</Label>
             <input
               id="name"
               type="text"
               bind:value={formData.name}
-              placeholder="e.g., Development Team Notifications"
+              placeholder={t('settings.notifications.namePlaceholder')}
               class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
               required
@@ -351,11 +352,11 @@
           </div>
 
           <div>
-            <Label for="description" color="default" class="mb-1">Description</Label>
+            <Label for="description" color="default" class="mb-1">{t('settings.notifications.description')}</Label>
             <Textarea
               id="description"
               bind:value={formData.description}
-              placeholder="Description of this notification setting..."
+              placeholder={t('settings.notifications.descriptionPlaceholder')}
               rows={3}
             />
           </div>
@@ -368,7 +369,7 @@
               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
             />
             <label for="is_active" class="ml-2 block text-sm" style="color: var(--ds-text)">
-              Active (can be assigned to configuration sets)
+              {t('settings.notifications.activeCanBeAssigned')}
             </label>
           </div>
         </div>
@@ -376,29 +377,29 @@
         <!-- Event Rules -->
         <div>
           <div class="flex items-center justify-between mb-4">
-            <h4 class="text-sm font-medium" style="color: var(--ds-text)">Event Rules</h4>
+            <h4 class="text-sm font-medium" style="color: var(--ds-text)">{t('settings.notifications.eventRules')}</h4>
             <Button
               variant="primary"
               size="sm"
               icon={Plus}
               onclick={addEventRule}
             >
-              Add Rule
+              {t('settings.notifications.addRule')}
             </Button>
           </div>
 
           {#if formData.event_rules.length === 0}
             <div class="text-center py-8 rounded" style="background-color: var(--ds-surface)">
               <Settings class="w-8 h-8 mx-auto mb-2" style="color: var(--ds-icon-subtle)" />
-              <p class="text-sm" style="color: var(--ds-text)">No event rules configured</p>
-              <p class="text-xs mt-1" style="color: var(--ds-text-subtle)">Add rules to define when notifications should be sent</p>
+              <p class="text-sm" style="color: var(--ds-text)">{t('settings.notifications.noEventRulesConfigured')}</p>
+              <p class="text-xs mt-1" style="color: var(--ds-text-subtle)">{t('settings.notifications.noEventRulesDesc')}</p>
             </div>
           {:else}
             <div class="space-y-4">
               {#each formData.event_rules as rule, index (index)}
                 <div class="border rounded p-4" style="border-color: var(--ds-border)">
                   <div class="flex items-center justify-between mb-4">
-                    <h5 class="font-medium" style="color: var(--ds-text)">Rule {index + 1}</h5>
+                    <h5 class="font-medium" style="color: var(--ds-text)">{t('settings.notifications.rule')} {index + 1}</h5>
                     <button
                       type="button"
                       onclick={() => removeEventRule(index)}
@@ -411,13 +412,13 @@
                   <div class="grid grid-cols-2 gap-4">
                     <!-- Event Type -->
                     <div>
-                      <Label color="default" required class="mb-1">Event Type</Label>
+                      <Label color="default" required class="mb-1">{t('settings.notifications.eventType')}</Label>
                       <BasePicker
                         bind:value={rule.event_type}
                         items={availableEvents || []}
-                        placeholder="Select event type..."
+                        placeholder={t('settings.notifications.selectEventType')}
                         showUnassigned={true}
-                        unassignedLabel="Select event type..."
+                        unassignedLabel={t('settings.notifications.selectEventType')}
                         getValue={(event) => event.type}
                         getLabel={(event) => `${event.category ? event.category.charAt(0).toUpperCase() + event.category.slice(1) + ': ' : ''}${event.name}`}
                       />
@@ -431,14 +432,14 @@
                         class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                       />
                       <label class="ml-2 block text-sm" style="color: var(--ds-text)">
-                        Enabled
+                        {t('common.enable')}
                       </label>
                     </div>
                   </div>
 
                   <!-- Notification Recipients -->
                   <div class="mt-4">
-                    <Label color="default" class="mb-2">Notify Recipients</Label>
+                    <Label color="default" class="mb-2">{t('settings.notifications.notifyRecipients')}</Label>
                     <div class="grid grid-cols-2 gap-4">
                       <label class="flex items-center">
                         <input
@@ -446,7 +447,7 @@
                           bind:checked={rule.notify_assignee}
                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                         />
-                        <span class="ml-2 text-sm" style="color: var(--ds-text)">Assignee</span>
+                        <span class="ml-2 text-sm" style="color: var(--ds-text)">{t('settings.notifications.assignee')}</span>
                       </label>
 
                       <label class="flex items-center">
@@ -455,7 +456,7 @@
                           bind:checked={rule.notify_creator}
                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                         />
-                        <span class="ml-2 text-sm" style="color: var(--ds-text)">Creator</span>
+                        <span class="ml-2 text-sm" style="color: var(--ds-text)">{t('settings.notifications.creator')}</span>
                       </label>
 
                       <label class="flex items-center">
@@ -464,7 +465,7 @@
                           bind:checked={rule.notify_watchers}
                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                         />
-                        <span class="ml-2 text-sm" style="color: var(--ds-text)">Watchers</span>
+                        <span class="ml-2 text-sm" style="color: var(--ds-text)">{t('settings.notifications.watchers')}</span>
                       </label>
 
                       <label class="flex items-center">
@@ -473,23 +474,23 @@
                           bind:checked={rule.notify_workspace_admins}
                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                         />
-                        <span class="ml-2 text-sm" style="color: var(--ds-text)">Workspace Admins</span>
+                        <span class="ml-2 text-sm" style="color: var(--ds-text)">{t('settings.notifications.workspaceAdmins')}</span>
                       </label>
                     </div>
                   </div>
 
                   <!-- Message Template -->
                   <div class="mt-4">
-                    <Label color="default" class="mb-1">Custom Message Template (optional)</Label>
+                    <Label color="default" class="mb-1">{t('settings.notifications.customMessageTemplate')}</Label>
                     <Textarea
                       bind:value={rule.message_template}
-                      placeholder="Leave empty for default message, or customize using variables like &#123;item.title&#125;, &#123;user.name&#125;, &#123;workspace.name&#125;"
+                      placeholder={t('settings.notifications.messageTemplatePlaceholder')}
                       rows={3}
                       class="text-sm"
                     />
                     <div class="mt-1 text-xs" style="color: var(--ds-text-subtle)">
-                      <strong>Available variables:</strong> &#123;item.title&#125;, &#123;item.key&#125;, &#123;user.name&#125;, &#123;workspace.name&#125;, &#123;event.type&#125;<br>
-                      <strong>Example:</strong> "Work item &#123;item.key&#125; '&#123;item.title&#125;' was updated in &#123;workspace.name&#125; by &#123;user.name&#125;"
+                      <strong>{t('settings.notifications.availableVariables')}:</strong> &#123;item.title&#125;, &#123;item.key&#125;, &#123;user.name&#125;, &#123;workspace.name&#125;, &#123;event.type&#125;<br>
+                      <strong>{t('settings.notifications.example')}:</strong> "Work item &#123;item.key&#125; '&#123;item.title&#125;' was updated in &#123;workspace.name&#125; by &#123;user.name&#125;"
                     </div>
                   </div>
                 </div>
@@ -504,6 +505,6 @@
   <DialogFooter
     onCancel={closeModals}
     onConfirm={handleSubmit}
-    confirmLabel={editingSetting ? 'Update Setting' : 'Create Setting'}
+    confirmLabel={editingSetting ? t('settings.notifications.updateSetting') : t('settings.notifications.createSetting')}
   />
 </Modal>

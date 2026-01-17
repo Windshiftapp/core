@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import Button from '../../components/Button.svelte';
@@ -275,7 +276,7 @@
         if (field.is_required) {
           const value = assetFormData.custom_field_values[field.custom_field_id];
           if (value === undefined || value === null || value === '') {
-            alert(`"${field.field_name}" is required`);
+            alert(t('validation.requiredField', { field: field.field_name }));
             return;
           }
         }
@@ -290,12 +291,12 @@
       showAssetForm = false;
     } catch (error) {
       console.error('Failed to save asset:', error);
-      alert('Failed to save asset: ' + error.message);
+      alert(t('dialogs.alerts.failedToSave', { error: error.message }));
     }
   }
 
   async function deleteAsset(id) {
-    if (confirm('Are you sure you want to delete this asset?')) {
+    if (confirm(t('dialogs.confirmations.deleteAsset'))) {
       try {
         await api.assets.delete(id);
         await loadAssets();
@@ -304,7 +305,7 @@
         }
       } catch (error) {
         console.error('Failed to delete asset:', error);
-        alert('Failed to delete asset: ' + error.message);
+        alert(t('dialogs.alerts.failedToDelete', { error: error.message }));
       }
     }
   }
@@ -420,7 +421,7 @@
         onclick={() => selectCategory(null)}
       >
         <Package class="w-4 h-4" />
-        All Assets
+        {t('common.all')}
       </button>
 
       {#if assetCategories.length > 0}
@@ -510,7 +511,7 @@
       {#if selectedSetId}
         <Button onclick={showAddAssetForm} class="whitespace-nowrap" keyboardHint="A">
           <Plus class="w-4 h-4 mr-1" />
-          New Asset
+          {t('common.create')}
         </Button>
       {/if}
     </div>
@@ -526,19 +527,19 @@
 
       {#if loading}
         <div class="flex items-center justify-center h-full">
-          <div class="text-gray-500">Loading...</div>
+          <div class="text-gray-500">{t('common.loading')}</div>
         </div>
       {:else if assetSets.length === 0}
         <EmptyState
           icon={Package}
-          title="No Asset Sets Available"
-          description="You don't have access to any asset sets. Contact an administrator to get access."
+          title={t('common.noItems')}
+          description={t('common.noItems')}
         />
       {:else if assets.length === 0}
         <EmptyState
           icon={Box}
-          title="No Assets Found"
-          description={activeQuery || selectedCategoryId ? "Try adjusting your query or filters." : "Create your first asset to get started."}
+          title={t('common.noItems')}
+          description={activeQuery || selectedCategoryId ? t('common.noItems') : t('common.noItems')}
           action={selectedSetId && !activeQuery && !selectedCategoryId ? createAssetAction : null}
         />
       {:else}
@@ -546,7 +547,7 @@
           columns={assetColumns}
           data={assets}
           keyField="id"
-          emptyMessage="No assets yet."
+          emptyMessage={t('common.noItems')}
           emptyIcon={Box}
           actionItems={buildAssetDropdownItems}
           onRowClick={(asset) => selectedAsset = asset}
@@ -617,14 +618,14 @@
       <div class="flex-1 overflow-auto p-4">
         {#if selectedAsset.description}
           <div class="mb-4">
-            <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">Description</h4>
+            <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.description')}</h4>
             <p class="text-sm" style="color: var(--ds-text);">{selectedAsset.description}</p>
           </div>
         {/if}
         <div class="space-y-3">
           {#if selectedAsset.type_name}
             <div>
-              <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">Type</h4>
+              <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.type')}</h4>
               <span class="inline-flex items-center gap-1" style="color: var(--ds-text);">
                 <ColorDot color={selectedAsset.type_color || '#6b7280'} />
                 {selectedAsset.type_name}
@@ -633,7 +634,7 @@
           {/if}
           {#if selectedAsset.category_name}
             <div>
-              <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">Category</h4>
+              <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.category')}</h4>
               <span class="inline-flex items-center gap-1" style="color: var(--ds-text);">
                 <Folder class="w-4 h-4 text-yellow-500" />
                 {selectedAsset.category_name}
@@ -642,7 +643,7 @@
           {/if}
           {#if selectedAsset.status_name}
             <div>
-              <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">Status</h4>
+              <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.status')}</h4>
               <span class="inline-flex items-center gap-1.5" style="color: var(--ds-text);">
                 <span class="w-2 h-2 rounded-full" style="background-color: {selectedAsset.status_color || '#6b7280'};"></span>
                 {selectedAsset.status_name}
@@ -657,16 +658,16 @@
           {/if}
           {#if selectedAsset.creator_name}
             <div>
-              <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">Created By</h4>
+              <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.createdBy')}</h4>
               <span class="text-sm" style="color: var(--ds-text);">{selectedAsset.creator_name}</span>
             </div>
           {/if}
           <div>
-            <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">Created</h4>
+            <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.created')}</h4>
             <span class="text-sm" style="color: var(--ds-text);">{new Date(selectedAsset.created_at).toLocaleDateString()}</span>
           </div>
           <div>
-            <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">Updated</h4>
+            <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.updated')}</h4>
             <span class="text-sm" style="color: var(--ds-text);">{new Date(selectedAsset.updated_at).toLocaleDateString()}</span>
           </div>
           {#if selectedAsset.linked_item_count > 0}
@@ -776,8 +777,8 @@
       {/if}
     </div>
     <div class="flex justify-end gap-2 mt-6">
-      <Button variant="outline" type="button" onclick={() => showAssetForm = false} keyboardHint="Esc">Cancel</Button>
-      <Button type="submit" keyboardHint="↵">{editingAsset ? 'Save' : 'Create'}</Button>
+      <Button variant="outline" type="button" onclick={() => showAssetForm = false} keyboardHint="Esc">{t('common.cancel')}</Button>
+      <Button type="submit" keyboardHint="↵">{editingAsset ? t('common.save') : t('common.create')}</Button>
     </div>
   </form>
 </Modal>

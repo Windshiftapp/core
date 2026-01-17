@@ -7,6 +7,7 @@
   import DialogFooter from './DialogFooter.svelte';
   import { X, GitMerge, GitBranch, GitCommit, Loader2, Search } from 'lucide-svelte';
   import EmptyState from '../components/EmptyState.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let itemId;
 
@@ -40,7 +41,7 @@
       }
     } catch (err) {
       console.error('Failed to load repositories:', err);
-      error = 'Failed to load repositories';
+      error = t('scm.failedToLoadRepos');
       repositories = [];
     } finally {
       loading = false;
@@ -49,7 +50,7 @@
 
   async function submit() {
     if (!selectedRepoId || !linkType || !externalId) {
-      error = 'Please fill in all required fields';
+      error = t('scm.fillAllRequired');
       return;
     }
 
@@ -78,7 +79,7 @@
       dispatch('created');
     } catch (err) {
       console.error('Failed to create link:', err);
-      error = err.message || 'Failed to create link';
+      error = err.message || t('scm.failedToCreateLink');
     } finally {
       submitting = false;
     }
@@ -139,9 +140,9 @@
 
   function getIdLabel(type) {
     switch (type) {
-      case 'pull_request': return 'PR Number';
-      case 'branch': return 'Branch Name';
-      case 'commit': return 'Commit SHA';
+      case 'pull_request': return t('scm.prNumber');
+      case 'branch': return t('scm.branchName');
+      case 'commit': return t('scm.commitSha');
       default: return 'ID';
     }
   }
@@ -165,10 +166,10 @@
     <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: var(--ds-border);">
       <div>
         <h2 id="add-scm-link-title" class="text-lg font-semibold" style="color: var(--ds-text);">
-          Link Development Resource
+          {t('scm.linkDevResource')}
         </h2>
         <p class="text-sm" style="color: var(--ds-text-subtle);">
-          Connect a PR, branch, or commit to this item
+          {t('scm.linkDevResourceDesc')}
         </p>
       </div>
       <button
@@ -189,19 +190,19 @@
       {:else if repositories.length === 0}
         <EmptyState
           icon={GitMerge}
-          title="No repositories linked to this workspace"
-          description="Link repositories in Workspace Settings → Source Control"
+          title={t('scm.noReposLinked')}
+          description={t('scm.linkReposHelp')}
         />
       {:else}
         <!-- Repository Selection -->
         <div>
-          <Label color="default" required class="mb-1.5">Repository</Label>
+          <Label color="default" required class="mb-1.5">{t('scm.repository')}</Label>
           <BasePicker
             bind:value={selectedRepoId}
             items={repositories}
-            placeholder="Select a repository..."
+            placeholder={t('scm.selectRepository')}
             showUnassigned={true}
-            unassignedLabel="Select a repository..."
+            unassignedLabel={t('scm.selectRepository')}
             getValue={(repo) => repo.id}
             getLabel={(repo) => `${repo.repository_name} (${repo.provider_name})`}
           />
@@ -209,7 +210,7 @@
 
         <!-- Link Type -->
         <div>
-          <Label color="default" required class="mb-1.5">Type</Label>
+          <Label color="default" required class="mb-1.5">{t('scm.type')}</Label>
           <div class="flex gap-2">
             <button
               class="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors"
@@ -222,7 +223,7 @@
               onclick={() => linkType = 'pull_request'}
             >
               <GitMerge class="w-4 h-4" />
-              PR
+              {t('scm.pr')}
             </button>
             <button
               class="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors"
@@ -235,7 +236,7 @@
               onclick={() => linkType = 'branch'}
             >
               <GitBranch class="w-4 h-4" />
-              Branch
+              {t('scm.branch')}
             </button>
             <button
               class="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors"
@@ -248,7 +249,7 @@
               onclick={() => linkType = 'commit'}
             >
               <GitCommit class="w-4 h-4" />
-              Commit
+              {t('scm.commit')}
             </button>
           </div>
         </div>
@@ -267,7 +268,7 @@
 
         <!-- Title (optional) -->
         <div>
-          <Label color="default" class="mb-1.5">Title (optional)</Label>
+          <Label color="default" class="mb-1.5">{t('scm.titleOptional')}</Label>
           <input
             type="text"
             bind:value={title}
@@ -288,9 +289,9 @@
     <DialogFooter
       onCancel={close}
       onConfirm={submit}
-      confirmLabel="Link Resource"
+      confirmLabel={t('scm.linkResource')}
       loading={submitting}
-      loadingLabel="Linking..."
+      loadingLabel={t('scm.linking')}
       disabled={loading || repositories.length === 0 || !selectedRepoId || !externalId}
     />
   </div>

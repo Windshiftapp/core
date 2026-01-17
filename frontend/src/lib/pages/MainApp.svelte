@@ -4,6 +4,7 @@
   import { testingStore, authStore, permissionStore, uiStore, currentWorkspace, workspacesStore, workspacePermissions, ssoStore } from '../stores';
   import EmailVerificationBanner from '../features/notifications/EmailVerificationBanner.svelte';
   import { moduleSettings } from '../stores/moduleSettings.js';
+  import { t } from '../stores/i18n.svelte.js';
   import NotFound from './NotFound.svelte';
   import Workspaces from '../workspaces/Workspaces.svelte';
   import WorkspaceSettings from '../workspaces/WorkspaceSettings.svelte';
@@ -550,7 +551,7 @@ let workspaceSearchQuery = $state('');
     items.push({
       type: 'search',
       id: 'search',
-      placeholder: 'Search workspaces...',
+      placeholder: t('nav.searchWorkspaces'),
       value: workspaceSearchQuery,
       onInput: (value) => {
         workspaceSearchQuery = value;
@@ -593,12 +594,12 @@ let workspaceSearchQuery = $state('');
     } else if ($workspacesStore.regularWorkspaces.length > 0 && workspaceSearchQuery) {
       // Show "no results" only if there are workspaces but search didn't match
       items.push(
-        { type: 'text', text: 'No workspaces match your search' },
+        { type: 'text', text: t('nav.noWorkspacesMatch') },
         { type: 'divider' }
       );
     } else if ($workspacesStore.regularWorkspaces.length === 0) {
       items.push(
-        { type: 'text', text: 'No workspaces found' },
+        { type: 'text', text: t('nav.noWorkspacesFound') },
         { type: 'divider' }
       );
     }
@@ -608,8 +609,8 @@ let workspaceSearchQuery = $state('');
       id: 'manage',
       type: 'regular',
       icon: Settings,
-      title: 'Manage Workspaces',
-      subtitle: 'Create, edit, and organize workspaces',
+      title: t('nav.manageWorkspaces'),
+      subtitle: t('nav.manageWorkspacesSubtitle'),
       color: 'var(--ds-text-link)',
       class: 'font-medium',
       onClick: () => navigate('/workspaces')
@@ -719,7 +720,7 @@ let workspaceSearchQuery = $state('');
       <p class="text-red-600">{message}</p>
       {#if retryFn}
         <Button variant="primary" onclick={retryFn} class="mt-4">
-          Retry
+          {t('nav.retry')}
         </Button>
       {/if}
     </div>
@@ -767,7 +768,7 @@ let workspaceSearchQuery = $state('');
       <!-- Main Navigation -->
       <div class="flex flex-col items-center space-y-1 flex-1">
         <!-- Workspaces -->
-        <Tooltip content="Workspaces" placement="right">
+        <Tooltip content={t('nav.workspaces')} placement="right">
           <div>
             <DropdownMenu
               triggerIcon={Grip}
@@ -783,7 +784,7 @@ let workspaceSearchQuery = $state('');
         </Tooltip>
 
         <!-- Collections -->
-        <Tooltip content="Collections" placement="right">
+        <Tooltip content={t('nav.collections')} placement="right">
           <a
             href="/collections"
             class="w-10 h-10 rounded flex items-center justify-center cursor-pointer nav-button {$currentRoute.view === 'collections-list' ? 'nav-button-selected' : ''}"
@@ -794,7 +795,7 @@ let workspaceSearchQuery = $state('');
         </Tooltip>
 
         <!-- Time & Projects -->
-        <Tooltip content="Time & Projects" placement="right">
+        <Tooltip content={t('nav.timeAndProjects')} placement="right">
           <a
             href="/time"
             class="w-10 h-10 rounded flex items-center justify-center cursor-pointer nav-button {$currentRoute.view === 'time' ? 'nav-button-selected' : ''}"
@@ -805,7 +806,7 @@ let workspaceSearchQuery = $state('');
         </Tooltip>
 
         <!-- Milestones -->
-        <Tooltip content="Milestones" placement="right">
+        <Tooltip content={t('nav.milestones')} placement="right">
           <a
             href="/milestones"
             class="w-10 h-10 rounded flex items-center justify-center cursor-pointer nav-button {$currentRoute.view === 'milestones' || $currentRoute.view === 'milestone-detail' ? 'nav-button-selected' : ''}"
@@ -816,7 +817,7 @@ let workspaceSearchQuery = $state('');
         </Tooltip>
 
         <!-- Iterations -->
-        <Tooltip content="Iterations" placement="right">
+        <Tooltip content={t('nav.iterations')} placement="right">
           <a
             href="/iterations"
             class="w-10 h-10 rounded flex items-center justify-center cursor-pointer nav-button {$currentRoute.view === 'iterations' || $currentRoute.view === 'iteration-detail' ? 'nav-button-selected' : ''}"
@@ -827,7 +828,7 @@ let workspaceSearchQuery = $state('');
         </Tooltip>
 
         <!-- Assets -->
-        <Tooltip content="Assets" placement="right">
+        <Tooltip content={t('nav.assets')} placement="right">
           <a
             href="/assets"
             class="w-10 h-10 rounded flex items-center justify-center cursor-pointer nav-button {$currentRoute.view === 'assets' || $currentRoute.view === 'asset-detail' ? 'nav-button-selected' : ''}"
@@ -838,7 +839,7 @@ let workspaceSearchQuery = $state('');
         </Tooltip>
 
         <!-- Channels -->
-        <Tooltip content="Channels" placement="right">
+        <Tooltip content={t('nav.channels')} placement="right">
           <a
             href="/channels"
             class="w-10 h-10 rounded flex items-center justify-center cursor-pointer nav-button {$currentRoute.view === 'channels' ? 'nav-button-selected' : ''}"
@@ -850,7 +851,7 @@ let workspaceSearchQuery = $state('');
 
         <!-- Customers (conditional based on permission) -->
         {#if $permissionStore.canAccessCustomers}
-          <Tooltip content="Customers" placement="right">
+          <Tooltip content={t('nav.customers')} placement="right">
             <a
               href="/customers"
               class="w-10 h-10 rounded flex items-center justify-center cursor-pointer nav-button {$currentRoute.view === 'customers' ? 'nav-button-selected' : ''}"
@@ -864,7 +865,7 @@ let workspaceSearchQuery = $state('');
         <!-- Top Actions Section - "Notch" style centered positioning -->
         <div class="flex flex-col items-center space-y-2 my-6 py-4">
           <!-- Create button -->
-          <Tooltip content="Create (C)" placement="right">
+          <Tooltip content="{t('nav.create')} (C)" placement="right">
             <button
               onclick={showCreateDropdown}
               class="w-10 h-10 bg-[var(--ds-interactive)] bg-primary text-white rounded items-center justify-center text-sm font-medium transition cursor-pointer flex gap-2"
@@ -874,7 +875,7 @@ let workspaceSearchQuery = $state('');
           </Tooltip>
 
           <!-- Search button -->
-          <Tooltip content="Search ({getShortcutDisplay('global', 'commandPalette')} or Space Space)" placement="right">
+          <Tooltip content="{t('nav.search')} ({getShortcutDisplay('global', 'commandPalette')} or Space Space)" placement="right">
             <button
               onclick={() => showCommandPalette = true}
               class="w-10 h-10 rounded flex items-center justify-center cursor-pointer nav-button"
@@ -889,7 +890,7 @@ let workspaceSearchQuery = $state('');
       <div class="flex flex-col items-center space-y-1 mt-auto">
         <!-- Admin (conditional) -->
         {#if $permissionStore.canAccessAdmin}
-          <Tooltip content="Admin" placement="right">
+          <Tooltip content={t('nav.admin')} placement="right">
             <a
               href="/admin"
               class="w-10 h-10 rounded flex items-center justify-center cursor-pointer nav-button {$currentRoute.view === 'admin' ? 'nav-button-selected' : ''}"
@@ -899,16 +900,16 @@ let workspaceSearchQuery = $state('');
             </a>
           </Tooltip>
         {/if}
-        
+
         <!-- Notification Tray -->
-        <Tooltip content="Notifications" placement="right">
+        <Tooltip content={t('nav.notifications')} placement="right">
           <div class="w-10 h-10 rounded flex items-center justify-center">
             <NotificationTray />
           </div>
         </Tooltip>
-        
+
         <!-- User Profile Avatar -->
-        <Tooltip content="Profile" placement="right">
+        <Tooltip content={t('nav.profile')} placement="right">
           <div class="w-10 h-10 rounded flex items-center justify-center">
             <UserAvatar />
           </div>
@@ -1031,7 +1032,7 @@ let workspaceSearchQuery = $state('');
     <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-white rounded p-6">
         <Spinner class="mx-auto mb-4" />
-        <p class="text-gray-600">Loading Search...</p>
+        <p class="text-gray-600">{t('nav.loadingSearch')}</p>
       </div>
     </div>
   {:else if commandPaletteComponent && showCommandPalette}
@@ -1060,7 +1061,7 @@ let workspaceSearchQuery = $state('');
     <div class="fixed inset-0 flex items-center justify-center z-50" style="background-color: rgba(0, 0, 0, 0.4); backdrop-filter: blur(2px);">
       <div class="bg-white rounded p-6">
         <Spinner class="mx-auto mb-4" />
-        <p class="text-gray-600">Loading Create Form...</p>
+        <p class="text-gray-600">{t('nav.loadingCreateForm')}</p>
       </div>
     </div>
   {:else if createModalComponent && showCreateModal}

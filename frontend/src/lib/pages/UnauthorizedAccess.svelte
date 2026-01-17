@@ -2,10 +2,14 @@
   import { Lock, Home, ArrowLeft, Info } from 'lucide-svelte';
   import { navigate } from '../router.js';
   import Button from '../components/Button.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let requiredPermission = null;
-  export let message = 'You do not have permission to access this page.';
+  export let message = null;
   export let showBackButton = true;
+
+  // Use translation if no message provided
+  $: displayMessage = message || t('errors.INSUFFICIENT_PERMISSION');
 </script>
 
 <div class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -16,7 +20,7 @@
           <Lock class="h-8 w-8 text-blue-600" />
         </div>
         <h2 class="text-xl font-medium text-gray-900 mb-2">Access Restricted</h2>
-        <p class="text-gray-500 mb-6 text-sm">{message}</p>
+        <p class="text-gray-500 mb-6 text-sm">{displayMessage}</p>
         
         {#if requiredPermission}
           <div class="bg-blue-50 border border-blue-200 rounded-md p-3 mb-6">
@@ -47,7 +51,7 @@
               icon={ArrowLeft}
               onclick={() => window.history.back()}
             >
-              Go Back
+              {t('common.back')}
             </Button>
           {/if}
 
@@ -57,7 +61,7 @@
             icon={Home}
             onclick={() => navigate('/dashboard')}
           >
-            Go to Dashboard
+            {t('dashboard.title')}
           </Button>
         </div>
         

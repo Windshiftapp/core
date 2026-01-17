@@ -15,6 +15,7 @@
   import DataTable from '../../components/DataTable.svelte';
   import TestCasePicker from '../../pickers/TestCasePicker.svelte';
   import { renderStatusBadge, renderMilestoneBadge } from '../../utils/testStatusColors.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let { workspaceId = null } = $props();
 
@@ -196,7 +197,7 @@
       await loadSetTestCases($selectedSet.id);
     } catch (error) {
       console.error('Failed to add test case to set:', error);
-      alert('Error adding test case: ' + error.message);
+      alert(t('dialogs.alerts.errorAddingTestCase', { error: error.message }));
     }
   }
 
@@ -232,10 +233,10 @@
 
   const workspaceTestBase = $derived.by(() => workspaceId ? `/workspaces/${workspaceId}/tests` : '/workspaces');
   const testSetColumns = $derived.by(() => [
-    { key: 'id', label: 'ID', width: 'w-16' },
+    { key: 'id', label: t('common.id'), width: 'w-16' },
     {
       key: 'name',
-      label: 'Name',
+      label: t('common.name'),
       html: true,
       render: (set) => {
         const description = set.description ? `<div class="text-xs mt-1" style="color: var(--ds-text-subtle);">${set.description}</div>` : '';
@@ -244,13 +245,13 @@
     },
     {
       key: 'milestone',
-      label: 'Milestone',
+      label: t('milestones.milestone'),
       html: true,
       render: (set) => renderMilestoneBadge(set.milestone_name)
     },
     {
       key: 'test_case_count',
-      label: 'Test Cases',
+      label: t('testing.testCases'),
       html: true,
       render: (set) => {
         const count = set.test_case_count || 0;
@@ -259,7 +260,7 @@
     },
     {
       key: 'total_runs',
-      label: 'Test Runs',
+      label: t('testing.testRuns'),
       html: true,
       render: (set) => {
         const total = set.total_runs || 0;
@@ -268,37 +269,37 @@
         const summary = total > 0
           ? `<div class="text-xs"><span style="color: var(--ds-text-success);">${success} ✓</span>${failed > 0 ? `<span style="color: var(--ds-text-danger);" class="ml-1">${failed} ✗</span>` : ''}</div>`
           : '';
-        return `<div class="flex items-center space-x-2"><span class="font-medium" style="color: var(--ds-text);">${total} total</span>${summary}</div>`;
+        return `<div class="flex items-center space-x-2"><span class="font-medium" style="color: var(--ds-text);">${total} ${t('common.total').toLowerCase()}</span>${summary}</div>`;
       }
     },
     {
       key: 'last_run_status',
-      label: 'Last Run',
+      label: t('testing.lastRun'),
       html: true,
       render: (set) => {
-        if (!set.last_run_status) return `<span style="color: var(--ds-text-subtle);">Never run</span>`;
+        if (!set.last_run_status) return `<span style="color: var(--ds-text-subtle);">${t('testing.neverRun')}</span>`;
         const datePart = set.last_run_date ? `<span class="text-xs mt-1" style="color: var(--ds-text-subtle);">${new Date(set.last_run_date).toLocaleDateString()}</span>` : '';
         return `<div class="flex flex-col">${renderStatusBadge(set.last_run_status)}${datePart}</div>`;
       }
     },
-    { key: 'actions', label: 'Actions', width: 'w-24', align: 'text-right' }
+    { key: 'actions', label: t('common.actions'), width: 'w-24', align: 'text-right' }
   ]);
 
   function testSetActions(set) {
     return [
       {
         id: 'manage-tests',
-        title: 'Tests',
+        title: t('testing.tests'),
         onClick: () => manageSetTests(set)
       },
       {
         id: 'edit',
-        title: 'Edit',
+        title: t('common.edit'),
         onClick: () => showEditForm(set)
       },
       {
         id: 'delete',
-        title: 'Delete',
+        title: t('common.delete'),
         color: 'var(--ds-text-danger)',
         onClick: () => deleteSet(set.id)
       }
@@ -308,15 +309,15 @@
 
 <div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface-raised);">
   <PageHeader
-    title="Test Plans"
-    subtitle="Organize test cases into executable plans"
+    title={t('testing.testPlans')}
+    subtitle={t('testing.testPlansSubtitle')}
   >
     {#snippet actions()}
       <div class="flex items-center gap-3">
         <div class="w-48">
           <MilestoneCombobox
             bind:value={selectedMilestoneFilter}
-            placeholder="All milestones"
+            placeholder={t('milestones.allMilestones')}
             onselect={handleMilestoneSelect}
           />
         </div>
@@ -326,7 +327,7 @@
           size="medium"
           keyboardHint="A"
         >
-          Add Test Plan
+          {t('testing.addTestPlan')}
         </Button>
       </div>
     {/snippet}
@@ -343,25 +344,25 @@
   >
     <div class="p-6">
       <h3 class="text-xl font-semibold mb-6" style="color: var(--ds-text);">
-        {editingSet ? 'Edit' : 'Add'} Test Plan
+        {editingSet ? t('testing.editTestPlan') : t('testing.addTestPlan')}
       </h3>
 
       <div class="space-y-4">
         <div>
-          <Label color="default" class="mb-2">Name</Label>
+          <Label color="default" class="mb-2">{t('common.name')}</Label>
           <Input bind:value={formData.name} required />
         </div>
 
         <div>
-          <Label color="default" class="mb-2">Description</Label>
+          <Label color="default" class="mb-2">{t('common.description')}</Label>
           <Textarea bind:value={formData.description} rows={3} />
         </div>
 
         <div>
-          <Label color="default" class="mb-2">Milestone (Optional)</Label>
+          <Label color="default" class="mb-2">{t('testing.milestoneOptional')}</Label>
           <MilestoneCombobox
             bind:value={formData.milestone_id}
-            placeholder="No milestone"
+            placeholder={t('testing.noMilestone')}
           />
         </div>
       </div>
@@ -373,7 +374,7 @@
           onclick={() => showForm = false}
           keyboardHint="Esc"
         >
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button
           variant="primary"
@@ -381,7 +382,7 @@
           disabled={!formData.name.trim()}
           keyboardHint={submitHint}
         >
-          {editingSet ? 'Save' : 'Create'}
+          {editingSet ? t('common.save') : t('common.create')}
         </Button>
       </div>
     </div>
@@ -394,7 +395,7 @@
   >
     <div class="p-6 max-h-[80vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-6">
-        <h3 class="text-xl font-semibold" style="color: var(--ds-text);">Manage Test Cases for {$selectedSet?.name}</h3>
+        <h3 class="text-xl font-semibold" style="color: var(--ds-text);">{t('testing.manageTestCasesFor', { name: $selectedSet?.name })}</h3>
         <button
           onclick={() => showTestCaseSelector = false}
           class="p-1 rounded transition-colors hover:bg-[var(--ds-background-neutral-hovered)]"
@@ -406,26 +407,26 @@
 
       <!-- Add Test Case Picker -->
       <div class="mb-6">
-        <span class="block text-sm font-medium mb-2" style="color: var(--ds-text);">Add Test Case</span>
+        <span class="block text-sm font-medium mb-2" style="color: var(--ds-text);">{t('testing.addTestCase')}</span>
         <TestCasePicker
           {workspaceId}
           excludeIds={setTestCases.map(tc => tc.id)}
           onselect={handleAddTestCase}
-          placeholder="Search test cases to add..."
+          placeholder={t('testing.searchTestCasesToAdd')}
         />
       </div>
 
       <!-- Assigned Test Cases List -->
       <div>
         <h4 class="font-medium mb-3" style="color: var(--ds-text);">
-          Assigned Test Cases ({setTestCases.length})
+          {t('testing.assignedTestCases', { count: setTestCases.length })}
         </h4>
         <div class="border rounded overflow-hidden" style="border-color: var(--ds-border);">
           {#if setTestCases.length === 0}
             <div class="p-8 text-center" style="background-color: var(--ds-surface);">
               <FileText size={32} style="color: var(--ds-text-subtle); margin: 0 auto 8px;" />
-              <p class="text-sm" style="color: var(--ds-text-subtle);">No test cases assigned yet</p>
-              <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">Use the search above to add test cases</p>
+              <p class="text-sm" style="color: var(--ds-text-subtle);">{t('testing.noTestCasesAssigned')}</p>
+              <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('testing.useSearchToAddTestCases')}</p>
             </div>
           {:else}
             <div class="max-h-80 overflow-y-auto" style="background-color: var(--ds-surface);">
@@ -447,7 +448,7 @@
                     onclick={() => removeTestCaseFromSet(tc.id)}
                     class="p-1.5 rounded transition-colors flex-shrink-0 hover:bg-[var(--ds-background-danger-hovered)] hover:text-[var(--ds-text-danger)]"
                     style="color: var(--ds-text-subtle);"
-                    title="Remove test case"
+                    title={t('testing.removeTestCase')}
                   >
                     <X size={16} />
                   </button>
@@ -463,7 +464,7 @@
           variant="ghost"
           onclick={() => showTestCaseSelector = false}
         >
-          Done
+          {t('common.done')}
         </Button>
         <Button
           variant="primary"
@@ -471,7 +472,7 @@
           disabled={setTestCases.length === 0}
           icon={Play}
         >
-          Start Run
+          {t('testing.startRun')}
         </Button>
       </div>
     </div>
@@ -484,8 +485,8 @@
       data={filteredTestSets}
       keyField="id"
       actionItems={testSetActions}
-      emptyMessage="No test plans yet"
-      emptyDescription="Create your first test plan to organize test cases."
+      emptyMessage={t('testing.noTestPlansYet')}
+      emptyDescription={t('testing.createFirstTestPlan')}
       emptyIcon={Package}
     />
   </div>
@@ -494,10 +495,10 @@
 <!-- Delete Test Plan Confirmation Dialog -->
 <ConfirmDialog
   bind:show={showDeleteConfirmation}
-  title="Delete Test Plan"
-  message="Are you sure you want to delete this test plan? This action cannot be undone."
-  confirmText="Delete Test Plan"
-  cancelText="Cancel"
+  title={t('testing.deleteTestPlan')}
+  message={t('testing.deleteTestPlanConfirm')}
+  confirmText={t('testing.deleteTestPlan')}
+  cancelText={t('common.cancel')}
   variant="danger"
   onconfirm={confirmDeleteSet}
   oncancel={() => {

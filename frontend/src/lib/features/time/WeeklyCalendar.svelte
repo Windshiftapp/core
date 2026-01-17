@@ -9,6 +9,7 @@
   import { exportTasksToICS } from '../../utils/icsExport.js';
   import { authStore, workspacesStore } from '../../stores';
   import { getStatusStyleFromStatuses } from '../../utils/statusColors.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   // Get current date and week
   let currentDate = new Date();
@@ -397,7 +398,7 @@
       await loadAssignedWorkItems();
     } catch (error) {
       console.error('Failed to create calendar task:', error);
-      alert('Failed to create task: ' + error.message);
+      alert(t('time.calendar.failedToCreateTask') + ': ' + error.message);
     }
   }
 
@@ -704,7 +705,7 @@
       id: 'export-ics',
       type: 'regular',
       icon: Download,
-      title: 'Export Week to ICS',
+      title: t('time.calendar.exportWeekToICS'),
       onClick: handleExportICS
     }
   ];
@@ -746,9 +747,9 @@
           <div>
             <h3 class="text-lg font-semibold flex items-center gap-2" style="color: var(--ds-text);">
               <CheckSquare class="w-5 h-5" style="color: var(--ds-accent-orange);" />
-              My Work Items
+              {t('time.calendar.myWorkItems')}
             </h3>
-            <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">Drag items to schedule them</p>
+            <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('time.calendar.dragToSchedule')}</p>
           </div>
           <button
             onclick={() => showTasksSidebar = false}
@@ -764,8 +765,8 @@
         {#if assignedWorkItems.length === 0}
           <div class="text-center py-8">
             <CheckSquare class="w-8 h-8 mx-auto mb-3" style="color: var(--ds-text-subtlest);" />
-            <p class="text-sm" style="color: var(--ds-text-subtle);">No work items assigned</p>
-            <p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">Work items will appear here when assigned to you</p>
+            <p class="text-sm" style="color: var(--ds-text-subtle);">{t('time.calendar.noWorkItems')}</p>
+            <p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">{t('time.calendar.workItemsWillAppear')}</p>
           </div>
         {:else}
           <div class="space-y-3">
@@ -856,15 +857,17 @@
       <!-- Progress Footer -->
       <div class="p-4 border-t" style="border-color: var(--ds-border);">
         <div class="text-xs" style="color: var(--ds-text-subtle);">
-          <span class="font-medium">{assignedWorkItems.filter(item => {
-            if (isPersonalWorkspaceItem(item)) {
-              return isPersonalTaskCompleted(item);
-            } else {
-              const status = availableStatuses.find(s => s.id === item.status_id);
-              return status?.category_name === 'Done';
-            }
-          }).length}</span> of
-          <span class="font-medium">{assignedWorkItems.length}</span> items completed
+          {t('time.calendar.itemsCompleted', {
+            completed: assignedWorkItems.filter(item => {
+              if (isPersonalWorkspaceItem(item)) {
+                return isPersonalTaskCompleted(item);
+              } else {
+                const status = availableStatuses.find(s => s.id === item.status_id);
+                return status?.category_name === 'Done';
+              }
+            }).length,
+            total: assignedWorkItems.length
+          })}
         </div>
       </div>
     </div>
@@ -876,9 +879,9 @@
     <div class="px-6 pt-6">
       <PageHeader
         icon={Calendar}
-        title="Weekly Calendar"
+        title={t('time.calendar.title')}
         subtitle="{formatWeekRange(currentWeekStart)}"
-        count="{allWeekTasks.length} items"
+        count={t('time.calendar.itemCount', { count: allWeekTasks.length })}
       >
         {#snippet actions()}
           <div class="flex items-center space-x-4">
@@ -887,7 +890,7 @@
               <button
                 class="p-2 rounded transition-colors text-[var(--ds-text-subtle)] hover:bg-[var(--ds-background-neutral-hovered)]"
                 onclick={() => navigateWeek(-1)}
-                title="Previous week"
+                title={t('time.calendar.previousWeek')}
               >
                 <ChevronLeft class="w-4 h-4" />
               </button>
@@ -895,12 +898,12 @@
                 class="text-xs px-2 py-1 rounded transition-colors text-[var(--ds-text-subtle)] hover:bg-[var(--ds-background-neutral-hovered)] hover:text-[var(--ds-text)]"
                 onclick={goToToday}
               >
-                this week
+                {t('time.calendar.thisWeek')}
               </button>
               <button
                 class="p-2 rounded transition-colors text-[var(--ds-text-subtle)] hover:bg-[var(--ds-background-neutral-hovered)]"
                 onclick={() => navigateWeek(1)}
-                title="Next week"
+                title={t('time.calendar.nextWeek')}
               >
                 <ChevronRight class="w-4 h-4" />
               </button>
@@ -914,7 +917,7 @@
                 style="background-color: var(--ds-surface-raised); color: var(--ds-text); border-color: var(--ds-border);"
               >
                 <CheckSquare class="w-4 h-4" />
-                My Work Items ({assignedWorkItems.length})
+                {t('time.calendar.myWorkItems')} ({assignedWorkItems.length})
               </button>
               <DropdownMenu
                 items={calendarMenuItems}
@@ -1188,7 +1191,7 @@
                       <input
                         type="text"
                         bind:value={newTaskTitle}
-                        placeholder="New task title..."
+                        placeholder={t('time.calendar.newTaskPlaceholder')}
                         class="w-full text-xs font-medium border-0 outline-none p-0"
                         style="background: transparent; color: var(--ds-text);"
                         autofocus

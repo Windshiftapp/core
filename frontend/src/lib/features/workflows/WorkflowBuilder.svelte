@@ -3,6 +3,7 @@
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { Plus, Edit, Trash2, Workflow, ArrowRight } from 'lucide-svelte';
+  import { t } from '../../stores/i18n.svelte.js';
   import Button from '../../components/Button.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
@@ -88,7 +89,7 @@
 
   async function createWorkflow() {
     if (!newWorkflow.name.trim()) {
-      alert('Please enter a workflow name');
+      alert(t('workflows.enterWorkflowName'));
       return;
     }
 
@@ -99,7 +100,7 @@
       newWorkflow = { name: '', description: '', is_default: false };
     } catch (error) {
       console.error('Failed to create workflow:', error);
-      alert('Failed to create workflow: ' + (error.message || error));
+      alert(t('dialogs.alerts.failedToCreate', { error: error.message || error }));
     }
   }
 
@@ -118,7 +119,7 @@
 
   async function updateWorkflow() {
     if (!editWorkflow.name.trim()) {
-      alert('Please enter a workflow name');
+      alert(t('workflows.enterWorkflowName'));
       return;
     }
 
@@ -128,12 +129,12 @@
       editingId = null;
     } catch (error) {
       console.error('Failed to update workflow:', error);
-      alert('Failed to update workflow: ' + (error.message || error));
+      alert(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
     }
   }
 
   async function deleteWorkflow(workflow) {
-    if (!confirm(`Are you sure you want to delete "${workflow.name}"? This action cannot be undone.`)) {
+    if (!confirm(t('workflows.confirmDeleteWorkflow', { name: workflow.name }))) {
       return;
     }
 
@@ -143,7 +144,7 @@
       await loadWorkflows();
     } catch (error) {
       console.error('Failed to delete workflow:', error);
-      alert('Failed to delete workflow: ' + (error.message || error));
+      alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
     }
   }
 
@@ -164,7 +165,7 @@
         id: 'design',
         type: 'regular',
         icon: ArrowRight,
-        title: 'Design',
+        title: t('workflows.design'),
         hoverClass: 'hover:bg-blue-50',
         onClick: () => navigate(`/workflows/${workflow.id}/design`)
       },
@@ -172,7 +173,7 @@
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: () => startEdit(workflow)
       },
@@ -180,7 +181,7 @@
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50',
         onClick: () => deleteWorkflow(workflow)
@@ -188,33 +189,33 @@
     ];
   }
 
-  // Table column definitions
-  const workflowColumns = [
+  // Table column definitions (use $derived to make it reactive to language changes)
+  let workflowColumns = $derived([
     {
       key: 'workflow',
-      label: 'Workflow',
+      label: t('workflows.workflow'),
       slot: 'workflow',
       render: (workflow) => workflow.name // Fallback if slot doesn't work
     },
     {
       key: 'description',
-      label: 'Description',
+      label: t('common.description'),
       render: (workflow) => workflow.description || '—',
       textColor: 'var(--ds-text-subtle)'
     },
     {
       key: 'actions',
-      label: 'Actions'
+      label: t('common.actions')
     }
-  ];
+  ]);
 </script>
 
 <div style="background-color: var(--ds-surface); min-height: 100vh;">
-  <PageHeader 
-    icon={Workflow} 
-    title="Workflows" 
-    subtitle="Design and manage workflow transitions between statuses."
-    count="{workflows.length} workflows"
+  <PageHeader
+    icon={Workflow}
+    title={t('workflows.title')}
+    subtitle={t('workflows.subtitle')}
+    count={t('workflows.count', { count: workflows.length })}
   >
     {#snippet actions()}
       <Button
@@ -224,7 +225,7 @@
         disabled={statuses.length === 0}
         keyboardHint="A"
       >
-        Create Workflow
+        {t('workflows.createWorkflow')}
       </Button>
     {/snippet}
   </PageHeader>
@@ -233,12 +234,12 @@
     <div class="rounded-xl border shadow-sm p-12" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
       <EmptyState
         icon={Workflow}
-        title="No statuses available"
-        description="You need to create statuses before you can create workflows."
+        title={t('workflows.noStatusesAvailable')}
+        description={t('workflows.createStatusesFirst')}
       >
         {#snippet action()}
           <Button variant="primary" onclick={() => navigate('/admin/statuses')}>
-            Manage Statuses
+            {t('workflows.manageStatuses')}
           </Button>
         {/snippet}
       </EmptyState>
@@ -249,7 +250,7 @@
       columns={workflowColumns}
       data={workflows}
       keyField="id"
-      emptyMessage="No workflows found. Create your first workflow to get started."
+      emptyMessage={t('workflows.noWorkflowsFound')}
       emptyIcon={Workflow}
       actionItems={buildWorkflowDropdownItems}
       loading={loading}
@@ -257,7 +258,7 @@
       <div slot="workflow" let:item={workflow} class="flex items-center gap-3">
         <h3 class="font-medium" style="color: var(--ds-text);">{workflow.name}</h3>
         {#if workflow.is_default}
-          <Lozenge color="green" text="Default" />
+          <Lozenge color="green" text={t('common.default')} />
         {/if}
       </div>
     </DataTable>
@@ -268,7 +269,7 @@
 <Modal isOpen={creating} onclose={cancelCreate} maxWidth="max-w-lg">
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-      Create Workflow
+      {t('workflows.createWorkflow')}
     </h3>
   </div>
 
@@ -276,12 +277,12 @@
     <form onsubmit={(e) => { e.preventDefault(); createWorkflow(); }}>
       <div class="space-y-4">
         <div>
-          <Label color="default" required class="mb-2">Name</Label>
+          <Label color="default" required class="mb-2">{t('common.name')}</Label>
           <input
             type="text"
             bind:value={newWorkflow.name}
             bind:this={nameInput}
-            placeholder="e.g., Default Workflow"
+            placeholder={t('workflows.workflowNamePlaceholder')}
             class="w-full px-3 py-2 rounded focus:outline-none focus:ring-2"
             style="border: 1px solid var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
             required
@@ -289,10 +290,10 @@
         </div>
 
         <div>
-          <Label color="default" class="mb-2">Description</Label>
+          <Label color="default" class="mb-2">{t('common.description')}</Label>
           <Textarea
             bind:value={newWorkflow.description}
-            placeholder="Optional description for this workflow"
+            placeholder={t('workflows.descriptionPlaceholder')}
             rows={2}
           />
         </div>
@@ -305,16 +306,16 @@
             class="rounded"
             style="border-color: var(--ds-border);"
           />
-          <label for="new-default" class="text-sm" style="color: var(--ds-text);">Set as default workflow</label>
+          <label for="new-default" class="text-sm" style="color: var(--ds-text);">{t('workflows.setAsDefault')}</label>
         </div>
       </div>
 
       <div class="flex justify-end gap-3 mt-6 pt-4 border-t" style="border-color: var(--ds-border);">
         <Button type="button" onclick={cancelCreate}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button variant="primary" type="submit">
-          Create Workflow
+          {t('workflows.createWorkflow')}
         </Button>
       </div>
     </form>
@@ -325,7 +326,7 @@
 <Modal isOpen={editingId !== null} onclose={cancelEdit} maxWidth="max-w-lg">
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-      Edit Workflow
+      {t('workflows.editWorkflow')}
     </h3>
   </div>
 
@@ -333,7 +334,7 @@
     <form onsubmit={(e) => { e.preventDefault(); updateWorkflow(); }}>
       <div class="space-y-4">
         <div>
-          <Label color="default" required class="mb-2">Name</Label>
+          <Label color="default" required class="mb-2">{t('common.name')}</Label>
           <input
             type="text"
             bind:value={editWorkflow.name}
@@ -344,7 +345,7 @@
         </div>
 
         <div>
-          <Label color="default" class="mb-2">Description</Label>
+          <Label color="default" class="mb-2">{t('common.description')}</Label>
           <Textarea
             bind:value={editWorkflow.description}
             rows={2}
@@ -359,16 +360,16 @@
             class="rounded"
             style="border-color: var(--ds-border);"
           />
-          <label for="edit-default" class="text-sm" style="color: var(--ds-text);">Set as default workflow</label>
+          <label for="edit-default" class="text-sm" style="color: var(--ds-text);">{t('workflows.setAsDefault')}</label>
         </div>
       </div>
 
       <div class="flex justify-end gap-3 mt-6 pt-4 border-t" style="border-color: var(--ds-border);">
         <Button type="button" onclick={cancelEdit}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button variant="primary" type="submit">
-          Save Changes
+          {t('common.saveChanges')}
         </Button>
       </div>
     </form>

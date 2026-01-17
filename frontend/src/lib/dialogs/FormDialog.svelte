@@ -2,14 +2,15 @@
   import Modal from './Modal.svelte';
   import ModalHeader from './ModalHeader.svelte';
   import DialogFooter from './DialogFooter.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     isOpen = false,
     title,
     subtitle = '',
     icon = null,
-    confirmLabel = 'Save',
-    cancelLabel = 'Cancel',
+    confirmLabel = null,
+    cancelLabel = null,
     variant = 'primary', // 'primary' | 'danger'
     loading = false,
     disabled = false,
@@ -50,8 +51,8 @@
   </div>
 
   <DialogFooter
-    {confirmLabel}
-    {cancelLabel}
+    confirmLabel={confirmLabel ?? t('dialogs.save')}
+    cancelLabel={cancelLabel ?? t('dialogs.cancel')}
     {variant}
     {loading}
     {disabled}

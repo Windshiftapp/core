@@ -9,6 +9,7 @@
   import Label from '../components/Label.svelte';
   import { successToast } from '../stores/toasts.svelte.js';
   import Toggle from '../components/Toggle.svelte';
+  import { t } from '../stores/i18n.svelte.js';
   
   let settings = $state({
     id: 1,
@@ -32,13 +33,13 @@
   let newMimeType = $state('');
   
   // Common MIME type presets
-  const mimeTypePresets = [
-    { label: 'Images', types: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] },
-    { label: 'Documents', types: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'] },
-    { label: 'Spreadsheets', types: ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'] },
-    { label: 'Archives', types: ['application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed'] },
-    { label: 'Text', types: ['text/plain', 'text/csv', 'application/json'] }
-  ];
+  const mimeTypePresets = $derived([
+    { label: t('settings.attachments.images'), types: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] },
+    { label: t('settings.attachments.documents'), types: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'] },
+    { label: t('settings.attachments.spreadsheets'), types: ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'] },
+    { label: t('settings.attachments.archives'), types: ['application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed'] },
+    { label: t('settings.attachments.text'), types: ['text/plain', 'text/csv', 'application/json'] }
+  ]);
 
   // Get color for MIME type chip based on type category
   function getMimeTypeColor(mimeType) {
@@ -76,7 +77,7 @@
     } catch (err) {
       if (err.message.includes('Not Found')) {
         // Attachment functionality is not configured
-        error = 'Attachment functionality is not available. Configure an attachment directory to enable attachments.';
+        error = t('settings.attachments.notAvailable');
         settings = {
           enabled: false,
           attachment_path: null,
@@ -85,7 +86,7 @@
         };
       } else {
         console.error('Failed to load attachment settings:', err);
-        error = 'Failed to load attachment settings';
+        error = t('settings.attachments.failedToLoad');
       }
     }
   }
@@ -118,14 +119,14 @@
 
       await api.attachmentSettings.update(settings.id, requestData);
 
-      successToast('Settings saved successfully');
+      successToast(t('settings.attachments.settingsSavedSuccess'));
 
       // Reload settings to get updated values
       await loadSettings();
 
     } catch (err) {
       console.error('Failed to save settings:', err);
-      error = err.message || 'Failed to save settings';
+      error = err.message || t('settings.attachments.failedToSave');
     } finally {
       saving = false;
     }
@@ -199,10 +200,10 @@
   let saveTimeout;
 </script>
 
-<PageHeader 
-  icon={Paperclip} 
-  title="Attachment Settings" 
-  subtitle="Configure file upload restrictions and attachment storage"
+<PageHeader
+  icon={Paperclip}
+  title={t('settings.attachments.title')}
+  subtitle={t('settings.attachments.subtitle')}
 />
     {#if loading}
       <div class="flex items-center justify-center py-12">
@@ -212,34 +213,34 @@
       <!-- Status Section -->
       {#if status}
         <div class="rounded border p-6 mb-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-          <h2 class="text-lg font-medium mb-4" style="color: var(--ds-text);">System Status</h2>
+          <h2 class="text-lg font-medium mb-4" style="color: var(--ds-text);">{t('settings.attachments.systemStatus')}</h2>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="flex items-center gap-3">
               {#if status.enabled}
                 <CheckCircle class="w-5 h-5" style="color: var(--ds-accent-green);" />
-                <span class="text-sm font-medium" style="color: var(--ds-accent-green-bolder);">Attachments Enabled</span>
+                <span class="text-sm font-medium" style="color: var(--ds-accent-green-bolder);">{t('settings.attachments.attachmentsEnabled')}</span>
               {:else}
                 <AlertCircle class="w-5 h-5" style="color: var(--ds-accent-red);" />
-                <span class="text-sm font-medium" style="color: var(--ds-accent-red-bolder);">Attachments Disabled</span>
+                <span class="text-sm font-medium" style="color: var(--ds-accent-red-bolder);">{t('settings.attachments.attachmentsDisabled')}</span>
               {/if}
             </div>
 
             <div class="text-sm">
-              <span style="color: var(--ds-text-subtle);">Storage Path:</span>
+              <span style="color: var(--ds-text-subtle);">{t('settings.attachments.storagePath')}</span>
               <br>
               <span class="font-mono text-xs" style="color: {status.attachment_path ? 'var(--ds-text)' : 'var(--ds-text-disabled)'};">
-                {status.attachment_path || 'Not configured'}
+                {status.attachment_path || t('settings.attachments.notConfigured')}
               </span>
             </div>
 
             <div class="flex items-center gap-3">
               {#if status.writable}
                 <CheckCircle class="w-5 h-5" style="color: var(--ds-accent-green);" />
-                <span class="text-sm font-medium" style="color: var(--ds-accent-green-bolder);">Path Writable</span>
+                <span class="text-sm font-medium" style="color: var(--ds-accent-green-bolder);">{t('settings.attachments.pathWritable')}</span>
               {:else}
                 <AlertCircle class="w-5 h-5" style="color: var(--ds-accent-yellow);" />
-                <span class="text-sm font-medium" style="color: var(--ds-accent-yellow-bolder);">Path Status Unknown</span>
+                <span class="text-sm font-medium" style="color: var(--ds-accent-yellow-bolder);">{t('settings.attachments.pathStatusUnknown')}</span>
               {/if}
             </div>
           </div>
@@ -247,21 +248,21 @@
           {#if !status.enabled}
             <div class="mt-4 p-3 rounded border-l-4" style="border-color: var(--ds-accent-blue); background-color: var(--ds-accent-blue-subtlest);">
               <p class="text-sm" style="color: var(--ds-accent-blue-bolder);">
-                <strong>Note:</strong> To enable attachments, restart the windshift server with the <code class="px-1 rounded" style="background-color: var(--ds-accent-blue-subtler);">--attachment-path</code> flag.
+                <strong>{t('settings.attachments.enableNote')}</strong>
                 <br>
-                Example: <code class="px-1 rounded" style="background-color: var(--ds-accent-blue-subtler);">./windshift --attachment-path /path/to/attachments</code>
+                {t('settings.attachments.enableExample')}
               </p>
             </div>
           {/if}
         </div>
       {:else}
         <div class="rounded border p-6 mb-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-          <h2 class="text-lg font-medium mb-4" style="color: var(--ds-text);">System Status</h2>
+          <h2 class="text-lg font-medium mb-4" style="color: var(--ds-text);">{t('settings.attachments.systemStatus')}</h2>
           <div class="p-3 rounded border-l-4" style="border-color: var(--ds-accent-blue); background-color: var(--ds-accent-blue-subtlest);">
             <p class="text-sm" style="color: var(--ds-accent-blue-bolder);">
-              <strong>Note:</strong> To enable attachments, restart the windshift server with the <code class="px-1 rounded" style="background-color: var(--ds-accent-blue-subtler);">--attachment-path</code> flag.
+              <strong>{t('settings.attachments.enableNote')}</strong>
               <br>
-              Example: <code class="px-1 rounded" style="background-color: var(--ds-accent-blue-subtler);">./windshift --attachment-path /path/to/attachments</code>
+              {t('settings.attachments.enableExample')}
             </p>
           </div>
         </div>
@@ -271,23 +272,23 @@
       <div class="space-y-6">
         <!-- General Settings -->
         <div class="rounded border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-          <h2 class="text-lg font-medium mb-4" style="color: var(--ds-text);">General Settings</h2>
-          
+          <h2 class="text-lg font-medium mb-4" style="color: var(--ds-text);">{t('settings.attachments.generalSettings')}</h2>
+
           <div class="space-y-4">
             <!-- Enable/Disable Toggle -->
             <div class="flex items-center justify-between">
               <div>
                 <label class="text-sm font-medium" style="color: var(--ds-text);">
-                  Enable Attachments
+                  {t('settings.attachments.enableAttachments')}
                 </label>
-                <p class="text-xs" style="color: var(--ds-text-subtle);">Allow users to upload attachments to work items</p>
+                <p class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.attachments.enableAttachmentsDesc')}</p>
               </div>
 <Toggle bind:checked={enabled} disabled={!status || !status.attachment_path} />
             </div>
-            
+
             <!-- Max File Size -->
             <div>
-              <Label color="default" class="mb-1">Maximum File Size (MB)</Label>
+              <Label color="default" class="mb-1">{t('settings.attachments.maxFileSize')}</Label>
               <input
                 type="number"
                 bind:value={maxFileSizeMB}
@@ -297,7 +298,7 @@
                 style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
               />
               <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-                Current: {formatFileSize(maxFileSizeMB * 1048576)}
+                {t('settings.attachments.current')}: {formatFileSize(maxFileSizeMB * 1048576)}
               </p>
             </div>
           </div>
@@ -305,14 +306,14 @@
 
         <!-- MIME Type Restrictions -->
         <div class="rounded border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-          <h2 class="text-lg font-medium mb-4" style="color: var(--ds-text);">File Type Restrictions</h2>
+          <h2 class="text-lg font-medium mb-4" style="color: var(--ds-text);">{t('settings.attachments.fileTypeRestrictions')}</h2>
           <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">
-            Leave empty to allow all file types. Add specific MIME types to restrict uploads.
+            {t('settings.attachments.fileTypeRestrictionsDesc')}
           </p>
-          
+
           <!-- Quick Add Presets -->
           <div class="mb-4">
-            <Label color="default" class="mb-2">Quick Add Common Types:</Label>
+            <Label color="default" class="mb-2">{t('settings.attachments.quickAddCommonTypes')}</Label>
             <div class="flex flex-wrap gap-2">
               {#each mimeTypePresets as preset}
                 <Button
@@ -332,21 +333,21 @@
                   disabled={saving}
                   class="text-red-600 hover:text-red-700"
                 >
-                  Clear All
+                  {t('settings.attachments.clearAll')}
                 </Button>
               {/if}
             </div>
           </div>
-          
+
           <!-- Add Custom MIME Type -->
           <div class="mb-4">
-            <Label color="default" class="mb-1">Add MIME Type:</Label>
+            <Label color="default" class="mb-1">{t('settings.attachments.addMimeType')}</Label>
             <div class="flex gap-2">
               <input
                 type="text"
                 bind:value={newMimeType}
                 onkeydown={handleKeydown}
-                placeholder="e.g., image/jpeg"
+                placeholder={t('settings.attachments.mimeTypePlaceholder')}
                 class="flex-1 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
               />
@@ -356,15 +357,15 @@
                 onclick={addMimeType}
                 disabled={!newMimeType.trim() || saving}
               >
-                Add
+                {t('common.add')}
               </Button>
             </div>
           </div>
-          
+
           <!-- Current MIME Types -->
           {#if allowedMimeTypes.length > 0}
             <div>
-              <Label color="default" class="mb-2">Allowed MIME Types ({allowedMimeTypes.length}):</Label>
+              <Label color="default" class="mb-2">{t('settings.attachments.allowedMimeTypes')} ({allowedMimeTypes.length}):</Label>
               <div class="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1">
                 {#each allowedMimeTypes as mimeType, index}
                   <Lozenge
@@ -387,7 +388,7 @@
             </div>
           {:else}
             <div class="text-center py-4" style="color: var(--ds-text-subtlest);">
-              <p class="text-sm">All file types allowed</p>
+              <p class="text-sm">{t('settings.attachments.allFileTypesAllowed')}</p>
             </div>
           {/if}
         </div>

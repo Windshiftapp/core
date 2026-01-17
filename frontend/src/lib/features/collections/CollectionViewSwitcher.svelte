@@ -1,5 +1,6 @@
 <script>
   import { navigate } from '../../router.js';
+  import { t } from '../../stores/i18n.svelte.js';
   import { SquareKanban, Inbox, Settings } from 'lucide-svelte';
   import { backlogStore } from '../../stores/index.js';
 
@@ -61,7 +62,7 @@
   >
     <div class="flex items-center gap-2">
       <SquareKanban class="w-4 h-4" />
-      Board
+      {t('collections.board')}
     </div>
   </button>
 
@@ -76,7 +77,7 @@
   >
     <div class="flex items-center gap-2">
       <Inbox class="w-4 h-4" />
-      Backlog
+      {t('collections.backlog')}
       {#if backlogStore.count > 0}
         <span class="px-1.5 py-0.5 rounded-full text-xs" style="background-color: var(--ds-accent-blue-subtle); color: var(--ds-text-info);">
           {backlogStore.count}
@@ -96,7 +97,7 @@
   >
     <div class="flex items-center gap-2">
       <Settings class="w-4 h-4" />
-      Configure
+      {t('collections.configure')}
     </div>
   </button>
 </div>

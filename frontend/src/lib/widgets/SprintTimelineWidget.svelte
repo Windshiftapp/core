@@ -1,6 +1,7 @@
 <script>
   import { CalendarDays } from 'lucide-svelte';
   import WidgetState from './WidgetState.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let workspaceId = null;
 
@@ -12,8 +13,8 @@
   error={null}
   isEmpty={sprints.length === 0}
   emptyIcon={CalendarDays}
-  emptyTitle="No active sprints"
-  emptySubtitle="Sprint timelines will appear here"
+  emptyTitle={t('widgets.sprintTimeline.emptyTitle')}
+  emptySubtitle={t('widgets.sprintTimeline.emptySubtitle')}
 >
   {#snippet children()}
     <div class="space-y-3">

@@ -13,6 +13,7 @@
   } from '../utils/timeUtils.js';
   import Modal from './Modal.svelte';
   import DialogFooter from './DialogFooter.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   // Configuration props
   let {
@@ -256,7 +257,7 @@
 >
   <!-- Header -->
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-    <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{editingWorklog ? 'Edit Time Entry' : 'Log Work Time'}</h3>
+    <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{editingWorklog ? t('time.editTimeEntry') : t('time.logTime')}</h3>
   </div>
 
   <!-- Form -->
@@ -264,12 +265,12 @@
     <!-- Project Selection (shown at top when from work item) -->
     {#if showProjectField}
       <div>
-        <Label color="default" required={!defaultItemId} class="mb-2">Time Tracking Project</Label>
+        <Label color="default" required={!defaultItemId} class="mb-2">{t('time.timeTrackingProject')}</Label>
         <div class="relative">
           <input
             use:melt={$projectInput}
             type="text"
-            placeholder="Search projects..."
+            placeholder={t('placeholders.searchProjects')}
             disabled={!allowProjectChange}
             class="w-full px-3 py-2.5 pr-8 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 text-sm"
             style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
@@ -321,12 +322,12 @@
     <!-- Work Item Selection (optional on time page) -->
     {#if showWorkItemField}
       <div>
-        <Label color="default" class="mb-2">Work Item (Optional)</Label>
+        <Label color="default" class="mb-2">{t('time.workItemOptional')}</Label>
         <div class="relative">
           <input
             use:melt={$workItemInput}
             type="text"
-            placeholder="Search work items..."
+            placeholder={t('placeholders.searchWorkItems')}
             class="w-full px-3 py-2.5 pr-8 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 text-sm"
             style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
           />
@@ -381,11 +382,11 @@
 
     <!-- Description -->
     <div>
-      <Label color="default" required class="mb-2">Description</Label>
+      <Label color="default" required class="mb-2">{t('common.description')}</Label>
       <Input
         id="time-log-description"
         bind:value={formData.description}
-        placeholder="What did you work on?"
+        placeholder={t('time.whatDidYouWorkOn')}
         size="small"
       />
     </div>
@@ -394,7 +395,7 @@
     <div class="grid grid-cols-4 gap-3">
       <!-- Start Time -->
       <div>
-        <Label color="default" class="mb-2">Start</Label>
+        <Label color="default" class="mb-2">{t('time.start')}</Label>
         <Input
           type="time"
           bind:value={formData.start_time}
@@ -405,7 +406,7 @@
 
       <!-- Duration -->
       <div>
-        <Label color="default" required class="mb-2">Duration</Label>
+        <Label color="default" required class="mb-2">{t('time.duration')}</Label>
         <Input
           bind:value={formData.duration}
           oninput={onDurationChange}
@@ -416,7 +417,7 @@
 
       <!-- End Time -->
       <div>
-        <Label color="default" class="mb-2">End</Label>
+        <Label color="default" class="mb-2">{t('time.end')}</Label>
         <Input
           type="time"
           bind:value={formData.end_time}
@@ -427,7 +428,7 @@
 
       <!-- Date -->
       <div>
-        <Label color="default" class="mb-2">Date</Label>
+        <Label color="default" class="mb-2">{t('common.date')}</Label>
         <Input
           type="date"
           bind:value={formData.date}
@@ -438,7 +439,7 @@
 
     <!-- Helper text -->
     <div class="text-xs" style="color: var(--ds-text-subtle);">
-      Enter start time + duration (2h) to auto-calculate end time, or enter start + end times to auto-calculate duration. Time formats: 1h, 30m, 1h30m, 2h15m, 1d (=8h)
+      {t('time.durationHelperText')}
     </div>
 
   </div>
@@ -447,7 +448,7 @@
   <DialogFooter
     onCancel={handleCancel}
     onConfirm={handleSave}
-    confirmLabel={editingWorklog ? 'Update Entry' : 'Log Time'}
+    confirmLabel={editingWorklog ? t('time.updateEntry') : t('time.logTime')}
     disabled={!isFormValid}
     showKeyboardHint={true}
     confirmKeyboardHint={submitHint}

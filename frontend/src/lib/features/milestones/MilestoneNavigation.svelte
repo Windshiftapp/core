@@ -5,6 +5,7 @@
   import { categoriesStore } from '../../stores/categories.js';
   import Button from '../../components/Button.svelte';
   import { getHexFromColorName } from '../../utils/colors.js';
+  import { t } from '../../stores/i18n.svelte.js';
   
   // Get active category from URL params
   $: activeCategoryId = $currentRoute.params?.categoryId || null;
@@ -35,9 +36,9 @@
   <!-- Header -->
   <div class="mb-6">
     <div class="flex items-center gap-3 mb-2">
-      <h2 class="text-xl font-semibold" style="color: var(--ds-text);">Milestones</h2>
+      <h2 class="text-xl font-semibold" style="color: var(--ds-text);">{t('milestones.title')}</h2>
     </div>
-    <p class="text-sm" style="color: var(--ds-text-subtle);">Track releases and deadlines</p>
+    <p class="text-sm" style="color: var(--ds-text-subtle);">{t('milestones.subtitle')}</p>
   </div>
   
   <!-- Navigation -->
@@ -51,7 +52,7 @@
       onmouseleave={(e) => { if (!isAllActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
     >
       <div class="w-4 h-4 rounded bg-gradient-to-br from-purple-400 to-purple-600 flex-shrink-0"></div>
-      <span>All Categories</span>
+      <span>{t('milestones.allCategories')}</span>
     </button>
 
     <!-- Category List -->
@@ -82,7 +83,7 @@
       onclick={handleManageCategories}
       class="w-full justify-center"
     >
-      Manage Categories
+      {t('milestones.manageCategories')}
     </Button>
   </div>
 </div>

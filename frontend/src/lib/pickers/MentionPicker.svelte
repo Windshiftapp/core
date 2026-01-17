@@ -4,6 +4,7 @@
   import { useEventListener } from 'runed';
   import Avatar from '../components/Avatar.svelte';
   import Text from '../components/Text.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -102,12 +103,12 @@
     style="top: {position.y}px; left: {position.x}px;"
     role="listbox"
     id={listboxId}
-    aria-label="Mention users"
+    aria-label={t('pickers.mentionUsers')}
   >
     {#if loading}
-      <div class="loading">Searching...</div>
+      <div class="loading">{t('pickers.searching')}</div>
     {:else if filteredUsers.length === 0}
-      <div class="no-results">No users found</div>
+      <div class="no-results">{t('pickers.noUsersFound')}</div>
     {:else}
       {#each filteredUsers as user, index}
         <button
@@ -136,7 +137,7 @@
     {/if}
     {#if isPersonalWorkspace}
       <div class="personal-warning">
-        No notification will be sent (personal task)
+        {t('pickers.noNotificationPersonalTask')}
       </div>
     {/if}
   </div>

@@ -3,6 +3,7 @@
   import { Shield, Calendar, Loader2, Terminal } from 'lucide-svelte';
   import { getSecuritySettings, updateSecuritySettings } from '../api.js';
   import Toggle from '../components/Toggle.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let loading = $state(true);
   let saving = $state(false);
@@ -23,7 +24,7 @@
       calendarFeedEnabled = settings.calendar_feed_enabled ?? true;
       pluginCliExecEnabled = settings.plugin_cli_exec_enabled ?? false;
     } catch (err) {
-      error = 'Failed to load security settings';
+      error = t('settings.security.failedToLoad');
       console.error('Failed to load security settings:', err);
     } finally {
       loading = false;
@@ -39,7 +40,7 @@
         plugin_cli_exec_enabled: pluginCliExecEnabled
       });
     } catch (err) {
-      error = 'Failed to save settings';
+      error = t('settings.security.failedToSave');
       console.error('Failed to save settings:', err);
     } finally {
       saving = false;
@@ -61,10 +62,10 @@
   <div class="mb-6">
     <div class="flex items-center gap-3 mb-2">
       <Shield class="w-6 h-6" style="color: var(--ds-icon);" />
-      <h2 class="text-2xl font-semibold" style="color: var(--ds-text);">Security</h2>
+      <h2 class="text-2xl font-semibold" style="color: var(--ds-text);">{t('settings.security.title')}</h2>
     </div>
     <p class="text-sm" style="color: var(--ds-text-subtle);">
-      Manage security-related settings and feature controls
+      {t('settings.security.subtitle')}
     </p>
   </div>
 
@@ -88,9 +89,9 @@
         <div class="flex-1">
           <div class="flex items-center justify-between">
             <div>
-              <h3 class="text-base font-medium" style="color: var(--ds-text);">Calendar Feed Subscriptions</h3>
+              <h3 class="text-base font-medium" style="color: var(--ds-text);">{t('settings.security.calendarFeeds')}</h3>
               <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-                Allow users to generate ICS feed URLs for external calendar apps
+                {t('settings.security.calendarFeedsDesc')}
               </p>
             </div>
             <Toggle
@@ -102,8 +103,7 @@
 
           {#if !calendarFeedEnabled}
             <div class="mt-3 p-3 rounded-md text-sm" style="background-color: var(--ds-background-warning-bold); color: var(--ds-text-warning-inverse);">
-              <strong>Warning:</strong> When disabled, existing calendar feeds will stop working immediately.
-              Users will not be able to generate new feed URLs.
+              {t('settings.security.calendarFeedsWarning')}
             </div>
           {/if}
         </div>
@@ -119,9 +119,9 @@
         <div class="flex-1">
           <div class="flex items-center justify-between">
             <div>
-              <h3 class="text-base font-medium" style="color: var(--ds-text);">Plugin CLI Command Execution</h3>
+              <h3 class="text-base font-medium" style="color: var(--ds-text);">{t('settings.security.pluginExecution')}</h3>
               <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-                Allow plugins to execute shell commands on the server
+                {t('settings.security.pluginExecutionDesc')}
               </p>
             </div>
             <Toggle
@@ -133,9 +133,7 @@
 
           {#if pluginCliExecEnabled}
             <div class="mt-3 p-3 rounded-md text-sm border" style="background-color: var(--ds-status-danger-bg); color: var(--ds-status-danger-text); border-color: var(--ds-status-danger-border);">
-              <strong>Warning:</strong> Enabling this setting allows plugins to execute shell commands.
-              Commands are restricted to each plugin's own directory for security.
-              Only enable if you trust all installed plugins.
+              {t('settings.security.pluginExecutionWarning')}
             </div>
           {/if}
         </div>

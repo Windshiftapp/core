@@ -4,6 +4,7 @@
   import { AlertCircle } from 'lucide-svelte';
   import { priorityIconMap } from '../utils/icons.js';
   import ItemPicker from './ItemPicker.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   // Props
   let {
@@ -11,12 +12,15 @@
     selectedPriorityId = $bindable(null),
     onChange = () => {},
     disabled = false,
-    placeholder = 'Select priority',
+    placeholder = '',
     triggerClass = '',
     showUnassigned = true,
-    unassignedLabel = 'No priority',
+    unassignedLabel = '',
     children = null  // Custom trigger snippet
   } = $props();
+
+  const resolvedPlaceholder = $derived(placeholder || t('pickers.selectPriority'));
+  const resolvedUnassignedLabel = $derived(unassignedLabel || t('pickers.noPriority'));
 
   // State
   let priorities = $state([]);
@@ -91,7 +95,7 @@
 
 {#if loading}
   <div class="w-full px-3 py-2 text-sm text-gray-500 border rounded" style="background-color: var(--ds-background-input); border-color: var(--ds-border);">
-    Loading priorities...
+    {t('pickers.loadingPriorities')}
   </div>
 {:else if error}
   <div class="w-full px-3 py-2 text-sm text-red-500 border rounded" style="background-color: var(--ds-background-input); border-color: var(--ds-border);">
@@ -99,16 +103,16 @@
   </div>
 {:else if priorities.length === 0}
   <div class="w-full px-3 py-2 text-sm text-gray-500 border rounded" style="background-color: var(--ds-background-input); border-color: var(--ds-border);">
-    No priorities configured
+    {t('pickers.noPrioritiesConfigured')}
   </div>
 {:else}
   <ItemPicker
     value={selectedPriorityId}
     items={priorities}
     config={pickerConfig}
-    placeholder={placeholder}
+    placeholder={resolvedPlaceholder}
     showUnassigned={showUnassigned}
-    unassignedLabel={unassignedLabel}
+    unassignedLabel={resolvedUnassignedLabel}
     disabled={disabled}
     class={triggerClass}
     {children}

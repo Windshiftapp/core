@@ -3,6 +3,7 @@
   import { LifeBuoy, Settings, Webhook, ExternalLink, Users, Globe, Check, X, Plus, Mail } from 'lucide-svelte';
   import { api } from '../api.js';
   import { channelCategoriesStore } from '../stores/channelCategories.js';
+  import { t } from '../stores/i18n.svelte.js';
   import Modal from './Modal.svelte';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
@@ -96,16 +97,16 @@
 
   // Available webhook events
   const webhookEvents = [
-    { id: 'item.created', label: 'Item Created', category: 'Items' },
-    { id: 'item.updated', label: 'Item Updated', category: 'Items' },
-    { id: 'item.deleted', label: 'Item Deleted', category: 'Items' },
-    { id: 'item.assigned', label: 'Item Assigned', category: 'Items' },
-    { id: 'status.changed', label: 'Status Changed', category: 'Items' },
-    { id: 'comment.created', label: 'Comment Created', category: 'Comments' },
-    { id: 'comment.updated', label: 'Comment Updated', category: 'Comments' },
-    { id: 'comment.deleted', label: 'Comment Deleted', category: 'Comments' },
-    { id: 'item.linked', label: 'Item Linked', category: 'Links' },
-    { id: 'item.unlinked', label: 'Item Unlinked', category: 'Links' }
+    { id: 'item.created', labelKey: 'channel.itemCreated', categoryKey: 'channel.items' },
+    { id: 'item.updated', labelKey: 'channel.itemUpdated', categoryKey: 'channel.items' },
+    { id: 'item.deleted', labelKey: 'channel.itemDeleted', categoryKey: 'channel.items' },
+    { id: 'item.assigned', labelKey: 'channel.itemAssigned', categoryKey: 'channel.items' },
+    { id: 'status.changed', labelKey: 'channel.statusChanged', categoryKey: 'channel.items' },
+    { id: 'comment.created', labelKey: 'channel.commentCreated', categoryKey: 'channel.comments' },
+    { id: 'comment.updated', labelKey: 'channel.commentUpdated', categoryKey: 'channel.comments' },
+    { id: 'comment.deleted', labelKey: 'channel.commentDeleted', categoryKey: 'channel.comments' },
+    { id: 'item.linked', labelKey: 'channel.itemLinked', categoryKey: 'channel.links' },
+    { id: 'item.unlinked', labelKey: 'channel.itemUnlinked', categoryKey: 'channel.links' }
   ];
 
   // Parse config JSON string
@@ -253,23 +254,23 @@
   function validateForm() {
     // Basic info - name is required
     if (!channelFormData.name?.trim()) {
-      return { valid: false, message: 'Channel name is required' };
+      return { valid: false, message: t('channel.channelNameRequired') };
     }
 
     // Portal validation
     if (channel.type === 'portal') {
       if (!portalFormData.slug?.trim()) {
-        return { valid: false, message: 'Portal slug is required' };
+        return { valid: false, message: t('channel.portalSlugRequired') };
       }
       if (!portalFormData.workspace_ids?.length) {
-        return { valid: false, message: 'Please select at least one target workspace' };
+        return { valid: false, message: t('channel.selectAtLeastOneWorkspace') };
       }
     }
 
     // Webhook validation
     if (channel.type === 'webhook' && !isPluginOwned(channel)) {
       if (!webhookFormData.url?.trim()) {
-        return { valid: false, message: 'Webhook URL is required' };
+        return { valid: false, message: t('channel.webhookUrlRequired') };
       }
     }
 
@@ -277,26 +278,26 @@
     if (channel.type === 'email') {
       if (emailFormData.auth_method === 'basic') {
         if (!emailFormData.imap_host?.trim()) {
-          return { valid: false, message: 'IMAP host is required' };
+          return { valid: false, message: t('channel.imapHostRequired') };
         }
         if (!emailFormData.imap_username?.trim()) {
-          return { valid: false, message: 'IMAP username is required' };
+          return { valid: false, message: t('channel.usernameRequired') };
         }
       } else if (emailFormData.auth_method === 'oauth') {
         if (!emailFormData.oauth_client_id?.trim()) {
-          return { valid: false, message: 'OAuth client ID is required' };
+          return { valid: false, message: t('channel.clientIdRequired') };
         }
         // Client secret only required if not already connected
         if (!emailFormData.oauth_connected && !emailFormData.oauth_client_secret?.trim()) {
-          return { valid: false, message: 'OAuth client secret is required' };
+          return { valid: false, message: t('channel.clientSecretRequired') };
         }
       }
 
       if (!emailFormData.workspace_id) {
-        return { valid: false, message: 'Target workspace is required' };
+        return { valid: false, message: t('channel.targetWorkspaceRequired') };
       }
       if (!emailFormData.item_type_id) {
-        return { valid: false, message: 'Item type is required' };
+        return { valid: false, message: t('channel.itemTypeRequired') };
       }
     }
 
@@ -390,12 +391,12 @@
         emailFormData.imap_password = '';
       }
 
-      toastMessage = 'Channel saved successfully!';
+      toastMessage = t('channel.channelSavedSuccess');
       showToast = true;
       onSave();
     } catch (error) {
       console.error('Failed to save channel:', error);
-      toastMessage = 'Failed to save: ' + (error.message || error);
+      toastMessage = t('channel.failedToSave') + ': ' + (error.message || error);
       showToast = true;
     } finally {
       loading = false;
@@ -404,18 +405,18 @@
 
   async function testWebhookSettings() {
     if (!channel || !webhookFormData.url) {
-      webhookTestResult = { success: false, message: 'Please enter a webhook URL.' };
+      webhookTestResult = { success: false, message: t('channel.pleaseEnterUrl') };
       return;
     }
 
     try {
       new URL(webhookFormData.url);
     } catch {
-      webhookTestResult = { success: false, message: 'Please enter a valid URL.' };
+      webhookTestResult = { success: false, message: t('channel.pleaseEnterValidUrl') };
       return;
     }
 
-    webhookTestResult = { success: true, message: 'Sending test webhook...', loading: true };
+    webhookTestResult = { success: true, message: t('channel.sendingTestWebhook'), loading: true };
 
     try {
       const headersObj = {};
@@ -442,14 +443,14 @@
       if (result.success) {
         webhookTestResult = {
           success: true,
-          message: 'Test webhook sent successfully! Configuration has been saved.',
+          message: t('channel.testWebhookSent'),
           loading: false
         };
         onSave();
       } else {
         webhookTestResult = {
           success: false,
-          message: `Webhook test failed: ${result.message || 'Unknown error'}`,
+          message: `${t('channel.testWebhookFailed')}: ${result.message || 'Unknown error'}`,
           loading: false
         };
       }
@@ -457,7 +458,7 @@
       console.error('Failed to test webhook:', error);
       webhookTestResult = {
         success: false,
-        message: 'Webhook test failed: ' + (error.message || error),
+        message: t('channel.testWebhookFailed') + ': ' + (error.message || error),
         loading: false
       };
     }
@@ -554,7 +555,7 @@
             size="small"
             icon={ExternalLink}
           >
-            Open Portal
+            {t('channel.openPortal')}
           </Button>
         {/if}
       </div>
@@ -572,7 +573,7 @@
           >
             <div class="flex items-center gap-2">
               <Settings class="w-4 h-4" />
-              <span>Configuration</span>
+              <span>{t('channel.configuration')}</span>
             </div>
             {#if activeTab === 'configuration'}
               <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--ds-interactive)]"></div>
@@ -590,7 +591,7 @@
             >
               <div class="flex items-center gap-2">
                 <Users class="w-4 h-4" />
-                <span>Managers</span>
+                <span>{t('channel.managers')}</span>
               </div>
               {#if activeTab === 'managers'}
                 <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--ds-interactive)]"></div>
@@ -605,17 +606,17 @@
         {#if activeTab === 'configuration'}
           <!-- Basic Info Section -->
           <div class="mb-8">
-            <h4 class="text-sm font-semibold mb-4" style="color: var(--ds-text);">Basic Information</h4>
+            <h4 class="text-sm font-semibold mb-4" style="color: var(--ds-text);">{t('channel.basicInformation')}</h4>
             <div class="space-y-4">
               <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <Label color="default" class="mb-2">Name</Label>
-                  <Input bind:value={channelFormData.name} placeholder="Channel name" />
+                  <Label color="default" class="mb-2">{t('channel.name')}</Label>
+                  <Input bind:value={channelFormData.name} placeholder={t('channel.channelName')} />
                 </div>
                 <div>
-                  <Label color="default" class="mb-2">Category</Label>
+                  <Label color="default" class="mb-2">{t('channel.category')}</Label>
                   <Select bind:value={channelFormData.category_id}>
-                    <option value={null}>No Category</option>
+                    <option value={null}>{t('channel.noCategory')}</option>
                     {#each $channelCategoriesStore as category}
                       <option value={category.id}>{category.name}</option>
                     {/each}
@@ -623,8 +624,8 @@
                 </div>
               </div>
               <div>
-                <Label color="default" class="mb-2">Description</Label>
-                <Textarea bind:value={channelFormData.description} rows={2} placeholder="Brief description..." />
+                <Label color="default" class="mb-2">{t('channel.description')}</Label>
+                <Textarea bind:value={channelFormData.description} rows={2} placeholder={t('channel.briefDescription')} />
               </div>
             </div>
           </div>
@@ -632,91 +633,91 @@
           <!-- Type-specific Configuration -->
           {#if channel.type === 'portal'}
             <div class="pt-6 border-t" style="border-color: var(--ds-border);">
-              <h4 class="text-sm font-semibold mb-4" style="color: var(--ds-text);">Portal Configuration</h4>
+              <h4 class="text-sm font-semibold mb-4" style="color: var(--ds-text);">{t('channel.portalConfiguration')}</h4>
 
               <form onsubmit={(e) => { e.preventDefault(); handlePortalSubmit(); }} class="space-y-4">
                 <div>
                   <Label color="default" required class="mb-2">
-                    Portal Slug <span class="text-xs font-normal" style="color: var(--ds-text-subtle);">(URL-friendly identifier)</span>
+                    {t('channel.portalSlug')} <span class="text-xs font-normal" style="color: var(--ds-text-subtle);">({t('channel.portalSlugHelp')})</span>
                   </Label>
                   <Input
                     bind:value={portalFormData.slug}
                     required
                     placeholder="support-portal"
                     pattern="[a-z0-9\-]+"
-                    title="Only lowercase letters, numbers, and hyphens allowed"
+                    title={t('validation.slugInvalid')}
                   />
                   <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-                    Portal URL: /portal/{portalFormData.slug || 'your-slug'}
+                    {t('channel.portalUrl')}: /portal/{portalFormData.slug || 'your-slug'}
                   </p>
                 </div>
 
                 <div>
                   <WorkspacePicker
                     bind:value={portalFormData.workspace_ids}
-                    label="Target Workspaces *"
-                    placeholder="Search for workspaces..."
+                    label="{t('channel.targetWorkspaces')} *"
+                    placeholder={t('channel.searchWorkspaces')}
                   />
                 </div>
 
                 <div>
-                  <Label color="default" class="mb-2">Portal Title</Label>
+                  <Label color="default" class="mb-2">{t('channel.portalTitle')}</Label>
                   <Input bind:value={portalFormData.title} placeholder="Support Portal" />
                 </div>
 
                 <div>
-                  <Label color="default" class="mb-2">Description</Label>
-                  <Textarea bind:value={portalFormData.description} placeholder="Describe what this portal is for..." rows={2} />
+                  <Label color="default" class="mb-2">{t('channel.description')}</Label>
+                  <Textarea bind:value={portalFormData.description} placeholder={t('channel.briefDescription')} rows={2} />
                 </div>
 
                 <div class="flex items-center gap-3 p-4 rounded" style="background-color: var(--ds-surface-raised);">
                   <input type="checkbox" id="portalEnabled" bind:checked={portalFormData.enabled} class="w-4 h-4 rounded" />
                   <label for="portalEnabled" class="text-sm font-medium cursor-pointer" style="color: var(--ds-text);">
-                    Enable Portal (allow public submissions)
+                    {t('channel.enablePortal')}
                   </label>
                 </div>
               </form>
             </div>
           {:else if channel.type === 'webhook'}
             <div class="pt-6 border-t" style="border-color: var(--ds-border);">
-              <h4 class="text-sm font-semibold mb-4" style="color: var(--ds-text);">Webhook Configuration</h4>
+              <h4 class="text-sm font-semibold mb-4" style="color: var(--ds-text);">{t('channel.webhookConfiguration')}</h4>
 
               {#if isPluginOwned(channel)}
                 <div class="p-4 rounded-lg border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
                   <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">
-                    This webhook is managed by the <strong style="color: var(--ds-text);">{channel.plugin_name}</strong> plugin.
+                    {t('channel.managedByPlugin', { pluginName: channel.plugin_name })}
                   </p>
                 </div>
               {:else}
                 <form onsubmit={(e) => { e.preventDefault(); handleWebhookSubmit(); }} class="space-y-6">
                   <div class="space-y-4">
                     <div>
-                      <Label color="default" required class="mb-2">Webhook URL</Label>
+                      <Label color="default" required class="mb-2">{t('channel.webhookUrl')}</Label>
                       <Input type="url" bind:value={webhookFormData.url} required placeholder="https://your-server.com/webhook" />
                     </div>
 
                     <div>
-                      <Label color="default" class="mb-2">Secret (optional)</Label>
-                      <Input type="password" bind:value={webhookFormData.secret} placeholder="Enter secret to update, leave blank to keep existing" />
+                      <Label color="default" class="mb-2">{t('channel.secretOptional')}</Label>
+                      <Input type="password" bind:value={webhookFormData.secret} placeholder={t('channel.secretPlaceholder')} />
                       <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-                        Used to sign requests with HMAC-SHA256.
+                        {t('channel.secretHelp')}
                       </p>
                     </div>
 
                     <!-- Custom Headers -->
                     <div>
                       <div class="flex items-center justify-between mb-2">
-                        <Label color="default">Custom Headers</Label>
+                        <Label color="default">{t('channel.customHeaders')}</Label>
                         <Button type="button" variant="ghost" size="small" onclick={addWebhookHeader}>
-                          + Add Header
+                          {t('channel.addHeader')}
                         </Button>
                       </div>
                       {#if webhookFormData.headers.length > 0}
                         <div class="space-y-2">
                           {#each webhookFormData.headers as header, index}
                             <div class="flex gap-2 items-center">
-                              <Input bind:value={header.key} placeholder="Header name" class="flex-1" />
-                              <Input bind:value={header.value} placeholder="Header value" class="flex-1" />
+                              <Input bind:value={header.key} placeholder={t('channel.headerName')} class="flex-1" />
+                              <Input bind:value={header.value} placeholder={t('channel.headerValue')} class="flex-1" />
                               <Button type="button" variant="ghost" size="small" onclick={() => removeWebhookHeader(index)}>
                                 <X class="w-4 h-4" />
                               </Button>
@@ -729,28 +730,28 @@
 
                   <!-- Scope Configuration -->
                   <div class="pt-4 border-t" style="border-color: var(--ds-border);">
-                    <h5 class="text-sm font-semibold mb-3" style="color: var(--ds-text);">Scope</h5>
+                    <h5 class="text-sm font-semibold mb-3" style="color: var(--ds-text);">{t('channel.scope')}</h5>
                     <div class="space-y-3">
                       <label class="flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="webhookScope" value="all" bind:group={webhookFormData.scope_type} class="w-4 h-4" />
-                        <span class="text-sm" style="color: var(--ds-text);">All items (instance-wide)</span>
+                        <span class="text-sm" style="color: var(--ds-text);">{t('channel.allItems')}</span>
                       </label>
                       <label class="flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="webhookScope" value="workspaces" bind:group={webhookFormData.scope_type} class="w-4 h-4" />
-                        <span class="text-sm" style="color: var(--ds-text);">Specific workspaces</span>
+                        <span class="text-sm" style="color: var(--ds-text);">{t('channel.specificWorkspaces')}</span>
                       </label>
                       {#if webhookFormData.scope_type === 'workspaces'}
                         <div class="ml-6">
-                          <WorkspacePicker bind:value={webhookFormData.workspace_ids} placeholder="Select workspaces..." />
+                          <WorkspacePicker bind:value={webhookFormData.workspace_ids} placeholder={t('channel.selectWorkspaces')} />
                         </div>
                       {/if}
                       <label class="flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="webhookScope" value="collections" bind:group={webhookFormData.scope_type} class="w-4 h-4" />
-                        <span class="text-sm" style="color: var(--ds-text);">Specific collections</span>
+                        <span class="text-sm" style="color: var(--ds-text);">{t('channel.specificCollections')}</span>
                       </label>
                       {#if webhookFormData.scope_type === 'collections'}
                         <div class="ml-6">
-                          <CollectionPicker bind:value={webhookFormData.collection_ids} placeholder="Select collections..." />
+                          <CollectionPicker bind:value={webhookFormData.collection_ids} placeholder={t('channel.selectCollections')} />
                         </div>
                       {/if}
                     </div>
@@ -758,22 +759,22 @@
 
                   <!-- Event Triggers -->
                   <div class="pt-4 border-t" style="border-color: var(--ds-border);">
-                    <h5 class="text-sm font-semibold mb-3" style="color: var(--ds-text);">Automatic Triggers</h5>
+                    <h5 class="text-sm font-semibold mb-3" style="color: var(--ds-text);">{t('channel.automaticTriggers')}</h5>
                     <label class="flex items-center gap-3 p-3 rounded cursor-pointer" style="background-color: var(--ds-surface-raised);">
                       <input type="checkbox" bind:checked={webhookFormData.auto_trigger} class="w-4 h-4 rounded" />
                       <div>
-                        <span class="text-sm font-medium" style="color: var(--ds-text);">Enable automatic triggers</span>
-                        <p class="text-xs" style="color: var(--ds-text-subtle);">Automatically send webhooks when selected events occur</p>
+                        <span class="text-sm font-medium" style="color: var(--ds-text);">{t('channel.enableAutoTriggers')}</span>
+                        <p class="text-xs" style="color: var(--ds-text-subtle);">{t('channel.autoTriggersHelp')}</p>
                       </div>
                     </label>
 
                     {#if webhookFormData.auto_trigger}
                       <div class="mt-4 space-y-4">
-                        {#each ['Items', 'Comments', 'Links'] as category}
+                        {#each ['channel.items', 'channel.comments', 'channel.links'] as categoryKey}
                           <div>
-                            <h6 class="text-xs font-medium uppercase tracking-wide mb-2" style="color: var(--ds-text-subtle);">{category}</h6>
+                            <h6 class="text-xs font-medium uppercase tracking-wide mb-2" style="color: var(--ds-text-subtle);">{t(categoryKey)}</h6>
                             <div class="grid grid-cols-2 gap-2">
-                              {#each webhookEvents.filter(e => e.category === category) as event}
+                              {#each webhookEvents.filter(e => e.categoryKey === categoryKey) as event}
                                 <label class="flex items-center gap-2 p-2 rounded cursor-pointer" style="background-color: var(--ds-surface);">
                                   <input
                                     type="checkbox"
@@ -781,7 +782,7 @@
                                     onchange={() => toggleWebhookEvent(event.id)}
                                     class="w-4 h-4 rounded"
                                   />
-                                  <span class="text-sm" style="color: var(--ds-text);">{event.label}</span>
+                                  <span class="text-sm" style="color: var(--ds-text);">{t(event.labelKey)}</span>
                                 </label>
                               {/each}
                             </div>
@@ -794,10 +795,10 @@
 
                 <!-- Test Webhook Section -->
                 <div class="mt-6 pt-6 border-t" style="border-color: var(--ds-border);">
-                  <h5 class="text-sm font-semibold mb-4" style="color: var(--ds-text);">Test Webhook</h5>
+                  <h5 class="text-sm font-semibold mb-4" style="color: var(--ds-text);">{t('channel.testWebhook')}</h5>
                   <div class="flex gap-2 mb-4">
                     <Button onclick={testWebhookSettings} variant="secondary" disabled={!webhookFormData.url || loading}>
-                      Send Test Webhook
+                      {t('channel.sendTestWebhook')}
                     </Button>
                   </div>
 
@@ -828,12 +829,12 @@
             </div>
           {:else if channel.type === 'email'}
             <div class="pt-6 border-t" style="border-color: var(--ds-border);">
-              <h4 class="text-sm font-semibold mb-4" style="color: var(--ds-text);">Email Configuration</h4>
+              <h4 class="text-sm font-semibold mb-4" style="color: var(--ds-text);">{t('channel.emailConfiguration')}</h4>
 
               <div class="space-y-6">
                 <!-- Authentication Method -->
                 <div class="space-y-4">
-                  <h5 class="text-sm font-medium" style="color: var(--ds-text);">Authentication Method</h5>
+                  <h5 class="text-sm font-medium" style="color: var(--ds-text);">{t('channel.authenticationMethod')}</h5>
 
                   <div class="grid grid-cols-2 gap-3">
                     <button
@@ -844,9 +845,9 @@
                         ? 'border-color: var(--ds-border-focused); background: var(--ds-surface-selected);'
                         : 'border-color: var(--ds-border);'}
                     >
-                      <div class="font-medium" style="color: var(--ds-text);">Basic (IMAP)</div>
+                      <div class="font-medium" style="color: var(--ds-text);">{t('channel.basicIMAP')}</div>
                       <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-                        Username and password
+                        {t('channel.usernameAndPassword')}
                       </div>
                     </button>
 
@@ -858,9 +859,9 @@
                         ? 'border-color: var(--ds-border-focused); background: var(--ds-surface-selected);'
                         : 'border-color: var(--ds-border);'}
                     >
-                      <div class="font-medium" style="color: var(--ds-text);">OAuth</div>
+                      <div class="font-medium" style="color: var(--ds-text);">{t('channel.oauth')}</div>
                       <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-                        Microsoft 365 or Google
+                        {t('channel.microsoftOrGoogle')}
                       </div>
                     </button>
                   </div>
@@ -871,7 +872,7 @@
                   <div class="space-y-4 pt-4 border-t" style="border-color: var(--ds-border);">
                     <!-- Provider Type -->
                     <div>
-                      <Label color="default" class="mb-2">Provider</Label>
+                      <Label color="default" class="mb-2">{t('channel.provider')}</Label>
                       <div class="grid grid-cols-2 gap-3">
                         <button
                           type="button"
@@ -881,7 +882,7 @@
                             ? 'border-color: var(--ds-border-focused); background: var(--ds-surface-selected);'
                             : 'border-color: var(--ds-border);'}
                         >
-                          <div class="font-medium" style="color: var(--ds-text);">Microsoft 365</div>
+                          <div class="font-medium" style="color: var(--ds-text);">{t('channel.microsoft365')}</div>
                         </button>
                         <button
                           type="button"
@@ -891,7 +892,7 @@
                             ? 'border-color: var(--ds-border-focused); background: var(--ds-surface-selected);'
                             : 'border-color: var(--ds-border);'}
                         >
-                          <div class="font-medium" style="color: var(--ds-text);">Google</div>
+                          <div class="font-medium" style="color: var(--ds-text);">{t('channel.google')}</div>
                         </button>
                       </div>
                     </div>
@@ -899,25 +900,25 @@
                     <!-- OAuth Credentials -->
                     <div class="grid grid-cols-2 gap-4">
                       <div>
-                        <Label color="default" required class="mb-2">Client ID</Label>
+                        <Label color="default" required class="mb-2">{t('channel.clientId')}</Label>
                         <Input bind:value={emailFormData.oauth_client_id} placeholder="Application (client) ID" />
                       </div>
                       <div>
-                        <Label color="default" required class="mb-2">Client Secret</Label>
+                        <Label color="default" required class="mb-2">{t('channel.clientSecret')}</Label>
                         <Input
                           type="password"
                           bind:value={emailFormData.oauth_client_secret}
-                          placeholder={emailFormData.oauth_connected ? 'Leave blank to keep existing' : 'Client secret value'}
+                          placeholder={emailFormData.oauth_connected ? t('channel.leaveBlankToKeep') : 'Client secret value'}
                         />
                       </div>
                     </div>
 
                     {#if emailFormData.oauth_provider_type === 'microsoft'}
                       <div>
-                        <Label color="default" class="mb-2">Tenant ID</Label>
+                        <Label color="default" class="mb-2">{t('channel.tenantId')}</Label>
                         <Input bind:value={emailFormData.oauth_tenant_id} placeholder="common (multi-tenant) or specific tenant ID" />
                         <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-                          Use "common" to allow any Microsoft account, or enter a specific tenant ID
+                          {t('channel.tenantIdHelp')}
                         </p>
                       </div>
                     {/if}
@@ -928,13 +929,13 @@
                         <div class="flex items-center gap-3">
                           <Check class="w-5 h-5" style="color: var(--ds-icon-success);" />
                           <div class="flex-1">
-                            <div class="font-medium" style="color: var(--ds-text);">Connected</div>
+                            <div class="font-medium" style="color: var(--ds-text);">{t('channel.connected')}</div>
                             <div class="text-sm" style="color: var(--ds-text-subtle);">
                               {emailFormData.oauth_email}
                             </div>
                           </div>
                           <Button variant="ghost" size="small" onclick={startOAuthFlow} disabled={loading}>
-                            Reconnect
+                            {t('channel.reconnect')}
                           </Button>
                         </div>
                       </div>
@@ -942,13 +943,13 @@
                       <div class="p-4 rounded-lg border" style="background: var(--ds-surface-raised); border-color: var(--ds-border);">
                         <div class="flex items-center justify-between">
                           <div>
-                            <div class="font-medium" style="color: var(--ds-text);">Not Connected</div>
+                            <div class="font-medium" style="color: var(--ds-text);">{t('channel.notConnected')}</div>
                             <div class="text-sm" style="color: var(--ds-text-subtle);">
-                              Save settings, then connect your mailbox
+                              {t('channel.saveAndConnect')}
                             </div>
                           </div>
                           <Button variant="primary" onclick={startOAuthFlow} disabled={loading}>
-                            Connect Mailbox
+                            {t('channel.connectMailbox')}
                           </Button>
                         </div>
                       </div>
@@ -956,7 +957,7 @@
 
                     <!-- Callback URL Info -->
                     <div class="p-3 rounded border" style="background: var(--ds-surface); border-color: var(--ds-border);">
-                      <div class="text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Redirect URI (for Azure AD / Google Console)</div>
+                      <div class="text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('channel.redirectUri')}</div>
                       <code class="text-xs" style="color: var(--ds-text);">
                         {window.location.origin}/api/channels/inline-oauth/callback
                       </code>
@@ -965,20 +966,20 @@
                 {:else}
                   <!-- Basic IMAP Configuration -->
                   <div class="space-y-4 pt-4 border-t" style="border-color: var(--ds-border);">
-                    <h5 class="text-sm font-medium" style="color: var(--ds-text);">IMAP Connection</h5>
+                    <h5 class="text-sm font-medium" style="color: var(--ds-text);">{t('channel.imapConnection')}</h5>
 
                     <div class="grid grid-cols-2 gap-4">
                       <div>
-                        <Label color="default" required class="mb-2">IMAP Host</Label>
+                        <Label color="default" required class="mb-2">{t('channel.imapHost')}</Label>
                         <Input bind:value={emailFormData.imap_host} placeholder="imap.example.com" />
                       </div>
                       <div class="grid grid-cols-2 gap-4">
                         <div>
-                          <Label color="default" class="mb-2">Port</Label>
+                          <Label color="default" class="mb-2">{t('channel.port')}</Label>
                           <Input type="number" bind:value={emailFormData.imap_port} placeholder="993" />
                         </div>
                         <div>
-                          <Label color="default" class="mb-2">Encryption</Label>
+                          <Label color="default" class="mb-2">{t('channel.encryption')}</Label>
                           <Select bind:value={emailFormData.imap_encryption}>
                             <option value="ssl">SSL</option>
                             <option value="tls">TLS (STARTTLS)</option>
@@ -990,13 +991,13 @@
 
                     <div class="grid grid-cols-2 gap-4">
                       <div>
-                        <Label color="default" required class="mb-2">Username</Label>
+                        <Label color="default" required class="mb-2">{t('channel.username')}</Label>
                         <Input bind:value={emailFormData.imap_username} placeholder="user@example.com" />
                       </div>
                       <div>
-                        <Label color="default" required class="mb-2">Password</Label>
+                        <Label color="default" required class="mb-2">{t('channel.password')}</Label>
                         <Input type="password" bind:value={emailFormData.imap_password} placeholder="Enter password to update" />
-                        <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">Leave blank to keep existing password</p>
+                        <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('channel.leaveBlankPassword')}</p>
                       </div>
                     </div>
                   </div>
@@ -1004,11 +1005,11 @@
 
                 <!-- Item Creation -->
                 <div class="pt-4 border-t space-y-4" style="border-color: var(--ds-border);">
-                  <h5 class="text-sm font-medium" style="color: var(--ds-text);">Item Creation</h5>
+                  <h5 class="text-sm font-medium" style="color: var(--ds-text);">{t('channel.itemCreation')}</h5>
 
                   <div class="grid grid-cols-2 gap-4">
                     <div>
-                      <Label color="default" required class="mb-2">Target Workspace</Label>
+                      <Label color="default" required class="mb-2">{t('channel.targetWorkspace')}</Label>
                       <Select
                         bind:value={emailFormData.workspace_id}
                         onchange={(e) => {
@@ -1018,22 +1019,22 @@
                           loadItemTypesForWorkspace(newWorkspaceId);
                         }}
                       >
-                        <option value={null}>Select workspace...</option>
+                        <option value={null}>{t('channel.selectWorkspace')}</option>
                         {#each workspaces as ws}
                           <option value={ws.id}>{ws.name}</option>
                         {/each}
                       </Select>
                     </div>
                     <div>
-                      <Label color="default" required class="mb-2">Item Type</Label>
+                      <Label color="default" required class="mb-2">{t('channel.itemType')}</Label>
                       <Select bind:value={emailFormData.item_type_id} disabled={!emailFormData.workspace_id}>
-                        <option value={null}>Select item type...</option>
+                        <option value={null}>{t('channel.selectItemType')}</option>
                         {#each itemTypes as type}
                           <option value={type.id}>{type.name}</option>
                         {/each}
                       </Select>
                       {#if !emailFormData.workspace_id}
-                        <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">Select a workspace first</p>
+                        <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('channel.selectWorkspaceFirst')}</p>
                       {/if}
                     </div>
                   </div>
@@ -1041,28 +1042,28 @@
 
                 <!-- Processing Options -->
                 <div class="pt-4 border-t space-y-4" style="border-color: var(--ds-border);">
-                  <h5 class="text-sm font-medium" style="color: var(--ds-text);">Processing Options</h5>
+                  <h5 class="text-sm font-medium" style="color: var(--ds-text);">{t('channel.processingOptions')}</h5>
 
                   <div>
-                    <Label color="default" class="mb-2">Mailbox</Label>
+                    <Label color="default" class="mb-2">{t('channel.mailbox')}</Label>
                     <Input bind:value={emailFormData.mailbox} placeholder="INBOX" />
-                    <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">The folder to poll for new emails</p>
+                    <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('channel.mailboxHelp')}</p>
                   </div>
 
                   <div class="space-y-3">
                     <label class="flex items-center gap-3 p-3 rounded cursor-pointer" style="background-color: var(--ds-surface-raised);">
                       <input type="checkbox" bind:checked={emailFormData.mark_as_read} class="w-4 h-4 rounded" />
                       <div>
-                        <span class="text-sm font-medium" style="color: var(--ds-text);">Mark as read after processing</span>
-                        <p class="text-xs" style="color: var(--ds-text-subtle);">Mark emails as read once they've been converted to items</p>
+                        <span class="text-sm font-medium" style="color: var(--ds-text);">{t('channel.markAsRead')}</span>
+                        <p class="text-xs" style="color: var(--ds-text-subtle);">{t('channel.markAsReadHelp')}</p>
                       </div>
                     </label>
 
                     <label class="flex items-center gap-3 p-3 rounded cursor-pointer" style="background-color: var(--ds-surface-raised);">
                       <input type="checkbox" bind:checked={emailFormData.delete_after_process} class="w-4 h-4 rounded" />
                       <div>
-                        <span class="text-sm font-medium" style="color: var(--ds-text);">Delete after processing</span>
-                        <p class="text-xs" style="color: var(--ds-text-subtle);">Remove emails from the mailbox after creating items (use with caution)</p>
+                        <span class="text-sm font-medium" style="color: var(--ds-text);">{t('channel.deleteAfterProcess')}</span>
+                        <p class="text-xs" style="color: var(--ds-text-subtle);">{t('channel.deleteAfterProcessHelp')}</p>
                       </div>
                     </label>
                   </div>
@@ -1074,7 +1075,7 @@
               <div class="text-center py-12">
                 <LifeBuoy class="w-16 h-16 mx-auto mb-4" style="color: var(--ds-text-subtle);" />
                 <p class="text-sm" style="color: var(--ds-text-subtle);">
-                  Configuration for {channel.type} channels coming soon
+                  {t('channel.comingSoon', { type: channel.type })}
                 </p>
               </div>
             </div>
@@ -1084,7 +1085,7 @@
           {#if channel.last_activity}
             <div class="pt-6 mt-6 border-t" style="border-color: var(--ds-border);">
               <div class="text-sm" style="color: var(--ds-text-subtle);">
-                Last activity: {new Date(channel.last_activity).toLocaleString()}
+                {t('channel.lastActivity')}: {new Date(channel.last_activity).toLocaleString()}
               </div>
             </div>
           {/if}
@@ -1102,14 +1103,14 @@
         <DialogFooter
           onCancel={handleClose}
           onConfirm={handleSaveAll}
-          cancelLabel="Close"
-          confirmLabel="Save Changes"
+          cancelLabel={t('common.close')}
+          confirmLabel={t('channel.saveChanges')}
           disabled={loading}
         />
       {:else}
         <DialogFooter
           onCancel={handleClose}
-          cancelLabel="Close"
+          cancelLabel={t('common.close')}
           showCancel={true}
         />
       {/if}

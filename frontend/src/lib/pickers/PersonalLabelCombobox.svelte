@@ -3,16 +3,19 @@
   import { createEventDispatcher, onMount } from 'svelte';
   import { api } from '../api.js';
   import { Plus, Check } from 'lucide-svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
   let {
     value = $bindable([]),
-    placeholder = 'Select labels...',
+    placeholder = '',
     class: className = '',
     disabled = false,
     userId = null
   } = $props();
+
+  const resolvedPlaceholder = $derived(placeholder || t('pickers.selectLabels'));
 
   let labels = $state([]);
   let loading = $state(false);
@@ -111,7 +114,7 @@
   items={labels}
   {loading}
   {error}
-  {placeholder}
+  placeholder={resolvedPlaceholder}
   {disabled}
   class={className}
   multiple={true}
@@ -134,7 +137,7 @@
   {#snippet noResultsSnippet({ searchQuery })}
     <div class="p-3 text-sm text-center" style="color: var(--ds-text-subtle);">
       <div class="space-y-2">
-        <div>No labels found for "{searchQuery}"</div>
+        <div>{t('pickers.noLabelsFoundFor', { query: searchQuery })}</div>
         <button
           type="button"
           class="flex items-center gap-2 px-3 py-1 rounded transition-colors mx-auto"
@@ -142,7 +145,7 @@
           onclick={() => handleCreate(searchQuery)}
         >
           <Plus class="w-4 h-4" />
-          Create "{searchQuery}"
+          {t('pickers.createItem', { name: searchQuery })}
         </button>
       </div>
     </div>

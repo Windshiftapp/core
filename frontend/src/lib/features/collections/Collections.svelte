@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
+  import { t } from '../../stores/i18n.svelte.js';
   import { Filter, Search, MoreHorizontal, Calendar, User, AlertCircle, Edit, Trash2, Eye, Save, SquareKanban } from 'lucide-svelte';
   import Button from '../../components/Button.svelte';
   import DataTable from '../../components/DataTable.svelte';
@@ -575,7 +576,7 @@
   }
 
   async function deleteItem(item) {
-    if (!confirm(`Are you sure you want to delete "${item.title}"? This action cannot be undone.`)) {
+    if (!confirm(t('collections.confirmDeleteItem', { title: item.title }))) {
       return;
     }
     
@@ -585,7 +586,7 @@
       await loadWorkItems(currentPage, itemsPerPage);
     } catch (error) {
       console.error('Failed to delete item:', error);
-      alert('Failed to delete item: ' + (error.message || error));
+      alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
     }
   }
 
@@ -595,14 +596,14 @@
         id: 'view',
         type: 'regular',
         icon: Eye,
-        title: 'View Details',
+        title: t('items.viewItem'),
         onClick: () => viewItem(item)
       },
       {
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         onClick: () => editItem(item)
       },
       { type: 'divider' },
@@ -610,7 +611,7 @@
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50 hover:text-red-700',
         onClick: () => deleteItem(item)
@@ -630,9 +631,9 @@
   // Collections functions
   async function updateCollectionDirectly() {
     if (!currentCollection) return;
-    
+
     if (!qlQuery.trim()) {
-      alert('No query to save. Please set up some filters or enter a QL query first.');
+      alert(t('collections.noQueryToSave'));
       return;
     }
 
@@ -650,7 +651,7 @@
       navigate('/collections');
     } catch (error) {
       console.error('Failed to update collection:', error);
-      alert('Failed to update collection: ' + (error.message || error));
+      alert(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
     }
   }
 
@@ -767,17 +768,17 @@
     <!-- Results Section -->
     {#if loading}
       <div class="rounded-xl border shadow-sm p-8 text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-        <div class="animate-pulse" style="color: var(--ds-text-subtle);">Loading workspaces...</div>
+        <div class="animate-pulse" style="color: var(--ds-text-subtle);">{t('collections.loadingWorkspaces')}</div>
       </div>
     {:else if !qlQuery.trim() && dynamicFilters.length === 0 && !currentCollection}
       <div class="rounded-xl border shadow-sm p-12 text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
         <Filter class="w-12 h-12 mx-auto mb-4" style="color: var(--ds-icon-subtle);" />
-        <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">Add filters to get started</h3>
-        <p style="color: var(--ds-text-subtle);">Use the sidebar filters or write a query to search for work items.</p>
+        <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">{t('collections.addFiltersToStart')}</h3>
+        <p style="color: var(--ds-text-subtle);">{t('collections.addFiltersDesc')}</p>
       </div>
     {:else if loadingItems}
       <div class="rounded-xl border shadow-sm p-8 text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-        <div class="animate-pulse" style="color: var(--ds-text-subtle);">Loading work items...</div>
+        <div class="animate-pulse" style="color: var(--ds-text-subtle);">{t('collections.loadingWorkItems')}</div>
       </div>
     {:else}
       <!-- Work Items Table -->
@@ -785,8 +786,8 @@
         data={tableData}
         columns={workItemColumns}
         keyField="id"
-        emptyMessage="No work items found"
-        emptyDescription="Try adjusting your filters or search terms."
+        emptyMessage={t('collections.noWorkItemsFound')}
+        emptyDescription={t('collections.tryAdjustingFilters')}
         emptyIcon={Search}
         actionItems={buildItemActions}
         onRowClick={viewItem}
@@ -807,7 +808,7 @@
       {:else}
         <!-- Results Summary -->
         <div class="mt-4 text-sm text-center" style="color: var(--ds-text-subtle);">
-          Showing {workItems.length} work items
+          {t('collections.showingWorkItems', { count: workItems.length })}
         </div>
       {/if}
     {/if}
@@ -822,29 +823,29 @@
   <div>
     <div class="px-8 py-6 border-b" style="border-color: var(--ds-border);">
       <h2 class="text-xl font-semibold" style="color: var(--ds-text);">
-        {associatedWorkspace ? 'Change Workspace Association' : 'Associate with a Workspace'}
+        {associatedWorkspace ? t('collections.changeWorkspaceAssociation') : t('collections.associateWithWorkspace')}
       </h2>
       <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-        Selecting a workspace will scope this collection to that workspace. Leave it unassigned to keep it global.
+        {t('collections.workspaceAssociationDesc')}
       </p>
     </div>
     <div class="px-8 py-6 space-y-4">
       <WorkspacePicker
         bind:value={workspaceAssociationSelection}
-        label="Workspace"
-        placeholder="Search for a workspace..."
+        label={t('workspaces.workspace')}
+        placeholder={t('collections.searchWorkspace')}
       />
       {#if workspaceAssociationError}
         <div class="text-sm" style="color: var(--ds-text-danger);">{workspaceAssociationError}</div>
       {/if}
       <p class="text-xs" style="color: var(--ds-text-subtle);">
-        Only one workspace can be associated at a time. Removing the selection converts the collection back to a global view.
+        {t('collections.workspaceAssociationNote')}
       </p>
     </div>
     <DialogFooter
       onCancel={closeAssociateWorkspaceModal}
       onConfirm={handleAssociateWorkspaceSave}
-      confirmLabel="Save Association"
+      confirmLabel={t('collections.saveAssociation')}
       disabled={workspaceAssociationSaving}
       loading={workspaceAssociationSaving}
     />

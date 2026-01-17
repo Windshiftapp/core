@@ -3,22 +3,30 @@
   import UserPicker from './UserPicker.svelte';
   import GroupPicker from './GroupPicker.svelte';
   import Label from '../components/Label.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     type = $bindable('user'), // 'user' or 'group'
     userId = $bindable(null),
     groupId = $bindable(null),
-    userLabel = 'Select User',
-    groupLabel = 'Select Group',
-    userPlaceholder = 'Search for a user...',
-    groupPlaceholder = 'Search for a group...',
-    confirmText = 'Add',
-    cancelText = 'Cancel',
+    userLabel = '',
+    groupLabel = '',
+    userPlaceholder = '',
+    groupPlaceholder = '',
+    confirmText = '',
+    cancelText = '',
     disabled = false,
     on_confirm = () => {},
     on_cancel = () => {},
     class: className = ''
   } = $props();
+
+  const resolvedUserLabel = $derived(userLabel || t('pickers.selectUser'));
+  const resolvedGroupLabel = $derived(groupLabel || t('pickers.selectGroup'));
+  const resolvedUserPlaceholder = $derived(userPlaceholder || t('pickers.searchUser'));
+  const resolvedGroupPlaceholder = $derived(groupPlaceholder || t('pickers.searchGroup'));
+  const resolvedConfirmText = $derived(confirmText || t('common.add'));
+  const resolvedCancelText = $derived(cancelText || t('common.cancel'));
 
   function handleConfirm() {
     const result = type === 'user' ? { userId } : { groupId };
@@ -35,7 +43,7 @@
 <div class="space-y-4 {className}">
   <!-- Type Selection -->
   <div>
-    <Label color="default" class="mb-2">Assign to:</Label>
+    <Label color="default" class="mb-2">{t('pickers.assignTo')}</Label>
     <div class="flex gap-4">
       <label class="flex items-center">
         <input
@@ -44,7 +52,7 @@
           value="user"
           class="mr-2"
         />
-        <span style="color: var(--ds-text);">User</span>
+        <span style="color: var(--ds-text);">{t('common.user')}</span>
       </label>
       <label class="flex items-center">
         <input
@@ -53,7 +61,7 @@
           value="group"
           class="mr-2"
         />
-        <span style="color: var(--ds-text);">Group</span>
+        <span style="color: var(--ds-text);">{t('common.group')}</span>
       </label>
     </div>
   </div>
@@ -63,16 +71,16 @@
     <div>
       <UserPicker
         bind:value={userId}
-        label={userLabel}
-        placeholder={userPlaceholder}
+        label={resolvedUserLabel}
+        placeholder={resolvedUserPlaceholder}
       />
     </div>
   {:else}
     <div>
       <GroupPicker
         bind:value={groupId}
-        label={groupLabel}
-        placeholder={groupPlaceholder}
+        label={resolvedGroupLabel}
+        placeholder={resolvedGroupPlaceholder}
       />
     </div>
   {/if}
@@ -84,7 +92,7 @@
       variant="secondary"
       size="medium"
     >
-      {cancelText}
+      {resolvedCancelText}
     </Button>
     <Button
       onclick={handleConfirm}
@@ -92,7 +100,7 @@
       size="medium"
       disabled={disabled || !isValid}
     >
-      {confirmText}
+      {resolvedConfirmText}
     </Button>
   </div>
 </div>

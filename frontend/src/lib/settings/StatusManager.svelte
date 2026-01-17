@@ -13,25 +13,26 @@
   import BasePicker from '../pickers/BasePicker.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   // System-protected status IDs (cannot be deleted)
   const PROTECTED_STATUS_IDS = [1, 6]; // Open and Closed
 
-  let statuses = [];
-  let statusCategories = [];
-  let workflowTransitions = [];
-  let loading = true;
-  let loadingCategories = true;
-  let showCreateForm = false;
-  let editingId = null;
+  let statuses = $state([]);
+  let statusCategories = $state([]);
+  let workflowTransitions = $state([]);
+  let loading = $state(true);
+  let loadingCategories = $state(true);
+  let showCreateForm = $state(false);
+  let editingId = $state(null);
 
   // Form state
-  let formData = {
+  let formData = $state({
     name: '',
     description: '',
     category_id: null,
     is_default: false
-  };
+  });
 
   onMount(async () => {
     await loadStatusCategories();
@@ -133,7 +134,7 @@
   async function saveStatus() {
     try {
       if (!formData.name.trim()) {
-        alert('Name is required');
+        alert(t('dialogs.alerts.nameRequired'));
         return;
       }
 
@@ -150,7 +151,7 @@
       cancelForm();
     } catch (error) {
       console.error('Failed to save status:', error);
-      alert('Failed to save status: ' + (error.message || error));
+      alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
     }
   }
 
@@ -161,17 +162,14 @@
     }
 
     if (status.transitionCount > 0) {
-      alert(
-        `Cannot delete "${status.name}" because it's being used in ${status.transitionCount} workflow transition${status.transitionCount === 1 ? '' : 's'}.\n\n` +
-        `To delete this status:\n` +
-        `1. Go to Workflow Management\n` +
-        `2. Remove all transitions that use this status\n` +
-        `3. Then try deleting the status again`
-      );
+      alert(t('dialogs.alerts.statusInUseByTransitions', {
+        name: status.name,
+        count: status.transitionCount
+      }));
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete the status "${status.name}"? This action cannot be undone.`)) {
+    if (!confirm(t('dialogs.confirmations.deleteItem', { name: status.name }))) {
       return;
     }
 
@@ -180,7 +178,7 @@
       statuses = statuses.filter(s => s.id !== status.id);
     } catch (error) {
       console.error('Failed to delete status:', error);
-      alert('Failed to delete status: ' + (error.message || error));
+      alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
     }
   }
 
@@ -206,7 +204,7 @@
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: () => startEdit(status)
       }
@@ -218,7 +216,7 @@
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: inUse ? 'Cannot delete status in use by workflows' : 'Delete',
+        title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50',
         onClick: () => deleteStatus(status),
@@ -230,44 +228,44 @@
   }
 
   // Table column definitions
-  const statusColumns = [
+  const statusColumns = $derived([
     {
       key: 'status_info',
-      label: 'Status',
+      label: t('common.status'),
       slot: 'status'
     },
     {
       key: 'category_info',
-      label: 'Category',
+      label: t('common.category'),
       slot: 'category'
     },
     {
       key: 'description',
-      label: 'Description',
+      label: t('common.description'),
       render: (status) => status.description || '—',
       textColor: 'var(--ds-text-subtle)'
     },
     {
       key: 'transitions',
-      label: 'Workflow Usage',
+      label: t('workflows.transitions'),
       render: (status) => `${status.transitionCount || 0} transition${status.transitionCount === 1 ? '' : 's'}`,
       textColor: 'var(--ds-text-subtle)'
     },
     {
       key: 'actions',
-      label: 'Actions'
+      label: t('common.actions')
     }
-  ];
+  ]);
 </script>
 
 <svelte:window onkeydown={handleGlobalKeydown} />
 
 <div style="background-color: var(--ds-surface); min-height: 100vh;">
-  <PageHeader 
-    icon={GitBranch} 
-    title="Statuses" 
-    subtitle="Manage individual statuses. Each status belongs to a category and can be used in workflows."
-    count="{statuses.length} statuses"
+  <PageHeader
+    icon={GitBranch}
+    title={t('statuses.title')}
+    subtitle={t('statuses.subtitle')}
+    count={t('statuses.statuses', { count: statuses.length })}
   >
     {#snippet actions()}
       <Button
@@ -277,7 +275,7 @@
         disabled={statusCategories.length === 0}
         keyboardHint="A"
       >
-        Add Status
+        {t('statuses.createStatus')}
       </Button>
     {/snippet}
   </PageHeader>
@@ -285,10 +283,10 @@
   {#if statusCategories.length === 0 && !loadingCategories}
     <div class="rounded-xl border shadow-sm p-12 text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
       <Circle class="w-12 h-12 text-gray-400 mx-auto mb-4" />
-      <h3 class="text-lg font-medium text-gray-900 mb-2">No status categories found</h3>
-      <p class="text-gray-500 mb-6">You need to create status categories before you can create statuses.</p>
+      <h3 class="text-lg font-medium text-gray-900 mb-2">{t('categories.noCategories')}</h3>
+      <p class="text-gray-500 mb-6">{t('statuses.noStatuses')}</p>
       <Button href="/admin/status-categories" variant="primary">
-        Go to Status Categories
+        {t('categories.title')}
       </Button>
     </div>
   {:else}
@@ -296,14 +294,14 @@
       columns={statusColumns}
       data={statuses}
       keyField="id"
-      emptyMessage="No statuses found. Create your first status to get started."
+      emptyMessage={t('statuses.noStatuses')}
       emptyIcon={Circle}
       actionItems={buildStatusDropdownItems}
     >
       <div slot="status" let:item={status} class="flex items-center gap-3">
         <h3 class="font-medium" style="color: var(--ds-text);">{status.name}</h3>
         {#if status.is_default}
-          <Lozenge color="green" text="Default" />
+          <Lozenge color="green" text={t('common.default')} />
         {/if}
       </div>
       
@@ -321,7 +319,7 @@
     <!-- Modal header -->
     <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
       <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-        {editingId ? 'Edit Status' : 'Create Status'}
+        {editingId ? t('statuses.editStatus') : t('statuses.createStatus')}
       </h3>
     </div>
 
@@ -329,7 +327,7 @@
     <div class="px-6 py-4">
       <form onsubmit={(e) => { e.preventDefault(); saveStatus(); }}>
         <div class="form-group">
-          <label for="name">Name *</label>
+          <label for="name">{t('common.name')} *</label>
           <input
             type="text"
             id="name"
@@ -340,21 +338,21 @@
         </div>
 
         <div class="form-group">
-          <label for="category">Category *</label>
+          <label for="category">{t('common.category')} *</label>
           <BasePicker
             bind:value={formData.category_id}
             items={statusCategories}
-            placeholder="Select category..."
+            placeholder={t('categories.selectCategory')}
             getValue={(item) => item.id}
             getLabel={(item) => item.name}
           />
         </div>
 
         <div class="form-group">
-          <label for="description">Description</label>
+          <label for="description">{t('common.description')}</label>
           <Textarea
             id="description"
-            placeholder="Optional description for this status"
+            placeholder={t('placeholders.optionalDescription')}
             bind:value={formData.description}
             rows={2}
           />
@@ -363,7 +361,7 @@
         <div class="mb-6">
           <Toggle
             bind:checked={formData.is_default}
-            label="Set as default status"
+            label={t('common.default')}
             size="small"
           />
         </div>
@@ -372,7 +370,7 @@
         <DialogFooter
           onCancel={cancelForm}
           onConfirm={saveStatus}
-          confirmLabel="{editingId ? 'Update' : 'Create'} Status"
+          confirmLabel={editingId ? t('common.update') : t('common.create')}
           showKeyboardHint={true}
           confirmKeyboardHint={submitHint}
           class="mx-[-1.5rem] mb-[-1rem] mt-0"

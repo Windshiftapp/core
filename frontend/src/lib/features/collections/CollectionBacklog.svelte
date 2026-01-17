@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
+  import { t } from '../../stores/i18n.svelte.js';
   import { getCollection } from '../collections/collectionService.js';
   import { getStatusCategory } from '../../utils/statusColors.js';
   import Lozenge from '../../components/Lozenge.svelte';
@@ -403,7 +404,7 @@
 
 {#if loading}
   <div class="p-6">
-    <div class="animate-pulse">Loading...</div>
+    <div class="animate-pulse">{t('common.loading')}</div>
   </div>
 {:else if workspace}
   <div class="min-h-screen" style="{backgroundStyle}">
@@ -436,9 +437,9 @@
           <div class="mb-4">
             <List class="w-16 h-16 mx-auto" style={emptyStateStyle} />
           </div>
-          <h3 class="text-lg font-medium mb-2" style={textStyle}>No Items in Backlog</h3>
+          <h3 class="text-lg font-medium mb-2" style={textStyle}>{t('collections.noItemsInBacklog')}</h3>
           <p class="text-sm mb-4" style={subtleTextStyle}>
-            All work items are either completed or no items exist yet.
+            {t('collections.noItemsInBacklogDesc')}
           </p>
         </div>
       {:else}
@@ -504,7 +505,7 @@
           <!-- Summary -->
           <div class="mt-8 text-center">
             <p class="text-sm" style={subtleTextStyle}>
-              Showing {backlogItems.length} items from backlog
+              {t('collections.showingItemsFromBacklog', { count: backlogItems.length })}
             </p>
           </div>
         </div>
@@ -514,7 +515,7 @@
 {:else}
   <div class="p-6">
     <div class="text-center" style="color: var(--ds-text-subtle);">
-      Workspace not found.
+      {t('collections.workspaceNotFound')}
     </div>
   </div>
 {/if}

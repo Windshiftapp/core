@@ -3,6 +3,7 @@
   import { fly } from 'svelte/transition';
   import { Check, ChevronDown, X } from 'lucide-svelte';
   import Spinner from '../components/Spinner.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     // Core props
@@ -13,14 +14,14 @@
     disabled = false,
 
     // Display props
-    placeholder = 'Select...',
+    placeholder = '',
     label = '',
     class: className = '',
 
     // Feature toggles
     allowClear = false,
     showUnassigned = false,
-    unassignedLabel = 'Unassigned',
+    unassignedLabel = '',
     multiple = false,
     showSelectedInTrigger = true,
 
@@ -46,6 +47,9 @@
     onCancel = () => {},
     onChange = () => {}
   } = $props();
+
+  const resolvedPlaceholder = $derived(placeholder || t('pickers.select'));
+  const resolvedUnassignedLabel = $derived(unassignedLabel || t('pickers.unassigned'));
 
   // Expose input value for create functionality
   export function getInputValue() {
@@ -95,7 +99,7 @@
     if (showUnassigned && !multiple) {
       opts.unshift({
         value: null,
-        label: unassignedLabel,
+        label: resolvedUnassignedLabel,
         item: null,
         isUnassigned: true
       });
@@ -313,7 +317,7 @@
           bind:this={inputRef}
           use:melt={$input}
           type="text"
-          placeholder={selectedItems.length === 0 ? placeholder : ''}
+          placeholder={selectedItems.length === 0 ? resolvedPlaceholder : ''}
           {disabled}
           onkeydowncapture={handleKeydown}
           class="flex-1 min-w-[120px] px-1 py-0.5 bg-transparent border-0 outline-none text-sm"
@@ -338,7 +342,7 @@
       <input
         use:melt={$input}
         type="text"
-        {placeholder}
+        placeholder={resolvedPlaceholder}
         {disabled}
         onkeydowncapture={handleKeydown}
         class="w-full px-4 py-2 pr-16 rounded border transition-all duration-200
@@ -357,7 +361,7 @@
             onclick={handleClear}
             class="p-0.5 rounded transition-colors"
             style="color: var(--ds-text-subtle);"
-            aria-label="Clear selection"
+            aria-label={t('pickers.clearSelection')}
             onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
           >
@@ -424,7 +428,7 @@
             <div class="flex items-center gap-3 flex-1 min-w-0">
               {#if opt.isUnassigned}
                 <!-- Unassigned option -->
-                <span class="font-medium truncate" style="color: var(--ds-text-subtle);">{unassignedLabel}</span>
+                <span class="font-medium truncate" style="color: var(--ds-text-subtle);">{resolvedUnassignedLabel}</span>
               {:else if itemSnippet}
                 <!-- Custom item rendering via snippet -->
                 {@render itemSnippet({ item: opt.item, isSelected: itemSelected })}
@@ -461,7 +465,7 @@
         {@render noResultsSnippet({ searchQuery: $inputValue })}
       {:else}
         <div class="px-4 py-4 text-center text-sm" style="color: var(--ds-text-subtle);">
-          No results found for "{$inputValue}"
+          {t('pickers.noResultsFor', { query: $inputValue })}
         </div>
       {/if}
     </div>
@@ -482,7 +486,7 @@
           style="color: var(--ds-interactive);"
           onclick={() => onCreate($inputValue)}
         >
-          <span class="text-sm">Create "{$inputValue}"</span>
+          <span class="text-sm">{t('pickers.createItem', { name: $inputValue })}</span>
         </button>
       {/if}
     </div>

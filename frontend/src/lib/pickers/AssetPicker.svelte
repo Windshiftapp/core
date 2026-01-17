@@ -4,12 +4,13 @@
   import { api } from '../api.js';
   import { onMount } from 'svelte';
   import { Box } from 'lucide-svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     value = $bindable(null),
     assetSetId,
     cqlQuery = '',
-    placeholder = 'Select asset...',
+    placeholder = '',
     disabled = false,
     allowClear = true,
     showUnassigned = false,
@@ -18,6 +19,8 @@
     onSelect = () => {},
     onCancel = () => {}
   } = $props();
+
+  const resolvedPlaceholder = $derived(placeholder || t('pickers.selectAsset'));
 
   const assets = createAsyncLoader(async () => {
     if (!assetSetId) return [];
@@ -44,11 +47,11 @@
   items={assets.data || []}
   loading={assets.loading}
   error={assets.error}
-  {placeholder}
+  placeholder={resolvedPlaceholder}
   {disabled}
   {allowClear}
   {showUnassigned}
-  unassignedLabel="None"
+  unassignedLabel={t('common.none')}
   class={className}
   searchFields={['title', 'asset_tag', 'description']}
   getValue={(asset) => asset?.id}
@@ -69,7 +72,7 @@
       <div class="flex flex-col min-w-0 flex-1">
         <span class="font-medium truncate">{asset.title}</span>
         <span class="text-xs truncate" style="color: var(--ds-text-subtle);">
-          {asset.asset_tag || 'No tag'}
+          {asset.asset_tag || t('pickers.noTag')}
           {#if asset.asset_type_name} · {asset.asset_type_name}{/if}
         </span>
       </div>

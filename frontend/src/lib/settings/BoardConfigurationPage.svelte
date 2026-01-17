@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { navigate } from '../router.js';
   import { api } from '../api.js';
+  import { t } from '../stores/i18n.svelte.js';
   import { getCollection } from '../features/collections/collectionService.js';
   import { Plus, GripVertical, Trash2, X } from 'lucide-svelte';
   import ViewHeader from '../layout/ViewHeader.svelte';
@@ -113,7 +114,7 @@
 
   function addColumn() {
     const newColumn = {
-      name: `Column ${columns.length + 1}`,
+      name: `${t('settings.boardConfig.columns')} ${columns.length + 1}`,
       display_order: columns.length,
       wip_limit: null,
       color: '#f3f4f6', // Default gray
@@ -219,14 +220,14 @@
       goToBoard();
     } catch (error) {
       console.error('Failed to save board configuration:', error);
-      alert('Failed to save configuration: ' + error.message);
+      alert(t('dialogs.alerts.failedToSave', { error: error.message }));
     } finally {
       saving = false;
     }
   }
 
   async function resetToDefault() {
-    if (!confirm('Are you sure you want to reset to default board configuration? This will delete your custom configuration.')) {
+    if (!confirm(t('dialogs.confirmations.resetBoardConfig'))) {
       return;
     }
 
@@ -241,7 +242,7 @@
         goToBoard();
       } catch (error) {
         console.error('Failed to delete board configuration:', error);
-        alert('Failed to reset configuration: ' + error.message);
+        alert(t('dialogs.alerts.failedToResetConfig', { error: error.message }));
       }
     } else {
       columns = [];
@@ -251,7 +252,7 @@
   }
 
   function cancelChanges() {
-    if (hasChanges && !confirm('You have unsaved changes. Are you sure you want to cancel?')) {
+    if (hasChanges && !confirm(t('dialogs.confirmations.discardChanges'))) {
       return;
     }
     goToBoard();
@@ -268,7 +269,7 @@
 
 {#if loading}
   <div class="p-6">
-    <div class="animate-pulse">Loading...</div>
+    <div class="animate-pulse">{t('common.loading')}</div>
   </div>
 {:else if workspace}
   <div style="background-color: var(--ds-surface);">
@@ -302,7 +303,7 @@
               style:color={activeTab === 'columns' ? '#2563eb' : 'var(--ds-text-subtle)'}
               onclick={() => activeTab = 'columns'}
             >
-              Columns
+              {t('settings.boardConfig.columns')}
             </button>
             <button
               class="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
@@ -311,7 +312,7 @@
               style:color={activeTab === 'backlog' ? '#2563eb' : 'var(--ds-text-subtle)'}
               onclick={() => activeTab = 'backlog'}
             >
-              Backlog
+              {t('settings.boardConfig.backlog')}
             </button>
           </div>
         </div>
@@ -337,6 +338,7 @@
                     style="color: var(--ds-text-subtlest);"
                     onmouseenter={(e) => e.currentTarget.style.color = 'var(--ds-text-subtle)'}
                     onmouseleave={(e) => e.currentTarget.style.color = 'var(--ds-text-subtlest)'}
+                    title={t('settings.boardConfig.dragToReorder')}
                   >
                     <GripVertical class="w-4 h-4" />
                   </div>
@@ -346,7 +348,7 @@
                     oninput={(e) => updateColumnName(index, e.target.value)}
                     class="flex-1 px-2 py-1 border rounded text-sm font-semibold min-w-0"
                     style="border-color: var(--ds-border); color: var(--ds-text); background-color: var(--ds-surface);"
-                    placeholder="Column name"
+                    placeholder={t('placeholders.columnName')}
                   />
                 </div>
                 <button
@@ -355,7 +357,7 @@
                   style="color: #dc2626;"
                   onmouseenter={(e) => e.currentTarget.style.backgroundColor = '#dc26261A'}
                   onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
-                  title="Delete column"
+                  title={t('common.delete')}
                 >
                   <Trash2 class="w-4 h-4" />
                 </button>
@@ -366,7 +368,7 @@
                 <!-- WIP Limit -->
                 <div>
                   <label class="text-xs font-medium block mb-1" style="color: var(--ds-text);">
-                    WIP Limit
+                    {t('settings.boardConfig.wipLimit')}
                   </label>
                   <input
                     type="number"
@@ -374,7 +376,7 @@
                     oninput={(e) => updateWIPLimit(index, e.target.value)}
                     class="w-full px-2 py-1 border rounded text-sm"
                     style="border-color: var(--ds-border); color: var(--ds-text); background-color: var(--ds-surface);"
-                    placeholder="None"
+                    placeholder={t('common.none')}
                     min="1"
                   />
                 </div>
@@ -382,7 +384,7 @@
                 <!-- Status mapping -->
                 <div>
                   <label class="text-xs font-medium block mb-2" style="color: var(--ds-text);">
-                    Mapped Statuses
+                    {t('settings.boardConfig.mappedStatuses')}
                   </label>
                   <div class="space-y-1">
                     {#each statuses as status}
@@ -403,7 +405,7 @@
                   </div>
                   {#if column.status_ids.length === 0}
                     <p class="text-xs mt-2" style="color: #ca8a04;">
-                      No statuses mapped
+                      {t('settings.boardConfig.noStatusesMapped')}
                     </p>
                   {/if}
                 </div>
@@ -421,7 +423,7 @@
           >
             <div class="flex flex-col items-center gap-2">
               <Plus class="w-8 h-8" />
-              <span class="font-medium">Add Column</span>
+              <span class="font-medium">{t('settings.boardConfig.addColumn')}</span>
             </div>
           </button>
         </div>
@@ -430,9 +432,9 @@
         <!-- Backlog Tab -->
         <div class="mt-6 mb-6">
           <div class="bg-white rounded border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-            <h3 class="text-lg font-semibold mb-2" style="color: var(--ds-text);">Backlog Statuses</h3>
+            <h3 class="text-lg font-semibold mb-2" style="color: var(--ds-text);">{t('settings.boardConfig.backlogStatuses')}</h3>
             <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">
-              Select which statuses should appear in the backlog. If no statuses are selected, the backlog shows every item whose status category is not marked as completed.
+              {t('settings.boardConfig.backlogStatusesHelp')}
             </p>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -457,7 +459,7 @@
 
             {#if backlogStatusIDs.length === 0}
               <p class="text-sm mt-4" style="color: #ca8a04;">
-                No statuses selected. The backlog will include all items whose status categories are not marked as completed.
+                {t('settings.boardConfig.noStatusesSelected')}
               </p>
             {:else}
               <p class="text-sm mt-4" style="color: var(--ds-text-subtle);">
@@ -478,7 +480,7 @@
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
             disabled={!boardConfig && columns.length === 0}
           >
-            Reset to Default
+            {t('settings.boardConfig.resetToDefault')}
           </button>
 
           <div class="flex gap-3">
@@ -490,7 +492,7 @@
               onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
               disabled={saving}
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <Button
               variant="primary"
@@ -498,7 +500,7 @@
               disabled={saving || (activeTab === 'columns' && columns.length === 0)}
               loading={saving}
             >
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? t('common.saving') : t('common.saveChanges')}
             </Button>
           </div>
         </div>
@@ -508,7 +510,7 @@
 {:else}
   <div class="p-6">
     <div class="text-center" style="color: var(--ds-text-subtle);">
-      Workspace not found.
+      {t('common.notFound')}
     </div>
   </div>
 {/if}

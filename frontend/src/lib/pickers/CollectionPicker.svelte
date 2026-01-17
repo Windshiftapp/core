@@ -3,16 +3,19 @@
   import { createEventDispatcher, onMount } from 'svelte';
   import { api } from '../api.js';
   import { FolderOpen, Globe } from 'lucide-svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
   let {
     value = $bindable([]),
-    placeholder = 'Select collections...',
+    placeholder = '',
     label = '',
     disabled = false,
     class: className = ''
   } = $props();
+
+  const resolvedPlaceholder = $derived(placeholder || t('pickers.selectCollections'));
 
   let collections = $state([]);
   let workspaces = $state([]);
@@ -56,9 +59,9 @@
   }
 
   function getWorkspaceName(workspaceId) {
-    if (!workspaceId) return 'Global';
+    if (!workspaceId) return t('common.global');
     const workspace = workspaces.find(w => w.id === workspaceId);
-    return workspace ? workspace.key : `Workspace ${workspaceId}`;
+    return workspace ? workspace.key : `${t('workspaces.workspace')} ${workspaceId}`;
   }
 </script>
 
@@ -67,7 +70,7 @@
   items={collections}
   {loading}
   {error}
-  {placeholder}
+  placeholder={resolvedPlaceholder}
   {label}
   {disabled}
   class={className}

@@ -1,6 +1,7 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { Paperclip, PenTool, Trash2 } from 'lucide-svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -40,7 +41,7 @@
       URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error('Download failed:', error);
-      alert('Failed to download file: ' + error.message);
+      alert(t('assets.failedToDownload') + ': ' + error.message);
     }
   }
 
@@ -78,7 +79,7 @@
             class="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--ds-background-danger-hovered)]"
             style="color: var(--ds-text-danger);"
             onclick={() => handleDelete(attachment)}
-            title="Delete"
+            title={t('common.delete')}
           >
             <Trash2 class="w-3.5 h-3.5" />
           </button>
@@ -92,19 +93,19 @@
           class="flex-1 text-sm truncate text-left hover:underline"
           style="color: var(--ds-text);"
           onclick={() => handleEditDiagram(diagram)}
-          title="Edit diagram"
+          title={t('assets.editDiagram')}
         >
-          {diagram.name || 'Untitled Diagram'}
+          {diagram.name || t('assets.untitledDiagram')}
         </button>
         <span class="text-xs" style="color: var(--ds-text-subtlest);">
-          {diagram.type || 'diagram'}
+          {diagram.type || t('assets.diagram')}
         </span>
         {#if canDelete}
           <button
             class="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--ds-background-danger-hovered)]"
             style="color: var(--ds-text-danger);"
             onclick={() => handleDeleteDiagram(diagram)}
-            title="Delete"
+            title={t('common.delete')}
           >
             <Trash2 class="w-3.5 h-3.5" />
           </button>

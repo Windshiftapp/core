@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { t } from '../../stores/i18n.svelte.js';
   import {
     Calendar, CheckCircle, Clock, Plus, Edit, Trash2,
     Globe, Building2, Target
@@ -43,12 +44,12 @@
     return iterations.filter(i => i.type_id === parseInt(activeTypeId));
   });
 
-  const statusOptions = [
-    { value: 'planned', label: 'Planned', lozengeColor: 'grey', icon: Clock },
-    { value: 'active', label: 'Active', lozengeColor: 'blue', icon: Target },
-    { value: 'completed', label: 'Completed', lozengeColor: 'green', icon: CheckCircle },
-    { value: 'cancelled', label: 'Cancelled', lozengeColor: 'red', icon: Target }
-  ];
+  let statusOptions = $derived([
+    { value: 'planned', label: t('iterations.status.planned'), lozengeColor: 'grey', icon: Clock },
+    { value: 'active', label: t('iterations.status.active'), lozengeColor: 'blue', icon: Target },
+    { value: 'completed', label: t('iterations.status.completed'), lozengeColor: 'green', icon: CheckCircle },
+    { value: 'cancelled', label: t('iterations.status.cancelled'), lozengeColor: 'red', icon: Target }
+  ]);
 
   onMount(async () => {
     await loadData();
@@ -136,13 +137,13 @@
   }
 
   async function deleteIteration(iteration) {
-    if (confirm(`Are you sure you want to delete iteration "${iteration.name}"?`)) {
+    if (confirm(t('iterations.confirmDelete', { name: iteration.name }))) {
       try {
         await api.iterations.delete(iteration.id);
         await loadData();
       } catch (error) {
         console.error('Failed to delete iteration:', error);
-        alert('Failed to delete iteration: ' + (error.message || error));
+        alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
       }
     }
   }
@@ -163,7 +164,7 @@
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: () => startEdit(iteration)
       });
@@ -171,7 +172,7 @@
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50',
         onClick: () => deleteIteration(iteration)
@@ -201,45 +202,45 @@
     const diffTime = end - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffDays < 0) return `${Math.abs(diffDays)} days overdue`;
-    if (diffDays === 0) return 'Ends today';
-    if (diffDays === 1) return '1 day left';
-    return `${diffDays} days left`;
+    if (diffDays < 0) return t('iterations.daysOverdue', { count: Math.abs(diffDays) });
+    if (diffDays === 0) return t('iterations.endsToday');
+    if (diffDays === 1) return t('iterations.oneDayRemaining');
+    return t('iterations.daysRemaining', { count: diffDays });
   }
 
   // DataTable configuration
   let columns = $derived([
     {
       key: 'name',
-      label: 'Name',
+      label: t('common.name'),
       sortable: true,
       width: '25%',
       slot: 'name'
     },
     {
       key: 'type',
-      label: 'Type',
+      label: t('common.type'),
       sortable: true,
       width: '15%',
       slot: 'type'
     },
     {
       key: 'date_range',
-      label: 'Date Range',
+      label: t('iterations.dateRange'),
       sortable: true,
       width: '20%',
       slot: 'date_range'
     },
     {
       key: 'status',
-      label: 'Status',
+      label: t('common.status'),
       sortable: true,
       width: '12%',
       slot: 'status'
     },
     {
       key: 'scope',
-      label: 'Scope',
+      label: t('iterations.scope'),
       sortable: true,
       width: '15%',
       slot: 'scope'
@@ -263,12 +264,12 @@
     <div class="p-6">
       <!-- Header -->
       <SectionHeader
-        title="Iterations"
+        title={t('sprints.title')}
         subtitle={isGlobalView
           ? (activeTypeId
-              ? `Showing ${iterationTypes.find(t => t.id === parseInt(activeTypeId))?.name || 'filtered'} iterations`
-              : 'Manage sprints, PIs, and other agile iteration cycles')
-          : 'Manage workspace iterations'}
+              ? `Showing ${iterationTypes.find(type => type.id === parseInt(activeTypeId))?.name || 'filtered'} iterations`
+              : t('sprints.subtitle'))
+          : t('sprints.subtitle')}
         class="mb-6"
       >
         {#snippet actions()}
@@ -279,7 +280,7 @@
             keyboardHint="A"
             onclick={startCreate}
           >
-            Create Iteration
+            {t('sprints.createSprint')}
           </Button>
         {/snippet}
       </SectionHeader>
@@ -288,18 +289,18 @@
       {#if loading}
         <div class="flex items-center justify-center p-12">
           <div class="text-center" style="color: var(--ds-text-subtle);">
-            Loading iterations...
+            {t('common.loading')}
           </div>
         </div>
       {:else if filteredIterations.length === 0}
         <div class="flex flex-col items-center justify-center p-12 border-2 border-dashed rounded" style="border-color: var(--ds-border);">
           <Calendar class="w-12 h-12 mb-4" style="color: var(--ds-text-subtle);" />
-          <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">No iterations yet</h3>
+          <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">{t('sprints.noSprints')}</h3>
           <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">
             {#if activeTypeId}
-              No iterations found for this type
+              {t('sprints.noSprints')}
             {:else}
-              Create your first iteration to start planning your work cycles
+              {t('sprints.noSprints')}
             {/if}
           </p>
           <Button
@@ -309,7 +310,7 @@
             keyboardHint="A"
             onclick={startCreate}
           >
-            Create Iteration
+            {t('sprints.createSprint')}
           </Button>
         </div>
       {:else}
@@ -368,9 +369,9 @@
 
               <span slot="scope" let:item class="text-sm text-gray-600">
                 {#if item.is_global}
-                  Global
+                  {t('iterations.global')}
                 {:else}
-                  {item.workspace_name || 'This workspace'}
+                  {item.workspace_name || t('iterations.thisWorkspace')}
                 {/if}
               </span>
             </DataTable>

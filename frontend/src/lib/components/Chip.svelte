@@ -1,5 +1,6 @@
 <script>
   import { X } from 'lucide-svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   /**
    * Chip - Metadata container with optional icon and remove button
@@ -50,7 +51,7 @@
       type="button"
       onclick={handleRemove}
       class="hover:opacity-70 transition-opacity -mr-0.5"
-      aria-label="Remove"
+      aria-label={t('common.remove')}
     >
       <X class="w-3 h-3" />
     </button>

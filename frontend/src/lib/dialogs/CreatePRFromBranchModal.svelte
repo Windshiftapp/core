@@ -6,6 +6,7 @@
   import DialogFooter from './DialogFooter.svelte';
   import { X, GitMerge, Loader2 } from 'lucide-svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let branchLink;
   export let itemKey = '';
@@ -23,7 +24,7 @@
 
   async function submit() {
     if (!branchLink?.id) {
-      error = 'No branch link provided';
+      error = t('scm.noBranchLink');
       return;
     }
 
@@ -38,11 +39,11 @@
       };
 
       const result = await api.itemSCMLinks.createPRFromBranch(branchLink.id, data);
-      successToast(`Pull request #${result.pr_number} created successfully`);
+      successToast(t('scm.prCreatedSuccess', { prNumber: result.pr_number }));
       dispatch('created', result);
     } catch (err) {
       console.error('Failed to create PR:', err);
-      error = err.message || 'Failed to create pull request';
+      error = err.message || t('scm.failedToCreatePR');
       errorToast(error);
     } finally {
       submitting = false;
@@ -72,10 +73,10 @@
     <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: var(--ds-border);">
       <div>
         <h2 id="create-pr-title" class="text-lg font-semibold" style="color: var(--ds-text);">
-          Create Pull Request
+          {t('scm.createPullRequest')}
         </h2>
         <p class="text-sm" style="color: var(--ds-text-subtle);">
-          Create PR from branch: <span class="font-mono">{branchLink?.external_id || branchLink?.title || 'branch'}</span>
+          {t('scm.createPRFrom', { branch: '' })} <span class="font-mono">{branchLink?.external_id || branchLink?.title || 'branch'}</span>
         </p>
       </div>
       <button
@@ -91,7 +92,7 @@
     <div class="px-6 py-4 space-y-4">
       <!-- PR Title -->
       <div>
-        <Label color="default" class="mb-1.5">PR Title</Label>
+        <Label color="default" class="mb-1.5">{t('scm.prTitle')}</Label>
         <input
           type="text"
           bind:value={prTitle}
@@ -103,7 +104,7 @@
 
       <!-- PR Body -->
       <div>
-        <Label color="default" class="mb-1.5">Description</Label>
+        <Label color="default" class="mb-1.5">{t('scm.description')}</Label>
         <textarea
           bind:value={prBody}
           placeholder={itemKey ? `Linked to ${itemKey}` : 'Pull request description'}
@@ -115,7 +116,7 @@
 
       <!-- Base Branch -->
       <div>
-        <Label color="default" class="mb-1.5">Base Branch</Label>
+        <Label color="default" class="mb-1.5">{t('scm.baseBranchPR')}</Label>
         <input
           type="text"
           bind:value={baseBranch}
@@ -124,7 +125,7 @@
           style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
         />
         <p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">
-          Leave empty to use the repository's default branch.
+          {t('scm.baseBranchPRHelp')}
         </p>
       </div>
 
@@ -138,9 +139,9 @@
     <DialogFooter
       onCancel={close}
       onConfirm={submit}
-      confirmLabel="Create PR"
+      confirmLabel={t('scm.createPR')}
       loading={submitting}
-      loadingLabel="Creating..."
+      loadingLabel={t('scm.creating')}
     />
   </div>
 </div>

@@ -16,40 +16,41 @@
 	import Lozenge from '../components/Lozenge.svelte';
 	import Label from '../components/Label.svelte';
 	import { matchesShortcut } from '../utils/keyboardShortcuts.js';
+	import { t } from '../stores/i18n.svelte.js';
 
-	let users = [];
-	let loading = false;
-	let error = '';
-	let searchQuery = '';
-	let showCreateForm = false;
-	let editingUser = null;
-	let showPasswordResetModal = false;
-	let resetPasswordUser = null;
-	let newPassword = '';
-	let generateRandomPassword = true;
-	let showPasswordResultModal = false;
-	let temporaryPassword = '';
-	let passwordResetSuccess = false;
-	let resetPasswordUserName = '';
+	let users = $state([]);
+	let loading = $state(false);
+	let error = $state('');
+	let searchQuery = $state('');
+	let showCreateForm = $state(false);
+	let editingUser = $state(null);
+	let showPasswordResetModal = $state(false);
+	let resetPasswordUser = $state(null);
+	let newPassword = $state('');
+	let generateRandomPassword = $state(true);
+	let showPasswordResultModal = $state(false);
+	let temporaryPassword = $state('');
+	let passwordResetSuccess = $state(false);
+	let resetPasswordUserName = $state('');
 
 
 	// Confirmation dialog state
-	let showConfirmDialog = false;
-	let confirmAction = null;
-	let confirmTitle = '';
-	let confirmMessage = '';
-	let confirmButtonText = '';
-	let confirmButtonVariant = 'danger';
+	let showConfirmDialog = $state(false);
+	let confirmAction = $state(null);
+	let confirmTitle = $state('');
+	let confirmMessage = $state('');
+	let confirmButtonText = $state('');
+	let confirmButtonVariant = $state('danger');
 
 	// Form data
-	let formData = {
+	let formData = $state({
 		email: '',
 		username: '',
 		first_name: '',
 		last_name: '',
 		password: '',
 		is_active: true
-	};
+	});
 
 	async function loadUsers() {
 		loading = true;
@@ -57,7 +58,7 @@
 			users = await api.getUsers();
 			error = '';
 		} catch (err) {
-			error = err.message || 'Failed to load users';
+			error = err.message || t('users.failedToLoad');
 		} finally {
 			loading = false;
 		}
@@ -74,7 +75,7 @@
 			resetForm();
 			await loadUsers();
 		} catch (err) {
-			const errorMsg = err.message || 'Failed to save user';
+			const errorMsg = err.message || t('users.failedToSave');
 			error = errorMsg;
 			errorToast(errorMsg);
 		}
@@ -107,15 +108,15 @@
 
 	function deleteUser(userId, userName) {
 		showConfirm(
-			'Delete User',
-			`Are you sure you want to delete ${userName}? This action cannot be undone.`,
-			'Delete User',
+			t('users.deleteUser'),
+			t('users.confirmDelete', { name: userName }),
+			t('users.deleteUser'),
 			async () => {
 				try {
 					await api.deleteUser(userId);
 					await loadUsers();
 				} catch (err) {
-					const errorMsg = err.message || 'Failed to delete user';
+					const errorMsg = err.message || t('users.failedToDelete');
 					error = errorMsg;
 					errorToast(errorMsg);
 				}
@@ -125,15 +126,15 @@
 
 	function activateUser(userId, userName) {
 		showConfirm(
-			'Activate User',
-			`Are you sure you want to activate ${userName}? They will be able to access the system.`,
-			'Activate User',
+			t('users.activateUser'),
+			t('users.confirmActivate', { name: userName }),
+			t('users.activateUser'),
 			async () => {
 				try {
 					await api.activateUser(userId);
 					await loadUsers();
 				} catch (err) {
-					const errorMsg = err.message || 'Failed to activate user';
+					const errorMsg = err.message || t('users.failedToActivate');
 					error = errorMsg;
 					errorToast(errorMsg);
 				}
@@ -144,15 +145,15 @@
 
 	function deactivateUser(userId, userName) {
 		showConfirm(
-			'Deactivate User',
-			`Are you sure you want to deactivate ${userName}? They will no longer be able to access the system.`,
-			'Deactivate User',
+			t('users.deactivateUser'),
+			t('users.confirmDeactivate', { name: userName }),
+			t('users.deactivateUser'),
 			async () => {
 				try {
 					await api.deactivateUser(userId);
 					await loadUsers();
 				} catch (err) {
-					const errorMsg = err.message || 'Failed to deactivate user';
+					const errorMsg = err.message || t('users.failedToDeactivate');
 					error = errorMsg;
 					errorToast(errorMsg);
 				}
@@ -188,7 +189,7 @@
 			showPasswordResultModal = true;
 			await loadUsers();
 		} catch (err) {
-			const errorMsg = err.message || 'Failed to reset password';
+			const errorMsg = err.message || t('users.failedToResetPassword');
 			error = errorMsg;
 			errorToast(errorMsg);
 		}
@@ -216,7 +217,7 @@
 				id: 'edit',
 				type: 'regular',
 				icon: Edit,
-				title: 'Edit',
+				title: t('common.edit'),
 				hoverClass: 'hover-bg',
 				onClick: () => editUser(user)
 			},
@@ -224,7 +225,7 @@
 				id: 'reset-password',
 				type: 'regular',
 				icon: RotateCcw,
-				title: 'Reset Password',
+				title: t('auth.resetPassword'),
 				hoverClass: 'hover-bg',
 				onClick: () => resetUserPassword(user.id, user.full_name)
 			}
@@ -238,7 +239,7 @@
 					id: 'deactivate',
 					type: 'regular',
 					icon: UserX,
-					title: 'Deactivate',
+					title: t('common.disable'),
 					color: '#f59e0b',
 					hoverClass: 'hover:bg-orange-50',
 					onClick: () => deactivateUser(user.id, user.full_name)
@@ -248,7 +249,7 @@
 					id: 'activate',
 					type: 'regular',
 					icon: UserCheck,
-					title: 'Activate',
+					title: t('common.enable'),
 					color: '#10b981',
 					hoverClass: 'hover:bg-green-50',
 					onClick: () => activateUser(user.id, user.full_name)
@@ -260,7 +261,7 @@
 				id: 'delete',
 				type: 'regular',
 				icon: Trash2,
-				title: 'Delete',
+				title: t('common.delete'),
 				color: '#dc2626',
 				hoverClass: 'hover:bg-red-50',
 				onClick: () => deleteUser(user.id, user.full_name)
@@ -271,31 +272,31 @@
 	}
 
 	// Table column definitions
-	const userColumns = [
+	const userColumns = $derived([
 		{
 			key: 'name',
-			label: 'Name',
+			label: t('common.name'),
 			slot: 'name'
 		},
 		{
 			key: 'email',
-			label: 'Email'
+			label: t('common.email')
 		},
 		{
 			key: 'username',
-			label: 'Username',
+			label: t('common.username'),
 			textColor: 'var(--ds-text-subtle)'
 		},
 		{
 			key: 'is_active',
-			label: 'Status',
+			label: t('common.status'),
 			slot: 'status'
 		},
 		{
 			key: 'actions',
-			label: 'Actions'
+			label: t('common.actions')
 		}
-	];
+	]);
 
 	function resetForm() {
 		formData = {
@@ -323,7 +324,7 @@
 	}
 
 	// Filter users based on search query
-	$: filteredUsers = users.filter(user => {
+	const filteredUsers = $derived(users.filter(user => {
 		if (!searchQuery.trim()) return true;
 
 		const query = searchQuery.toLowerCase();
@@ -332,7 +333,7 @@
 			user.email?.toLowerCase().includes(query) ||
 			user.username?.toLowerCase().includes(query)
 		);
-	});
+	}));
 
 	onMount(() => {
 		loadUsers();
@@ -374,14 +375,14 @@
 <div class="space-y-6">
 	<PageHeader
 		icon={Users}
-		title="User Management"
-		subtitle="Manage user accounts, roles, and access permissions"
+		title={t('users.title')}
+		subtitle={t('users.subtitle')}
 	>
 		{#snippet actions()}
 			<div class="flex gap-3">
 				<SearchInput
 					bind:value={searchQuery}
-					placeholder="Search users..."
+					placeholder={t('users.searchUsers')}
 					class="w-64"
 				/>
 				<Button
@@ -393,7 +394,7 @@
 					}}
 					keyboardHint="A"
 				>
-					Add User
+					{t('users.addUser')}
 				</Button>
 			</div>
 		{/snippet}
@@ -405,7 +406,7 @@
 
 	<Modal isOpen={showCreateForm} onclose={resetForm} maxWidth="max-w-2xl">
 		<ModalHeader
-			title={editingUser ? 'Edit User' : 'Create New User'}
+			title={editingUser ? t('users.editUser') : t('users.createUser')}
 			onClose={resetForm}
 		/>
 
@@ -414,7 +415,7 @@
 			<form onsubmit={(e) => { e.preventDefault(); saveUser(); }} class="space-y-4">
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 					<div>
-						<Label for="first_name" color="default">First Name</Label>
+						<Label for="first_name" color="default">{t('users.firstName')}</Label>
 						<Input
 							id="first_name"
 							bind:value={formData.first_name}
@@ -423,7 +424,7 @@
 					</div>
 
 					<div>
-						<Label for="last_name" color="default">Last Name</Label>
+						<Label for="last_name" color="default">{t('users.lastName')}</Label>
 						<Input
 							id="last_name"
 							bind:value={formData.last_name}
@@ -433,7 +434,7 @@
 				</div>
 
 				<div>
-					<Label for="email" color="default">Email</Label>
+					<Label for="email" color="default">{t('common.email')}</Label>
 					<Input
 						id="email"
 						type="email"
@@ -443,7 +444,7 @@
 				</div>
 
 				<div>
-					<Label for="username" color="default">Username</Label>
+					<Label for="username" color="default">{t('common.username')}</Label>
 					<Input
 						id="username"
 						bind:value={formData.username}
@@ -453,24 +454,21 @@
 
 				{#if !editingUser}
 					<div>
-						<Label for="password" color="default" required>Password</Label>
+						<Label for="password" color="default" required>{t('common.password')}</Label>
 						<Input
 							id="password"
 							type="password"
 							bind:value={formData.password}
 							required
-							placeholder="Enter password"
+							placeholder={t('placeholders.enterPassword')}
 						/>
-						<p class="text-xs mt-1" style="color: var(--ds-text-subtle)">
-							Enter a password for the user
-						</p>
 					</div>
 				{/if}
 			</form>
 		</div>
 
 		<DialogFooter
-			confirmLabel={editingUser ? 'Update User' : 'Create User'}
+			confirmLabel={editingUser ? t('common.update') : t('common.create')}
 			onCancel={resetForm}
 			onConfirm={saveUser}
 		/>
@@ -478,7 +476,7 @@
 
 	<Modal isOpen={showPasswordResetModal} onclose={closePasswordResetModal} maxWidth="max-w-md">
 		<ModalHeader
-			title="Reset Password for {resetPasswordUser?.name}"
+			title={t('auth.resetPassword')}
 			onClose={closePasswordResetModal}
 		/>
 
@@ -493,11 +491,8 @@
 							value={true}
 							class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
 						/>
-						<span class="ml-2 text-sm" style="color: var(--ds-text)">Generate random temporary password</span>
+						<span class="ml-2 text-sm" style="color: var(--ds-text)">{t('auth.resetPassword')}</span>
 					</label>
-					<p class="ml-6 text-xs mt-1" style="color: var(--ds-text-subtle)">
-						A secure random password will be generated and displayed to copy
-					</p>
 				</div>
 
 				<div>
@@ -508,22 +503,19 @@
 							value={false}
 							class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
 						/>
-						<span class="ml-2 text-sm" style="color: var(--ds-text)">Set custom password</span>
+						<span class="ml-2 text-sm" style="color: var(--ds-text)">{t('common.custom')}</span>
 					</label>
-					<p class="ml-6 text-xs mt-1" style="color: var(--ds-text-subtle)">
-						Specify a password for the user
-					</p>
 				</div>
 
 				{#if !generateRandomPassword}
 					<div class="ml-6">
-						<Label for="new-password" color="default" class="mb-1">New Password</Label>
+						<Label for="new-password" color="default" class="mb-1">{t('auth.newPassword')}</Label>
 						<input
 							id="new-password"
 							type="password"
 							bind:value={newPassword}
 							required={!generateRandomPassword}
-							placeholder="Enter new password"
+							placeholder={t('placeholders.enterNewPassword')}
 							class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 						/>
 					</div>
@@ -532,7 +524,7 @@
 		</div>
 
 		<DialogFooter
-			confirmLabel="Reset Password"
+			confirmLabel={t('auth.resetPassword')}
 			disabled={!generateRandomPassword && !newPassword.trim()}
 			onCancel={closePasswordResetModal}
 			onConfirm={performPasswordReset}
@@ -541,7 +533,7 @@
 
 	<Modal isOpen={showPasswordResultModal} onclose={closePasswordResultModal} maxWidth="max-w-md">
 		<ModalHeader
-			title="Password Reset Successful"
+			title={t('toast.success')}
 			icon={CheckCircle}
 			onClose={closePasswordResultModal}
 		/>
@@ -551,13 +543,13 @@
 			{#if temporaryPassword}
 				<div class="space-y-3">
 					<p class="text-sm" style="color: var(--ds-text-subtle)">
-						A temporary password has been generated for <strong>{resetPasswordUserName}</strong>.
+						{t('auth.resetPassword')} - <strong>{resetPasswordUserName}</strong>
 					</p>
 
 					<div class="rounded p-4 border" style="background-color: var(--ds-surface); border-color: var(--ds-border)">
 						<div class="flex items-center gap-2 mb-2">
 							<Key class="w-4 h-4" style="color: var(--ds-text-subtle)" />
-							<span class="text-sm font-medium" style="color: var(--ds-text)">Temporary Password</span>
+							<span class="text-sm font-medium" style="color: var(--ds-text)">{t('common.password')}</span>
 						</div>
 						<div class="flex items-center gap-2">
 							<code class="flex-1 border rounded px-3 py-2 text-sm font-mono select-all" style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text)">
@@ -566,31 +558,24 @@
 							<button
 								class="p-2 rounded transition-colors"
 								style="color: var(--ds-text-subtle)"
-								title="Copy to clipboard"
+								title={t('common.copy')}
 								onclick={() => navigator.clipboard.writeText(temporaryPassword)}
 							>
 								<Copy class="w-4 h-4" />
 							</button>
 						</div>
 					</div>
-
-					<div class="bg-blue-50 rounded p-3">
-						<p class="text-xs text-blue-800">
-							<strong>Important:</strong> Please provide this temporary password to the user.
-							They will be required to change it on their next login.
-						</p>
-					</div>
 				</div>
 			{:else}
 				<p class="text-sm" style="color: var(--ds-text-subtle)">
-					The new password has been successfully set for <strong>{resetPasswordUserName}</strong>.
+					{t('auth.resetPassword')} - <strong>{resetPasswordUserName}</strong>
 				</p>
 			{/if}
 		</div>
 
 		<DialogFooter
 			showCancel={false}
-			confirmLabel="Done"
+			confirmLabel={t('common.done')}
 			onConfirm={closePasswordResultModal}
 		/>
 	</Modal>
@@ -620,14 +605,14 @@
 
 	{#if loading}
 		<div class="text-center py-8">
-			<div style="color: var(--ds-text-subtle)">Loading users...</div>
+			<div style="color: var(--ds-text-subtle)">{t('common.loading')}</div>
 		</div>
 	{:else}
 		<DataTable
 			columns={userColumns}
 			data={filteredUsers}
 			keyField="id"
-			emptyMessage={searchQuery ? 'No users match your search' : 'No users found'}
+			emptyMessage={searchQuery ? t('common.noResults') : t('users.noUsers')}
 			emptyIcon={Circle}
 			actionItems={buildUserDropdownItems}
 		>
@@ -646,12 +631,12 @@
 						{user.full_name}
 					</div>
 					<div class="text-sm" style="color: var(--ds-text-subtle)">
-						Created {new Date(user.created_at).toLocaleDateString()}
+						{t('common.created')} {new Date(user.created_at).toLocaleDateString()}
 					</div>
 				</div>
 			</div>
 
-			<Lozenge slot="status" let:item={user} color={user.is_active ? 'green' : 'red'} text={user.is_active ? 'Active' : 'Inactive'} />
+			<Lozenge slot="status" let:item={user} color={user.is_active ? 'green' : 'red'} text={user.is_active ? t('common.active') : t('common.inactive')} />
 		</DataTable>
 	{/if}
 </div>

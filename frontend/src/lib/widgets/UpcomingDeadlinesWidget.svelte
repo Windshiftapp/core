@@ -1,6 +1,7 @@
 <script>
   import { Calendar } from 'lucide-svelte';
   import WidgetState from './WidgetState.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let workspaceId = null;
 
@@ -12,8 +13,8 @@
   error={null}
   isEmpty={upcomingItems.length === 0}
   emptyIcon={Calendar}
-  emptyTitle="No upcoming deadlines"
-  emptySubtitle="Items with due dates will appear here"
+  emptyTitle={t('widgets.upcomingDeadlines.emptyTitle')}
+  emptySubtitle={t('widgets.upcomingDeadlines.emptySubtitle')}
 >
   {#snippet children()}
     <div class="space-y-2">

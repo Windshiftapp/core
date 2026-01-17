@@ -154,3 +154,139 @@ textarea {
 .hover-bg:hover {
   background-color: var(--ds-background-neutral-hovered);
 }
+
+/* =========================
+   RTL (Right-to-Left) Support
+   ========================= */
+
+/* Base RTL direction */
+[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+/* RTL-aware margin utilities using logical properties */
+.ms-auto {
+  margin-inline-start: auto;
+}
+
+.me-auto {
+  margin-inline-end: auto;
+}
+
+.ms-1 {
+  margin-inline-start: 0.25rem;
+}
+
+.ms-2 {
+  margin-inline-start: 0.5rem;
+}
+
+.ms-3 {
+  margin-inline-start: 0.75rem;
+}
+
+.ms-4 {
+  margin-inline-start: 1rem;
+}
+
+.me-1 {
+  margin-inline-end: 0.25rem;
+}
+
+.me-2 {
+  margin-inline-end: 0.5rem;
+}
+
+.me-3 {
+  margin-inline-end: 0.75rem;
+}
+
+.me-4 {
+  margin-inline-end: 1rem;
+}
+
+/* RTL-aware padding utilities using logical properties */
+.ps-1 {
+  padding-inline-start: 0.25rem;
+}
+
+.ps-2 {
+  padding-inline-start: 0.5rem;
+}
+
+.ps-3 {
+  padding-inline-start: 0.75rem;
+}
+
+.ps-4 {
+  padding-inline-start: 1rem;
+}
+
+.pe-1 {
+  padding-inline-end: 0.25rem;
+}
+
+.pe-2 {
+  padding-inline-end: 0.5rem;
+}
+
+.pe-3 {
+  padding-inline-end: 0.75rem;
+}
+
+.pe-4 {
+  padding-inline-end: 1rem;
+}
+
+/* RTL-aware border utilities */
+.border-s {
+  border-inline-start-width: 1px;
+}
+
+.border-e {
+  border-inline-end-width: 1px;
+}
+
+/* RTL-aware positioning */
+.start-0 {
+  inset-inline-start: 0;
+}
+
+.end-0 {
+  inset-inline-end: 0;
+}
+
+/* RTL-aware text alignment */
+.text-start {
+  text-align: start;
+}
+
+.text-end {
+  text-align: end;
+}
+
+/* RTL flip utility for icons/arrows that need to flip in RTL */
+[dir="rtl"] .rtl-flip {
+  transform: scaleX(-1);
+}
+
+/* RTL-aware flex utilities */
+.flex-row-reverse-rtl {
+  flex-direction: row;
+}
+
+[dir="rtl"] .flex-row-reverse-rtl {
+  flex-direction: row-reverse;
+}
+
+/* Ensure icons in buttons align correctly */
+[dir="rtl"] .icon-start {
+  margin-inline-end: 0.5rem;
+  margin-inline-start: 0;
+}
+
+[dir="rtl"] .icon-end {
+  margin-inline-start: 0.5rem;
+  margin-inline-end: 0;
+}

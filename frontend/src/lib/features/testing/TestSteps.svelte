@@ -9,6 +9,7 @@
   import Spinner from '../../components/Spinner.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import { createShortcutHandler } from '../../utils/keyboardShortcuts.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let { workspaceId = null } = $props();
 
@@ -31,13 +32,13 @@
   });
 
   // DataTable columns definition
-  const columns = [
-    { key: 'step_number', label: 'Step', width: '70px', align: 'text-center', slot: 'step_number' },
-    { key: 'action', label: 'Action', slot: 'step_action' },
-    { key: 'data', label: 'Data', slot: 'step_data' },
-    { key: 'expected', label: 'Expected Result', slot: 'step_expected' },
+  const columns = $derived([
+    { key: 'step_number', label: t('testing.step'), width: '70px', align: 'text-center', slot: 'step_number' },
+    { key: 'action', label: t('testing.action'), slot: 'step_action' },
+    { key: 'data', label: t('testing.data'), slot: 'step_data' },
+    { key: 'expected', label: t('testing.expectedResult'), slot: 'step_expected' },
     { key: 'actions', label: '' }
-  ];
+  ]);
 
   // Get testCaseId from route params
   let testCaseId = $derived($currentRoute.params?.testId ? parseInt($currentRoute.params.testId) : null);
@@ -72,7 +73,7 @@
       await loadTestSteps(id);
     } catch (err) {
       console.error('Failed to load data:', err);
-      error = 'Failed to load Tests';
+      error = t('testing.failedToLoadTests');
     } finally {
       loading = false;
     }
@@ -150,7 +151,7 @@
       cancelStepForm();
     } catch (error) {
       console.error('Failed to save test step:', error);
-      alert('Failed to save test step: ' + (error.message || error));
+      alert(t('testing.failedToSaveStep') + ': ' + (error.message || error));
     }
   }
 
@@ -177,14 +178,14 @@
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         onClick: () => showEditStepForm(step)
       },
       {
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: 'var(--ds-text-danger)',
         onClick: () => deleteTestStep(step.id)
       }
@@ -226,19 +227,19 @@
     </div>
   {:else if error}
     <div class="text-center py-12">
-      <div class="text-lg font-medium mb-2" style="color: var(--ds-text-danger);">Error</div>
+      <div class="text-lg font-medium mb-2" style="color: var(--ds-text-danger);">{t('common.error')}</div>
       <div class="text-sm" style="color: var(--ds-text-subtle);">{error}</div>
     </div>
   {:else if testCase}
     <div class="flex items-start justify-between gap-4 mb-6">
       <div>
         <h2 class="text-lg font-semibold" style="color: var(--ds-text);">
-          Test Steps: {testCase.title}
+          {t('testing.testStepsFor', { title: testCase.title })}
         </h2>
         {#if testCase.preconditions}
           <div class="text-sm mt-3 px-4 py-3 rounded border-l-4"
                style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle); border-left-color: var(--ds-status-info-solid);">
-            <strong style="color: var(--ds-text);">Preconditions:</strong> {testCase.preconditions}
+            <strong style="color: var(--ds-text);">{t('testing.preconditions')}:</strong> {testCase.preconditions}
           </div>
         {/if}
       </div>
@@ -247,7 +248,7 @@
           onclick={goBack}
           icon={ArrowLeft}
         >
-          Back to Test Cases
+          {t('testing.backToTestCases')}
         </Button>
         {#if !showStepForm}
           <Button
@@ -257,7 +258,7 @@
             size="medium"
             keyboardHint="A"
           >
-            Add Test Step
+            {t('testing.addTestStep')}
           </Button>
         {/if}
       </div>
@@ -272,17 +273,17 @@
     {#if showStepForm}
       <div class="test-step-form mb-6 p-5 rounded-xl border shadow-sm" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
         <h4 class="text-lg font-medium mb-4" style="color: var(--ds-text);">
-          {editingStep ? 'Edit' : 'Add'} Test Step
+          {editingStep ? t('testing.editTestStep') : t('testing.addTestStep')}
         </h4>
         <form onsubmit={(e) => { e.preventDefault(); handleStepSubmit(); }} onkeydown={handleFormKeydown}>
           <div class="grid grid-cols-3 gap-4">
             <!-- Action Column -->
             <div>
-              <Label color="default" class="mb-2" required>Action</Label>
+              <Label color="default" class="mb-2" required>{t('testing.action')}</Label>
               <div id="step-action-input" class="border rounded overflow-hidden" style="border-color: var(--ds-border); min-height: 80px;">
                 <MilkdownEditor
                   bind:content={stepFormData.action}
-                  placeholder="What action should be performed?"
+                  placeholder={t('testing.actionPlaceholder')}
                   showToolbar={true}
                   entityType="test_case"
                   entityId={testCaseId}
@@ -292,11 +293,11 @@
 
             <!-- Data Column -->
             <div>
-              <Label color="default" class="mb-2">Data</Label>
+              <Label color="default" class="mb-2">{t('testing.data')}</Label>
               <div class="border rounded overflow-hidden" style="border-color: var(--ds-border); min-height: 80px;">
                 <MilkdownEditor
                   bind:content={stepFormData.data}
-                  placeholder="Any test data or inputs..."
+                  placeholder={t('testing.dataPlaceholder')}
                   showToolbar={true}
                   entityType="test_case"
                   entityId={testCaseId}
@@ -306,11 +307,11 @@
 
             <!-- Expected Result Column -->
             <div>
-              <Label color="default" class="mb-2" required>Expected Result</Label>
+              <Label color="default" class="mb-2" required>{t('testing.expectedResult')}</Label>
               <div class="border rounded overflow-hidden" style="border-color: var(--ds-border); min-height: 80px;">
                 <MilkdownEditor
                   bind:content={stepFormData.expected}
-                  placeholder="What should happen?"
+                  placeholder={t('testing.expectedPlaceholder')}
                   showToolbar={true}
                   entityType="test_case"
                   entityId={testCaseId}
@@ -326,7 +327,7 @@
               onclick={cancelStepForm}
               size="medium"
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               type="submit"
@@ -335,7 +336,7 @@
               size="medium"
               keyboardHint="⌘ ↵"
             >
-              {editingStep ? 'Update' : 'Add'} Step
+              {editingStep ? t('testing.updateStep') : t('testing.addStep')}
             </Button>
           </div>
         </form>
@@ -347,8 +348,8 @@
       {columns}
       data={testSteps}
       keyField="id"
-      emptyMessage="No test steps yet"
-      emptyDescription="Add your first test step to define the specific actions, data, and expected results for this test case."
+      emptyMessage={t('testing.noTestStepsYet')}
+      emptyDescription={t('testing.addFirstTestStep')}
       emptyIcon={ClipboardList}
       actionItems={buildStepDropdownItems}
     >
@@ -384,7 +385,7 @@
     <!-- Steps Summary -->
     {#if testSteps && testSteps.length > 0}
       <div class="mt-4 text-sm" style="color: var(--ds-text-subtle);">
-        {testSteps.length} test step{testSteps.length !== 1 ? 's' : ''} configured
+        {t('testing.testStepsConfigured', { count: testSteps.length })}
       </div>
     {/if}
   </div>
@@ -393,10 +394,10 @@
 <!-- Delete Step Confirmation Dialog -->
 <ConfirmDialog
   bind:show={showDeleteConfirmation}
-  title="Delete Test Step"
-  message="Are you sure you want to delete this test step? This action cannot be undone."
-  confirmText="Delete Step"
-  cancelText="Cancel"
+  title={t('testing.deleteTestStep')}
+  message={t('testing.deleteStepConfirm')}
+  confirmText={t('testing.deleteStep')}
+  cancelText={t('common.cancel')}
   variant="danger"
   onconfirm={confirmDeleteStep}
   oncancel={() => {
@@ -408,7 +409,7 @@
 {#if showImagePreview && previewImage.src}
   <div class="image-lightbox-backdrop" onclick={closePreview}>
     <div class="image-lightbox" onclick={(e) => e.stopPropagation()}>
-      <Button class="lightbox-close" variant="ghost" icon={X} onclick={closePreview} title="Close image preview" />
+      <Button class="lightbox-close" variant="ghost" icon={X} onclick={closePreview} title={t('testing.closeImagePreview')} />
       <img src={previewImage.src} alt={previewImage.alt} />
       {#if previewImage.alt}
         <div class="lightbox-caption">{previewImage.alt}</div>

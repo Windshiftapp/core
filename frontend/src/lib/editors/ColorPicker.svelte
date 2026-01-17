@@ -1,6 +1,7 @@
 <script>
   import Modal from '../dialogs/Modal.svelte';
   import Label from '../components/Label.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   // Color palette matching IconSelector - 25 colors for 5x5 grid
   export const DEFAULT_COLORS = [
@@ -28,7 +29,7 @@
     class="w-6 h-6 rounded cursor-pointer transition-transform hover:scale-105"
     style="background-color: {value}; border: 1px solid var(--ds-border);"
     onclick={() => showModal = true}
-    title="Click to change color"
+    title={t('editors.clickToChangeColor')}
   />
 
   <Modal isOpen={showModal} onclose={() => showModal = false} maxWidth="max-w-[200px]">
@@ -58,7 +59,7 @@
           class="w-6 h-6 rounded cursor-pointer p-0"
           style="border: 1px solid var(--ds-border);"
         />
-        <span class="text-xs" style="color: var(--ds-text-subtle);">Custom</span>
+        <span class="text-xs" style="color: var(--ds-text-subtle);">{t('common.custom')}</span>
       </div>
     </div>
   </Modal>
@@ -89,6 +90,6 @@
       class="w-6 h-6 rounded cursor-pointer p-0"
       style="border: 1px solid var(--ds-border);"
     />
-    <span class="text-xs" style="color: var(--ds-text-subtle);">Custom</span>
+    <span class="text-xs" style="color: var(--ds-text-subtle);">{t('common.custom')}</span>
   </div>
 {/if}

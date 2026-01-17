@@ -6,6 +6,7 @@
   import { onMount } from 'svelte';
   import Avatar from '../components/Avatar.svelte';
   import Text from '../components/Text.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   // Generate unique IDs for ARIA attributes
   const listboxId = `listbox-${Math.random().toString(36).slice(2, 9)}`;
@@ -14,15 +15,18 @@
   // Props
   let {
     value = $bindable(null),
-    placeholder = 'Select user...',
+    placeholder = '',
     showUnassigned = false,
-    unassignedLabel = 'Unassigned',
+    unassignedLabel = '',
     disabled = false,
     class: className = '',
     children = null,
     onSelect = () => {},
     onCancel = () => {}
   } = $props();
+
+  const resolvedPlaceholder = $derived(placeholder || t('pickers.selectUser'));
+  const resolvedUnassignedLabel = $derived(unassignedLabel || t('pickers.unassigned'));
 
   // Load users
   const users = createAsyncLoader(() => api.getUsers());
@@ -167,7 +171,7 @@
         />
         <span class="truncate">{selectedUser.first_name} {selectedUser.last_name}</span>
       {:else}
-        <span style="color: var(--ds-text-subtle);">{placeholder}</span>
+        <span style="color: var(--ds-text-subtle);">{resolvedPlaceholder}</span>
       {/if}
     </div>
     <ChevronDown size={16} style="color: var(--ds-text-subtle);" />
@@ -199,7 +203,7 @@
         bind:value={searchTerm}
         onkeydown={handleKeyDown}
         type="text"
-        placeholder="Search users..."
+        placeholder={t('pickers.searchUsers')}
         class="w-full px-3 py-2 rounded text-sm outline-none"
         style="
           background-color: var(--ds-background-input);
@@ -215,10 +219,10 @@
     </div>
 
     <!-- Users List -->
-    <div class="max-h-80 overflow-y-auto" role="listbox" id={listboxId} aria-label="Users">
+    <div class="max-h-80 overflow-y-auto" role="listbox" id={listboxId} aria-label={t('pickers.users')}>
       {#if users.loading}
         <div class="p-4 text-center" style="color: var(--ds-text-subtle);">
-          Loading...
+          {t('common.loading')}
         </div>
       {:else}
         <!-- Unassigned Option -->
@@ -245,7 +249,7 @@
               }
             }}
           >
-            <span style="color: var(--ds-text-subtle);">{unassignedLabel}</span>
+            <span style="color: var(--ds-text-subtle);">{resolvedUnassignedLabel}</span>
           </button>
         {/if}
 
@@ -298,7 +302,7 @@
         <!-- No Results -->
         {#if filteredUsers.length === 0 && !showUnassigned}
           <div class="p-4 text-center" style="color: var(--ds-text-subtle);">
-            {searchTerm ? 'No users found' : 'No users available'}
+            {searchTerm ? t('pickers.noUsersFound') : t('pickers.noUsersAvailable')}
           </div>
         {/if}
       {/if}

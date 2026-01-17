@@ -8,6 +8,7 @@
   import Label from '../components/Label.svelte';
   import { Camera, Trash2 } from 'lucide-svelte';
   import { api } from '../api.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   // Props
   export let isOpen = false;
@@ -35,13 +36,13 @@
     if (!files || files.length === 0) return;
 
     if (!attachmentsEnabled) {
-      alert('Attachments must be enabled to upload organization avatars');
+      alert(t('organization.attachmentsRequired'));
       return;
     }
 
     const file = files[0];
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      alert(t('organization.pleaseSelectImage'));
       return;
     }
 
@@ -59,7 +60,7 @@
         showAvatarUpload = false;
       }
     } catch (err) {
-      alert('Failed to upload avatar: ' + (err.message || err));
+      alert(t('organization.failedToUploadAvatar') + ': ' + (err.message || err));
     } finally {
       uploadingAvatar = false;
     }
@@ -116,24 +117,24 @@
   >
     <div class="p-6">
       <h3 class="text-xl font-semibold mb-6" style="color: var(--ds-text);">
-        {isEditing ? 'Edit Organization' : 'New Organization'}
+        {isEditing ? t('organization.editOrganization') : t('organization.newOrganization')}
       </h3>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <Label required class="mb-2">Organization Name</Label>
+          <Label required class="mb-2">{t('organization.organizationName')}</Label>
           <Input id={nameInputId} bind:inputRef={nameInputRef} bind:value={formData.name} required />
         </div>
 
         <div>
-          <Label class="mb-2">Email</Label>
+          <Label class="mb-2">{t('organization.email')}</Label>
           <Input type="email" bind:value={formData.email} />
         </div>
       </div>
 
       <!-- Avatar Upload Section -->
       <div class="mt-6">
-        <Label class="mb-2">Organization Avatar</Label>
+        <Label class="mb-2">{t('organization.organizationAvatar')}</Label>
 
         <!-- Avatar Preview -->
         {#if formData.avatar_url}
@@ -144,8 +145,8 @@
               class="w-16 h-16 rounded object-cover"
             />
             <div class="flex-1">
-              <div class="text-sm font-medium" style="color: var(--ds-text);">Custom Avatar</div>
-              <div class="text-xs" style="color: var(--ds-text-subtle);">Uploaded image</div>
+              <div class="text-sm font-medium" style="color: var(--ds-text);">{t('organization.customAvatar')}</div>
+              <div class="text-xs" style="color: var(--ds-text-subtle);">{t('organization.uploadedImage')}</div>
             </div>
             <Button
               variant="default"
@@ -153,7 +154,7 @@
               onclick={removeAvatar}
               icon={Trash2}
             >
-              Remove
+              {t('common.remove')}
             </Button>
           </div>
         {:else}
@@ -162,8 +163,8 @@
               {getInitials(formData.name)}
             </div>
             <div class="flex-1">
-              <div class="text-sm font-medium" style="color: var(--ds-text);">Default Avatar</div>
-              <div class="text-xs" style="color: var(--ds-text-subtle);">Using initials</div>
+              <div class="text-sm font-medium" style="color: var(--ds-text);">{t('organization.defaultAvatar')}</div>
+              <div class="text-xs" style="color: var(--ds-text-subtle);">{t('organization.usingInitials')}</div>
             </div>
           </div>
         {/if}
@@ -177,11 +178,11 @@
             icon={Camera}
             disabled={!attachmentsEnabled}
           >
-            {formData.avatar_url ? 'Change Avatar' : 'Upload Avatar'}
+            {formData.avatar_url ? t('organization.changeAvatar') : t('organization.uploadAvatar')}
           </Button>
           {#if !attachmentsEnabled}
             <p class="text-xs mt-1" style="color: var(--ds-text-warning);">
-              Attachments must be enabled to upload organization avatars
+              {t('organization.attachmentsRequired')}
             </p>
           {/if}
         </div>
@@ -197,17 +198,17 @@
               class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
             />
             {#if uploadingAvatar}
-              <div class="mt-2 text-sm text-blue-600">Uploading...</div>
+              <div class="mt-2 text-sm text-blue-600">{t('common.uploading')}</div>
             {/if}
             <p class="text-xs mt-2" style="color: var(--ds-text-subtle);">
-              Recommended: Square images, at least 256x256 pixels for best quality
+              {t('organization.uploadRecommendation')}
             </p>
           </div>
         {/if}
       </div>
 
       <div class="mt-6">
-        <Label class="mb-2">Description</Label>
+        <Label class="mb-2">{t('common.description')}</Label>
         <Textarea bind:value={formData.description} rows={3} />
       </div>
 
@@ -218,13 +219,13 @@
           id="active"
           class="mr-3 w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
         />
-        <label for="active" class="text-sm font-medium" style="color: var(--ds-text);">Active Organization</label>
+        <label for="active" class="text-sm font-medium" style="color: var(--ds-text);">{t('organization.activeOrganization')}</label>
       </div>
 
       <!-- Custom Fields -->
       {#if customerOrgFields.length > 0}
         <div class="mt-6 pt-6 border-t" style="border-color: var(--ds-border);">
-          <h3 class="text-sm font-medium mb-4" style="color: var(--ds-text);">Custom Fields</h3>
+          <h3 class="text-sm font-medium mb-4" style="color: var(--ds-text);">{t('organization.customFields')}</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             {#each customerOrgFields as field}
               <CustomFieldRenderer
@@ -248,7 +249,7 @@
           size="medium"
           keyboardHint={submitHint}
         >
-          {isEditing ? 'Update' : 'Create'} Organization
+          {isEditing ? t('organization.updateOrganization') : t('organization.createOrganization')}
         </Button>
         <Button
           variant="default"
@@ -256,7 +257,7 @@
           size="medium"
           keyboardHint="Esc"
         >
-          Cancel
+          {t('common.cancel')}
         </Button>
       </div>
     </div>

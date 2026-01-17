@@ -8,6 +8,7 @@
   import AlertBox from '../components/AlertBox.svelte';
   import { X, ArrowRight, Type, FileText, Flag, Activity } from 'lucide-svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let configurationSet = null;
   export let targetConfigurationSet = null; // NEW: The config set being migrated TO
@@ -346,23 +347,23 @@
     <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
       <div class="flex items-center justify-between">
         <h2 class="text-xl font-semibold" style="color: var(--ds-text);">
-          {comprehensive ? 'Configuration Set Migration' : 'Workflow Migration Assistant'}
+          {comprehensive ? t('migrationAssistant.configSetMigration') : t('migrationAssistant.workflowMigration')}
         </h2>
         <Button
           variant="ghost"
           icon={X}
           onclick={() => closeAssistant(true)}
-          title="Close"
+          title={t('common.close')}
         />
       </div>
       {#if comprehensive && migrationAnalysis}
         <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-          Migrating from <span class="font-medium">{migrationAnalysis.old_config_set_name}</span>
-          to <span class="font-medium">{migrationAnalysis.new_config_set_name}</span>
+          {t('migrationAssistant.migratingFrom')} <span class="font-medium">{migrationAnalysis.old_config_set_name}</span>
+          {t('migrationAssistant.to')} <span class="font-medium">{migrationAnalysis.new_config_set_name}</span>
         </p>
       {:else if configurationSet}
         <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-          Configuration Set: <span class="font-medium">{configurationSet.name}</span>
+          {t('migrationAssistant.configurationSet')}: <span class="font-medium">{configurationSet.name}</span>
         </p>
       {/if}
     </div>
@@ -377,10 +378,10 @@
       {#if isAnalyzing}
         <div class="flex items-center justify-center py-8">
           <Spinner />
-          <span class="ml-3" style="color: var(--ds-text-subtle);">Analyzing migration requirements...</span>
+          <span class="ml-3" style="color: var(--ds-text-subtle);">{t('migrationAssistant.analyzingMigration')}</span>
         </div>
       {:else if analysisError}
-        <AlertBox variant="error" message="Analysis Failed: {analysisError}" />
+        <AlertBox variant="error" message="{t('migrationAssistant.analysisFailed')}: {analysisError}" />
       {:else if migrationAnalysis}
         {#if !requiresMigration}
           <AlertBox variant="success" message="No Migration Required - All items ({migrationAnalysis.total_affected_items}) are compatible with the new configuration." />
@@ -400,7 +401,7 @@
                   onclick={() => activeTab = 'itemType'}
                 >
                   <Type size={16} />
-                  Item Types
+                  {t('migrationAssistant.itemTypes')}
                   {#if itemTypeCount > 0}
                     <span class="px-1.5 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800">{itemTypeCount}</span>
                   {/if}
@@ -414,7 +415,7 @@
                   onclick={() => activeTab = 'fields'}
                 >
                   <FileText size={16} />
-                  Fields
+                  {t('migrationAssistant.fields')}
                   {#if fieldCount > 0}
                     <span class="px-1.5 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800">{fieldCount}</span>
                   {/if}
@@ -428,7 +429,7 @@
                   onclick={() => activeTab = 'status'}
                 >
                   <Activity size={16} />
-                  Status
+                  {t('migrationAssistant.status')}
                   {#if statusCount > 0}
                     <span class="px-1.5 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800">{statusCount}</span>
                   {/if}
@@ -442,7 +443,7 @@
                   onclick={() => activeTab = 'priority'}
                 >
                   <Flag size={16} />
-                  Priority
+                  {t('migrationAssistant.priority')}
                   {#if priorityCount > 0}
                     <span class="px-1.5 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800">{priorityCount}</span>
                   {/if}
@@ -453,9 +454,9 @@
             <!-- Item Type Migrations -->
             {#if activeTab === 'itemType' && comprehensive}
               <div>
-                <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">Item Type Migrations</h3>
+                <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">{t('migrationAssistant.itemTypeMigrations')}</h3>
                 {#if itemTypeMappings.length === 0}
-                  <p class="text-sm" style="color: var(--ds-text-subtle);">No items to migrate.</p>
+                  <p class="text-sm" style="color: var(--ds-text-subtle);">{t('migrationAssistant.noItemsToMigrate')}</p>
                 {:else}
                   <div class="space-y-4">
                     {#each itemTypeMappings as mapping}
@@ -472,9 +473,9 @@
                                   <BasePicker
                                     bind:value={mapping.to_item_type_id}
                                     items={mapping.available_targets}
-                                    placeholder="Select target type..."
+                                    placeholder={t('migrationAssistant.selectTargetType')}
                                     showUnassigned={true}
-                                    unassignedLabel="Select target type..."
+                                    unassignedLabel={t('migrationAssistant.selectTargetType')}
                                     getValue={(type) => type.id}
                                     getLabel={(type) => type.name}
                                     onSelect={(type) => {
@@ -486,14 +487,14 @@
                                 </div>
                               {:else}
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                  {mapping.to_item_type_name || 'Compatible'}
+                                  {mapping.to_item_type_name || t('migrationAssistant.compatible')}
                                 </span>
                               {/if}
                             </div>
                             <p class="text-sm mt-2" style="color: var(--ds-text-subtle);">
                               {mapping.item_count} item{mapping.item_count !== 1 ? 's' : ''}
                               {#if mapping.requires_migration}
-                                <span class="text-yellow-600 font-medium"> - Requires migration</span>
+                                <span class="text-yellow-600 font-medium"> - {t('migrationAssistant.requiresMigration')}</span>
                               {/if}
                             </p>
                           </div>
@@ -508,7 +509,7 @@
             <!-- Custom Field Migrations -->
             {#if activeTab === 'fields' && comprehensive}
               <div>
-                <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">Custom Field Changes</h3>
+                <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">{t('migrationAssistant.customFieldChanges')}</h3>
                 {#if customFieldMappings.length === 0}
                   <p class="text-sm" style="color: var(--ds-text-subtle);">No field changes detected.</p>
                 {:else}
@@ -560,7 +561,7 @@
             <!-- Status Migrations -->
             {#if activeTab === 'status' || !comprehensive}
               <div>
-                <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">Status Migrations</h3>
+                <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">{t('migrationAssistant.statusMigrations')}</h3>
                 {#if statusMappings.length === 0}
                   <p class="text-sm" style="color: var(--ds-text-subtle);">No status changes detected.</p>
                 {:else}
@@ -598,14 +599,14 @@
                                 </div>
                               {:else}
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                  {workflowStatuses.find(s => s.id === mapping.to_status_id)?.name || 'Compatible'}
+                                  {workflowStatuses.find(s => s.id === mapping.to_status_id)?.name || t('migrationAssistant.compatible')}
                                 </span>
                               {/if}
                             </div>
                             <p class="text-sm mt-2" style="color: var(--ds-text-subtle);">
                               {mapping.item_count} item{mapping.item_count !== 1 ? 's' : ''}
                               {#if mapping.requires_migration}
-                                <span class="text-yellow-600 font-medium"> - Requires migration</span>
+                                <span class="text-yellow-600 font-medium"> - {t('migrationAssistant.requiresMigration')}</span>
                               {/if}
                             </p>
                           </div>
@@ -620,9 +621,9 @@
             <!-- Priority Migrations -->
             {#if activeTab === 'priority' && comprehensive}
               <div>
-                <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">Priority Migrations</h3>
+                <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">{t('migrationAssistant.priorityMigrations')}</h3>
                 {#if priorityMappings.length === 0}
-                  <p class="text-sm" style="color: var(--ds-text-subtle);">No items to migrate.</p>
+                  <p class="text-sm" style="color: var(--ds-text-subtle);">{t('migrationAssistant.noItemsToMigrate')}</p>
                 {:else}
                   <div class="space-y-4">
                     {#each priorityMappings as mapping}
@@ -653,14 +654,14 @@
                                 </div>
                               {:else}
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                  {mapping.to_priority_name || 'Compatible'}
+                                  {mapping.to_priority_name || t('migrationAssistant.compatible')}
                                 </span>
                               {/if}
                             </div>
                             <p class="text-sm mt-2" style="color: var(--ds-text-subtle);">
                               {mapping.item_count} item{mapping.item_count !== 1 ? 's' : ''}
                               {#if mapping.requires_migration}
-                                <span class="text-yellow-600 font-medium"> - Requires migration</span>
+                                <span class="text-yellow-600 font-medium"> - {t('migrationAssistant.requiresMigration')}</span>
                               {/if}
                             </p>
                           </div>
@@ -685,9 +686,9 @@
         class="flex-shrink-0"
         onCancel={() => closeAssistant(true)}
         onConfirm={executeMigration}
-        confirmLabel="Execute Migration"
+        confirmLabel={t('migrationAssistant.executeMigration')}
         loading={isMigrating}
-        loadingLabel="Migrating..."
+        loadingLabel={t('migrationAssistant.migrating')}
       />
     {/if}
   </div>

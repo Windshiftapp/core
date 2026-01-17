@@ -13,6 +13,7 @@
   import { formatDateShort } from '../../utils/dateFormatter.js';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let { iterationId } = $props();
 
@@ -33,12 +34,12 @@
     workspace_id: null
   });
 
-  const statusOptions = [
-    { value: 'planned', label: 'Planned', lozengeColor: 'grey' },
-    { value: 'active', label: 'Active', lozengeColor: 'blue' },
-    { value: 'completed', label: 'Completed', lozengeColor: 'green' },
-    { value: 'cancelled', label: 'Cancelled', lozengeColor: 'red' }
-  ];
+  let statusOptions = $derived([
+    { value: 'planned', label: t('iterations.status.planned'), lozengeColor: 'grey' },
+    { value: 'active', label: t('iterations.status.active'), lozengeColor: 'blue' },
+    { value: 'completed', label: t('iterations.status.completed'), lozengeColor: 'green' },
+    { value: 'cancelled', label: t('iterations.status.cancelled'), lozengeColor: 'red' }
+  ]);
 
   const radius = 48;
   const circumference = 2 * Math.PI * radius;
@@ -66,7 +67,7 @@
       }
     } catch (err) {
       console.error('Failed to load iteration progress:', err);
-      error = err.message || 'Failed to load iteration progress';
+      error = err.message || t('dialogs.alerts.failedToLoad', { error: 'iteration progress' });
     } finally {
       loading = false;
     }
@@ -94,10 +95,10 @@
     const diffTime = end - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffDays < 0) return { text: `${Math.abs(diffDays)} days overdue`, overdue: true };
-    if (diffDays === 0) return { text: 'Ends today', overdue: false };
-    if (diffDays === 1) return { text: '1 day remaining', overdue: false };
-    return { text: `${diffDays} days remaining`, overdue: false };
+    if (diffDays < 0) return { text: t('iterations.daysOverdue', { count: Math.abs(diffDays) }), overdue: true };
+    if (diffDays === 0) return { text: t('iterations.endsToday'), overdue: false };
+    if (diffDays === 1) return { text: t('iterations.oneDayRemaining'), overdue: false };
+    return { text: t('iterations.daysRemaining', { count: diffDays }), overdue: false };
   }
 
   function buildSegments(breakdown, totalItems) {
@@ -151,18 +152,18 @@
       await loadProgress();
     } catch (err) {
       console.error('Failed to update iteration:', err);
-      alert('Failed to update iteration: ' + (err.message || err));
+      alert(t('dialogs.alerts.failedToUpdate', { error: err.message || err }));
     }
   }
 
   async function deleteIteration() {
-    if (confirm(`Are you sure you want to delete iteration "${progress?.iteration_name}"?`)) {
+    if (confirm(t('iterations.confirmDelete', { name: progress?.iteration_name }))) {
       try {
         await api.iterations.delete(iterationId);
         navigate('/iterations');
       } catch (err) {
         console.error('Failed to delete iteration:', err);
-        alert('Failed to delete iteration: ' + (err.message || err));
+        alert(t('dialogs.alerts.failedToDelete', { error: err.message || err }));
       }
     }
   }
@@ -176,7 +177,7 @@
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: startEdit
       },
@@ -184,7 +185,7 @@
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50',
         onClick: deleteIteration
@@ -203,7 +204,7 @@
         style="color: var(--ds-text-subtle);"
       >
         <ArrowLeft class="w-4 h-4" />
-        Back to Iterations
+        {t('iterations.backToIterations')}
       </button>
 
       {#if progress}
@@ -226,7 +227,7 @@
     {:else if error}
       <div class="text-center py-20">
         <p class="text-red-500">{error}</p>
-        <Button onclick={loadProgress} class="mt-4">Retry</Button>
+        <Button onclick={loadProgress} class="mt-4">{t('common.retry')}</Button>
       </div>
     {:else if progress}
       <!-- Iteration Header Card -->
@@ -245,7 +246,7 @@
                 {#if iteration?.is_global}
                   <div class="flex items-center gap-1 px-2 py-0.5 rounded text-xs" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
                     <Globe class="w-3 h-3" />
-                    Global
+                    {t('iterations.global')}
                   </div>
                 {:else if iteration?.workspace_name}
                   <div class="flex items-center gap-1 px-2 py-0.5 rounded text-xs" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
@@ -312,12 +313,12 @@
                   {formatPercent(progress.percent_complete)}%
                 </text>
                 <text class="text-xs uppercase" x="70" y="86" text-anchor="middle" fill="var(--ds-text-subtle)">
-                  complete
+                  {t('iterations.complete')}
                 </text>
               </svg>
             {:else}
               <div class="w-36 h-36 rounded-full border-2 border-dashed flex items-center justify-center" style="border-color: var(--ds-border);">
-                <span class="text-sm" style="color: var(--ds-text-subtlest);">No items</span>
+                <span class="text-sm" style="color: var(--ds-text-subtlest);">{t('iterations.noItems')}</span>
               </div>
             {/if}
           </div>
@@ -325,18 +326,18 @@
 
         <!-- Summary Stats -->
         <div class="rounded-xl border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-          <h3 class="text-sm font-medium mb-4" style="color: var(--ds-text-subtle);">Summary</h3>
+          <h3 class="text-sm font-medium mb-4" style="color: var(--ds-text-subtle);">{t('iterations.summary')}</h3>
           <div class="space-y-3">
             <div class="flex justify-between items-center">
-              <span style="color: var(--ds-text-subtle);">Total Items</span>
+              <span style="color: var(--ds-text-subtle);">{t('iterations.totalItems')}</span>
               <span class="font-semibold" style="color: var(--ds-text);">{progress.total_items}</span>
             </div>
             <div class="flex justify-between items-center">
-              <span style="color: var(--ds-text-subtle);">Completed</span>
+              <span style="color: var(--ds-text-subtle);">{t('iterations.completed')}</span>
               <span class="font-semibold text-green-600">{progress.completed_items}</span>
             </div>
             <div class="flex justify-between items-center">
-              <span style="color: var(--ds-text-subtle);">Remaining</span>
+              <span style="color: var(--ds-text-subtle);">{t('iterations.remaining')}</span>
               <span class="font-semibold" style="color: var(--ds-text);">{progress.total_items - progress.completed_items}</span>
             </div>
           </div>
@@ -344,7 +345,7 @@
 
         <!-- Status Breakdown Legend -->
         <div class="rounded-xl border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-          <h3 class="text-sm font-medium mb-4" style="color: var(--ds-text-subtle);">By Status Category</h3>
+          <h3 class="text-sm font-medium mb-4" style="color: var(--ds-text-subtle);">{t('iterations.byStatusCategory')}</h3>
           <div class="space-y-2">
             {#if progress.status_breakdown && progress.status_breakdown.length > 0}
               {#each progress.status_breakdown as breakdown}
@@ -360,7 +361,7 @@
                 </div>
               {/each}
             {:else}
-              <p class="text-sm" style="color: var(--ds-text-subtlest);">No status data</p>
+              <p class="text-sm" style="color: var(--ds-text-subtlest);">{t('iterations.noStatusData')}</p>
             {/if}
           </div>
         </div>
@@ -368,7 +369,7 @@
 
       <!-- Items Grouped by Category -->
       <div class="space-y-4">
-        <h2 class="text-lg font-semibold" style="color: var(--ds-text);">Work Items</h2>
+        <h2 class="text-lg font-semibold" style="color: var(--ds-text);">{t('iterations.workItems')}</h2>
 
         {#if progress.status_breakdown && progress.status_breakdown.length > 0}
           {#each progress.status_breakdown as category}
@@ -431,8 +432,8 @@
           <div class="rounded-xl border p-8" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
             <EmptyState
               icon={Target}
-              title="No items assigned"
-              description="Assign work items to this iteration to track progress"
+              title={t('iterations.noItemsAssigned')}
+              description={t('iterations.assignItemsHint')}
             />
           </div>
         {/if}
@@ -451,38 +452,38 @@
   let:submitHint
 >
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-    <h3 class="text-lg font-semibold" style="color: var(--ds-text);">Edit Iteration</h3>
+    <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{t('iterations.editIteration')}</h3>
   </div>
 
   <div class="px-6 py-4">
     <form onsubmit={(e) => { e.preventDefault(); saveIteration(); }}>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <Label for="iteration-name" required class="mb-2">Iteration Name</Label>
+          <Label for="iteration-name" required class="mb-2">{t('iterations.iterationName')}</Label>
           <input
             id="iteration-name"
             type="text"
             bind:value={formData.name}
             class="w-full px-4 py-3 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
             style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-            placeholder="e.g., Sprint 1"
+            placeholder={t('iterations.iterationNamePlaceholder')}
             required
           />
         </div>
 
         <div>
-          <Label for="iteration-status" class="mb-2">Status</Label>
+          <Label for="iteration-status" class="mb-2">{t('common.status')}</Label>
           <BasePicker
             bind:value={formData.status}
             items={statusOptions}
-            placeholder="Select status..."
+            placeholder={t('iterations.selectStatus')}
             getValue={(item) => item.value}
             getLabel={(item) => item.label}
           />
         </div>
 
         <div>
-          <Label for="iteration-start-date" required class="mb-2">Start Date</Label>
+          <Label for="iteration-start-date" required class="mb-2">{t('iterations.startDate')}</Label>
           <input
             id="iteration-start-date"
             type="date"
@@ -494,7 +495,7 @@
         </div>
 
         <div>
-          <Label for="iteration-end-date" required class="mb-2">End Date</Label>
+          <Label for="iteration-end-date" required class="mb-2">{t('iterations.endDate')}</Label>
           <input
             id="iteration-end-date"
             type="date"
@@ -506,12 +507,12 @@
         </div>
 
         <div class="md:col-span-2">
-          <Label for="iteration-description" class="mb-2">Description</Label>
+          <Label for="iteration-description" class="mb-2">{t('common.description')}</Label>
           <Textarea
             id="iteration-description"
             bind:value={formData.description}
             rows={3}
-            placeholder="Optional description"
+            placeholder={t('iterations.descriptionPlaceholder')}
           />
         </div>
       </div>
@@ -521,7 +522,7 @@
   <DialogFooter
     onCancel={() => showEditModal = false}
     onConfirm={saveIteration}
-    confirmLabel="Update Iteration"
+    confirmLabel={t('iterations.updateIteration')}
     disabled={!formData.name.trim() || !formData.start_date || !formData.end_date}
     showKeyboardHint={true}
     confirmKeyboardHint={submitHint}

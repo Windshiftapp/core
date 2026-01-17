@@ -15,6 +15,7 @@
   import { getVisibleColor, isGrayColor, lightenColor } from '../../utils/colorUtils.js';
   import { workspacePermissions } from '../../stores';
   import { themeStore } from '../../stores/theme.svelte.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   // Click outside action
   function clickOutside(node) {
@@ -372,7 +373,7 @@
   <div class="flex-1 px-4 py-4 overflow-y-auto">
     <!-- DETAILS Section Header -->
     <div class="flex items-center justify-between mb-4">
-      <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">Details</Text>
+      <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">{t('common.details')}</Text>
       <div class="flex items-center gap-1">
         <DropdownMenu
           triggerText=""
@@ -409,7 +410,7 @@
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
           >
             <div class="flex items-center gap-2">
-              <Text variant="subtle" size="sm">Status</Text>
+              <Text variant="subtle" size="sm">{t('common.status')}</Text>
               <kbd class="px-1.5 py-0.5 text-xs font-medium rounded border opacity-0 group-hover:opacity-70 transition-opacity"
                    style="background-color: var(--ds-background-neutral-subtle); border-color: var(--ds-border); color: var(--ds-text-subtle);">
                 F
@@ -424,7 +425,7 @@
                 {selectedStatus.label}
               </span>
             {:else}
-              <Text variant="subtle" size="sm">Set status</Text>
+              <Text variant="subtle" size="sm">{t('items.setStatus')}</Text>
             {/if}
           </div>
         {/snippet}
@@ -456,13 +457,13 @@
             onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
           >
-            <Text variant="subtle" size="sm">Priority</Text>
+            <Text variant="subtle" size="sm">{t('common.priority')}</Text>
             <div class="flex items-center gap-2">
               {#if selectedPriority}
                 <ChevronsUp size={14} class="flex-shrink-0" style="color: {selectedPriority.color};" />
                 <span style="color: var(--ds-text);">{selectedPriority.name}</span>
               {:else}
-                <Text variant="subtle" size="sm">None</Text>
+                <Text variant="subtle" size="sm">{t('common.none')}</Text>
               {/if}
             </div>
           </div>
@@ -499,13 +500,13 @@
           onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
           onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
         >
-          <Text variant="subtle" size="sm">Due date</Text>
+          <Text variant="subtle" size="sm">{t('common.dueDate')}</Text>
           <div class="flex items-center gap-2">
             {#if item?.due_date}
               <Calendar size={14} class="flex-shrink-0" style="color: var(--ds-text-subtle);" />
               <span style="color: var(--ds-text);">{new Date(item.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
             {:else}
-              <Text variant="subtle" size="sm">None</Text>
+              <Text variant="subtle" size="sm">{t('common.none')}</Text>
             {/if}
           </div>
         </button>
@@ -552,13 +553,13 @@
               onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
               onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
             >
-              <Text variant="subtle" size="sm">Project</Text>
+              <Text variant="subtle" size="sm">{t('items.project')}</Text>
               <div class="flex items-center gap-2">
                 {#if item.effective_project_name || item.project_name}
                   <Briefcase size={14} class="flex-shrink-0" style="color: var(--ds-text-subtle);" />
                   <span style="color: var(--ds-text);">{getProjectDisplayText(item)}</span>
                 {:else}
-                  <Text variant="subtle" size="sm">None</Text>
+                  <Text variant="subtle" size="sm">{t('common.none')}</Text>
                 {/if}
               </div>
             </div>
@@ -589,13 +590,13 @@
             onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
           >
-            <Text variant="subtle" size="sm">Assignee</Text>
+            <Text variant="subtle" size="sm">{t('common.assignee')}</Text>
             <div class="flex items-center gap-2">
               {#if item.assignee_id && item.assignee_name}
                 <Avatar src={item.assignee_avatar} name={item.assignee_name} size="xs" variant="teal" />
                 <span style="color: var(--ds-text);">{item.assignee_name}</span>
               {:else}
-                <Text variant="subtle" size="sm">Unassigned</Text>
+                <Text variant="subtle" size="sm">{t('items.unassigned')}</Text>
               {/if}
             </div>
           </div>
@@ -634,9 +635,9 @@
             onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
           >
-            <Text variant="subtle" size="sm">Milestone</Text>
+            <Text variant="subtle" size="sm">{t('items.milestone')}</Text>
             <span style="color: {selectedMilestone ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};">
-              {selectedMilestone ? selectedMilestone.name : 'None'}
+              {selectedMilestone ? selectedMilestone.name : t('common.none')}
             </span>
           </div>
         {/snippet}
@@ -670,7 +671,7 @@
             onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
           >
-            <Text variant="subtle" size="sm">Iteration</Text>
+            <Text variant="subtle" size="sm">{t('items.iteration')}</Text>
             <div class="flex items-center gap-2">
               {#if selectedIteration}
                 {#if selectedIteration.is_global}
@@ -680,7 +681,7 @@
                 {/if}
                 <span style="color: var(--ds-text);">{selectedIteration.name}</span>
               {:else}
-                <Text variant="subtle" size="sm">None</Text>
+                <Text variant="subtle" size="sm">{t('common.none')}</Text>
               {/if}
             </div>
           </div>
@@ -698,7 +699,7 @@
 
         <!-- Custom Fields Header -->
         <div class="flex items-center justify-between mb-3">
-          <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">Custom Fields</Text>
+          <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">{t('fields.title')}</Text>
         </div>
 
         <div class="space-y-1">
@@ -737,11 +738,11 @@
                     <span style="color: {currentValue ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};">
                       {#if currentValue !== null && currentValue !== undefined && currentValue !== ''}
                         {#if fieldDef.field_type === 'checkbox'}
-                          {currentValue ? 'Yes' : 'No'}
+                          {currentValue ? t('common.yes') : t('common.no')}
                         {:else if fieldDef.field_type === 'date'}
                           {new Date(currentValue).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         {:else if fieldDef.field_type === 'user' && typeof currentValue === 'object'}
-                          {currentValue.name || 'Selected'}
+                          {currentValue.name || t('common.selected')}
                         {:else if Array.isArray(currentValue)}
                           {currentValue.map(v => typeof v === 'object' ? v.title || v.name || v.label || v.value : v).join(', ')}
                         {:else if typeof currentValue === 'object'}
@@ -750,7 +751,7 @@
                           {currentValue}
                         {/if}
                       {:else}
-                        None
+                        {t('common.none')}
                       {/if}
                     </span>
                   </button>

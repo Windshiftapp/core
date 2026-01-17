@@ -6,6 +6,7 @@
   import { workspacesStore, shouldNavigateAfterCreate } from '../stores';
   import { api } from '../api.js';
   import { X, MoreHorizontal, Calendar, Target, Flag, User, Tag, Milestone as MilestoneIcon, Building, FolderOpen, Layers, ChevronRight, ChevronDown, FileText } from 'lucide-svelte';
+  import { t } from '../stores/i18n.svelte.js';
   import MilkdownEditor from '../editors/MilkdownEditor.svelte';
   import Button from '../components/Button.svelte';
   import CompactWorkspaceSelector from '../pickers/CompactWorkspaceSelector.svelte';
@@ -23,13 +24,13 @@
   import { errorToast } from '../stores/toasts.svelte.js';
   import { createPopover, melt } from '@melt-ui/svelte';
 
-  // Status options for milestones
-  const milestoneStatusOptions = [
-    { value: 'planning', label: 'Planning' },
-    { value: 'in-progress', label: 'In Progress' },
-    { value: 'completed', label: 'Completed' },
-    { value: 'cancelled', label: 'Cancelled' }
-  ];
+  // Status options for milestones - reactive for i18n
+  const milestoneStatusOptions = $derived([
+    { value: 'planning', label: t('createModal.planning') },
+    { value: 'in-progress', label: t('createModal.inProgress') },
+    { value: 'completed', label: t('createModal.completed') },
+    { value: 'cancelled', label: t('createModal.cancelled') }
+  ]);
 
   // Type icons and options for the type selector
   const typeIcons = {
@@ -39,12 +40,13 @@
     'collection': FolderOpen
   };
 
-  const typeOptions = [
-    { value: 'work-item', label: 'Work Item', icon: FileText },
-    { value: 'milestone', label: 'Milestone', icon: Target },
-    { value: 'workspace', label: 'Workspace', icon: Building },
-    { value: 'collection', label: 'Collection', icon: FolderOpen }
-  ];
+  // Type options - reactive for i18n
+  const typeOptions = $derived([
+    { value: 'work-item', label: t('createModal.workItem'), icon: FileText },
+    { value: 'milestone', label: t('createModal.milestone'), icon: Target },
+    { value: 'workspace', label: t('createModal.workspace'), icon: Building },
+    { value: 'collection', label: t('createModal.collection'), icon: FolderOpen }
+  ]);
 
   const dispatch = createEventDispatcher();
 
@@ -200,13 +202,13 @@
     }
   }
 
-  // Type display names
-  const typeLabels = {
-    'work-item': 'Work Item',
-    'milestone': 'Milestone',
-    'workspace': 'Workspace',
-    'collection': 'Collection'
-  };
+  // Type display names - reactive for i18n
+  const typeLabels = $derived({
+    'work-item': t('createModal.workItem'),
+    'milestone': t('createModal.milestone'),
+    'workspace': t('createModal.workspace'),
+    'collection': t('createModal.collection')
+  });
 
   // Helper functions for screen field configuration
   function isFieldRequired(fieldIdentifier) {
@@ -927,9 +929,9 @@
     const date = new Date(dateStr);
     const today = new Date();
     const diffDays = Math.ceil((date - today) / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Tomorrow';
-    if (diffDays === -1) return 'Yesterday';
+    if (diffDays === 0) return t('common.today');
+    if (diffDays === 1) return t('common.tomorrow');
+    if (diffDays === -1) return t('common.yesterday');
     if (diffDays > 0 && diffDays <= 7) return `${diffDays} days`;
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
@@ -954,11 +956,11 @@
         <!-- Type Selector FIRST (independent of workspace) -->
         {#if !parentItem && !compactMode}
           <FieldChip
-            label="Type"
+            label={t('createModal.type')}
             value={selectedType}
             displayValue={typeLabels[selectedType]}
             icon={typeIcons[selectedType]}
-            placeholder="Type"
+            placeholder={t('createModal.type')}
           >
             {#snippet children({ close: closePopover })}
               <div class="py-1">
@@ -1004,9 +1006,9 @@
 
         <span class="font-medium" style="color: var(--ds-text);">
           {#if parentItem}
-            New Child Item
+            {t('createModal.newChildItem')}
           {:else}
-            New {currentTypeName}
+            {t('createModal.new')} {currentTypeName}
           {/if}
         </span>
 
@@ -1027,7 +1029,7 @@
         <!-- Validation Errors -->
         {#if validationErrorMessages.length > 0}
           <div class="p-3 rounded text-sm" style="background-color: var(--ds-background-danger-subtle, #fef2f2); border: 1px solid var(--ds-border-danger, #fecaca); color: var(--ds-text-danger, #dc2626);">
-            <p class="font-medium mb-1">Please fill in required fields:</p>
+            <p class="font-medium mb-1">{t('createModal.fillRequiredFields')}</p>
             <ul class="list-disc list-inside">
               {#each validationErrorMessages as error}
                 <li>{error}</li>
@@ -1039,7 +1041,7 @@
         <!-- Parent Item Info (for sub-issues) -->
         {#if parentItem}
           <div class="text-xs px-2 py-1.5 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
-            Parent: {parentItem.title}
+            {t('createModal.parent')}: {parentItem.title}
           </div>
         {/if}
 
@@ -1050,7 +1052,7 @@
           type="text"
           class="w-full text-lg font-medium border-0 outline-none bg-transparent"
           style="color: var(--ds-text);"
-          placeholder={selectedType === 'work-item' ? 'Issue title' : `${currentTypeName} name`}
+          placeholder={selectedType === 'work-item' ? t('createModal.issueTitle') : t('createModal.workspaceName', { type: currentTypeName })}
         />
 
         <!-- Workspace Key (for workspace creation) -->
@@ -1060,7 +1062,7 @@
             type="text"
             class="w-full text-sm border-0 outline-none bg-transparent"
             style="color: var(--ds-text-subtle);"
-            placeholder="Workspace key (e.g., PROJ, TEAM)"
+            placeholder={t('createModal.workspaceKeyPlaceholder')}
           />
         {/if}
 
@@ -1068,7 +1070,7 @@
         <div class="min-h-[60px]">
           <MilkdownEditor
             bind:content={formData.description}
-            placeholder="Add description..."
+            placeholder={t('createModal.addDescription')}
             compact={true}
             showToolbar={false}
             readonly={false}
@@ -1083,11 +1085,11 @@
             {#if availableItemTypes.length >= 1}
               <FieldChip
                 bind:this={itemTypeChipRef}
-                label="Type"
+                label={t('createModal.type')}
                 value={formData.item_type_id}
                 displayValue={selectedItemType?.name || ''}
                 icon={Layers}
-                placeholder="Type"
+                placeholder={t('createModal.type')}
               >
                 {#snippet children({ close: closePopover })}
                   <div class="p-2 max-h-48 overflow-y-auto">
@@ -1122,7 +1124,7 @@
                     selectedPriorityObj = priority;
                   }}
                   showUnassigned={true}
-                  unassignedLabel="No priority"
+                  unassignedLabel={t('createModal.noPriority')}
                 >
                   {#snippet children()}
                     <div
@@ -1137,7 +1139,7 @@
                     >
                       <Flag size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
                       <span class="truncate max-w-[120px]">
-                        {selectedPriorityObj?.name || 'Priority'}
+                        {selectedPriorityObj?.name || t('createModal.priority')}
                       </span>
                       <ChevronDown size={12} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
                     </div>
@@ -1149,7 +1151,7 @@
                   style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: var(--ds-text-subtle);"
                 >
                   <Flag size={14} style="flex-shrink: 0;" />
-                  <span>Priority</span>
+                  <span>{t('createModal.priority')}</span>
                   <ChevronDown size={12} style="flex-shrink: 0;" />
                 </div>
               {/if}
@@ -1160,7 +1162,7 @@
               <UserPicker
                 bind:value={formData.assignee_id}
                 showUnassigned={true}
-                unassignedLabel="Unassigned"
+                unassignedLabel={t('createModal.unassigned')}
               >
                 {#snippet children()}
                   <div
@@ -1175,7 +1177,7 @@
                   >
                     <User size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
                     <span class="truncate max-w-[120px]">
-                      {selectedAssignee?.name || selectedAssignee?.email || 'Assignee'}
+                      {selectedAssignee?.name || selectedAssignee?.email || t('createModal.assignee')}
                     </span>
                     <ChevronDown size={12} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
                   </div>
@@ -1198,7 +1200,7 @@
               >
                 <Calendar size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
                 <span class="truncate max-w-[120px]">
-                  {formData.due_date ? formatDueDate(formData.due_date) : 'Due date'}
+                  {formData.due_date ? formatDueDate(formData.due_date) : t('createModal.dueDate')}
                 </span>
                 <ChevronDown size={12} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
               </button>
@@ -1229,7 +1231,7 @@
                 bind:value={formData.milestone_id}
                 workspaceId={selectedWorkspace?.id}
                 showUnassigned={true}
-                unassignedLabel="No milestone"
+                unassignedLabel={t('createModal.noMilestone')}
               >
                 {#snippet children()}
                   <div
@@ -1248,7 +1250,7 @@
                       <MilestoneIcon size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
                     {/if}
                     <span class="truncate max-w-[120px]">
-                      {selectedMilestone?.name || 'Milestone'}
+                      {selectedMilestone?.name || t('createModal.milestoneField')}
                     </span>
                     <ChevronDown size={12} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
                   </div>
@@ -1275,7 +1277,7 @@
                   style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border); min-width: 200px; max-width: 300px;"
                 >
                   <div class="text-xs font-medium px-2 py-1 mb-1" style="color: var(--ds-text-subtle);">
-                    Additional Fields
+                    {t('createModal.additionalFields')}
                   </div>
                   {#each nonRequiredCustomFields as field}
                     <div class="px-2 py-2">
@@ -1302,25 +1304,25 @@
                 {#if field.field_identifier === 'priority'}
                   <div class="space-y-1">
                     <Label color="default">
-                      Priority <span style="color: var(--ds-text-danger, #ef4444);">*</span>
+                      {t('createModal.priority')} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
                     </Label>
                     {#if selectedWorkspace}
                       <PriorityPicker
                         workspaceId={selectedWorkspace.id}
                         selectedPriorityId={formData.priority_id}
                         onChange={(priorityId) => formData.priority_id = priorityId}
-                        placeholder="Select priority"
+                        placeholder={t('createModal.noPriority')}
                       />
                     {:else}
                       <div class="px-3 py-2 text-sm rounded border" style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text-subtle);">
-                        Select a workspace first
+                        {t('createModal.selectWorkspaceFirst')}
                       </div>
                     {/if}
                   </div>
                 {:else if field.field_identifier === 'due_date'}
                   <div class="space-y-1">
                     <Label color="default">
-                      Due Date <span style="color: var(--ds-text-danger, #ef4444);">*</span>
+                      {t('createModal.dueDate')} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
                     </Label>
                     <input
                       type="date"
@@ -1332,22 +1334,22 @@
                 {:else if field.field_identifier === 'milestone'}
                   <div class="space-y-1">
                     <Label color="default">
-                      Milestone <span style="color: var(--ds-text-danger, #ef4444);">*</span>
+                      {t('createModal.milestoneField')} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
                     </Label>
                     <MilestoneCombobox
                       bind:value={formData.milestone_id}
                       workspaceId={selectedWorkspace?.id}
-                      placeholder="Select milestone"
+                      placeholder={t('createModal.noMilestone')}
                     />
                   </div>
                 {:else if field.field_identifier === 'assignee'}
                   <div class="space-y-1">
                     <Label color="default">
-                      Assignee <span style="color: var(--ds-text-danger, #ef4444);">*</span>
+                      {t('createModal.assignee')} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
                     </Label>
                     <UserPicker
                       bind:value={formData.assignee_id}
-                      placeholder="Select assignee"
+                      placeholder={t('createModal.unassigned')}
                     />
                   </div>
                 {/if}
@@ -1382,11 +1384,11 @@
           <div class="flex flex-wrap items-center gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
             <!-- Target Date Chip -->
             <FieldChip
-              label="Target Date"
+              label={t('createModal.targetDate')}
               value={formData.target_date}
               displayValue={formData.target_date ? new Date(formData.target_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
               icon={Calendar}
-              placeholder="Target date"
+              placeholder={t('createModal.targetDate')}
               required={true}
             >
               {#snippet children({ close: closePopover })}
@@ -1405,11 +1407,11 @@
             <!-- Status Chip -->
             <FieldChip
               bind:this={statusChipRef}
-              label="Status"
+              label={t('createModal.status')}
               value={formData.status}
-              displayValue={milestoneStatusOptions.find(s => s.value === formData.status)?.label || 'Planning'}
+              displayValue={milestoneStatusOptions.find(s => s.value === formData.status)?.label || t('createModal.planning')}
               icon={Target}
-              placeholder="Status"
+              placeholder={t('createModal.status')}
             >
               {#snippet children({ close: closePopover })}
                 <div class="p-2 max-h-48 overflow-y-auto">
@@ -1439,11 +1441,11 @@
           <div class="flex flex-wrap items-center gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
             <FieldChip
               bind:this={categoryChipRef}
-              label="Category"
+              label={t('createModal.category')}
               value={collectionCategoryId}
               displayValue={$collectionCategoriesStore.find(c => c.id === collectionCategoryId)?.name || ''}
               icon={FolderOpen}
-              placeholder="Category"
+              placeholder={t('createModal.category')}
             >
               {#snippet children({ close: closePopover })}
                 <div class="p-2 max-h-48 overflow-y-auto">
@@ -1458,7 +1460,7 @@
                       closePopover();
                     }}
                   >
-                    No Category
+                    {t('createModal.noCategory')}
                   </button>
                   {#each $collectionCategoriesStore as category}
                     <button
@@ -1494,7 +1496,7 @@
                    (selectedType === 'work-item' && !formData.workspace_id) ||
                    (selectedType === 'workspace' && !formData.key.trim())}
         >
-          Create {currentTypeName}
+          {t('createModal.create')} {currentTypeName}
         </Button>
       </div>
     </div>

@@ -4,11 +4,12 @@
 	import { Github, GitBranch, CheckCircle, XCircle, LogOut, Loader2, ExternalLink } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
 	import AlertBox from '../components/AlertBox.svelte';
+	import { t } from '../stores/i18n.svelte.js';
 
-	let loading = true;
-	let providers = [];
-	let error = '';
-	let disconnecting = null;
+	let loading = $state(true);
+	let providers = $state([]);
+	let error = $state('');
+	let disconnecting = $state(null);
 
 	onMount(() => {
 		loadProviders();
@@ -21,7 +22,7 @@
 			providers = await api.userSCM.getAvailableProviders() || [];
 		} catch (err) {
 			console.error('Failed to load SCM providers:', err);
-			error = 'Failed to load connected accounts';
+			error = t('settings.connectedAccounts.failedToLoad');
 			providers = [];
 		} finally {
 			loading = false;
@@ -37,7 +38,7 @@
 			await loadProviders();
 		} catch (err) {
 			console.error('Failed to disconnect:', err);
-			error = 'Failed to disconnect account';
+			error = t('settings.connectedAccounts.failedToDisconnect');
 		} finally {
 			disconnecting = null;
 		}
@@ -53,7 +54,7 @@
 			}
 		}).catch(err => {
 			console.error('Failed to start OAuth:', err);
-			error = 'Failed to start connection flow';
+			error = t('settings.connectedAccounts.failedToStartConnection');
 		});
 	}
 
@@ -81,9 +82,9 @@
 	{:else if providers.length === 0}
 		<div class="text-center py-8">
 			<GitBranch class="w-12 h-12 mx-auto mb-4" style="color: var(--ds-text-subtle);" />
-			<h3 class="text-base font-medium mb-2" style="color: var(--ds-text);">No SCM Providers Available</h3>
+			<h3 class="text-base font-medium mb-2" style="color: var(--ds-text);">{t('settings.connectedAccounts.noProvidersTitle')}</h3>
 			<p class="text-sm" style="color: var(--ds-text-subtle);">
-				Your administrator has not configured any SCM providers with OAuth.
+				{t('settings.connectedAccounts.noProvidersDesc')}
 			</p>
 		</div>
 	{:else}
@@ -117,7 +118,7 @@
 									style="background-color: var(--ds-background-success); color: var(--ds-text-success);"
 								>
 									<CheckCircle class="w-3 h-3" />
-									Connected
+									{t('settings.connectedAccounts.connected')}
 								</span>
 							{:else}
 								<span
@@ -125,7 +126,7 @@
 									style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);"
 								>
 									<XCircle class="w-3 h-3" />
-									Not connected
+									{t('settings.connectedAccounts.notConnected')}
 								</span>
 							{/if}
 						</div>
@@ -144,13 +145,13 @@
 								</span>
 								{#if provider.connected_at}
 									<span class="text-xs" style="color: var(--ds-text-subtlest);">
-										Connected {new Date(provider.connected_at).toLocaleDateString()}
+										{t('settings.connectedAccounts.connectedOn')} {new Date(provider.connected_at).toLocaleDateString()}
 									</span>
 								{/if}
 							</div>
 						{:else if !provider.connected}
 							<p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-								Connect your account to create branches and pull requests
+								{t('settings.connectedAccounts.connectDesc')}
 							</p>
 						{/if}
 					</div>
@@ -166,10 +167,10 @@
 							>
 								{#if disconnecting === provider.id}
 									<Loader2 class="w-4 h-4 animate-spin mr-1" />
-									Disconnecting...
+									{t('settings.connectedAccounts.disconnecting')}
 								{:else}
 									<LogOut class="w-4 h-4 mr-1" />
-									Disconnect
+									{t('settings.connectedAccounts.disconnect')}
 								{/if}
 							</Button>
 						{:else}
@@ -178,7 +179,7 @@
 								size="small"
 								onclick={() => connect(provider)}
 							>
-								Connect {provider.provider_type || 'Account'}
+								{t('settings.connectedAccounts.connect')} {provider.provider_type || t('settings.connectedAccounts.account')}
 							</Button>
 						{/if}
 					</div>
@@ -189,8 +190,7 @@
 		<!-- Info Text -->
 		<div class="mt-6 text-xs" style="color: var(--ds-text-subtlest);">
 			<p>
-				Connected accounts are used to create branches and pull requests in your name.
-				Each user must connect their own account for proper attribution.
+				{t('settings.connectedAccounts.footerNote')}
 			</p>
 		</div>
 	{/if}

@@ -18,21 +18,22 @@
   import Text from '../components/Text.svelte';
   import Card from '../components/Card.svelte';
   import Label from '../components/Label.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
-  let providers = [];
-  let loading = true;
-  let error = null;
-  let showCreateModal = false;
-  let showEditModal = false;
-  let showDeleteModal = false;
-  let editingProvider = null;
-  let deletingProvider = null;
-  let testResult = null;
-  let testLoading = false;
-  let saving = false;
+  let providers = $state([]);
+  let loading = $state(true);
+  let error = $state(null);
+  let showCreateModal = $state(false);
+  let showEditModal = $state(false);
+  let showDeleteModal = $state(false);
+  let editingProvider = $state(null);
+  let deletingProvider = $state(null);
+  let testResult = $state(null);
+  let testLoading = $state(false);
+  let saving = $state(false);
 
   // Form state
-  let formData = {
+  let formData = $state({
     slug: '',
     name: '',
     provider_type: 'oidc',
@@ -46,9 +47,9 @@
     allow_password_login: true,
     require_verified_email: true,
     attribute_mapping: ''
-  };
+  });
 
-  let formErrors = {};
+  let formErrors = $state({});
 
   // Keyboard shortcut handler
   const handleGlobalKeydown = createShortcutHandler({
@@ -82,7 +83,7 @@
       })();
     } catch (err) {
       console.error('Failed to load SSO providers:', err);
-      error = 'Failed to load SSO providers';
+      error = t('settings.sso.failedToLoad');
     } finally {
       loading = false;
     }
@@ -155,28 +156,28 @@
     formErrors = {};
 
     if (!formData.slug.trim()) {
-      formErrors.slug = 'Slug is required';
+      formErrors.slug = t('settings.sso.slugRequired');
     } else if (!/^[a-z0-9-]+$/.test(formData.slug)) {
-      formErrors.slug = 'Slug must contain only lowercase letters, numbers, and hyphens';
+      formErrors.slug = t('settings.sso.slugInvalid');
     }
 
     if (!formData.name.trim()) {
-      formErrors.name = 'Name is required';
+      formErrors.name = t('settings.sso.nameRequired');
     }
 
     if (!formData.issuer_url.trim()) {
-      formErrors.issuer_url = 'Issuer URL is required';
+      formErrors.issuer_url = t('settings.sso.issuerUrlRequired');
     } else if (!formData.issuer_url.startsWith('https://') && !formData.issuer_url.startsWith('http://')) {
-      formErrors.issuer_url = 'Issuer URL must start with https:// or http://';
+      formErrors.issuer_url = t('settings.sso.issuerUrlInvalid');
     }
 
     if (!formData.client_id.trim()) {
-      formErrors.client_id = 'Client ID is required';
+      formErrors.client_id = t('settings.sso.clientIdRequired');
     }
 
     // Client secret required for new providers
     if (showCreateModal && !formData.client_secret.trim()) {
-      formErrors.client_secret = 'Client Secret is required';
+      formErrors.client_secret = t('settings.sso.clientSecretRequired');
     }
 
     return Object.keys(formErrors).length === 0;
@@ -193,7 +194,7 @@
       await loadProviders();
     } catch (err) {
       console.error('Failed to create SSO provider:', err);
-      error = err.message || 'Failed to create SSO provider';
+      error = err.message || t('settings.sso.failedToCreate');
     } finally {
       saving = false;
     }
@@ -210,7 +211,7 @@
       await loadProviders();
     } catch (err) {
       console.error('Failed to update SSO provider:', err);
-      error = err.message || 'Failed to update SSO provider';
+      error = err.message || t('settings.sso.failedToUpdate');
     } finally {
       saving = false;
     }
@@ -225,7 +226,7 @@
       await loadProviders();
     } catch (err) {
       console.error('Failed to delete SSO provider:', err);
-      error = err.message || 'Failed to delete SSO provider';
+      error = err.message || t('settings.sso.failedToDelete');
     } finally {
       saving = false;
     }
@@ -241,7 +242,7 @@
       testResult = result;
     } catch (err) {
       console.error('Failed to test SSO provider:', err);
-      testResult = { success: false, error: err.message || 'Connection test failed' };
+      testResult = { success: false, error: err.message || t('settings.sso.connectionTestFailed') };
     } finally {
       testLoading = false;
     }
@@ -267,16 +268,16 @@
     <div>
       <Text as="h2" size="lg" weight="semibold" class="flex items-center gap-2">
         <KeyRound class="w-5 h-5" style="color: var(--ds-icon-subtle);" />
-        Single Sign-On (SSO)
+        {t('settings.sso.title')}
       </Text>
       <Text as="p" size="sm" variant="subtle" class="mt-1">
-        Configure OIDC identity providers for Single Sign-On authentication
+        {t('settings.sso.subtitle')}
       </Text>
     </div>
     {#if providers.length === 0}
-      <Button variant="primary" on:click={openCreateModal} keyboardHint="A">
+      <Button variant="primary" onclick={openCreateModal} keyboardHint="A">
         <Plus class="w-4 h-4 mr-2" />
-        Add Provider
+        {t('settings.sso.addProvider')}
       </Button>
     {/if}
   </div>
@@ -295,14 +296,13 @@
     <!-- Empty State -->
     <Card variant="dashed" padding="spacious" class="text-center">
       <KeyRound class="w-12 h-12 mx-auto mb-4" style="color: var(--ds-icon-subtle);" />
-      <Text as="h3" size="lg" weight="medium" class="mb-2">No SSO Provider Configured</Text>
+      <Text as="h3" size="lg" weight="medium" class="mb-2">{t('settings.sso.noProviderConfigured')}</Text>
       <Text as="p" size="sm" variant="subtle" class="mb-4 max-w-md mx-auto">
-        Add an OIDC identity provider to enable Single Sign-On for your users.
-        Supports Keycloak, Authentik, Pocket ID, and other OIDC-compliant providers.
+        {t('settings.sso.noProviderDescription')}
       </Text>
-      <Button variant="primary" on:click={openCreateModal} keyboardHint="A">
+      <Button variant="primary" onclick={openCreateModal} keyboardHint="A">
         <Plus class="w-4 h-4 mr-2" />
-        Add Provider
+        {t('settings.sso.addProvider')}
       </Button>
     </Card>
   {:else}
@@ -321,47 +321,47 @@
               {#if provider.enabled}
                 <Lozenge color="green" size="md">
                   <Power class="w-3 h-3" />
-                  Enabled
+                  {t('settings.sso.enabled')}
                 </Lozenge>
               {:else}
                 <Lozenge color="gray" size="md">
                   <PowerOff class="w-3 h-3" />
-                  Disabled
+                  {t('settings.sso.disabled')}
                 </Lozenge>
               {/if}
             </div>
             <div class="flex items-center gap-2">
-              <Button variant="default" size="sm" on:click={() => openEditModal(provider)}>
+              <Button variant="default" size="sm" onclick={() => openEditModal(provider)}>
                 <Edit class="w-4 h-4 mr-1" />
-                Edit
+                {t('common.edit')}
               </Button>
-              <Button variant="danger" size="sm" on:click={() => openDeleteModal(provider)}>
+              <Button variant="danger" size="sm" onclick={() => openDeleteModal(provider)}>
                 <Trash2 class="w-4 h-4 mr-1" />
-                Delete
+                {t('common.delete')}
               </Button>
             </div>
           </div>
 
           <div class="mt-4 grid grid-cols-2 gap-4 text-sm">
             <div>
-              <span style="color: var(--ds-text-subtle);">Provider Type:</span>
+              <span style="color: var(--ds-text-subtle);">{t('settings.sso.providerType')}:</span>
               <span class="ml-2 font-medium uppercase" style="color: var(--ds-text);">{provider.provider_type}</span>
             </div>
             <div>
-              <span style="color: var(--ds-text-subtle);">Issuer URL:</span>
+              <span style="color: var(--ds-text-subtle);">{t('settings.sso.issuerUrl')}:</span>
               <a href={provider.issuer_url} target="_blank" rel="noopener noreferrer" class="ml-2 hover:underline flex items-center gap-1 inline-flex" style="color: var(--ds-link);">
                 {provider.issuer_url}
                 <ExternalLink class="w-3 h-3" />
               </a>
             </div>
             <div>
-              <span style="color: var(--ds-text-subtle);">Client ID:</span>
+              <span style="color: var(--ds-text-subtle);">{t('settings.sso.clientId')}:</span>
               <span class="ml-2 font-mono text-xs" style="color: var(--ds-text);">{provider.client_id}</span>
             </div>
             <div>
-              <span style="color: var(--ds-text-subtle);">Client Secret:</span>
+              <span style="color: var(--ds-text-subtle);">{t('settings.sso.clientSecret')}:</span>
               <span class="ml-2" style="color: var(--ds-text);">
-                {provider.has_client_secret ? '••••••••' : 'Not configured'}
+                {provider.has_client_secret ? '••••••••' : t('settings.sso.notConfigured')}
               </span>
             </div>
           </div>
@@ -371,28 +371,28 @@
               <div class="flex items-center gap-2">
                 {#if provider.auto_provision_users}
                   <CheckCircle class="w-4 h-4" style="color: var(--ds-text-success);" />
-                  <span style="color: var(--ds-text);">Auto-provision users</span>
+                  <span style="color: var(--ds-text);">{t('settings.sso.autoProvisionUsers')}</span>
                 {:else}
                   <XCircle class="w-4 h-4" style="color: var(--ds-icon-subtle);" />
-                  <span style="color: var(--ds-text-subtle);">Manual user creation only</span>
+                  <span style="color: var(--ds-text-subtle);">{t('settings.sso.manualUserCreationOnly')}</span>
                 {/if}
               </div>
               <div class="flex items-center gap-2">
                 {#if provider.allow_password_login}
                   <CheckCircle class="w-4 h-4" style="color: var(--ds-text-success);" />
-                  <span style="color: var(--ds-text);">Password login allowed</span>
+                  <span style="color: var(--ds-text);">{t('settings.sso.passwordLoginAllowed')}</span>
                 {:else}
                   <XCircle class="w-4 h-4" style="color: var(--ds-text-warning);" />
-                  <span style="color: var(--ds-text-warning);">SSO-only mode</span>
+                  <span style="color: var(--ds-text-warning);">{t('settings.sso.ssoOnlyMode')}</span>
                 {/if}
               </div>
               <div class="flex items-center gap-2">
                 {#if provider.require_verified_email !== false}
                   <CheckCircle class="w-4 h-4" style="color: var(--ds-text-success);" />
-                  <span style="color: var(--ds-text);">Trust IdP email verification</span>
+                  <span style="color: var(--ds-text);">{t('settings.sso.trustIdpEmailVerification')}</span>
                 {:else}
                   <XCircle class="w-4 h-4" style="color: var(--ds-text-warning);" />
-                  <span style="color: var(--ds-text-warning);">IdP verification not enforced</span>
+                  <span style="color: var(--ds-text-warning);">{t('settings.sso.idpVerificationNotEnforced')}</span>
                 {/if}
               </div>
             </div>
@@ -406,28 +406,28 @@
 {#if showCreateModal || showEditModal}
   <Modal
     isOpen={true}
-    on:close={closeModals}
+    onclose={closeModals}
     maxWidth="max-w-2xl"
   >
     <ModalHeader
-      title={showCreateModal ? 'Add SSO Provider' : 'Edit SSO Provider'}
+      title={showCreateModal ? t('settings.sso.addSsoProvider') : t('settings.sso.editSsoProvider')}
       icon={KeyRound}
       onClose={closeModals}
     />
-    <form on:submit|preventDefault={showCreateModal ? handleCreate : handleUpdate} class="p-6 space-y-4">
+    <form onsubmit={(e) => { e.preventDefault(); showCreateModal ? handleCreate() : handleUpdate(); }} class="p-6 space-y-4">
       <div class="grid grid-cols-2 gap-4">
         <!-- Name -->
         <div>
-          <Label for="name" color="default" required class="mb-1">Display Name</Label>
+          <Label for="name" color="default" required class="mb-1">{t('settings.sso.displayName')}</Label>
           <input
             type="text"
             id="name"
             bind:value={formData.name}
-            on:input={handleNameChange}
+            oninput={handleNameChange}
             class="w-full px-3 py-2 border rounded-md focus:ring-2"
             class:border-red-500={formErrors.name}
             style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);"
-            placeholder="e.g., Authentik, Keycloak"
+            placeholder={t('settings.sso.displayNamePlaceholder')}
           />
           {#if formErrors.name}
             <p class="mt-1 text-sm" style="color: var(--ds-text-danger);">{formErrors.name}</p>
@@ -436,7 +436,7 @@
 
         <!-- Slug -->
         <div>
-          <Label for="slug" color="default" required class="mb-1">Slug</Label>
+          <Label for="slug" color="default" required class="mb-1">{t('settings.sso.slug')}</Label>
           <input
             type="text"
             id="slug"
@@ -444,18 +444,18 @@
             class="w-full px-3 py-2 border rounded-md focus:ring-2 font-mono"
             class:border-red-500={formErrors.slug}
             style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);"
-            placeholder="e.g., authentik"
+            placeholder={t('settings.sso.slugPlaceholder')}
           />
           {#if formErrors.slug}
             <p class="mt-1 text-sm" style="color: var(--ds-text-danger);">{formErrors.slug}</p>
           {/if}
-          <p class="mt-1 text-xs" style="color: var(--ds-text-subtle);">Used in the SSO login URL: /api/sso/login/{formData.slug || 'slug'}</p>
+          <p class="mt-1 text-xs" style="color: var(--ds-text-subtle);">{t('settings.sso.slugHelp')}: /api/sso/login/{formData.slug || 'slug'}</p>
         </div>
       </div>
 
       <!-- Callback URL (read-only with copy button) -->
       <div>
-        <Label color="default" class="mb-1">Callback URL</Label>
+        <Label color="default" class="mb-1">{t('settings.sso.callbackUrl')}</Label>
         <div class="flex items-center gap-2">
           <div class="flex-1 px-3 py-2 border rounded-md font-mono text-sm overflow-x-auto"
                style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);">
@@ -465,20 +465,20 @@
             type="button"
             class="p-2 rounded-md hover-bg"
             style="color: var(--ds-text-subtle);"
-            on:click={copyCallbackUrl}
-            title="Copy to clipboard"
+            onclick={copyCallbackUrl}
+            title={t('toast.copied')}
           >
             <Copy class="w-4 h-4" />
           </button>
         </div>
         <p class="mt-1 text-xs" style="color: var(--ds-text-subtle);">
-          Configure this URL as the redirect/callback URL in your identity provider
+          {t('settings.sso.callbackUrlHelp')}
         </p>
       </div>
 
       <!-- Issuer URL -->
       <div>
-        <Label for="issuer_url" color="default" required class="mb-1">Issuer URL</Label>
+        <Label for="issuer_url" color="default" required class="mb-1">{t('settings.sso.issuerUrl')}</Label>
         <input
           type="url"
           id="issuer_url"
@@ -486,18 +486,18 @@
           class="w-full px-3 py-2 border rounded-md focus:ring-2 font-mono text-sm"
           class:border-red-500={formErrors.issuer_url}
           style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);"
-          placeholder="https://auth.example.com/realms/myrealm"
+          placeholder={t('settings.sso.issuerUrlPlaceholder')}
         />
         {#if formErrors.issuer_url}
           <p class="mt-1 text-sm" style="color: var(--ds-text-danger);">{formErrors.issuer_url}</p>
         {/if}
-        <p class="mt-1 text-xs" style="color: var(--ds-text-subtle);">The OIDC issuer URL. For Keycloak: https://host/realms/realmname</p>
+        <p class="mt-1 text-xs" style="color: var(--ds-text-subtle);">{t('settings.sso.issuerUrlHelp')}</p>
       </div>
 
       <div class="grid grid-cols-2 gap-4">
         <!-- Client ID -->
         <div>
-          <Label for="client_id" color="default" required class="mb-1">Client ID</Label>
+          <Label for="client_id" color="default" required class="mb-1">{t('settings.sso.clientId')}</Label>
           <input
             type="text"
             id="client_id"
@@ -505,7 +505,7 @@
             class="w-full px-3 py-2 border rounded-md focus:ring-2 font-mono"
             class:border-red-500={formErrors.client_id}
             style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);"
-            placeholder="windshift"
+            placeholder={t('settings.sso.clientIdPlaceholder')}
           />
           {#if formErrors.client_id}
             <p class="mt-1 text-sm" style="color: var(--ds-text-danger);">{formErrors.client_id}</p>
@@ -514,7 +514,7 @@
 
         <!-- Client Secret -->
         <div>
-          <Label for="client_secret" color="default" required={showCreateModal} class="mb-1">Client Secret</Label>
+          <Label for="client_secret" color="default" required={showCreateModal} class="mb-1">{t('settings.sso.clientSecret')}</Label>
           <input
             type="password"
             id="client_secret"
@@ -522,7 +522,7 @@
             class="w-full px-3 py-2 border rounded-md focus:ring-2"
             class:border-red-500={formErrors.client_secret}
             style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);"
-            placeholder={showEditModal ? '(leave empty to keep current)' : 'Enter client secret'}
+            placeholder={showEditModal ? t('settings.sso.leaveEmptyToKeepCurrent') : t('settings.sso.enterClientSecret')}
           />
           {#if formErrors.client_secret}
             <p class="mt-1 text-sm" style="color: var(--ds-text-danger);">{formErrors.client_secret}</p>
@@ -532,7 +532,7 @@
 
       <!-- Scopes -->
       <div>
-        <Label for="scopes" color="default" class="mb-1">Scopes</Label>
+        <Label for="scopes" color="default" class="mb-1">{t('settings.sso.scopes')}</Label>
         <input
           type="text"
           id="scopes"
@@ -541,7 +541,7 @@
           style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);"
           placeholder="openid email profile"
         />
-        <p class="mt-1 text-xs" style="color: var(--ds-text-subtle);">Space-separated list of OIDC scopes</p>
+        <p class="mt-1 text-xs" style="color: var(--ds-text-subtle);">{t('settings.sso.scopesHelp')}</p>
       </div>
 
       <!-- Checkboxes -->
@@ -554,8 +554,8 @@
             style="border-color: var(--ds-border);"
           />
           <span class="text-sm" style="color: var(--ds-text);">
-            <span class="font-medium">Enable this provider</span>
-            <span class="block text-xs" style="color: var(--ds-text-subtle);">Users can sign in using this SSO provider</span>
+            <span class="font-medium">{t('settings.sso.enableThisProvider')}</span>
+            <span class="block text-xs" style="color: var(--ds-text-subtle);">{t('settings.sso.enableThisProviderDesc')}</span>
           </span>
         </label>
 
@@ -567,8 +567,8 @@
             style="border-color: var(--ds-border);"
           />
           <span class="text-sm" style="color: var(--ds-text);">
-            <span class="font-medium">Auto-provision users</span>
-            <span class="block text-xs" style="color: var(--ds-text-subtle);">Automatically create user accounts on first SSO login</span>
+            <span class="font-medium">{t('settings.sso.autoProvisionUsers')}</span>
+            <span class="block text-xs" style="color: var(--ds-text-subtle);">{t('settings.sso.autoProvisionUsersDesc')}</span>
           </span>
         </label>
 
@@ -580,8 +580,8 @@
             style="border-color: var(--ds-border);"
           />
           <span class="text-sm" style="color: var(--ds-text);">
-            <span class="font-medium">Allow password login</span>
-            <span class="block text-xs" style="color: var(--ds-text-subtle);">Users can still sign in with username/password. Disable for SSO-only mode.</span>
+            <span class="font-medium">{t('settings.sso.allowPasswordLogin')}</span>
+            <span class="block text-xs" style="color: var(--ds-text-subtle);">{t('settings.sso.allowPasswordLoginDesc')}</span>
           </span>
         </label>
 
@@ -593,8 +593,8 @@
             style="border-color: var(--ds-border);"
           />
           <span class="text-sm" style="color: var(--ds-text);">
-            <span class="font-medium">Trust IdP email verification</span>
-            <span class="block text-xs" style="color: var(--ds-text-subtle);">When enabled, blocks login if the IdP explicitly reports the email as unverified. When the IdP doesn't report verification status, we'll send a verification email.</span>
+            <span class="font-medium">{t('settings.sso.trustIdpEmailVerification')}</span>
+            <span class="block text-xs" style="color: var(--ds-text-subtle);">{t('settings.sso.trustIdpEmailVerificationDesc')}</span>
           </span>
         </label>
       </div>
@@ -605,27 +605,27 @@
           <div class="flex items-center gap-3">
             <Button
               variant="default"
-              on:click={handleTest}
+              onclick={handleTest}
               disabled={testLoading}
             >
               {#if testLoading}
                 <RefreshCw class="w-4 h-4 mr-2 animate-spin" />
-                Testing...
+                {t('settings.sso.testing')}
               {:else}
                 <TestTube class="w-4 h-4 mr-2" />
-                Test Connection
+                {t('settings.sso.testConnection')}
               {/if}
             </Button>
             {#if testResult}
               {#if testResult.success}
                 <span class="flex items-center text-sm" style="color: var(--ds-text-success);">
                   <CheckCircle class="w-4 h-4 mr-1" />
-                  Connection successful
+                  {t('settings.sso.connectionSuccessful')}
                 </span>
               {:else}
                 <span class="flex items-center text-sm" style="color: var(--ds-text-danger);">
                   <XCircle class="w-4 h-4 mr-1" />
-                  {testResult.error || 'Connection failed'}
+                  {testResult.error || t('settings.sso.connectionFailed')}
                 </span>
               {/if}
             {/if}
@@ -635,14 +635,14 @@
 
       <!-- Modal Actions -->
       <div class="flex justify-end gap-3 pt-4 border-t" style="border-color: var(--ds-border);">
-        <Button variant="default" on:click={closeModals} disabled={saving}>
-          Cancel
+        <Button variant="default" onclick={closeModals} disabled={saving}>
+          {t('common.cancel')}
         </Button>
         <Button variant="primary" type="submit" disabled={saving}>
           {#if saving}
             <Spinner class="w-4 h-4 mr-2" />
           {/if}
-          {showCreateModal ? 'Create Provider' : 'Save Changes'}
+          {showCreateModal ? t('settings.sso.createProvider') : t('common.saveChanges')}
         </Button>
       </div>
     </form>
@@ -653,30 +653,30 @@
 {#if showDeleteModal && deletingProvider}
   <Modal
     isOpen={true}
-    on:close={closeModals}
+    onclose={closeModals}
     maxWidth="max-w-md"
   >
     <ModalHeader
-      title="Delete SSO Provider"
+      title={t('settings.sso.deleteSsoProvider')}
       icon={Trash2}
       onClose={closeModals}
     />
     <div class="p-6 space-y-4">
       <p style="color: var(--ds-text-subtle);">
-        Are you sure you want to delete the SSO provider <strong style="color: var(--ds-text);">{deletingProvider.name}</strong>?
+        {t('settings.sso.confirmDeleteProvider')} <strong style="color: var(--ds-text);">{deletingProvider.name}</strong>?
       </p>
       <AlertBox type="warning">
-        This will unlink all external accounts and users will need to sign in with a password.
+        {t('settings.sso.deleteWarning')}
       </AlertBox>
       <div class="flex justify-end gap-3 pt-4">
-        <Button variant="default" on:click={closeModals} disabled={saving}>
-          Cancel
+        <Button variant="default" onclick={closeModals} disabled={saving}>
+          {t('common.cancel')}
         </Button>
-        <Button variant="danger" on:click={handleDelete} disabled={saving}>
+        <Button variant="danger" onclick={handleDelete} disabled={saving}>
           {#if saving}
             <Spinner class="w-4 h-4 mr-2" />
           {/if}
-          Delete Provider
+          {t('settings.sso.deleteProvider')}
         </Button>
       </div>
     </div>

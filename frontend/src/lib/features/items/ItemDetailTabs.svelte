@@ -5,6 +5,7 @@
   import ItemHistory from '../items/ItemHistory.svelte';
   import { createEventDispatcher } from 'svelte';
   import { formatDateTimeLocale } from '../../utils/dateFormatter.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -68,7 +69,7 @@
         onclick={() => switchTab('comments')}
       >
         <MessageSquare class="w-4 h-4" />
-        Comments
+        {t('items.comments')}
         {#if commentCount > 0}
           <span class="text-xs px-2 py-0.5 rounded-full" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">{commentCount}</span>
         {/if}
@@ -80,7 +81,7 @@
           onclick={() => switchTab('time')}
         >
           <Clock class="w-4 h-4" />
-          Time Tracking
+          {t('items.timeTracking')}
           {#if timeWorklogs && timeWorklogs.length > 0}
             <span class="text-xs px-2 py-0.5 rounded-full" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">{timeWorklogs.length}</span>
           {/if}
@@ -92,7 +93,7 @@
         onclick={() => switchTab('details')}
       >
         <Info class="w-4 h-4" />
-        Details
+        {t('items.details')}
       </button>
       <button
         class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative"
@@ -100,7 +101,7 @@
         onclick={() => switchTab('history')}
       >
         <History class="w-4 h-4" />
-        History
+        {t('items.history')}
       </button>
     </div>
 
@@ -112,36 +113,36 @@
         <div class="space-y-4">
           <div class="grid grid-cols-2 gap-6">
             <div>
-              <h4 class="text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Created</h4>
+              <h4 class="text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('items.created')}</h4>
               <p class="text-sm" style="color: var(--ds-text);">{formatDateTimeLocale(item.created_at) || '-'}</p>
               {#if item.creator_name}
-                <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">by {item.creator_name}</p>
+                <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('items.by')} {item.creator_name}</p>
               {/if}
             </div>
             <div>
-              <h4 class="text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Last Updated</h4>
+              <h4 class="text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('items.lastUpdated')}</h4>
               <p class="text-sm" style="color: var(--ds-text);">{formatDateTimeLocale(item.updated_at) || '-'}</p>
               {#if item.updated_by_name}
-                <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">by {item.updated_by_name}</p>
+                <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('items.by')} {item.updated_by_name}</p>
               {/if}
             </div>
           </div>
 
           <!-- Additional metadata can be added here -->
           <div class="pt-2">
-            <h4 class="text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">Work Item Information</h4>
+            <h4 class="text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('items.workItemInformation')}</h4>
             <div class="space-y-2">
               <div class="flex justify-between">
-                <span class="text-xs" style="color: var(--ds-text-subtle);">ID:</span>
+                <span class="text-xs" style="color: var(--ds-text-subtle);">{t('items.id')}</span>
                 <span class="text-xs font-mono" style="color: var(--ds-text);">{workspace?.key || 'WORK'}-{item.id}</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-xs" style="color: var(--ds-text-subtle);">Type:</span>
-                <span class="text-xs" style="color: var(--ds-text);">{item.item_type_name || 'Work Item'}</span>
+                <span class="text-xs" style="color: var(--ds-text-subtle);">{t('items.type')}</span>
+                <span class="text-xs" style="color: var(--ds-text);">{item.item_type_name || t('items.workItem')}</span>
               </div>
               {#if item.parent_id}
                 <div class="flex justify-between">
-                  <span class="text-xs" style="color: var(--ds-text-subtle);">Parent:</span>
+                  <span class="text-xs" style="color: var(--ds-text-subtle);">{t('items.parent')}</span>
                   <span class="text-xs" style="color: var(--ds-text);">{workspace?.key || 'WORK'}-{item.parent_id}</span>
                 </div>
               {/if}
@@ -151,15 +152,15 @@
       {:else if tab === 'time' && moduleSettings.time_tracking_enabled}
         {#if !getDefaultProjectForTimeLogging()}
           <div class="text-center py-8">
-            <div class="text-sm mb-2" style="color: #ca8a04;">No project configured for time tracking</div>
-            <div class="text-xs" style="color: var(--ds-text-subtle);">Set a default project in workspace or item settings to log time</div>
+            <div class="text-sm mb-2" style="color: #ca8a04;">{t('items.noProjectConfigured')}</div>
+            <div class="text-xs" style="color: var(--ds-text-subtle);">{t('items.setDefaultProject')}</div>
           </div>
         {:else}
           <!-- Time Entries List -->
           {#if timeWorklogs && timeWorklogs.length > 0}
             <div class="space-y-3">
               <div class="flex items-center justify-between">
-                <h4 class="text-sm font-medium" style="color: var(--ds-text);">Time Entries ({timeWorklogs.length})</h4>
+                <h4 class="text-sm font-medium" style="color: var(--ds-text);">{t('items.timeEntries')} ({timeWorklogs.length})</h4>
                 <div class="flex gap-2">
                   {#if !activeTimer && getDefaultProjectForTimeLogging()}
                     <Button
@@ -167,9 +168,9 @@
                       icon={Play}
                       onclick={handleStartTimer}
                       size="small"
-                      title="Start tracking time for this work item"
+                      title={t('items.startTimerTitle')}
                     >
-                      Start Timer
+                      {t('items.startTimer')}
                     </Button>
                   {/if}
                   <Button
@@ -177,9 +178,9 @@
                     size="small"
                     onclick={handleLogTime}
                     disabled={!getDefaultProjectForTimeLogging()}
-                    title="Manually log time worked on this item"
+                    title={t('items.logTimeTitle')}
                   >
-                    Log Time
+                    {t('items.logTime')}
                   </Button>
                 </div>
               </div>
@@ -202,7 +203,7 @@
             </div>
           {:else}
             <div class="text-center py-8">
-              <div class="text-sm mb-4" style="color: var(--ds-text-subtle);">No time logged yet</div>
+              <div class="text-sm mb-4" style="color: var(--ds-text-subtle);">{t('items.noTimeLogged')}</div>
               <div class="flex justify-center gap-2">
                 {#if !activeTimer && getDefaultProjectForTimeLogging()}
                   <Button
@@ -210,9 +211,9 @@
                     icon={Play}
                     onclick={handleStartTimer}
                     size="small"
-                    title="Start tracking time for this work item"
+                    title={t('items.startTimerTitle')}
                   >
-                    Start Timer
+                    {t('items.startTimer')}
                   </Button>
                 {/if}
                 <Button
@@ -220,9 +221,9 @@
                   size="small"
                   onclick={handleLogTime}
                   disabled={!getDefaultProjectForTimeLogging()}
-                  title="Manually log time worked on this item"
+                  title={t('items.logTimeTitle')}
                 >
-                  Log Time
+                  {t('items.logTime')}
                 </Button>
               </div>
             </div>

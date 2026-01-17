@@ -15,6 +15,7 @@
     getBaseLoginState,
     performFidoLogin
   } from '../utils/loginUtils.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -164,8 +165,8 @@
       <div class="flex justify-center mb-4">
         <img src="/cmicon-2.svg" alt={APP_NAME} class="w-12 h-12" />
       </div>
-      <h2 class="text-xl font-semibold text-[var(--ds-text)]">Sign In</h2>
-      <p class="text-sm text-[var(--ds-text-subtle)] mt-1">Please sign in to continue</p>
+      <h2 class="text-xl font-semibold text-[var(--ds-text)]">{t('auth.signIn')}</h2>
+      <p class="text-sm text-[var(--ds-text-subtle)] mt-1">{t('auth.loginSubtitle')}</p>
     </div>
 
     <!-- Error Messages -->
@@ -205,7 +206,7 @@
         disabled={$authStore.loading}
       >
         <LogIn class="w-4 h-4 mr-2" />
-        Sign in with {$ssoStore.providerName || 'SSO'}
+        {t('auth.continueWith', { provider: $ssoStore.providerName || 'SSO' })}
       </Button>
 
       {#if $ssoStore.allowPasswordLogin}
@@ -214,7 +215,7 @@
             <div class="w-full border-t border-[var(--ds-border)]"></div>
           </div>
           <div class="relative flex justify-center text-sm">
-            <span class="px-2 bg-[var(--ds-surface-raised)] text-[var(--ds-text-subtle)]">or sign in with password</span>
+            <span class="px-2 bg-[var(--ds-surface-raised)] text-[var(--ds-text-subtle)]">{t('auth.orSignInWithPassword')}</span>
           </div>
         </div>
       {/if}
@@ -228,7 +229,7 @@
       <!-- Email/Username Field -->
       <div>
         <Label for="emailOrUsername" color="default" class="mb-1">
-          Email or Username
+          {t('auth.emailOrUsername')}
         </Label>
         <div class="relative">
           <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -243,7 +244,7 @@
             onblur={checkFidoAvailability}
             disabled={$authStore.loading}
             class="block w-full pl-10 pr-3 py-2 border border-[var(--ds-border)] rounded-md leading-5 bg-[var(--ds-background-input)] placeholder-[var(--ds-text-subtlest)] text-[var(--ds-text)] focus:outline-none focus:placeholder-[var(--ds-text-disabled)] focus:ring-1 focus:ring-[var(--ds-border-focused)] focus:border-[var(--ds-border-focused)] disabled:bg-[var(--ds-background-disabled)] disabled:text-[var(--ds-text-disabled)]"
-            placeholder="Enter email or username"
+            placeholder={t('placeholders.enterEmailOrUsername')}
             autocomplete="username"
             required
           />
@@ -253,7 +254,7 @@
       <!-- Password Field -->
       <div>
         <Label for="password" color="default" class="mb-1">
-          Password
+          {t('common.password')}
         </Label>
         <div class="relative">
           <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -266,7 +267,7 @@
             onkeydown={handleKeydown}
             disabled={$authStore.loading}
             class="block w-full pl-10 pr-10 py-2 border border-[var(--ds-border)] rounded-md leading-5 bg-[var(--ds-background-input)] placeholder-[var(--ds-text-subtlest)] text-[var(--ds-text)] focus:outline-none focus:placeholder-[var(--ds-text-disabled)] focus:ring-1 focus:ring-[var(--ds-border-focused)] focus:border-[var(--ds-border-focused)] disabled:bg-[var(--ds-background-disabled)] disabled:text-[var(--ds-text-disabled)]"
-            placeholder="Enter password"
+            placeholder={t('placeholders.enterPassword')}
             autocomplete="current-password"
             required
           />
@@ -295,7 +296,7 @@
           class="h-4 w-4 text-[var(--ds-interactive)] focus:ring-[var(--ds-border-focused)] border-[var(--ds-border)] rounded disabled:bg-[var(--ds-background-disabled)]"
         />
         <label for="rememberMe" class="ml-2 block text-sm text-[var(--ds-text)]">
-          Keep me signed in for 30 days
+          {t('auth.staySignedIn')}
         </label>
       </div>
 
@@ -306,7 +307,7 @@
             <div class="w-full border-t border-[var(--ds-border)]"></div>
           </div>
           <div class="relative flex justify-center text-sm">
-            <span class="px-2 bg-[var(--ds-surface-raised)] text-[var(--ds-text-subtle)]">or</span>
+            <span class="px-2 bg-[var(--ds-surface-raised)] text-[var(--ds-text-subtle)]">{t('common.or')}</span>
           </div>
         </div>
 
@@ -322,7 +323,7 @@
               <path fill-rule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-2 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z" clip-rule="evenodd" />
             </svg>
           {/if}
-          {tryingFido ? 'Touch your security key...' : 'Sign in with Security Key'}
+          {tryingFido ? t('auth.touchSecurityKey') : t('auth.signInWithSecurityKey')}
         </Button>
       {/if}
 
@@ -334,7 +335,7 @@
         loading={$authStore.loading}
         disabled={$authStore.loading || !emailOrUsername.trim() || !password}
       >
-        {$authStore.loading ? 'Signing in...' : 'Sign In'}
+        {$authStore.loading ? t('auth.loggingIn') : t('auth.signIn')}
       </Button>
     </form>
     {/if}

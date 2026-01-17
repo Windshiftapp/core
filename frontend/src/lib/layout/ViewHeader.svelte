@@ -1,4 +1,6 @@
 <script>
+  import { t } from '../stores/i18n.svelte.js';
+
   export let workspaceName = '';
   export let collection = '';
   export let viewName = '';
@@ -23,7 +25,7 @@
     </div>
     <div class="flex items-center">
       <span class="text-sm" style={subtleTextStyle}>
-        {workspaceName}{#if itemCount !== null} • {itemCount} items{/if}
+        {workspaceName}{#if itemCount !== null} • {itemCount} {t('layout.items')}{/if}
       </span>
     </div>
   </div>

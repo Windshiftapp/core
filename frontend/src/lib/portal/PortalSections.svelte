@@ -3,6 +3,7 @@
   import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { Plus, Trash2, X, Package } from 'lucide-svelte';
   import { portalStore, iconMap } from '../stores/portal.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     onOpenRequestForm = () => {}
@@ -121,7 +122,7 @@
               disabled={sectionIndex === 0}
               class="p-1 rounded transition-all disabled:opacity-30 hover:bg-black/5"
               style="color: {portalStore.isDarkMode ? '#94a3b8' : '#6b7280'};"
-              title="Move section up"
+              title={t('layout.moveUp')}
             >
               <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" />
@@ -132,7 +133,7 @@
               disabled={sectionIndex === portalStore.portalSections.length - 1}
               class="p-1 rounded transition-all disabled:opacity-30 hover:bg-black/5"
               style="color: {portalStore.isDarkMode ? '#94a3b8' : '#6b7280'};"
-              title="Move section down"
+              title={t('layout.moveDown')}
             >
               <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -142,7 +143,7 @@
               onclick={() => { if (confirm('Are you sure you want to delete this section?')) portalStore.deleteSection(section.id); }}
               class="p-1 rounded transition-all hover:bg-red-50"
               style="color: #dc2626;"
-              title="Delete section"
+              title={t('layout.deleteSection')}
             >
               <Trash2 class="w-4 h-4" />
             </button>
@@ -234,7 +235,7 @@
                         onclick={(e) => { e.stopPropagation(); portalStore.removeRequestTypeFromSection(section.id, requestType.id); }}
                         class="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                         style="background-color: {portalStore.isDarkMode ? 'rgba(220, 38, 38, 0.1)' : '#fee2e2'}; color: #dc2626;"
-                        title="Remove from section"
+                        title={t('portal.removeFromSection')}
                       >
                         <X class="w-3 h-3" />
                       </button>
@@ -266,7 +267,7 @@
               {#if portalStore.draggedRequestType && dropZoneStates.get(section.id)?.isOver && (portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'request-types'))}
                 <div class="mt-4 text-center py-4 border-2 border-dashed rounded" style="border-color: #3b82f6; background-color: {portalStore.isDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#dbeafe'};">
                   <p class="text-sm font-medium" style="color: {portalStore.isDarkMode ? '#60a5fa' : '#2563eb'};">
-                    Drop here to add to this section
+                    {t('portal.dropHereToAdd')}
                   </p>
                 </div>
               {/if}
@@ -276,7 +277,7 @@
                 style="border-color: {dropZoneStates.get(section.id)?.isOver ? '#3b82f6' : (portalStore.isDarkMode ? '#475569' : '#d1d5db')}; background-color: {dropZoneStates.get(section.id)?.isOver ? (portalStore.isDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#dbeafe') : 'transparent'};"
               >
                 <p class="text-sm" style="color: var(--ds-text-subtle);">
-                  {dropZoneStates.get(section.id)?.isOver ? 'Drop here to add request type' : 'No request types in this section yet. Drag request types here from the sidebar.'}
+                  {dropZoneStates.get(section.id)?.isOver ? t('portal.dropHereToAdd') : t('portal.noRequestTypesInSection')}
                 </p>
               </div>
             {/if}
@@ -294,7 +295,7 @@
       style="border-color: {portalStore.isDarkMode ? '#475569' : '#d1d5db'}; color: {portalStore.isDarkMode ? '#94a3b8' : '#6b7280'};"
     >
       <Plus class="w-5 h-5" />
-      <span class="font-medium">Add Section</span>
+      <span class="font-medium">{t('portal.addSection')}</span>
     </button>
   {/if}
 
@@ -302,7 +303,7 @@
   {#if portalStore.portalSections.length === 0 && !portalStore.isEditing}
     <div class="text-center py-16">
       <p class="text-sm" style="color: var(--ds-text-subtle);">
-        No content sections configured yet.
+        {t('portal.noContentSections')}
       </p>
     </div>
   {/if}

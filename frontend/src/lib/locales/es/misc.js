@@ -1,0 +1,193 @@
+/**
+ * Spanish (es) - Miscellaneous locale strings
+ * Contains: sprints, iterations, milestones, assets, personal, connections,
+ * migration, migrationAssistant, setup, createModal, scm, organization,
+ * fields, itemTypes, categories, members, configuration, audit, auditLog, projects
+ */
+
+export default {
+  itemTypes: {
+    title: 'Tipos de elementos',
+    subtitle: 'Configurar tipos de elementos y sus propiedades',
+    itemType: 'Tipo de elemento',
+    itemTypes_one: '{count} tipo de elemento',
+    itemTypes_other: '{count} tipos de elementos',
+    createItemType: 'Crear tipo de elemento',
+    editItemType: 'Editar tipo de elemento',
+    deleteItemType: 'Eliminar tipo de elemento',
+    typeName: 'Nombre del tipo',
+    noItemTypes: 'No se encontraron tipos de elementos',
+    itemTypeCreated: 'Tipo de elemento creado correctamente',
+    itemTypeUpdated: 'Tipo de elemento actualizado correctamente',
+    itemTypeDeleted: 'Tipo de elemento eliminado correctamente'
+  },
+
+  fields: {
+    title: 'Campos personalizados',
+    subtitle: 'Definir campos personalizados para sus elementos',
+    field: 'Campo',
+    fields_one: '{count} campo',
+    fields_other: '{count} campos',
+    createField: 'Crear campo',
+    editField: 'Editar campo',
+    deleteField: 'Eliminar campo',
+    fieldName: 'Nombre del campo',
+    fieldType: 'Tipo de campo',
+    fieldDescription: 'Descripcion',
+    defaultValue: 'Valor predeterminado',
+    placeholder: 'Marcador de posicion',
+    helpText: 'Texto de ayuda',
+    noFields: 'No se encontraron campos',
+    fieldCreated: 'Campo creado correctamente',
+    fieldUpdated: 'Campo actualizado correctamente',
+    fieldDeleted: 'Campo eliminado correctamente',
+    configureFields: 'Configurar campos',
+    searchFields: 'Buscar campos...',
+    text: 'Texto',
+    number: 'Numero',
+    date: 'Fecha',
+    datetime: 'Fecha y hora',
+    select: 'Seleccion',
+    multiSelect: 'Seleccion multiple',
+    checkbox: 'Casilla de verificacion',
+    user: 'Usuario',
+    url: 'URL'
+  },
+
+  categories: {
+    title: 'Categorias',
+    subtitle: 'Administrar categorias',
+    category: 'Categoria',
+    categories_one: '{count} categoria',
+    categories_other: '{count} categorias',
+    createCategory: 'Crear categoria',
+    editCategory: 'Editar categoria',
+    deleteCategory: 'Eliminar categoria',
+    categoryName: 'Nombre de categoria',
+    noCategories: 'No se encontraron categorias',
+    noCategorizedWork: 'Aun no hay trabajo categorizado',
+    categoryCreated: 'Categoria creada correctamente',
+    categoryUpdated: 'Categoria actualizada correctamente',
+    categoryDeleted: 'Categoria eliminada correctamente',
+    deleteWarning: 'Los elementos en esta categoria quedaran sin categoria',
+    selectCategory: 'Seleccionar categoria',
+    uncategorized: 'Sin categoria'
+  },
+
+  projects: {
+    title: 'Proyectos',
+    subtitle: 'Administrar sus proyectos',
+    project: 'Proyecto',
+    projects_one: '{count} proyecto',
+    projects_other: '{count} proyectos',
+    createProject: 'Crear proyecto',
+    editProject: 'Editar proyecto',
+    deleteProject: 'Eliminar proyecto',
+    projectName: 'Nombre del proyecto',
+    projectKey: 'Clave del proyecto',
+    noProjects: 'No se encontraron proyectos',
+    searchProjects: 'Buscar proyectos...',
+    loadingProjects: 'Cargando proyectos...',
+    projectCreated: 'Proyecto creado correctamente',
+    projectUpdated: 'Proyecto actualizado correctamente',
+    projectDeleted: 'Proyecto eliminado correctamente'
+  },
+
+  sprints: {
+    title: 'Sprints',
+    subtitle: 'Administrar iteraciones de sprint',
+    sprint: 'Sprint',
+    sprints_one: '{count} sprint',
+    sprints_other: '{count} sprints',
+    createSprint: 'Crear sprint',
+    editSprint: 'Editar sprint',
+    deleteSprint: 'Eliminar sprint',
+    startSprint: 'Iniciar sprint',
+    completeSprint: 'Completar sprint',
+    sprintName: 'Nombre del sprint',
+    sprintGoal: 'Objetivo del sprint',
+    noSprints: 'No se encontraron sprints',
+    backlog: 'Backlog',
+    sprintCreated: 'Sprint creado correctamente',
+    sprintUpdated: 'Sprint actualizado correctamente',
+    sprintDeleted: 'Sprint eliminado correctamente',
+    sprintStarted: 'Sprint iniciado correctamente',
+    sprintCompleted: 'Sprint completado correctamente'
+  },
+
+  iterations: {},
+
+  milestones: {},
+
+  assets: {},
+
+  personal: {},
+
+  audit: {
+    title: 'Registro de auditoria',
+    subtitle: 'Rastrear y revisar todas las acciones administrativas y eventos de seguridad',
+    event: 'Evento',
+    user: 'Usuario',
+    action: 'Accion',
+    resource: 'Recurso',
+    timestamp: 'Marca de tiempo',
+    details: 'Detalles',
+    ipAddress: 'Direccion IP',
+    noEvents: 'No se encontraron eventos de auditoria'
+  },
+
+  connections: {
+    title: 'Conexiones',
+    subtitle: 'Administrar integraciones externas',
+    connection: 'Conexion',
+    createConnection: 'Crear conexion',
+    editConnection: 'Editar conexion',
+    deleteConnection: 'Eliminar conexion',
+    connectionType: 'Tipo de conexion',
+    noConnections: 'No se encontraron conexiones',
+    connectionCreated: 'Conexion creada correctamente',
+    connectionUpdated: 'Conexion actualizada correctamente',
+    connectionDeleted: 'Conexion eliminada',
+    connectionSuccessful: 'Conexion exitosa',
+    testConnection: 'Probar conexion'
+  },
+
+  migration: {
+    title: 'Migracion',
+    subtitle: 'Migrar datos entre sistemas',
+    migrateConfiguration: 'Migrar configuracion',
+    migrationCompleted: 'Migracion completada',
+    migrationSuccess: 'Todos los elementos han sido migrados correctamente',
+    targetWorkspace: 'Espacio de trabajo de destino',
+    targetWorkspaceRequired: 'El espacio de trabajo de destino es requerido'
+  },
+
+  members: {
+    title: 'Miembros',
+    subtitle: 'Administrar miembros del equipo',
+    addMember: 'Agregar miembro',
+    removeMember: 'Quitar miembro',
+    searchMembers: 'Buscar miembros por nombre o correo...'
+  },
+
+  configuration: {
+    title: 'Configuracion',
+    searchConfigurationSets: 'Buscar conjuntos de configuracion...'
+  },
+
+  auditLog: {},
+
+  migrationAssistant: {},
+
+  setup: {
+    goBackEsc: 'Volver (Esc)',
+    continueNextStepEnter: 'Continuar al siguiente paso (Enter)',
+    completeSetupEnter: 'Completar configuracion (Enter)'
+  },
+
+  createModal: {},
+
+  scm: {},
+
+  organization: {}
+};

@@ -15,6 +15,7 @@
   import FieldLayoutEditor from '../../editors/FieldLayoutEditor.svelte';
   import ColorPicker from '../../editors/ColorPicker.svelte';
   import Label from '../../components/Label.svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   // State for asset sets
   let assetSets = $state([]);
@@ -122,12 +123,12 @@
       showSetForm = false;
     } catch (error) {
       console.error('Failed to save asset set:', error);
-      alert('Failed to save asset set: ' + error.message);
+      alert(t('dialogs.alerts.failedToSave', { error: error.message }));
     }
   }
 
   async function deleteSet(id) {
-    if (confirm('Are you sure you want to delete this asset set? This will delete all assets, types, and categories within it.')) {
+    if (confirm(t('dialogs.confirmations.deleteAssetSet'))) {
       try {
         await api.assetSets.delete(id);
         if (selectedSetId === id) {
@@ -136,7 +137,7 @@
         await loadAssetSets();
       } catch (error) {
         console.error('Failed to delete asset set:', error);
-        alert('Failed to delete asset set: ' + error.message);
+        alert(t('dialogs.alerts.failedToDelete', { error: error.message }));
       }
     }
   }
@@ -181,18 +182,18 @@
       showTypeForm = false;
     } catch (error) {
       console.error('Failed to save asset type:', error);
-      alert('Failed to save asset type: ' + error.message);
+      alert(t('dialogs.alerts.failedToSave', { error: error.message }));
     }
   }
 
   async function deleteType(id) {
-    if (confirm('Are you sure you want to delete this asset type? Assets using this type will no longer have a type assigned.')) {
+    if (confirm(t('dialogs.confirmations.deleteAssetType'))) {
       try {
         await api.assetTypes.delete(id);
         await loadAssetTypes();
       } catch (error) {
         console.error('Failed to delete asset type:', error);
-        alert('Failed to delete asset type: ' + error.message);
+        alert(t('dialogs.alerts.failedToDelete', { error: error.message }));
       }
     }
   }
@@ -251,7 +252,7 @@
       showFieldsModal = true;
     } catch (error) {
       console.error('Failed to load fields:', error);
-      alert('Failed to load fields: ' + error.message);
+      alert(t('dialogs.alerts.failedToLoadFields', { error: error.message }));
     }
   }
 
@@ -274,7 +275,7 @@
       typeFields = [];
     } catch (error) {
       console.error('Failed to save field assignments:', error);
-      alert('Failed to save field assignments: ' + error.message);
+      alert(t('dialogs.alerts.failedToSaveFields', { error: error.message }));
     }
   }
 
@@ -322,18 +323,18 @@
       showCategoryForm = false;
     } catch (error) {
       console.error('Failed to save category:', error);
-      alert('Failed to save category: ' + error.message);
+      alert(t('dialogs.alerts.failedToSave', { error: error.message }));
     }
   }
 
   async function deleteCategory(id) {
-    if (confirm('Are you sure you want to delete this category? Child categories will be moved to the parent.')) {
+    if (confirm(t('dialogs.confirmations.deleteCategory'))) {
       try {
         await api.assetCategories.delete(id);
         await loadAssetCategories();
       } catch (error) {
         console.error('Failed to delete category:', error);
-        alert('Failed to delete category: ' + error.message);
+        alert(t('dialogs.alerts.failedToDelete', { error: error.message }));
       }
     }
   }
@@ -398,18 +399,18 @@
       showRoleForm = false;
     } catch (error) {
       console.error('Failed to assign role:', error);
-      alert('Failed to assign role: ' + error.message);
+      alert(t('dialogs.alerts.failedToAssignRole', { error: error.message }));
     }
   }
 
   async function revokeRole(assignmentId, type) {
-    if (confirm('Are you sure you want to revoke this role?')) {
+    if (confirm(t('dialogs.confirmations.revokeRole'))) {
       try {
         await api.assetSets.revokeRole(selectedSetId, assignmentId, type);
         await loadSetRoles();
       } catch (error) {
         console.error('Failed to revoke role:', error);
-        alert('Failed to revoke role: ' + error.message);
+        alert(t('dialogs.alerts.failedToRevokeRole', { error: error.message }));
       }
     }
   }
@@ -422,7 +423,7 @@
       await loadSetRoles();
     } catch (error) {
       console.error('Failed to update everyone role:', error);
-      alert('Failed to update everyone role: ' + error.message);
+      alert(t('dialogs.alerts.failedToUpdateRole', { error: error.message }));
     }
   }
 
@@ -472,21 +473,21 @@
 </script>
 
 <div class="p-6">
-  <PageHeader title="Asset Management" icon={Package} subtitle="Manage asset sets, types, categories, and assets">
+  <PageHeader title={t('assets.title')} icon={Package} subtitle={t('assets.subtitle')}>
     {#snippet actions()}
       <div class="flex items-center gap-2">
         <Select
           bind:value={selectedSetId}
           class="w-48"
         >
-          <option value={null}>Select Asset Set</option>
+          <option value={null}>{t('assets.selectAssetSet')}</option>
           {#each assetSets as set}
-            <option value={set.id}>{set.name}{set.is_default ? ' (Default)' : ''}</option>
+            <option value={set.id}>{set.name}{set.is_default ? ` (${t('assets.default')})` : ''}</option>
           {/each}
         </Select>
         <Button variant="outline" size="sm" onclick={showAddSetForm} class="whitespace-nowrap">
           <Plus class="w-4 h-4 mr-1" />
-          New Set
+          {t('assets.newSet')}
         </Button>
       </div>
     {/snippet}
@@ -495,7 +496,7 @@
   {#snippet createSetButton()}
     <Button onclick={showAddSetForm}>
       <Plus class="w-4 h-4 mr-1" />
-      Create Asset Set
+      {t('assets.createAssetSet')}
     </Button>
   {/snippet}
 
@@ -503,15 +504,15 @@
   {#if assetSets.length === 0}
     <EmptyState
       icon={Package}
-      title="No Asset Sets"
-      description="Create your first asset set to start managing assets."
+      title={t('assets.noAssetSets')}
+      description={t('assets.noAssetSetsDesc')}
       action={createSetButton}
     />
   {:else if !selectedSetId}
     <EmptyState
       icon={Package}
-      title="Select an Asset Set"
-      description="Choose an asset set from the dropdown above to view and manage assets."
+      title={t('assets.selectAnAssetSet')}
+      description={t('assets.selectAnAssetSetDesc')}
     />
   {:else}
     <!-- Set info header -->
@@ -528,8 +529,8 @@
         showChevron={false}
         triggerClass="p-2 rounded hover-bg"
         items={[
-          { id: 'edit', title: 'Edit Set', icon: Edit, onClick: () => showEditSetForm(selectedSet) },
-          { id: 'delete', title: 'Delete Set', icon: Trash2, color: 'var(--ds-text-danger)', onClick: () => deleteSet(selectedSetId) }
+          { id: 'edit', title: t('assets.editSet'), icon: Edit, onClick: () => showEditSetForm(selectedSet) },
+          { id: 'delete', title: t('assets.deleteSet'), icon: Trash2, color: 'var(--ds-text-danger)', onClick: () => deleteSet(selectedSetId) }
         ]}
       />
     </div>
@@ -542,21 +543,21 @@
           onclick={() => activeTab = 'types'}
         >
           <Settings class="w-4 h-4 inline mr-1" />
-          Types
+          {t('assets.types')}
         </button>
         <button
           class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'categories' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}"
           onclick={() => activeTab = 'categories'}
         >
           <FolderTree class="w-4 h-4 inline mr-1" />
-          Categories
+          {t('assets.categories')}
         </button>
         <button
           class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'permissions' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}"
           onclick={() => activeTab = 'permissions'}
         >
           <Users class="w-4 h-4 inline mr-1" />
-          Permissions
+          {t('assets.permissions')}
         </button>
       </nav>
     </div>
@@ -566,22 +567,22 @@
       <div class="mb-4 flex justify-end">
         <Button onclick={showAddTypeForm}>
           <Plus class="w-4 h-4 mr-1" />
-          New Type
+          {t('assets.newType')}
         </Button>
       </div>
 
       {#snippet createTypeButton()}
         <Button onclick={showAddTypeForm}>
           <Plus class="w-4 h-4 mr-1" />
-          Create Type
+          {t('assets.createType')}
         </Button>
       {/snippet}
 
       {#if assetTypes.length === 0}
         <EmptyState
           icon={Settings}
-          title="No Asset Types"
-          description="Create asset types to categorize your assets."
+          title={t('assets.noAssetTypes')}
+          description={t('assets.noAssetTypesDesc')}
           action={createTypeButton}
         />
       {:else}
@@ -622,22 +623,22 @@
       <div class="mb-4 flex justify-end">
         <Button onclick={() => showAddCategoryForm(null)}>
           <Plus class="w-4 h-4 mr-1" />
-          New Category
+          {t('assets.newCategory')}
         </Button>
       </div>
 
       {#snippet createCategoryButton()}
         <Button onclick={() => showAddCategoryForm(null)}>
           <Plus class="w-4 h-4 mr-1" />
-          Create Category
+          {t('assets.createCategory')}
         </Button>
       {/snippet}
 
       {#if assetCategories.length === 0}
         <EmptyState
           icon={FolderTree}
-          title="No Categories"
-          description="Create categories to organize your assets."
+          title={t('assets.noCategories')}
+          description={t('assets.noCategoriesDesc')}
           action={createCategoryButton}
         />
       {:else}
@@ -706,14 +707,14 @@
       <div class="mb-6 p-4 rounded-lg" style="background: var(--ds-surface); border: 1px solid var(--ds-border);">
         <div class="flex items-center justify-between">
           <div>
-            <h3 class="text-sm font-semibold" style="color: var(--ds-text);">Default Access</h3>
+            <h3 class="text-sm font-semibold" style="color: var(--ds-text);">{t('assets.everyoneRole')}</h3>
             <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-              Role for all authenticated users without specific access
+              {t('assets.everyoneRoleDesc')}
             </p>
           </div>
           <div class="w-48">
             <Select bind:value={everyoneRoleId} onchange={handleEveryoneRoleChange}>
-              <option value={null}>No access</option>
+              <option value={null}>{t('common.none')}</option>
               {#each assetRoles as role}
                 <option value={role.id}>{role.name}</option>
               {/each}
@@ -724,25 +725,25 @@
 
       <!-- Role Assignments -->
       <div class="mb-4 flex justify-between items-center">
-        <h3 class="text-sm font-semibold" style="color: var(--ds-text);">Role Assignments</h3>
+        <h3 class="text-sm font-semibold" style="color: var(--ds-text);">{t('assets.permissions')}</h3>
         <Button onclick={showAddRoleForm}>
           <Plus class="w-4 h-4 mr-1" />
-          Assign Role
+          {t('assets.assignRole')}
         </Button>
       </div>
 
       {#snippet assignRoleButton()}
         <Button onclick={showAddRoleForm}>
           <Plus class="w-4 h-4 mr-1" />
-          Assign Role
+          {t('assets.assignRole')}
         </Button>
       {/snippet}
 
       {#if allRoleAssignments().length === 0}
         <EmptyState
           icon={Users}
-          title="No Role Assignments"
-          description="Assign roles to specific users or groups for override access."
+          title={t('assets.noRoleAssignments')}
+          description={t('assets.noRoleAssignmentsDesc')}
           action={assignRoleButton}
         />
       {:else}
@@ -781,11 +782,11 @@
 
 <!-- Asset Set Form Modal -->
 <Modal isOpen={showSetForm} onclose={() => showSetForm = false}>
-  <ModalHeader title={editingSet ? 'Edit Asset Set' : 'New Asset Set'} onClose={() => showSetForm = false} />
+  <ModalHeader title={editingSet ? t('assets.editSet') : t('assets.createAssetSet')} onClose={() => showSetForm = false} />
   <form onsubmit={(e) => { e.preventDefault(); handleSetSubmit(); }} class="p-6">
     <div class="space-y-4">
       <div>
-        <Label color="default" class="mb-1">Name</Label>
+        <Label color="default" class="mb-1">{t('common.name')}</Label>
         <input
           type="text"
           bind:value={setFormData.name}
@@ -795,7 +796,7 @@
         />
       </div>
       <div>
-        <Label color="default" class="mb-1">Description</Label>
+        <Label color="default" class="mb-1">{t('common.description')}</Label>
         <textarea
           bind:value={setFormData.description}
           rows="3"
@@ -805,23 +806,23 @@
       </div>
       <div class="flex items-center gap-2">
         <input type="checkbox" id="is_default" bind:checked={setFormData.is_default} />
-        <label for="is_default" class="text-sm" style="color: var(--ds-text);">Set as default</label>
+        <label for="is_default" class="text-sm" style="color: var(--ds-text);">{t('assets.default')}</label>
       </div>
     </div>
     <div class="flex justify-end gap-2 mt-6">
-      <Button variant="outline" type="button" onclick={() => showSetForm = false}>Cancel</Button>
-      <Button type="submit">{editingSet ? 'Save' : 'Create'}</Button>
+      <Button variant="outline" type="button" onclick={() => showSetForm = false}>{t('common.cancel')}</Button>
+      <Button type="submit">{editingSet ? t('common.save') : t('common.create')}</Button>
     </div>
   </form>
 </Modal>
 
 <!-- Asset Type Form Modal -->
 <Modal isOpen={showTypeForm} onclose={() => showTypeForm = false}>
-  <ModalHeader title={editingType ? 'Edit Asset Type' : 'New Asset Type'} onClose={() => showTypeForm = false} />
+  <ModalHeader title={editingType ? t('assets.editType') : t('assets.createType')} onClose={() => showTypeForm = false} />
   <form onsubmit={(e) => { e.preventDefault(); handleTypeSubmit(); }} class="p-6">
     <div class="space-y-4">
       <div>
-        <Label color="default" class="mb-1">Name</Label>
+        <Label color="default" class="mb-1">{t('common.name')}</Label>
         <input
           type="text"
           bind:value={typeFormData.name}
@@ -831,7 +832,7 @@
         />
       </div>
       <div>
-        <Label color="default" class="mb-1">Description</Label>
+        <Label color="default" class="mb-1">{t('common.description')}</Label>
         <textarea
           bind:value={typeFormData.description}
           rows="2"
@@ -840,27 +841,27 @@
         ></textarea>
       </div>
       <div>
-        <ColorPicker bind:value={typeFormData.color} label="Color" />
+        <ColorPicker bind:value={typeFormData.color} label={t('common.color')} />
       </div>
       <div class="flex items-center gap-2">
         <input type="checkbox" id="type_active" bind:checked={typeFormData.is_active} />
-        <label for="type_active" class="text-sm" style="color: var(--ds-text);">Active</label>
+        <label for="type_active" class="text-sm" style="color: var(--ds-text);">{t('common.active')}</label>
       </div>
     </div>
     <div class="flex justify-end gap-2 mt-6">
-      <Button variant="outline" type="button" onclick={() => showTypeForm = false}>Cancel</Button>
-      <Button type="submit">{editingType ? 'Save' : 'Create'}</Button>
+      <Button variant="outline" type="button" onclick={() => showTypeForm = false}>{t('common.cancel')}</Button>
+      <Button type="submit">{editingType ? t('common.save') : t('common.create')}</Button>
     </div>
   </form>
 </Modal>
 
 <!-- Category Form Modal -->
 <Modal isOpen={showCategoryForm} onclose={() => showCategoryForm = false}>
-  <ModalHeader title={editingCategory ? 'Edit Category' : 'New Category'} onClose={() => showCategoryForm = false} />
+  <ModalHeader title={editingCategory ? t('assets.editCategory') : t('assets.createCategory')} onClose={() => showCategoryForm = false} />
   <form onsubmit={(e) => { e.preventDefault(); handleCategorySubmit(); }} class="p-6">
     <div class="space-y-4">
       <div>
-        <Label color="default" class="mb-1">Name</Label>
+        <Label color="default" class="mb-1">{t('common.name')}</Label>
         <input
           type="text"
           bind:value={categoryFormData.name}
@@ -870,7 +871,7 @@
         />
       </div>
       <div>
-        <Label color="default" class="mb-1">Description</Label>
+        <Label color="default" class="mb-1">{t('common.description')}</Label>
         <textarea
           bind:value={categoryFormData.description}
           rows="2"
@@ -879,9 +880,9 @@
         ></textarea>
       </div>
       <div>
-        <Label color="default" class="mb-1">Parent Category</Label>
+        <Label color="default" class="mb-1">{t('assets.parentCategory')}</Label>
         <Select bind:value={categoryFormData.parent_id}>
-          <option value={null}>None (Root)</option>
+          <option value={null}>{t('assets.noParent')}</option>
           {#each flatCategories.filter(c => c.id !== editingCategory?.id) as cat}
             <option value={cat.id}>{'  '.repeat(cat.level)}{cat.name}</option>
           {/each}
@@ -889,20 +890,20 @@
       </div>
     </div>
     <div class="flex justify-end gap-2 mt-6">
-      <Button variant="outline" type="button" onclick={() => showCategoryForm = false}>Cancel</Button>
-      <Button type="submit">{editingCategory ? 'Save' : 'Create'}</Button>
+      <Button variant="outline" type="button" onclick={() => showCategoryForm = false}>{t('common.cancel')}</Button>
+      <Button type="submit">{editingCategory ? t('common.save') : t('common.create')}</Button>
     </div>
   </form>
 </Modal>
 
 <!-- Role Assignment Form Modal -->
 <Modal isOpen={showRoleForm} onclose={() => showRoleForm = false}>
-  <ModalHeader title="Assign Role" onClose={() => showRoleForm = false} />
+  <ModalHeader title={t('assets.assignRole')} onClose={() => showRoleForm = false} />
   <form onsubmit={(e) => { e.preventDefault(); handleRoleSubmit(); }} class="p-6">
     <div class="space-y-4">
       <!-- Assignee Type Toggle -->
       <div>
-        <Label color="default" class="mb-2">Assign To</Label>
+        <Label color="default" class="mb-2">{t('common.assignTo')}</Label>
         <div class="flex gap-2">
           <button
             type="button"
@@ -910,7 +911,7 @@
             onclick={() => roleFormData.type = 'user'}
           >
             <User class="w-4 h-4 inline mr-1" />
-            User
+            {t('common.user')}
           </button>
           <button
             type="button"
@@ -918,7 +919,7 @@
             onclick={() => roleFormData.type = 'group'}
           >
             <Users class="w-4 h-4 inline mr-1" />
-            Group
+            {t('common.group')}
           </button>
         </div>
       </div>
@@ -926,9 +927,9 @@
       <!-- User/Group Select -->
       {#if roleFormData.type === 'user'}
         <div>
-          <Label color="default" class="mb-1">User</Label>
+          <Label color="default" class="mb-1">{t('common.user')}</Label>
           <Select bind:value={roleFormData.user_id} required>
-            <option value={null}>Select a user</option>
+            <option value={null}>{t('pickers.selectUser')}</option>
             {#each availableUsers as user}
               <option value={user.id}>{user.display_name || user.username} ({user.email})</option>
             {/each}
@@ -936,9 +937,9 @@
         </div>
       {:else}
         <div>
-          <Label color="default" class="mb-1">Group</Label>
+          <Label color="default" class="mb-1">{t('common.group')}</Label>
           <Select bind:value={roleFormData.group_id} required>
-            <option value={null}>Select a group</option>
+            <option value={null}>{t('pickers.selectGroup')}</option>
             {#each availableGroups as group}
               <option value={group.id}>{group.name}</option>
             {/each}
@@ -948,7 +949,7 @@
 
       <!-- Role Select -->
       <div>
-        <Label color="default" class="mb-1">Role</Label>
+        <Label color="default" class="mb-1">{t('assets.role')}</Label>
         <Select bind:value={roleFormData.role_id} required>
           {#each assetRoles as role}
             <option value={role.id}>{role.name}{role.description ? ` - ${role.description}` : ''}</option>
@@ -957,8 +958,8 @@
       </div>
     </div>
     <div class="flex justify-end gap-2 mt-6">
-      <Button variant="outline" type="button" onclick={() => showRoleForm = false}>Cancel</Button>
-      <Button type="submit">Assign</Button>
+      <Button variant="outline" type="button" onclick={() => showRoleForm = false}>{t('common.cancel')}</Button>
+      <Button type="submit">{t('common.assign')}</Button>
     </div>
   </form>
 </Modal>

@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { api } from '../api.js';
   import { authStore } from '../stores';
+  import { t } from '../stores/i18n.svelte.js';
   import DashboardOnboarding from './DashboardOnboarding.svelte';
   import ColorDot from '../components/ColorDot.svelte';
   import ItemCard from '../features/items/ItemCard.svelte';
@@ -125,13 +126,13 @@
 
     // Determine greeting based on time of day
     if (hour >= 5 && hour < 12) {
-      greeting = 'Good morning';
+      greeting = t('dashboard.goodMorning');
     } else if (hour >= 12 && hour < 18) {
-      greeting = 'Good afternoon';
+      greeting = t('dashboard.goodAfternoon');
     } else if (hour >= 18 && hour < 22) {
-      greeting = 'Good evening';
+      greeting = t('dashboard.goodEvening');
     } else {
-      greeting = 'Good night';
+      greeting = t('dashboard.goodNight');
     }
 
     // Format current date
@@ -239,13 +240,13 @@
       <div class="rounded-lg border hover-lift homepage-card" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
         <div class="px-4 py-3 border-b flex items-center" style="border-color: var(--ds-border);">
           <Bell class="w-4 h-4 mr-2" style="color: var(--ds-text-subtle);" />
-          <h2 class="text-sm font-semibold" style="color: var(--ds-text);">What's New</h2>
+          <h2 class="text-sm font-semibold" style="color: var(--ds-text);">{t('dashboard.whatsNew')}</h2>
         </div>
         <div class="p-5 space-y-4">
           {#if notifications.length === 0}
             <div class="text-center py-6" style="color: var(--ds-text-subtle);">
               <Bell class="w-10 h-10 mx-auto mb-2 opacity-40" />
-              <p class="text-sm">No notifications yet</p>
+              <p class="text-sm">{t('dashboard.noNotifications')}</p>
             </div>
           {:else}
             {#each notifications as notification}
@@ -278,7 +279,7 @@
       <div class="rounded-lg border hover-lift homepage-card" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
         <div class="px-4 py-3 border-b flex items-center" style="border-color: var(--ds-border);">
           <Eye class="w-4 h-4 mr-2" style="color: var(--ds-text-subtle);" />
-          <h2 class="text-sm font-semibold" style="color: var(--ds-text);">Your Activity</h2>
+          <h2 class="text-sm font-semibold" style="color: var(--ds-text);">{t('dashboard.yourActivity')}</h2>
         </div>
 
         <!-- Tabs -->
@@ -290,7 +291,7 @@
               ? 'background-color: var(--ds-background-selected); color: var(--ds-text);'
               : 'color: var(--ds-text-subtle);'}
           >
-            Viewed
+            {t('dashboard.viewed')}
           </button>
           <button
             onclick={() => activeTab = 'edited'}
@@ -299,7 +300,7 @@
               ? 'background-color: var(--ds-background-selected); color: var(--ds-text);'
               : 'color: var(--ds-text-subtle);'}
           >
-            Edited
+            {t('dashboard.edited')}
           </button>
           <button
             onclick={() => activeTab = 'commented'}
@@ -308,7 +309,7 @@
               ? 'background-color: var(--ds-background-selected); color: var(--ds-text);'
               : 'color: var(--ds-text-subtle);'}
           >
-            Commented
+            {t('dashboard.commented')}
           </button>
         </div>
 
@@ -318,7 +319,7 @@
             {#if recentlyViewed.length === 0}
               <div class="text-center py-6" style="color: var(--ds-text-subtle);">
                 <Eye class="w-10 h-10 mx-auto mb-2 opacity-40" />
-                <p class="text-sm">No recently viewed items</p>
+                <p class="text-sm">{t('dashboard.noRecentlyViewed')}</p>
               </div>
             {:else}
               <div class="space-y-2">
@@ -357,7 +358,7 @@
             {#if recentlyEdited.length === 0}
               <div class="text-center py-6" style="color: var(--ds-text-subtle);">
                 <Edit class="w-10 h-10 mx-auto mb-2 opacity-40" />
-                <p class="text-sm">No recently edited items</p>
+                <p class="text-sm">{t('dashboard.noRecentlyEdited')}</p>
               </div>
             {:else}
               <div class="space-y-2">
@@ -396,7 +397,7 @@
             {#if recentlyCommented.length === 0}
               <div class="text-center py-6" style="color: var(--ds-text-subtle);">
                 <MessageSquare class="w-10 h-10 mx-auto mb-2 opacity-40" />
-                <p class="text-sm">No recently commented items</p>
+                <p class="text-sm">{t('dashboard.noRecentlyCommented')}</p>
               </div>
             {:else}
               <div class="space-y-2">
@@ -443,9 +444,9 @@
         <div class="flex items-start">
           <Search class="w-4 h-4 mr-3 mt-0.5 flex-shrink-0 text-blue-600" />
           <div>
-            <p class="text-sm font-medium mb-1" style="color: var(--ds-text);">Quick Access</p>
+            <p class="text-sm font-medium mb-1" style="color: var(--ds-text);">{t('dashboard.quickAccess')}</p>
             <p class="text-xs" style="color: var(--ds-text-subtle);">
-              Press <kbd class="px-1.5 py-0.5 rounded text-xs font-mono" style="background-color: var(--ds-surface); border: 1px solid var(--ds-border);">Space</kbd> <kbd class="px-1.5 py-0.5 rounded text-xs font-mono" style="background-color: var(--ds-surface); border: 1px solid var(--ds-border);">Space</kbd> to open the command palette
+              {t('dashboard.quickAccessHint', { shortcut: 'Space Space' })}
             </p>
           </div>
         </div>
@@ -456,7 +457,7 @@
         <div class="rounded-lg border hover-lift-sm homepage-card" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
           <div class="px-4 py-3 border-b flex items-center" style="border-color: var(--ds-border);">
             <Target class="w-4 h-4 mr-2" style="color: var(--ds-text-subtle);" />
-            <h2 class="text-sm font-semibold" style="color: var(--ds-text);">Upcoming Milestones</h2>
+            <h2 class="text-sm font-semibold" style="color: var(--ds-text);">{t('dashboard.upcomingMilestones')}</h2>
           </div>
           <div class="p-3 space-y-3">
             {#each upcomingMilestones as milestone}
@@ -473,16 +474,16 @@
                       {#if milestone.target_date}
                         {#if calculateDaysUntil(milestone.target_date) !== null}
                           {#if calculateDaysUntil(milestone.target_date) > 0}
-                            Due in {calculateDaysUntil(milestone.target_date)}d
+                            {t('dashboard.dueIn', { days: calculateDaysUntil(milestone.target_date) })}
                           {:else if calculateDaysUntil(milestone.target_date) === 0}
-                            Due today
+                            {t('dashboard.dueToday')}
                           {:else}
-                            {Math.abs(calculateDaysUntil(milestone.target_date))}d overdue
+                            {t('dashboard.overdue', { days: Math.abs(calculateDaysUntil(milestone.target_date)) })}
                           {/if}
                           {' · '}
                         {/if}
                       {/if}
-                      {milestone.done_items}/{milestone.total_items} done
+                      {t('dashboard.done', { done: milestone.done_items, total: milestone.total_items })}
                     </p>
                   </div>
                   <div class="text-right ml-2 flex-shrink-0">
@@ -507,7 +508,7 @@
         <div class="rounded-lg border hover-lift-sm homepage-card" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
           <div class="px-4 py-3 border-b flex items-center" style="border-color: var(--ds-border);">
             <Bookmark class="w-4 h-4 mr-2" style="color: var(--ds-text-subtle);" />
-            <h2 class="text-sm font-semibold" style="color: var(--ds-text);">Watching</h2>
+            <h2 class="text-sm font-semibold" style="color: var(--ds-text);">{t('dashboard.watching')}</h2>
           </div>
           <div class="p-3 space-y-2">
             {#each watchedItems as item}
@@ -540,16 +541,16 @@
       <div class="rounded-lg border hover-lift-sm homepage-card" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
         <div class="px-4 py-3 border-b flex items-center" style="border-color: var(--ds-border);">
           <Briefcase class="w-4 h-4 mr-2" style="color: var(--ds-text-subtle);" />
-          <h2 class="text-sm font-semibold" style="color: var(--ds-text);">Recent Workspaces</h2>
+          <h2 class="text-sm font-semibold" style="color: var(--ds-text);">{t('dashboard.recentWorkspaces')}</h2>
         </div>
         <div class="p-3 space-y-2">
           {#if loading}
             <div class="p-4 text-center text-sm" style="color: var(--ds-text-subtle);">
-              Loading...
+              {t('common.loading')}
             </div>
           {:else if recentWorkspaces.length === 0}
             <div class="p-4 text-center text-sm" style="color: var(--ds-text-subtle);">
-              No recent workspaces
+              {t('dashboard.noRecentWorkspaces')}
             </div>
           {:else}
             {#each recentWorkspaces as workspace}
@@ -588,9 +589,9 @@
       <div class="rounded-lg border p-4 flex items-start" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
         <Search class="w-4 h-4 mr-3 mt-0.5 flex-shrink-0 text-blue-600" />
         <div>
-          <p class="text-sm font-medium mb-1" style="color: var(--ds-text);">Quick Access</p>
+          <p class="text-sm font-medium mb-1" style="color: var(--ds-text);">{t('dashboard.quickAccess')}</p>
           <p class="text-xs" style="color: var(--ds-text-subtle);">
-            Press <kbd class="px-1.5 py-0.5 rounded text-xs font-mono" style="background-color: var(--ds-surface); border: 1px solid var(--ds-border);">Space</kbd> <kbd class="px-1.5 py-0.5 rounded text-xs font-mono" style="background-color: var(--ds-surface); border: 1px solid var(--ds-border);">Space</kbd> to open the command palette
+            {t('dashboard.quickAccessHint', { shortcut: 'Space Space' })}
           </p>
         </div>
       </div>

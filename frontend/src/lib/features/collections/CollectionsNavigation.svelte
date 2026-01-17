@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { Tag, FolderOpen } from 'lucide-svelte';
   import { navigate, currentRoute } from '../../router.js';
+  import { t } from '../../stores/i18n.svelte.js';
   import { collectionCategoriesStore } from '../../stores/collectionCategories.js';
   import Button from '../../components/Button.svelte';
   import { getHexFromColorName } from '../../utils/colors.js';
@@ -36,9 +37,9 @@
 <div class="w-64 border-r flex flex-col p-6" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
   <div class="mb-6">
     <div class="flex items-center gap-3 mb-2">
-      <h2 class="text-xl font-semibold" style="color: var(--ds-text);">Collections</h2>
+      <h2 class="text-xl font-semibold" style="color: var(--ds-text);">{t('collections.title')}</h2>
     </div>
-    <p class="text-sm" style="color: var(--ds-text-subtle);">Saved queries and filters</p>
+    <p class="text-sm" style="color: var(--ds-text-subtle);">{t('collections.subtitle')}</p>
   </div>
 
   <nav class="flex-1 space-y-1">
@@ -51,7 +52,7 @@
       onmouseleave={(e) => { if (!isAllGlobalActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
     >
       <div class="w-4 h-4 rounded bg-gradient-to-br from-purple-400 to-purple-600 flex-shrink-0"></div>
-      <span>All Global</span>
+      <span>{t('collections.allGlobal')}</span>
     </button>
 
     <!-- Category List -->
@@ -85,7 +86,7 @@
       onmouseleave={(e) => { if (!isWorkspaceView) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
     >
       <FolderOpen class="w-4 h-4 flex-shrink-0" />
-      <span>Workspace Collections</span>
+      <span>{t('collections.workspaceCollections')}</span>
     </button>
   </nav>
 
@@ -97,7 +98,7 @@
       onclick={handleManageCategories}
       class="w-full justify-center"
     >
-      Manage Categories
+      {t('collections.manageCategories')}
     </Button>
   </div>
 </div>

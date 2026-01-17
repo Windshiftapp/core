@@ -6,6 +6,7 @@
   import LinkComponent from '../../components/Link.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import { createEventDispatcher } from 'svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -30,7 +31,7 @@
   const TEST_LINK_TYPE_ID = 1;
   $: selectedLinkTypeId = addLinkData?.link_type_id ? Number(addLinkData.link_type_id) : null;
   $: isTestLinkTypeSelected = selectedLinkTypeId === TEST_LINK_TYPE_ID;
-  $: searchPlaceholder = isTestLinkTypeSelected ? 'Search test cases...' : 'Search work items...';
+  $: searchPlaceholder = isTestLinkTypeSelected ? t('items.searchTestCases') : t('items.searchWorkItems');
   $: searchDisabled = !addLinkData?.link_type_id;
 
   // Use centralized icon map for item types
@@ -98,12 +99,12 @@
       <!-- Header with icon and label -->
       <div class="flex items-center gap-2 mb-4">
         <Link2 class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-        <h3 class="text-sm font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle); font-size: 11px;">Linked Items</h3>
+        <h3 class="text-sm font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle); font-size: 11px;">{t('items.linkedItems')}</h3>
       </div>
 
       {#if loadingLinks}
         <div class="text-center py-4">
-          <div class="text-sm text-gray-500">Loading links...</div>
+          <div class="text-sm text-gray-500">{t('items.loadingLinks')}</div>
         </div>
       {:else}
       <div class="space-y-2">
@@ -180,7 +181,7 @@
                 onmouseenter={(e) => e.currentTarget.style.color = '#dc2626'}
                 onmouseleave={(e) => e.currentTarget.style.color = 'var(--ds-text-subtle)'}
                 onclick={() => removeLink(link.id)}
-                title="Remove link"
+                title={t('items.removeLink')}
               >
                 <Trash2 class="w-4 h-4" />
               </button>
@@ -193,32 +194,32 @@
     <!-- Add Link Form -->
     {#if showAddLinkForm}
       <div class="mt-4 pt-4 border-t" style="border-color: var(--ds-border);">
-        <h4 class="text-sm font-medium mb-3" style="color: var(--ds-text);">Add Link</h4>
+        <h4 class="text-sm font-medium mb-3" style="color: var(--ds-text);">{t('items.addLink')}</h4>
         
         <div class="space-y-3">
           <div class="space-y-1">
-            <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Link Type</label>
+            <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('items.linkType')}</label>
             <BasePicker
               bind:value={addLinkData.link_type_id}
               items={linkTypes}
-              placeholder="Choose relationship type..."
+              placeholder={t('items.chooseRelationshipType')}
               showUnassigned={true}
-              unassignedLabel="Choose relationship type..."
+              unassignedLabel={t('items.chooseRelationshipType')}
               getValue={(item) => item.id}
               getLabel={(item) => item.name}
             />
             {#if isTestLinkTypeSelected}
-              <p class="text-xs text-blue-600">Link this item to a test case.</p>
+              <p class="text-xs text-blue-600">{t('items.linkToTestCase')}</p>
             {/if}
           </div>
           
           <div>
-            <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Target Item</label>
+            <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('items.targetItem')}</label>
             {#if addLinkData.target_id}
               <div class="flex items-center justify-between py-2">
                 <div>
                   <div class="text-xs uppercase tracking-wide text-gray-400">
-                    {addLinkData.target_type === 'test_case' ? 'Test Case' : 'Work Item'}
+                    {addLinkData.target_type === 'test_case' ? t('items.testCase') : t('items.workItem')}
                   </div>
                   <div class="text-sm" style="color: var(--ds-text);">{addLinkData.target_title}</div>
                 </div>
@@ -230,7 +231,7 @@
                     addLinkData.target_type = isTestLinkTypeSelected ? 'test_case' : 'item';
                   }}
                 >
-                  Clear
+                  {t('common.clear')}
                 </button>
               </div>
             {:else}
@@ -245,7 +246,7 @@
                 />
                 
                 {#if searchDisabled}
-                  <p class="text-xs text-gray-400 mt-2">Select a link type to start searching.</p>
+                  <p class="text-xs text-gray-400 mt-2">{t('items.selectLinkTypeToSearch')}</p>
                 {/if}
                 
                 {#if searching}
@@ -265,7 +266,7 @@
                         <div class="flex items-center justify-between gap-2">
                           <div class="font-medium text-sm truncate">{result.title}</div>
                           <span class="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full {result.type === 'test_case' ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}">
-                            {result.type === 'test_case' ? 'Test Case' : 'Work Item'}
+                            {result.type === 'test_case' ? t('items.testCase') : t('items.workItem')}
                           </span>
                         </div>
                         <div class="text-xs text-gray-500 mt-0.5">
@@ -290,14 +291,14 @@
               disabled={!addLinkData.link_type_id || !addLinkData.target_id}
               onclick={addLink}
             >
-              Add Link
+              {t('items.addLink')}
             </Button>
             <Button
               variant="secondary"
               size="small"
               onclick={cancelAddLink}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
           </div>
         </div>
@@ -313,12 +314,12 @@
     <div class="pt-2">
       <div class="flex items-center gap-2 mb-4">
         <FileText class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-        <h3 class="text-sm font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle); font-size: 11px;">Child Work Items</h3>
+        <h3 class="text-sm font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle); font-size: 11px;">{t('items.childWorkItems')}</h3>
       </div>
 
       {#if loadingChildItems}
         <div class="text-center py-4">
-          <div class="text-sm" style="color: var(--ds-text-subtle);">Loading child work items...</div>
+          <div class="text-sm" style="color: var(--ds-text-subtle);">{t('items.loadingChildItems')}</div>
         </div>
       {:else}
         <div class="space-y-2">

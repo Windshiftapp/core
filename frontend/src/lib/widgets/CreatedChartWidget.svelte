@@ -1,5 +1,6 @@
 <script>
   import ResponsiveLineChart from './ResponsiveLineChart.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let chartData = [];
 </script>
@@ -7,7 +8,7 @@
 <ResponsiveLineChart
   {chartData}
   color="#3b82f6"
-  emptyMessage="No creation data available"
+  emptyMessage={t('widgets.createdChart.emptyMessage')}
   gradientPrefix="created"
   minHeight={220}
 />

@@ -1,15 +1,18 @@
 <script>
   import { createEventDispatcher, onMount } from 'svelte';
+  import { t } from '../stores/i18n.svelte.js';
   import { api } from '../api.js';
   import ConfigurationSetEntityPicker from '../pickers/ConfigurationSetEntityPicker.svelte';
 
-  export let allWorkspaces = [];
-  export let selectedWorkspaceIds = [];
-  export let configurationSetId = null;
+  let {
+    allWorkspaces = [],
+    selectedWorkspaceIds = [],
+    configurationSetId = null
+  } = $props();
 
   const dispatch = createEventDispatcher();
 
-  let workspaceAssignments = {}; // Maps workspace_id to config_set info for conflict detection
+  let workspaceAssignments = $state({}); // Maps workspace_id to config_set info for conflict detection
 
   // Load which workspaces are assigned to which config sets (for conflict warnings)
   onMount(loadWorkspaceAssignments);
@@ -45,7 +48,7 @@
 
 <div>
   <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">
-    Select which workspaces use this configuration set. A workspace can only belong to one configuration set.
+    {t('settings.configSets.selectWorkspaces')}
   </p>
 
   <ConfigurationSetEntityPicker

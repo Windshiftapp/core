@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { Search, Calendar, User, Eye, Edit, Trash2, MoreHorizontal, Building, AlertCircle } from 'lucide-svelte';
+  import { t } from '../stores/i18n.svelte.js';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import WorkItemFilter from '../features/items/WorkItemFilter.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
@@ -58,7 +59,7 @@
   }
 
   async function deleteItem(item) {
-    if (!confirm(`Are you sure you want to delete "${item.title}"? This action cannot be undone.`)) {
+    if (!confirm(t('dialogs.confirmations.deleteItem', { name: item.title }))) {
       return;
     }
 
@@ -68,7 +69,7 @@
       await searchStore.executeSearch();
     } catch (error) {
       console.error('Failed to delete item:', error);
-      alert('Failed to delete item: ' + (error.message || error));
+      alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
     }
   }
 
@@ -78,14 +79,14 @@
         id: 'view',
         type: 'regular',
         icon: Eye,
-        title: 'View Details',
+        title: t('common.viewDetails'),
         onClick: () => viewItem(item)
       },
       {
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         onClick: () => editItem(item)
       },
       { type: 'divider' },
@@ -93,7 +94,7 @@
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50 hover:text-red-700',
         onClick: () => deleteItem(item)
@@ -108,8 +109,8 @@
     <!-- Header -->
     <PageHeader
       icon={Search}
-      title="Search Work Items"
-      subtitle="Search across all workspaces with advanced filtering options"
+      title={t('search.title')}
+      subtitle={t('search.subtitle')}
     />
 
     <!-- Work Item Filter Component -->
@@ -119,7 +120,7 @@
       <!-- Results Count -->
       {#if searchResults.length > 0}
         <div class="text-sm mb-4" style="color: var(--ds-text-subtle);">
-          {searchResults.length} results found
+          {searchResults.length} {t('search.searchResults').toLowerCase()}
         </div>
       {/if}
     </div>
@@ -128,22 +129,22 @@
     {#if loading}
       <div class="rounded-xl border shadow-sm p-8 text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
         <Spinner class="mx-auto mb-4" />
-        <div style="color: var(--ds-text-subtle);">Searching...</div>
+        <div style="color: var(--ds-text-subtle);">{t('common.loading')}</div>
       </div>
     {:else if searchResults.length === 0 && hasFilters}
       <div class="rounded-xl border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
         <EmptyState
           icon={Search}
-          title="No results found"
-          description="Try adjusting your search terms or filters."
+          title={t('search.noSearchResults')}
+          description={t('search.configureFilter')}
         />
       </div>
     {:else if searchResults.length === 0}
       <div class="rounded-xl border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
         <EmptyState
           icon={Search}
-          title="Start your search"
-          description="Enter keywords or use filters to find work items."
+          title={t('search.title')}
+          description={t('search.searchPlaceholder')}
         />
       </div>
     {:else}
@@ -151,12 +152,12 @@
         <!-- Table Header -->
         <div class="px-6 py-4 border-b" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
           <div class="grid grid-cols-12 gap-4 font-medium text-sm" style="color: var(--ds-text-subtle);">
-            <div class="col-span-5">Work Item</div>
-            <div class="col-span-2">Workspace</div>
-            <div class="col-span-1">Status</div>
-            <div class="col-span-1">Priority</div>
-            <div class="col-span-2">Updated</div>
-            <div class="col-span-1">Actions</div>
+            <div class="col-span-5">{t('search.workItem')}</div>
+            <div class="col-span-2">{t('search.workspace')}</div>
+            <div class="col-span-1">{t('common.status')}</div>
+            <div class="col-span-1">{t('common.priority')}</div>
+            <div class="col-span-2">{t('common.updated')}</div>
+            <div class="col-span-1">{t('common.actions')}</div>
           </div>
         </div>
 

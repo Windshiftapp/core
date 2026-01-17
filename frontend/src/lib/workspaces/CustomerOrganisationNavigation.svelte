@@ -2,6 +2,7 @@
   import { Search, Users, Plus } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
   import Avatar from '../components/Avatar.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     organisations = [],
@@ -34,8 +35,8 @@
 <div class="w-64 min-w-64 flex-shrink-0 border-r flex flex-col p-6" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
   <!-- Header -->
   <div class="mb-6">
-    <h2 class="text-xl font-semibold" style="color: var(--ds-text);">Customers</h2>
-    <p class="text-sm" style="color: var(--ds-text-subtle);">Portal customer management</p>
+    <h2 class="text-xl font-semibold" style="color: var(--ds-text);">{t('workspaces.customers.title')}</h2>
+    <p class="text-sm" style="color: var(--ds-text-subtle);">{t('workspaces.customers.subtitle')}</p>
   </div>
 
   <!-- Search -->
@@ -44,7 +45,7 @@
     <input
       type="text"
       bind:value={searchQuery}
-      placeholder="Search organisations..."
+      placeholder={t('workspaces.customers.searchOrganisations')}
       class="w-full pl-9 pr-3 py-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
       style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);"
     />
@@ -64,7 +65,7 @@
       <div class="w-6 h-6 flex items-center justify-center flex-shrink-0">
         <Users class="w-4 h-4" />
       </div>
-      <span class="flex-1 truncate">Unassigned</span>
+      <span class="flex-1 truncate">{t('workspaces.customers.unassigned')}</span>
       <span class="text-xs px-1.5 py-0.5 rounded" style="background: var(--ds-interactive-subtle);">{unassignedCount}</span>
     </button>
 
@@ -94,7 +95,7 @@
 
     {#if filteredOrgs.length === 0 && searchQuery}
       <div class="text-center py-4" style="color: var(--ds-text-subtle);">
-        <p class="text-sm">No organisations found</p>
+        <p class="text-sm">{t('workspaces.customers.noOrganisationsFound')}</p>
       </div>
     {/if}
   </nav>
@@ -102,7 +103,7 @@
   <!-- Footer -->
   <div class="pt-4 border-t" style="border-color: var(--ds-border);">
     <Button variant="default" icon={Plus} onclick={onManageOrgs} class="w-full justify-center">
-      Manage Organisations
+      {t('workspaces.customers.manageOrganisations')}
     </Button>
   </div>
 </div>

@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { writable } from 'svelte/store';
+  import { t } from '../stores/i18n.svelte.js';
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Modal from '../dialogs/Modal.svelte';
@@ -16,16 +17,16 @@
 
   const linkTypes = writable([]);
 
-  let showForm = false;
-  let editingLinkType = null;
-  let formData = {
+  let showForm = $state(false);
+  let editingLinkType = $state(null);
+  let formData = $state({
     name: '',
     description: '',
     forward_label: '',
     reverse_label: '',
     color: '#6b7280',
     active: true
-  };
+  });
 
   onMount(() => {
     loadLinkTypes();
@@ -91,23 +92,23 @@
       showForm = false;
     } catch (error) {
       console.error('Failed to save link type:', error);
-      alert('Failed to save link type: ' + error.message);
+      alert(t('settings.linkTypes.failedToSave') + ' ' + error.message);
     }
   }
 
   async function deleteLinkType(id, isSystem) {
     if (isSystem) {
-      alert('Cannot delete system link types');
+      alert(t('settings.linkTypes.cannotDeleteSystem'));
       return;
     }
-    
-    if (confirm('Are you sure you want to delete this link type? This will also remove all links of this type.')) {
+
+    if (confirm(t('dialogs.confirmations.deleteLinkType'))) {
       try {
         await api.linkTypes.delete(id);
         await loadLinkTypes();
       } catch (error) {
         console.error('Failed to delete link type:', error);
-        alert('Failed to delete link type: ' + error.message);
+        alert(t('dialogs.alerts.failedToDelete', { error: error.message }));
       }
     }
   }
@@ -121,42 +122,42 @@
       await loadLinkTypes();
     } catch (error) {
       console.error('Failed to toggle link type status:', error);
-      alert('Failed to toggle link type status: ' + error.message);
+      alert(t('dialogs.alerts.failedToToggleStatus', { error: error.message }));
     }
   }
 
   function getStatusBadge(linkType) {
     if (linkType.is_system) {
-      return { text: 'System', color: 'blue' };
+      return { text: t('settings.linkTypes.system'), color: 'blue' };
     } else if (linkType.active) {
-      return { text: 'Active', color: 'green' };
+      return { text: t('settings.linkTypes.active'), color: 'green' };
     } else {
-      return { text: 'Inactive', color: 'gray' };
+      return { text: t('settings.linkTypes.inactive'), color: 'gray' };
     }
   }
 
   // DataTable columns configuration
-  const linkTypeColumns = [
+  const linkTypeColumns = $derived([
     {
       key: 'name',
-      label: 'Name',
+      label: t('settings.linkTypes.name'),
       slot: 'name'
     },
     {
       key: 'color',
-      label: 'Color',
+      label: t('settings.linkTypes.color'),
       slot: 'color'
     },
     {
       key: 'status',
-      label: 'Status',
+      label: t('common.status'),
       slot: 'status'
     },
     {
       key: 'actions',
-      label: 'Actions'
+      label: t('common.actions')
     }
-  ];
+  ]);
 
   // Build dropdown action items for each link type
   function buildLinkTypeActionItems(linkType) {
@@ -168,7 +169,7 @@
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: () => showEditForm(linkType)
       });
@@ -177,7 +178,7 @@
         id: 'delete',
         type: 'danger',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         hoverClass: 'hover:bg-red-50',
         onClick: () => deleteLinkType(linkType.id, linkType.is_system)
       });
@@ -188,7 +189,7 @@
       id: linkType.active ? 'deactivate' : 'activate',
       type: 'regular',
       icon: linkType.active ? PowerOff : Power,
-      title: linkType.active ? 'Deactivate' : 'Activate',
+      title: linkType.active ? t('common.deactivate') : t('common.activate'),
       color: linkType.active ? '#f59e0b' : '#10b981',
       hoverClass: linkType.active ? 'hover:bg-orange-50' : 'hover:bg-green-50',
       onClick: () => toggleActive(linkType)
@@ -198,10 +199,10 @@
   }
 </script>
 
-<PageHeader 
-  icon={Link} 
-  title="Link Types" 
-  subtitle="Manage relationship types between work items and test cases"
+<PageHeader
+  icon={Link}
+  title={t('links.title')}
+  subtitle={t('links.subtitle')}
 >
   {#snippet actions()}
     <Button
@@ -211,7 +212,7 @@
       size="medium"
       keyboardHint="A"
     >
-      Add Link Type
+      {t('settings.linkTypes.addLinkType')}
     </Button>
   {/snippet}
 </PageHeader>
@@ -220,7 +221,7 @@
   <!-- Modal header -->
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-      {editingLinkType ? 'Edit Link Type' : 'Create Link Type'}
+      {editingLinkType ? t('settings.linkTypes.editLinkType') : t('settings.linkTypes.addLinkType')}
     </h3>
   </div>
 
@@ -229,7 +230,7 @@
     <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div>
-          <Label color="default" class="mb-2">Name</Label>
+          <Label color="default" class="mb-2">{t('settings.linkTypes.name')}</Label>
           <input
             type="text"
             bind:value={formData.name}
@@ -240,13 +241,13 @@
           />
         </div>
         <div>
-          <ColorPicker bind:value={formData.color} label="Color" />
+          <ColorPicker bind:value={formData.color} label={t('settings.linkTypes.color')} />
         </div>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div>
-          <Label color="default" class="mb-2">Forward Label</Label>
+          <Label color="default" class="mb-2">{t('settings.linkTypes.forwardLabel')}</Label>
           <input
             type="text"
             bind:value={formData.forward_label}
@@ -258,7 +259,7 @@
           <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">When A links to B, show as "A implements B"</p>
         </div>
         <div>
-          <Label color="default" class="mb-2">Reverse Label</Label>
+          <Label color="default" class="mb-2">{t('settings.linkTypes.reverseLabel')}</Label>
           <input
             type="text"
             bind:value={formData.reverse_label}
@@ -272,7 +273,7 @@
       </div>
 
       <div class="mb-4">
-        <Label color="default" class="mb-2">Description</Label>
+        <Label color="default" class="mb-2">{t('settings.linkTypes.description')}</Label>
         <Textarea
           bind:value={formData.description}
           rows={3}
@@ -287,7 +288,7 @@
             bind:checked={formData.active}
             class="mr-2"
           />
-          <span class="text-sm" style="color: var(--ds-text);">Active</span>
+          <span class="text-sm" style="color: var(--ds-text);">{t('settings.linkTypes.active')}</span>
         </label>
       </div>
     </form>
@@ -296,7 +297,7 @@
   <DialogFooter
     onCancel={() => showForm = false}
     onConfirm={handleSubmit}
-    confirmLabel={editingLinkType ? 'Update Link Type' : 'Create Link Type'}
+    confirmLabel={editingLinkType ? t('common.update') : t('common.create')}
     disabled={!formData.name || !formData.forward_label || !formData.reverse_label}
   />
 </Modal>

@@ -3,6 +3,7 @@
   import { currentRoute } from '../router.js';
   import { authStore } from '../stores';
   import { AlertCircle, Menu, ArrowLeft, Palette, Edit3, Sun, Moon, User, LogOut, List } from 'lucide-svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   // Components
   import Spinner from '../components/Spinner.svelte';
@@ -162,7 +163,7 @@
     <div class="flex-1 flex items-center justify-center">
       <div class="text-center">
         <Spinner size="lg" class="mx-auto mb-4" />
-        <p style="color: var(--ds-text-subtle);">Loading portal...</p>
+        <p style="color: var(--ds-text-subtle);">{t('portal.loading')}</p>
       </div>
     </div>
   {:else if portalStore.error}
@@ -170,7 +171,7 @@
     <div class="flex-1 flex items-center justify-center px-4">
       <EmptyState
         icon={AlertCircle}
-        title="Portal Not Found"
+        title={t('portal.notFound')}
         description={portalStore.error}
       />
     </div>
@@ -202,7 +203,7 @@
                   <button
                     onclick={() => portalStore.showMainMenu = !portalStore.showMainMenu}
                     class="w-10 h-10 rounded flex items-center justify-center text-white bg-white/10 backdrop-blur-sm hover:bg-white/20 transition-all shadow-lg border border-white/20"
-                    title="Menu"
+                    title={t('portal.menu')}
                   >
                     <Menu class="w-5 h-5" />
                   </button>
@@ -224,7 +225,7 @@
                         style="color: var(--ds-text);"
                       >
                         <ArrowLeft class="w-5 h-5" />
-                        <span class="font-medium">Back to App</span>
+                        <span class="font-medium">{t('portal.backToApp')}</span>
                       </button>
 
                       {#if authStore.isAuthenticated}
@@ -235,7 +236,7 @@
                             style="color: var(--ds-text);"
                           >
                             <Palette class="w-5 h-5" />
-                            <span class="font-medium">Edit</span>
+                            <span class="font-medium">{t('common.edit')}</span>
                           </button>
                         {/if}
                       {/if}
@@ -247,10 +248,10 @@
                       >
                         {#if portalStore.isDarkMode}
                           <Sun class="w-5 h-5" />
-                          <span class="font-medium">Light Mode</span>
+                          <span class="font-medium">{t('portal.lightMode')}</span>
                         {:else}
                           <Moon class="w-5 h-5" />
-                          <span class="font-medium">Dark Mode</span>
+                          <span class="font-medium">{t('portal.darkMode')}</span>
                         {/if}
                       </button>
                     </div>
@@ -262,7 +263,7 @@
                   <button
                     onclick={() => portalStore.showProfileMenu = !portalStore.showProfileMenu}
                     class="w-10 h-10 rounded flex items-center justify-center text-white bg-white/10 backdrop-blur-sm hover:bg-white/20 transition-all shadow-lg border border-white/20"
-                    title="Profile"
+                    title={t('common.profile')}
                   >
                     <User class="w-5 h-5" />
                   </button>
@@ -300,7 +301,7 @@
                             onclick={() => portalStore.toggleMyRequests()}
                           >
                             <List class="w-4 h-4" />
-                            <span class="text-sm">{portalStore.showMyRequests ? 'Back to Portal' : 'My Requests'}</span>
+                            <span class="text-sm">{portalStore.showMyRequests ? t('portal.backToPortal') : t('portal.myRequests')}</span>
                           </button>
                           <button
                             class="w-full px-4 py-2 flex items-center gap-3 transition-colors text-left"
@@ -310,7 +311,7 @@
                             onclick={handleLogout}
                           >
                             <LogOut class="w-4 h-4" />
-                            <span class="text-sm">Sign Out</span>
+                            <span class="text-sm">{t('auth.signOut')}</span>
                           </button>
                         </div>
                       {:else}
@@ -320,8 +321,8 @@
                               <User class="w-5 h-5" style="color: var(--ds-text);" />
                             </div>
                             <div class="flex-1">
-                              <div class="font-medium text-sm" style="color: var(--ds-text);">Guest User</div>
-                              <div class="text-xs" style="color: var(--ds-text-subtle);">Not signed in</div>
+                              <div class="font-medium text-sm" style="color: var(--ds-text);">{t('portal.guestUser')}</div>
+                              <div class="text-xs" style="color: var(--ds-text-subtle);">{t('portal.notSignedIn')}</div>
                             </div>
                           </div>
                         </div>
@@ -335,7 +336,7 @@
                             onclick={() => { portalStore.showLoginDialog = true; portalStore.showProfileMenu = false; }}
                           >
                             <User class="w-4 h-4" />
-                            <span class="text-sm font-medium">Sign In</span>
+                            <span class="text-sm font-medium">{t('auth.signIn')}</span>
                           </button>
                         </div>
                       {/if}
@@ -349,7 +350,7 @@
                   class="flex items-center gap-2 px-4 py-2 rounded text-white bg-white/10 backdrop-blur-sm hover:bg-white/20 transition-all shadow-lg border border-white/20"
                 >
                   <ArrowLeft class="w-4 h-4" />
-                  <span class="font-medium">Back to Portal</span>
+                  <span class="font-medium">{t('portal.backToPortal')}</span>
                 </button>
               </div>
             </div>

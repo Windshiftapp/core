@@ -4,6 +4,34 @@ export const API_BASE = '/api';
 // CSRF token management
 let csrfToken = null;
 
+/**
+ * Create an enhanced error object from an API response
+ * @param {Response} response - Fetch Response object
+ * @param {string} responseText - Response body text
+ * @returns {Error} Enhanced error object with code, details, etc.
+ */
+function createApiError(response, responseText) {
+  const error = new Error(responseText || `Request failed: ${response.statusText}`);
+
+  // Try to parse structured error from response
+  try {
+    const parsed = JSON.parse(responseText);
+    error.code = parsed.code;
+    error.errorCode = parsed.code; // Alias for compatibility
+    error.details = parsed.details || {};
+    error.requestId = parsed.request_id;
+    error.message = parsed.error || parsed.message || error.message;
+  } catch {
+    // Response is not JSON, keep original message
+  }
+
+  // Add HTTP status info
+  error.status = response.status;
+  error.statusText = response.statusText;
+
+  return error;
+}
+
 export async function getCSRFToken() {
   if (!csrfToken) {
     try {
@@ -57,16 +85,13 @@ export async function fetchAPI(endpoint, options = {}) {
 
       if (!retryResponse.ok) {
         // Try to get a more descriptive error message from the response body
-        let errorMessage = `Request failed: ${retryResponse.statusText}`;
+        let errorData = '';
         try {
-          const errorData = await retryResponse.text();
-          if (errorData) {
-            errorMessage = errorData;
-          }
+          errorData = await retryResponse.text();
         } catch (e) {
           // If we can't read the error body, use the status text
         }
-        throw new Error(errorMessage);
+        throw createApiError(retryResponse, errorData);
       }
 
       if (retryResponse.status === 204) {
@@ -90,16 +115,13 @@ export async function fetchAPI(endpoint, options = {}) {
       authStore.clearAuth();
     }
     // Try to get a more descriptive error message from the response body
-    let errorMessage = `Request failed: ${response.statusText}`;
+    let errorData = '';
     try {
-      const errorData = await response.text();
-      if (errorData) {
-        errorMessage = errorData;
-      }
+      errorData = await response.text();
     } catch (e) {
       // If we can't read the error body, use the status text
     }
-    throw new Error(errorMessage);
+    throw createApiError(response, errorData);
   }
 
   if (response.status === 204) {

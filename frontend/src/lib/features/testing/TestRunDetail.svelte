@@ -8,6 +8,7 @@
   import Spinner from '../../components/Spinner.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import { getStatusBadgeCSS, getStatusLabel } from '../../utils/testStatusColors.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let testRun = null;
   let testResults = [];
@@ -88,7 +89,7 @@
 
   async function exportResults() {
     if (!testRun || !testRun.ended_at) {
-      alert('No test results available for export. Please execute the test run first.');
+      alert(t('testing.noResultsForExport'));
       return;
     }
     
@@ -119,7 +120,7 @@
       summaryWindow.document.close();
     } catch (error) {
       console.error('Failed to get summary:', error);
-      alert('Failed to load test run summary');
+      alert(t('testing.failedToLoadSummary'));
     }
   }
 
@@ -233,7 +234,7 @@
       }
     } catch (error) {
       console.error('Failed to delete test run:', error);
-      alert('Failed to delete test run: ' + error.message);
+      alert(t('testing.failedToDeleteRun') + ': ' + error.message);
     }
   }
 </script>
@@ -262,9 +263,9 @@
               {testRun.name}
             </h1>
             <div class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-              Started: {new Date(testRun.started_at).toLocaleString()}
+              {t('testing.started')}: {new Date(testRun.started_at).toLocaleString()}
               {#if testRun.ended_at}
-                • Ended: {new Date(testRun.ended_at).toLocaleString()}
+                • {t('testing.ended')}: {new Date(testRun.ended_at).toLocaleString()}
               {/if}
             </div>
           </div>
@@ -278,7 +279,7 @@
               size="medium"
               icon={FileText}
             >
-              Export Results
+              {t('testing.exportResults')}
             </Button>
           {:else}
             <Button
@@ -287,7 +288,7 @@
               icon={Play}
               size="medium"
             >
-              Continue Execution
+              {t('testing.continueExecution')}
             </Button>
           {/if}
           <Button
@@ -295,9 +296,9 @@
             variant="danger"
             size="medium"
             icon={Trash2}
-            title="Delete test run"
+            title={t('testing.deleteTestRun')}
           >
-            Delete
+            {t('common.delete')}
           </Button>
         </div>
       </div>
@@ -307,7 +308,7 @@
         <!-- Status Overview -->
         <div class="lg:col-span-2">
           <div>
-            <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">Test Results</h2>
+            <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">{t('testing.testResults')}</h2>
             
             {#if testResults.length > 0}
               <!-- Test Results Display -->
@@ -327,7 +328,7 @@
 
                     {#if result.actual_result}
                       <div class="mb-3">
-                        <h4 class="text-sm font-medium mb-1" style="color: var(--ds-text);">Actual Result</h4>
+                        <h4 class="text-sm font-medium mb-1" style="color: var(--ds-text);">{t('testing.actualResult')}</h4>
                         <p class="text-sm p-2 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
                           {result.actual_result}
                         </p>
@@ -336,7 +337,7 @@
 
                     {#if result.notes}
                       <div class="mb-3">
-                        <h4 class="text-sm font-medium mb-1" style="color: var(--ds-text);">Notes</h4>
+                        <h4 class="text-sm font-medium mb-1" style="color: var(--ds-text);">{t('common.notes')}</h4>
                         <p class="text-sm p-2 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
                           {result.notes}
                         </p>
@@ -347,30 +348,30 @@
                     {#if result.test_steps && result.test_steps.length > 0}
                       {#if result.stepResults && Object.keys(result.stepResults).length > 0}
                         <div class="mt-4 pt-3 border-t" style="border-color: var(--ds-border);">
-                          <h4 class="text-sm font-medium mb-2" style="color: var(--ds-text);">Step Results</h4>
+                          <h4 class="text-sm font-medium mb-2" style="color: var(--ds-text);">{t('testing.stepResults')}</h4>
                           <div class="space-y-3">
                             {#each result.test_steps as step, index}
                               {@const stepResult = result.stepResults[step.id]}
                               <div class="border rounded p-3" style="border-color: var(--ds-border); background-color: var(--ds-surface);">
                                 <div class="flex items-center gap-2 text-sm mb-2">
                                   <span class="w-2 h-2 rounded-full" style="background-color: {getStepStatusStyle(stepResult?.status || 'not_run')};"></span>
-                                  <span class="font-medium" style="color: var(--ds-text);">Step {index + 1}: {getStatusLabel(stepResult?.status || 'not_run')}</span>
+                                  <span class="font-medium" style="color: var(--ds-text);">{t('testing.stepNumber', { number: index + 1 })}: {getStatusLabel(stepResult?.status || 'not_run')}</span>
                                   {#if stepResult?.defect_id}
                                     <AlertTriangle class="w-3 h-3" style="color: var(--ds-status-warning-text);" />
                                   {/if}
                                 </div>
 
                                 <div class="text-xs mb-2" style="color: var(--ds-text-subtle);">
-                                  <strong style="color: var(--ds-text);">Action:</strong> {step.action}
+                                  <strong style="color: var(--ds-text);">{t('testing.action')}:</strong> {step.action}
                                   {#if step.data}
-                                    <br><strong style="color: var(--ds-text);">Data:</strong> {step.data}
+                                    <br><strong style="color: var(--ds-text);">{t('testing.data')}:</strong> {step.data}
                                   {/if}
-                                  <br><strong style="color: var(--ds-text);">Expected:</strong> {step.expected}
+                                  <br><strong style="color: var(--ds-text);">{t('testing.expected')}:</strong> {step.expected}
                                 </div>
 
                                 {#if stepResult?.actual_result}
                                   <div class="mt-2">
-                                    <div class="text-xs font-medium mb-1" style="color: var(--ds-text);">Actual Result:</div>
+                                    <div class="text-xs font-medium mb-1" style="color: var(--ds-text);">{t('testing.actualResult')}:</div>
                                     <div class="text-xs p-2 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
                                       {stepResult.actual_result}
                                     </div>
@@ -379,7 +380,7 @@
 
                                 {#if stepResult?.notes}
                                   <div class="mt-2">
-                                    <div class="text-xs font-medium mb-1" style="color: var(--ds-text);">Notes:</div>
+                                    <div class="text-xs font-medium mb-1" style="color: var(--ds-text);">{t('common.notes')}:</div>
                                     <div class="text-xs p-2 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
                                       {stepResult.notes}
                                     </div>
@@ -391,9 +392,9 @@
                         </div>
                       {:else}
                         <div class="mt-4 pt-3 border-t" style="border-color: var(--ds-border);">
-                          <h4 class="text-sm font-medium mb-2" style="color: var(--ds-text);">Step Results</h4>
+                          <h4 class="text-sm font-medium mb-2" style="color: var(--ds-text);">{t('testing.stepResults')}</h4>
                           <div class="text-sm" style="color: var(--ds-text-subtle);">
-                            {result.test_steps.length} steps - Not executed
+                            {t('testing.stepsNotExecuted', { count: result.test_steps.length })}
                           </div>
                         </div>
                       {/if}
@@ -401,14 +402,14 @@
                       <!-- Test case has no steps -->
                       <div class="mt-4 pt-3 border-t" style="border-color: var(--ds-border);">
                         <div class="text-sm italic" style="color: var(--ds-text-subtle);">
-                          This test case has no defined steps
+                          {t('testing.noDefinedSteps')}
                         </div>
                       </div>
                     {/if}
-                    
+
                     {#if result.executed_at}
                       <div class="text-xs mt-3 pt-2 border-t" style="border-color: var(--ds-border); color: var(--ds-text-subtle);">
-                        Executed: {new Date(result.executed_at).toLocaleString()}
+                        {t('testing.executed')}: {new Date(result.executed_at).toLocaleString()}
                       </div>
                     {/if}
                   </div>
@@ -417,9 +418,9 @@
             {:else}
               <div class="text-center py-8">
                 <div class="text-6xl mb-4">🧪</div>
-                <div class="text-lg font-medium mb-2" style="color: var(--ds-text);">No results yet</div>
+                <div class="text-lg font-medium mb-2" style="color: var(--ds-text);">{t('testing.noResultsYet')}</div>
                 <div class="text-sm" style="color: var(--ds-text-subtle);">
-                  Execute this test run to see results
+                  {t('testing.executeToSeeResults')}
                 </div>
                 <Button
                   variant="primary"
@@ -428,7 +429,7 @@
                   size="medium"
                   class="mt-4"
                 >
-                  Start Execution
+                  {t('testing.startExecution')}
                 </Button>
               </div>
             {/if}
@@ -440,38 +441,38 @@
           <!-- Summary Stats -->
           {#if testResults.length > 0}
             <div>
-              <h3 class="font-semibold mb-4" style="color: var(--ds-text);">Results Summary</h3>
-              
+              <h3 class="font-semibold mb-4" style="color: var(--ds-text);">{t('testing.resultsSummary')}</h3>
+
               {#if testResults.length > 0}
                 {@const summary = getResultsSummary(testResults)}
                 <div class="space-y-3">
                 <div class="flex justify-between">
-                  <span class="text-sm" style="color: var(--ds-text-subtle);">Total</span>
+                  <span class="text-sm" style="color: var(--ds-text-subtle);">{t('common.total')}</span>
                   <span class="text-sm font-medium" style="color: var(--ds-text);">{summary.total}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-sm" style="color: var(--ds-status-success-text);">Passed</span>
+                  <span class="text-sm" style="color: var(--ds-status-success-text);">{t('testing.passed')}</span>
                   <span class="text-sm font-medium" style="color: var(--ds-status-success-text);">{summary.passed}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-sm" style="color: var(--ds-status-danger-text);">Failed</span>
+                  <span class="text-sm" style="color: var(--ds-status-danger-text);">{t('testing.failed')}</span>
                   <span class="text-sm font-medium" style="color: var(--ds-status-danger-text);">{summary.failed}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-sm" style="color: var(--ds-status-warning-text);">Blocked</span>
+                  <span class="text-sm" style="color: var(--ds-status-warning-text);">{t('testing.blocked')}</span>
                   <span class="text-sm font-medium" style="color: var(--ds-status-warning-text);">{summary.blocked}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-sm" style="color: var(--ds-status-neutral-text);">Skipped</span>
+                  <span class="text-sm" style="color: var(--ds-status-neutral-text);">{t('testing.skipped')}</span>
                   <span class="text-sm font-medium" style="color: var(--ds-status-neutral-text);">{summary.skipped}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-sm" style="color: var(--ds-text-subtle);">Not Run</span>
+                  <span class="text-sm" style="color: var(--ds-text-subtle);">{t('testing.notRun')}</span>
                   <span class="text-sm font-medium" style="color: var(--ds-text-subtle);">{summary.not_run}</span>
                 </div>
                 <div class="pt-2 border-t" style="border-color: var(--ds-border);">
                   <div class="flex justify-between">
-                    <span class="text-sm font-medium" style="color: var(--ds-text);">Success Rate</span>
+                    <span class="text-sm font-medium" style="color: var(--ds-text);">{t('testing.successRate')}</span>
                     <span class="text-sm font-medium" style="color: {summary.successRate >= 80 ? 'var(--ds-status-success-text)' : summary.successRate >= 60 ? 'var(--ds-status-warning-text)' : 'var(--ds-status-danger-text)'};">
                       {summary.successRate}%
                     </span>
@@ -484,18 +485,18 @@
 
           <!-- Run Information -->
           <div>
-            <h3 class="font-semibold mb-4" style="color: var(--ds-text);">Run Information</h3>
-            
+            <h3 class="font-semibold mb-4" style="color: var(--ds-text);">{t('testing.runInformation')}</h3>
+
             <div class="space-y-3">
               <div>
-                <div class="text-sm font-medium" style="color: var(--ds-text-subtle);">Status</div>
+                <div class="text-sm font-medium" style="color: var(--ds-text-subtle);">{t('common.status')}</div>
                 <div class="mt-1">
-                  <Lozenge color={testRun.ended_at ? 'green' : 'blue'} text={testRun.ended_at ? 'Completed' : 'In Progress'} />
+                  <Lozenge color={testRun.ended_at ? 'green' : 'blue'} text={testRun.ended_at ? t('testing.completed') : t('testing.inProgress')} />
                 </div>
               </div>
-              
+
               <div>
-                <div class="text-sm font-medium" style="color: var(--ds-text-subtle);">Started</div>
+                <div class="text-sm font-medium" style="color: var(--ds-text-subtle);">{t('testing.started')}</div>
                 <div class="text-sm" style="color: var(--ds-text);">
                   {new Date(testRun.started_at).toLocaleString()}
                 </div>
@@ -503,14 +504,14 @@
               
               {#if testRun.ended_at}
                 <div>
-                  <div class="text-sm font-medium" style="color: var(--ds-text-subtle);">Ended</div>
+                  <div class="text-sm font-medium" style="color: var(--ds-text-subtle);">{t('testing.ended')}</div>
                   <div class="text-sm" style="color: var(--ds-text);">
                     {new Date(testRun.ended_at).toLocaleString()}
                   </div>
                 </div>
-                
+
                 <div>
-                  <div class="text-sm font-medium" style="color: var(--ds-text-subtle);">Duration</div>
+                  <div class="text-sm font-medium" style="color: var(--ds-text-subtle);">{t('testing.duration')}</div>
                   <div class="text-sm" style="color: var(--ds-text);">
                     {getDuration(testRun.started_at, testRun.ended_at)}
                   </div>
@@ -522,14 +523,14 @@
       </div>
     {:else}
       <div class="text-center py-12">
-        <div style="color: var(--ds-text-subtle);">Test run not found</div>
+        <div style="color: var(--ds-text-subtle);">{t('testing.testRunNotFound')}</div>
         <Button
           onclick={goBack}
           variant="primary"
           size="medium"
           class="mt-4"
         >
-          Back to Test Runs
+          {t('testing.backToTestRuns')}
         </Button>
       </div>
     {/if}
@@ -541,9 +542,9 @@
   bind:show={showDeleteConfirm}
   onconfirm={deleteRun}
   oncancel={() => {}}
-  title="Delete Test Run"
-  message="Are you sure you want to delete '{testRun?.name}'? This will permanently delete all test results and cannot be undone."
-  confirmText="Delete"
-  cancelText="Cancel"
+  title={t('testing.deleteTestRun')}
+  message={t('testing.deleteRunConfirm', { name: testRun?.name })}
+  confirmText={t('common.delete')}
+  cancelText={t('common.cancel')}
   variant="danger"
 />

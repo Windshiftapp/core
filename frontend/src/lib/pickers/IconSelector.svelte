@@ -4,6 +4,7 @@
   import { Search, ChevronDown, Package } from 'lucide-svelte';
   import { workspaceIconMap, workspaceIconOptions } from '../utils/icons.js';
   import Label from '../components/Label.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -23,8 +24,10 @@
   // Props
   export let selectedIcon = 'Package';
   export let selectedColor = '#3b82f6';
-  export let label = 'Icon & Color';
+  export let label = '';
   export let compact = false;  // When true, shows compact trigger that opens popover
+
+  $: resolvedLabel = label || t('pickers.iconAndColor');
 
   // Search functionality
   let searchQuery = '';
@@ -77,8 +80,8 @@
 {#if compact}
   <!-- Compact Mode -->
   <div class="icon-selector icon-selector-compact">
-    {#if label}
-      <Label class="mb-2">{label}</Label>
+    {#if resolvedLabel}
+      <Label class="mb-2">{resolvedLabel}</Label>
     {/if}
 
     <!-- Compact Trigger Button -->
@@ -112,7 +115,7 @@
           <Search class="popover-search-icon" size={14} />
           <input
             type="text"
-            placeholder="Search icons..."
+            placeholder={t('pickers.searchIcons')}
             bind:value={searchQuery}
             class="popover-search-input"
             style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
@@ -122,7 +125,7 @@
         <!-- Scrollable Icon Grid -->
         <div class="popover-icons">
           <div class="popover-section-header" style="color: var(--ds-text-subtle);">
-            Icons ({filteredIcons.length})
+            {t('pickers.icons')} ({filteredIcons.length})
           </div>
           <div class="popover-icon-grid">
             {#each filteredIcons as icon}
@@ -142,7 +145,7 @@
         <!-- Color Selection -->
         <div class="popover-colors" style="border-color: var(--ds-border);">
           <div class="popover-section-header" style="color: var(--ds-text-subtle);">
-            Colors
+            {t('pickers.colors')}
           </div>
           <div class="popover-color-grid">
             {#each colorOptions as color}
@@ -166,7 +169,7 @@
               class="custom-color-input"
               style="border-color: var(--ds-border);"
             />
-            <span class="text-xs" style="color: var(--ds-text-subtle);">Custom</span>
+            <span class="text-xs" style="color: var(--ds-text-subtle);">{t('pickers.custom')}</span>
           </div>
         </div>
       </div>
@@ -191,12 +194,12 @@
     <!-- Icon Selection -->
     <div class="selection-section">
       <div class="section-header">
-        <h4 class="text-sm font-medium" style="color: var(--ds-text);">Icon</h4>
+        <h4 class="text-sm font-medium" style="color: var(--ds-text);">{t('pickers.icon')}</h4>
         <div class="search-box">
           <Search class="w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search icons..."
+            placeholder={t('pickers.searchIcons')}
             bind:value={searchQuery}
             class="search-input"
             style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
@@ -222,7 +225,7 @@
     <!-- Color Selection -->
     <div class="selection-section">
       <div class="section-header">
-        <h4 class="text-sm font-medium" style="color: var(--ds-text);">Color</h4>
+        <h4 class="text-sm font-medium" style="color: var(--ds-text);">{t('pickers.color')}</h4>
         <input
           type="color"
           bind:value={selectedColor}

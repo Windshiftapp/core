@@ -1,6 +1,7 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { X } from 'lucide-svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
 
@@ -72,7 +73,7 @@
           <button
             onclick={close}
             class="p-2 rounded transition-all hover:bg-white/10"
-            aria-label="Close"
+            aria-label={t('aria.close')}
           >
             <X class="w-5 h-5" style={`color: ${isDarkMode ? '#94a3b8' : '#6b7280'};`} />
           </button>

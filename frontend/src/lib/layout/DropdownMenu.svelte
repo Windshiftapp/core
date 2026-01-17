@@ -2,6 +2,7 @@
   import { createDropdownMenu, melt } from '@melt-ui/svelte';
   import { ChevronDown } from 'lucide-svelte';
   import { getTextColorForBackground } from '../utils/statusColors.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   export let triggerText = '';
   export let triggerIcon = null;
@@ -92,7 +93,7 @@
     style="{triggerBgColor ? `background-color: ${triggerBgColor}; ${triggerStyle}` : triggerStyle}"
   >
     {#if triggerAvatar}
-      <img src={triggerAvatar} alt="Profile" class="w-8 h-8 rounded-full object-cover" />
+      <img src={triggerAvatar} alt={t('common.profile')} class="w-8 h-8 rounded-full object-cover" />
     {:else}
       {#if triggerIcon}
         {#if triggerBgColor}
@@ -135,7 +136,7 @@
             <input
               bind:this={searchInputElement}
               type="text"
-              placeholder={itemData.placeholder || 'Search...'}
+              placeholder={itemData.placeholder || t('common.search')}
               value={itemData.value || ''}
               oninput={(e) => itemData.onInput && itemData.onInput(e.target.value)}
               onkeydown={(e) => {

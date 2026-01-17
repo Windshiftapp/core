@@ -9,6 +9,7 @@
   import Text from '../../components/Text.svelte';
   import { createShortcutHandler, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import { Plus, Trash2, Edit, Users } from 'lucide-svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let customers = [];
   let customFields = [];
@@ -108,12 +109,12 @@
       cancelForm();
     } catch (error) {
       console.error('Failed to save customer:', error);
-      alert('Failed to save customer: ' + (error.message || error));
+      alert(t('time.organizations.failedToSave') + ': ' + (error.message || error));
     }
   }
 
   async function deleteCustomer(customer) {
-    if (confirm(`Are you sure you want to delete "${customer.name}"?`)) {
+    if (confirm(t('time.organizations.confirmDelete', { name: customer.name }))) {
       try {
         await api.time.customers.delete(customer.id);
         await loadCustomers();
@@ -132,14 +133,14 @@
     }
   }, 'timeCustomers');
 
-  // DataTable columns configuration
-  const customerColumns = [
-    { key: 'name', label: 'Name', slot: 'name' },
-    { key: 'email', label: 'Email', slot: 'email' },
-    { key: 'status', label: 'Status', slot: 'status' },
-    { key: 'created_at', label: 'Created', render: (customer) => new Date(customer.created_at).toLocaleDateString(), textColor: 'var(--ds-text-subtle)' },
-    { key: 'actions', label: 'Actions' }
-  ];
+  // DataTable columns configuration - use $derived for reactivity
+  const customerColumns = $derived([
+    { key: 'name', label: t('common.name'), slot: 'name' },
+    { key: 'email', label: t('common.email'), slot: 'email' },
+    { key: 'status', label: t('common.status'), slot: 'status' },
+    { key: 'created_at', label: t('common.created'), render: (customer) => new Date(customer.created_at).toLocaleDateString(), textColor: 'var(--ds-text-subtle)' },
+    { key: 'actions', label: t('common.actions') }
+  ]);
 
   // Build dropdown action items for each customer
   function buildCustomerDropdownItems(customer) {
@@ -148,7 +149,7 @@
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: () => startEdit(customer)
       },
@@ -156,7 +157,7 @@
         id: 'delete',
         type: 'danger',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         hoverClass: 'hover:bg-red-50',
         onClick: () => deleteCustomer(customer)
       }
@@ -170,9 +171,9 @@
 <!-- Header -->
 <div class="mb-6 flex justify-between items-start">
   <div>
-    <Text as="h2" size="lg" weight="semibold">Organizations</Text>
+    <Text as="h2" size="lg" weight="semibold">{t('time.organizations.title')}</Text>
     <Text as="div" size="xs" variant="subtle" class="mt-1">
-      Manage your client organizations
+      {t('time.organizations.subtitle')}
     </Text>
   </div>
     <Button
@@ -182,7 +183,7 @@
       size="medium"
       keyboardHint={getShortcutDisplay('timeCustomers', 'addCustomer')}
     >
-      Add Organization
+      {t('time.organizations.addOrganization')}
     </Button>
   </div>
 
@@ -201,7 +202,7 @@
     columns={customerColumns}
     data={customers}
     keyField="id"
-    emptyMessage="No organizations found. Create your first organization to get started."
+    emptyMessage={t('time.organizations.noOrganizations')}
     emptyIcon={Users}
     actionItems={buildCustomerDropdownItems}
   >
@@ -231,7 +232,7 @@
 
     <!-- Status badge -->
     <div slot="status" let:item={customer}>
-      <Lozenge color={customer.active ? 'green' : 'gray'} text={customer.active ? 'Active' : 'Inactive'} />
+      <Lozenge color={customer.active ? 'green' : 'gray'} text={customer.active ? t('common.active') : t('common.inactive')} />
     </div>
   </DataTable>
 

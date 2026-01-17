@@ -1,11 +1,12 @@
 <script>
   import Toast from '../notifications/Toast.svelte';
   import { XCircle } from 'lucide-svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   // Props - controlled component pattern (no mutation)
   let {
     show = false,
-    title = 'Error',
+    title = $derived(t('common.error')),
     message = '',
     position = 'bottom-right',
     onClose = () => {}
