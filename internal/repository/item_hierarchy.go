@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"windshift/internal/database"
 	"windshift/internal/models"
 )
 
@@ -162,6 +163,20 @@ func (r *ItemRepository) GetDescendantIDs(parentID int) ([]int, error) {
 	}
 
 	return ids, nil
+}
+
+// UpdateParent updates the parent_id for an item
+func (r *ItemRepository) UpdateParent(tx database.Tx, itemID int, newParentID *int) error {
+	var err error
+	if newParentID == nil {
+		_, err = tx.Exec(`UPDATE items SET parent_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, itemID)
+	} else {
+		_, err = tx.Exec(`UPDATE items SET parent_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, *newParentID, itemID)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to update parent: %w", err)
+	}
+	return nil
 }
 
 // Helper function to scan items with details from rows

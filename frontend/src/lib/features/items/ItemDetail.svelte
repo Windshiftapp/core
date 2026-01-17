@@ -21,6 +21,7 @@ import {
     COMMAND_PRIORITIES 
   } from '../../utils/contextCommands.js';
 import Modal from '../../dialogs/Modal.svelte';
+import DeleteItemDialog from '../../dialogs/DeleteItemDialog.svelte';
   
   const dispatch = createEventDispatcher();
   
@@ -109,6 +110,9 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   let searchResults = $state([]);
   let searchQuery = $state('');
   let searching = $state(false);
+
+  // Delete dialog state
+  let showDeleteDialog = $state(false);
 
   // Filter link types for item → item linking
   // The "Tests" link type (ID=1) can only link between items and test cases
@@ -888,31 +892,24 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     }
   }
 
-  async function handleDeleteItem() {
-    const confirmed = await confirm({
-      title: t('items.deleteWorkItem'),
-      message: t('items.confirmDeleteItem', { title: item.title }),
-      confirmText: t('common.delete'),
-      cancelText: t('common.cancel'),
-      variant: 'danger',
-      icon: Trash2
-    });
+  function handleDeleteItem() {
+    showDeleteDialog = true;
+  }
 
-    if (!confirmed) {
-      return;
+  function handleDeleteComplete(result) {
+    // Navigate based on deletion result
+    if (result?.mode === 'reparent' && result?.newParentId) {
+      // If reparenting, navigate to the new parent item
+      navigate(`/workspaces/${workspaceId}/items/${result.newParentId}`);
+    } else {
+      // Otherwise, navigate to workspace list
+      navigate(`/workspaces/${workspaceId}/list`);
     }
+  }
 
-    try {
-      await api.items.delete(item.id);
-
-      // Navigate back to list
-      navigate(`/workspaces/${workspaceId}/collections/default/list`);
-
-
-    } catch (err) {
-      console.error('Failed to delete item:', err);
-      showError(t('items.failedToDelete'), err.message || String(err));
-    }
+  function handleDeleteError(err) {
+    console.error('Failed to delete item:', err);
+    showError(t('items.failedToDelete'), err.message || String(err));
   }
 
   async function loadWatchStatus() {
@@ -1762,4 +1759,10 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 {/if}
 {/if}
 
-
+<!-- Delete Item Dialog -->
+<DeleteItemDialog
+  bind:show={showDeleteDialog}
+  item={item}
+  ondeleted={handleDeleteComplete}
+  onerror={handleDeleteError}
+/>

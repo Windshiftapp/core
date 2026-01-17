@@ -186,13 +186,23 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if level := r.URL.Query().Get("level"); level != "" {
+			levelInt, err := strconv.Atoi(level)
+			if err != nil {
+				http.Error(w, "Invalid level parameter: must be an integer", http.StatusBadRequest)
+				return
+			}
 			whereClause += " AND COALESCE(it.hierarchy_level, 0) = ?"
-			args = append(args, level)
+			args = append(args, levelInt)
 		}
 
 		if maxLevel := r.URL.Query().Get("max_level"); maxLevel != "" {
+			maxLevelInt, err := strconv.Atoi(maxLevel)
+			if err != nil {
+				http.Error(w, "Invalid max_level parameter: must be an integer", http.StatusBadRequest)
+				return
+			}
 			whereClause += " AND COALESCE(it.hierarchy_level, 0) <= ?"
-			args = append(args, maxLevel)
+			args = append(args, maxLevelInt)
 		}
 
 		// Date filters
@@ -1211,6 +1221,239 @@ func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// GetDeleteInfo returns information needed before deleting an item (descendant count, parent info)
+func (h *ItemHandler) GetDeleteInfo(w http.ResponseWriter, r *http.Request) {
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	// Require authentication
+	user := h.getUserFromContext(r)
+	if user == nil {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
+	}
+
+	repo := repository.NewItemRepository(h.db)
+	item, err := repo.FindByID(id)
+	if err != nil {
+		if err == repository.ErrNotFound {
+			http.Error(w, "Item not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Failed to fetch item: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Check permission - need at least view access
+	canEdit, err := h.canEditItem(user.ID, item.WorkspaceID)
+	if err != nil {
+		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !canEdit {
+		http.Error(w, "Insufficient permissions", http.StatusForbidden)
+		return
+	}
+
+	// Get descendant IDs
+	descendantIDs, err := repo.GetDescendantIDs(id)
+	if err != nil {
+		http.Error(w, "Failed to get descendants: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Get hierarchy level for the item type (needed for filtering reparent candidates)
+	var hierarchyLevel sql.NullInt64
+	if item.ItemTypeID != nil {
+		h.db.QueryRow("SELECT hierarchy_level FROM item_types WHERE id = ?", *item.ItemTypeID).Scan(&hierarchyLevel)
+	}
+
+	response := map[string]interface{}{
+		"hasChildren":     len(descendantIDs) > 0,
+		"descendantCount": len(descendantIDs),
+		"parentId":        item.ParentID,
+		"title":           item.Title,
+		"itemTypeId":      item.ItemTypeID,
+		"workspaceId":     item.WorkspaceID,
+		"hierarchyLevel":  utils.NullInt64ToPtr(hierarchyLevel),
+	}
+
+	respondJSONOK(w, response)
+}
+
+// ReparentChildren moves all direct children of an item to a new parent
+func (h *ItemHandler) ReparentChildren(w http.ResponseWriter, r *http.Request) {
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	// Require authentication
+	user := h.getUserFromContext(r)
+	if user == nil {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		NewParentID *int `json:"newParentId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	repo := repository.NewItemRepository(h.db)
+	item, err := repo.FindByID(id)
+	if err != nil {
+		if err == repository.ErrNotFound {
+			http.Error(w, "Item not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Failed to fetch item: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Check permission
+	canEdit, err := h.canEditItem(user.ID, item.WorkspaceID)
+	if err != nil {
+		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !canEdit {
+		http.Error(w, "Insufficient permissions to modify items in this workspace", http.StatusForbidden)
+		return
+	}
+
+	// If new parent is specified, verify it exists and is in the same workspace
+	if req.NewParentID != nil {
+		newParent, err := repo.FindByID(*req.NewParentID)
+		if err != nil {
+			if err == repository.ErrNotFound {
+				http.Error(w, "New parent item not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, "Failed to fetch new parent: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if newParent.WorkspaceID != item.WorkspaceID {
+			http.Error(w, "New parent must be in the same workspace", http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Get direct children
+	children, err := repo.GetChildren(id)
+	if err != nil {
+		http.Error(w, "Failed to get children: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if len(children) == 0 {
+		respondJSONOK(w, map[string]interface{}{"reparentedCount": 0})
+		return
+	}
+
+	// Start transaction
+	tx, err := h.db.Begin()
+	if err != nil {
+		http.Error(w, "Failed to begin transaction: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+
+	// Update parent_id for all direct children
+	for _, child := range children {
+		if err := repo.UpdateParent(tx, child.ID, req.NewParentID); err != nil {
+			http.Error(w, "Failed to update child parent: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		http.Error(w, "Failed to commit transaction: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	respondJSONOK(w, map[string]interface{}{"reparentedCount": len(children)})
+}
+
+// DeleteCascade deletes an item and all its descendants
+func (h *ItemHandler) DeleteCascade(w http.ResponseWriter, r *http.Request) {
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	// Require authentication
+	user := h.getUserFromContext(r)
+	if user == nil {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
+	}
+
+	// Get item details before deletion (for permission check and notifications)
+	repo := repository.NewItemRepository(h.db)
+	item, err := repo.FindByID(id)
+	if err != nil {
+		if err == repository.ErrNotFound {
+			http.Error(w, "Item not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Failed to fetch item: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Check permission
+	canDelete, err := h.canDeleteItem(user.ID, item.WorkspaceID)
+	if err != nil {
+		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !canDelete {
+		http.Error(w, "Insufficient permissions to delete items in this workspace", http.StatusForbidden)
+		return
+	}
+
+	// Use the CRUD service for cascade delete
+	crudService := services.NewItemCRUDService(h.db)
+	result, err := crudService.Delete(id)
+	if err != nil {
+		http.Error(w, "Failed to delete item: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Emit notification for the main item
+	if h.notificationService != nil {
+		h.notificationService.EmitEvent(&services.NotificationEvent{
+			EventType:   models.EventItemDeleted,
+			WorkspaceID: item.WorkspaceID,
+			ActorUserID: user.ID,
+			ItemID:      id,
+			AssigneeID:  item.AssigneeID,
+			CreatorID:   item.CreatorID,
+			Title:       "Item Deleted",
+			TemplateData: map[string]interface{}{
+				"item.title":  item.Title,
+				"item.id":     id,
+				"user.name":   user.Username,
+				"descendants": result.DeletedCount - 1,
+			},
+		})
+	}
+
+	// Dispatch webhook event for item deletion
+	if h.webhookSender != nil {
+		go h.webhookSender.DispatchEvent("item.deleted", item)
+	}
+
+	respondJSONOK(w, map[string]interface{}{
+		"deletedCount": result.DeletedCount,
+	})
+}
+
 func (h *ItemHandler) Copy(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
@@ -1303,7 +1546,7 @@ func (h *ItemHandler) Copy(w http.ResponseWriter, r *http.Request) {
 	// Record item creation history for the copied item
 	updateService := services.NewItemUpdateService(h.db)
 	if err := updateService.RecordItemCreationHistory(h.db, int(copiedItemID), user.ID); err != nil {
-		slog.Warn("failed to record copied item creation history", slog.Int64("item_id", copiedItemID), slog.Any("error", err))
+		slog.Warn("failed to record copied item creation history", slog.Int("item_id", copiedItemID), slog.Any("error", err))
 		// Don't fail request, just log the error
 	}
 

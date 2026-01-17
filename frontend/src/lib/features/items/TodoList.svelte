@@ -5,7 +5,7 @@
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
-  import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
+  import DeleteItemDialog from '../../dialogs/DeleteItemDialog.svelte';
   import { navigate } from '../../router.js';
   import ItemDetail from '../items/ItemDetail.svelte';
   import PersonalTaskDetail from '../personal/PersonalTaskDetail.svelte';
@@ -319,22 +319,18 @@
     showDeleteConfirm = true;
   }
 
-  async function confirmDelete() {
-    if (!itemToDelete) return;
-
-    try {
-      await api.items.delete(itemToDelete.id);
-
-      if (isPersonalDelete) {
-        await loadPersonalTodos();
-      } else {
-        await loadAssignedWork();
-      }
-    } catch (error) {
-      console.error('Failed to delete todo:', error);
-    } finally {
-      itemToDelete = null;
+  async function handleDeleteComplete(result) {
+    // Reload the appropriate list after deletion
+    if (isPersonalDelete) {
+      await loadPersonalTodos();
+    } else {
+      await loadAssignedWork();
     }
+    itemToDelete = null;
+  }
+
+  function handleDeleteError(error) {
+    console.error('Failed to delete todo:', error);
   }
 
   function handleKeydown(event) {
@@ -564,14 +560,11 @@
 {/if}
 
 <!-- Delete Confirmation Dialog -->
-<ConfirmDialog
+<DeleteItemDialog
   bind:show={showDeleteConfirm}
-  title={t('todo.deleteTask')}
-  message={t('todo.confirmDelete', { title: itemToDelete?.title || '' })}
-  confirmText={t('common.delete')}
-  variant="danger"
-  icon={Trash2}
-  onconfirm={confirmDelete}
+  item={itemToDelete}
+  ondeleted={handleDeleteComplete}
+  onerror={handleDeleteError}
 />
 
 <style>

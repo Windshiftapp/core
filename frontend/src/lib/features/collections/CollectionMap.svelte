@@ -972,9 +972,9 @@ async function loadStatuses() {
 </div>
 
                       <!-- Actions Footer -->
-                      <div class="p-3 pt-2 flex items-center justify-between flex-wrap gap-2">
-                        <!-- Left side: Icon buttons + Create/Cancel -->
-                        <div class="flex items-center gap-2 flex-shrink-0">
+                      <div class="p-3 pt-2 flex items-center gap-2 flex-wrap">
+                        <!-- Icon buttons + Create/Cancel -->
+                        <div class="flex items-center gap-2 flex-wrap">
                           <!-- Workspace Selector - Icon Only Button -->
                           <div class="relative">
                             <button
@@ -1093,19 +1093,11 @@ async function loadStatuses() {
                             </div>
                           </div>
 
-                          <!-- Action Buttons -->
-                          <button
-                            onclick={() => createChildItem(backboneItem.id)}
-                            class="px-2.5 py-1.5 text-sm font-medium rounded transition-colors"
-                            style="background-color: var(--ds-background-accent-blue); color: white;"
-                            disabled={!state.workspaceId || !state.itemTypeId || !state.title?.trim()}
-                          >
-                            {t('collections.create')}
-                          </button>
+                          <!-- Cancel Button -->
                           <button
                             onclick={() => cancelQuickAdd(backboneItem.id)}
-                            class="px-2.5 py-1.5 text-sm font-medium rounded transition-colors hover:bg-gray-50"
-                            style="color: var(--ds-text-subtle);"
+                            class="px-2.5 py-1.5 text-sm font-medium rounded transition-colors"
+                            style="color: var(--ds-text-subtle); background-color: var(--ds-background-neutral);"
                           >
                             {t('common.cancel')}
                           </button>

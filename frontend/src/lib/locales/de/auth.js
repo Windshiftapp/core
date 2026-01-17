@@ -24,6 +24,9 @@ export default {
 
     // Login form
     welcomeBack: 'Willkommen zurück',
+    loginSubtitle: 'Geben Sie Ihre Anmeldedaten ein, um fortzufahren',
+    emailOrUsername: 'E-Mail oder Benutzername',
+    staySignedIn: 'Angemeldet bleiben',
     signInToContinue: 'Melden Sie sich an, um fortzufahren',
     noAccount: 'Noch kein Konto?',
     hasAccount: 'Bereits ein Konto?',

@@ -23,6 +23,14 @@ export const items = {
   delete: (id) => fetchAPI(`/items/${id}`, {
     method: 'DELETE',
   }),
+  getDeleteInfo: (id) => fetchAPI(`/items/${id}/delete-info`),
+  deleteCascade: (id) => fetchAPI(`/items/${id}/cascade`, {
+    method: 'DELETE',
+  }),
+  reparentChildren: (id, newParentId) => fetchAPI(`/items/${id}/reparent-children`, {
+    method: 'POST',
+    body: JSON.stringify({ newParentId }),
+  }),
   copy: (id) => fetchAPI(`/items/${id}/copy`, {
     method: 'POST',
   }),
