@@ -8,6 +8,11 @@
   import { themeStore } from '../stores/theme.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
 
+  let {
+    expanded = false,
+    label = ''
+  } = $props();
+
   // Local state
   let loadingPersonalWorkspace = $state(false);
   let attachmentSettings = $state(null);
@@ -26,6 +31,9 @@
   // Check if attachments are enabled
   const attachmentsEnabled = $derived(attachmentSettings?.enabled && attachmentSettings?.attachment_path);
 
+  // Only show avatar if attachments are enabled and user has an avatar
+  const showAvatar = $derived(attachmentsEnabled && authStore.currentUser?.avatar_url);
+
   onMount(async () => {
     try {
       loadingAttachments = true;
@@ -42,9 +50,8 @@
     // The App.svelte reactive statement will handle showing the login dialog
   }
 
-  function handleAvatarClick() {
-    // Navigate to profile page with avatar focus, or open avatar upload modal
-    navigate('/profile?focus=avatar');
+  function handleProfileClick() {
+    navigate('/profile');
   }
 
   // Load personal workspace on-demand
@@ -107,13 +114,19 @@
 <!-- svelte-ignore a11y-mouse-events-have-key-events -->
 <div on:mouseenter={loadPersonalWorkspaceIfNeeded}>
 <DropdownMenu
-  triggerAvatar={authStore.currentUser?.avatar_url}
-  triggerText={authStore.currentUser?.avatar_url ? '' : userInitials}
-  triggerIcon={authStore.currentUser ? null : User}
-  triggerClass={authStore.currentUser?.avatar_url
-    ? "w-8 h-8 rounded-full cursor-pointer hover:opacity-80 transition-opacity overflow-hidden"
-    : "w-8 h-8 rounded-full flex items-center justify-center cursor-pointer nav-button text-xs font-bold select-none"
+  triggerAvatar={showAvatar ? authStore.currentUser?.avatar_url : null}
+  triggerText={expanded && label ? label : (showAvatar ? '' : userInitials)}
+  triggerIcon={expanded && !showAvatar ? User : null}
+  triggerIconClass="w-5 h-5"
+  triggerClass={expanded
+    ? "w-full px-3 h-10 rounded flex items-center cursor-pointer nav-button"
+    : (showAvatar
+      ? "w-8 h-8 rounded-full cursor-pointer hover:opacity-80 transition-opacity overflow-hidden"
+      : "w-8 h-8 rounded-full flex items-center justify-center cursor-pointer nav-button text-xs font-bold select-none"
+    )
   }
+  triggerGap={expanded ? "gap-3" : ""}
+  triggerAlignment={expanded ? "start" : "center"}
   showChevron={false}
   items={[
     ...(authStore.currentUser ? [{
@@ -125,15 +138,16 @@
       subtitle: t('components.userAvatar.myWorkspaceSubtitle'),
       onClick: navigateToPersonalWorkspace
     }, { type: 'divider' }] : []),
-    ...(attachmentsEnabled ? [{
-      id: 'avatar',
+    {
+      id: 'profile',
       type: 'regular',
       icon: User,
       iconColor: '#3b82f6',
       title: t('users.profile'),
       subtitle: t('components.userAvatar.profileSubtitle'),
-      onClick: handleAvatarClick
-    }, { type: 'divider' }] : []),
+      onClick: handleProfileClick
+    },
+    { type: 'divider' },
     {
       id: 'security',
       type: 'regular',

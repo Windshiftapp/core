@@ -19,22 +19,18 @@
   import Customers from '../workspaces/Customers.svelte';
   import Footer from '../layout/Footer.svelte';
   import {
-    Layers3, Search, BarChart3, Settings, Plus, Sheet, Target, User, Notebook, Grip, GitBranch, MapPin, Shield, Home, Clock, CheckSquare, Calendar, LifeBuoy, MoreHorizontal, Inbox, SquareKanban, FolderOpen, Milestone, Library, Package, Users
+    Layers3, BarChart3, Sheet, Target, User, Notebook, GitBranch, MapPin, Shield, Home, CheckSquare, MoreHorizontal, Inbox, SquareKanban, FolderOpen
   } from 'lucide-svelte';
-  import DropdownMenu from '../layout/DropdownMenu.svelte';
-  import Tooltip from '../components/Tooltip.svelte';
   import GlobalConfirmDialog from '../dialogs/GlobalConfirmDialog.svelte';
   import FloatingTimer from '../features/time/FloatingTimer.svelte';
-  import NotificationTray from '../features/notifications/NotificationTray.svelte';
   import ToastContainer from '../features/notifications/ToastContainer.svelte';
-  import UserAvatar from '../components/UserAvatar.svelte';
   import Spinner from '../components/Spinner.svelte';
   import Button from '../components/Button.svelte';
   import PermissionGuard from '../layout/PermissionGuard.svelte';
   import UnauthorizedAccess from './UnauthorizedAccess.svelte';
   import WorkspaceNavigation from '../workspaces/WorkspaceNavigation.svelte';
-  import { getShortcut, matchesShortcut, getShortcutDisplay } from '../utils/keyboardShortcuts.js';
-  import { workspaceIconMap } from '../utils/icons.js';
+  import { getShortcut, matchesShortcut } from '../utils/keyboardShortcuts.js';
+  import MainSidebar from '../layout/MainSidebar.svelte';
 
   // Get shortcut configurations
   const commandPaletteShortcut = getShortcut('global', 'commandPalette');
@@ -48,7 +44,6 @@
   let loadingRoutes = $state(new Set());
   let lastSpaceTime = 0;
   const DOUBLE_SPACE_THRESHOLD = 300; // milliseconds
-let workspaceSearchQuery = $state('');
 
   // Component loaders with literal import paths for Vite's static analysis
   const componentLoaders = {
@@ -543,83 +538,6 @@ let workspaceSearchQuery = $state('');
 
 
 
-  // Derived workspace dropdown items that automatically updates when store or search changes
-  const workspacesDropdownItems = $derived.by(() => {
-    const items = [];
-
-    // Add search input at the top
-    items.push({
-      type: 'search',
-      id: 'search',
-      placeholder: t('nav.searchWorkspaces'),
-      value: workspaceSearchQuery,
-      onInput: (value) => {
-        workspaceSearchQuery = value;
-      }
-    });
-
-    // Filter workspaces based on search query
-    const search = workspaceSearchQuery?.trim().toLowerCase();
-    const filteredWorkspaces = !search
-      ? $workspacesStore.regularWorkspaces
-      : $workspacesStore.regularWorkspaces.filter(workspace => {
-          const nameMatch = workspace.name?.toLowerCase().includes(search);
-          const keyMatch = workspace.key?.toLowerCase().includes(search);
-          const descriptionMatch = workspace.description?.toLowerCase().includes(search);
-          return nameMatch || keyMatch || descriptionMatch;
-        });
-
-    // Add workspace items
-    if (filteredWorkspaces.length > 0) {
-      const workspaceItems = filteredWorkspaces.map(workspace => {
-        const hasAvatar = workspace.avatar_url;
-        const workspaceIcon = workspaceIconMap[workspace.icon] || workspaceIconMap.Package;
-
-        return {
-          id: workspace.id,
-          type: 'regular',
-          icon: hasAvatar ? null : workspaceIcon,
-          iconColor: hasAvatar ? null : workspace.color,
-          avatarUrl: hasAvatar ? workspace.avatar_url : null,
-          title: workspace.name,
-          subtitle: workspace.description,
-          onClick: () => navigateToWorkspace(workspace.id)
-        };
-      });
-
-      items.push(
-        { type: 'group', items: workspaceItems },
-        { type: 'divider' }
-      );
-    } else if ($workspacesStore.regularWorkspaces.length > 0 && workspaceSearchQuery) {
-      // Show "no results" only if there are workspaces but search didn't match
-      items.push(
-        { type: 'text', text: t('nav.noWorkspacesMatch') },
-        { type: 'divider' }
-      );
-    } else if ($workspacesStore.regularWorkspaces.length === 0) {
-      items.push(
-        { type: 'text', text: t('nav.noWorkspacesFound') },
-        { type: 'divider' }
-      );
-    }
-
-    // Add combined manage workspaces action
-    items.push({
-      id: 'manage',
-      type: 'regular',
-      icon: Settings,
-      title: t('nav.manageWorkspaces'),
-      subtitle: t('nav.manageWorkspacesSubtitle'),
-      color: 'var(--ds-text-link)',
-      class: 'font-medium',
-      onClick: () => navigate('/workspaces')
-    });
-
-    return items;
-  });
-
-
   function showCreateDropdown() {
     showCreateModal = true;
     
@@ -633,10 +551,6 @@ let workspaceSearchQuery = $state('');
         }));
       }, 50);
     }
-  }
-  
-  function navigateToWorkspace(workspaceId) {
-    navigate(`/workspaces/${workspaceId}`);
   }
 
   // Generic lazy loader function for all routes
@@ -754,172 +668,14 @@ let workspaceSearchQuery = $state('');
 
   <!-- Vertical Left Sidebar Navigation -->
   {#if !$uiStore.reviewFullscreen}
-    <nav class="w-16 shadow-lg border-r flex flex-col items-center py-4 fixed h-full z-40 themed-nav" style="border-color: var(--ds-border);" aria-label="Main navigation">
-      <!-- Logo -->
-      <Tooltip content="Windshift" placement="right">
-        <a
-          href="/"
-          class="flex items-center justify-center w-10 h-10 mb-6 hover:opacity-80 transition-opacity cursor-pointer"
-        >
-          <img src="/cmicon-2.svg" alt="Windshift" class="w-8 h-8 flex-shrink-0" />
-        </a>
-      </Tooltip>
-
-      <!-- Main Navigation -->
-      <div class="flex flex-col items-center space-y-1 flex-1">
-        <!-- Workspaces -->
-        <Tooltip content={t('nav.workspaces')} placement="right">
-          <div>
-            <DropdownMenu
-              triggerIcon={Grip}
-              triggerClass="w-10 h-10 rounded flex items-center justify-center cursor-pointer nav-button {isWorkspaceRoute($currentRoute.view) ? 'nav-button-selected' : ''} {!$workspacesStore.loaded ? 'opacity-50 cursor-wait' : ''}"
-              triggerStyle=""
-              items={workspacesDropdownItems}
-              maxWidth="max-w-xs"
-              showChevron={false}
-              placement="right-start"
-              iconOnly={true}
-            />
-          </div>
-        </Tooltip>
-
-        <!-- Collections -->
-        <Tooltip content={t('nav.collections')} placement="right">
-          <a
-            href="/collections"
-            class="w-10 h-10 rounded flex items-center justify-center cursor-pointer nav-button {$currentRoute.view === 'collections-list' ? 'nav-button-selected' : ''}"
-            aria-current={$currentRoute.view === 'collections-list' ? 'page' : undefined}
-          >
-            <Library class="w-5 h-5" />
-          </a>
-        </Tooltip>
-
-        <!-- Time & Projects -->
-        <Tooltip content={t('nav.timeAndProjects')} placement="right">
-          <a
-            href="/time"
-            class="w-10 h-10 rounded flex items-center justify-center cursor-pointer nav-button {$currentRoute.view === 'time' ? 'nav-button-selected' : ''}"
-            aria-current={$currentRoute.view === 'time' ? 'page' : undefined}
-          >
-            <Clock class="w-5 h-5" />
-          </a>
-        </Tooltip>
-
-        <!-- Milestones -->
-        <Tooltip content={t('nav.milestones')} placement="right">
-          <a
-            href="/milestones"
-            class="w-10 h-10 rounded flex items-center justify-center cursor-pointer nav-button {$currentRoute.view === 'milestones' || $currentRoute.view === 'milestone-detail' ? 'nav-button-selected' : ''}"
-            aria-current={$currentRoute.view === 'milestones' ? 'page' : undefined}
-          >
-            <Milestone class="w-5 h-5" />
-          </a>
-        </Tooltip>
-
-        <!-- Iterations -->
-        <Tooltip content={t('nav.iterations')} placement="right">
-          <a
-            href="/iterations"
-            class="w-10 h-10 rounded flex items-center justify-center cursor-pointer nav-button {$currentRoute.view === 'iterations' || $currentRoute.view === 'iteration-detail' ? 'nav-button-selected' : ''}"
-            aria-current={$currentRoute.view === 'iterations' ? 'page' : undefined}
-          >
-            <Calendar class="w-5 h-5" />
-          </a>
-        </Tooltip>
-
-        <!-- Assets -->
-        <Tooltip content={t('nav.assets')} placement="right">
-          <a
-            href="/assets"
-            class="w-10 h-10 rounded flex items-center justify-center cursor-pointer nav-button {$currentRoute.view === 'assets' || $currentRoute.view === 'asset-detail' ? 'nav-button-selected' : ''}"
-            aria-current={$currentRoute.view === 'assets' ? 'page' : undefined}
-          >
-            <Package class="w-5 h-5" />
-          </a>
-        </Tooltip>
-
-        <!-- Channels -->
-        <Tooltip content={t('nav.channels')} placement="right">
-          <a
-            href="/channels"
-            class="w-10 h-10 rounded flex items-center justify-center cursor-pointer nav-button {$currentRoute.view === 'channels' ? 'nav-button-selected' : ''}"
-            aria-current={$currentRoute.view === 'channels' ? 'page' : undefined}
-          >
-            <LifeBuoy class="w-5 h-5" />
-          </a>
-        </Tooltip>
-
-        <!-- Customers (conditional based on permission) -->
-        {#if $permissionStore.canAccessCustomers}
-          <Tooltip content={t('nav.customers')} placement="right">
-            <a
-              href="/customers"
-              class="w-10 h-10 rounded flex items-center justify-center cursor-pointer nav-button {$currentRoute.view === 'customers' ? 'nav-button-selected' : ''}"
-              aria-current={$currentRoute.view === 'customers' ? 'page' : undefined}
-            >
-              <Users class="w-5 h-5" />
-            </a>
-          </Tooltip>
-        {/if}
-
-        <!-- Top Actions Section - "Notch" style centered positioning -->
-        <div class="flex flex-col items-center space-y-2 my-6 py-4">
-          <!-- Create button -->
-          <Tooltip content="{t('nav.create')} (C)" placement="right">
-            <button
-              onclick={showCreateDropdown}
-              class="w-10 h-10 bg-[var(--ds-interactive)] bg-primary text-white rounded items-center justify-center text-sm font-medium transition cursor-pointer flex gap-2"
-            >
-              <Plus class="w-5 h-5" />
-            </button>
-          </Tooltip>
-
-          <!-- Search button -->
-          <Tooltip content="{t('nav.search')} ({getShortcutDisplay('global', 'commandPalette')} or Space Space)" placement="right">
-            <button
-              onclick={() => showCommandPalette = true}
-              class="w-10 h-10 rounded flex items-center justify-center cursor-pointer nav-button"
-            >
-              <Search class="w-5 h-5" />
-            </button>
-          </Tooltip>
-        </div>
-      </div>
-
-      <!-- Bottom Section -->
-      <div class="flex flex-col items-center space-y-1 mt-auto">
-        <!-- Admin (conditional) -->
-        {#if $permissionStore.canAccessAdmin}
-          <Tooltip content={t('nav.admin')} placement="right">
-            <a
-              href="/admin"
-              class="w-10 h-10 rounded flex items-center justify-center cursor-pointer nav-button {$currentRoute.view === 'admin' ? 'nav-button-selected' : ''}"
-              aria-current={$currentRoute.view === 'admin' ? 'page' : undefined}
-            >
-              <Settings class="w-5 h-5" />
-            </a>
-          </Tooltip>
-        {/if}
-
-        <!-- Notification Tray -->
-        <Tooltip content={t('nav.notifications')} placement="right">
-          <div class="w-10 h-10 rounded flex items-center justify-center">
-            <NotificationTray />
-          </div>
-        </Tooltip>
-
-        <!-- User Profile Avatar -->
-        <Tooltip content={t('nav.profile')} placement="right">
-          <div class="w-10 h-10 rounded flex items-center justify-center">
-            <UserAvatar />
-          </div>
-        </Tooltip>
-      </div>
-    </nav>
-    {/if}
+    <MainSidebar
+      onShowCommandPalette={() => showCommandPalette = true}
+      onShowCreateModal={showCreateDropdown}
+    />
+  {/if}
 
     <!-- Main Content Area with Sidebar Layout -->
-    <div class="flex flex-1 {!$uiStore.reviewFullscreen ? 'ml-16' : ''}">
+    <div class="flex flex-1 {!$uiStore.reviewFullscreen ? ($uiStore.navExpanded ? 'ml-[200px]' : 'ml-16') : ''} transition-all duration-200">
       <!-- Left Sidebar for Workspace/Admin Navigation -->
       {#if !$uiStore.reviewFullscreen && $currentRoute.view !== 'workspaces' && (isWorkspaceRoute($currentRoute.view) || effectiveView === 'personal-task-detail' || testViews.has($currentRoute.view))}
         <WorkspaceNavigation workspaceId={$currentRoute.path?.startsWith('/personal') ? $workspacesStore.personalWorkspace?.id : $currentRoute.params.id} />
@@ -1017,7 +773,7 @@ let workspaceSearchQuery = $state('');
     </div>
     
     <!-- Footer with proper sidebar margin -->
-    <footer class="{!$uiStore.reviewFullscreen ? 'ml-16' : ''}">
+    <footer class="{!$uiStore.reviewFullscreen ? ($uiStore.navExpanded ? 'ml-[200px]' : 'ml-16') : ''} transition-all duration-200">
       <Footer />
     </footer>
 </div>
@@ -1112,7 +868,6 @@ let workspaceSearchQuery = $state('');
     position: relative;
     transition:
       background-color var(--duration-normal, 200ms) var(--ease-smooth, ease),
-      transform var(--duration-fast, 100ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
       box-shadow var(--duration-normal, 200ms) var(--ease-smooth, ease);
   }
 
@@ -1135,15 +890,10 @@ let workspaceSearchQuery = $state('');
 
   :global(.themed-nav .nav-button:hover) {
     background-color: var(--ds-background-neutral-hovered);
-    transform: scale(1.05);
   }
 
   :global(.themed-nav .nav-button:hover::before) {
     opacity: 0.12;
-  }
-
-  :global(.themed-nav .nav-button:active) {
-    transform: scale(0.95);
   }
 
   :global(.themed-nav .nav-button.nav-button-selected) {
@@ -1153,7 +903,6 @@ let workspaceSearchQuery = $state('');
 
   :global(.themed-nav .nav-button.nav-button-selected:hover) {
     background-color: var(--ds-surface-pressed);
-    transform: scale(1.02);
   }
 
   :global(.themed-nav .nav-button.nav-button-selected::before) {
@@ -1186,9 +935,6 @@ let workspaceSearchQuery = $state('');
     :global(.themed-nav .bg-primary) {
       transition: none;
     }
-    :global(.themed-nav .nav-button:hover),
-    :global(.themed-nav .nav-button:active),
-    :global(.themed-nav .nav-button.nav-button-selected:hover),
     :global(.themed-nav .bg-primary:hover),
     :global(.themed-nav .bg-primary:active) {
       transform: none;

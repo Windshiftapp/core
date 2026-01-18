@@ -18,6 +18,8 @@ export default {
     admin: 'Admin',
     notifications: 'Notifications',
     profile: 'Profile',
+    expand: 'Expand',
+    collapse: 'Collapse',
     manageWorkspaces: 'Manage Workspaces',
     manageWorkspacesSubtitle: 'Create, edit, and organize workspaces',
     searchWorkspaces: 'Search workspaces...',

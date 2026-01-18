@@ -17,6 +17,8 @@ export default {
     admin: 'Admin',
     notifications: 'Benachrichtigungen',
     profile: 'Profil',
+    expand: 'Erweitern',
+    collapse: 'Zuklappen',
     manageWorkspaces: 'Arbeitsbereiche verwalten',
     manageWorkspacesSubtitle: 'Arbeitsbereiche erstellen, bearbeiten und organisieren',
     searchWorkspaces: 'Arbeitsbereiche suchen...',

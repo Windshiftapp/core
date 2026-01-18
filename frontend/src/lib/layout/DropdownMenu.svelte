@@ -9,6 +9,8 @@
   export let triggerAvatar = null; // URL for avatar image
   export let triggerIconBgColor = null; // Background color for the icon (hex color)
   export let triggerBgColor = null; // Background color for entire button (hex color)
+  export let triggerIconClass = 'w-4 h-4'; // Icon size class
+  export let triggerGap = 'gap-2'; // Gap between icon and text
   export let items = [];
   export let maxWidth = 'max-w-3xl';
   export let placement = 'bottom'; // 'bottom', 'right', 'left', 'top'
@@ -89,16 +91,22 @@
   <button
     bind:this={triggerElement}
     use:melt={$trigger}
-    class="{triggerAvatar ? 'p-0' : iconOnly ? '' : triggerClass ? '' : 'px-4 py-2'} rounded text-sm font-medium transition cursor-pointer flex items-center {alignmentClass} gap-2 flex-shrink-0 {triggerBgColor ? getTextColorForBackground(triggerBgColor) : ''} {triggerClass}"
+    class="{triggerAvatar ? 'p-0' : iconOnly ? '' : triggerClass ? '' : 'px-4 py-2'} rounded text-sm font-medium transition cursor-pointer flex items-center {alignmentClass} {triggerGap} flex-shrink-0 {triggerBgColor ? getTextColorForBackground(triggerBgColor) : ''} {triggerClass}"
     style="{triggerBgColor ? `background-color: ${triggerBgColor}; ${triggerStyle}` : triggerStyle}"
   >
     {#if triggerAvatar}
-      <img src={triggerAvatar} alt={t('common.profile')} class="w-8 h-8 rounded-full object-cover" />
+      <img src={triggerAvatar} alt={t('common.profile')} class="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+      {#if triggerText}
+        <span class="text-sm whitespace-nowrap">{triggerText}</span>
+      {/if}
+      {#if showChevron}
+        <ChevronDown class="w-3 h-3" />
+      {/if}
     {:else}
       {#if triggerIcon}
         {#if triggerBgColor}
           <!-- When full background is colored, show icon without circle -->
-          <svelte:component this={triggerIcon} class="w-4 h-4" />
+          <svelte:component this={triggerIcon} class="{triggerIconClass} flex-shrink-0" />
         {:else if triggerIconBgColor}
           <div
             class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
@@ -107,7 +115,7 @@
             <svelte:component this={triggerIcon} class="w-3.5 h-3.5 text-white" />
           </div>
         {:else}
-          <svelte:component this={triggerIcon} class="w-4 h-4" />
+          <svelte:component this={triggerIcon} class="{triggerIconClass} flex-shrink-0" />
         {/if}
       {/if}
       {triggerText}
@@ -169,7 +177,7 @@
               }}
               class="flex items-center w-full px-4 py-3 text-sm transition-all duration-200 cursor-pointer {groupItem.class || 'group'}"
               style="color: {groupItem.color || 'var(--ds-text)'};"
-              onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
+              onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-pressed)'}
               onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
             >
               {#if groupItem.type === 'checkbox'}
@@ -228,7 +236,7 @@
             }}
             class="flex items-center w-full px-4 py-3 text-sm transition-all duration-200 cursor-pointer {itemData.class || ''}"
             style="color: {itemData.color || 'var(--ds-text)'}; {itemData.style || ''}"
-            onmouseenter={(e) => { if (!itemData.style) e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'; }}
+            onmouseenter={(e) => { if (!itemData.style) e.currentTarget.style.backgroundColor = 'var(--ds-surface-pressed)'; }}
             onmouseleave={(e) => { if (!itemData.style) e.currentTarget.style.backgroundColor = ''; }}
           >
             {#if itemData.type === 'checkbox'}

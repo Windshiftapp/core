@@ -577,21 +577,21 @@
 	/>
 
 	<!-- Profile Information -->
-	<div class="bg-white shadow rounded p-6" style="background-color: var(--ds-surface-raised);">
+	<div class="shadow rounded p-6 border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
 		<h2 class="text-lg font-medium mb-4" style="color: var(--ds-text);">{t('users.profileInformation')}</h2>
 		{#if user}
 			<div class="grid grid-cols-2 gap-4">
 				<div>
-					<span class="block text-sm font-medium text-gray-700">{t('users.fullName')}</span>
-					<p class="mt-1 text-sm text-gray-900">{user.full_name}</p>
+					<span class="block text-sm font-medium" style="color: var(--ds-text-subtle);">{t('users.fullName')}</span>
+					<p class="mt-1 text-sm" style="color: var(--ds-text);">{user.full_name}</p>
 				</div>
 				<div>
-					<span class="block text-sm font-medium text-gray-700">{t('common.email')}</span>
-					<p class="mt-1 text-sm text-gray-900">{user.email}</p>
+					<span class="block text-sm font-medium" style="color: var(--ds-text-subtle);">{t('common.email')}</span>
+					<p class="mt-1 text-sm" style="color: var(--ds-text);">{user.email}</p>
 				</div>
 				{#if user.requires_password_reset}
 					<div>
-						<span class="block text-sm font-medium text-gray-700">{t('common.status')}</span>
+						<span class="block text-sm font-medium" style="color: var(--ds-text-subtle);">{t('common.status')}</span>
 						<span class="mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
 							{t('users.passwordResetRequired')}
 						</span>
@@ -602,12 +602,12 @@
 			<div class="animate-pulse space-y-4">
 				<div class="grid grid-cols-2 gap-4">
 					<div>
-						<div class="h-4 bg-gray-300 rounded w-16 mb-2"></div>
-						<div class="h-4 bg-gray-300 rounded w-32"></div>
+						<div class="h-4 rounded w-16 mb-2" style="background-color: var(--ds-background-neutral);"></div>
+						<div class="h-4 rounded w-32" style="background-color: var(--ds-background-neutral);"></div>
 					</div>
 					<div>
-						<div class="h-4 bg-gray-300 rounded w-12 mb-2"></div>
-						<div class="h-4 bg-gray-300 rounded w-48"></div>
+						<div class="h-4 rounded w-12 mb-2" style="background-color: var(--ds-background-neutral);"></div>
+						<div class="h-4 rounded w-48" style="background-color: var(--ds-background-neutral);"></div>
 					</div>
 				</div>
 			</div>
@@ -656,19 +656,19 @@
 			<div class="flex items-center gap-6 mb-6">
 				<div class="relative">
 					{#if user?.avatar_url}
-						<img class="h-20 w-20 rounded-full border-2 border-gray-200" src={user.avatar_url} alt="Current avatar" />
+						<img class="h-20 w-20 rounded-full border-2" style="border-color: var(--ds-border);" src={user.avatar_url} alt="Current avatar" />
 					{:else}
-						<div class="h-20 w-20 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">
-							<User class="h-10 w-10 text-gray-500" />
+						<div class="h-20 w-20 rounded-full flex items-center justify-center border-2" style="background-color: var(--ds-background-neutral); border-color: var(--ds-border);">
+							<User class="h-10 w-10" style="color: var(--ds-icon);" />
 						</div>
 					{/if}
 				</div>
 				<div>
-					<h3 class="font-medium text-gray-900">{t('users.currentProfilePicture')}</h3>
-					<p class="text-sm text-gray-600 mt-1">
+					<h3 class="font-medium" style="color: var(--ds-text);">{t('users.currentProfilePicture')}</h3>
+					<p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
 						{user?.avatar_url ? t('users.customAvatarActive') : t('users.usingDefaultAvatar')}
 					</p>
-					<p class="text-xs text-gray-500 mt-1">
+					<p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">
 						{t('users.avatarRecommendation')}
 					</p>
 				</div>
@@ -676,8 +676,8 @@
 
 			<!-- Avatar Upload Interface -->
 			{#if showAvatarUpload}
-				<div class="bg-gray-50 border border-gray-200 rounded p-4">
-					<h3 class="text-sm font-medium text-gray-900 mb-3">{t('users.uploadNewAvatar')}</h3>
+				<div class="border rounded p-4" style="background-color: var(--ds-surface-sunken); border-color: var(--ds-border);">
+					<h3 class="text-sm font-medium mb-3" style="color: var(--ds-text);">{t('users.uploadNewAvatar')}</h3>
 
 					<div class="mb-4">
 						<input
@@ -685,16 +685,17 @@
 							accept="image/*"
 							onchange={(e) => handleAvatarUpload(e.target.files)}
 							disabled={uploadingAvatar}
-							class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
+							class="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-600 file:text-white hover:file:bg-blue-700 disabled:opacity-50"
+							style="color: var(--ds-text-subtle);"
 						/>
-						<p class="text-xs text-gray-500 mt-2">
+						<p class="text-xs mt-2" style="color: var(--ds-text-subtlest);">
 							{t('users.avatarFileHint')}
 						</p>
 					</div>
 
 					{#if uploadingAvatar}
 						<div class="mb-4">
-							<div class="flex items-center gap-2 text-sm text-gray-600">
+							<div class="flex items-center gap-2 text-sm" style="color: var(--ds-text-subtle);">
 								<Spinner size="sm" />
 								{t('users.uploadingAvatar')}
 							</div>
@@ -728,7 +729,7 @@
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 			<!-- Timezone Selection -->
 			<div>
-				<label for="timezone" class="block text-sm font-medium text-gray-700 mb-2">
+				<label for="timezone" class="block text-sm font-medium mb-2" style="color: var(--ds-text-subtle);">
 					{t('users.timezone')}
 				</label>
 				<BasePicker
@@ -739,14 +740,14 @@
 					getValue={(item) => item.value}
 					getLabel={(item) => item.label}
 				/>
-				<p class="text-xs text-gray-500 mt-2">
+				<p class="text-xs mt-2" style="color: var(--ds-text-subtlest);">
 					{t('users.timezoneHint')}
 				</p>
 			</div>
 
 			<!-- Language Selection -->
 			<div>
-				<label for="language" class="block text-sm font-medium text-gray-700 mb-2">
+				<label for="language" class="block text-sm font-medium mb-2" style="color: var(--ds-text-subtle);">
 					{t('users.language')}
 				</label>
 				<BasePicker
@@ -757,7 +758,7 @@
 					getValue={(item) => item.value}
 					getLabel={(item) => item.label}
 				/>
-				<p class="text-xs text-gray-500 mt-2">
+				<p class="text-xs mt-2" style="color: var(--ds-text-subtlest);">
 					{t('users.languageHint')}
 				</p>
 			</div>

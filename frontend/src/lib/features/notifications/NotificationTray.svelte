@@ -9,6 +9,11 @@
   import { onClickOutside } from 'runed';
   import { t } from '../../stores/i18n.svelte.js';
 
+  let {
+    expanded = false,
+    label = ''
+  } = $props();
+
   let showDropdown = $state(false);
   let unreadCount = $state(0);
   let dropdownElement = $state();
@@ -78,22 +83,27 @@
   <button
     bind:this={buttonElement}
     onclick={toggleDropdown}
-    class="relative p-2 rounded-full nav-button {showDropdown ? 'nav-button-selected' : ''}"
+    class="{expanded ? 'w-full px-3' : 'w-10 justify-center'} h-10 rounded flex items-center cursor-pointer nav-button {showDropdown ? 'nav-button-selected' : ''}"
     title={t('notifications.title')}
     aria-label={t('notifications.title')}
     aria-expanded={showDropdown}
   >
-    <Bell class="w-5 h-5" />
-    
-    <!-- Unread count badge -->
-    {#if unreadCount > 0}
-      <span 
-        class="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center"
-        in:scale={{ duration: 200, easing: quintOut }}
-        out:scale={{ duration: 150 }}
-      >
-        {unreadCount > 99 ? '99+' : unreadCount}
-      </span>
+    <span class="relative">
+      <Bell class="w-5 h-5 flex-shrink-0" />
+
+      <!-- Unread count badge -->
+      {#if unreadCount > 0}
+        <span
+          class="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center"
+          in:scale={{ duration: 200, easing: quintOut }}
+          out:scale={{ duration: 150 }}
+        >
+          {unreadCount > 99 ? '99+' : unreadCount}
+        </span>
+      {/if}
+    </span>
+    {#if expanded && label}
+      <span class="ml-3 text-sm whitespace-nowrap">{label}</span>
     {/if}
   </button>
 
