@@ -414,13 +414,13 @@ func (ns *NotificationService) determineRecipients(event *NotificationEvent, rul
 		}
 	}
 
-	// TODO: Add watchers support when watcher system is implemented
-	// if rule.NotifyWatchers {
-	//     watcherIDs := ns.getItemWatchers(event.ItemID)
-	//     for _, watcherID := range watcherIDs {
-	//         recipientSet[watcherID] = true
-	//     }
-	// }
+	// Add watchers
+	if rule.NotifyWatchers {
+		watcherIDs := ns.getItemWatchers(event.ItemID)
+		for _, watcherID := range watcherIDs {
+			recipientSet[watcherID] = true
+		}
+	}
 
 	// Convert set to slice
 	recipients := make([]int, 0, len(recipientSet))
@@ -453,6 +453,30 @@ func (ns *NotificationService) getWorkspaceAdmins(workspaceID int) []int {
 	}
 
 	return adminIDs
+}
+
+// getItemWatchers retrieves active watcher user IDs for an item
+func (ns *NotificationService) getItemWatchers(itemID int) []int {
+	rows, err := ns.db.Query(`
+		SELECT DISTINCT user_id
+		FROM item_watches
+		WHERE item_id = ? AND is_active = true
+	`, itemID)
+	if err != nil {
+		slog.Error("failed to fetch item watchers", slog.String("component", "notifications"), slog.Int("item_id", itemID), slog.Any("error", err))
+		return nil
+	}
+	defer rows.Close()
+
+	var watcherIDs []int
+	for rows.Next() {
+		var userID int
+		if err := rows.Scan(&userID); err == nil {
+			watcherIDs = append(watcherIDs, userID)
+		}
+	}
+
+	return watcherIDs
 }
 
 // generateNotificationMessage generates title and message for a notification
