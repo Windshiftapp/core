@@ -515,7 +515,16 @@ export default {
     categoryDeleted: 'Kategorie erfolgreich gelöscht',
     deleteWarning: 'Einträge in dieser Kategorie werden unkategorisiert',
     selectCategory: 'Kategorie auswählen',
-    uncategorized: 'Unkategorisiert'
+    uncategorized: 'Unkategorisiert',
+    // Kategorie-Modal
+    addNewCategory: 'Neue Kategorie hinzufügen',
+    addCategory: 'Kategorie hinzufügen',
+    categoryNamePlaceholder: 'Kategoriename...',
+    existingCategories: 'Vorhandene Kategorien',
+    confirmDeleteCategory: 'Kategorie "{name}" löschen? Einträge in dieser Kategorie werden unkategorisiert.',
+    failedToDeleteCategory: 'Kategorie konnte nicht gelöscht werden. Sie wird möglicherweise noch verwendet.',
+    noCategoriesYet: 'Noch keine Kategorien',
+    addFirstCategoryHint: 'Fügen Sie oben Ihre erste Kategorie hinzu.'
   },
 
   members: {
