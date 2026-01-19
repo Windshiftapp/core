@@ -8,7 +8,7 @@ import { auth } from './auth.js';
 import { time, timer } from './time.js';
 import { statusCategories, statuses, workflows } from './workflows.js';
 import { assetSets, assetRoles, assetTypes, assetCategories, assetStatuses, assets, itemLinkedAssets } from './assets.js';
-import { portal, portalCustomers, contactRoles, customerOrganisations } from './portal.js';
+import { portal, portalAuth, portalCustomers, contactRoles, customerOrganisations } from './portal.js';
 import { scmProviders, workspaceSCM, itemSCMLinks, userSCM } from './scm.js';
 import { channels, channelCategories, requestTypes } from './channels.js';
 import { milestoneCategories, milestones, iterationTypes, iterations } from './milestones.js';
@@ -252,6 +252,9 @@ export const api = {
 
   // Portal API (public endpoints, no authentication)
   portal,
+
+  // Portal Auth API (magic link authentication for portal customers)
+  portalAuth,
 
   // Portal Customers Management
   portalCustomers,

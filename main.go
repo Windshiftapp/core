@@ -664,6 +664,8 @@ func main() {
 	setupLimiter := middleware.NewRateLimiter(5.0/60.0, 10, useProxy, additionalProxyList)
 	// SSO: 10 requests per minute with burst of 5 (stricter to prevent OIDC resource exhaustion)
 	ssoRateLimiter := middleware.NewRateLimiter(10.0/60.0, 5, useProxy, additionalProxyList)
+	// Portal auth magic link: 3 requests per minute with burst of 3 (strict to prevent abuse)
+	portalAuthLimiter := middleware.NewRateLimiter(3.0/60.0, 3, useProxy, additionalProxyList)
 
 	defer loginRateLimiter.Stop()
 	defer scimRateLimiter.Stop()
@@ -674,6 +676,7 @@ func main() {
 	defer emailVerifyLimiter.Stop()
 	defer setupLimiter.Stop()
 	defer ssoRateLimiter.Stop()
+	defer portalAuthLimiter.Stop()
 
 	// Note: emailVerificationService is initialized later after smtpSender
 	var authHandler *handlers.AuthHandler
@@ -739,6 +742,12 @@ func main() {
 		emailVerificationBaseURL = fmt.Sprintf("http://localhost:%d", port)
 	}
 	emailVerificationService := services.NewEmailVerificationService(db, smtpSender, emailVerificationBaseURL)
+
+	// Initialize portal customer session manager for magic link authentication
+	portalSessionManager := auth.NewPortalSessionManager(db, enableHTTPS, useProxy, additionalProxyList)
+
+	// Initialize magic link service for portal customer authentication
+	magicLinkService := services.NewMagicLinkService(db, smtpSender, emailVerificationBaseURL)
 
 	// Initialize auth handler with email verification service
 	authHandler = handlers.NewAuthHandler(db, sessionManager, loginRateLimiter, permService, emailVerificationService, ipExtractor)
@@ -931,7 +940,8 @@ func main() {
 
 	// Webhook handler for manual triggers
 	webhookHandler := handlers.NewWebhookHandler(db, webhookSender, permService)
-	portalHandler := handlers.NewPortalHandler(db, sessionManager, ipExtractor)
+	portalHandler := handlers.NewPortalHandler(db, sessionManager, portalSessionManager, ipExtractor)
+	portalAuthHandler := handlers.NewPortalAuthHandler(db, portalSessionManager, magicLinkService, ipExtractor)
 	portalCustomersHandler := handlers.NewPortalCustomersHandler(db)
 	contactRolesHandler := handlers.NewEnumHandler(
 		services.NewEnumService(db, services.NewContactRoleConfig()),
@@ -1052,6 +1062,7 @@ func main() {
 		SCIMRateLimiter:     scimRateLimiter,
 		PortalSubmitLimiter: portalSubmitLimiter,
 		PortalSearchLimiter: portalSearchLimiter,
+		PortalAuthLimiter:   portalAuthLimiter,
 		EmailVerifyLimiter:  emailVerifyLimiter,
 		SetupLimiter:        setupLimiter,
 
@@ -1147,6 +1158,7 @@ func main() {
 		},
 		Portal: routes.PortalHandlers{
 			Portal:         portalHandler,
+			PortalAuth:     portalAuthHandler,
 			PortalCustomer: portalCustomersHandler,
 			ContactRole:    contactRolesHandler,
 		},

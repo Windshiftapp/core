@@ -12,6 +12,14 @@ func RegisterPortalRoutes(deps *Deps) {
 	api.HandleH("POST /portal/{slug}/submit", deps.PortalSubmitLimiter.Limit(http.HandlerFunc(deps.Portal.Portal.SubmitToPortal)))
 	api.HandleH("POST /portal/{slug}/knowledge-base/search", deps.PortalSearchLimiter.Limit(http.HandlerFunc(deps.Portal.Portal.SearchKnowledgeBase)))
 
+	// Portal customer authentication endpoints (magic link)
+	if deps.Portal.PortalAuth != nil {
+		api.HandleH("POST /portal/{slug}/auth/request", deps.PortalAuthLimiter.Limit(http.HandlerFunc(deps.Portal.PortalAuth.RequestMagicLink)))
+		api.Handle("GET /portal/{slug}/auth/verify", deps.Portal.PortalAuth.VerifyMagicLink)
+		api.Handle("POST /portal/{slug}/auth/logout", deps.Portal.PortalAuth.Logout)
+		api.Handle("GET /portal/{slug}/auth/me", deps.Portal.PortalAuth.GetCurrentCustomer)
+	}
+
 	// Portal request tracking endpoints (OptionalAuth)
 	api.Handle("GET /portal/{slug}/my-requests", deps.Portal.Portal.GetMyRequests)
 	api.Handle("GET /portal/{slug}/requests/{itemId}", deps.Portal.Portal.GetRequestDetail)

@@ -36,6 +36,7 @@ type Deps struct {
 	SCIMRateLimiter      RateLimiter  // Rate limiter for SCIM provisioning endpoints (10 req/sec)
 	PortalSubmitLimiter  RateLimiter
 	PortalSearchLimiter  RateLimiter
+	PortalAuthLimiter    RateLimiter  // Rate limiter for portal magic link requests (3 req/min per IP)
 	EmailVerifyLimiter   RateLimiter
 	SetupLimiter         RateLimiter
 
@@ -172,6 +173,7 @@ type ChannelHandlers struct {
 // PortalHandlers groups portal-related handlers.
 type PortalHandlers struct {
 	Portal         *handlers.PortalHandler
+	PortalAuth     *handlers.PortalAuthHandler
 	PortalCustomer *handlers.PortalCustomersHandler
 	ContactRole    *handlers.EnumHandler
 }

@@ -1,5 +1,25 @@
 import { fetchAPI } from './core.js';
 
+// Portal Auth API (magic link authentication for portal customers)
+export const portalAuth = {
+  // Request a magic link email
+  requestMagicLink: (slug, email) => fetchAPI(`/portal/${slug}/auth/request`, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  }),
+
+  // Verify a magic link token (returns session on success)
+  verifyMagicLink: (slug, token) => fetchAPI(`/portal/${slug}/auth/verify?token=${encodeURIComponent(token)}`),
+
+  // Get current authenticated portal customer
+  getCurrentCustomer: (slug) => fetchAPI(`/portal/${slug}/auth/me`),
+
+  // Logout portal customer
+  logout: (slug) => fetchAPI(`/portal/${slug}/auth/logout`, {
+    method: 'POST',
+  }),
+};
+
 // Portal API (uses fetchAPI for automatic CSRF handling)
 export const portal = {
   get: (slug) => fetchAPI(`/portal/${slug}`),

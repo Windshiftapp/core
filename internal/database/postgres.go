@@ -26,6 +26,9 @@ var timeTrackingSchemaPostgres string
 //go:embed schema/portal_postgres.sql
 var portalSchemaPostgres string
 
+//go:embed schema/portal_auth_postgres.sql
+var portalAuthSchemaPostgres string
+
 //go:embed schema/milestones_postgres.sql
 var milestonesSchemaPostgres string
 
@@ -309,6 +312,7 @@ func (p *PostgresDB) getPostgresSchemaFiles() []schemaFile {
 		{"channels_postgres.sql", channelsSchemaPostgres},
 		{"time_tracking_postgres.sql", timeTrackingSchemaPostgres},
 		{"portal_postgres.sql", portalSchemaPostgres},
+		{"portal_auth_postgres.sql", portalAuthSchemaPostgres},
 		{"workspace_postgres.sql", workspaceSchemaPostgres},
 		{"config_workflows_postgres.sql", configWorkflowsSchemaPostgres},
 		{"milestones_postgres.sql", milestonesSchemaPostgres},

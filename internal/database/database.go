@@ -34,6 +34,9 @@ var timeTrackingSchema string
 //go:embed schema/portal.sql
 var portalSchema string
 
+//go:embed schema/portal_auth.sql
+var portalAuthSchema string
+
 //go:embed schema/milestones.sql
 var milestonesSchema string
 
@@ -198,7 +201,7 @@ func (db *DB) Initialize() error {
 	}
 
 	// Database needs full initialization
-	schema := coreSchema + itemsSchema + requestTypeSchema + usersSchema + testsSchema + workspaceSchema + configWorkflowsSchema + timeTrackingSchema + channelsSchema + portalSchema + milestonesSchema + iterationsSchema + contentSchema + mentionsSchema + notificationsSchema + permissionsSchema + systemSchema + userPreferencesSchema + webauthnSchema + ssoSchema + scmSchema + assetsSchema + recurringTasksSchema + jiraImportSchema
+	schema := coreSchema + itemsSchema + requestTypeSchema + usersSchema + testsSchema + workspaceSchema + configWorkflowsSchema + timeTrackingSchema + channelsSchema + portalSchema + portalAuthSchema + milestonesSchema + iterationsSchema + contentSchema + mentionsSchema + notificationsSchema + permissionsSchema + systemSchema + userPreferencesSchema + webauthnSchema + ssoSchema + scmSchema + assetsSchema + recurringTasksSchema + jiraImportSchema
 
 	if _, err := db.Exec(schema); err != nil {
 		return fmt.Errorf("failed to initialize database schema: %w", err)

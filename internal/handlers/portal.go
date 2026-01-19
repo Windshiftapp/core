@@ -21,9 +21,10 @@ import (
 
 // PortalHandler handles public portal submissions
 type PortalHandler struct {
-	db             database.Database
-	sessionManager *auth.SessionManager
-	ipExtractor    *utils.IPExtractor
+	db                   database.Database
+	sessionManager       *auth.SessionManager
+	portalSessionManager *auth.PortalSessionManager
+	ipExtractor          *utils.IPExtractor
 }
 
 // getClientIP extracts the client IP with proxy validation
@@ -31,12 +32,57 @@ func (h *PortalHandler) getClientIP(r *http.Request) string {
 	return h.ipExtractor.GetClientIP(r)
 }
 
+// getPortalCustomerID attempts to get the portal customer ID from either:
+// 1. A direct portal customer session (magic link auth)
+// 2. An internal user session with a linked portal customer (backward compatible)
+// Returns the portal customer ID and an error if authentication fails
+func (h *PortalHandler) getPortalCustomerID(ctx context.Context, r *http.Request) (*int, error) {
+	clientIP := h.getClientIP(r)
+
+	// First, try portal customer session (direct magic link auth)
+	if h.portalSessionManager != nil {
+		portalToken, err := h.portalSessionManager.GetPortalSessionFromRequest(r)
+		if err == nil && portalToken != "" {
+			portalSession, err := h.portalSessionManager.ValidatePortalSession(portalToken)
+			if err == nil && portalSession != nil {
+				slog.Debug("portal customer authenticated via portal session", slog.String("component", "portal"), slog.Int("portal_customer_id", portalSession.PortalCustomerID))
+				return &portalSession.PortalCustomerID, nil
+			}
+		}
+	}
+
+	// Fall back to internal user session (backward compatible)
+	sessionToken, err := h.sessionManager.GetSessionFromRequest(r)
+	if err != nil {
+		return nil, fmt.Errorf("authentication required")
+	}
+
+	session, err := h.sessionManager.ValidateSession(sessionToken, clientIP)
+	if err != nil || session == nil {
+		return nil, fmt.Errorf("invalid or expired session")
+	}
+
+	// Get portal customer ID from the user's internal session
+	customerQuery := `SELECT id FROM portal_customers WHERE user_id = ?`
+	var customerID int
+	err = h.db.QueryRowContext(ctx, customerQuery, session.UserID).Scan(&customerID)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("no portal customer found for this user")
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to find portal customer: %w", err)
+	}
+
+	slog.Debug("portal customer authenticated via internal user session", slog.String("component", "portal"), slog.Int("portal_customer_id", customerID), slog.Int("user_id", session.UserID))
+	return &customerID, nil
+}
+
 // NewPortalHandler creates a new portal handler
-func NewPortalHandler(db database.Database, sessionManager *auth.SessionManager, ipExtractor *utils.IPExtractor) *PortalHandler {
+func NewPortalHandler(db database.Database, sessionManager *auth.SessionManager, portalSessionManager *auth.PortalSessionManager, ipExtractor *utils.IPExtractor) *PortalHandler {
 	return &PortalHandler{
-		db:             db,
-		sessionManager: sessionManager,
-		ipExtractor:    ipExtractor,
+		db:                   db,
+		sessionManager:       sessionManager,
+		portalSessionManager: portalSessionManager,
+		ipExtractor:          ipExtractor,
 	}
 }
 
@@ -699,37 +745,12 @@ func (h *PortalHandler) GetMyRequests(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check for authenticated session
-	sessionToken, err := h.sessionManager.GetSessionFromRequest(r)
+	// Get portal customer ID (supports both portal session and internal user session)
+	portalCustomerID, err := h.getPortalCustomerID(ctx, r)
 	if err != nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
-
-	// Validate session
-	clientIP := h.getClientIP(r)
-	session, err := h.sessionManager.ValidateSession(sessionToken, clientIP)
-	if err != nil || session == nil {
-		http.Error(w, "Invalid or expired session", http.StatusUnauthorized)
-		return
-	}
-
-	// Get portal customer ID from user's session
-	// First check if this is a portal customer user
-	var portalCustomerID *int
-	customerQuery := `SELECT id FROM portal_customers WHERE user_id = ?`
-	var customerID int
-	err = h.db.QueryRowContext(ctx, customerQuery, session.UserID).Scan(&customerID)
-	if err == sql.ErrNoRows {
-		// User is not linked to a portal customer - check if they're submitting as portal customer directly
-		// This handles anonymous submissions that were later authenticated
-		http.Error(w, "No portal customer found for this user", http.StatusNotFound)
-		return
-	} else if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to find portal customer: %v", err), http.StatusInternalServerError)
-		return
-	}
-	portalCustomerID = &customerID
 
 	// Get all requests submitted by this portal customer through this channel
 	requestsQuery := `
@@ -868,29 +889,13 @@ func (h *PortalHandler) GetRequestDetail(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Check for authenticated session
-	sessionToken, err := h.sessionManager.GetSessionFromRequest(r)
+	// Get portal customer ID (supports both portal session and internal user session)
+	portalCustomerIDPtr, err := h.getPortalCustomerID(ctx, r)
 	if err != nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
-
-	// Validate session
-	clientIP := h.getClientIP(r)
-	session, err := h.sessionManager.ValidateSession(sessionToken, clientIP)
-	if err != nil || session == nil {
-		http.Error(w, "Invalid or expired session", http.StatusUnauthorized)
-		return
-	}
-
-	// Get portal customer ID from user's session
-	var portalCustomerID int
-	customerQuery := `SELECT id FROM portal_customers WHERE user_id = ?`
-	err = h.db.QueryRowContext(ctx, customerQuery, session.UserID).Scan(&portalCustomerID)
-	if err != nil {
-		http.Error(w, "No portal customer found for this user", http.StatusNotFound)
-		return
-	}
+	portalCustomerID := *portalCustomerIDPtr
 
 	// Get the request details and verify ownership
 	detailQuery := `
@@ -1043,29 +1048,13 @@ func (h *PortalHandler) GetRequestComments(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Check for authenticated session
-	sessionToken, err := h.sessionManager.GetSessionFromRequest(r)
+	// Get portal customer ID (supports both portal session and internal user session)
+	portalCustomerIDPtr, err := h.getPortalCustomerID(ctx, r)
 	if err != nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
-
-	// Validate session
-	clientIP := h.getClientIP(r)
-	session, err := h.sessionManager.ValidateSession(sessionToken, clientIP)
-	if err != nil || session == nil {
-		http.Error(w, "Invalid or expired session", http.StatusUnauthorized)
-		return
-	}
-
-	// Get portal customer ID from user's session
-	var portalCustomerID int
-	customerQuery := `SELECT id FROM portal_customers WHERE user_id = ?`
-	err = h.db.QueryRowContext(ctx, customerQuery, session.UserID).Scan(&portalCustomerID)
-	if err != nil {
-		http.Error(w, "No portal customer found for this user", http.StatusNotFound)
-		return
-	}
+	portalCustomerID := *portalCustomerIDPtr
 
 	// Verify the item belongs to this portal customer and was submitted through this channel
 	verifyQuery := `
@@ -1211,29 +1200,13 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Check for authenticated session
-	sessionToken, err := h.sessionManager.GetSessionFromRequest(r)
+	// Get portal customer ID (supports both portal session and internal user session)
+	portalCustomerIDPtr, err := h.getPortalCustomerID(ctx, r)
 	if err != nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
-
-	// Validate session
-	clientIP := h.getClientIP(r)
-	session, err := h.sessionManager.ValidateSession(sessionToken, clientIP)
-	if err != nil || session == nil {
-		http.Error(w, "Invalid or expired session", http.StatusUnauthorized)
-		return
-	}
-
-	// Get portal customer ID from user's session
-	var portalCustomerID int
-	customerQuery := `SELECT id FROM portal_customers WHERE user_id = ?`
-	err = h.db.QueryRowContext(ctx, customerQuery, session.UserID).Scan(&portalCustomerID)
-	if err != nil {
-		http.Error(w, "No portal customer found for this user", http.StatusNotFound)
-		return
-	}
+	portalCustomerID := *portalCustomerIDPtr
 
 	// Verify the item belongs to this portal customer and was submitted through this channel
 	verifyQuery := `
@@ -1280,13 +1253,13 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 	// Sanitize comment content to prevent XSS
 	sanitizedContent := utils.StripHTMLTags(commentData.Content)
 
-	// Insert comment
+	// Insert comment with portal_customer_id
 	now := time.Now()
 	insertQuery := `
-		INSERT INTO comments (item_id, author_id, content, created_at, updated_at)
+		INSERT INTO comments (item_id, portal_customer_id, content, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?)
 	`
-	result, err := h.db.ExecWriteContext(ctx, insertQuery, itemID, session.UserID, sanitizedContent, now, now)
+	result, err := h.db.ExecWriteContext(ctx, insertQuery, itemID, portalCustomerID, sanitizedContent, now, now)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to add comment: %v", err), http.StatusInternalServerError)
 		return
@@ -1300,12 +1273,12 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 
 	// Return the created comment
 	response := map[string]interface{}{
-		"id":         commentID,
-		"item_id":    itemID,
-		"author_id":  session.UserID,
-		"content":    commentData.Content,
-		"created_at": now,
-		"updated_at": now,
+		"id":                  commentID,
+		"item_id":             itemID,
+		"portal_customer_id":  portalCustomerID,
+		"content":             commentData.Content,
+		"created_at":          now,
+		"updated_at":          now,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
