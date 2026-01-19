@@ -12,7 +12,7 @@
   }
 </script>
 
-<div class="add-comment-node">
+<div class="add-comment-node" class:selected>
   <Handle type="target" position={Position.Left} id="input" />
 
   <div class="node-header">
@@ -42,6 +42,10 @@
     border-radius: 8px;
     min-width: 180px;
     box-shadow: var(--shadow-md);
+  }
+
+  .add-comment-node.selected {
+    box-shadow: 0 0 0 2px var(--ds-interactive), 0 0 12px rgba(59, 130, 246, 0.5);
   }
 
   .node-header {

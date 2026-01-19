@@ -23,7 +23,7 @@
   }
 </script>
 
-<div class="trigger-node">
+<div class="trigger-node" class:selected>
   <div class="node-header">
     <Zap size={16} class="node-icon" />
     <span class="node-title">{t('actions.nodes.trigger')}</span>
@@ -54,6 +54,10 @@
     border-radius: 8px;
     min-width: 180px;
     box-shadow: var(--shadow-md);
+  }
+
+  .trigger-node.selected {
+    box-shadow: 0 0 0 2px var(--ds-interactive), 0 0 12px rgba(59, 130, 246, 0.5);
   }
 
   .node-header {
