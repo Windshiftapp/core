@@ -1,7 +1,7 @@
 <script>
   import { onMount, createEventDispatcher } from 'svelte';
   import { api } from '../api.js';
-  import { User, Shield, Clock, CheckSquare, AlertCircle, Check } from 'lucide-svelte';
+  import { User, Blocks, Clock, ClipboardList, AlertCircle, Check } from 'lucide-svelte';
   import Modal from '../dialogs/Modal.svelte';
   import Button from '../components/Button.svelte';
   import Label from '../components/Label.svelte';
@@ -169,7 +169,7 @@
 </script>
 
 {#if !loading && isOpen}
-  <div class="fixed inset-0 z-40" style="background: linear-gradient(135deg, #1d5a94 0%, #2874BB 50%, #1AB1BC 100%);"></div>
+  <div class="fixed inset-0 z-40 setup-gradient"></div>
   <Modal bind:isOpen={isOpen} maxWidth="max-w-2xl" preventClose={true} noBackdrop={true} zIndexClass="z-50 !items-center !pt-0 setup-modal">
     <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
     <div bind:this={keyboardDiv} role="dialog" tabindex="0" onkeydown={handleKeyDown} class="outline-none">
@@ -303,8 +303,8 @@
       {#if currentStep === 2}
         <div class="space-y-6">
           <div class="text-center">
-            <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style="background-color: var(--ds-surface-success);">
-              <Shield class="w-6 h-6" style="color: var(--ds-icon-success);" />
+            <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style="background-color: var(--ds-surface-information);">
+              <Blocks class="w-6 h-6" style="color: var(--ds-icon-info);" />
             </div>
             <h2 class="text-xl font-semibold mb-2" style="color: var(--ds-text);">{t('setup.configureModules')}</h2>
             <p style="color: var(--ds-text-subtle);">{t('setup.configureModulesDesc')}</p>
@@ -314,8 +314,8 @@
             <div class="border rounded p-4" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 rounded flex items-center justify-center" style="background-color: var(--ds-surface-success);">
-                    <CheckSquare class="w-5 h-5" style="color: var(--ds-icon-success);" />
+                  <div class="w-10 h-10 rounded flex items-center justify-center" style="background-color: var(--ds-surface-information);">
+                    <ClipboardList class="w-5 h-5" style="color: var(--ds-icon-info);" />
                   </div>
                   <div>
                     <h3 class="font-medium" style="color: var(--ds-text);">{t('setup.testManagement')}</h3>
@@ -408,6 +408,29 @@
 
 <style>
   :global(.setup-modal > div) {
-    box-shadow: var(--shadow-2xl);
+    box-shadow:
+      0 0 60px 5px rgba(26, 177, 188, 0.4),
+      0 0 100px 20px rgba(40, 116, 187, 0.3),
+      0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+  }
+
+  .setup-gradient {
+    background: linear-gradient(135deg, #1d5a94 0%, #2563a8 20%, #2874BB 40%, #1f93a5 60%, #1AB1BC 80%, #2874BB 100%);
+    background-size: 200% 200%;
+    animation: setup-gradient-shift 90s ease infinite;
+  }
+
+  @keyframes setup-gradient-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .setup-gradient {
+      animation: none;
+      background: linear-gradient(135deg, #1d5a94 0%, #2874BB 50%, #1AB1BC 100%);
+      background-size: 100% 100%;
+    }
   }
 </style>
