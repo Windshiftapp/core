@@ -13,6 +13,7 @@ import workflows from './workflows.js';
 import ui from './ui.js';
 import navigation from './navigation.js';
 import misc from './misc.js';
+import actions from './actions.js';
 
 export default {
   ...common,
@@ -25,5 +26,6 @@ export default {
   ...workflows,
   ...ui,
   ...navigation,
-  ...misc
+  ...misc,
+  ...actions
 };

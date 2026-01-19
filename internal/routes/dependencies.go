@@ -108,6 +108,7 @@ type WorkspaceHandlers struct {
 	Status               *handlers.EnumHandler
 	StatusLegacy         *handlers.StatusHandler
 	Workflow             *handlers.WorkflowHandler
+	Actions              *handlers.ActionsHandler
 }
 
 // UserHandlers groups user-related handlers.

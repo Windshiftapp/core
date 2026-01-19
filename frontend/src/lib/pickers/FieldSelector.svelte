@@ -19,44 +19,48 @@
   let customFields = [];
   let dropdownElement;
 
+  // Helper to get field translation (handles both object and string formats)
+  function getFieldTranslation(fieldKey) {
+    const field = t(`pickers.fields.${fieldKey}`);
+    if (typeof field === 'object' && field !== null) {
+      return { name: field.name || fieldKey, description: field.description || '' };
+    }
+    return { name: field || fieldKey, description: '' };
+  }
+
   // Standard fields grouped by category - using reactive to support i18n
   $: standardFields = [
     {
       category: t('pickers.fieldCategories.basic'),
       fields: [
-        { id: 'title', name: t('pickers.fields.title'), type: 'text', description: t('pickers.fields.titleDesc') },
-        { id: 'description', name: t('pickers.fields.description'), type: 'text', description: t('pickers.fields.descriptionDesc') },
-        { id: 'key', name: t('pickers.fields.key'), type: 'identifier', description: t('pickers.fields.keyDesc') },
-        { id: 'id', name: t('pickers.fields.id'), type: 'identifier', description: t('pickers.fields.idDesc') }
+        { id: 'title', name: getFieldTranslation('title').name, type: 'text', description: getFieldTranslation('title').description },
+        { id: 'description', name: getFieldTranslation('description').name, type: 'text', description: getFieldTranslation('description').description },
+        { id: 'status', name: getFieldTranslation('status').name, type: 'enum', description: getFieldTranslation('status').description },
+        { id: 'priority', name: getFieldTranslation('priority').name, type: 'enum', description: getFieldTranslation('priority').description },
+        { id: 'type', name: getFieldTranslation('type').name, type: 'enum', description: getFieldTranslation('type').description }
       ]
     },
     {
-      category: t('pickers.fieldCategories.assignments'),
+      category: t('pickers.fieldCategories.people'),
       fields: [
-        { id: 'assignee', name: t('pickers.fields.assignee'), type: 'user', description: t('pickers.fields.assigneeDesc') },
-        { id: 'creator', name: t('pickers.fields.creator'), type: 'user', description: t('pickers.fields.creatorDesc') }
-      ]
-    },
-    {
-      category: t('pickers.fieldCategories.projectsMilestones'),
-      fields: [
-        { id: 'milestone', name: t('pickers.fields.milestone'), type: 'enum', description: t('pickers.fields.milestoneDesc') },
-        { id: 'project', name: t('pickers.fields.project'), type: 'enum', description: t('pickers.fields.projectDesc') },
-        { id: 'itemType', name: t('pickers.fields.itemType'), type: 'enum', description: t('pickers.fields.itemTypeDesc') }
+        { id: 'assignee', name: getFieldTranslation('assignee').name, type: 'user', description: getFieldTranslation('assignee').description },
+        { id: 'reporter', name: getFieldTranslation('reporter').name, type: 'user', description: getFieldTranslation('reporter').description }
       ]
     },
     {
       category: t('pickers.fieldCategories.dates'),
       fields: [
-        { id: 'created', name: t('pickers.fields.createdDate'), type: 'date', description: t('pickers.fields.createdDateDesc') },
-        { id: 'updated', name: t('pickers.fields.updatedDate'), type: 'date', description: t('pickers.fields.updatedDateDesc') }
+        { id: 'createdAt', name: getFieldTranslation('createdAt').name, type: 'date', description: getFieldTranslation('createdAt').description },
+        { id: 'updatedAt', name: getFieldTranslation('updatedAt').name, type: 'date', description: getFieldTranslation('updatedAt').description },
+        { id: 'dueDate', name: getFieldTranslation('dueDate').name, type: 'date', description: getFieldTranslation('dueDate').description }
       ]
     },
     {
-      category: t('pickers.fieldCategories.hierarchy'),
+      category: t('pickers.fieldCategories.workflow'),
       fields: [
-        { id: 'parent', name: t('pickers.fields.parentId'), type: 'reference', description: t('pickers.fields.parentIdDesc') },
-        { id: 'isTask', name: t('pickers.fields.isTask'), type: 'boolean', description: t('pickers.fields.isTaskDesc') }
+        { id: 'milestone', name: getFieldTranslation('milestone').name, type: 'enum', description: getFieldTranslation('milestone').description },
+        { id: 'sprint', name: getFieldTranslation('sprint').name, type: 'enum', description: getFieldTranslation('sprint').description },
+        { id: 'labels', name: getFieldTranslation('labels').name, type: 'enum', description: getFieldTranslation('labels').description }
       ]
     },
   ];

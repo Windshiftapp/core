@@ -109,4 +109,16 @@ func RegisterWorkspaceRoutes(deps *Deps) {
 	api.HandleH("GET /workflows/{id}/transitions", auth(http.HandlerFunc(deps.Workspaces.Workflow.GetTransitions)))
 	api.HandleH("PUT /workflows/{id}/transitions", admin(http.HandlerFunc(deps.Workspaces.Workflow.UpdateTransitions)))
 	api.HandleH("GET /workflows/{id}/available-transitions/{statusId}", auth(http.HandlerFunc(deps.Workspaces.Workflow.GetAvailableTransitions)))
+
+	// Actions automation endpoints (workspace-scoped)
+	if deps.Workspaces.Actions != nil {
+		api.HandleH("GET /workspaces/{workspaceId}/actions", auth(http.HandlerFunc(deps.Workspaces.Actions.ListActions)))
+		api.HandleH("POST /workspaces/{workspaceId}/actions", auth(http.HandlerFunc(deps.Workspaces.Actions.CreateAction)))
+		api.HandleH("GET /workspaces/{workspaceId}/actions/{id}", auth(http.HandlerFunc(deps.Workspaces.Actions.GetAction)))
+		api.HandleH("PUT /workspaces/{workspaceId}/actions/{id}", auth(http.HandlerFunc(deps.Workspaces.Actions.UpdateAction)))
+		api.HandleH("DELETE /workspaces/{workspaceId}/actions/{id}", auth(http.HandlerFunc(deps.Workspaces.Actions.DeleteAction)))
+		api.HandleH("POST /workspaces/{workspaceId}/actions/{id}/toggle", auth(http.HandlerFunc(deps.Workspaces.Actions.ToggleAction)))
+		api.HandleH("GET /workspaces/{workspaceId}/actions/{id}/logs", auth(http.HandlerFunc(deps.Workspaces.Actions.GetActionLogs)))
+		api.HandleH("GET /workspaces/{workspaceId}/action-logs", auth(http.HandlerFunc(deps.Workspaces.Actions.GetWorkspaceLogs)))
+	}
 }

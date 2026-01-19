@@ -18,6 +18,9 @@ type ItemLinkHandler struct {
 	notificationService interface {
 		EmitEvent(event *services.NotificationEvent)
 	} // Notification service for async notification processing (optional, can be nil)
+	actionService interface {
+		EmitActionEvent(event *models.ActionEvent)
+	} // Action service for automation workflows (optional, can be nil)
 }
 
 func NewItemLinkHandler(db database.Database, notificationService interface {
@@ -27,6 +30,13 @@ func NewItemLinkHandler(db database.Database, notificationService interface {
 		db:                  db,
 		notificationService: notificationService,
 	}
+}
+
+// SetActionService sets the action service for automation workflows
+func (h *ItemLinkHandler) SetActionService(actionService interface {
+	EmitActionEvent(event *models.ActionEvent)
+}) {
+	h.actionService = actionService
 }
 
 // GetLinksForItem returns all links for a specific item (work item or test case)
@@ -217,6 +227,25 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 		}
+	}
+
+	// Emit action event for item linked
+	if h.actionService != nil && link.SourceType == "item" {
+		// Get workspace ID for the source item
+		var workspaceID int
+		h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", link.SourceID).Scan(&workspaceID)
+
+		h.actionService.EmitActionEvent(&models.ActionEvent{
+			EventType:   models.ActionTriggerItemLinked,
+			WorkspaceID: workspaceID,
+			ItemID:      link.SourceID,
+			ActorUserID: currentUser.ID,
+			NewValues: map[string]interface{}{
+				"link_type_id": link.LinkTypeID,
+				"target_type":  link.TargetType,
+				"target_id":    link.TargetID,
+			},
+		})
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -2498,3 +2498,196 @@ type RRulePreviewRequest struct {
 	DtStart string `json:"dtstart"`
 	Count   int    `json:"count,omitempty"` // Number of occurrences to preview (default 10)
 }
+
+// Actions Automation Models
+
+// ActionTriggerType defines the type of event that triggers an action
+type ActionTriggerType string
+
+const (
+	ActionTriggerStatusTransition ActionTriggerType = "status_transition"
+	ActionTriggerItemCreated      ActionTriggerType = "item_created"
+	ActionTriggerItemUpdated      ActionTriggerType = "item_updated"
+	ActionTriggerItemLinked       ActionTriggerType = "item_linked"
+)
+
+// ActionNodeType defines the type of action node
+type ActionNodeType string
+
+const (
+	ActionNodeTrigger    ActionNodeType = "trigger"
+	ActionNodeSetField   ActionNodeType = "set_field"
+	ActionNodeSetStatus  ActionNodeType = "set_status"
+	ActionNodeAddComment ActionNodeType = "add_comment"
+	ActionNodeNotifyUser ActionNodeType = "notify_user"
+	ActionNodeCondition  ActionNodeType = "condition"
+)
+
+// ActionExecutionStatus defines the status of an action execution
+type ActionExecutionStatus string
+
+const (
+	ActionStatusRunning   ActionExecutionStatus = "running"
+	ActionStatusCompleted ActionExecutionStatus = "completed"
+	ActionStatusFailed    ActionExecutionStatus = "failed"
+	ActionStatusSkipped   ActionExecutionStatus = "skipped"
+)
+
+// Action represents a workspace-scoped automation definition
+type Action struct {
+	ID            int               `json:"id"`
+	WorkspaceID   int               `json:"workspace_id"`
+	Name          string            `json:"name"`
+	Description   string            `json:"description,omitempty"`
+	IsEnabled     bool              `json:"is_enabled"`
+	TriggerType   ActionTriggerType `json:"trigger_type"`
+	TriggerConfig string            `json:"trigger_config,omitempty"` // JSON with trigger-specific conditions
+	CreatedBy     *int              `json:"created_by,omitempty"`
+	CreatedAt     time.Time         `json:"created_at"`
+	UpdatedAt     time.Time         `json:"updated_at"`
+	// Joined fields for API responses
+	CreatorName string       `json:"creator_name,omitempty"`
+	Nodes       []ActionNode `json:"nodes,omitempty"`
+	Edges       []ActionEdge `json:"edges,omitempty"`
+}
+
+// ActionTriggerConfig represents trigger-specific configuration
+type ActionTriggerConfig struct {
+	// For status_transition
+	FromStatusID *int `json:"from_status_id,omitempty"` // null means any status
+	ToStatusID   *int `json:"to_status_id,omitempty"`   // null means any status
+	// For item_created and item_updated
+	ItemTypeID *int `json:"item_type_id,omitempty"` // Filter by item type (optional)
+	// For item_updated
+	FieldName string `json:"field_name,omitempty"` // Which field changed
+	// For item_linked
+	LinkTypeID *int `json:"link_type_id,omitempty"` // Filter by link type (optional)
+}
+
+// ActionNode represents a step in the action flow
+type ActionNode struct {
+	ID         int            `json:"id"`
+	ActionID   int            `json:"action_id"`
+	NodeType   ActionNodeType `json:"node_type"`
+	NodeConfig string         `json:"node_config"` // JSON configuration for the node
+	PositionX  float64        `json:"position_x"`
+	PositionY  float64        `json:"position_y"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
+}
+
+// ActionEdge represents a connection between nodes
+type ActionEdge struct {
+	ID           int       `json:"id"`
+	ActionID     int       `json:"action_id"`
+	SourceNodeID int       `json:"source_node_id"`
+	TargetNodeID int       `json:"target_node_id"`
+	EdgeType     string    `json:"edge_type"` // default, true, false (for conditions)
+	SourceHandle string    `json:"source_handle,omitempty"`
+	TargetHandle string    `json:"target_handle,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+// ActionExecutionLog represents the audit trail for action executions
+type ActionExecutionLog struct {
+	ID             int                   `json:"id"`
+	ActionID       int                   `json:"action_id"`
+	ItemID         *int                  `json:"item_id,omitempty"`
+	TriggerEvent   string                `json:"trigger_event"`
+	Status         ActionExecutionStatus `json:"status"`
+	StartedAt      time.Time             `json:"started_at"`
+	CompletedAt    *time.Time            `json:"completed_at,omitempty"`
+	ErrorMessage   string                `json:"error_message,omitempty"`
+	ExecutionTrace string                `json:"execution_trace,omitempty"` // JSON step log
+	// Joined fields for API responses
+	ActionName string `json:"action_name,omitempty"`
+	ItemTitle  string `json:"item_title,omitempty"`
+}
+
+// ActionEvent represents an event that can trigger actions
+type ActionEvent struct {
+	EventType   ActionTriggerType      `json:"event_type"`
+	WorkspaceID int                    `json:"workspace_id"`
+	ItemID      int                    `json:"item_id"`
+	ActorUserID int                    `json:"actor_user_id"`
+	OldValues   map[string]interface{} `json:"old_values,omitempty"` // Previous field values
+	NewValues   map[string]interface{} `json:"new_values,omitempty"` // New field values
+}
+
+// ExecutionContext holds context during action execution
+type ExecutionContext struct {
+	Action      *Action                `json:"action"`
+	Event       *ActionEvent           `json:"event"`
+	Item        *Item                  `json:"item,omitempty"`
+	Actor       *User                  `json:"actor,omitempty"`
+	Variables   map[string]interface{} `json:"variables,omitempty"` // Dynamic variables during execution
+	StepResults []StepResult           `json:"step_results,omitempty"`
+}
+
+// StepResult holds the result of executing a single node
+type StepResult struct {
+	NodeID       int                    `json:"node_id"`
+	NodeType     ActionNodeType         `json:"node_type"`
+	Status       ActionExecutionStatus  `json:"status"`
+	StartedAt    time.Time              `json:"started_at"`
+	CompletedAt  *time.Time             `json:"completed_at,omitempty"`
+	ErrorMessage string                 `json:"error_message,omitempty"`
+	Output       map[string]interface{} `json:"output,omitempty"`
+}
+
+// Node configuration types
+
+// SetFieldNodeConfig configures a set_field node
+type SetFieldNodeConfig struct {
+	FieldName string `json:"field_name"`
+	Value     string `json:"value"` // Can contain {{variable}} templates
+}
+
+// SetStatusNodeConfig configures a set_status node
+type SetStatusNodeConfig struct {
+	StatusID int `json:"status_id"`
+}
+
+// AddCommentNodeConfig configures an add_comment node
+type AddCommentNodeConfig struct {
+	Content   string `json:"content"` // Can contain {{variable}} templates
+	IsPrivate bool   `json:"is_private"`
+}
+
+// NotifyUserNodeConfig configures a notify_user node
+type NotifyUserNodeConfig struct {
+	Recipients  []string `json:"recipients"`      // "assignee", "creator", or specific user IDs
+	Message     string   `json:"message"`         // Can contain {{variable}} templates
+	Title       string   `json:"title,omitempty"`
+	IncludeLink bool     `json:"include_link"` // Include link to item
+}
+
+// ConditionNodeConfig configures a condition node
+type ConditionNodeConfig struct {
+	FieldName string `json:"field_name"` // Field to check
+	Operator  string `json:"operator"`   // eq, ne, gt, lt, contains, etc.
+	Value     string `json:"value"`      // Value to compare against
+}
+
+// API Request/Response types
+
+// CreateActionRequest represents the API request to create an action
+type CreateActionRequest struct {
+	Name          string            `json:"name"`
+	Description   string            `json:"description,omitempty"`
+	TriggerType   ActionTriggerType `json:"trigger_type"`
+	TriggerConfig string            `json:"trigger_config,omitempty"`
+	Nodes         []ActionNode      `json:"nodes,omitempty"`
+	Edges         []ActionEdge      `json:"edges,omitempty"`
+}
+
+// UpdateActionRequest represents the API request to update an action
+type UpdateActionRequest struct {
+	Name          *string            `json:"name,omitempty"`
+	Description   *string            `json:"description,omitempty"`
+	TriggerType   *ActionTriggerType `json:"trigger_type,omitempty"`
+	TriggerConfig *string            `json:"trigger_config,omitempty"`
+	IsEnabled     *bool              `json:"is_enabled,omitempty"`
+	Nodes         []ActionNode       `json:"nodes,omitempty"`
+	Edges         []ActionEdge       `json:"edges,omitempty"`
+}

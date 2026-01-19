@@ -9,6 +9,7 @@
   import WorkspaceConfigurationAssigner from './WorkspaceConfigurationAssigner.svelte';
   import WorkspaceConfigurationPreview from './WorkspaceConfigurationPreview.svelte';
   import WorkspaceSCMSettings from './WorkspaceSCMSettings.svelte';
+  import ActionsSettings from '../features/actions/ActionsSettings.svelte';
   import IconSelector from '../pickers/IconSelector.svelte';
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
@@ -220,6 +221,8 @@
       navigate(`/workspaces/${workspaceId}/settings/configuration`);
     } else if (tab === 'source-control') {
       navigate(`/workspaces/${workspaceId}/settings/source-control`);
+    } else if (tab === 'actions') {
+      navigate(`/workspaces/${workspaceId}/settings/actions`);
     } else if (tab === 'danger') {
       navigate(`/workspaces/${workspaceId}/settings/danger`);
     } else {
@@ -380,6 +383,13 @@
           on:click={() => switchTab('source-control')}
         >
           {t('workspaceSettings.tabs.sourceControl')}
+        </button>
+        <button
+          class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative settings-tab"
+          style="color: {activeTab === 'actions' ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; {activeTab === 'actions' ? 'margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : ''}"
+          on:click={() => switchTab('actions')}
+        >
+          {t('actions.title')}
         </button>
         <button
           class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative settings-tab-danger"
@@ -682,6 +692,12 @@
         <WorkspaceSCMSettings {workspaceId} />
       </div>
 
+    {:else if activeTab === 'actions'}
+      <!-- Actions Automation -->
+      <div class="rounded-xl border shadow-sm actions-container" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+        <ActionsSettings {workspaceId} />
+      </div>
+
     {:else if activeTab === 'danger'}
       <!-- Remove Workspace -->
       <div class="rounded-xl p-8 border border-red-200 shadow-sm" style="background-color: #fef2f2;">
@@ -766,5 +782,10 @@
 
   .toggle-off {
     background-color: var(--ds-surface);
+  }
+
+  .actions-container {
+    height: calc(100vh - 280px);
+    min-height: 500px;
   }
 </style>

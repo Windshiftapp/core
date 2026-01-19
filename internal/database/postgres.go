@@ -95,6 +95,9 @@ var recurringTasksSchemaPostgres string
 //go:embed schema/jira_import_postgres.sql
 var jiraImportSchemaPostgres string
 
+//go:embed schema/actions_postgres.sql
+var actionsSchemaPostgres string
+
 // PostgresDB implements the Database interface for PostgreSQL
 type PostgresDB struct {
 	db  *sql.DB
@@ -331,6 +334,7 @@ func (p *PostgresDB) getPostgresSchemaFiles() []schemaFile {
 		{"assets_postgres.sql", assetsSchemaPostgres},
 		{"recurring_tasks_postgres.sql", recurringTasksSchemaPostgres},
 		{"jira_import_postgres.sql", jiraImportSchemaPostgres},
+		{"actions_postgres.sql", actionsSchemaPostgres},
 	}
 }
 

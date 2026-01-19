@@ -13,6 +13,7 @@ import time from './time.js';
 import ui from './ui.js';
 import workflows from './workflows.js';
 import workspace from './workspace.js';
+import actions from './actions.js';
 
 export default {
   // Admin related (settings, roles, permissions)
@@ -48,5 +49,8 @@ export default {
   ...workflows,
 
   // Workspace (workspaces, items, comments, todo, collectionTree, collections, links)
-  ...workspace
+  ...workspace,
+
+  // Actions automation
+  ...actions
 };

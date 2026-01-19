@@ -27,6 +27,7 @@ const routes = {
   '/workspaces/:id/settings/members': 'workspace-settings-members',
   '/workspaces/:id/settings/configuration': 'workspace-settings-configuration',
   '/workspaces/:id/settings/source-control': 'workspace-settings-source-control',
+  '/workspaces/:id/settings/actions': 'workspace-settings-actions',
   '/workspaces/:id/settings/danger': 'workspace-settings-danger',
   '/workspaces/:id/items/:itemId': 'item-detail',
   '/workspaces/:id/collections/:collectionId/items/:itemId': 'item-detail',

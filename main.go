@@ -727,6 +727,11 @@ func main() {
 	recurrenceScheduler.Start()
 	slog.Info("recurrence scheduler started")
 
+	// Initialize action service for automation workflows
+	actionService := services.NewActionService(db, services.DefaultActionServiceConfig())
+	actionService.SetNotificationService(notificationService)
+	slog.Info("action service initialized")
+
 	// Initialize email scheduler for inbound email channel IMAP polling
 	// Uses the same encryption as SCM providers for OAuth token storage
 	var emailScheduler *scheduler.EmailScheduler
@@ -827,6 +832,9 @@ func main() {
 
 	// Recurrence handler for recurring tasks
 	recurrenceHandler := handlers.NewRecurrenceHandler(db, recurrenceScheduler)
+
+	// Actions handler for automation workflows
+	actionsHandler := handlers.NewActionsHandler(db, actionService)
 
 	milestoneCategoryHandler := handlers.NewEnumHandler(
 		services.NewEnumService(db, services.NewMilestoneCategoryConfig()),
@@ -931,6 +939,10 @@ func main() {
 	mentionService := services.NewMentionService(db, notificationService)
 	itemHandler.SetMentionService(mentionService)
 	commentHandler.SetMentionService(mentionService)
+
+	// Wire up action service for automation workflows
+	itemHandler.SetActionService(actionService)
+	itemLinkHandler.SetActionService(actionService)
 
 	// Channels management
 	channelHandler := handlers.NewChannelHandler(db, permService, webhookSender)
@@ -1107,6 +1119,7 @@ func main() {
 			Status:                statusHandler,
 			StatusLegacy:          statusHandlerLegacy,
 			Workflow:              workflowHandler,
+			Actions:               actionsHandler,
 		},
 		Users: routes.UserHandlers{
 			User:          userHandler,
@@ -1330,6 +1343,11 @@ func main() {
 	slog.Info("stopping recurrence scheduler")
 	recurrenceScheduler.Stop()
 	slog.Info("recurrence scheduler stopped")
+
+	// Stop action service
+	slog.Info("stopping action service")
+	actionService.Stop()
+	slog.Info("action service stopped")
 
 	// Stop email scheduler
 	if emailScheduler != nil {

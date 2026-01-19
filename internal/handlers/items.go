@@ -30,6 +30,9 @@ type ItemHandler struct {
 	notificationService interface {
 		EmitEvent(event *services.NotificationEvent)
 	} // Notification service for async notification processing (optional, can be nil)
+	actionService interface {
+		EmitActionEvent(event *models.ActionEvent)
+	} // Action service for automation workflows (optional, can be nil)
 	webhookSender *webhook.WebhookSender // Webhook sender for dispatching webhook events (optional, can be nil)
 }
 
@@ -63,6 +66,13 @@ func (h *ItemHandler) SetWebhookSender(sender *webhook.WebhookSender) {
 // SetMentionService sets the mention service for processing @mentions
 func (h *ItemHandler) SetMentionService(mentionService *services.MentionService) {
 	h.mentionService = mentionService
+}
+
+// SetActionService sets the action service for automation workflows
+func (h *ItemHandler) SetActionService(actionService interface {
+	EmitActionEvent(event *models.ActionEvent)
+}) {
+	h.actionService = actionService
 }
 
 func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
@@ -834,6 +844,24 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 			},
 		})
 	}
+
+	// Emit action event for automation
+	if h.actionService != nil {
+		h.actionService.EmitActionEvent(&models.ActionEvent{
+			EventType:   models.ActionTriggerItemCreated,
+			WorkspaceID: createdItem.WorkspaceID,
+			ItemID:      createdItem.ID,
+			ActorUserID: user.ID,
+			NewValues: map[string]interface{}{
+				"title":       createdItem.Title,
+				"status_id":   createdItem.StatusID,
+				"item_type_id": createdItem.ItemTypeID,
+				"assignee_id": createdItem.AssigneeID,
+				"creator_id":  createdItem.CreatorID,
+				"priority_id": createdItem.PriorityID,
+			},
+		})
+	}
 	notifyTime := time.Since(notifyStart)
 
 	// Dispatch webhook event for item creation
@@ -1098,6 +1126,51 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 					"item.key":   itemKey,
 					"item.id":    updatedItem.ID,
 					"user.name":  user.Username,
+				},
+			})
+		}
+	}
+
+	// Emit action events for automation
+	if h.actionService != nil && user != nil {
+		// Emit status transition event
+		if result.StatusChanged {
+			h.actionService.EmitActionEvent(&models.ActionEvent{
+				EventType:   models.ActionTriggerStatusTransition,
+				WorkspaceID: updatedItem.WorkspaceID,
+				ItemID:      updatedItem.ID,
+				ActorUserID: user.ID,
+				OldValues: map[string]interface{}{
+					"status_id": originalItem.StatusID,
+				},
+				NewValues: map[string]interface{}{
+					"status_id":   updatedItem.StatusID,
+					"title":       updatedItem.Title,
+					"assignee_id": updatedItem.AssigneeID,
+					"creator_id":  updatedItem.CreatorID,
+				},
+			})
+		}
+
+		// Emit item updated event for other changes
+		if !result.StatusChanged {
+			h.actionService.EmitActionEvent(&models.ActionEvent{
+				EventType:   models.ActionTriggerItemUpdated,
+				WorkspaceID: updatedItem.WorkspaceID,
+				ItemID:      updatedItem.ID,
+				ActorUserID: user.ID,
+				OldValues: map[string]interface{}{
+					"status_id":   originalItem.StatusID,
+					"assignee_id": originalItem.AssigneeID,
+					"title":       originalItem.Title,
+					"priority_id": originalItem.PriorityID,
+				},
+				NewValues: map[string]interface{}{
+					"status_id":   updatedItem.StatusID,
+					"assignee_id": updatedItem.AssigneeID,
+					"title":       updatedItem.Title,
+					"priority_id": updatedItem.PriorityID,
+					"creator_id":  updatedItem.CreatorID,
 				},
 			})
 		}
