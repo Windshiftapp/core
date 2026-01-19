@@ -15,6 +15,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/utils"
 )
 
 // ExecutionChain tracks state for cycle detection during action cascades.
@@ -423,14 +424,14 @@ func (as *ActionService) matchesTrigger(action *models.Action, event *models.Act
 	case models.ActionTriggerStatusTransition:
 		// Check from_status_id and to_status_id conditions
 		if config.FromStatusID != nil {
-			oldStatusID, ok := event.OldValues["status_id"].(int)
-			if !ok || oldStatusID != *config.FromStatusID {
+			oldStatusID := utils.InterfaceToIntPtr(event.OldValues["status_id"])
+			if oldStatusID == nil || *oldStatusID != *config.FromStatusID {
 				return false
 			}
 		}
 		if config.ToStatusID != nil {
-			newStatusID, ok := event.NewValues["status_id"].(int)
-			if !ok || newStatusID != *config.ToStatusID {
+			newStatusID := utils.InterfaceToIntPtr(event.NewValues["status_id"])
+			if newStatusID == nil || *newStatusID != *config.ToStatusID {
 				return false
 			}
 		}

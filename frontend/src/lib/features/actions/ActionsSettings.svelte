@@ -6,6 +6,7 @@
   import { statusCategoriesStore } from '../../stores/statusCategories.svelte.js';
   import ActionsManager from './ActionsManager.svelte';
   import ActionFlowEditor from './ActionFlowEditor.svelte';
+  import ActionLogs from './ActionLogs.svelte';
 
   export let workspaceId;
 
@@ -13,6 +14,7 @@
   let statuses = [];
   let loading = true;
   let editingAction = null;
+  let viewingLogsAction = null;
   let showCreateModal = false;
 
   // New action form data
@@ -110,9 +112,11 @@
   }
 
   function handleViewLogs(event) {
-    const action = event.detail;
-    // TODO: Implement logs view modal
-    console.log('View logs for action:', action.id);
+    viewingLogsAction = event.detail;
+  }
+
+  function handleBackFromLogs() {
+    viewingLogsAction = null;
   }
 
   async function handleSaveAction(updatedAction) {
@@ -140,6 +144,14 @@
       {statuses}
       onSave={handleSaveAction}
       onCancel={handleCancelEdit}
+    />
+  </div>
+{:else if viewingLogsAction}
+  <div class="h-full">
+    <ActionLogs
+      {workspaceId}
+      action={viewingLogsAction}
+      onBack={handleBackFromLogs}
     />
   </div>
 {:else}

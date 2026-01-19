@@ -214,6 +214,10 @@
                     <slot name="details" {item} {column}>
                       {getCellValue(item, column) || '—'}
                     </slot>
+                  {:else if column.slot === 'item'}
+                    <slot name="item" {item} {column}>
+                      {getCellValue(item, column) || '—'}
+                    </slot>
                   {:else if column.slot === 'date_range'}
                     <slot name="date_range" {item} {column}>
                       {getCellValue(item, column) || '—'}
