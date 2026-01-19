@@ -22,7 +22,9 @@ export default {
       statusTransition: 'Cambio de Estado',
       itemCreated: 'Elemento Creado',
       itemUpdated: 'Elemento Actualizado',
-      itemLinked: 'Elemento Vinculado'
+      itemLinked: 'Elemento Vinculado',
+      respondToCascades: 'Responder a cambios activados por acciones',
+      respondToCascadesHint: 'Cuando está activado, esta acción también se ejecutará cuando sea activada por otras acciones, no solo por cambios del usuario.'
     },
 
     nodes: {

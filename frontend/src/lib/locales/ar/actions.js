@@ -22,7 +22,9 @@ export default {
       statusTransition: 'تغيير الحالة',
       itemCreated: 'تم إنشاء عنصر',
       itemUpdated: 'تم تحديث عنصر',
-      itemLinked: 'تم ربط عنصر'
+      itemLinked: 'تم ربط عنصر',
+      respondToCascades: 'الاستجابة للتغييرات التي تطلقها الإجراءات',
+      respondToCascadesHint: 'عند التفعيل، سيتم تشغيل هذا الإجراء أيضاً عند تفعيله بواسطة إجراءات أخرى، وليس فقط تغييرات المستخدم.'
     },
 
     nodes: {

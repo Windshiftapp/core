@@ -23,7 +23,9 @@ export default {
       statusTransition: 'Status Transition',
       itemCreated: 'Item Created',
       itemUpdated: 'Item Updated',
-      itemLinked: 'Item Linked'
+      itemLinked: 'Item Linked',
+      respondToCascades: 'Respond to action-triggered changes',
+      respondToCascadesHint: 'When enabled, this action will also run when triggered by other actions, not just user changes.'
     },
 
     // Node types

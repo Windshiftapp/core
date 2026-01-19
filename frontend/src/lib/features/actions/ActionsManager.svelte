@@ -1,12 +1,28 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { createShortcutHandler, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
+  import Button from '../../components/Button.svelte';
+  import { Plus } from 'lucide-svelte';
 
   export let workspaceId;
   export let actions = [];
   export let loading = false;
 
   const dispatch = createEventDispatcher();
+
+  // Keyboard shortcuts
+  const shortcutHandler = createShortcutHandler({
+    add: () => handleCreate()
+  }, 'actions');
+
+  onMount(() => {
+    window.addEventListener('keydown', shortcutHandler);
+  });
+
+  onDestroy(() => {
+    window.removeEventListener('keydown', shortcutHandler);
+  });
 
   function getTriggerTypeLabel(triggerType) {
     const labels = {
@@ -47,12 +63,14 @@
       <h2 class="text-xl font-semibold title">{t('actions.title')}</h2>
       <p class="text-sm subtitle mt-1">{t('actions.description')}</p>
     </div>
-    <button
-      class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+    <Button
+      variant="primary"
+      icon={Plus}
+      keyboardHint={getShortcutDisplay('actions', 'add')}
       onclick={handleCreate}
     >
       {t('actions.create')}
-    </button>
+    </Button>
   </div>
 
   {#if loading}
@@ -67,12 +85,14 @@
       <h3 class="mt-2 text-sm font-medium">{t('actions.noActions')}</h3>
       <p class="mt-1 text-sm text-gray-500">{t('actions.noActionsDescription')}</p>
       <div class="mt-6">
-        <button
-          class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+        <Button
+          variant="primary"
+          icon={Plus}
+          keyboardHint={getShortcutDisplay('actions', 'add')}
           onclick={handleCreate}
         >
           {t('actions.createFirst')}
-        </button>
+        </Button>
       </div>
     </div>
   {:else}

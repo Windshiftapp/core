@@ -22,7 +22,9 @@ export default {
       statusTransition: 'Statusänderung',
       itemCreated: 'Element erstellt',
       itemUpdated: 'Element aktualisiert',
-      itemLinked: 'Element verknüpft'
+      itemLinked: 'Element verknüpft',
+      respondToCascades: 'Auf durch Aktionen ausgelöste Änderungen reagieren',
+      respondToCascadesHint: 'Wenn aktiviert, wird diese Aktion auch ausgeführt, wenn sie durch andere Aktionen ausgelöst wird, nicht nur durch Benutzeränderungen.'
     },
 
     nodes: {

@@ -290,3 +290,12 @@ textarea {
   margin-inline-start: 0.5rem;
   margin-inline-end: 0;
 }
+
+/* =========================
+   Action Flow Node Styles
+   ========================= */
+
+/* Selection glow for action flow nodes */
+.action-flow-node.selected {
+  box-shadow: 0 0 0 2px var(--ds-interactive), 0 0 12px rgba(59, 130, 246, 0.5) !important;
+}

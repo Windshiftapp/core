@@ -1,5 +1,5 @@
 <script>
-  import { BaseEdge, getBezierPath } from '@xyflow/svelte';
+  import { BaseEdge, EdgeReconnectAnchor, getBezierPath } from '@xyflow/svelte';
   import { t } from '../../../stores/i18n.svelte.js';
 
   export let id;
@@ -13,6 +13,9 @@
   export let markerEnd;
   export let style;
   export let sourceHandleId;
+  export let selected = false;
+
+  let reconnecting = false;
 
   $: [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -37,12 +40,31 @@
       : '';
 </script>
 
-<BaseEdge
-  {id}
-  path={edgePath}
-  {markerEnd}
-  style="{style}; stroke: {edgeColor}; stroke-width: 2px;"
-/>
+<!-- Hide base edge during reconnection -->
+{#if !reconnecting}
+  <BaseEdge
+    {id}
+    path={edgePath}
+    {markerEnd}
+    style="{style}; stroke: {edgeColor}; stroke-width: 2px;"
+  />
+{/if}
+
+<!-- Show reconnection anchors when edge is selected -->
+{#if selected}
+  <EdgeReconnectAnchor
+    bind:reconnecting
+    type="source"
+    position={{ x: sourceX, y: sourceY }}
+    style={!reconnecting ? `background: ${edgeColor}; border: 2px solid var(--ds-surface-raised); border-radius: 100%; width: 10px; height: 10px;` : ''}
+  />
+  <EdgeReconnectAnchor
+    bind:reconnecting
+    type="target"
+    position={{ x: targetX, y: targetY }}
+    style={!reconnecting ? `background: ${edgeColor}; border: 2px solid var(--ds-surface-raised); border-radius: 100%; width: 10px; height: 10px;` : ''}
+  />
+{/if}
 
 {#if showLabel}
   <foreignObject

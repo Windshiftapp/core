@@ -12,10 +12,11 @@
   import CreateBranchModal from '../../dialogs/CreateBranchModal.svelte';
   import CreatePRFromBranchModal from '../../dialogs/CreatePRFromBranchModal.svelte';
   import { createEventDispatcher } from 'svelte';
-  import { getVisibleColor, isGrayColor, lightenColor } from '../../utils/colorUtils.js';
+  import { isGrayColor, lightenColor } from '../../utils/colorUtils.js';
   import { workspacePermissions } from '../../stores';
   import { themeStore } from '../../stores/theme.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import StatusBadge from '../../components/StatusBadge.svelte';
 
   // Click outside action
   function clickOutside(node) {
@@ -248,19 +249,6 @@
       : null
   );
 
-  // Use category color directly for text (with semi-transparent background)
-  // Apply getVisibleColor to darken light colors for better visibility
-  // In dark mode, lighten gray colors for better visibility
-  let statusTextColor = $derived(
-    selectedStatus?.categoryColor
-      ? getVisibleColor(selectedStatus.categoryColor, themeStore.isDarkMode)
-      : 'var(--ds-text)'
-  );
-
-  let statusBorderColor = $derived(
-    selectedStatus?.categoryColor || 'var(--ds-border)'
-  );
-
   // Project helpers
   function startEditingProject() {
     if (!canEdit) return;
@@ -417,13 +405,7 @@
               </kbd>
             </div>
             {#if selectedStatus}
-              <span
-                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium uppercase"
-                style="border: 1px solid {statusBorderColor}; color: {statusTextColor};"
-              >
-                <span class="w-1.5 h-1.5 rounded-full" style="background-color: {statusBorderColor};"></span>
-                {selectedStatus.label}
-              </span>
+              <StatusBadge status={selectedStatus} />
             {:else}
               <Text variant="subtle" size="sm">{t('items.setStatus')}</Text>
             {/if}

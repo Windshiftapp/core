@@ -3,6 +3,7 @@
   import { api } from '../../api.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { successToast, errorToast } from '../../stores/toasts.svelte.js';
+  import { statusCategoriesStore } from '../../stores/statusCategories.svelte.js';
   import ActionsManager from './ActionsManager.svelte';
   import ActionFlowEditor from './ActionFlowEditor.svelte';
 
@@ -19,7 +20,7 @@
   let newActionDescription = '';
 
   onMount(async () => {
-    await Promise.all([loadActions(), loadStatuses()]);
+    await Promise.all([loadActions(), loadStatuses(), statusCategoriesStore.init()]);
     loading = false;
   });
 
@@ -72,8 +73,16 @@
     }
   }
 
-  function handleEdit(event) {
-    editingAction = event.detail;
+  async function handleEdit(event) {
+    const action = event.detail;
+    try {
+      // Fetch full action with nodes and edges
+      const fullAction = await api.get(`/workspaces/${workspaceId}/actions/${action.id}`);
+      editingAction = fullAction;
+    } catch (error) {
+      console.error('Failed to load action details:', error);
+      errorToast(t('errors.failedToLoad'));
+    }
   }
 
   async function handleToggle(event) {

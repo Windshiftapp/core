@@ -262,6 +262,30 @@ class ActionFlowStore {
   }
 
   /**
+   * Update an existing edge with new connection info.
+   * Used for edge reconnection.
+   * @param {string} edgeId - The edge ID to update
+   * @param {Object} updates - Object with edge properties to merge (source, target, sourceHandle, targetHandle)
+   */
+  updateEdge(edgeId, updates) {
+    this.edges = this.edges.map(edge => {
+      if (edge.id !== edgeId) return edge;
+
+      // Determine edgeType based on new sourceHandle
+      const sourceHandle = updates.sourceHandle ?? edge.sourceHandle;
+      const edgeType = sourceHandle === 'true' || sourceHandle === 'false'
+        ? sourceHandle
+        : 'default';
+
+      return {
+        ...edge,
+        ...updates,
+        data: { ...edge.data, edgeType }
+      };
+    });
+  }
+
+  /**
    * Update nodes array (for SvelteFlow compatibility).
    * @param {Array} newNodes - New nodes array
    */

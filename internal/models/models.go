@@ -2562,6 +2562,8 @@ type ActionTriggerConfig struct {
 	FieldName string `json:"field_name,omitempty"` // Which field changed
 	// For item_linked
 	LinkTypeID *int `json:"link_type_id,omitempty"` // Filter by link type (optional)
+	// Cascade control - applies to all trigger types
+	RespondToCascades bool `json:"respond_to_cascades,omitempty"` // If true, action responds to events triggered by other actions
 }
 
 // ActionNode represents a step in the action flow
@@ -2612,6 +2614,10 @@ type ActionEvent struct {
 	ActorUserID int                    `json:"actor_user_id"`
 	OldValues   map[string]interface{} `json:"old_values,omitempty"` // Previous field values
 	NewValues   map[string]interface{} `json:"new_values,omitempty"` // New field values
+	// Cascade control fields for loop prevention
+	TriggeredByAction bool   `json:"triggered_by_action,omitempty"` // True if this event was emitted by an action
+	ExecutionChainID  string `json:"execution_chain_id,omitempty"`  // UUID to look up cached chain state for cycle detection
+	CascadeDepth      int    `json:"cascade_depth,omitempty"`       // Depth level of this event (0 = user-triggered)
 }
 
 // ExecutionContext holds context during action execution
@@ -2622,6 +2628,8 @@ type ExecutionContext struct {
 	Actor       *User                  `json:"actor,omitempty"`
 	Variables   map[string]interface{} `json:"variables,omitempty"` // Dynamic variables during execution
 	StepResults []StepResult           `json:"step_results,omitempty"`
+	// ChainID is set when this action is part of a cascade chain (for emitting chained events)
+	ChainID string `json:"-"` // Not serialized - internal use only
 }
 
 // StepResult holds the result of executing a single node

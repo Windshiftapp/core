@@ -1,5 +1,5 @@
 <script>
-  import { onMount, untrack } from 'svelte';
+  import { onMount, onDestroy, untrack } from 'svelte';
   import {
     SvelteFlow,
     Controls,
@@ -10,6 +10,8 @@
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
   import { Pencil, RefreshCw, MessageSquare, Bell, HelpCircle } from 'lucide-svelte';
+  import { createShortcutHandler, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
+  import Button from '../../components/Button.svelte';
   import FieldSelector from '../../pickers/FieldSelector.svelte';
   import TriggerNode from './nodes/TriggerNode.svelte';
   import SetFieldNode from './nodes/SetFieldNode.svelte';
@@ -34,6 +36,7 @@
   let edges = $state([]);
   let selectedNodeId = $state(null);
   let saving = $state(false);
+  let isReconnecting = $state(false);
 
   // Track store version to detect config changes
   let lastStoreNodesVersion = $state(0);
@@ -127,8 +130,19 @@
     { value: 'item_linked', label: t('actions.trigger.itemLinked') }
   ];
 
+  // Keyboard shortcuts
+  const shortcutHandler = createShortcutHandler({
+    save: () => !saving && handleSave(),
+    cancel: () => !saving && onCancel()
+  }, 'actions');
+
   onMount(() => {
     actionFlowStore.init(action, statuses);
+    window.addEventListener('keydown', shortcutHandler);
+  });
+
+  onDestroy(() => {
+    window.removeEventListener('keydown', shortcutHandler);
   });
 
   function handleConnect(params) {
@@ -160,6 +174,29 @@
     }
   }
 
+  function handleReconnectStart() {
+    isReconnecting = true;
+  }
+
+  function handleReconnectEnd() {
+    isReconnecting = false;
+  }
+
+  function handleReconnect(oldEdge, newConnection) {
+    // Update the edge with new connection info
+    actionFlowStore.updateEdge(oldEdge.id, {
+      source: newConnection.source,
+      target: newConnection.target,
+      sourceHandle: newConnection.sourceHandle,
+      targetHandle: newConnection.targetHandle
+    });
+  }
+
+  // Only allow connections during reconnection, block new edge creation
+  function isValidConnection(connection) {
+    return isReconnecting;
+  }
+
   function handleNodeClick(event) {
     const node = event.detail?.node || event.node;
     if (node) {
@@ -168,7 +205,8 @@
   }
 
   function handleAddNode(nodeType) {
-    actionFlowStore.addNode(nodeType);
+    const newNode = actionFlowStore.addNode(nodeType);
+    actionFlowStore.selectNode(newNode.id);
   }
 
   function handleClearSelection() {
@@ -190,6 +228,12 @@
   function handleToStatusChange(e) {
     actionFlowStore.updateNodeConfig(selectedNode.id, {
       to_status_id: e.target.value ? parseInt(e.target.value) : null
+    });
+  }
+
+  function handleRespondToCascadesChange(e) {
+    actionFlowStore.updateNodeConfig(selectedNode.id, {
+      respond_to_cascades: e.target.checked
     });
   }
 
@@ -303,6 +347,10 @@
       {nodeTypes}
       {edgeTypes}
       onconnect={handleConnect}
+      onreconnectstart={handleReconnectStart}
+      onreconnectend={handleReconnectEnd}
+      onreconnect={handleReconnect}
+      {isValidConnection}
       onnodeschange={handleNodesChange}
       onedgeschange={handleEdgesChange}
       onnodeclick={handleNodeClick}
@@ -317,20 +365,23 @@
 
     <!-- Save/Cancel buttons overlay -->
     <div class="absolute top-4 right-4 flex gap-2 z-10">
-      <button
-        class="px-4 py-2 text-sm font-medium border rounded-md button-secondary"
+      <Button
+        variant="default"
         onclick={onCancel}
         disabled={saving}
+        keyboardHint={getShortcutDisplay('actions', 'cancel')}
       >
         {t('common.cancel')}
-      </button>
-      <button
-        class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+      </Button>
+      <Button
+        variant="primary"
         onclick={handleSave}
         disabled={saving}
+        loading={saving}
+        keyboardHint={getShortcutDisplay('actions', 'save')}
       >
-        {saving ? t('common.saving') : t('common.save')}
-      </button>
+        {t('common.save')}
+      </Button>
     </div>
 
     <!-- Action info header -->
@@ -397,6 +448,19 @@
               </select>
             </div>
           {/if}
+          <div class="pt-4 border-t cascade-option">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedNode.data?.config?.respond_to_cascades || false}
+                onchange={handleRespondToCascadesChange}
+              />
+              <span class="text-sm">{t('actions.trigger.respondToCascades')}</span>
+            </label>
+            <p class="text-xs cascade-hint mt-1 ml-6">
+              {t('actions.trigger.respondToCascadesHint')}
+            </p>
+          </div>
         {:else if selectedNode.type === 'set_status'}
           <div>
             <label class="block text-xs font-medium mb-1">{t('actions.config.targetStatus')}</label>
@@ -525,16 +589,6 @@
     background-color: var(--ds-surface-hovered);
   }
 
-  .button-secondary {
-    color: var(--ds-text);
-    background-color: var(--ds-surface);
-    border-color: var(--ds-border);
-  }
-
-  .button-secondary:hover:enabled {
-    background-color: var(--ds-surface-hovered);
-  }
-
   .action-header {
     background-color: var(--ds-surface-raised);
     border-color: var(--ds-border);
@@ -551,6 +605,14 @@
     border-color: var(--ds-interactive);
     outline: none;
     ring: 2px var(--ds-interactive);
+  }
+
+  .cascade-option {
+    border-color: var(--ds-border);
+  }
+
+  .cascade-hint {
+    color: var(--ds-text-subtlest);
   }
 
   :global(.action-flow) {

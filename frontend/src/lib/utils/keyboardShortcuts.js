@@ -135,6 +135,12 @@ const shortcuts = {
   // Pages
   screens: {
     add: { key: 'a' }
+  },
+  // Actions automation
+  actions: {
+    add: { key: 'a' },
+    save: { key: 'Enter', modifierKey: true },
+    cancel: { key: 'Escape' }
   }
 };
 

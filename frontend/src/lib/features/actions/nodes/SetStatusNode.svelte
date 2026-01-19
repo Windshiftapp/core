@@ -2,12 +2,20 @@
   import { Handle, Position } from '@xyflow/svelte';
   import { RefreshCw } from 'lucide-svelte';
   import { t } from '../../../stores/i18n.svelte.js';
+  import StatusBadge from '../../../components/StatusBadge.svelte';
 
   export let data = {};
   export let selected = false;
+
+  function getStatus(statusId) {
+    if (!statusId || !data.statuses) return null;
+    return data.statuses.find(s => s.id === statusId);
+  }
+
+  $: status = data.config?.status_id ? getStatus(data.config.status_id) : null;
 </script>
 
-<div class="set-status-node" class:selected>
+<div class="set-status-node action-flow-node" class:selected>
   <Handle type="target" position={Position.Left} id="input" />
 
   <div class="node-header">
@@ -15,10 +23,8 @@
     <span class="node-title">{t('actions.nodes.setStatus')}</span>
   </div>
   <div class="node-body">
-    {#if data.config?.status_name}
-      <div class="status-badge" style:background-color={data.config.status_color || 'var(--ds-accent-blue)'}>
-        {data.config.status_name}
-      </div>
+    {#if status}
+      <StatusBadge {status} />
     {:else if data.config?.status_id}
       <div class="status-id">ID: {data.config.status_id}</div>
     {:else}
@@ -36,10 +42,6 @@
     border-radius: 8px;
     min-width: 180px;
     box-shadow: var(--shadow-md);
-  }
-
-  .set-status-node.selected {
-    box-shadow: 0 0 0 2px var(--ds-interactive), 0 0 12px rgba(59, 130, 246, 0.5);
   }
 
   .node-header {
@@ -64,15 +66,6 @@
 
   .node-body {
     padding: 10px 12px;
-  }
-
-  .status-badge {
-    display: inline-block;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 500;
-    color: white;
   }
 
   .status-id {

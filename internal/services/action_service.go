@@ -11,10 +11,18 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 )
+
+// ExecutionChain tracks state for cycle detection during action cascades.
+// The chain is stored in memory and keyed by ExecutionChainID.
+type ExecutionChain struct {
+	ExecutedActions map[int]bool // Set of action IDs already executed in this chain
+	CreatedAt       time.Time    // For TTL cleanup
+}
 
 // ActionServiceConfig represents configuration for the action service
 type ActionServiceConfig struct {
@@ -47,6 +55,10 @@ type ActionService struct {
 
 	// Dependencies for action execution
 	notificationService *NotificationService
+
+	// Execution chain cache for cascade loop prevention
+	// Maps ExecutionChainID -> *ExecutionChain
+	chainCache sync.Map
 
 	// Statistics
 	eventsProcessed int64
@@ -163,6 +175,8 @@ func (as *ActionService) cacheRefresher() {
 			if err := as.refreshActionCache(); err != nil {
 				slog.Error("failed to refresh action cache", slog.String("component", "actions"), slog.Any("error", err))
 			}
+			// Also cleanup stale execution chains
+			as.cleanupChains()
 		case <-as.stopChan:
 			slog.Debug("stopping action cache refresher", slog.String("component", "actions"))
 			return
@@ -239,6 +253,53 @@ func (as *ActionService) InvalidateWorkspaceCache(workspaceID int) {
 	as.cacheMu.Unlock()
 }
 
+// getChain retrieves an execution chain from cache by its ID.
+// Returns nil if the chain doesn't exist.
+func (as *ActionService) getChain(chainID string) *ExecutionChain {
+	if chainID == "" {
+		return nil
+	}
+	if chain, ok := as.chainCache.Load(chainID); ok {
+		return chain.(*ExecutionChain)
+	}
+	return nil
+}
+
+// createChain creates a new execution chain and stores it in the cache.
+// Returns the newly created chain.
+func (as *ActionService) createChain(chainID string) *ExecutionChain {
+	chain := &ExecutionChain{
+		ExecutedActions: make(map[int]bool),
+		CreatedAt:       time.Now(),
+	}
+	as.chainCache.Store(chainID, chain)
+	return chain
+}
+
+// cleanupChains removes stale execution chains older than 5 minutes.
+// This is called periodically from the cache refresher.
+func (as *ActionService) cleanupChains() {
+	threshold := time.Now().Add(-5 * time.Minute)
+	cleaned := 0
+	as.chainCache.Range(func(key, value interface{}) bool {
+		chain := value.(*ExecutionChain)
+		if chain.CreatedAt.Before(threshold) {
+			as.chainCache.Delete(key)
+			cleaned++
+		}
+		return true
+	})
+	if cleaned > 0 {
+		slog.Debug("cleaned up stale execution chains",
+			slog.String("component", "actions"),
+			slog.Int("count", cleaned),
+		)
+	}
+}
+
+// MaxCascadeDepth is the maximum depth of nested action triggers (safety limit)
+const MaxCascadeDepth = 5
+
 // processEvent processes a single action event
 func (as *ActionService) processEvent(event *models.ActionEvent) error {
 	slog.Debug("processing action event",
@@ -246,7 +307,32 @@ func (as *ActionService) processEvent(event *models.ActionEvent) error {
 		slog.String("event_type", string(event.EventType)),
 		slog.Int("workspace_id", event.WorkspaceID),
 		slog.Int("item_id", event.ItemID),
+		slog.Bool("triggered_by_action", event.TriggeredByAction),
+		slog.Int("cascade_depth", event.CascadeDepth),
 	)
+
+	// Check cascade depth limit (uses event's immutable depth)
+	if event.CascadeDepth >= MaxCascadeDepth {
+		slog.Warn("action execution depth limit reached",
+			slog.String("component", "actions"),
+			slog.String("chain_id", event.ExecutionChainID),
+			slog.Int("depth", event.CascadeDepth),
+		)
+		return nil
+	}
+
+	// Get chain state from cache for cycle detection (if cascaded event)
+	var chain *ExecutionChain
+	if event.ExecutionChainID != "" {
+		chain = as.getChain(event.ExecutionChainID)
+		if chain == nil {
+			slog.Warn("execution chain not found in cache",
+				slog.String("component", "actions"),
+				slog.String("chain_id", event.ExecutionChainID),
+			)
+			// Chain expired or missing - treat as new chain (safe default)
+		}
+	}
 
 	// Get actions for this workspace from cache
 	as.cacheMu.RLock()
@@ -263,6 +349,17 @@ func (as *ActionService) processEvent(event *models.ActionEvent) error {
 
 	// Find matching actions
 	for _, action := range actions {
+		// Cycle detection: skip if this action already ran in this chain
+		if chain != nil && chain.ExecutedActions[action.ID] {
+			slog.Debug("skipping action - already executed in chain",
+				slog.String("component", "actions"),
+				slog.Int("action_id", action.ID),
+				slog.String("action_name", action.Name),
+				slog.String("chain_id", event.ExecutionChainID),
+			)
+			continue
+		}
+
 		if as.matchesTrigger(action, event) {
 			slog.Debug("action matches trigger, executing",
 				slog.String("component", "actions"),
@@ -270,7 +367,7 @@ func (as *ActionService) processEvent(event *models.ActionEvent) error {
 				slog.String("action_name", action.Name),
 			)
 
-			if err := as.executeAction(action, event); err != nil {
+			if err := as.executeAction(action, event, chain); err != nil {
 				slog.Error("failed to execute action",
 					slog.String("component", "actions"),
 					slog.Int("action_id", action.ID),
@@ -294,18 +391,32 @@ func (as *ActionService) matchesTrigger(action *models.Action, event *models.Act
 	}
 
 	// Parse trigger config if present
-	if action.TriggerConfig == "" {
-		return true // No additional conditions
+	var config models.ActionTriggerConfig
+	if action.TriggerConfig != "" {
+		if err := json.Unmarshal([]byte(action.TriggerConfig), &config); err != nil {
+			slog.Warn("failed to parse trigger config",
+				slog.String("component", "actions"),
+				slog.Int("action_id", action.ID),
+				slog.Any("error", err),
+			)
+			return false
+		}
 	}
 
-	var config models.ActionTriggerConfig
-	if err := json.Unmarshal([]byte(action.TriggerConfig), &config); err != nil {
-		slog.Warn("failed to parse trigger config",
+	// Check cascade control: if the event was triggered by another action,
+	// only process if this action has respond_to_cascades enabled
+	if event.TriggeredByAction && !config.RespondToCascades {
+		slog.Debug("skipping action - does not respond to cascades",
 			slog.String("component", "actions"),
 			slog.Int("action_id", action.ID),
-			slog.Any("error", err),
+			slog.String("action_name", action.Name),
 		)
 		return false
+	}
+
+	// If no trigger config, any event of matching type triggers the action
+	if action.TriggerConfig == "" {
+		return true
 	}
 
 	switch event.EventType {
@@ -353,8 +464,22 @@ func (as *ActionService) matchesTrigger(action *models.Action, event *models.Act
 }
 
 // executeAction executes an action's flow
-func (as *ActionService) executeAction(action *models.Action, event *models.ActionEvent) error {
+func (as *ActionService) executeAction(action *models.Action, event *models.ActionEvent, chain *ExecutionChain) error {
 	startTime := time.Now()
+
+	// Get or create execution chain for cascade tracking
+	chainID := event.ExecutionChainID
+	if chainID == "" {
+		// First action in chain - create new chain
+		chainID = uuid.New().String()
+		chain = as.createChain(chainID)
+	} else if chain == nil {
+		// Chain ID exists but chain not found (expired) - create new one
+		chain = as.createChain(chainID)
+	}
+
+	// Mark this action as executed (for cycle detection)
+	chain.ExecutedActions[action.ID] = true
 
 	// Create execution log
 	log := &models.ActionExecutionLog{
@@ -380,6 +505,7 @@ func (as *ActionService) executeAction(action *models.Action, event *models.Acti
 		Event:       event,
 		Variables:   make(map[string]interface{}),
 		StepResults: []models.StepResult{},
+		ChainID:     chainID,
 	}
 
 	// Populate initial variables from event
@@ -599,12 +725,40 @@ func (as *ActionService) executeSetField(node *models.ActionNode, ctx *models.Ex
 	// Substitute variables in value
 	value := as.substituteVariables(config.Value, ctx)
 
+	// Get current field value for event emission (best effort)
+	var oldValue interface{}
+	row := as.db.QueryRow(`SELECT `+config.FieldName+` FROM items WHERE id = ?`, ctx.Event.ItemID)
+	if err := row.Scan(&oldValue); err != nil {
+		slog.Debug("failed to get current field value for cascade event",
+			slog.String("component", "actions"),
+			slog.String("field_name", config.FieldName),
+			slog.Int("item_id", ctx.Event.ItemID),
+			slog.Any("error", err),
+		)
+	}
+
 	// Update the item's field
 	_, err := as.db.Exec(`
 		UPDATE items SET `+config.FieldName+` = ?, updated_at = ? WHERE id = ?
 	`, value, time.Now(), ctx.Event.ItemID)
+	if err != nil {
+		return err
+	}
 
-	return err
+	// Emit chained event for potential cascade actions
+	as.EmitActionEvent(&models.ActionEvent{
+		EventType:         models.ActionTriggerItemUpdated,
+		WorkspaceID:       ctx.Event.WorkspaceID,
+		ItemID:            ctx.Event.ItemID,
+		ActorUserID:       ctx.Event.ActorUserID,
+		OldValues:         map[string]interface{}{config.FieldName: oldValue},
+		NewValues:         map[string]interface{}{config.FieldName: value},
+		TriggeredByAction: true,
+		ExecutionChainID:  ctx.ChainID,
+		CascadeDepth:      ctx.Event.CascadeDepth + 1,
+	})
+
+	return nil
 }
 
 // executeSetStatus executes a set_status node
@@ -614,11 +768,42 @@ func (as *ActionService) executeSetStatus(node *models.ActionNode, ctx *models.E
 		return fmt.Errorf("failed to parse set_status config: %w", err)
 	}
 
-	_, err := as.db.Exec(`
+	// Get current status for event emission
+	var oldStatusID int
+	err := as.db.QueryRow(`SELECT status_id FROM items WHERE id = ?`, ctx.Event.ItemID).Scan(&oldStatusID)
+	if err != nil {
+		slog.Warn("failed to get current status for cascade event",
+			slog.String("component", "actions"),
+			slog.Int("item_id", ctx.Event.ItemID),
+			slog.Any("error", err),
+		)
+	}
+
+	// Update the status
+	_, err = as.db.Exec(`
 		UPDATE items SET status_id = ?, updated_at = ? WHERE id = ?
 	`, config.StatusID, time.Now(), ctx.Event.ItemID)
+	if err != nil {
+		return err
+	}
 
-	return err
+	// Only emit cascade event if status actually changed
+	if oldStatusID != config.StatusID {
+		// Emit chained event for potential cascade actions
+		as.EmitActionEvent(&models.ActionEvent{
+			EventType:         models.ActionTriggerStatusTransition,
+			WorkspaceID:       ctx.Event.WorkspaceID,
+			ItemID:            ctx.Event.ItemID,
+			ActorUserID:       ctx.Event.ActorUserID,
+			OldValues:         map[string]interface{}{"status_id": oldStatusID},
+			NewValues:         map[string]interface{}{"status_id": config.StatusID},
+			TriggeredByAction: true,
+			ExecutionChainID:  ctx.ChainID,
+			CascadeDepth:      ctx.Event.CascadeDepth + 1,
+		})
+	}
+
+	return nil
 }
 
 // executeAddComment executes an add_comment node
