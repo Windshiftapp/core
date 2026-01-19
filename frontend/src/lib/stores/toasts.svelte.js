@@ -1,6 +1,8 @@
 // Toast store for managing multiple stacked toasts
 // Uses Svelte 5 runes for reactivity
 
+import { t } from './i18n.svelte.js';
+
 let toastId = 0;
 
 // Reactive state for toasts array
@@ -72,27 +74,27 @@ export function clearToasts() {
 /**
  * Convenience function for error toast
  */
-export function errorToast(message, title = 'Error') {
-  return addToast({ message, title, variant: 'error' });
+export function errorToast(message, title) {
+  return addToast({ message, title: title ?? t('toast.error'), variant: 'error' });
 }
 
 /**
  * Convenience function for success toast
  */
-export function successToast(message, title = 'Success') {
-  return addToast({ message, title, variant: 'success' });
+export function successToast(message, title) {
+  return addToast({ message, title: title ?? t('toast.success'), variant: 'success' });
 }
 
 /**
  * Convenience function for warning toast
  */
-export function warningToast(message, title = 'Warning') {
-  return addToast({ message, title, variant: 'warning' });
+export function warningToast(message, title) {
+  return addToast({ message, title: title ?? t('toast.warning'), variant: 'warning' });
 }
 
 /**
  * Convenience function for info toast
  */
-export function infoToast(message, title = 'Info') {
-  return addToast({ message, title, variant: 'info' });
+export function infoToast(message, title) {
+  return addToast({ message, title: title ?? t('toast.info'), variant: 'info' });
 }

@@ -141,7 +141,8 @@ export default {
     tomorrow: 'Manana',
     now: 'Ahora',
     never: 'Nunca',
-    always: 'Siempre'
+    always: 'Siempre',
+    saved: 'Guardado correctamente'
   },
 
   // Toast notifications

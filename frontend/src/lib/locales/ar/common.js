@@ -144,7 +144,8 @@ export default {
     never: 'أبداً',
     always: 'دائماً',
 
-    viewDetails: 'عرض التفاصيل'
+    viewDetails: 'عرض التفاصيل',
+    saved: 'تم الحفظ بنجاح'
   },
 
   // Toast notifications

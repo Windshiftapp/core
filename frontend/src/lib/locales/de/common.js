@@ -172,7 +172,8 @@ export default {
     project: 'Projekt',
     noProject: 'Kein Projekt',
     global: 'Global',
-    root: 'Stammordner'
+    root: 'Stammordner',
+    saved: 'Erfolgreich gespeichert'
   },
 
   // Toast notifications
