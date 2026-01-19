@@ -6,6 +6,7 @@
   import { workspaceIconMap } from '../utils/icons.js';
   import DropdownMenu from './DropdownMenu.svelte';
   import Tooltip from '../components/Tooltip.svelte';
+  import NavLink from './NavLink.svelte';
   import UserAvatar from '../components/UserAvatar.svelte';
   import NotificationTray from '../features/notifications/NotificationTray.svelte';
   import {
@@ -96,6 +97,30 @@
     return items;
   });
 
+  // Navigation items data
+  const mainNavItems = [
+    { id: 'collections', icon: Library, labelKey: 'nav.collections', href: '/collections', activeViews: ['collections-list'] },
+    { id: 'time', icon: Clock, labelKey: 'nav.timeAndProjects', href: '/time', activeViews: ['time'] },
+    { id: 'milestones', icon: Milestone, labelKey: 'nav.milestones', href: '/milestones', activeViews: ['milestones', 'milestone-detail'] },
+    { id: 'iterations', icon: Calendar, labelKey: 'nav.iterations', href: '/iterations', activeViews: ['iterations', 'iteration-detail'] },
+    { id: 'assets', icon: Package, labelKey: 'nav.assets', href: '/assets', activeViews: ['assets', 'asset-detail'] },
+    { id: 'channels', icon: LifeBuoy, labelKey: 'nav.channels', href: '/channels', activeViews: ['channels'] },
+    { id: 'customers', icon: Users, labelKey: 'nav.customers', href: '/customers', activeViews: ['customers'], permission: 'canAccessCustomers' }
+  ];
+
+  const bottomNavItems = [
+    { id: 'admin', icon: Settings, labelKey: 'nav.admin', href: '/admin', activeViews: ['admin'], permission: 'canAccessAdmin' }
+  ];
+
+  // Filter nav items based on permissions
+  const filteredMainNav = $derived(
+    mainNavItems.filter(item => !item.permission || $permissionStore[item.permission])
+  );
+
+  const filteredBottomNav = $derived(
+    bottomNavItems.filter(item => !item.permission || $permissionStore[item.permission])
+  );
+
   function showCreateDropdown() {
     onShowCreateModal();
   }
@@ -141,115 +166,34 @@
       </div>
     </Tooltip>
 
-    <!-- Collections -->
-    <Tooltip content={t('nav.collections')} placement="right" disabled={$uiStore.navExpanded}>
-      <a
-        href="/collections"
-        class="{$uiStore.navExpanded ? 'w-full px-3' : 'w-10'} h-10 rounded flex items-center {$uiStore.navExpanded ? '' : 'justify-center'} cursor-pointer nav-button {$currentRoute.view === 'collections-list' ? 'nav-button-selected' : ''}"
-        aria-current={$currentRoute.view === 'collections-list' ? 'page' : undefined}
-      >
-        <Library class="w-5 h-5 flex-shrink-0" />
-        {#if $uiStore.navExpanded}<span class="ml-3 text-sm whitespace-nowrap">{t('nav.collections')}</span>{/if}
-      </a>
-    </Tooltip>
-
-    <!-- Time & Projects -->
-    <Tooltip content={t('nav.timeAndProjects')} placement="right" disabled={$uiStore.navExpanded}>
-      <a
-        href="/time"
-        class="{$uiStore.navExpanded ? 'w-full px-3' : 'w-10'} h-10 rounded flex items-center {$uiStore.navExpanded ? '' : 'justify-center'} cursor-pointer nav-button {$currentRoute.view === 'time' ? 'nav-button-selected' : ''}"
-        aria-current={$currentRoute.view === 'time' ? 'page' : undefined}
-      >
-        <Clock class="w-5 h-5 flex-shrink-0" />
-        {#if $uiStore.navExpanded}<span class="ml-3 text-sm whitespace-nowrap">{t('nav.timeAndProjects')}</span>{/if}
-      </a>
-    </Tooltip>
-
-    <!-- Milestones -->
-    <Tooltip content={t('nav.milestones')} placement="right" disabled={$uiStore.navExpanded}>
-      <a
-        href="/milestones"
-        class="{$uiStore.navExpanded ? 'w-full px-3' : 'w-10'} h-10 rounded flex items-center {$uiStore.navExpanded ? '' : 'justify-center'} cursor-pointer nav-button {$currentRoute.view === 'milestones' || $currentRoute.view === 'milestone-detail' ? 'nav-button-selected' : ''}"
-        aria-current={$currentRoute.view === 'milestones' ? 'page' : undefined}
-      >
-        <Milestone class="w-5 h-5 flex-shrink-0" />
-        {#if $uiStore.navExpanded}<span class="ml-3 text-sm whitespace-nowrap">{t('nav.milestones')}</span>{/if}
-      </a>
-    </Tooltip>
-
-    <!-- Iterations -->
-    <Tooltip content={t('nav.iterations')} placement="right" disabled={$uiStore.navExpanded}>
-      <a
-        href="/iterations"
-        class="{$uiStore.navExpanded ? 'w-full px-3' : 'w-10'} h-10 rounded flex items-center {$uiStore.navExpanded ? '' : 'justify-center'} cursor-pointer nav-button {$currentRoute.view === 'iterations' || $currentRoute.view === 'iteration-detail' ? 'nav-button-selected' : ''}"
-        aria-current={$currentRoute.view === 'iterations' ? 'page' : undefined}
-      >
-        <Calendar class="w-5 h-5 flex-shrink-0" />
-        {#if $uiStore.navExpanded}<span class="ml-3 text-sm whitespace-nowrap">{t('nav.iterations')}</span>{/if}
-      </a>
-    </Tooltip>
-
-    <!-- Assets -->
-    <Tooltip content={t('nav.assets')} placement="right" disabled={$uiStore.navExpanded}>
-      <a
-        href="/assets"
-        class="{$uiStore.navExpanded ? 'w-full px-3' : 'w-10'} h-10 rounded flex items-center {$uiStore.navExpanded ? '' : 'justify-center'} cursor-pointer nav-button {$currentRoute.view === 'assets' || $currentRoute.view === 'asset-detail' ? 'nav-button-selected' : ''}"
-        aria-current={$currentRoute.view === 'assets' ? 'page' : undefined}
-      >
-        <Package class="w-5 h-5 flex-shrink-0" />
-        {#if $uiStore.navExpanded}<span class="ml-3 text-sm whitespace-nowrap">{t('nav.assets')}</span>{/if}
-      </a>
-    </Tooltip>
-
-    <!-- Channels -->
-    <Tooltip content={t('nav.channels')} placement="right" disabled={$uiStore.navExpanded}>
-      <a
-        href="/channels"
-        class="{$uiStore.navExpanded ? 'w-full px-3' : 'w-10'} h-10 rounded flex items-center {$uiStore.navExpanded ? '' : 'justify-center'} cursor-pointer nav-button {$currentRoute.view === 'channels' ? 'nav-button-selected' : ''}"
-        aria-current={$currentRoute.view === 'channels' ? 'page' : undefined}
-      >
-        <LifeBuoy class="w-5 h-5 flex-shrink-0" />
-        {#if $uiStore.navExpanded}<span class="ml-3 text-sm whitespace-nowrap">{t('nav.channels')}</span>{/if}
-      </a>
-    </Tooltip>
-
-    <!-- Customers (conditional based on permission) -->
-    {#if $permissionStore.canAccessCustomers}
-      <Tooltip content={t('nav.customers')} placement="right" disabled={$uiStore.navExpanded}>
-        <a
-          href="/customers"
-          class="{$uiStore.navExpanded ? 'w-full px-3' : 'w-10'} h-10 rounded flex items-center {$uiStore.navExpanded ? '' : 'justify-center'} cursor-pointer nav-button {$currentRoute.view === 'customers' ? 'nav-button-selected' : ''}"
-          aria-current={$currentRoute.view === 'customers' ? 'page' : undefined}
-        >
-          <Users class="w-5 h-5 flex-shrink-0" />
-          {#if $uiStore.navExpanded}<span class="ml-3 text-sm whitespace-nowrap">{t('nav.customers')}</span>{/if}
-        </a>
-      </Tooltip>
-    {/if}
+    <!-- Main Nav Links -->
+    {#each filteredMainNav as item (item.id)}
+      <NavLink
+        icon={item.icon}
+        label={t(item.labelKey)}
+        href={item.href}
+        isActive={item.activeViews.includes($currentRoute.view)}
+        expanded={$uiStore.navExpanded}
+      />
+    {/each}
 
     <!-- Top Actions Section - "Notch" style centered positioning -->
     <div class="flex flex-col items-stretch space-y-2 my-6 py-4">
-      <!-- Create button -->
-      <Tooltip content="{t('nav.create')} (C)" placement="right" disabled={$uiStore.navExpanded}>
-        <button
-          onclick={showCreateDropdown}
-          class="{$uiStore.navExpanded ? 'w-full' : 'w-10'} h-10 bg-[var(--ds-interactive)] bg-primary text-white rounded flex items-center {$uiStore.navExpanded ? 'px-3' : 'justify-center'} text-sm font-medium transition cursor-pointer"
-        >
-          <Plus class="w-5 h-5 flex-shrink-0" />
-          {#if $uiStore.navExpanded}<span class="ml-3 whitespace-nowrap">{t('nav.create')}</span>{/if}
-        </button>
-      </Tooltip>
-
-      <!-- Search button -->
-      <Tooltip content="{t('nav.search')} ({getShortcutDisplay('global', 'commandPalette')} or Space Space)" placement="right" disabled={$uiStore.navExpanded}>
-        <button
-          onclick={onShowCommandPalette}
-          class="{$uiStore.navExpanded ? 'w-full' : 'w-10'} h-10 rounded flex items-center {$uiStore.navExpanded ? 'px-3' : 'justify-center'} cursor-pointer nav-button"
-        >
-          <Search class="w-5 h-5 flex-shrink-0" />
-          {#if $uiStore.navExpanded}<span class="ml-3 text-sm whitespace-nowrap">{t('nav.search')}</span>{/if}
-        </button>
-      </Tooltip>
+      <NavLink
+        icon={Plus}
+        label={t('nav.create')}
+        onclick={showCreateDropdown}
+        expanded={$uiStore.navExpanded}
+        variant="primary"
+        tooltipSuffix=" (C)"
+      />
+      <NavLink
+        icon={Search}
+        label={t('nav.search')}
+        onclick={onShowCommandPalette}
+        expanded={$uiStore.navExpanded}
+        tooltipSuffix=" ({getShortcutDisplay('global', 'commandPalette')} or Space Space)"
+      />
     </div>
   </div>
 
@@ -268,19 +212,16 @@
         <PanelLeftOpen class="w-5 h-5" />
       {/if}
     </button>
-    <!-- Admin (conditional) -->
-    {#if $permissionStore.canAccessAdmin}
-      <Tooltip content={t('nav.admin')} placement="right" disabled={$uiStore.navExpanded}>
-        <a
-          href="/admin"
-          class="{$uiStore.navExpanded ? 'w-full px-3' : 'w-10 justify-center'} h-10 rounded flex items-center cursor-pointer nav-button {$currentRoute.view === 'admin' ? 'nav-button-selected' : ''}"
-          aria-current={$currentRoute.view === 'admin' ? 'page' : undefined}
-        >
-          <Settings class="w-5 h-5 flex-shrink-0" />
-          {#if $uiStore.navExpanded}<span class="ml-3 text-sm whitespace-nowrap">{t('nav.admin')}</span>{/if}
-        </a>
-      </Tooltip>
-    {/if}
+    <!-- Bottom Nav Links -->
+    {#each filteredBottomNav as item (item.id)}
+      <NavLink
+        icon={item.icon}
+        label={t(item.labelKey)}
+        href={item.href}
+        isActive={item.activeViews.includes($currentRoute.view)}
+        expanded={$uiStore.navExpanded}
+      />
+    {/each}
 
     <!-- Notification Tray -->
     <Tooltip content={t('nav.notifications')} placement="right" disabled={$uiStore.navExpanded}>
