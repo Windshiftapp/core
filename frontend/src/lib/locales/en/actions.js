@@ -107,7 +107,65 @@ export default {
       startedAt: 'Started At',
       completedAt: 'Completed At',
       error: 'Error',
+      details: 'Details',
       viewDetails: 'View Details'
+    },
+
+    // Execution trace
+    trace: {
+      title: 'Execution Details',
+      noSteps: 'No execution steps recorded',
+      setStatus: 'Changed status from "{from}" to "{to}"',
+      setField: 'Set {field} from "{from}" to "{to}"',
+      addComment: 'Added {prefix}comment: "{content}"',
+      notifyUser: 'Sent notification to {count} user(s)',
+      notifySkipped: 'Notification skipped: {reason}',
+      conditionResult: 'Condition evaluated to {result}'
+    },
+
+    // Test/manual execution
+    test: {
+      title: 'Test Action',
+      description: 'Select an item to run this action against. This will execute the action immediately, bypassing the normal trigger.',
+      selectItem: 'Select Item',
+      itemPlaceholder: 'Search for an item...',
+      execute: 'Run Action',
+      run: 'Test Run',
+      executionFailed: 'Failed to execute action',
+      executionQueued: 'Action queued for execution'
+    },
+
+    // Placeholder reference
+    placeholders: {
+      title: 'Available Placeholders',
+      description: 'Use these placeholders in your template. They will be replaced with actual values when the action runs.',
+      showReference: 'Show placeholder reference',
+      categories: {
+        item: 'Item Fields',
+        user: 'Current User',
+        old: 'Previous Values',
+        trigger: 'Trigger Context'
+      },
+      item: {
+        title: 'Item title',
+        id: 'Item ID',
+        statusId: 'Status ID',
+        assigneeId: 'Assignee user ID',
+        any: 'Any item field'
+      },
+      user: {
+        name: "User's full name",
+        email: "User's email",
+        id: 'User ID'
+      },
+      old: {
+        description: 'Previous value before change',
+        example: 'Any field\'s previous value'
+      },
+      trigger: {
+        itemId: 'Triggering item ID',
+        workspaceId: 'Workspace ID'
+      }
     }
   }
 };

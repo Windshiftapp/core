@@ -2509,6 +2509,7 @@ const (
 	ActionTriggerItemCreated      ActionTriggerType = "item_created"
 	ActionTriggerItemUpdated      ActionTriggerType = "item_updated"
 	ActionTriggerItemLinked       ActionTriggerType = "item_linked"
+	ActionTriggerManual           ActionTriggerType = "manual"
 )
 
 // ActionNodeType defines the type of action node

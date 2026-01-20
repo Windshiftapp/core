@@ -90,6 +90,17 @@ textarea {
   text-decoration: none;
 }
 
+/* Reusable link utility class */
+a.link {
+  color: var(--ds-text-link);
+  transition: color 0.15s ease;
+}
+
+a.link:hover {
+  color: var(--ds-text-link-hovered);
+  text-decoration: underline;
+}
+
 .html-content blockquote {
   border-left: 3px solid var(--ds-border-bold);
   margin: 0.75rem 0;

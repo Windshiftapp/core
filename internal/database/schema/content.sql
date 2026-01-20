@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS comments (
 	author_id INTEGER,
 	portal_customer_id INTEGER,
 	content TEXT NOT NULL,
+	is_private BOOLEAN DEFAULT false,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,

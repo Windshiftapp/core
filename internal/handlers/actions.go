@@ -416,3 +416,64 @@ func (h *ActionsHandler) GetWorkspaceLogs(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(logs)
 }
+
+// ExecuteActionRequest represents the request body for manual action execution
+type ExecuteActionRequest struct {
+	ItemID int `json:"item_id"`
+}
+
+// ExecuteAction manually executes an action for a specific item
+func (h *ActionsHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
+	actionIDStr := r.PathValue("id")
+	actionID, err := strconv.Atoi(actionIDStr)
+	if err != nil {
+		http.Error(w, "Invalid action ID", http.StatusBadRequest)
+		return
+	}
+
+	// Parse request body
+	var req ExecuteActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.ItemID == 0 {
+		http.Error(w, "item_id is required", http.StatusBadRequest)
+		return
+	}
+
+	// Get action
+	action, err := h.repo.GetByID(actionID)
+	if err == repository.ErrNotFound {
+		http.Error(w, "Action not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Get current user
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser == nil {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
+	}
+
+	// Execute action manually
+	if h.actionService == nil {
+		http.Error(w, "Action service not available", http.StatusInternalServerError)
+		return
+	}
+
+	// Execute the action (this is synchronous for immediate feedback)
+	err = h.actionService.ExecuteActionManually(action, req.ItemID, currentUser.ID)
+	if err != nil {
+		http.Error(w, "Failed to execute action: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "completed"})
+}

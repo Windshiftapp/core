@@ -7,6 +7,8 @@
   import ActionsManager from './ActionsManager.svelte';
   import ActionFlowEditor from './ActionFlowEditor.svelte';
   import ActionLogs from './ActionLogs.svelte';
+  import Modal from '../../dialogs/Modal.svelte';
+  import Button from '../../components/Button.svelte';
 
   export let workspaceId;
 
@@ -168,55 +170,59 @@
 {/if}
 
 <!-- Create Action Modal -->
-{#if showCreateModal}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onclick={() => showCreateModal = false}>
-    <div class="modal-content p-6 rounded-lg shadow-xl max-w-md w-full mx-4" onclick={(e) => e.stopPropagation()}>
-      <h2 class="text-lg font-semibold mb-4 modal-title">{t('actions.create')}</h2>
+<Modal
+  isOpen={showCreateModal}
+  onSubmit={createAction}
+  submitDisabled={!newActionName.trim()}
+  maxWidth="max-w-md"
+  onclose={() => showCreateModal = false}
+  let:submitHint
+>
+  <div class="p-6">
+    <h2 class="text-lg font-semibold mb-4 modal-title">{t('actions.create')}</h2>
 
-      <div class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium mb-1 modal-label">{t('common.name')}</label>
-          <input
-            type="text"
-            class="w-full px-3 py-2 border rounded-md text-sm modal-input"
-            bind:value={newActionName}
-            placeholder={t('actions.newAction')}
-          />
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-1 modal-label">{t('common.description')}</label>
-          <textarea
-            class="w-full px-3 py-2 border rounded-md text-sm modal-input"
-            rows="2"
-            bind:value={newActionDescription}
-          ></textarea>
-        </div>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium mb-1 modal-label">{t('common.name')}</label>
+        <input
+          type="text"
+          class="w-full px-3 py-2 border rounded-md text-sm modal-input"
+          bind:value={newActionName}
+          placeholder={t('actions.newAction')}
+        />
       </div>
 
-      <div class="flex justify-end gap-3 mt-6">
-        <button
-          class="px-4 py-2 text-sm font-medium border rounded-md modal-cancel-btn"
-          onclick={() => showCreateModal = false}
-        >
-          {t('common.cancel')}
-        </button>
-        <button
-          class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-          onclick={createAction}
-        >
-          {t('common.create')}
-        </button>
+      <div>
+        <label class="block text-sm font-medium mb-1 modal-label">{t('common.description')}</label>
+        <textarea
+          class="w-full px-3 py-2 border rounded-md text-sm modal-input"
+          rows="2"
+          bind:value={newActionDescription}
+        ></textarea>
       </div>
     </div>
+
+    <div class="flex justify-end gap-3 mt-6">
+      <Button
+        variant="default"
+        onclick={() => showCreateModal = false}
+        keyboardHint="Esc"
+      >
+        {t('common.cancel')}
+      </Button>
+      <Button
+        variant="primary"
+        onclick={createAction}
+        disabled={!newActionName.trim()}
+        keyboardHint={submitHint}
+      >
+        {t('common.create')}
+      </Button>
+    </div>
   </div>
-{/if}
+</Modal>
 
 <style>
-  .modal-content {
-    background-color: var(--ds-surface-raised);
-  }
-
   .modal-title {
     color: var(--ds-text);
   }
@@ -234,15 +240,5 @@
   .modal-input:focus {
     border-color: var(--ds-interactive);
     outline: none;
-  }
-
-  .modal-cancel-btn {
-    color: var(--ds-text);
-    background-color: var(--ds-surface);
-    border-color: var(--ds-border);
-  }
-
-  .modal-cancel-btn:hover {
-    background-color: var(--ds-surface-hovered);
   }
 </style>

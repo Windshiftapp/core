@@ -9,7 +9,7 @@
     addEdge
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
-  import { Pencil, RefreshCw, MessageSquare, Bell, HelpCircle } from 'lucide-svelte';
+  import { Pencil, RefreshCw, MessageSquare, Bell, HelpCircle, Zap } from 'lucide-svelte';
   import { createShortcutHandler, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import Button from '../../components/Button.svelte';
   import FieldSelector from '../../pickers/FieldSelector.svelte';
@@ -20,7 +20,9 @@
   import NotifyUserNode from './nodes/NotifyUserNode.svelte';
   import ConditionNode from './nodes/ConditionNode.svelte';
   import ActionEdge from './edges/ActionEdge.svelte';
+  import PlaceholderReferenceModal from './PlaceholderReferenceModal.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import { actionFlowStore } from '../../stores/actionFlowStore.svelte.js';
 
   // Props using Svelte 5 $props()
@@ -37,6 +39,7 @@
   let selectedNodeId = $state(null);
   let saving = $state(false);
   let isReconnecting = $state(false);
+  let showPlaceholderModal = $state(false);
 
   // Track store version to detect config changes
   let lastStoreNodesVersion = $state(0);
@@ -192,9 +195,19 @@
     });
   }
 
-  // Only allow connections during reconnection, block new edge creation
   function isValidConnection(connection) {
-    return isReconnecting;
+    // Allow reconnections
+    if (isReconnecting) return true;
+
+    // Allow new connections from source to target
+    // Prevent self-connections
+    if (connection.source === connection.target) return false;
+
+    // Prevent connecting to trigger node (it has no input)
+    const targetNode = nodes.find(n => n.id === connection.target);
+    if (targetNode?.type === 'trigger') return false;
+
+    return true;
   }
 
   function handleNodeClick(event) {
@@ -306,7 +319,7 @@
       await onSave(actionData);
     } catch (error) {
       console.error('Failed to save action:', error);
-      alert(t('actions.failedToSave') + ': ' + (error.message || error));
+      errorToast(error.message || String(error), t('actions.failedToSave'));
     } finally {
       actionFlowStore.setSaving(false);
     }
@@ -315,27 +328,41 @@
 
 <div class="flex h-full action-flow-editor">
   <!-- Node Palette -->
-  <div class="w-64 sidebar border-r p-4 overflow-y-auto flex-shrink-0">
-    <h3 class="text-sm font-medium sidebar-title mb-3">{t('actions.addNodes')}</h3>
-    <div class="space-y-2">
-      {#each nodePalette as item}
-        <button
-          class="w-full p-3 text-left border rounded-lg node-palette-item flex items-center"
-          onclick={() => handleAddNode(item.type)}
-        >
-          <svelte:component this={item.icon} size={16} class="mr-2 flex-shrink-0" />
-          <span class="text-sm">{item.label}</span>
-        </button>
-      {/each}
+  <div class="w-64 sidebar border-r flex flex-col py-4 overflow-y-auto flex-shrink-0">
+    <!-- Actions Header -->
+    <div class="px-4 mb-4 pb-4 border-b" style="border-color: var(--ds-border);">
+      <div class="flex items-center gap-3">
+        <div class="flex items-center justify-center w-10 h-10 flex-shrink-0">
+          <div class="w-8 h-8 rounded-md flex items-center justify-center bg-amber-500">
+            <Zap size={18} color="white" />
+          </div>
+        </div>
+        <span class="font-medium text-sm" style="color: var(--ds-text);">{t('actions.title')}</span>
+      </div>
     </div>
 
-    <div class="mt-6 pt-4 border-t">
-      <h4 class="text-xs font-medium sidebar-subtitle mb-2">{t('actions.tips')}</h4>
-      <ul class="text-xs space-y-1 sidebar-hints">
-        <li>{t('actions.tipDragToConnect')}</li>
-        <li>{t('actions.tipClickToEdit')}</li>
-        <li>{t('actions.tipConditionBranches')}</li>
-      </ul>
+    <div class="px-4">
+      <h3 class="text-sm font-medium sidebar-title mb-3">{t('actions.addNodes')}</h3>
+      <div class="space-y-2">
+        {#each nodePalette as item}
+          <button
+            class="w-full px-3 py-2 text-left rounded-lg text-sm font-medium flex items-center gap-2 node-palette-item cursor-pointer"
+            onclick={() => handleAddNode(item.type)}
+          >
+            <svelte:component this={item.icon} class="w-4 h-4 flex-shrink-0" />
+            <span>{item.label}</span>
+          </button>
+        {/each}
+      </div>
+
+      <div class="mt-6 pt-4 border-t">
+        <h4 class="text-xs font-medium sidebar-subtitle mb-2">{t('actions.tips')}</h4>
+        <ul class="text-xs space-y-1 sidebar-hints">
+          <li>{t('actions.tipDragToConnect')}</li>
+          <li>{t('actions.tipClickToEdit')}</li>
+          <li>{t('actions.tipConditionBranches')}</li>
+        </ul>
+      </div>
     </div>
   </div>
 
@@ -487,7 +514,16 @@
             />
           </div>
           <div>
-            <label class="block text-xs font-medium mb-1">{t('actions.config.value')}</label>
+            <div class="flex items-center gap-1 mb-1">
+              <label class="block text-xs font-medium">{t('actions.config.value')}</label>
+              <button
+                onclick={() => showPlaceholderModal = true}
+                class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
+                title={t('actions.placeholders.showReference')}
+              >
+                <HelpCircle class="w-3.5 h-3.5" />
+              </button>
+            </div>
             <input
               type="text"
               class="w-full px-3 py-2 border rounded-md text-sm config-input"
@@ -498,7 +534,16 @@
           </div>
         {:else if selectedNode.type === 'add_comment'}
           <div>
-            <label class="block text-xs font-medium mb-1">{t('actions.config.commentContent')}</label>
+            <div class="flex items-center gap-1 mb-1">
+              <label class="block text-xs font-medium">{t('actions.config.commentContent')}</label>
+              <button
+                onclick={() => showPlaceholderModal = true}
+                class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
+                title={t('actions.placeholders.showReference')}
+              >
+                <HelpCircle class="w-3.5 h-3.5" />
+              </button>
+            </div>
             <textarea
               class="w-full px-3 py-2 border rounded-md text-sm config-input"
               rows="4"
@@ -556,6 +601,10 @@
   {/if}
 </div>
 
+{#if showPlaceholderModal}
+  <PlaceholderReferenceModal onclose={() => showPlaceholderModal = false} />
+{/if}
+
 <style>
   .action-flow-editor {
     background-color: var(--ds-surface);
@@ -580,13 +629,21 @@
 
   .node-palette-item {
     background-color: var(--ds-surface);
-    border-color: var(--ds-border);
-    color: var(--ds-text);
+    color: var(--ds-text-subtle);
+    transition:
+      background-color 200ms ease,
+      color 100ms ease,
+      transform 100ms cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
   .node-palette-item:hover {
-    border-color: var(--ds-interactive);
     background-color: var(--ds-surface-hovered);
+    color: var(--ds-text);
+    transform: translateX(4px);
+  }
+
+  .node-palette-item:active {
+    transform: translateX(2px) scale(0.98);
   }
 
   .action-header {
@@ -636,5 +693,13 @@
   :global(.action-flow .svelte-flow__minimap) {
     background-color: var(--ds-surface-raised);
     border: 1px solid var(--ds-border);
+  }
+
+  :global(.action-flow .svelte-flow__attribution) {
+    background-color: transparent;
+  }
+
+  :global(.action-flow .svelte-flow__attribution a) {
+    color: var(--ds-text-subtlest);
   }
 </style>

@@ -3,13 +3,28 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { createShortcutHandler, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import Button from '../../components/Button.svelte';
-  import { Plus } from 'lucide-svelte';
+  import TestActionModal from './TestActionModal.svelte';
+  import { Plus, Play } from 'lucide-svelte';
 
   export let workspaceId;
   export let actions = [];
   export let loading = false;
 
   const dispatch = createEventDispatcher();
+
+  // Test action modal state
+  let showTestModal = false;
+  let testAction = null;
+
+  function handleTest(action) {
+    testAction = action;
+    showTestModal = true;
+  }
+
+  function closeTestModal() {
+    showTestModal = false;
+    testAction = null;
+  }
 
   // Keyboard shortcuts
   const shortcutHandler = createShortcutHandler({
@@ -132,6 +147,13 @@
             <div class="flex items-center gap-2">
               <button
                 class="p-2 rounded-md action-button"
+                onclick={() => handleTest(action)}
+                title={t('actions.test.run')}
+              >
+                <Play class="h-5 w-5" />
+              </button>
+              <button
+                class="p-2 rounded-md action-button"
                 onclick={() => handleViewLogs(action)}
                 title={t('actions.viewLogs')}
               >
@@ -180,6 +202,18 @@
     </div>
   {/if}
 </div>
+
+{#if showTestModal && testAction}
+  <TestActionModal
+    action={testAction}
+    {workspaceId}
+    onclose={closeTestModal}
+    onsuccess={() => {
+      // Optionally refresh logs or show toast
+      dispatch('testExecuted', testAction);
+    }}
+  />
+{/if}
 
 <style>
   .actions-manager {

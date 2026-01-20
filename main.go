@@ -940,6 +940,16 @@ func main() {
 	itemHandler.SetMentionService(mentionService)
 	commentHandler.SetMentionService(mentionService)
 
+	// Comment service for unified comment creation (used by both HTTP handlers and action automation)
+	commentService := services.NewCommentService(db)
+	commentService.SetActivityTracker(activityTracker)
+	commentService.SetNotificationService(notificationService)
+	commentService.SetMentionService(mentionService)
+	commentService.SetWebhookSender(webhookSender)
+	commentHandler.SetCommentService(commentService)
+	actionService.SetCommentService(commentService)
+	slog.Info("comment service initialized")
+
 	// Wire up action service for automation workflows
 	itemHandler.SetActionService(actionService)
 	itemLinkHandler.SetActionService(actionService)

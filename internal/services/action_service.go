@@ -56,6 +56,7 @@ type ActionService struct {
 
 	// Dependencies for action execution
 	notificationService *NotificationService
+	commentService      *CommentService
 
 	// Execution chain cache for cascade loop prevention
 	// Maps ExecutionChainID -> *ExecutionChain
@@ -96,6 +97,11 @@ func NewActionService(db database.Database, config ActionServiceConfig) *ActionS
 // SetNotificationService sets the notification service for notify_user actions
 func (as *ActionService) SetNotificationService(ns *NotificationService) {
 	as.notificationService = ns
+}
+
+// SetCommentService sets the comment service for add_comment actions
+func (as *ActionService) SetCommentService(cs *CommentService) {
+	as.commentService = cs
 }
 
 // EmitActionEvent sends an event to be processed asynchronously (non-blocking)
@@ -553,7 +559,7 @@ func (as *ActionService) executeAction(action *models.Action, event *models.Acti
 			StartedAt: time.Now(),
 		}
 
-		err := as.executeNode(&node, ctx)
+		err := as.executeNode(&node, ctx, &stepResult)
 		completedAt := time.Now()
 		stepResult.CompletedAt = &completedAt
 
@@ -699,25 +705,25 @@ func (as *ActionService) canExecuteNode(nodeID int, edges []models.ActionEdge, e
 }
 
 // executeNode executes a single node
-func (as *ActionService) executeNode(node *models.ActionNode, ctx *models.ExecutionContext) error {
+func (as *ActionService) executeNode(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
 	switch node.NodeType {
 	case models.ActionNodeSetField:
-		return as.executeSetField(node, ctx)
+		return as.executeSetField(node, ctx, stepResult)
 	case models.ActionNodeSetStatus:
-		return as.executeSetStatus(node, ctx)
+		return as.executeSetStatus(node, ctx, stepResult)
 	case models.ActionNodeAddComment:
-		return as.executeAddComment(node, ctx)
+		return as.executeAddComment(node, ctx, stepResult)
 	case models.ActionNodeNotifyUser:
-		return as.executeNotifyUser(node, ctx)
+		return as.executeNotifyUser(node, ctx, stepResult)
 	case models.ActionNodeCondition:
-		return as.executeCondition(node, ctx)
+		return as.executeCondition(node, ctx, stepResult)
 	default:
 		return fmt.Errorf("unknown node type: %s", node.NodeType)
 	}
 }
 
 // executeSetField executes a set_field node
-func (as *ActionService) executeSetField(node *models.ActionNode, ctx *models.ExecutionContext) error {
+func (as *ActionService) executeSetField(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
 	var config models.SetFieldNodeConfig
 	if err := json.Unmarshal([]byte(node.NodeConfig), &config); err != nil {
 		return fmt.Errorf("failed to parse set_field config: %w", err)
@@ -746,6 +752,13 @@ func (as *ActionService) executeSetField(node *models.ActionNode, ctx *models.Ex
 		return err
 	}
 
+	// Populate step result output with change details
+	stepResult.Output = map[string]interface{}{
+		"field_name": config.FieldName,
+		"old_value":  oldValue,
+		"new_value":  value,
+	}
+
 	// Emit chained event for potential cascade actions
 	as.EmitActionEvent(&models.ActionEvent{
 		EventType:         models.ActionTriggerItemUpdated,
@@ -763,7 +776,7 @@ func (as *ActionService) executeSetField(node *models.ActionNode, ctx *models.Ex
 }
 
 // executeSetStatus executes a set_status node
-func (as *ActionService) executeSetStatus(node *models.ActionNode, ctx *models.ExecutionContext) error {
+func (as *ActionService) executeSetStatus(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
 	var config models.SetStatusNodeConfig
 	if err := json.Unmarshal([]byte(node.NodeConfig), &config); err != nil {
 		return fmt.Errorf("failed to parse set_status config: %w", err)
@@ -788,6 +801,18 @@ func (as *ActionService) executeSetStatus(node *models.ActionNode, ctx *models.E
 		return err
 	}
 
+	// Resolve status names for output
+	oldStatusName := as.getStatusName(oldStatusID)
+	newStatusName := as.getStatusName(config.StatusID)
+
+	// Populate step result output with change details
+	stepResult.Output = map[string]interface{}{
+		"old_status_id":   oldStatusID,
+		"new_status_id":   config.StatusID,
+		"old_status_name": oldStatusName,
+		"new_status_name": newStatusName,
+	}
+
 	// Only emit cascade event if status actually changed
 	if oldStatusID != config.StatusID {
 		// Emit chained event for potential cascade actions
@@ -808,7 +833,7 @@ func (as *ActionService) executeSetStatus(node *models.ActionNode, ctx *models.E
 }
 
 // executeAddComment executes an add_comment node
-func (as *ActionService) executeAddComment(node *models.ActionNode, ctx *models.ExecutionContext) error {
+func (as *ActionService) executeAddComment(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
 	var config models.AddCommentNodeConfig
 	if err := json.Unmarshal([]byte(node.NodeConfig), &config); err != nil {
 		return fmt.Errorf("failed to parse add_comment config: %w", err)
@@ -817,20 +842,65 @@ func (as *ActionService) executeAddComment(node *models.ActionNode, ctx *models.
 	// Substitute variables in content
 	content := as.substituteVariables(config.Content, ctx)
 
-	_, err := as.db.Exec(`
-		INSERT INTO comments (item_id, user_id, content, is_private, created_at)
-		VALUES (?, ?, ?, ?, ?)
-	`, ctx.Event.ItemID, ctx.Event.ActorUserID, content, config.IsPrivate, time.Now())
+	var commentID int64
 
-	return err
+	// Use CommentService if available for unified comment creation with side effects
+	if as.commentService != nil {
+		result, err := as.commentService.Create(CreateCommentParams{
+			ItemID:      ctx.Event.ItemID,
+			AuthorID:    ctx.Event.ActorUserID,
+			Content:     content,
+			IsPrivate:   config.IsPrivate,
+			ActorUserID: ctx.Event.ActorUserID,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create comment via service: %w", err)
+		}
+		commentID = result.CommentID
+	} else {
+		// Legacy fallback: direct DB insert without side effects
+		slog.Warn("commentService not configured, using legacy comment creation without notifications/mentions/webhooks",
+			slog.String("component", "actions"),
+			slog.Int("item_id", ctx.Event.ItemID),
+		)
+
+		now := time.Now()
+		result, err := as.db.Exec(`
+			INSERT INTO comments (item_id, author_id, content, is_private, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?)
+		`, ctx.Event.ItemID, ctx.Event.ActorUserID, content, config.IsPrivate, now, now)
+		if err != nil {
+			return err
+		}
+
+		// Get the inserted comment ID if available
+		if result != nil {
+			commentID, _ = result.LastInsertId()
+		}
+	}
+
+	// Populate step result output with change details
+	stepResult.Output = map[string]interface{}{
+		"content":    content,
+		"is_private": config.IsPrivate,
+		"comment_id": commentID,
+	}
+
+	return nil
 }
 
 // executeNotifyUser executes a notify_user node
-func (as *ActionService) executeNotifyUser(node *models.ActionNode, ctx *models.ExecutionContext) error {
+func (as *ActionService) executeNotifyUser(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
 	if as.notificationService == nil {
 		slog.Warn("notification service not configured, skipping notify_user",
 			slog.String("component", "actions"),
 		)
+		// Still populate output to show it was skipped
+		stepResult.Output = map[string]interface{}{
+			"recipient_count": 0,
+			"skipped":         true,
+			"reason":          "notification service not configured",
+		}
 		return nil
 	}
 
@@ -879,11 +949,18 @@ func (as *ActionService) executeNotifyUser(node *models.ActionNode, ctx *models.
 		})
 	}
 
+	// Populate step result output with notification details
+	stepResult.Output = map[string]interface{}{
+		"recipient_count": len(userIDs),
+		"title":           title,
+		"message":         message,
+	}
+
 	return nil
 }
 
 // executeCondition executes a condition node
-func (as *ActionService) executeCondition(node *models.ActionNode, ctx *models.ExecutionContext) error {
+func (as *ActionService) executeCondition(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
 	var config models.ConditionNodeConfig
 	if err := json.Unmarshal([]byte(node.NodeConfig), &config); err != nil {
 		return fmt.Errorf("failed to parse condition config: %w", err)
@@ -898,26 +975,13 @@ func (as *ActionService) executeCondition(node *models.ActionNode, ctx *models.E
 	// Evaluate the condition
 	result := as.evaluateCondition(fieldValue, config.Operator, config.Value)
 
-	// Store result for edge evaluation
-	for i, stepResult := range ctx.StepResults {
-		if stepResult.NodeID == node.ID {
-			if ctx.StepResults[i].Output == nil {
-				ctx.StepResults[i].Output = make(map[string]interface{})
-			}
-			ctx.StepResults[i].Output["condition_result"] = result
-			break
-		}
-	}
-
-	// Also add to current step result
-	if len(ctx.StepResults) > 0 {
-		lastIdx := len(ctx.StepResults) - 1
-		if ctx.StepResults[lastIdx].NodeID == node.ID {
-			if ctx.StepResults[lastIdx].Output == nil {
-				ctx.StepResults[lastIdx].Output = make(map[string]interface{})
-			}
-			ctx.StepResults[lastIdx].Output["condition_result"] = result
-		}
+	// Populate step result output with condition details
+	stepResult.Output = map[string]interface{}{
+		"condition_result": result,
+		"field_name":       config.FieldName,
+		"field_value":      fieldValue,
+		"operator":         config.Operator,
+		"compare_value":    config.Value,
 	}
 
 	return nil
@@ -1027,6 +1091,16 @@ func (as *ActionService) substituteVariables(template string, ctx *models.Execut
 	})
 }
 
+// getStatusName retrieves a status name by its ID
+func (as *ActionService) getStatusName(statusID int) string {
+	var name string
+	err := as.db.QueryRow(`SELECT name FROM statuses WHERE id = ?`, statusID).Scan(&name)
+	if err != nil {
+		return fmt.Sprintf("Status #%d", statusID)
+	}
+	return name
+}
+
 // GetStats returns service statistics
 func (as *ActionService) GetStats() map[string]int64 {
 	return map[string]int64{
@@ -1034,4 +1108,42 @@ func (as *ActionService) GetStats() map[string]int64 {
 		"actions_executed": atomic.LoadInt64(&as.actionsExecuted),
 		"errors":           atomic.LoadInt64(&as.errors),
 	}
+}
+
+// ExecuteActionManually executes a specific action for a given item.
+// This bypasses the normal trigger matching and directly executes the action.
+func (as *ActionService) ExecuteActionManually(action *models.Action, itemID int, actorUserID int) error {
+	slog.Debug("executing action manually",
+		slog.String("component", "actions"),
+		slog.Int("action_id", action.ID),
+		slog.String("action_name", action.Name),
+		slog.Int("item_id", itemID),
+		slog.Int("actor_user_id", actorUserID),
+	)
+
+	// Create a manual trigger event
+	event := &models.ActionEvent{
+		EventType:         models.ActionTriggerManual,
+		WorkspaceID:       action.WorkspaceID,
+		ItemID:            itemID,
+		ActorUserID:       actorUserID,
+		OldValues:         map[string]interface{}{},
+		NewValues:         map[string]interface{}{},
+		TriggeredByAction: false,
+		CascadeDepth:      0,
+	}
+
+	// Execute the action directly (bypassing the event queue and trigger matching)
+	if err := as.executeAction(action, event, nil); err != nil {
+		slog.Error("failed to execute action manually",
+			slog.String("component", "actions"),
+			slog.Int("action_id", action.ID),
+			slog.Any("error", err),
+		)
+		atomic.AddInt64(&as.errors, 1)
+		return err
+	}
+
+	atomic.AddInt64(&as.actionsExecuted, 1)
+	return nil
 }

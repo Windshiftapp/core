@@ -4,11 +4,10 @@
   import { t } from '../../stores/i18n.svelte.js';
   import DataTable from '../../components/DataTable.svelte';
   import Button from '../../components/Button.svelte';
-  import { ArrowLeft, CheckCircle, XCircle, Clock, SkipForward } from 'lucide-svelte';
+  import ExecutionTraceModal from './ExecutionTraceModal.svelte';
+  import { ArrowLeft, CheckCircle, XCircle, Clock, SkipForward, Eye } from 'lucide-svelte';
 
-  export let workspaceId;
-  export let action;
-  export let onBack;
+  let { workspaceId, action, onBack } = $props();
 
   function getTriggerTypeLabel(triggerType) {
     const labels = {
@@ -20,8 +19,17 @@
     return labels[triggerType] || triggerType;
   }
 
-  let logs = [];
-  let loading = true;
+  let logs = $state([]);
+  let loading = $state(true);
+  let selectedLog = $state(null);
+
+  function showDetails(log) {
+    selectedLog = log;
+  }
+
+  function closeDetails() {
+    selectedLog = null;
+  }
 
   // DataTable columns
   const columns = [
@@ -30,7 +38,8 @@
     { key: 'trigger_event', label: t('common.type'), render: (item) => getTriggerTypeLabel(item.trigger_event) },
     { key: 'started_at', label: t('actions.logs.startedAt'), slot: 'date', width: '180px' },
     { key: 'duration', label: t('time.duration'), render: (item) => formatDuration(item), width: '100px' },
-    { key: 'error_message', label: t('actions.logs.error'), slot: 'details' }
+    { key: 'error_message', label: t('actions.logs.error'), slot: 'error' },
+    { key: 'details', label: t('actions.logs.details'), slot: 'details', width: '100px' }
   ];
 
   onMount(loadLogs);
@@ -112,7 +121,7 @@
           {#if item.item_id}
             <a
               href={`/workspaces/${workspaceId}/items/${item.item_id}`}
-              class="item-link hover:underline"
+              class="link"
             >
               {item.item_title || '-'}
             </a>
@@ -126,8 +135,8 @@
           <span class="date-text">{formatDate(item.started_at)}</span>
         </svelte:fragment>
 
-        <!-- Error details slot -->
-        <svelte:fragment slot="details" let:item>
+        <!-- Error slot -->
+        <svelte:fragment slot="error" let:item>
           {#if item.error_message}
             <span class="text-red-500 text-xs truncate block max-w-xs" title={item.error_message}>
               {item.error_message}
@@ -136,10 +145,27 @@
             <span class="text-gray-400">—</span>
           {/if}
         </svelte:fragment>
+
+        <!-- Details button slot -->
+        <svelte:fragment slot="details" let:item>
+          <Button
+            variant="ghost"
+            size="sm"
+            onclick={() => showDetails(item)}
+            title={t('actions.logs.viewDetails')}
+          >
+            <Eye class="w-4 h-4" />
+          </Button>
+        </svelte:fragment>
       </DataTable>
     {/if}
   </div>
 </div>
+
+<!-- Execution Trace Modal -->
+{#if selectedLog}
+  <ExecutionTraceModal log={selectedLog} onclose={closeDetails} />
+{/if}
 
 <style>
   .action-logs {
@@ -165,14 +191,6 @@
 
   .date-text {
     color: var(--ds-text);
-  }
-
-  .item-link {
-    color: var(--ds-link);
-  }
-
-  .item-link:hover {
-    color: var(--ds-link-hovered);
   }
 
   .text-subtle {

@@ -99,7 +99,62 @@ export default {
       startedAt: 'Gestartet um',
       completedAt: 'Abgeschlossen um',
       error: 'Fehler',
+      details: 'Details',
       viewDetails: 'Details anzeigen'
+    },
+
+    trace: {
+      title: 'Ausführungsdetails',
+      noSteps: 'Keine Ausführungsschritte aufgezeichnet',
+      setStatus: 'Status von "{from}" auf "{to}" geändert',
+      setField: '{field} von "{from}" auf "{to}" gesetzt',
+      addComment: '{prefix}Kommentar hinzugefügt: "{content}"',
+      notifyUser: 'Benachrichtigung an {count} Benutzer gesendet',
+      notifySkipped: 'Benachrichtigung übersprungen: {reason}',
+      conditionResult: 'Bedingung ergab {result}'
+    },
+
+    test: {
+      title: 'Aktion testen',
+      description: 'Wählen Sie ein Element aus, für das diese Aktion ausgeführt werden soll. Die Aktion wird sofort ausgeführt und umgeht den normalen Auslöser.',
+      selectItem: 'Element auswählen',
+      itemPlaceholder: 'Nach einem Element suchen...',
+      execute: 'Aktion ausführen',
+      run: 'Testlauf',
+      executionFailed: 'Aktion konnte nicht ausgeführt werden',
+      executionQueued: 'Aktion zur Ausführung eingereiht'
+    },
+
+    placeholders: {
+      title: 'Verfügbare Platzhalter',
+      description: 'Verwenden Sie diese Platzhalter in Ihrer Vorlage. Sie werden beim Ausführen der Aktion durch tatsächliche Werte ersetzt.',
+      showReference: 'Platzhalter-Referenz anzeigen',
+      categories: {
+        item: 'Element-Felder',
+        user: 'Aktueller Benutzer',
+        old: 'Vorherige Werte',
+        trigger: 'Auslöser-Kontext'
+      },
+      item: {
+        title: 'Element-Titel',
+        id: 'Element-ID',
+        statusId: 'Status-ID',
+        assigneeId: 'Zugewiesener Benutzer-ID',
+        any: 'Beliebiges Element-Feld'
+      },
+      user: {
+        name: 'Vollständiger Name des Benutzers',
+        email: 'E-Mail des Benutzers',
+        id: 'Benutzer-ID'
+      },
+      old: {
+        description: 'Vorheriger Wert vor der Änderung',
+        example: 'Vorheriger Wert eines beliebigen Feldes'
+      },
+      trigger: {
+        itemId: 'Auslösendes Element-ID',
+        workspaceId: 'Arbeitsbereich-ID'
+      }
     }
   }
 };

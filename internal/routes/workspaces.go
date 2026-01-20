@@ -118,6 +118,7 @@ func RegisterWorkspaceRoutes(deps *Deps) {
 		api.HandleH("PUT /workspaces/{workspaceId}/actions/{id}", auth(http.HandlerFunc(deps.Workspaces.Actions.UpdateAction)))
 		api.HandleH("DELETE /workspaces/{workspaceId}/actions/{id}", auth(http.HandlerFunc(deps.Workspaces.Actions.DeleteAction)))
 		api.HandleH("POST /workspaces/{workspaceId}/actions/{id}/toggle", auth(http.HandlerFunc(deps.Workspaces.Actions.ToggleAction)))
+		api.HandleH("POST /workspaces/{workspaceId}/actions/{id}/execute", auth(http.HandlerFunc(deps.Workspaces.Actions.ExecuteAction)))
 		api.HandleH("GET /workspaces/{workspaceId}/actions/{id}/logs", auth(http.HandlerFunc(deps.Workspaces.Actions.GetActionLogs)))
 		api.HandleH("GET /workspaces/{workspaceId}/action-logs", auth(http.HandlerFunc(deps.Workspaces.Actions.GetWorkspaceLogs)))
 	}

@@ -99,7 +99,62 @@ export default {
       startedAt: 'Iniciado a las',
       completedAt: 'Completado a las',
       error: 'Error',
+      details: 'Detalles',
       viewDetails: 'Ver Detalles'
+    },
+
+    trace: {
+      title: 'Detalles de Ejecución',
+      noSteps: 'No se registraron pasos de ejecución',
+      setStatus: 'Estado cambiado de "{from}" a "{to}"',
+      setField: '{field} establecido de "{from}" a "{to}"',
+      addComment: 'Comentario {prefix}agregado: "{content}"',
+      notifyUser: 'Notificación enviada a {count} usuario(s)',
+      notifySkipped: 'Notificación omitida: {reason}',
+      conditionResult: 'La condición resultó en {result}'
+    },
+
+    test: {
+      title: 'Probar Acción',
+      description: 'Selecciona un elemento para ejecutar esta acción. La acción se ejecutará inmediatamente, sin esperar el disparador normal.',
+      selectItem: 'Seleccionar Elemento',
+      itemPlaceholder: 'Buscar un elemento...',
+      execute: 'Ejecutar Acción',
+      run: 'Prueba',
+      executionFailed: 'Error al ejecutar la acción',
+      executionQueued: 'Acción en cola para ejecución'
+    },
+
+    placeholders: {
+      title: 'Marcadores Disponibles',
+      description: 'Usa estos marcadores en tu plantilla. Se reemplazarán con valores reales cuando se ejecute la acción.',
+      showReference: 'Mostrar referencia de marcadores',
+      categories: {
+        item: 'Campos del Elemento',
+        user: 'Usuario Actual',
+        old: 'Valores Anteriores',
+        trigger: 'Contexto del Disparador'
+      },
+      item: {
+        title: 'Título del elemento',
+        id: 'ID del elemento',
+        statusId: 'ID del estado',
+        assigneeId: 'ID del usuario asignado',
+        any: 'Cualquier campo del elemento'
+      },
+      user: {
+        name: 'Nombre completo del usuario',
+        email: 'Correo del usuario',
+        id: 'ID del usuario'
+      },
+      old: {
+        description: 'Valor anterior antes del cambio',
+        example: 'Valor anterior de cualquier campo'
+      },
+      trigger: {
+        itemId: 'ID del elemento disparador',
+        workspaceId: 'ID del espacio de trabajo'
+      }
     }
   }
 };

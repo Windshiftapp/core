@@ -25,7 +25,9 @@
     autoOpen = false,
     showSelectedInTrigger = true,
     class: className = '',
-    children = null  // Optional custom trigger snippet
+    children = null,  // Optional custom trigger snippet
+    onSearchChange = null,  // Callback for async search: (searchTerm) => void
+    searchDebounce = 300  // Debounce delay for onSearchChange in ms
   } = $props();
 
   const resolvedPlaceholder = $derived(placeholder || t('pickers.select'));
@@ -50,6 +52,20 @@
   let searchTerm = $state('');
   let highlightedIndex = $state(0);
   let inputElement = $state(null);
+  let searchDebounceTimeout = null;
+
+  // Debounced search change callback for async search
+  $effect(() => {
+    if (onSearchChange) {
+      if (searchDebounceTimeout) {
+        clearTimeout(searchDebounceTimeout);
+      }
+      const term = searchTerm;
+      searchDebounceTimeout = setTimeout(() => {
+        onSearchChange(term);
+      }, searchDebounce);
+    }
+  });
 
   // Create popover
   const {
@@ -97,6 +113,10 @@
   );
 
   let filteredItems = $derived.by(() => {
+    // When onSearchChange is provided, skip client-side filtering (parent handles it via API)
+    if (onSearchChange) {
+      return items;
+    }
     if (!searchTerm.trim()) {
       return items;
     }

@@ -1,20 +1,20 @@
 package handlers
 
 import (
+	"database/sql"
+	"encoding/json"
+	"log/slog"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 	"windshift/internal/webhook"
-	"database/sql"
-	"encoding/json"
-	"fmt"
-	"log/slog"
-	"net/http"
-	"strconv"
-	"strings"
-	"time"
 )
 
 // CommentHandler handles comment-related HTTP requests
@@ -26,7 +26,8 @@ type CommentHandler struct {
 	notificationService interface{
 		EmitEvent(event *services.NotificationEvent)
 	} // Notification service for async notification processing (optional, can be nil)
-	webhookSender *webhook.WebhookSender // Webhook sender for dispatching webhook events (optional, can be nil)
+	webhookSender  *webhook.WebhookSender     // Webhook sender for dispatching webhook events (optional, can be nil)
+	commentService *services.CommentService   // CommentService for unified comment creation logic
 }
 
 // NewCommentHandler creates a new comment handler
@@ -49,6 +50,11 @@ func (h *CommentHandler) SetWebhookSender(sender *webhook.WebhookSender) {
 // SetMentionService sets the mention service for processing @mentions
 func (h *CommentHandler) SetMentionService(mentionService *services.MentionService) {
 	h.mentionService = mentionService
+}
+
+// SetCommentService sets the comment service for unified comment creation
+func (h *CommentHandler) SetCommentService(commentService *services.CommentService) {
+	h.commentService = commentService
 }
 
 // GetComments handles GET /api/items/{id}/comments
@@ -199,18 +205,9 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get item details for permission check and notifications
+	// Get item's workspace_id for permission check
 	var workspaceID int
-	var itemTitle string
-	var workspaceItemNumber int
-	var workspaceKey string
-	var assigneeID, creatorID sql.NullInt64
-	err = h.db.QueryRow(`
-		SELECT i.workspace_id, i.title, i.workspace_item_number, w.key, i.assignee_id, i.creator_id
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		WHERE i.id = ?
-	`, itemID).Scan(&workspaceID, &itemTitle, &workspaceItemNumber, &workspaceKey, &assigneeID, &creatorID)
+	err = h.db.QueryRow(`SELECT workspace_id FROM items WHERE id = ?`, itemID).Scan(&workspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			http.Error(w, "Item not found", http.StatusNotFound)
@@ -243,89 +240,46 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Sanitize comment content to prevent XSS
-	sanitizedContent := utils.StripHTMLTags(reqBody.Content)
-
-	// Insert the comment
-	now := time.Now()
+	// Use CommentService if available, otherwise fall back to legacy inline logic
 	var commentID int64
-	err = h.db.QueryRow(`
-		INSERT INTO comments (item_id, author_id, content, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?) RETURNING id
-	`, itemID, reqBody.AuthorID, sanitizedContent, now, now).Scan(&commentID)
-	if err != nil {
-		http.Error(w, "Failed to create comment", http.StatusInternalServerError)
-		return
-	}
+	if h.commentService != nil {
+		result, err := h.commentService.Create(services.CreateCommentParams{
+			ItemID:      itemID,
+			AuthorID:    reqBody.AuthorID,
+			Content:     reqBody.Content,
+			IsPrivate:   false,
+			ActorUserID: user.ID,
+		})
+		if err != nil {
+			slog.Error("failed to create comment via service", slog.String("component", "comment"), slog.Any("error", err))
+			http.Error(w, "Failed to create comment", http.StatusInternalServerError)
+			return
+		}
+		commentID = result.CommentID
+	} else {
+		// Legacy fallback: direct DB insert without side effects
+		// This path should not be used in production - CommentService should always be set
+		slog.Warn("commentService is nil, using legacy comment creation without notifications/mentions/webhooks",
+			slog.String("component", "comment"),
+			slog.Int("item_id", itemID))
 
-	// Track comment activity on the item
-	if h.activityTracker != nil {
-		if err := h.activityTracker.TrackItemActivity(user.ID, itemID, services.ActivityComment); err != nil {
-			// Don't fail the request if activity tracking fails, just log it
-			// The comment was successfully created
+		sanitizedContent := utils.StripHTMLTags(reqBody.Content)
+		now := time.Now()
+		err = h.db.QueryRow(`
+			INSERT INTO comments (item_id, author_id, content, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?) RETURNING id
+		`, itemID, reqBody.AuthorID, sanitizedContent, now, now).Scan(&commentID)
+		if err != nil {
+			http.Error(w, "Failed to create comment", http.StatusInternalServerError)
+			return
 		}
 	}
 
-	// Fetch the created comment with author details
+	// Fetch the created comment with author details for response
 	comment, err := h.getCommentByID(int(commentID))
 	if err != nil {
 		http.Error(w, "Failed to fetch created comment", http.StatusInternalServerError)
 		return
-	}
-
-	// Emit notification event
-	if h.notificationService != nil {
-		assigneeIDPtr := utils.NullInt64ToPtr(assigneeID)
-		creatorIDPtr := utils.NullInt64ToPtr(creatorID)
-
-		slog.Debug("emitting notification event for comment", slog.String("component", "comment"), slog.Int("item_id", itemID), slog.Int("user_id", user.ID), slog.String("username", user.Username), slog.Any("assignee_id", assigneeIDPtr), slog.Any("creator_id", creatorIDPtr))
-
-		// Construct the item key (e.g., "TST-1")
-		itemKey := fmt.Sprintf("%s-%d", workspaceKey, workspaceItemNumber)
-
-		h.notificationService.EmitEvent(&services.NotificationEvent{
-			EventType:   models.EventCommentCreated,
-			WorkspaceID: workspaceID,
-			ActorUserID: user.ID,
-			ItemID:      itemID,
-			AssigneeID:  assigneeIDPtr,
-			CreatorID:   creatorIDPtr,
-			Title:       "New Comment Added",
-			TemplateData: map[string]interface{}{
-				"item.title": itemTitle,
-				"item.key":   itemKey,
-				"item.id":    itemID,
-				"user.name":  user.Username,
-			},
-		})
-
-		slog.Debug("successfully emitted EventCommentCreated", slog.String("component", "comment"), slog.Int("item_id", itemID))
-	} else {
-		slog.Warn("notificationService is nil, skipping notification for comment", slog.String("component", "comment"), slog.Int("item_id", itemID))
-	}
-
-	// Process @mentions in comment content
-	if h.mentionService != nil {
-		if err := h.mentionService.ProcessMentions(services.ProcessMentionsParams{
-			SourceType:  "comment",
-			SourceID:    int(commentID),
-			Content:     reqBody.Content,
-			ItemID:      itemID,
-			WorkspaceID: workspaceID,
-			ActorUserID: user.ID,
-		}); err != nil {
-			slog.Warn("failed to process mentions", slog.String("component", "comment"), slog.Any("error", err))
-			// Don't fail the request if mention processing fails
-		}
-	}
-
-	// Dispatch webhook event for comment creation
-	if h.webhookSender != nil {
-		// Get full item for webhook payload
-		itemRepo := repository.NewItemRepository(h.db)
-		if item, err := itemRepo.FindByIDWithDetails(itemID); err == nil {
-			go h.webhookSender.DispatchEvent("comment.created", item)
-		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

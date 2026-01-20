@@ -72,6 +72,7 @@
     'workspace-map': () => import('../features/collections/CollectionMap.svelte'),
     'workspace-iterations': () => import('../features/iterations/Iterations.svelte'),
     'workspace-milestones': () => import('../features/milestones/Milestones.svelte'),
+    'workspace-actions': () => import('../features/actions/ActionsSettings.svelte'),
     'command-palette': () => import('../layout/CommandPalette.svelte'),
     'create-modal': () => import('../dialogs/CreateModal.svelte'),
     'homepage': () => import('./Homepage.svelte'),
@@ -169,7 +170,10 @@
       loadingMsg: 'Loading Milestone...',
       errorMsg: 'Failed to load Milestone',
       wrapper: 'surface-full',
-      getProps: (route) => ({ milestoneId: route.params.id })
+      getProps: (route) => ({
+        milestoneId: route.params.id,
+        workspaceId: route.query?.workspaceId || null
+      })
     },
     'iterations': {
       loadingMsg: 'Loading Iterations...',
@@ -234,6 +238,12 @@
       loadingMsg: 'Loading Milestones...',
       errorMsg: 'Failed to load Milestones',
       wrapper: 'surface-full',
+      getProps: (route) => ({ workspaceId: route.params.id })
+    },
+    'workspace-actions': {
+      loadingMsg: 'Loading Actions...',
+      errorMsg: 'Failed to load Actions',
+      wrapper: 'none',
       getProps: (route) => ({ workspaceId: route.params.id })
     },
     'command-palette': {
@@ -543,7 +553,7 @@
     
     // Pre-select current workspace if we're in a workspace context
     const currentWorkspaceId = $currentRoute.params?.id;
-    if (currentWorkspaceId && ['workspace-detail', 'workspace-calendar', 'workspace-reviews', 'workspace-settings', 'workspace-settings-general', 'workspace-settings-appearance', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-actions', 'workspace-settings-danger', 'workspace-board', 'workspace-backlog', 'workspace-list', 'workspace-tree', 'workspace-map', 'item-detail'].includes($currentRoute.view)) {
+    if (currentWorkspaceId && ['workspace-detail', 'workspace-calendar', 'workspace-reviews', 'workspace-settings', 'workspace-settings-general', 'workspace-settings-appearance', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger', 'workspace-board', 'workspace-backlog', 'workspace-list', 'workspace-tree', 'workspace-map', 'workspace-actions', 'item-detail'].includes($currentRoute.view)) {
       // Dispatch event to pre-select the workspace
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('set-create-workspace', { 
@@ -692,7 +702,7 @@
       {#if view === 'workspaces'}
       <Workspaces showAdminHeader={false} />
 
-    {:else if ['workspace-settings', 'workspace-settings-general', 'workspace-settings-appearance', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-actions', 'workspace-settings-danger'].includes(view)}
+    {:else if ['workspace-settings', 'workspace-settings-general', 'workspace-settings-appearance', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger'].includes(view)}
       <div class="p-6" style="background-color: var(--ds-surface);">
         <WorkspaceSettings
           workspaceId={$currentRoute.params.id}
@@ -702,7 +712,6 @@
             view === 'workspace-settings-members' ? 'members' :
             view === 'workspace-settings-configuration' ? 'configuration' :
             view === 'workspace-settings-source-control' ? 'source-control' :
-            view === 'workspace-settings-actions' ? 'actions' :
             view === 'workspace-settings-danger' ? 'danger' :
             'general'
           }
@@ -752,6 +761,11 @@
           />
         </svelte:fragment>
       </PermissionGuard>
+
+    {:else if view === 'workspace-actions'}
+      <div class="h-full" style="background-color: var(--ds-surface); height: calc(100vh - 56px);">
+        {@render lazyLoadedComponent(view)}
+      </div>
 
     {:else if hasLazyRoute}
       {#if wrapper === 'surface-full'}

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Plus, CheckSquare, Calendar, Home, Inbox, SquareKanban, List, GitBranch, MapPin, Settings, BookOpen, Package, ChevronDown, FileCheck, FileStack, Play, BarChart3, ListTree, Milestone, Grip } from 'lucide-svelte';
+  import { Plus, CheckSquare, Calendar, Home, Inbox, SquareKanban, List, GitBranch, MapPin, Settings, BookOpen, Package, ChevronDown, FileCheck, FileStack, Play, BarChart3, ListTree, Milestone, Grip, Zap } from 'lucide-svelte';
   import { workspaceIconMap } from '../utils/icons.js';
   import { navigate, currentRoute } from '../router.js';
   import { currentWorkspace, workspacePermissions } from '../stores';
@@ -30,7 +30,8 @@
 
   const workspaceOnlyViews = [
     { id: 'iterations', label: 'Iterations', icon: Calendar, tooltip: 'Manage sprints, PIs, and other iteration cycles' },
-    { id: 'milestones', label: 'Milestones', icon: Milestone, tooltip: 'Manage workspace milestones and releases' }
+    { id: 'milestones', label: 'Milestones', icon: Milestone, tooltip: 'Manage workspace milestones and releases' },
+    { id: 'actions', label: 'Actions', icon: Zap, tooltip: 'Automate workflows and triggers' }
   ];
   const workspaceOnlyViewIds = new Set(workspaceOnlyViews.map(view => view.id));
   const workspaceTestViewIds = new Set([
@@ -505,9 +506,9 @@
             <button
               onclick={() => navigate(`/workspaces/${workspaceId}/settings/general`)}
               class="w-full text-left px-3 py-2 cursor-pointer rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item"
-              style={['workspace-settings', 'workspace-settings-general', 'workspace-settings-appearance', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-actions', 'workspace-settings-danger'].includes($currentRoute.view) ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
-              onmouseenter={(e) => { if (!['workspace-settings', 'workspace-settings-general', 'workspace-settings-appearance', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-actions', 'workspace-settings-danger'].includes($currentRoute.view)) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
-              onmouseleave={(e) => { if (!['workspace-settings', 'workspace-settings-general', 'workspace-settings-appearance', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-actions', 'workspace-settings-danger'].includes($currentRoute.view)) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
+              style={['workspace-settings', 'workspace-settings-general', 'workspace-settings-appearance', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger'].includes($currentRoute.view) ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
+              onmouseenter={(e) => { if (!['workspace-settings', 'workspace-settings-general', 'workspace-settings-appearance', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger'].includes($currentRoute.view)) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
+              onmouseleave={(e) => { if (!['workspace-settings', 'workspace-settings-general', 'workspace-settings-appearance', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger'].includes($currentRoute.view)) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
             >
               <Settings class="w-4 h-4" />
               Settings
