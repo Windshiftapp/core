@@ -92,6 +92,26 @@
     showDeleteConfirmation = true;
   }
 
+  function buildWorklogDropdownItems(worklog) {
+    return [
+      {
+        id: 'edit',
+        type: 'regular',
+        icon: Edit,
+        title: t('common.edit'),
+        onClick: () => handleEditWorklog(worklog)
+      },
+      {
+        id: 'delete',
+        type: 'regular',
+        icon: Trash2,
+        title: t('common.delete'),
+        color: '#dc2626',
+        onClick: () => handleDeleteWorklog(worklog)
+      }
+    ];
+  }
+
   function confirmDeleteWorklog() {
     if (worklogToDelete) {
       dispatch('delete-worklog', worklogToDelete);
@@ -248,20 +268,14 @@
                         {worklog.project_name}
                       </div>
                     </div>
-                    <div class="flex items-center gap-1 ml-2">
-                      <ActionButton
-                        icon={Edit}
-                        size="xs"
-                        variant="ghost"
-                        onclick={() => handleEditWorklog(worklog)}
-                        title={t('common.edit')}
-                      />
-                      <ActionButton
-                        icon={Trash2}
-                        size="xs"
-                        variant="danger"
-                        onclick={() => handleDeleteWorklog(worklog)}
-                        title={t('common.delete')}
+                    <div class="ml-2">
+                      <DropdownMenu
+                        items={buildWorklogDropdownItems(worklog)}
+                        triggerIcon={MoreHorizontal}
+                        showChevron={false}
+                        iconOnly={true}
+                        triggerClass="p-1.5 rounded-md transition-colors duration-150"
+                        triggerStyle="color: var(--ds-text-subtle);"
                       />
                     </div>
                   </div>
