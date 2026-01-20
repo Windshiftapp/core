@@ -875,8 +875,8 @@
   confirmText={t('testing.finishExecution')}
   cancelText={t('common.cancel')}
   variant="info"
-  on:confirm={confirmFinishExecution}
-  on:cancel={() => showFinishConfirmation = false}
+  onconfirm={confirmFinishExecution}
+  oncancel={() => showFinishConfirmation = false}
 />
 
 <!-- Error Dialog -->
@@ -887,8 +887,8 @@
   confirmText={t('common.ok')}
   cancelText=""
   variant="danger"
-  on:confirm={() => showErrorDialog = false}
-  on:cancel={() => showErrorDialog = false}
+  onconfirm={() => showErrorDialog = false}
+  oncancel={() => showErrorDialog = false}
 />
 
 <!-- Image Preview Modal -->

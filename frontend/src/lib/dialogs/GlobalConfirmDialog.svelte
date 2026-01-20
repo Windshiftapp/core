@@ -25,6 +25,6 @@
   cancelText={dialog.cancelText}
   variant={dialog.variant}
   icon={dialog.icon}
-  on:confirm={handleConfirm}
-  on:cancel={handleCancel}
+  onconfirm={handleConfirm}
+  oncancel={handleCancel}
 />

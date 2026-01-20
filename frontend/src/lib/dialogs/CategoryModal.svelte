@@ -64,7 +64,7 @@
 
 <Modal
   {isOpen}
-  on:close={handleClose}
+  onclose={handleClose}
   maxWidth="max-w-2xl"
 >
   <div class="p-6">

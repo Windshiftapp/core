@@ -141,6 +141,11 @@ const shortcuts = {
     add: { key: 'a' },
     save: { key: 'Enter', modifierKey: true },
     cancel: { key: 'Escape' }
+  },
+  // Item detail time tracking
+  itemDetail: {
+    startTimer: { key: 'a', modifierKey: true },
+    logTime: { key: 'a' }
   }
 };
 

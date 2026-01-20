@@ -445,7 +445,7 @@
 <!-- Edit Modal -->
 <Modal
   isOpen={showEditModal}
-  on:close={() => showEditModal = false}
+  onclose={() => showEditModal = false}
   onSubmit={saveIteration}
   submitDisabled={!formData.name.trim() || !formData.start_date || !formData.end_date}
   maxWidth="max-w-2xl"

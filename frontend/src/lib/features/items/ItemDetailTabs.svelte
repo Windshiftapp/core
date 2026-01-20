@@ -1,13 +1,20 @@
 <script>
-  import { MessageSquare, Clock, Play, Info, History } from 'lucide-svelte';
+  import { MessageSquare, Clock, Play, Info, History, Edit, Trash2 } from 'lucide-svelte';
   import Button from '../../components/Button.svelte';
+  import ActionButton from '../../layout/ActionButton.svelte';
   import Comments from '../items/Comments.svelte';
   import ItemHistory from '../items/ItemHistory.svelte';
+  import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
   import { createEventDispatcher } from 'svelte';
-  import { formatDateTimeLocale } from '../../utils/dateFormatter.js';
+  import { formatDateTimeLocale, formatDateShort } from '../../utils/dateFormatter.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { createShortcutHandler, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
 
   const dispatch = createEventDispatcher();
+
+  // Delete confirmation state
+  let showDeleteConfirmation = false;
+  let worklogToDelete = null;
 
   export let item;
   export let workspace;
@@ -57,7 +64,49 @@
   function handleCommentsLoaded(event) {
     commentCount = event.detail.count;
   }
+
+  function handleGlobalKeydown(event) {
+    // Only handle shortcuts when on time tab and time tracking is enabled
+    if (tab !== 'time' || !moduleSettings?.time_tracking_enabled) return;
+
+    createShortcutHandler({
+      startTimer: () => {
+        if (!activeTimer && getDefaultProjectForTimeLogging()) {
+          handleStartTimer();
+        }
+      },
+      logTime: () => {
+        if (getDefaultProjectForTimeLogging()) {
+          handleLogTime();
+        }
+      }
+    }, 'itemDetail')(event);
+  }
+
+  function handleEditWorklog(worklog) {
+    dispatch('edit-worklog', worklog);
+  }
+
+  function handleDeleteWorklog(worklog) {
+    worklogToDelete = worklog;
+    showDeleteConfirmation = true;
+  }
+
+  function confirmDeleteWorklog() {
+    if (worklogToDelete) {
+      dispatch('delete-worklog', worklogToDelete);
+    }
+    showDeleteConfirmation = false;
+    worklogToDelete = null;
+  }
+
+  function cancelDeleteWorklog() {
+    showDeleteConfirmation = false;
+    worklogToDelete = null;
+  }
 </script>
+
+<svelte:window onkeydown={handleGlobalKeydown} />
 
 <div class="mt-6">
   <div>
@@ -169,6 +218,7 @@
                       onclick={handleStartTimer}
                       size="small"
                       title={t('items.startTimerTitle')}
+                      keyboardHint={getShortcutDisplay('itemDetail', 'startTimer')}
                     >
                       {t('items.startTimer')}
                     </Button>
@@ -179,6 +229,7 @@
                     onclick={handleLogTime}
                     disabled={!getDefaultProjectForTimeLogging()}
                     title={t('items.logTimeTitle')}
+                    keyboardHint={getShortcutDisplay('itemDetail', 'logTime')}
                   >
                     {t('items.logTime')}
                   </Button>
@@ -189,13 +240,29 @@
                   <div class="flex justify-between items-center p-3 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface);">
                     <div class="flex-1">
                       <div class="text-sm font-medium" style="color: var(--ds-text);">
-                        {worklog.description}
+                        {worklog.description || t('items.noDescription')}
                       </div>
                       <div class="text-xs" style="color: var(--ds-text-subtle);">
-                        {new Date(worklog.date * 1000).toLocaleDateString()} • 
-                        {Math.floor(worklog.duration_minutes / 60)}h {worklog.duration_minutes % 60}m • 
+                        {formatDateShort(new Date(worklog.date * 1000))} •
+                        {Math.floor(worklog.duration_minutes / 60)}h {worklog.duration_minutes % 60}m •
                         {worklog.project_name}
                       </div>
+                    </div>
+                    <div class="flex items-center gap-1 ml-2">
+                      <ActionButton
+                        icon={Edit}
+                        size="xs"
+                        variant="ghost"
+                        onclick={() => handleEditWorklog(worklog)}
+                        title={t('common.edit')}
+                      />
+                      <ActionButton
+                        icon={Trash2}
+                        size="xs"
+                        variant="danger"
+                        onclick={() => handleDeleteWorklog(worklog)}
+                        title={t('common.delete')}
+                      />
                     </div>
                   </div>
                 {/each}
@@ -212,6 +279,7 @@
                     onclick={handleStartTimer}
                     size="small"
                     title={t('items.startTimerTitle')}
+                    keyboardHint={getShortcutDisplay('itemDetail', 'startTimer')}
                   >
                     {t('items.startTimer')}
                   </Button>
@@ -222,6 +290,7 @@
                   onclick={handleLogTime}
                   disabled={!getDefaultProjectForTimeLogging()}
                   title={t('items.logTimeTitle')}
+                  keyboardHint={getShortcutDisplay('itemDetail', 'logTime')}
                 >
                   {t('items.logTime')}
                 </Button>
@@ -235,3 +304,15 @@
     </div>
   </div>
 </div>
+
+<!-- Delete Time Entry Confirmation Dialog -->
+<ConfirmDialog
+  bind:show={showDeleteConfirmation}
+  title={t('items.deleteTimeEntry')}
+  message={t('items.deleteTimeEntryConfirm')}
+  confirmText={t('common.delete')}
+  cancelText={t('common.cancel')}
+  variant="danger"
+  onconfirm={confirmDeleteWorklog}
+  oncancel={cancelDeleteWorklog}
+/>

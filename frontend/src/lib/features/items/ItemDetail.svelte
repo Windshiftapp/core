@@ -129,6 +129,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   let timeProjects = $state([]);
   let timeWorklogs = $state([]);
   let showTimeLogModal = $state(false);
+  let editingWorklog = $state(null);
   let workItems = $state([]);
   let customers = $state([]);
   let workspaces = $state([]);
@@ -823,19 +824,43 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   }
 
   function handleLogTime() {
+    editingWorklog = null;
     showTimeLogModal = true;
+  }
+
+  function handleEditWorklog(event) {
+    editingWorklog = event.detail;
+    showTimeLogModal = true;
+  }
+
+  async function handleDeleteWorklog(event) {
+    const worklog = event.detail;
+    try {
+      await api.time.worklogs.delete(worklog.id);
+      // Reload worklogs
+      const worklogsData = await api.time.worklogs.getByItem(itemId);
+      timeWorklogs = worklogsData || [];
+    } catch (error) {
+      console.error('Failed to delete worklog:', error);
+      showError(t('items.failedToDeleteTimeEntry'), error.message || t('errors.UNKNOWN'));
+    }
   }
 
   async function handleModalSave(event) {
     try {
       const data = event.detail;
-      await api.time.worklogs.create(data);
+      if (editingWorklog) {
+        await api.time.worklogs.update(editingWorklog.id, data);
+      } else {
+        await api.time.worklogs.create(data);
+      }
 
       // Reload worklogs
       const worklogsData = await api.time.worklogs.getByItem(itemId);
       timeWorklogs = worklogsData || [];
 
       showTimeLogModal = false;
+      editingWorklog = null;
     } catch (error) {
       console.error('Failed to save worklog:', error);
       showError(t('items.failedToSaveTimeEntry'), error.message || t('errors.UNKNOWN'));
@@ -844,6 +869,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 
   function handleModalCancel() {
     showTimeLogModal = false;
+    editingWorklog = null;
   }
 
   // Get default project for time logging
@@ -1626,6 +1652,8 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     on:start-editing-custom-field={handleStartEditingCustomField}
     on:start-timer={handleStartTimer}
     on:log-time={handleLogTime}
+    on:edit-worklog={handleEditWorklog}
+    on:delete-worklog={handleDeleteWorklog}
     on:parent-changed={handleParentChanged}
     on:attachment-upload={attachmentManager.handleUpload}
     on:attachment-upload-files={attachmentManager.uploadFiles}
@@ -1751,10 +1779,11 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     {customers}
     {workItems}
     {workspaces}
+    {editingWorklog}
     showProjectField={true}
     showWorkItemField={false}
-    on:save={handleModalSave}
-    on:cancel={handleModalCancel}
+    onsave={handleModalSave}
+    oncancel={handleModalCancel}
   />
 {/if}
 {/if}

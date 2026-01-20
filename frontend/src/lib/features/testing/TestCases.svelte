@@ -1051,7 +1051,7 @@
 <!-- Folder Form Modal -->
 <Modal
   isOpen={showFolderForm}
-  on:close={() => showFolderForm = false}
+  onclose={() => showFolderForm = false}
   maxWidth="max-w-md"
 >
   <div class="p-6">
@@ -1116,7 +1116,7 @@
   isOpen={showCaseForm}
   maxWidth="max-w-2xl"
   onSubmit={handleCaseSubmit}
-  on:close={() => showCaseForm = false}
+  onclose={() => showCaseForm = false}
 >
   <div class="p-6">
     <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">
@@ -1222,8 +1222,8 @@
   confirmText={t('testing.deleteTestCase')}
   cancelText={t('common.cancel')}
   variant="danger"
-  on:confirm={confirmDeleteTestCase}
-  on:cancel={() => {
+  onconfirm={confirmDeleteTestCase}
+  oncancel={() => {
     showDeleteTestCaseConfirmation = false;
     testCaseToDelete = null;
   }}
@@ -1237,8 +1237,8 @@
   confirmText={t('testing.deleteFolder')}
   cancelText={t('common.cancel')}
   variant="danger"
-  on:confirm={confirmDeleteFolder}
-  on:cancel={() => {
+  onconfirm={confirmDeleteFolder}
+  oncancel={() => {
     showDeleteFolderConfirmation = false;
     folderToDelete = null;
   }}
@@ -1248,7 +1248,7 @@
 <Modal
   isOpen={showLabelsModal && selectedTestCase}
   maxWidth="max-w-2xl"
-  on:close={closeLabelsModal}
+  onclose={closeLabelsModal}
 >
   <div class="max-h-[80vh] flex flex-col">
     <!-- Header -->

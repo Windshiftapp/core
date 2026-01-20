@@ -36,7 +36,7 @@
   {isOpen}
   {maxWidth}
   {preventClose}
-  on:close={handleClose}
+  onclose={handleClose}
 >
   <ModalHeader
     {title}

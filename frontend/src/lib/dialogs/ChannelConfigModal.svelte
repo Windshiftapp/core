@@ -520,7 +520,7 @@
 
 <Modal
   {isOpen}
-  on:close={handleClose}
+  onclose={handleClose}
   maxWidth="max-w-4xl"
 >
   {#if channel}

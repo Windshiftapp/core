@@ -428,7 +428,7 @@
 <!-- Edit Modal -->
 <Modal
   isOpen={showEditModal}
-  on:close={() => showEditModal = false}
+  onclose={() => showEditModal = false}
   onSubmit={saveMilestone}
   submitDisabled={!formData.name.trim()}
   maxWidth="max-w-2xl"

@@ -198,6 +198,14 @@
     dispatch('log-time');
   }
 
+  function handleEditWorklog(event) {
+    dispatch('edit-worklog', event.detail);
+  }
+
+  function handleDeleteWorklog(event) {
+    dispatch('delete-worklog', event.detail);
+  }
+
   function handleParentChanged() {
     dispatch('parent-changed');
   }
@@ -373,6 +381,8 @@
             on:switch-tab={handleSwitchTab}
             on:start-timer={handleStartTimer}
             on:log-time={handleLogTime}
+            on:edit-worklog={handleEditWorklog}
+            on:delete-worklog={handleDeleteWorklog}
           />
         </div>
 

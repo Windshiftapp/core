@@ -817,7 +817,7 @@
 
 <Modal
   isOpen={showWorkspaceAssociationModal}
-  on:close={closeAssociateWorkspaceModal}
+  onclose={closeAssociateWorkspaceModal}
   maxWidth="max-w-2xl"
 >
   <div>

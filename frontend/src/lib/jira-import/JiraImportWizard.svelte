@@ -139,7 +139,7 @@
   }
 </script>
 
-<Modal bind:isOpen maxWidth="max-w-4xl" on:close={handleClose}>
+<Modal bind:isOpen maxWidth="max-w-4xl" onclose={handleClose}>
   <div class="flex flex-col max-h-[90vh]">
     <!-- Header with stepper -->
     <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">

@@ -255,7 +255,7 @@
   actionItems={buildHierarchyDropdownItems}
 />
 
-<Modal isOpen={showCreateForm} on:close={cancelEdit} maxWidth="max-w-lg" onSubmit={saveHierarchyLevel} let:submitHint>
+<Modal isOpen={showCreateForm} onclose={cancelEdit} maxWidth="max-w-lg" onSubmit={saveHierarchyLevel} let:submitHint>
   <!-- Modal header -->
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold" style="color: var(--ds-text);">

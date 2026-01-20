@@ -239,8 +239,8 @@
   confirmText={t('settings.channelManagers.removeManager')}
   cancelText={t('common.cancel')}
   variant="danger"
-  on:confirm={confirmRemoveManager}
-  on:cancel={() => {
+  onconfirm={confirmRemoveManager}
+  oncancel={() => {
     showRemoveConfirmation = false;
     managerToRemove = null;
   }}

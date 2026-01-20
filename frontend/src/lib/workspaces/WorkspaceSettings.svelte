@@ -151,6 +151,7 @@
       saving = true;
       await api.workspaces.update(workspaceId, {
         ...formData,
+        time_project_id: formData.time_project_id ? parseInt(formData.time_project_id, 10) : null,
         time_project_categories: selectedTimeProjectCategories
       });
       
@@ -487,7 +488,7 @@
         <Button
           variant="primary"
           size="medium"
-          on:click={saveWorkspace}
+          onclick={saveWorkspace}
           disabled={saving || !formData.name.trim() || !formData.key.trim()}
         >
           {#if saving}{t('workspaceSettings.saving')}{:else}{t('workspaceSettings.saveChanges')}{/if}
@@ -495,7 +496,7 @@
         <Button
           variant="secondary"
           size="medium"
-          on:click={loadWorkspace}
+          onclick={loadWorkspace}
         >
           {t('workspaceSettings.reset')}
         </Button>
@@ -540,7 +541,7 @@
                   <Button
                     variant="default"
                     size="sm"
-                    on:click={removeAvatar}
+                    onclick={removeAvatar}
                     icon={Trash2}
                   >
                     {t('workspaceSettings.remove')}
@@ -563,7 +564,7 @@
                 <Button
                   variant="default"
                   size="sm"
-                  on:click={() => showAvatarUpload = !showAvatarUpload}
+                  onclick={() => showAvatarUpload = !showAvatarUpload}
                   icon={Camera}
                   disabled={!attachmentsEnabled}
                 >
@@ -607,7 +608,7 @@
         <Button
           variant="primary"
           size="medium"
-          on:click={saveWorkspace}
+          onclick={saveWorkspace}
           disabled={saving || !formData.name.trim() || !formData.key.trim()}
         >
           {#if saving}{t('workspaceSettings.saving')}{:else}{t('workspaceSettings.saveChanges')}{/if}
@@ -615,7 +616,7 @@
         <Button
           variant="secondary"
           size="medium"
-          on:click={loadWorkspace}
+          onclick={loadWorkspace}
         >
           {t('workspaceSettings.reset')}
         </Button>
@@ -644,7 +645,7 @@
         <Button
           variant="primary"
           size="medium"
-          on:click={saveWorkspace}
+          onclick={saveWorkspace}
           disabled={saving || !formData.name.trim() || !formData.key.trim()}
         >
           {#if saving}{t('workspaceSettings.saving')}{:else}{t('workspaceSettings.saveChanges')}{/if}
@@ -652,7 +653,7 @@
         <Button
           variant="secondary"
           size="medium"
-          on:click={loadWorkspace}
+          onclick={loadWorkspace}
         >
           {t('workspaceSettings.reset')}
         </Button>

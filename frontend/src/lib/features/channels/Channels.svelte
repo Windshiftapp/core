@@ -408,7 +408,7 @@
 <!-- Add Channel Modal -->
 <Modal
   isOpen={showAddForm}
-  on:close={cancelChannelForm}
+  onclose={cancelChannelForm}
   onSubmit={handleChannelSubmit}
   submitDisabled={!channelFormData.name.trim()}
   maxWidth="max-w-lg"
@@ -518,8 +518,8 @@
   confirmText="Delete Channel"
   cancelText="Cancel"
   variant="danger"
-  on:confirm={confirmDeleteChannel}
-  on:cancel={() => {
+  onconfirm={confirmDeleteChannel}
+  oncancel={() => {
     showDeleteConfirmation = false;
     channelToDelete = null;
   }}
