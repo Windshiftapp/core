@@ -178,21 +178,21 @@
 					<div class="py-1">
 						<div class="flex items-center justify-between mb-2">
 							<div class="flex items-center space-x-2">
-								<h4 class="text-sm font-medium text-gray-900">
+								<h4 class="text-sm font-medium" style="color: var(--ds-text);">
 									{comment.author_name || t('common.unknownUser')}
 								</h4>
-								<span class="text-xs text-gray-500">
+								<span class="text-xs" style="color: var(--ds-text-subtle);">
 									{formatRelativeTime(comment.created_at) || '-'}
 								</span>
 								{#if isEdited(comment)}
-									<span class="text-xs text-gray-400">({t('comments.edited')})</span>
+									<span class="text-xs" style="color: var(--ds-text-subtlest);">({t('comments.edited')})</span>
 								{/if}
 							</div>
 							{#if authStore.currentUser && comment.author_id === authStore.currentUser.id && editingCommentId !== comment.id}
 								<div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
 									<button
 										onclick={() => startEdit(comment)}
-										class="text-gray-400 hover:text-blue-600 transition-colors"
+										class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
 										title={t('comments.editComment')}
 									>
 										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -201,7 +201,7 @@
 									</button>
 									<button
 										onclick={() => deleteComment(comment.id)}
-										class="text-gray-400 hover:text-red-600 transition-colors"
+										class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-danger)] transition-colors"
 										title={t('comments.deleteComment')}
 									>
 										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -224,7 +224,7 @@
 									{isPersonalWorkspace}
 								/>
 								<div class="flex items-center justify-between mt-3">
-									<div class="text-xs text-gray-500">
+									<div class="text-xs" style="color: var(--ds-text-subtle);">
 										{t('common.pressEscapeToCancel')}
 									</div>
 									<div class="flex items-center space-x-2">
@@ -250,7 +250,7 @@
 							</div>
 						{:else}
 							<!-- Read Mode -->
-							<div class="comment-content text-sm text-gray-700">
+							<div class="comment-content text-sm" style="color: var(--ds-text);">
 								<MilkdownEditor
 									content={comment.content}
 									readonly={true}
@@ -287,7 +287,7 @@
 					{isPersonalWorkspace}
 				/>
 				<div class="flex items-center justify-between mt-3">
-					<div class="text-xs text-gray-500">
+					<div class="text-xs" style="color: var(--ds-text-subtle);">
 						{t('comments.markdownSupported')}
 					</div>
 					<Button
