@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import {
     Milestone, Calendar, CheckCircle, Clock, Plus, Edit, Trash2,
     MoreHorizontal, Tag, MessageSquare, Globe, Building2
@@ -138,7 +139,7 @@
       status: milestone.status,
       category_id: milestone.category_id,
       is_global: milestone.is_global !== false, // Default to true if undefined
-      workspace_id: milestone.workspace_id || null
+      workspace_id: milestone.workspace_id ? parseInt(milestone.workspace_id, 10) : null
     };
     showCreateForm = true;
   }
@@ -152,7 +153,7 @@
       category_id: null,
       // Auto-set scope based on view context
       is_global: isGlobalView,
-      workspace_id: isGlobalView ? null : workspaceId
+      workspace_id: isGlobalView ? null : (workspaceId ? parseInt(workspaceId, 10) : null)
     };
   }
 
@@ -175,7 +176,7 @@
       cancelForm();
     } catch (error) {
       console.error('Failed to save milestone:', error);
-      alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
+      errorToast(error.message || String(error), t('errors.failedToSave'));
     }
   }
 
@@ -185,7 +186,7 @@
         await milestonesStore.delete(milestone.id);
       } catch (error) {
         console.error('Failed to delete milestone:', error);
-        alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
+        errorToast(error.message || String(error), t('errors.failedToDelete'));
       }
     }
   }
@@ -257,10 +258,10 @@
 
   // DataTable configuration
   let milestoneColumns = $derived([
-    { 
-      key: 'status', 
-      label: 'Status', 
-      width: 'w-32',
+    {
+      key: 'status',
+      label: 'Status',
+      width: 'w-40',
       slot: 'status'
     },
     { 
@@ -374,11 +375,10 @@
           {#if item}
             {#key item.id}
               <a
-                href="/milestones/{item.id}"
+                href="/milestones/{item.id}{workspaceId ? `?workspaceId=${workspaceId}` : ''}"
                 class="font-medium hover:underline cursor-pointer"
                 style="color: var(--ds-text);"
                 title={item.description || ''}
-                onclick={(e) => { e.preventDefault(); navigate(`/milestones/${item.id}`); }}
               >
                 {item.name}
               </a>

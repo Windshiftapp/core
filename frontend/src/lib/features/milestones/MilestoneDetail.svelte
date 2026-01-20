@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import { ArrowLeft, Calendar, Flag, Edit, Trash2, ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import { api } from '../../api.js';
@@ -16,7 +17,7 @@
   import BasePicker from '../../pickers/BasePicker.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
 
-  let { milestoneId } = $props();
+  let { milestoneId, workspaceId = null } = $props();
 
   let loading = $state(true);
   let error = $state(null);
@@ -66,7 +67,11 @@
   }
 
   function goBack() {
-    navigate('/milestones');
+    if (workspaceId) {
+      navigate(`/workspaces/${workspaceId}/milestones`);
+    } else {
+      navigate('/milestones');
+    }
   }
 
   function getStatusInfo(status) {
@@ -128,7 +133,9 @@
         description: progress.description || '',
         target_date: progress.target_date ? progress.target_date.split('T')[0] : '',
         status: progress.status,
-        category_id: null // We don't have this in progress response, but it's optional
+        category_id: null, // We don't have this in progress response, but it's optional
+        is_global: progress.is_global ?? !workspaceId,
+        workspace_id: progress.workspace_id ?? (workspaceId ? parseInt(workspaceId, 10) : null)
       };
       showEditModal = true;
     }
@@ -141,7 +148,7 @@
       await loadProgress();
     } catch (err) {
       console.error('Failed to update milestone:', err);
-      alert(t('dialogs.alerts.failedToUpdate', { error: err.message || err }));
+      errorToast(err.message || String(err), t('errors.failedToUpdate'));
     }
   }
 
@@ -149,10 +156,10 @@
     if (confirm(t('milestones.confirmDelete', { name: progress?.milestone_name }))) {
       try {
         await milestonesStore.delete(milestoneId);
-        navigate('/milestones');
+        goBack();
       } catch (err) {
         console.error('Failed to delete milestone:', err);
-        alert(t('dialogs.alerts.failedToDelete', { error: err.message || err }));
+        errorToast(err.message || String(err), t('errors.failedToDelete'));
       }
     }
   }
