@@ -50,13 +50,6 @@ export function transitionsToEdges(transitions) {
     return handle.replace('target-', '');
   };
 
-  // Normalize target handle - ensure it has 'target-' prefix
-  const normalizeTargetHandle = (handle) => {
-    if (!handle) return null;
-    const base = handle.replace('target-', '');
-    return `target-${base}`;
-  };
-
   return transitions
     .filter(transition =>
       transition.from_status_id !== null &&
@@ -189,12 +182,12 @@ export const positionPersistence = {
     nodes
       .filter(node => node.type === 'status')
       .forEach(node => {
-        positions[node.data.statusId] = { 
-          x: node.position.x, 
-          y: node.position.y 
+        positions[node.data.statusId] = {
+          x: node.position.x,
+          y: node.position.y
         };
       });
-    
+
     const storageKey = `workflow_${workflowId}_positions`;
     localStorage.setItem(storageKey, JSON.stringify(positions));
   },
@@ -202,7 +195,7 @@ export const positionPersistence = {
   load(workflowId) {
     const storageKey = `workflow_${workflowId}_positions`;
     const stored = localStorage.getItem(storageKey);
-    
+
     if (stored) {
       try {
         return JSON.parse(stored);
@@ -210,7 +203,7 @@ export const positionPersistence = {
         console.error('Failed to parse stored positions:', error);
       }
     }
-    
+
     return {};
   }
 };

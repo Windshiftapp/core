@@ -60,10 +60,10 @@ function createSearchStore() {
 
       // If no filters are set, return empty
       if ($selectedWorkspaces.length === 0 &&
-          $selectedStatuses.length === 0 &&
-          $selectedPriorities.length === 0 &&
-          !$searchQuery.trim() &&
-          !hasDynamicFilters) {
+        $selectedStatuses.length === 0 &&
+        $selectedPriorities.length === 0 &&
+        !$searchQuery.trim() &&
+        !hasDynamicFilters) {
         return '';
       }
 
@@ -293,7 +293,7 @@ function createSearchStore() {
         debouncedSearch();
       }
     }
-  ).subscribe(() => {});
+  ).subscribe(() => { });
 
   // ===== Public API =====
 
@@ -392,10 +392,6 @@ function createSearchStore() {
         }
         return [...current, priority];
       });
-    },
-
-    setDynamicFilters(filters) {
-      dynamicFilters.set(filters);
     },
 
     addDynamicFilter() {

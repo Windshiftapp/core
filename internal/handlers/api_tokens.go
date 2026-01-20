@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"windshift/internal/database"
-	"windshift/internal/services"
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"windshift/internal/database"
+	"windshift/internal/services"
 
 	"windshift/internal/auth"
 	"windshift/internal/models"
@@ -111,7 +111,7 @@ func (ath *ApiTokenHandler) GetUserTokens(w http.ResponseWriter, r *http.Request
 // GetToken retrieves a specific token by ID (for current user)
 func (ath *ApiTokenHandler) GetToken(w http.ResponseWriter, r *http.Request) {
 	tokenIDStr := r.PathValue("id")
-	
+
 	tokenID, err := strconv.Atoi(tokenIDStr)
 	if err != nil {
 		http.Error(w, "Invalid token ID", http.StatusBadRequest)
@@ -144,7 +144,7 @@ func (ath *ApiTokenHandler) GetToken(w http.ResponseWriter, r *http.Request) {
 // RevokeToken deletes/revokes a token
 func (ath *ApiTokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 	tokenIDStr := r.PathValue("id")
-	
+
 	tokenID, err := strconv.Atoi(tokenIDStr)
 	if err != nil {
 		http.Error(w, "Invalid token ID", http.StatusBadRequest)
@@ -175,7 +175,7 @@ func (ath *ApiTokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) 
 func (ath *ApiTokenHandler) ValidateToken(w http.ResponseWriter, r *http.Request) {
 	// This endpoint is useful for API clients to test their tokens
 	// If they can call this successfully, their token is valid
-	
+
 	// Get user and token info from context (set by auth middleware)
 	user, ok := r.Context().Value("user").(*models.User)
 	if !ok || user == nil {
@@ -183,7 +183,7 @@ func (ath *ApiTokenHandler) ValidateToken(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	apiToken, ok := r.Context().Value("api_token").(*models.ApiToken)
+	apiToken, _ := r.Context().Value("api_token").(*models.ApiToken)
 	authMethod, _ := r.Context().Value("auth_method").(string)
 
 	response := map[string]interface{}{

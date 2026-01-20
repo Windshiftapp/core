@@ -1,4 +1,4 @@
-import { fetchAPI, API_BASE } from './core.js';
+import { fetchAPI } from './core.js';
 
 export const setup = {
   getStatus: () => fetchAPI('/setup/status'),

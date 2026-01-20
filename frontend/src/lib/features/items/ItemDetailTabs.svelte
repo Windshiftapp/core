@@ -1,7 +1,7 @@
 <script>
-  import { MessageSquare, Clock, Play, Info, History, Edit, Trash2 } from 'lucide-svelte';
+  import { MessageSquare, Clock, Play, Info, History, Edit, Trash2, MoreHorizontal } from 'lucide-svelte';
   import Button from '../../components/Button.svelte';
-  import ActionButton from '../../layout/ActionButton.svelte';
+  import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import Comments from '../items/Comments.svelte';
   import ItemHistory from '../items/ItemHistory.svelte';
   import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';

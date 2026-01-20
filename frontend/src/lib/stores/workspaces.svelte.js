@@ -1,10 +1,9 @@
-import { writable, derived, get } from 'svelte/store';
+import { writable, derived } from 'svelte/store';
 import { api } from '../api.js';
-import { authStore } from './auth.svelte.js';
 
 // Current workspace store - automatically syncs with route
 function createCurrentWorkspaceStore() {
-  const { subscribe, set, update } = writable(null);
+  const { subscribe, set } = writable(null);
   let lastWorkspaceId = null;
 
   return {

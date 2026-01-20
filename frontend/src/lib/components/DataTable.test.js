@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import DataTable from './DataTable.svelte';
 
@@ -12,13 +12,13 @@ vi.mock('lucide-svelte', () => ({
 // Mock child components - for Svelte 5, provide minimal component mocks
 vi.mock('./DropdownMenu.svelte', () => {
   return {
-    default: function MockDropdownMenu() {},
+    default: function MockDropdownMenu() { },
   };
 });
 
 vi.mock('./EmptyState.svelte', () => {
   return {
-    default: function MockEmptyState() {},
+    default: function MockEmptyState() { },
   };
 });
 

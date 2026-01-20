@@ -166,13 +166,11 @@ export class QLTokenizer {
 
       // Numbers and dates (YYYY-MM-DD)
       if (/\d/.test(this.current)) {
-        const start = this.position;
-        let value = '';
 
         // Check if it's a date pattern (YYYY-MM-DD)
         if (this.current && /\d/.test(this.current) &&
-            this.peekAhead(4) === '-' &&
-            this.peekAhead(7) === '-') {
+          this.peekAhead(4) === '-' &&
+          this.peekAhead(7) === '-') {
           tokens.push({
             type: TokenType.DATE,
             value: this.readDate()
@@ -425,8 +423,8 @@ export class QLParser {
     const left = this.primary();
 
     if (this.match(TokenType.EQUALS, TokenType.NOT_EQUALS, TokenType.LESS_THAN,
-                    TokenType.LESS_EQUAL, TokenType.GREATER_THAN, TokenType.GREATER_EQUAL,
-                    TokenType.CONTAINS)) {
+      TokenType.LESS_EQUAL, TokenType.GREATER_THAN, TokenType.GREATER_EQUAL,
+      TokenType.CONTAINS)) {
       const operator = this.advance();
       const right = this.primary();
       return {

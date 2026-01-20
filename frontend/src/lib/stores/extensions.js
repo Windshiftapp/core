@@ -1,5 +1,4 @@
 import { writable } from 'svelte/store';
-import { api } from '../api';
 
 // Store for extension registry
 export const extensions = writable({});

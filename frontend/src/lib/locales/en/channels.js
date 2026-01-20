@@ -238,7 +238,6 @@ export default {
     removeFromSection: 'Remove from section',
     removeLink: 'Remove link',
     backToApp: 'Back to App',
-    customize: 'Customize',
     lightMode: 'Light Mode',
     darkMode: 'Dark Mode',
     signIn: 'Sign In',
