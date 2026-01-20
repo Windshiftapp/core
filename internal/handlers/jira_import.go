@@ -1611,7 +1611,7 @@ func (h *JiraImportHandler) DeleteImportedData(w http.ResponseWriter, r *http.Re
 	}
 
 	// Update job status to indicate data was deleted
-	_, err = h.db.ExecWrite(`
+	_, _ = h.db.ExecWrite(`
 		UPDATE jira_import_jobs
 		SET status = 'data_deleted', result_json = ?
 		WHERE id = ?

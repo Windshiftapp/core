@@ -140,8 +140,8 @@ func (h *TestCoverageHandler) CreateConfig(w http.ResponseWriter, r *http.Reques
 			return
 		}
 
-		wsID, err := strconv.Atoi(workspaceIDStr)
-		if err != nil {
+		wsID, parseErr := strconv.Atoi(workspaceIDStr)
+		if parseErr != nil {
 			http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
 			return
 		}
@@ -153,8 +153,8 @@ func (h *TestCoverageHandler) CreateConfig(w http.ResponseWriter, r *http.Reques
 			wsID, typeIDsBytes, time.Now(), time.Now(),
 		).Scan(&configID)
 	} else {
-		collID, err := strconv.Atoi(id)
-		if err != nil {
+		collID, parseErr := strconv.Atoi(id)
+		if parseErr != nil {
 			http.Error(w, "Invalid collection ID", http.StatusBadRequest)
 			return
 		}

@@ -80,7 +80,7 @@ func (d *ItemKeyDetector) DetectItemKeysWithPattern(text, pattern string, source
 			seen[key] = true
 
 			var number int
-			fmt.Sscanf(match[2], "%d", &number)
+			_, _ = fmt.Sscanf(match[2], "%d", &number)
 
 			results = append(results, DetectedItemKey{
 				Key:    key,

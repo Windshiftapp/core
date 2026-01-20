@@ -69,7 +69,7 @@ func (cs *CredentialStore) GetUserCredentials(userID int) ([]webauthn.Credential
 	if err != nil {
 		return nil, fmt.Errorf("failed to query credentials: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var credentials []webauthn.Credential
 	for rows.Next() {
@@ -261,7 +261,7 @@ func (cs *CredentialStore) GetUserCredentialsList(userID int) ([]WebAuthnCredent
 	if err != nil {
 		return nil, fmt.Errorf("failed to query credentials: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var credentials []WebAuthnCredential
 	for rows.Next() {

@@ -131,7 +131,7 @@ func (tm *SCIMTokenManager) ValidateToken(token string) (*models.SCIMToken, erro
 
 // updateLastUsed updates the last_used_at timestamp for a token
 func (tm *SCIMTokenManager) updateLastUsed(tokenID int) {
-	tm.db.Exec(`UPDATE scim_tokens SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?`, tokenID)
+	_, _ = tm.db.Exec(`UPDATE scim_tokens SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?`, tokenID)
 }
 
 // CreateToken creates a new SCIM token

@@ -331,9 +331,11 @@ func isFooterLine(line string) bool {
 
 // StripHTML removes HTML tags from a string (for HTML-only emails)
 func StripHTML(html string) string {
-	// Remove script and style elements
-	re := regexp.MustCompile(`(?is)<(script|style)[^>]*>.*?</\1>`)
-	html = re.ReplaceAllString(html, "")
+	// Remove script and style elements (using separate patterns since RE2 doesn't support backreferences)
+	scriptRe := regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
+	html = scriptRe.ReplaceAllString(html, "")
+	styleRe := regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`)
+	html = styleRe.ReplaceAllString(html, "")
 
 	// Replace common block elements with newlines
 	blockElements := []string{"</p>", "</div>", "</tr>", "</li>", "<br>", "<br/>", "<br />"}
@@ -342,8 +344,8 @@ func StripHTML(html string) string {
 	}
 
 	// Remove all remaining HTML tags
-	re = regexp.MustCompile(`<[^>]*>`)
-	text := re.ReplaceAllString(html, "")
+	tagRe := regexp.MustCompile(`<[^>]*>`)
+	text := tagRe.ReplaceAllString(html, "")
 
 	// Decode common HTML entities
 	text = strings.ReplaceAll(text, "&nbsp;", " ")

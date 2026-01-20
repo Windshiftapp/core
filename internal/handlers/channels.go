@@ -645,7 +645,7 @@ func (h *ChannelHandler) testSMTPConfig(config models.ChannelConfig) bool {
 	}
 
 	// Test actual SMTP connection
-	addr := fmt.Sprintf("%s:%d", config.SMTPHost, config.SMTPPort)
+	addr := net.JoinHostPort(config.SMTPHost, strconv.Itoa(config.SMTPPort))
 
 	// Set connection timeout
 	timeout := 10 * time.Second
@@ -1248,7 +1248,7 @@ func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Req
 		}
 	} else if managerType == "group" {
 		nameQuery := "SELECT name FROM groups WHERE id = ?"
-		err = h.db.QueryRowContext(ctx, nameQuery, actualManagerID).Scan(&managerName)
+		_ = h.db.QueryRowContext(ctx, nameQuery, actualManagerID).Scan(&managerName)
 	}
 
 	// Delete the manager

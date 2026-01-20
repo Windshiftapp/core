@@ -63,7 +63,7 @@ func NewStatusCategoryConfig() EnumConfig {
 
 		CheckDependencies: func(db database.Database, id int) string {
 			var count int
-			db.QueryRow("SELECT COUNT(*) FROM statuses WHERE category_id = ?", id).Scan(&count)
+			_ = db.QueryRow("SELECT COUNT(*) FROM statuses WHERE category_id = ?", id).Scan(&count)
 			if count > 0 {
 				return "Cannot delete status category that is in use by statuses"
 			}
@@ -146,7 +146,7 @@ func NewMilestoneCategoryConfig() EnumConfig {
 
 		CheckDependencies: func(db database.Database, id int) string {
 			var count int
-			db.QueryRow("SELECT COUNT(*) FROM milestones WHERE category_id = ?", id).Scan(&count)
+			_ = db.QueryRow("SELECT COUNT(*) FROM milestones WHERE category_id = ?", id).Scan(&count)
 			if count > 0 {
 				return "Cannot delete milestone category that is in use by milestones"
 			}
@@ -229,7 +229,7 @@ func NewCollectionCategoryConfig() EnumConfig {
 
 		CheckDependencies: func(db database.Database, id int) string {
 			var count int
-			db.QueryRow("SELECT COUNT(*) FROM collections WHERE category_id = ?", id).Scan(&count)
+			_ = db.QueryRow("SELECT COUNT(*) FROM collections WHERE category_id = ?", id).Scan(&count)
 			if count > 0 {
 				return "Cannot delete collection category that is in use by collections"
 			}
@@ -312,7 +312,7 @@ func NewChannelCategoryConfig() EnumConfig {
 
 		CheckDependencies: func(db database.Database, id int) string {
 			var count int
-			db.QueryRow("SELECT COUNT(*) FROM channels WHERE category_id = ?", id).Scan(&count)
+			_ = db.QueryRow("SELECT COUNT(*) FROM channels WHERE category_id = ?", id).Scan(&count)
 			if count > 0 {
 				return "Cannot delete channel category that is in use by channels"
 			}
@@ -389,7 +389,7 @@ func NewIterationTypeConfig() EnumConfig {
 
 		CheckDependencies: func(db database.Database, id int) string {
 			var count int
-			db.QueryRow("SELECT COUNT(*) FROM iterations WHERE iteration_type_id = ?", id).Scan(&count)
+			_ = db.QueryRow("SELECT COUNT(*) FROM iterations WHERE iteration_type_id = ?", id).Scan(&count)
 			if count > 0 {
 				return "Cannot delete iteration type that is in use by iterations"
 			}

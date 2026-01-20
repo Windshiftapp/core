@@ -70,12 +70,6 @@ func respondSCIMError(w http.ResponseWriter, status int, detail string, scimType
 	w.Header().Set("Content-Type", "application/scim+json")
 	w.WriteHeader(status)
 
-	// Format status as string
-	statusStr := http.StatusText(status)
-	if statusStr == "" {
-		statusStr = "Error"
-	}
-
 	scimError := models.SCIMError{
 		Schemas:  []string{models.SCIMSchemaError},
 		Detail:   detail,

@@ -326,7 +326,7 @@ func (r *CredentialResolver) GetCredentialsForUser(ctx context.Context, connecti
 
 		// Update last_used_at for the user token
 		go func() {
-			r.db.Exec(`
+			_, _ = r.db.Exec(`
 				UPDATE user_scm_oauth_tokens SET last_used_at = CURRENT_TIMESTAMP
 				WHERE user_id = ? AND scm_provider_id = ?
 			`, userID, providerID)

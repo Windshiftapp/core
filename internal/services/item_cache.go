@@ -112,7 +112,7 @@ func NewItemCacheService(db database.Database, config ItemCacheConfig) (*ItemCac
 
 	// Warm up cache if configured
 	if config.EnablePreWarm {
-		go service.WarmCache()
+		go func() { _ = service.WarmCache() }()
 	}
 
 	return service, nil

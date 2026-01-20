@@ -86,7 +86,7 @@ func (p *GenericProvider) Connect(ctx context.Context, config *models.ChannelCon
 	}
 
 	if err := client.AuthenticateBasic(config.IMAPUsername, config.IMAPPassword); err != nil {
-		client.Close()
+		_ = client.Close()
 		return nil, fmt.Errorf("basic authentication failed: %w", err)
 	}
 
@@ -99,6 +99,6 @@ func (p *GenericProvider) TestConnection(ctx context.Context, config *models.Cha
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 	return nil
 }

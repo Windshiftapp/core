@@ -117,7 +117,7 @@ func (p *MicrosoftProvider) ExchangeCode(ctx context.Context, code, redirectURI 
 			Error            string `json:"error"`
 			ErrorDescription string `json:"error_description"`
 		}
-		json.Unmarshal(body, &errResp)
+		_ = json.Unmarshal(body, &errResp)
 		return nil, fmt.Errorf("token exchange failed: %s - %s", errResp.Error, errResp.ErrorDescription)
 	}
 
@@ -178,7 +178,7 @@ func (p *MicrosoftProvider) RefreshToken(ctx context.Context, refreshToken strin
 			Error            string `json:"error"`
 			ErrorDescription string `json:"error_description"`
 		}
-		json.Unmarshal(body, &errResp)
+		_ = json.Unmarshal(body, &errResp)
 		return nil, fmt.Errorf("token refresh failed: %s - %s", errResp.Error, errResp.ErrorDescription)
 	}
 

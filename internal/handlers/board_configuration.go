@@ -39,8 +39,8 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 			return
 		}
 
-		workspaceID, err := strconv.Atoi(workspaceIDStr)
-		if err != nil {
+		workspaceID, parseErr := strconv.Atoi(workspaceIDStr)
+		if parseErr != nil {
 			http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
 			return
 		}
@@ -71,8 +71,8 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 		}
 	} else {
 		// Collection-level configuration
-		collectionID, err := strconv.Atoi(id)
-		if err != nil {
+		collectionID, parseErr := strconv.Atoi(id)
+		if parseErr != nil {
 			http.Error(w, "Invalid collection ID", http.StatusBadRequest)
 			return
 		}
@@ -167,8 +167,8 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 			return
 		}
 
-		wsID, err := strconv.Atoi(workspaceIDStr)
-		if err != nil {
+		wsID, parseErr := strconv.Atoi(workspaceIDStr)
+		if parseErr != nil {
 			http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
 			return
 		}
@@ -182,8 +182,8 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 		).Scan(&configID)
 	} else {
 		// Collection-level configuration
-		collID, err := strconv.Atoi(id)
-		if err != nil {
+		collID, parseErr := strconv.Atoi(id)
+		if parseErr != nil {
 			http.Error(w, "Invalid collection ID", http.StatusBadRequest)
 			return
 		}

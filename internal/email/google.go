@@ -107,7 +107,7 @@ func (p *GoogleProvider) ExchangeCode(ctx context.Context, code, redirectURI str
 			Error            string `json:"error"`
 			ErrorDescription string `json:"error_description"`
 		}
-		json.Unmarshal(body, &errResp)
+		_ = json.Unmarshal(body, &errResp)
 		return nil, fmt.Errorf("token exchange failed: %s - %s", errResp.Error, errResp.ErrorDescription)
 	}
 
@@ -165,7 +165,7 @@ func (p *GoogleProvider) RefreshToken(ctx context.Context, refreshToken string) 
 			Error            string `json:"error"`
 			ErrorDescription string `json:"error_description"`
 		}
-		json.Unmarshal(body, &errResp)
+		_ = json.Unmarshal(body, &errResp)
 		return nil, fmt.Errorf("token refresh failed: %s - %s", errResp.Error, errResp.ErrorDescription)
 	}
 
@@ -242,7 +242,7 @@ func (p *GoogleProvider) Connect(ctx context.Context, config *models.ChannelConf
 	}
 
 	if err := client.AuthenticateXOAuth2(config.EmailOAuthEmail, config.EmailOAuthAccessToken); err != nil {
-		client.Close()
+		_ = client.Close()
 		return nil, fmt.Errorf("XOAUTH2 authentication failed: %w", err)
 	}
 
@@ -255,6 +255,6 @@ func (p *GoogleProvider) TestConnection(ctx context.Context, config *models.Chan
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 	return nil
 }

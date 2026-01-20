@@ -461,5 +461,5 @@ func (w *WebhookSender) generateSignature(payload []byte, secret string) string 
 // updateChannelActivity updates the last_activity timestamp for a channel
 func (w *WebhookSender) updateChannelActivity(ctx context.Context, channelID int, success bool) {
 	query := "UPDATE channels SET last_activity = ? WHERE id = ?"
-	w.db.ExecWriteContext(ctx, query, time.Now(), channelID)
+	_, _ = w.db.ExecWriteContext(ctx, query, time.Now(), channelID)
 }

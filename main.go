@@ -744,7 +744,7 @@ func main() {
 	}
 	if emailVerificationBaseURL == "" {
 		// Construct from server port (for development/local)
-		emailVerificationBaseURL = fmt.Sprintf("http://localhost:%d", port)
+		emailVerificationBaseURL = fmt.Sprintf("http://localhost:%s", port)
 	}
 	emailVerificationService := services.NewEmailVerificationService(db, smtpSender, emailVerificationBaseURL)
 
@@ -801,7 +801,7 @@ func main() {
 		scimBaseURL = os.Getenv("PUBLIC_URL")
 	}
 	if scimBaseURL == "" {
-		scimBaseURL = fmt.Sprintf("http://localhost:%d", port)
+		scimBaseURL = fmt.Sprintf("http://localhost:%s", port)
 	}
 	scimHandler := handlers.NewSCIMHandler(db, scimBaseURL)
 	scimTokenHandler := handlers.NewSCIMTokenHandler(scimTokenManager)

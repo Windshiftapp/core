@@ -196,7 +196,7 @@ func (c *client) TestConnection(ctx context.Context) (*JiraInstanceInfo, error) 
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrConnectionFailed, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)
@@ -216,7 +216,7 @@ func (c *client) TestConnection(ctx context.Context) (*JiraInstanceInfo, error) 
 			URL:         c.baseURL,
 		}, nil
 	}
-	defer serverResp.Body.Close()
+	defer func() { _ = serverResp.Body.Close() }()
 
 	var serverInfo struct {
 		BaseURL        string   `json:"baseUrl"`
@@ -247,7 +247,7 @@ func (c *client) ListProjects(ctx context.Context) ([]JiraProject, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)
@@ -266,7 +266,7 @@ func (c *client) GetProject(ctx context.Context, projectKey string) (*JiraProjec
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)
@@ -289,7 +289,7 @@ func (c *client) ListIssueTypes(ctx context.Context) ([]JiraIssueType, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)
@@ -308,7 +308,7 @@ func (c *client) GetProjectIssueTypes(ctx context.Context, projectKey string) ([
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)
@@ -346,7 +346,7 @@ func (c *client) ListCustomFields(ctx context.Context) ([]JiraCustomField, error
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)
@@ -392,7 +392,7 @@ func (c *client) GetProjectFields(ctx context.Context, projectIDs []string) ([]J
 		}
 
 		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if err != nil {
 			return nil, fmt.Errorf("failed to read response: %w", err)
 		}
@@ -442,7 +442,7 @@ func (c *client) ListStatuses(ctx context.Context) ([]JiraStatus, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)
@@ -461,7 +461,7 @@ func (c *client) GetStatusCategories(ctx context.Context) ([]JiraStatusCategory,
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)
@@ -481,7 +481,7 @@ func (c *client) GetProjectWorkflowScheme(ctx context.Context, projectKey string
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)
@@ -543,7 +543,7 @@ func (c *client) SearchIssues(ctx context.Context, opts SearchOptions) (*SearchR
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)
@@ -572,7 +572,7 @@ func (c *client) GetIssue(ctx context.Context, issueKey string, expand []string)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)
@@ -647,7 +647,7 @@ func (c *client) SearchIssuesJQL(ctx context.Context, req JQLSearchRequest) (*JQ
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)
@@ -667,7 +667,7 @@ func (c *client) BulkFetchIssues(ctx context.Context, req BulkFetchRequest) (*Bu
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)
@@ -720,7 +720,7 @@ func (c *client) GetProjectVersions(ctx context.Context, projectKey string) ([]J
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)
@@ -744,7 +744,7 @@ func (c *client) ListBoards(ctx context.Context, projectKey string) (*BoardListR
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)
@@ -763,7 +763,7 @@ func (c *client) GetBoardSprints(ctx context.Context, boardID int) (*SprintListR
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)
@@ -798,7 +798,7 @@ func (c *client) DownloadAttachment(ctx context.Context, attachmentURL string) (
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return nil, "", c.handleErrorResponse(resp)
 	}
 
@@ -816,7 +816,7 @@ func (c *client) ListObjectSchemas(ctx context.Context) ([]AssetObjectSchema, er
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, ErrAssetsNotAvailable
@@ -840,7 +840,7 @@ func (c *client) GetObjectSchema(ctx context.Context, schemaID string) (*AssetOb
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)
@@ -859,7 +859,7 @@ func (c *client) ListObjectTypes(ctx context.Context, schemaID string) ([]AssetO
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)
@@ -878,7 +878,7 @@ func (c *client) GetObjectTypeAttributes(ctx context.Context, objectTypeID strin
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)
@@ -911,7 +911,7 @@ func (c *client) SearchObjects(ctx context.Context, opts ObjectSearchOptions) (*
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleErrorResponse(resp)

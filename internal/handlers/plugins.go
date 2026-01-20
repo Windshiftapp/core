@@ -159,15 +159,15 @@ func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
 		err = h.manager.UploadPlugin("", fileData)
 	} else if strings.HasSuffix(header.Filename, ".wasm") {
 		// Handle direct WASM file - need manifest (legacy)
-		manifestFile, _, err := r.FormFile("manifest")
-		if err != nil {
+		manifestFile, _, formErr := r.FormFile("manifest")
+		if formErr != nil {
 			http.Error(w, "Missing manifest.json for WASM upload", http.StatusBadRequest)
 			return
 		}
 		defer manifestFile.Close()
 
-		manifestData, err := io.ReadAll(manifestFile)
-		if err != nil {
+		manifestData, readErr := io.ReadAll(manifestFile)
+		if readErr != nil {
 			http.Error(w, "Failed to read manifest", http.StatusInternalServerError)
 			return
 		}

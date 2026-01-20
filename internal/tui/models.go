@@ -575,10 +575,6 @@ func (m Model) renderWorkItemDetail() string {
 
 	// Status field (index 2) - uses picker
 	statusLabel := m.styles.Subtitle.Render("Status:")
-	statusValue := m.editForm.statusName
-	if statusValue == "" {
-		statusValue = "(not set)"
-	}
 	if m.editForm.currentField == 2 {
 		// Show with color badge
 		statusDisplay := m.formatStatusWithColor(m.editForm.statusName, m.editForm.statusColor)
@@ -590,10 +586,6 @@ func (m Model) renderWorkItemDetail() string {
 
 	// Priority field (index 3) - uses picker
 	priorityLabel := m.styles.Subtitle.Render("Priority:")
-	priorityValue := m.editForm.priorityName
-	if priorityValue == "" {
-		priorityValue = "(not set)"
-	}
 	if m.editForm.currentField == 3 {
 		priorityDisplay := m.formatPriorityWithColor(m.editForm.priorityName, m.editForm.priorityColor)
 		content = append(content, priorityLabel, m.styles.SelectedItem.Render(priorityDisplay+" [Enter to change]"), "")
@@ -658,10 +650,6 @@ func (m Model) renderCreateWorkItem() string {
 
 	// Priority field (index 2) - uses picker
 	priorityLabel := m.styles.Subtitle.Render("Priority:")
-	priorityValue := m.createForm.priorityName
-	if priorityValue == "" {
-		priorityValue = "(not set)"
-	}
 	if m.createForm.currentField == 2 {
 		priorityDisplay := m.formatPriorityWithColor(m.createForm.priorityName, m.createForm.priorityColor)
 		content = append(content, priorityLabel, m.styles.SelectedItem.Render(priorityDisplay+" [Enter to select]"), "")

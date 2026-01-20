@@ -57,7 +57,7 @@ func (s *stubNotificationManager) expectNoNotification(t *testing.T, timeout tim
 
 func TestNotificationService_AssignmentIncludesItemKey(t *testing.T) {
 	db := createTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	env := seedBaseNotificationEnv(t, db)
 	attachNotificationSettingAndRule(t, db, env)
@@ -67,7 +67,7 @@ func TestNotificationService_AssignmentIncludesItemKey(t *testing.T) {
 		RefreshInterval: time.Hour,
 		EventBufferSize: 10,
 	})
-	defer service.Close()
+	defer func() { _ = service.Close() }()
 
 	itemID := 42
 	itemKey := "TST-42"
@@ -104,7 +104,7 @@ func TestNotificationService_AssignmentIncludesItemKey(t *testing.T) {
 
 func TestNotificationService_ForceRefreshLoadsNewAssignments(t *testing.T) {
 	db := createTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	env := seedBaseNotificationEnv(t, db)
 
@@ -113,7 +113,7 @@ func TestNotificationService_ForceRefreshLoadsNewAssignments(t *testing.T) {
 		RefreshInterval: time.Hour,
 		EventBufferSize: 10,
 	})
-	defer service.Close()
+	defer func() { _ = service.Close() }()
 
 	itemID := 55
 

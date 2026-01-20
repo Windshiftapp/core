@@ -142,7 +142,7 @@ func (g *GitHubProvider) ListAppInstallations(ctx context.Context) ([]GitHubAppI
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return nil, ErrInvalidCredentials
@@ -198,7 +198,7 @@ func (g *GitHubProvider) GetInstallationAccessToken(ctx context.Context, install
 	if err != nil {
 		return "", nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
@@ -273,7 +273,7 @@ func (g *GitHubProvider) TestConnection(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return ErrInvalidCredentials
@@ -326,7 +326,7 @@ func (g *GitHubProvider) ListRepositories(ctx context.Context, opts ListReposito
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, g.handleErrorResponse(resp)
@@ -374,7 +374,7 @@ func (g *GitHubProvider) GetRepository(ctx context.Context, owner, repo string) 
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, ErrNotFound
@@ -421,7 +421,7 @@ func (g *GitHubProvider) ListPullRequests(ctx context.Context, owner, repo strin
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, g.handleErrorResponse(resp)
@@ -453,7 +453,7 @@ func (g *GitHubProvider) GetPullRequest(ctx context.Context, owner, repo string,
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, ErrNotFound
@@ -490,7 +490,7 @@ func (g *GitHubProvider) CreateBranch(ctx context.Context, owner, repo, branchNa
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return g.handleErrorResponse(resp)
@@ -524,7 +524,7 @@ func (g *GitHubProvider) CreateBranch(ctx context.Context, owner, repo, branchNa
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return g.handleErrorResponse(resp)
@@ -562,7 +562,7 @@ func (g *GitHubProvider) CreatePullRequest(ctx context.Context, owner, repo stri
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, g.handleErrorResponse(resp)
@@ -591,7 +591,7 @@ func (g *GitHubProvider) GetCommit(ctx context.Context, owner, repo, sha string)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, ErrNotFound
@@ -623,7 +623,7 @@ func (g *GitHubProvider) ListBranches(ctx context.Context, owner, repo string) (
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, g.handleErrorResponse(resp)
@@ -683,7 +683,7 @@ func (g *GitHubProvider) RegisterWebhook(ctx context.Context, owner, repo string
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, g.handleErrorResponse(resp)
@@ -723,7 +723,7 @@ func (g *GitHubProvider) DeleteWebhook(ctx context.Context, owner, repo, webhook
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return ErrNotFound
@@ -768,7 +768,7 @@ func (g *GitHubProvider) ExchangeCode(ctx context.Context, code, redirectURI str
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -816,7 +816,7 @@ func (g *GitHubProvider) GetCurrentUser(ctx context.Context) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return nil, ErrInvalidCredentials

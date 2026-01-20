@@ -169,14 +169,14 @@ func (p *Processor) findOrCreatePortalCustomer(
 // grantChannelAccess grants the portal customer access to the channel and connected portal
 func (p *Processor) grantChannelAccess(ctx context.Context, customerID, channelID int, config *models.ChannelConfig) {
 	// Grant access to email channel
-	p.db.Exec(`
+	_, _ = p.db.Exec(`
 		INSERT OR IGNORE INTO portal_customer_channels (portal_customer_id, channel_id)
 		VALUES (?, ?)
 	`, customerID, channelID)
 
 	// Grant access to connected portal if configured
 	if config.EmailConnectedPortalID != nil {
-		p.db.Exec(`
+		_, _ = p.db.Exec(`
 			INSERT OR IGNORE INTO portal_customer_channels (portal_customer_id, channel_id)
 			VALUES (?, ?)
 		`, customerID, *config.EmailConnectedPortalID)

@@ -116,7 +116,7 @@ func (g *GiteaProvider) TestConnection(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return ErrInvalidCredentials
@@ -151,7 +151,7 @@ func (g *GiteaProvider) ListRepositories(ctx context.Context, opts ListRepositor
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, g.handleErrorResponse(resp)
@@ -183,7 +183,7 @@ func (g *GiteaProvider) GetRepository(ctx context.Context, owner, repo string) (
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, ErrNotFound
@@ -215,7 +215,7 @@ func (g *GiteaProvider) ListBranches(ctx context.Context, owner, repo string) ([
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, g.handleErrorResponse(resp)
@@ -263,7 +263,7 @@ func (g *GiteaProvider) ListPullRequests(ctx context.Context, owner, repo string
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, g.handleErrorResponse(resp)
@@ -295,7 +295,7 @@ func (g *GiteaProvider) GetPullRequest(ctx context.Context, owner, repo string, 
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, ErrNotFound
@@ -327,7 +327,7 @@ func (g *GiteaProvider) GetCommit(ctx context.Context, owner, repo, sha string) 
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, ErrNotFound
@@ -366,7 +366,7 @@ func (g *GiteaProvider) CreateBranch(ctx context.Context, owner, repo, branchNam
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Gitea returns 201 Created on success
 	if resp.StatusCode != http.StatusCreated {
@@ -398,7 +398,7 @@ func (g *GiteaProvider) CreatePullRequest(ctx context.Context, owner, repo strin
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, g.handleErrorResponse(resp)
@@ -450,7 +450,7 @@ func (g *GiteaProvider) RegisterWebhook(ctx context.Context, owner, repo string,
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, g.handleErrorResponse(resp)
@@ -484,7 +484,7 @@ func (g *GiteaProvider) DeleteWebhook(ctx context.Context, owner, repo, webhookI
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return ErrNotFound
@@ -713,7 +713,7 @@ func (g *GiteaProvider) ExchangeCode(ctx context.Context, code, redirectURI stri
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -775,7 +775,7 @@ func (g *GiteaProvider) RefreshToken(ctx context.Context, refreshToken string) (
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -826,7 +826,7 @@ func (g *GiteaProvider) GetCurrentUser(ctx context.Context) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return nil, ErrInvalidCredentials

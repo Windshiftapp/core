@@ -242,7 +242,7 @@ func (s *ProviderStore) List() ([]*SSOProvider, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var providers []*SSOProvider
 	for rows.Next() {

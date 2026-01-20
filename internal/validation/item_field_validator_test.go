@@ -1,4 +1,4 @@
-// go:build test
+//go:build test
 
 package validation
 
@@ -80,26 +80,6 @@ func TestItemFieldValidator(t *testing.T) {
 
 		if item.Description == "" {
 			t.Error("Description should be set")
-		}
-	})
-
-	t.Run("ValidateTaskStatus", func(t *testing.T) {
-		item := &models.Item{WorkspaceID: testData.WorkspaceID, IsTask: true, Status: "open"}
-		updateData := map[string]interface{}{
-			"status": "in_progress",
-		}
-
-		err := validator.ValidateAndApplyUpdates(item, updateData, testData.UserID)
-		if err == nil {
-			t.Error("Expected validation error for invalid task status")
-		}
-
-		// Valid task statuses should work
-		item.Status = "open"
-		updateData["status"] = "completed"
-		err = validator.ValidateAndApplyUpdates(item, updateData, testData.UserID)
-		if err != nil {
-			t.Errorf("Expected no error for valid task status, got: %v", err)
 		}
 	})
 

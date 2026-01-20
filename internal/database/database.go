@@ -150,7 +150,7 @@ func NewDB(dataSourceName string) (*DB, error) {
 	// Create dedicated write connection with only 1 max connection to serialize writes
 	writeConn, err := sql.Open("sqlite3", connectionString)
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to open write connection: %w", err)
 	}
 
@@ -158,8 +158,8 @@ func NewDB(dataSourceName string) (*DB, error) {
 	writeConn.SetMaxIdleConns(1)
 
 	if err := writeConn.Ping(); err != nil {
-		db.Close()
-		writeConn.Close()
+		_ = db.Close()
+		_ = writeConn.Close()
 		return nil, fmt.Errorf("failed to ping write connection: %w", err)
 	}
 
@@ -237,7 +237,7 @@ func (db *DB) initializeDefaultData() error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// 1. Create default status categories
 	categories := []struct {
@@ -699,7 +699,7 @@ func (db *DB) EnsureDefaultNotificationSettings() error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Create notification setting
 	result, err := tx.Exec(

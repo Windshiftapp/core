@@ -261,7 +261,7 @@ func (p *PostgresDB) Initialize() error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Execute each schema file individually
 	schemaFiles := p.getPostgresSchemaFiles()
@@ -357,7 +357,7 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// 1. Create default status categories
 	categories := []struct {
@@ -825,7 +825,7 @@ func (p *PostgresDB) EnsureDefaultNotificationSettings() error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Create notification setting
 	var notificationSettingID int64

@@ -297,7 +297,7 @@ func (s *UserStore) FindOrCreateUser(provider *SSOProvider, claims *OIDCClaims) 
 	extAccount, err := s.FindExternalAccount(provider.ID, claims.Subject)
 	if err == nil {
 		// Update last login time
-		s.UpdateLastLogin(extAccount.ID)
+		_ = s.UpdateLastLogin(extAccount.ID)
 		user, err := s.GetUserByID(extAccount.UserID)
 		if err != nil {
 			return nil, err
@@ -374,7 +374,7 @@ func (s *UserStore) GetExternalAccountsForUser(userID int) ([]*ExternalAccount, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var accounts []*ExternalAccount
 	for rows.Next() {

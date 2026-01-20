@@ -281,13 +281,13 @@ func (am *AuthMiddleware) handleAuthError(w http.ResponseWriter, r *http.Request
 	if strings.HasPrefix(r.URL.Path, "/api/") {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"error": "` + message + `", "code": "AUTHENTICATION_REQUIRED"}`))
+		_, _ = w.Write([]byte(`{"error": "` + message + `", "code": "AUTHENTICATION_REQUIRED"}`))
 		return
 	}
 
 	// For web requests, return 401 (frontend will handle by showing login dialog)
 	w.WriteHeader(http.StatusUnauthorized)
-	w.Write([]byte("Authentication required"))
+	_, _ = w.Write([]byte("Authentication required"))
 }
 
 // getClientIP extracts the client IP address from request with proxy validation

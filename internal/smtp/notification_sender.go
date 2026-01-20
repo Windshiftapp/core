@@ -291,7 +291,7 @@ func (s *NotificationSMTPSender) sendWithStartTLS(addr string, auth smtp.Auth, f
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// Start TLS
 	tlsConfig := &tls.Config{
@@ -324,7 +324,7 @@ func (s *NotificationSMTPSender) sendWithStartTLS(addr string, auth smtp.Auth, f
 	if err != nil {
 		return err
 	}
-	defer writer.Close()
+	defer func() { _ = writer.Close() }()
 
 	_, err = writer.Write([]byte(message))
 	return err
@@ -342,14 +342,14 @@ func (s *NotificationSMTPSender) sendWithSSL(addr string, auth smtp.Auth, from, 
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	// Create SMTP client on TLS connection
 	client, err := smtp.NewClient(conn, strings.Split(addr, ":")[0])
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// Authenticate
 	if auth != nil {
@@ -372,7 +372,7 @@ func (s *NotificationSMTPSender) sendWithSSL(addr string, auth smtp.Auth, from, 
 	if err != nil {
 		return err
 	}
-	defer writer.Close()
+	defer func() { _ = writer.Close() }()
 
 	_, err = writer.Write([]byte(message))
 	return err

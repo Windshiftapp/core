@@ -125,7 +125,7 @@ func (s *CommentService) Create(params CreateCommentParams) (*CreateCommentResul
 
 		// Get actor username for notification
 		var actorName string
-		s.db.QueryRow("SELECT username FROM users WHERE id = ?", params.ActorUserID).Scan(&actorName)
+		_ = s.db.QueryRow("SELECT username FROM users WHERE id = ?", params.ActorUserID).Scan(&actorName)
 		if actorName == "" {
 			actorName = fmt.Sprintf("User #%d", params.ActorUserID)
 		}

@@ -98,7 +98,7 @@ func RespondError(w http.ResponseWriter, r *http.Request, err *APIError) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(err.StatusCode)
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // RespondErrorWithMessage writes an error response with a custom message

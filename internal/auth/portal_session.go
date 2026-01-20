@@ -167,7 +167,7 @@ func (sm *PortalSessionManager) ValidatePortalSession(token string) (*PortalSess
 	// Check if session is expired
 	if time.Now().After(session.ExpiresAt) {
 		// Clean up expired session
-		sm.DeletePortalSession(token)
+		_ = sm.DeletePortalSession(token)
 		return nil, ErrPortalSessionExpired
 	}
 

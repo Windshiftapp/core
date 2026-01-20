@@ -130,7 +130,7 @@ func (s *SessionStore) GetSession(sessionID string) (*webauthn.SessionData, erro
 	// Check if expired
 	if time.Now().After(expiresAt) {
 		// Delete expired session
-		s.db.Exec("DELETE FROM webauthn_sessions WHERE id = ?", sessionID)
+		_, _ = s.db.Exec("DELETE FROM webauthn_sessions WHERE id = ?", sessionID)
 		return nil, fmt.Errorf("session expired")
 	}
 
@@ -191,7 +191,7 @@ func (s *SessionStore) GetUserSessions(userID int) ([]SessionData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user sessions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var sessions []SessionData
 	for rows.Next() {

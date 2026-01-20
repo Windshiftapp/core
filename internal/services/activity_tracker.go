@@ -161,7 +161,7 @@ func (at *ActivityTracker) TrackWorkspaceVisit(userID, workspaceID int) error {
 	at.pendingMu.Unlock()
 
 	// Invalidate cache for this user
-	at.InvalidateUserCache(userID)
+	_ = at.InvalidateUserCache(userID)
 
 	return nil
 }
@@ -186,7 +186,7 @@ func (at *ActivityTracker) TrackItemActivity(userID, itemID int, activityType Ac
 	at.pendingMu.Unlock()
 
 	// Invalidate cache for this user
-	at.InvalidateUserCache(userID)
+	_ = at.InvalidateUserCache(userID)
 
 	// All activities are now served from pending buffer via mergePendingActivities()
 	// No immediate flush needed - activities batch write every 5 minutes
@@ -210,7 +210,7 @@ func (at *ActivityTracker) AddWatch(userID, itemID int, reason string) error {
 	}
 
 	// Invalidate cache
-	at.InvalidateUserCache(userID)
+	_ = at.InvalidateUserCache(userID)
 
 	return nil
 }
@@ -228,7 +228,7 @@ func (at *ActivityTracker) RemoveWatch(userID, itemID int) error {
 	}
 
 	// Invalidate cache
-	at.InvalidateUserCache(userID)
+	_ = at.InvalidateUserCache(userID)
 
 	return nil
 }
@@ -360,13 +360,13 @@ func (at *ActivityTracker) getUserActivityCache(userID int) (*UserActivityCache,
 	var cached UserActivityCache
 	if err := json.Unmarshal(entry, &cached); err != nil {
 		// Remove corrupted cache entry
-		at.cache.Delete(cacheKey)
+		_ = at.cache.Delete(cacheKey)
 		return nil, err
 	}
 
 	// Check if cache entry has expired
 	if time.Now().After(cached.ExpiresAt) {
-		at.cache.Delete(cacheKey)
+		_ = at.cache.Delete(cacheKey)
 		return nil, fmt.Errorf("cache entry expired")
 	}
 
@@ -401,7 +401,7 @@ func (at *ActivityTracker) loadUserActivityFromDB(userID int) (*UserActivityCach
 	if err != nil {
 		return nil, fmt.Errorf("failed to load workspace visits: %w", err)
 	}
-	defer workspaceRows.Close()
+	defer func() { _ = workspaceRows.Close() }()
 
 	for workspaceRows.Next() {
 		var visit WorkspaceVisit
@@ -434,7 +434,7 @@ func (at *ActivityTracker) loadUserActivityFromDB(userID int) (*UserActivityCach
 				activities = append(activities, activity)
 			}
 		}
-		activityRows.Close()
+		_ = activityRows.Close()
 
 		cached.ItemActivities[activityType] = activities
 	}
@@ -449,7 +449,7 @@ func (at *ActivityTracker) loadUserActivityFromDB(userID int) (*UserActivityCach
 	if err != nil {
 		slog.Error("Failed to load watches", slog.String("component", "activity"), slog.Any("error", err))
 	} else {
-		defer watchRows.Close()
+		defer func() { _ = watchRows.Close() }()
 		for watchRows.Next() {
 			var itemID int
 			if err := watchRows.Scan(&itemID); err == nil {
@@ -459,7 +459,7 @@ func (at *ActivityTracker) loadUserActivityFromDB(userID int) (*UserActivityCach
 	}
 
 	// Store in cache
-	at.storeUserActivityCache(userID, cached)
+	_ = at.storeUserActivityCache(userID, cached)
 
 	return cached, nil
 }

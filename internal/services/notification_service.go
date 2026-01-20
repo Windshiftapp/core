@@ -292,7 +292,7 @@ func (ns *NotificationService) refreshRuleCache() error {
 	if err != nil {
 		return fmt.Errorf("failed to load notification event rules: %w", err)
 	}
-	defer ruleRows.Close()
+	defer func() { _ = ruleRows.Close() }()
 
 	for ruleRows.Next() {
 		var rule models.NotificationEventRule
@@ -328,7 +328,7 @@ func (ns *NotificationService) refreshRuleCache() error {
 	if err != nil {
 		slog.Warn("failed to load notification templates", slog.String("component", "notifications"), slog.Any("error", err))
 	} else {
-		defer templateRows.Close()
+		defer func() { _ = templateRows.Close() }()
 		for templateRows.Next() {
 			var name, content string
 			if err := templateRows.Scan(&name, &content); err != nil {

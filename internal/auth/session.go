@@ -170,7 +170,7 @@ func (sm *SessionManager) ValidateSession(token, ipAddress string) (*Session, er
 	// Check if session is expired
 	if time.Now().After(session.ExpiresAt) {
 		// Clean up expired session
-		sm.DeleteSession(token)
+		_ = sm.DeleteSession(token)
 		return nil, ErrSessionExpired
 	}
 

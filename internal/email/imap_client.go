@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/emersion/go-imap/v2"
@@ -43,7 +44,7 @@ func Connect(opts ConnectOptions) (*Client, error) {
 		opts.Timeout = 30 * time.Second
 	}
 
-	addr := fmt.Sprintf("%s:%d", opts.Host, opts.Port)
+	addr := net.JoinHostPort(opts.Host, strconv.Itoa(opts.Port))
 
 	var conn net.Conn
 	var err error
@@ -75,7 +76,7 @@ func Connect(opts ConnectOptions) (*Client, error) {
 		}
 		client, err = imapclient.NewStartTLS(conn, clientOpts)
 		if err != nil {
-			conn.Close()
+			_ = conn.Close()
 			return nil, fmt.Errorf("STARTTLS failed: %w", err)
 		}
 
@@ -190,7 +191,7 @@ func (c *Client) FetchMessages(mailbox string, sinceUID uint32, batchSize int) (
 	}
 
 	fetchCmd := c.client.Fetch(uidSet, fetchOptions)
-	defer fetchCmd.Close()
+	defer func() { _ = fetchCmd.Close() }()
 
 	var messages []*FetchedMessage
 	for {
@@ -292,7 +293,7 @@ func (c *Client) Expunge() error {
 // Close closes the IMAP connection
 func (c *Client) Close() error {
 	if c.client != nil {
-		c.client.Logout().Wait()
+		_ = c.client.Logout().Wait()
 		return c.client.Close()
 	}
 	return nil

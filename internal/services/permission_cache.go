@@ -288,13 +288,13 @@ func (ps *PermissionService) getUserPermissionCache(userID int) (*models.UserPer
 	var cached models.UserPermissionCache
 	if err := json.Unmarshal(entry, &cached); err != nil {
 		// Remove corrupted cache entry
-		ps.cache.Delete(cacheKey)
+		_ = ps.cache.Delete(cacheKey)
 		return nil, err
 	}
 
 	// Check if cache entry has expired
 	if time.Now().After(cached.ExpiresAt) {
-		ps.cache.Delete(cacheKey)
+		_ = ps.cache.Delete(cacheKey)
 		return nil, fmt.Errorf("cache entry expired")
 	}
 
@@ -310,7 +310,7 @@ func (ps *PermissionService) loadUserPermissionAndCheck(userID, workspaceID int,
 	}
 
 	// Store in cache
-	ps.storeUserPermissionCache(userID, cached)
+	_ = ps.storeUserPermissionCache(userID, cached)
 
 	// Check if user is system admin
 	if cached.IsSystemAdmin {
@@ -341,7 +341,7 @@ func (ps *PermissionService) loadUserPermissionAndCheckGlobal(userID int, permis
 	}
 
 	// Store in cache
-	ps.storeUserPermissionCache(userID, cached)
+	_ = ps.storeUserPermissionCache(userID, cached)
 
 	// Check if user is system admin
 	if cached.IsSystemAdmin {
@@ -363,7 +363,7 @@ func (ps *PermissionService) loadUserPermissionAndCheckMultiple(userID, workspac
 	}
 
 	// Store in cache
-	ps.storeUserPermissionCache(userID, cached)
+	_ = ps.storeUserPermissionCache(userID, cached)
 
 	// Check if user is system admin
 	if cached.IsSystemAdmin {
@@ -827,7 +827,7 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 		SELECT workspace_id, role_id FROM workspace_everyone_roles
 	`)
 	if err == nil {
-		defer everyoneRows.Close()
+		defer func() { _ = everyoneRows.Close() }()
 		for everyoneRows.Next() {
 			var workspaceID int
 			var roleID sql.NullInt64
@@ -869,7 +869,7 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 	if err != nil {
 		return nil, fmt.Errorf("error loading global permissions: %v", err)
 	}
-	defer globalRows.Close()
+	defer func() { _ = globalRows.Close() }()
 
 	for globalRows.Next() {
 		var permissionKey string
@@ -884,7 +884,7 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 		SELECT group_id FROM group_members WHERE user_id = ?
 	`, userID)
 	if err == nil {
-		defer groupRows.Close()
+		defer func() { _ = groupRows.Close() }()
 		for groupRows.Next() {
 			var groupID int
 			if err := groupRows.Scan(&groupID); err == nil {
@@ -902,7 +902,7 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 		WHERE uwr.user_id = ?
 	`, userID)
 	if err == nil {
-		defer roleRows.Close()
+		defer func() { _ = roleRows.Close() }()
 		for roleRows.Next() {
 			var workspaceID, roleID int
 			var permissionKey string
@@ -963,7 +963,7 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 
 		groupRoleRows, err := ps.db.Query(groupRoleQuery)
 		if err == nil {
-			defer groupRoleRows.Close()
+			defer func() { _ = groupRoleRows.Close() }()
 			for groupRoleRows.Next() {
 				var workspaceID int
 				var permissionKey string
@@ -1068,152 +1068,12 @@ func clonePermissionSet(src map[string]bool) map[string]bool {
 // This implements the "All Viewers" inheritance model where:
 // - Roles without explicit members grant to all users with Viewer permissions
 // - Roles with explicit members are restricted to those members only
-func (ps *PermissionService) applyAllViewersInheritance(cached *models.UserPermissionCache, editorPerms, testerPerms, adminPerms map[string]bool) {
-	// Disabled: This feature grants all permissions to viewers when no explicit
-	// role assignments exist, which breaks role-based access control.
-	// If needed in the future, this should be a workspace-level opt-in setting.
-	return
-
-	// Get role IDs for Editor, Tester, and Administrator
-	roleIDs := make(map[string]int)
-	var viewerRoleID int
-	err := ps.db.QueryRow(`SELECT id FROM workspace_roles WHERE name = 'Viewer'`).Scan(&viewerRoleID)
-	if err != nil {
-		return // Can't proceed without Viewer role
-	}
-
-	for _, roleName := range []string{"Editor", "Tester", "Administrator"} {
-		var roleID int
-		if err := ps.db.QueryRow(`SELECT id FROM workspace_roles WHERE name = ?`, roleName).Scan(&roleID); err == nil {
-			roleIDs[roleName] = roleID
-		}
-	}
-
-	// If no inheritable roles found, nothing to do
-	if len(roleIDs) == 0 {
-		return
-	}
-
-	// Build a map of which roles have explicit members in each workspace
-	// rolesWithMembers[workspaceID][roleID] = true if role has explicit members
-	rolesWithMembers := make(map[int]map[int]bool)
-
-	// Build list of role IDs to check (only those that exist)
-	roleIDsToCheck := []interface{}{}
-	for _, roleID := range roleIDs {
-		roleIDsToCheck = append(roleIDsToCheck, roleID)
-	}
-
-	if len(roleIDsToCheck) == 0 {
-		return // No roles to check
-	}
-
-	// Build query with correct number of placeholders
-	placeholders := ""
-	for i := 0; i < len(roleIDsToCheck); i++ {
-		if i > 0 {
-			placeholders += ", "
-		}
-		placeholders += "?"
-	}
-
-	// Check both user_workspace_roles AND group_workspace_roles for explicit members
-	// If a role is assigned to either a user or a group, it has explicit members
-	query := fmt.Sprintf(`
-		SELECT DISTINCT workspace_id, role_id FROM user_workspace_roles WHERE role_id IN (%s)
-		UNION
-		SELECT DISTINCT workspace_id, role_id FROM group_workspace_roles WHERE role_id IN (%s)
-	`, placeholders, placeholders)
-
-	// Need to duplicate args for the UNION query
-	args := append(roleIDsToCheck, roleIDsToCheck...)
-	memberRows, err := ps.db.Query(query, args...)
-
-	if err == nil {
-		defer memberRows.Close()
-		for memberRows.Next() {
-			var workspaceID, roleID int
-			if err := memberRows.Scan(&workspaceID, &roleID); err == nil {
-				if rolesWithMembers[workspaceID] == nil {
-					rolesWithMembers[workspaceID] = make(map[int]bool)
-				}
-				rolesWithMembers[workspaceID][roleID] = true
-			}
-		}
-	}
-
-	// For each workspace, check if user has Viewer permissions
-	for workspaceID := range cached.WorkspacePermissions {
-		hasViewer := false
-
-		// Check if user has item.view permission (core Viewer permission)
-		if cached.WorkspacePermissions[workspaceID]["item.view"] {
-			hasViewer = true
-		}
-
-		// Also check Everyone role for Viewer permissions
-		if everyonePerms, ok := cached.WorkspaceEveryone[workspaceID]; ok {
-			if everyonePerms["item.view"] {
-				hasViewer = true
-			}
-		}
-
-		// If user doesn't have Viewer, skip (can't inherit)
-		if !hasViewer {
-			continue
-		}
-
-		// Check each inheritable role
-		inheritableRoles := map[string]map[string]bool{
-			"Editor":        editorPerms,
-			"Tester":        testerPerms,
-			"Administrator": adminPerms,
-		}
-
-		for roleName, perms := range inheritableRoles {
-			roleID, exists := roleIDs[roleName]
-			if !exists || perms == nil {
-				continue
-			}
-
-			// Check if this role has explicit members in this workspace
-			hasExplicitMembers := false
-			if workspaceRoles, ok := rolesWithMembers[workspaceID]; ok {
-				if workspaceRoles[roleID] {
-					hasExplicitMembers = true
-				}
-			}
-
-			// If role has NO explicit members, grant to "All Viewers"
-			if !hasExplicitMembers {
-				// Check if user already has this role explicitly assigned
-				userHasExplicitRole := false
-				if userRoles, ok := cached.RoleAssignments[workspaceID]; ok {
-					for _, rid := range userRoles {
-						if rid == roleID {
-							userHasExplicitRole = true
-							break
-						}
-					}
-				}
-
-				// Grant inherited permissions (only if not already explicitly assigned)
-				if !userHasExplicitRole {
-					for permKey := range perms {
-						cached.WorkspacePermissions[workspaceID][permKey] = true
-
-						// Track source as "inherited" if not already set
-						if cached.PermissionSources[workspaceID] == nil {
-							cached.PermissionSources[workspaceID] = make(map[string]string)
-						}
-						if cached.PermissionSources[workspaceID][permKey] == "" {
-							cached.PermissionSources[workspaceID][permKey] = "inherited"
-						}
-					}
-				}
-			}
-		}
-	}
+//
+// NOTE: This function is intentionally disabled. The feature was found to grant all permissions
+// to viewers when no explicit role assignments exist, which breaks role-based access control.
+// If needed in the future, this should be a workspace-level opt-in setting.
+func (ps *PermissionService) applyAllViewersInheritance(_ *models.UserPermissionCache, _, _, _ map[string]bool) {
+	// Function intentionally disabled - see comment above
 }
 
 // WarmCache pre-loads permissions for recently active users
