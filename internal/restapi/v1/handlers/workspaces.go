@@ -77,13 +77,20 @@ func (h *WorkspaceHandler) List(w http.ResponseWriter, r *http.Request) {
 		SELECT DISTINCT w.id, w.name, w.key, w.description, w.active, w.is_personal,
 		       w.icon, w.color, w.created_at, w.updated_at
 		FROM workspaces w
-		LEFT JOIN workspace_permissions wp ON w.id = wp.workspace_id AND wp.user_id = ?
+		LEFT JOIN user_workspace_roles uwr ON w.id = uwr.workspace_id AND uwr.user_id = ?
+		LEFT JOIN (
+			SELECT DISTINCT gwr.workspace_id
+			FROM group_workspace_roles gwr
+			JOIN group_members gm ON gwr.group_id = gm.group_id
+			WHERE gm.user_id = ?
+		) grp ON w.id = grp.workspace_id
 		WHERE w.active = 1
-		   OR (w.active = 0 AND wp.role = 'admin')
+		   OR (w.active = 0 AND uwr.role_id IS NOT NULL)
+		   OR (w.active = 0 AND grp.workspace_id IS NOT NULL)
 		   OR (w.is_personal = 1 AND w.owner_id = ?)
 		ORDER BY w.name
 		LIMIT ? OFFSET ?
-	`, user.ID, user.ID, pagination.Limit, pagination.Offset)
+	`, user.ID, user.ID, user.ID, pagination.Limit, pagination.Offset)
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
@@ -109,11 +116,18 @@ func (h *WorkspaceHandler) List(w http.ResponseWriter, r *http.Request) {
 	h.db.QueryRow(`
 		SELECT COUNT(DISTINCT w.id)
 		FROM workspaces w
-		LEFT JOIN workspace_permissions wp ON w.id = wp.workspace_id AND wp.user_id = ?
+		LEFT JOIN user_workspace_roles uwr ON w.id = uwr.workspace_id AND uwr.user_id = ?
+		LEFT JOIN (
+			SELECT DISTINCT gwr.workspace_id
+			FROM group_workspace_roles gwr
+			JOIN group_members gm ON gwr.group_id = gm.group_id
+			WHERE gm.user_id = ?
+		) grp ON w.id = grp.workspace_id
 		WHERE w.active = 1
-		   OR (w.active = 0 AND wp.role = 'admin')
+		   OR (w.active = 0 AND uwr.role_id IS NOT NULL)
+		   OR (w.active = 0 AND grp.workspace_id IS NOT NULL)
 		   OR (w.is_personal = 1 AND w.owner_id = ?)
-	`, user.ID, user.ID).Scan(&total)
+	`, user.ID, user.ID, user.ID).Scan(&total)
 
 	restapi.RespondPaginated(w, workspaces, restapi.NewPaginationMeta(pagination, total))
 }
@@ -205,9 +219,9 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Grant admin permission to creator
 	h.db.ExecWrite(`
-		INSERT INTO workspace_permissions (workspace_id, user_id, role)
-		VALUES (?, ?, 'admin')
-	`, id, user.ID)
+		INSERT INTO user_workspace_roles (workspace_id, user_id, role_id, granted_by, granted_at)
+		SELECT ?, ?, id, ?, CURRENT_TIMESTAMP FROM workspace_roles WHERE name = 'Administrator'
+	`, id, user.ID, user.ID)
 
 	// Return created workspace
 	var ws WorkspaceResponse

@@ -28,9 +28,20 @@ func (p *PermissionHelper) CanViewWorkspace(userID, workspaceID int) (bool, erro
 	var exists int
 	err := p.db.QueryRow(`
 		SELECT 1 FROM workspaces w
-		LEFT JOIN workspace_permissions wp ON w.id = wp.workspace_id AND wp.user_id = ?
-		WHERE w.id = ? AND (w.active = 1 OR wp.role = 'admin' OR (w.is_personal = 1 AND w.owner_id = ?))
-	`, userID, workspaceID, userID).Scan(&exists)
+		LEFT JOIN user_workspace_roles uwr ON w.id = uwr.workspace_id AND uwr.user_id = ?
+		LEFT JOIN (
+			SELECT DISTINCT gwr.workspace_id
+			FROM group_workspace_roles gwr
+			JOIN group_members gm ON gwr.group_id = gm.group_id
+			WHERE gm.user_id = ?
+		) grp ON w.id = grp.workspace_id
+		WHERE w.id = ? AND (
+			w.active = 1
+			OR uwr.role_id IS NOT NULL
+			OR grp.workspace_id IS NOT NULL
+			OR (w.is_personal = 1 AND w.owner_id = ?)
+		)
+	`, userID, userID, workspaceID, userID).Scan(&exists)
 	return err == nil, nil
 }
 
@@ -40,28 +51,43 @@ func (p *PermissionHelper) CanEditWorkspace(userID, workspaceID int) (bool, erro
 		return p.permissionService.HasWorkspacePermission(userID, workspaceID, "edit_items")
 	}
 	// Fallback query when permission service is not available
-	var role string
+	// Check for Editor or Administrator role via direct assignment or group membership
+	var hasPermission int
 	err := p.db.QueryRow(`
-		SELECT wp.role FROM workspace_permissions wp
-		WHERE wp.workspace_id = ? AND wp.user_id = ?
-	`, workspaceID, userID).Scan(&role)
+		SELECT 1 FROM user_workspace_roles uwr
+		JOIN workspace_roles wr ON uwr.role_id = wr.id
+		WHERE uwr.workspace_id = ? AND uwr.user_id = ? AND wr.name IN ('Editor', 'Administrator')
+		UNION
+		SELECT 1 FROM group_workspace_roles gwr
+		JOIN workspace_roles wr ON gwr.role_id = wr.id
+		JOIN group_members gm ON gwr.group_id = gm.group_id
+		WHERE gwr.workspace_id = ? AND gm.user_id = ? AND wr.name IN ('Editor', 'Administrator')
+		LIMIT 1
+	`, workspaceID, userID, workspaceID, userID).Scan(&hasPermission)
 	if err != nil {
-		return false, err
+		return false, nil // No edit permission found
 	}
-	return role == "admin" || role == "editor", nil
+	return hasPermission == 1, nil
 }
 
 // GetAccessibleWorkspaceIDs returns all workspace IDs the user can access
 func (p *PermissionHelper) GetAccessibleWorkspaceIDs(userID int) ([]int, error) {
-	// Query for accessible workspaces based on permissions
+	// Query for accessible workspaces based on RBAC role assignments
 	rows, err := p.db.Query(`
 		SELECT DISTINCT w.id
 		FROM workspaces w
-		LEFT JOIN workspace_permissions wp ON w.id = wp.workspace_id AND wp.user_id = ?
+		LEFT JOIN user_workspace_roles uwr ON w.id = uwr.workspace_id AND uwr.user_id = ?
+		LEFT JOIN (
+			SELECT DISTINCT gwr.workspace_id
+			FROM group_workspace_roles gwr
+			JOIN group_members gm ON gwr.group_id = gm.group_id
+			WHERE gm.user_id = ?
+		) grp ON w.id = grp.workspace_id
 		WHERE w.active = 1
-		   OR (w.active = 0 AND wp.role = 'admin')
+		   OR (w.active = 0 AND uwr.role_id IS NOT NULL)
+		   OR (w.active = 0 AND grp.workspace_id IS NOT NULL)
 		   OR (w.is_personal = 1 AND w.owner_id = ?)
-	`, userID, userID)
+	`, userID, userID, userID)
 	if err != nil {
 		return nil, err
 	}
