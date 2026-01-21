@@ -322,12 +322,16 @@
 
       if (restrictedItemTypes && restrictedItemTypes.length > 0) {
         availableItemTypes = restrictedItemTypes.sort((a, b) => a.hierarchy_level - b.hierarchy_level || a.sort_order - b.sort_order);
+        // When we have restricted types (child item creation), ensure the selected type is valid
+        const currentTypeValid = formData.item_type_id && availableItemTypes.some(t => t.id === formData.item_type_id);
+        if (!currentTypeValid && availableItemTypes.length > 0) {
+          formData.item_type_id = availableItemTypes[0].id;
+        }
       } else {
         availableItemTypes = itemTypes.sort((a, b) => a.hierarchy_level - b.hierarchy_level || a.sort_order - b.sort_order);
-      }
-
-      if (availableItemTypes.length > 0 && !formData.item_type_id) {
-        formData.item_type_id = availableItemTypes[0].id;
+        if (availableItemTypes.length > 0 && !formData.item_type_id) {
+          formData.item_type_id = availableItemTypes[0].id;
+        }
       }
 
       itemTypesLoaded = true;
