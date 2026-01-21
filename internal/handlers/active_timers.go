@@ -47,9 +47,25 @@ func (h *ActiveTimerHandler) StartTimer(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Validate project exists and is Active
+	var projectStatus string
+	err := h.db.QueryRow("SELECT status FROM time_projects WHERE id = ?", req.ProjectID).Scan(&projectStatus)
+	if err == sql.ErrNoRows {
+		http.Error(w, "project not found", http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		http.Error(w, "Database error checking project", http.StatusInternalServerError)
+		return
+	}
+	if projectStatus != "Active" {
+		http.Error(w, "cannot start timer on a project that is not active", http.StatusBadRequest)
+		return
+	}
+
 	// Check if there's already an active timer (only one timer allowed at a time)
 	var existingID int
-	err := h.db.QueryRow("SELECT id FROM active_timers LIMIT 1").Scan(&existingID)
+	err = h.db.QueryRow("SELECT id FROM active_timers LIMIT 1").Scan(&existingID)
 	if err != sql.ErrNoRows {
 		if err != nil {
 			http.Error(w, "Database error checking existing timer", http.StatusInternalServerError)

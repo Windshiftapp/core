@@ -69,16 +69,18 @@
     }
   });
 
-  // Prepare projects for combobox with customer info
-  const projectOptions = $derived(projects.map(project => {
-    const customer = customers.find(c => c.id === project.customer_id);
-    return {
-      id: project.id,
-      name: project.name,
-      subtitle: customer?.name || 'Unknown Customer',
-      project
-    };
-  }));
+  // Prepare projects for combobox with customer info (only Active projects can have time logged)
+  const projectOptions = $derived(projects
+    .filter(project => project.status === 'Active')
+    .map(project => {
+      const customer = customers.find(c => c.id === project.customer_id);
+      return {
+        id: project.id,
+        name: project.name,
+        subtitle: customer?.name || 'Unknown Customer',
+        project
+      };
+    }));
 
   // Prepare work items for combobox with workspace info
   const workItemOptions = $derived(workItems.map(item => ({
