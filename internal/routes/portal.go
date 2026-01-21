@@ -45,4 +45,15 @@ func RegisterPortalRoutes(deps *Deps) {
 
 	// Customer Organisation Contacts
 	api.HandleH("GET /customer-organisations/{id}/contacts", customersPerm(http.HandlerFunc(deps.Portal.PortalCustomer.GetOrganisationContacts)))
+
+	// Portal Hub endpoints (for internal users)
+	auth := deps.AuthMiddleware.RequireAuth
+	admin := deps.PermissionMiddleware.RequireSystemAdmin()
+
+	if deps.Portal.Hub != nil {
+		api.HandleH("GET /hub", auth(http.HandlerFunc(deps.Portal.Hub.GetHub)))
+		api.HandleH("PUT /hub/config", admin(http.HandlerFunc(deps.Portal.Hub.UpdateHubConfig)))
+		api.HandleH("GET /hub/inbox", auth(http.HandlerFunc(deps.Portal.Hub.GetHubInbox)))
+		api.HandleH("GET /hub/inbox/{itemId}", auth(http.HandlerFunc(deps.Portal.Hub.GetHubInboxItem)))
+	}
 }

@@ -58,6 +58,7 @@ export default {
       security: { title: 'Sicherheit', description: 'Sicherheitseinstellungen und Funktionssteuerungen verwalten' },
       workspaces: { title: 'Arbeitsbereiche', description: 'Arbeitsbereiche und Einstellungen verwalten' },
       notificationSettings: { title: 'Benachrichtigungen', description: 'Benachrichtigungskonfigurationen verwalten' },
+      channels: { title: 'Kanäle', description: 'Eingehende und ausgehende Kanäle, Portale und Webhooks konfigurieren' },
       assets: { title: 'Assets', description: 'Asset-Sets, -Typen, -Kategorien und Assets verwalten' }
     },
 

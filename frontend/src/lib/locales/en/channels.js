@@ -211,6 +211,11 @@ export default {
     title: 'Portal',
     subtitle: 'Customer portal settings',
     portalTitle: 'Portal Title',
+    // Keys used by hub and portal customize panels
+    theme: 'Theme',
+    gradient: 'Gradient',
+    searchBox: 'Search Box',
+    customize: 'Customize',
     portalDescription: 'Portal description (optional)',
     portalSlug: 'Portal Slug',
     requestTypes: 'Request Types',
@@ -347,5 +352,39 @@ export default {
     addNewStep: 'Add new step',
     removeCurrentStep: 'Remove current step',
     removeField: 'Remove field'
+  },
+
+  // Portal Hub translations
+  hub: {
+    loading: 'Loading hub...',
+    error: 'Error loading hub',
+    inbox: 'Inbox',
+    inboxDescription: 'Requests from all portals',
+    backToHub: 'Back to Hub',
+    customizeHub: 'Customize Hub',
+    sections: 'Sections',
+    sectionsHelp: 'Organize portals into sections. Drag portals between sections on the main view.',
+    addSection: 'Add Section',
+    noPortals: 'No portals available yet',
+    noDescription: 'No description',
+    requestTypes: 'request types',
+    unassignedPortals: 'Unassigned Portals',
+    dragToSection: 'Drag these portals to a section above',
+    dropPortalsHere: 'Drag portals here or add them from the customize panel',
+    manageChannels: 'Manage Channels',
+    heroContent: 'Hero Content',
+    // Inbox
+    noRequests: 'No requests yet',
+    noRequestsDescription: 'Requests submitted through your portals will appear here',
+    request: 'Request',
+    portal: 'Portal',
+    submitter: 'Submitter',
+    status: 'Status',
+    date: 'Date',
+    allPortals: 'All Portals',
+    allStatuses: 'All Statuses',
+    anonymous: 'Anonymous',
+    showingResults: 'Showing',
+    of: 'of'
   }
 };

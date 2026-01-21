@@ -25,6 +25,7 @@
   import SCMProviderManager from '../settings/SCMProviderManager.svelte';
   import SecuritySettings from '../settings/SecuritySettings.svelte';
   import AssetManager from '../features/assets/AssetManager.svelte';
+  import Channels from '../features/channels/Channels.svelte';
   import PermissionSetEdit from '../settings/PermissionSetEdit.svelte';
   import ConfigurationSetDetail from '../settings/ConfigurationSetDetail.svelte';
   import SystemImportPage from '../jira-import/SystemImportPage.svelte';
@@ -36,7 +37,7 @@
     Settings, UserStar, Layout, Database, GitBranch,
     Workflow, Package, Link, Paperclip, Puzzle,
     Network, FileText, Shield, Bell, Search, X,
-    Layers, Cog, LinkIcon, UserCheck, MessageSquare, Folder, UsersRound, Palette, Notebook, Grip, ScrollText, AlertCircle, KeyRound, BadgeCheck, GitMerge, CloudDownload
+    Layers, Cog, LinkIcon, UserCheck, MessageSquare, Folder, UsersRound, Palette, Notebook, Grip, ScrollText, AlertCircle, KeyRound, BadgeCheck, GitMerge, CloudDownload, LifeBuoy
   } from 'lucide-svelte';
 
   // Check if we're on a nested detail route (not a tab)
@@ -48,7 +49,13 @@
   const isConfigSetRoute = $derived($currentRoute.path.startsWith('/admin/configuration-sets/'));
 
   // Get active tab from URL - supports both /admin/:tab path and ?tab= query param
-  const activeTab = $derived($currentRoute.params?.tab || $currentRoute.query?.tab || 'custom-fields');
+  // Special handling for /admin/channels/* routes which have nested paths
+  const activeTab = $derived.by(() => {
+    if ($currentRoute.path.startsWith('/admin/channels')) {
+      return 'channels';
+    }
+    return $currentRoute.params?.tab || $currentRoute.query?.tab || 'custom-fields';
+  });
 
   // Search functionality
   let searchQuery = $state('');
@@ -114,6 +121,7 @@
       label: t('settings.adminGroups.communication'),
       icon: MessageSquare,
       items: [
+        { id: 'channels', label: t('settings.adminItems.channels.title', 'Channels'), icon: LifeBuoy, description: t('settings.adminItems.channels.description', 'Configure inbound and outbound channels, portals, and webhooks') },
         { id: 'notification-settings', label: t('settings.adminItems.notificationSettings.title'), icon: Bell, description: t('settings.adminItems.notificationSettings.description') },
       ]
     },
@@ -467,6 +475,11 @@
   <!-- Notification Settings Tab -->
   {#if activeTab === 'notification-settings'}
     <NotificationSettings />
+  {/if}
+
+  <!-- Channels Tab -->
+  {#if activeTab === 'channels'}
+    <Channels embedded={true} />
   {/if}
 
   <!-- Link Types Tab -->

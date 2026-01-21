@@ -190,6 +190,10 @@ export default {
     title: 'Portal',
     subtitle: 'Kundenportal-Einstellungen',
     portalTitle: 'Portal-Titel',
+    // Keys used by hub and portal customize panels
+    theme: 'Design',
+    gradient: 'Farbverlauf',
+    searchBox: 'Suchfeld',
     portalDescription: 'Portal-Beschreibung (optional)',
     portalSlug: 'Portal-Slug',
     requestTypes: 'Anfragetypen',
@@ -277,5 +281,39 @@ export default {
     addNewStep: 'Neuen Schritt hinzufügen',
     removeCurrentStep: 'Aktuellen Schritt entfernen',
     removeField: 'Feld entfernen'
+  },
+
+  // Portal Hub translations
+  hub: {
+    loading: 'Hub wird geladen...',
+    error: 'Fehler beim Laden des Hubs',
+    inbox: 'Posteingang',
+    inboxDescription: 'Anfragen von allen Portalen',
+    backToHub: 'Zurück zum Hub',
+    customizeHub: 'Hub anpassen',
+    sections: 'Abschnitte',
+    sectionsHelp: 'Portale in Abschnitte organisieren. Ziehen Sie Portale zwischen Abschnitten in der Hauptansicht.',
+    addSection: 'Abschnitt hinzufügen',
+    noPortals: 'Noch keine Portale verfügbar',
+    noDescription: 'Keine Beschreibung',
+    requestTypes: 'Anfragetypen',
+    unassignedPortals: 'Nicht zugewiesene Portale',
+    dragToSection: 'Ziehen Sie diese Portale in einen Abschnitt oben',
+    dropPortalsHere: 'Portale hierher ziehen oder über das Anpassungspanel hinzufügen',
+    manageChannels: 'Kanäle verwalten',
+    heroContent: 'Hero-Inhalt',
+    // Inbox
+    noRequests: 'Noch keine Anfragen',
+    noRequestsDescription: 'Über Ihre Portale eingereichte Anfragen werden hier angezeigt',
+    request: 'Anfrage',
+    portal: 'Portal',
+    submitter: 'Einreicher',
+    status: 'Status',
+    date: 'Datum',
+    allPortals: 'Alle Portale',
+    allStatuses: 'Alle Status',
+    anonymous: 'Anonym',
+    showingResults: 'Zeige',
+    of: 'von'
   }
 };

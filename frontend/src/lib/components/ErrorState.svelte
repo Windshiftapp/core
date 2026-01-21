@@ -17,6 +17,13 @@
    *
    * @example custom icon
    * <ErrorState title="Not found" icon={FileX} />
+   *
+   * @example fill viewport with custom action
+   * <ErrorState title="Not found" fill={true}>
+   *   {#snippet action()}
+   *     <button onclick={handleClose}>Close</button>
+   *   {/snippet}
+   * </ErrorState>
    */
   let {
     title = '',
@@ -24,6 +31,8 @@
     onRetry = null,
     retryLabel = '',
     icon: IconComponent = AlertCircle,
+    fill = false,
+    action = null,
     class: className = ''
   } = $props();
 </script>

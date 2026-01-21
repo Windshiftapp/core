@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
-  import { LifeBuoy, Plus, Webhook, Globe, Trash2, Settings, Search, Mail } from 'lucide-svelte';
+  import { LifeBuoy, Plus, Webhook, Globe, Trash2, Settings, Search, Mail, Layers, Tag } from 'lucide-svelte';
   import { api } from '../../api.js';
   import { currentRoute, navigate } from '../../router.js';
   import { channelCategoriesStore } from '../../stores/channelCategories.js';
@@ -22,14 +22,55 @@
   import Label from '../../components/Label.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
 
+  // Props
+  let { embedded = false } = $props();
+
+  // Channel type definitions for embedded tab navigation
+  const channelTypes = [
+    { id: null, label: t('channels.allTypes', 'All'), icon: Layers },
+    { id: 'portal', label: t('channels.portal', 'Portal'), icon: Globe },
+    { id: 'webhook', label: t('channels.webhook', 'Webhook'), icon: Webhook },
+    { id: 'email', label: t('channels.email', 'Email'), icon: Mail }
+  ];
+
   let channels = $state([]);
   let loading = $state(true);
   let error = $state(null);
   let channelSearch = $state('');
 
-  // Filters from URL
-  let activeCategoryId = $derived($currentRoute.params?.categoryId || null);
-  let activeTypeFilter = $derived($currentRoute.params?.type || null);
+  // Local state for embedded mode filters
+  let embeddedTypeFilter = $state(null);
+  let embeddedCategoryId = $state(null);
+
+  // Filters - use local state for embedded mode, URL for standalone
+  let activeCategoryId = $derived(embedded ? embeddedCategoryId : ($currentRoute.params?.categoryId || null));
+  let activeTypeFilter = $derived(embedded ? embeddedTypeFilter : ($currentRoute.params?.type || null));
+
+  // Handlers for embedded tab navigation
+  function handleTypeClick(typeId) {
+    if (embedded) {
+      embeddedTypeFilter = typeId;
+    } else {
+      if (typeId === null) {
+        navigate('/admin/channels');
+      } else {
+        navigate(`/admin/channels/type/${typeId}`);
+      }
+    }
+  }
+
+  function handleCategoryChange(event) {
+    const value = event.target.value;
+    if (embedded) {
+      embeddedCategoryId = value === '' ? null : value;
+    } else {
+      if (value === '') {
+        navigate('/admin/channels');
+      } else {
+        navigate(`/admin/channels/category/${value}`);
+      }
+    }
+  }
 
   // Filtered channels based on type, category, and search
   let filteredChannels = $derived(() => {
@@ -288,25 +329,76 @@
 
 <!-- Main container with sidebar layout -->
 <div class="flex min-h-screen" style="background-color: var(--ds-surface);">
-  <!-- Left Sidebar - Category Navigation -->
-  <ChannelNavigation />
+  <!-- Left Sidebar - Category Navigation (only when not embedded in Admin) -->
+  {#if !embedded}
+    <ChannelNavigation />
+  {/if}
 
   <!-- Main Content -->
-  <div class="flex-1 p-6">
+  <div class="flex-1 {embedded ? '' : 'p-6'}">
+    <!-- Embedded Tab Navigation -->
+    {#if embedded}
+      <div class="border-b mb-6" style="border-color: var(--ds-border);">
+        <!-- Type Tabs -->
+        <div class="flex gap-1">
+          {#each channelTypes as type (type.id)}
+            {@const isActive = activeTypeFilter === type.id}
+            <button
+              onclick={() => handleTypeClick(type.id)}
+              class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors flex items-center gap-2"
+              style={isActive
+                ? 'border-color: var(--ds-border-focused); color: var(--ds-text);'
+                : 'border-color: transparent; color: var(--ds-text-subtle);'}
+              onmouseenter={(e) => { if (!isActive) e.currentTarget.style.color = 'var(--ds-text)'; }}
+              onmouseleave={(e) => { if (!isActive) e.currentTarget.style.color = 'var(--ds-text-subtle)'; }}
+            >
+              <svelte:component this={type.icon} class="w-4 h-4" />
+              {type.label}
+            </button>
+          {/each}
+        </div>
+        <!-- Category Filter Row -->
+        <div class="flex items-center gap-3 py-3">
+          <span class="text-sm" style="color: var(--ds-text-subtle);">{t('channels.category', 'Category')}:</span>
+          <Select
+            value={activeCategoryId || ''}
+            onchange={handleCategoryChange}
+            size="small"
+            class="w-48"
+          >
+            <option value="">{t('channels.allCategories', 'All Categories')}</option>
+            {#each $channelCategoriesStore as category}
+              <option value={category.id}>{category.name}</option>
+            {/each}
+          </Select>
+          <Button
+            onclick={() => showCategoryModal = true}
+            variant="ghost"
+            size="small"
+            icon={Tag}
+          >
+            {t('channels.manageCategories', 'Manage')}
+          </Button>
+        </div>
+      </div>
+    {/if}
+
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
       <div>
-        <h1 class="text-2xl font-semibold" style="color: var(--ds-text);">
-          {#if activeTypeFilter}
-            {activeTypeFilter === 'portal' ? 'Portal' : activeTypeFilter === 'webhook' ? 'Webhook' : activeTypeFilter} {t('channels.title')}
-          {:else if activeCategoryId}
-            {@const category = $channelCategoriesStore.find(c => c.id === parseInt(activeCategoryId))}
-            {category?.name || t('common.category')}
-          {:else}
-            {t('channels.title')}
-          {/if}
-        </h1>
-        <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">
+        {#if !embedded}
+          <h1 class="text-2xl font-semibold" style="color: var(--ds-text);">
+            {#if activeTypeFilter}
+              {activeTypeFilter === 'portal' ? 'Portal' : activeTypeFilter === 'webhook' ? 'Webhook' : activeTypeFilter} {t('channels.title')}
+            {:else if activeCategoryId}
+              {@const category = $channelCategoriesStore.find(c => c.id === parseInt(activeCategoryId))}
+              {category?.name || t('common.category')}
+            {:else}
+              {t('channels.title')}
+            {/if}
+          </h1>
+        {/if}
+        <p class="{embedded ? '' : 'mt-1'} text-sm" style="color: var(--ds-text-subtle);">
           {filteredChannels().length} channel{filteredChannels().length !== 1 ? 's' : ''}
         </p>
       </div>

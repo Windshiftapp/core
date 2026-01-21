@@ -62,6 +62,7 @@ export default {
       security: { title: 'Security', description: 'Manage security settings and feature controls' },
       workspaces: { title: 'Workspaces', description: 'Manage workspaces and settings' },
       notificationSettings: { title: 'Notification Settings', description: 'Manage notification configurations' },
+      channels: { title: 'Channels', description: 'Configure inbound and outbound channels, portals, and webhooks' },
       assets: { title: 'Assets', description: 'Manage asset sets, types, categories, and assets' }
     },
 

@@ -20,6 +20,7 @@
   import About from './About.svelte';
   import Channels from '../features/channels/Channels.svelte';
   import Customers from '../workspaces/Customers.svelte';
+  import Hub from '../layout/Hub.svelte';
   import Footer from '../layout/Footer.svelte';
   import {
     Layers3, BarChart3, Sheet, Target, User, Notebook, GitBranch, MapPin, Shield, Home, CheckSquare, MoreHorizontal, Inbox, SquareKanban, FolderOpen
@@ -763,6 +764,10 @@
     {:else if view === 'channels'}
       <div style="background-color: var(--ds-surface);">
         <Channels />
+      </div>
+    {:else if view === 'hub' || view === 'hub-inbox'}
+      <div style="background-color: var(--ds-surface);">
+        <Hub />
       </div>
     {:else if view === 'customers'}
       <Customers />

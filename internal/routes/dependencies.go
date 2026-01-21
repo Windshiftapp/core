@@ -178,6 +178,7 @@ type PortalHandlers struct {
 	PortalAuth     *handlers.PortalAuthHandler
 	PortalCustomer *handlers.PortalCustomersHandler
 	ContactRole    *handlers.EnumHandler
+	Hub            *handlers.HubHandler
 }
 
 // AssetHandlers groups asset management handlers.
