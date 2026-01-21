@@ -138,6 +138,9 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   let diagrams = $state([]);
   let loadingDiagrams = $state(false);
 
+  // Manual actions
+  let manualActions = $state([]);
+
   // Status transition lazy loading
   let availableStatusTransitions = $state([]);
   let loadingStatusTransitions = $state(false);
@@ -1066,6 +1069,33 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     }
   }
 
+  // Load manual actions for the workspace
+  async function loadManualActions() {
+    if (!workspaceId) return;
+
+    try {
+      const allActions = await api.actions.getAll(workspaceId);
+      manualActions = (allActions || []).filter(a =>
+        a.trigger_type === 'manual' && a.is_enabled
+      );
+    } catch (err) {
+      console.error('Failed to load manual actions:', err);
+      manualActions = [];
+    }
+  }
+
+  // Handler for executing a manual action
+  async function handleExecuteAction(event) {
+    const action = event.detail;
+    try {
+      await api.actions.execute(workspaceId, action.id, item.id);
+      successToast(t('actions.test.executionQueued'));
+    } catch (err) {
+      console.error('Failed to execute action:', err);
+      errorToast(err.message || t('errors.UNKNOWN'), t('actions.test.executionFailed'));
+    }
+  }
+
   // Handle diagram saved event - reload diagrams
   async function handleDiagramSaved() {
     await loadDiagrams();
@@ -1322,6 +1352,9 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 
       // Load diagrams (always load, not dependent on attachment settings)
       await loadDiagrams();
+
+      // Load manual actions for the workspace
+      await loadManualActions();
 
       // Load workspace screen configuration
       await loadWorkspaceScreenFields();
@@ -1625,11 +1658,12 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     {milestones}
     {iterations}
     {priorities}
-    attachments={attachmentManager.attachments}
+    attachments={attachmentManager.attachments || []}
     attachmentPagination={attachmentManager.pagination}
     attachmentSettings={attachmentManager.settings}
     {diagrams}
     {loadingDiagrams}
+    {manualActions}
     on:navigate={handleNavigate}
     on:go-back={handleGoBack}
     on:copy-key={handleCopyKey}
@@ -1661,6 +1695,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     on:attachment-page-change={attachmentManager.handlePageChange}
     on:attachment-page-size-change={attachmentManager.handlePageSizeChange}
     on:diagram-saved={handleDiagramSaved}
+    on:execute-action={handleExecuteAction}
     on:close={closeModal}
   />
 {/snippet}

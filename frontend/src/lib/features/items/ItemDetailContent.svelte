@@ -72,6 +72,7 @@
   export let attachmentSettings = null;
   export let diagrams = [];
   export let loadingDiagrams = false;
+  export let manualActions = [];
 
   // Component references
   let diagramListComponent;
@@ -253,6 +254,10 @@
       diagramListComponent.refresh();
     }
   }
+
+  function handleExecuteAction(event) {
+    dispatch('execute-action', event.detail);
+  }
 </script>
 
 {#if loading}
@@ -326,6 +331,7 @@
             {attachments}
             {diagrams}
             {attachmentSettings}
+            {manualActions}
             on:save-field={handleSaveField}
             on:cancel-edit={handleCancelEdit}
             on:show-add-link={() => showAddLinkForm = true}
@@ -337,6 +343,7 @@
             on:new-diagram={handleNewDiagram}
             on:edit-diagram={(e) => handleEditDiagram(e.detail)}
             on:delete-diagram={(e) => handleDeleteDiagram(e.detail)}
+            on:execute-action={handleExecuteAction}
           />
 
           <ItemDetailLinks 

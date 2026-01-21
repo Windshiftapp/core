@@ -23,6 +23,7 @@ export default {
       itemCreated: 'Element erstellt',
       itemUpdated: 'Element aktualisiert',
       itemLinked: 'Element verknüpft',
+      manual: 'Manuell',
       respondToCascades: 'Auf durch Aktionen ausgelöste Änderungen reagieren',
       respondToCascadesHint: 'Wenn aktiviert, wird diese Aktion auch ausgeführt, wenn sie durch andere Aktionen ausgelöst wird, nicht nur durch Benutzeränderungen.'
     },
@@ -33,7 +34,9 @@ export default {
       setStatus: 'Status setzen',
       addComment: 'Kommentar hinzufügen',
       notifyUser: 'Benutzer benachrichtigen',
-      condition: 'Bedingung'
+      condition: 'Bedingung',
+      updateAsset: 'Asset aktualisieren',
+      createAsset: 'Asset erstellen'
     },
 
     addNodes: 'Knoten hinzufügen',
@@ -64,7 +67,39 @@ export default {
       triggerType: 'Auslösertyp',
       fromStatus: 'Von Status',
       toStatus: 'Nach Status',
-      anyStatus: 'Beliebiger Status'
+      anyStatus: 'Beliebiger Status',
+      recipientType: 'Empfänger',
+      notifyMessage: 'Nachricht',
+      notifyPlaceholder: 'Nachricht eingeben. Verwenden Sie {{item.title}} für Variablen.',
+      includeLink: 'Link zum Element einfügen',
+      // Asset aktualisieren Konfiguration
+      sourceAssetField: 'Asset-Feld am Element',
+      selectAssetField: 'Asset-Feld auswählen...',
+      sourceAssetFieldHint: 'Wählen Sie das Elementfeld, das das verknüpfte Asset enthält',
+      targetAssetType: 'Ziel-Asset-Typ',
+      selectAssetType: 'Asset-Typ auswählen...',
+      fieldMappingsLabel: 'Feldzuordnungen',
+      fieldMappings: '{count} Feldzuordnung(en)',
+      configureAssetUpdate: 'Asset-Aktualisierung konfigurieren...',
+      fromField: 'Von Feld',
+      sourceTypeVariable: 'Variable/Vorlage',
+      sourceTypeItemField: 'Element-Feld',
+      sourceTypeLiteral: 'Literalwert',
+      selectTargetField: 'Zielfeld auswählen...',
+      addMapping: 'Zuordnung hinzufügen',
+      // Asset erstellen Konfiguration
+      assetSet: 'Asset-Set',
+      selectAssetSet: 'Asset-Set auswählen...',
+      assetTitle: 'Asset-Titel',
+      assetTitleHint: 'Verwenden Sie {{item.title}} oder andere Variablen',
+      assetDescription: 'Beschreibung',
+      assetTagLabel: 'Asset-Tag',
+      assetCategory: 'Kategorie',
+      selectCategory: 'Kategorie auswählen (optional)...',
+      assetStatus: 'Status',
+      selectStatusOptional: 'Status auswählen (optional)...',
+      requiredField: 'Erforderlich',
+      configureAssetCreation: 'Asset-Erstellung konfigurieren...'
     },
 
     recipients: {
@@ -111,7 +146,11 @@ export default {
       addComment: '{prefix}Kommentar hinzugefügt: "{content}"',
       notifyUser: 'Benachrichtigung an {count} Benutzer gesendet',
       notifySkipped: 'Benachrichtigung übersprungen: {reason}',
-      conditionResult: 'Bedingung ergab {result}'
+      conditionResult: 'Bedingung ergab {result}',
+      updateAsset: 'Asset #{asset_id} aktualisiert',
+      updateAssetSkipped: 'Asset-Aktualisierung übersprungen: {reason}',
+      createAsset: 'Asset #{asset_id} erstellt: {title}',
+      createAssetFailed: 'Asset-Erstellung fehlgeschlagen: {reason}'
     },
 
     test: {

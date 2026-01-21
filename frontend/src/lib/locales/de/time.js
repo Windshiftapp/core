@@ -156,7 +156,8 @@ export default {
       applyFiltersTitle: 'Ausgewählte Filter auf die Zeiteinträge anwenden',
       clearFiltersTitle: 'Alle Filter löschen und alle Zeiteinträge anzeigen',
       noEntries: 'Keine Zeiteinträge gefunden. Erfassen Sie Ihren ersten Zeiteintrag, um loszulegen.',
-      clickToView: 'Klicken Sie hier, um {key}-{number} anzuzeigen'
+      clickToView: 'Klicken Sie hier, um {key}-{number} anzuzeigen',
+      budgetExceeded: '- Budget überschritten'
     },
 
     // Organizations (formerly Customers)
@@ -182,8 +183,10 @@ export default {
     none: 'Keine',
     categoryOptional: 'Kategorie (Optional)',
     hourlyRate: 'Stundensatz (€)',
+    maxHours: 'Max. Stunden',
+    maxHoursPlaceholder: 'Kein Limit',
+    maxHoursHint: 'Optionales Budget für Berichte',
     projectColor: 'Projektfarbe',
-    activeProject: 'Aktives Projekt',
     updateProject: 'Projekt aktualisieren',
     createProject: 'Projekt erstellen'
   },

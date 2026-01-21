@@ -778,21 +778,22 @@ type TimeProjectCategory struct {
 }
 
 type TimeProject struct {
-	ID          int       `json:"id"`
-	CustomerID  *int      `json:"customer_id,omitempty"` // Now optional
-	CategoryID  *int      `json:"category_id,omitempty"` // Link to project category
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Status      string    `json:"status"` // Active, On Hold, Completed, Archived
-	Color       string    `json:"color,omitempty"`
-	HourlyRate  float64   `json:"hourly_rate"`
-	Active      bool      `json:"active"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          int                    `json:"id"`
+	CustomerID  *int                   `json:"customer_id,omitempty"` // Now optional
+	CategoryID  *int                   `json:"category_id,omitempty"` // Link to project category
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Status      string                 `json:"status"` // Active, On Hold, Completed, Archived
+	Color       string                 `json:"color,omitempty"`
+	HourlyRate  float64                `json:"hourly_rate"`
+	Settings    map[string]interface{} `json:"settings,omitempty"` // Flexible JSON attributes (e.g., max_hours)
+	CreatedAt   time.Time              `json:"created_at"`
+	UpdatedAt   time.Time              `json:"updated_at"`
 	// Joined fields for API responses
-	CustomerName  string `json:"customer_name,omitempty"`
-	CategoryName  string `json:"category_name,omitempty"`
-	CategoryColor string `json:"category_color,omitempty"`
+	CustomerName  string   `json:"customer_name,omitempty"`
+	CategoryName  string   `json:"category_name,omitempty"`
+	CategoryColor string   `json:"category_color,omitempty"`
+	TotalHours    *float64 `json:"total_hours,omitempty"` // Computed from worklogs
 }
 
 type Worklog struct {
@@ -808,12 +809,14 @@ type Worklog struct {
 	CreatedAt    int64  `json:"created_at"` // Unix timestamp
 	UpdatedAt    int64  `json:"updated_at"` // Unix timestamp
 	// Joined fields for API responses
-	CustomerName        string `json:"customer_name,omitempty"`
-	ProjectName         string `json:"project_name,omitempty"`
-	ItemTitle           string `json:"item_title,omitempty"`            // Title of linked work item
-	WorkspaceID         *int   `json:"workspace_id,omitempty"`          // Workspace ID of linked item
-	WorkspaceKey        string `json:"workspace_key,omitempty"`         // Workspace key for navigation (e.g., "TEST")
-	WorkspaceItemNumber int    `json:"workspace_item_number,omitempty"` // Item number for display key (e.g., "TEST-123")
+	CustomerName        string   `json:"customer_name,omitempty"`
+	ProjectName         string   `json:"project_name,omitempty"`
+	ItemTitle           string   `json:"item_title,omitempty"`            // Title of linked work item
+	WorkspaceID         *int     `json:"workspace_id,omitempty"`          // Workspace ID of linked item
+	WorkspaceKey        string   `json:"workspace_key,omitempty"`         // Workspace key for navigation (e.g., "TEST")
+	WorkspaceItemNumber int      `json:"workspace_item_number,omitempty"` // Item number for display key (e.g., "TEST-123")
+	ProjectMaxHours     *float64 `json:"project_max_hours,omitempty"`     // Project budget limit for indicator
+	ProjectTotalHours   *float64 `json:"project_total_hours,omitempty"`   // Project total hours for indicator
 }
 
 // Active Timer Model
@@ -2516,12 +2519,14 @@ const (
 type ActionNodeType string
 
 const (
-	ActionNodeTrigger    ActionNodeType = "trigger"
-	ActionNodeSetField   ActionNodeType = "set_field"
-	ActionNodeSetStatus  ActionNodeType = "set_status"
-	ActionNodeAddComment ActionNodeType = "add_comment"
-	ActionNodeNotifyUser ActionNodeType = "notify_user"
-	ActionNodeCondition  ActionNodeType = "condition"
+	ActionNodeTrigger     ActionNodeType = "trigger"
+	ActionNodeSetField    ActionNodeType = "set_field"
+	ActionNodeSetStatus   ActionNodeType = "set_status"
+	ActionNodeAddComment  ActionNodeType = "add_comment"
+	ActionNodeNotifyUser  ActionNodeType = "notify_user"
+	ActionNodeCondition   ActionNodeType = "condition"
+	ActionNodeUpdateAsset ActionNodeType = "update_asset"
+	ActionNodeCreateAsset ActionNodeType = "create_asset"
 )
 
 // ActionExecutionStatus defines the status of an action execution
@@ -2676,6 +2681,33 @@ type ConditionNodeConfig struct {
 	FieldName string `json:"field_name"` // Field to check
 	Operator  string `json:"operator"`   // eq, ne, gt, lt, contains, etc.
 	Value     string `json:"value"`      // Value to compare against
+}
+
+// UpdateAssetNodeConfig configures an update_asset node
+type UpdateAssetNodeConfig struct {
+	SourceFieldID string              `json:"source_field_id"` // Item's asset field containing the asset reference
+	AssetTypeID   int                 `json:"asset_type_id"`   // Expected asset type
+	AssetSetID    int                 `json:"asset_set_id"`    // Asset set for validation
+	FieldMappings []AssetFieldMapping `json:"field_mappings"`
+}
+
+// AssetFieldMapping represents a single field mapping from item to asset
+type AssetFieldMapping struct {
+	SourceType    string `json:"source_type"`     // "item_field", "literal", or "variable"
+	SourceValue   string `json:"source_value"`    // Field name, literal value, or template
+	TargetFieldID string `json:"target_field_id"` // Asset field to update
+}
+
+// CreateAssetNodeConfig configures a create_asset node
+type CreateAssetNodeConfig struct {
+	AssetSetID    int                 `json:"asset_set_id"`    // Target asset set
+	AssetTypeID   int                 `json:"asset_type_id"`   // Asset type to create
+	Title         string              `json:"title"`           // Title template (supports {{variables}})
+	Description   string              `json:"description"`     // Description template (optional)
+	AssetTag      string              `json:"asset_tag"`       // Asset tag template (optional)
+	CategoryID    *int                `json:"category_id"`     // Optional category
+	StatusID      *int                `json:"status_id"`       // Optional status (defaults to set default)
+	FieldMappings []AssetFieldMapping `json:"field_mappings"`  // Field mappings for custom fields
 }
 
 // API Request/Response types

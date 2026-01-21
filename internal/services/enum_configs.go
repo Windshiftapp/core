@@ -799,30 +799,30 @@ func NewTimeProjectConfig() EnumConfig {
 	return EnumConfig{
 		TableName:  "time_projects",
 		EntityName: "Time project",
-		SelectColumns: `p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color, p.hourly_rate, p.active, p.created_at, p.updated_at,
+		SelectColumns: `p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color, p.hourly_rate, p.created_at, p.updated_at,
 		       co.name as customer_name, c.name as category_name, c.color as category_color`,
 		SelectQuery: `
-			SELECT p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color, p.hourly_rate, p.active, p.created_at, p.updated_at,
+			SELECT p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color, p.hourly_rate, p.created_at, p.updated_at,
 			       co.name as customer_name, c.name as category_name, c.color as category_color
 			FROM time_projects p
 			LEFT JOIN customer_organisations co ON p.customer_id = co.id
 			LEFT JOIN time_project_categories c ON p.category_id = c.id
-			ORDER BY p.active DESC, p.name ASC`,
+			ORDER BY p.name ASC`,
 		GetByIDQuery: `
-			SELECT p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color, p.hourly_rate, p.active, p.created_at, p.updated_at,
+			SELECT p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color, p.hourly_rate, p.created_at, p.updated_at,
 			       co.name as customer_name, c.name as category_name, c.color as category_color
 			FROM time_projects p
 			LEFT JOIN customer_organisations co ON p.customer_id = co.id
 			LEFT JOIN time_project_categories c ON p.category_id = c.id
 			WHERE p.id = ?`,
-		DefaultOrderBy: "p.active DESC, p.name ASC",
+		DefaultOrderBy: "p.name ASC",
 
 		ScanRow: func(rows *sql.Rows) (EnumEntity, error) {
 			var p models.TimeProject
 			var customerID, categoryID sql.NullInt64
 			var description, status, color, customerName, categoryName, categoryColor sql.NullString
 			err := rows.Scan(&p.ID, &customerID, &categoryID, &p.Name, &description, &status, &color,
-				&p.HourlyRate, &p.Active, &p.CreatedAt, &p.UpdatedAt,
+				&p.HourlyRate, &p.CreatedAt, &p.UpdatedAt,
 				&customerName, &categoryName, &categoryColor)
 			if customerID.Valid {
 				id := int(customerID.Int64)
@@ -858,7 +858,7 @@ func NewTimeProjectConfig() EnumConfig {
 			var customerID, categoryID sql.NullInt64
 			var description, status, color, customerName, categoryName, categoryColor sql.NullString
 			err := row.Scan(&p.ID, &customerID, &categoryID, &p.Name, &description, &status, &color,
-				&p.HourlyRate, &p.Active, &p.CreatedAt, &p.UpdatedAt,
+				&p.HourlyRate, &p.CreatedAt, &p.UpdatedAt,
 				&customerName, &categoryName, &categoryColor)
 			if customerID.Valid {
 				id := int(customerID.Int64)
@@ -936,15 +936,15 @@ func NewTimeProjectConfig() EnumConfig {
 
 		InsertArgs: func(entity interface{}, now time.Time) (string, string, []interface{}) {
 			p := entity.(*models.TimeProject)
-			return "customer_id, category_id, name, description, status, color, hourly_rate, active, created_at, updated_at",
-				"?, ?, ?, ?, ?, ?, ?, ?, ?, ?",
-				[]interface{}{p.CustomerID, p.CategoryID, p.Name, p.Description, p.Status, p.Color, p.HourlyRate, p.Active, now, now}
+			return "customer_id, category_id, name, description, status, color, hourly_rate, created_at, updated_at",
+				"?, ?, ?, ?, ?, ?, ?, ?, ?",
+				[]interface{}{p.CustomerID, p.CategoryID, p.Name, p.Description, p.Status, p.Color, p.HourlyRate, now, now}
 		},
 
 		UpdateArgs: func(entity interface{}, now time.Time) (string, []interface{}) {
 			p := entity.(*models.TimeProject)
-			return "customer_id = ?, category_id = ?, name = ?, description = ?, status = ?, color = ?, hourly_rate = ?, active = ?, updated_at = ?",
-				[]interface{}{p.CustomerID, p.CategoryID, p.Name, p.Description, p.Status, p.Color, p.HourlyRate, p.Active, now}
+			return "customer_id = ?, category_id = ?, name = ?, description = ?, status = ?, color = ?, hourly_rate = ?, updated_at = ?",
+				[]interface{}{p.CustomerID, p.CategoryID, p.Name, p.Description, p.Status, p.Color, p.HourlyRate, now}
 		},
 	}
 }

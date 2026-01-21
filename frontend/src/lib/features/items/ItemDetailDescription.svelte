@@ -1,6 +1,6 @@
 <script>
-  import { Link2, Plus, Paperclip, PenTool } from 'lucide-svelte';
-  import { tick } from 'svelte';
+  import { Link2, Plus, Paperclip, PenTool, Zap, ChevronDown } from 'lucide-svelte';
+  import { tick, onMount, onDestroy } from 'svelte';
   import Button from '../../components/Button.svelte';
   import MilkdownEditor from '../../editors/MilkdownEditor.svelte';
   import AttachmentDiagramList from '../assets/AttachmentDiagramList.svelte';
@@ -26,7 +26,12 @@
   export let attachmentSettings = null;
   export let showLinkButton = true;
 
+  // Manual actions
+  export let manualActions = [];
+
   let milkdownEditor;
+  let showActionsMenu = false;
+  let actionsMenuRef;
 
   // Handle image insertions from attachments or uploads
   export function insertImage(imageData) {
@@ -98,6 +103,25 @@
   function handleDeleteDiagram(diagram) {
     dispatch('delete-diagram', diagram);
   }
+
+  function handleClickOutside(event) {
+    if (actionsMenuRef && !actionsMenuRef.contains(event.target)) {
+      showActionsMenu = false;
+    }
+  }
+
+  function handleExecuteAction(action) {
+    dispatch('execute-action', action);
+    showActionsMenu = false;
+  }
+
+  onMount(() => {
+    document.addEventListener('click', handleClickOutside);
+  });
+
+  onDestroy(() => {
+    document.removeEventListener('click', handleClickOutside);
+  });
 </script>
 
 <div class="pt-2">
@@ -207,6 +231,37 @@
         <PenTool class="w-4 h-4 flex-shrink-0" />
         <span class="action-label">{t('items.diagram')}</span>
       </button>
+    {/if}
+    {#if manualActions.length > 0}
+      <div class="relative" bind:this={actionsMenuRef}>
+        <button
+          class="action-btn inline-flex items-center gap-1.5 px-2 py-1.5 rounded text-xs transition-all"
+          style="color: var(--ds-text-subtle);"
+          onclick={(e) => { e.stopPropagation(); showActionsMenu = !showActionsMenu; }}
+          title={t('actions.title')}
+        >
+          <Zap class="w-4 h-4 flex-shrink-0" />
+          <span class="action-label">{t('actions.title')}</span>
+          <ChevronDown class="w-3 h-3 ml-0.5" />
+        </button>
+
+        {#if showActionsMenu}
+          <div class="absolute left-0 top-full mt-1 z-50 min-w-[200px] rounded-md shadow-lg py-1" style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);">
+            {#each manualActions as action}
+              <button
+                class="w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+                style="color: var(--ds-text);"
+                onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
+                onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                onclick={() => handleExecuteAction(action)}
+              >
+                <Zap class="w-4 h-4 text-amber-500 flex-shrink-0" />
+                {action.name}
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
     {/if}
   </div>
 

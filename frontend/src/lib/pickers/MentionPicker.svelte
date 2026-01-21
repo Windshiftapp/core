@@ -1,28 +1,30 @@
 <script>
-  import { onMount, createEventDispatcher } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { useEventListener } from 'runed';
   import Avatar from '../components/Avatar.svelte';
   import Text from '../components/Text.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  const dispatch = createEventDispatcher();
-
   // Generate unique IDs for ARIA attributes
   const listboxId = `mention-listbox-${Math.random().toString(36).slice(2, 9)}`;
   const getOptionId = (index) => `${listboxId}-option-${index}`;
 
-  // Props
-  export let query = '';
-  export let position = { x: 0, y: 0 };
-  export let open = false;
-  export let isPersonalWorkspace = false;
+  // Props using Svelte 5 $props()
+  let {
+    query = '',
+    position = { x: 0, y: 0 },
+    open = false,
+    isPersonalWorkspace = false,
+    onselect = null,
+    oncancel = null
+  } = $props();
 
   // State
-  let users = [];
-  let loading = false;
-  let highlightedIndex = 0;
-  let containerElement;
+  let users = $state([]);
+  let loading = $state(false);
+  let highlightedIndex = $state(0);
+  let containerElement = $state(null);
 
   // Load users on mount
   onMount(async () => {
@@ -50,7 +52,7 @@
   }
 
   // Filter users based on query
-  $: filteredUsers = (() => {
+  let filteredUsers = $derived.by(() => {
     if (!query.trim()) {
       return users.slice(0, 10);
     }
@@ -61,15 +63,16 @@
       user.username?.toLowerCase().includes(search) ||
       user.email?.toLowerCase().includes(search)
     ).slice(0, 10);
-  })();
+  });
 
-  // Reset highlight when users change
-  $: if (filteredUsers) {
+  // Reset highlight when query changes
+  $effect(() => {
+    query; // Track query changes
     highlightedIndex = 0;
-  }
+  });
 
   function handleSelect(user) {
-    dispatch('select', user);
+    onselect?.(user);
   }
 
   function handleKeyDown(e) {
@@ -91,7 +94,7 @@
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      dispatch('cancel');
+      oncancel?.();
     }
   }
 </script>

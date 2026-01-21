@@ -9,7 +9,7 @@
     addEdge
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
-  import { Pencil, RefreshCw, MessageSquare, Bell, HelpCircle, Zap } from 'lucide-svelte';
+  import { Pencil, RefreshCw, MessageSquare, Bell, HelpCircle, Zap, Database, PlusSquare } from 'lucide-svelte';
   import { createShortcutHandler, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import Button from '../../components/Button.svelte';
   import FieldSelector from '../../pickers/FieldSelector.svelte';
@@ -19,7 +19,11 @@
   import AddCommentNode from './nodes/AddCommentNode.svelte';
   import NotifyUserNode from './nodes/NotifyUserNode.svelte';
   import ConditionNode from './nodes/ConditionNode.svelte';
+  import UpdateAssetNode from './nodes/UpdateAssetNode.svelte';
+  import CreateAssetNode from './nodes/CreateAssetNode.svelte';
   import ActionEdge from './edges/ActionEdge.svelte';
+  import UpdateAssetConfigPanel from './UpdateAssetConfigPanel.svelte';
+  import CreateAssetConfigPanel from './CreateAssetConfigPanel.svelte';
   import PlaceholderReferenceModal from './PlaceholderReferenceModal.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
@@ -96,7 +100,9 @@
     set_status: SetStatusNode,
     add_comment: AddCommentNode,
     notify_user: NotifyUserNode,
-    condition: ConditionNode
+    condition: ConditionNode,
+    update_asset: UpdateAssetNode,
+    create_asset: CreateAssetNode
   };
 
   const edgeTypes = {
@@ -122,7 +128,9 @@
     { type: 'set_status', label: t('actions.nodes.setStatus'), icon: RefreshCw },
     { type: 'add_comment', label: t('actions.nodes.addComment'), icon: MessageSquare },
     { type: 'notify_user', label: t('actions.nodes.notifyUser'), icon: Bell },
-    { type: 'condition', label: t('actions.nodes.condition'), icon: HelpCircle }
+    { type: 'condition', label: t('actions.nodes.condition'), icon: HelpCircle },
+    { type: 'update_asset', label: t('actions.nodes.updateAsset'), icon: Database },
+    { type: 'create_asset', label: t('actions.nodes.createAsset'), icon: PlusSquare }
   ];
 
   // Trigger type options
@@ -130,7 +138,8 @@
     { value: 'status_transition', label: t('actions.trigger.statusTransition') },
     { value: 'item_created', label: t('actions.trigger.itemCreated') },
     { value: 'item_updated', label: t('actions.trigger.itemUpdated') },
-    { value: 'item_linked', label: t('actions.trigger.itemLinked') }
+    { value: 'item_linked', label: t('actions.trigger.itemLinked') },
+    { value: 'manual', label: t('actions.trigger.manual') }
   ];
 
   // Keyboard shortcuts
@@ -301,6 +310,24 @@
   function handleConditionValueChange(e) {
     actionFlowStore.updateNodeConfig(selectedNode.id, {
       value: e.target.value
+    });
+  }
+
+  function handleRecipientTypeChange(e) {
+    actionFlowStore.updateNodeConfig(selectedNode.id, {
+      recipient_type: e.target.value
+    });
+  }
+
+  function handleNotifyMessageChange(e) {
+    actionFlowStore.updateNodeConfig(selectedNode.id, {
+      message: e.target.value
+    });
+  }
+
+  function handleIncludeLinkChange(e) {
+    actionFlowStore.updateNodeConfig(selectedNode.id, {
+      include_link: e.target.checked
     });
   }
 
@@ -595,6 +622,51 @@
               oninput={handleConditionValueChange}
             />
           </div>
+        {:else if selectedNode.type === 'notify_user'}
+          <div>
+            <label class="block text-xs font-medium mb-1">{t('actions.config.recipientType')}</label>
+            <select
+              class="w-full px-3 py-2 border rounded-md text-sm config-input"
+              value={selectedNode.data?.config?.recipient_type || 'assignee'}
+              onchange={handleRecipientTypeChange}
+            >
+              <option value="assignee">{t('actions.recipients.assignee')}</option>
+              <option value="creator">{t('actions.recipients.creator')}</option>
+              <option value="specific">{t('actions.recipients.specific')}</option>
+            </select>
+          </div>
+          <div>
+            <div class="flex items-center gap-1 mb-1">
+              <label class="block text-xs font-medium">{t('actions.config.notifyMessage')}</label>
+              <button
+                onclick={() => showPlaceholderModal = true}
+                class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
+                title={t('actions.placeholders.showReference')}
+              >
+                <HelpCircle class="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <textarea
+              class="w-full px-3 py-2 border rounded-md text-sm config-input"
+              rows="4"
+              value={selectedNode.data?.config?.message || ''}
+              oninput={handleNotifyMessageChange}
+              placeholder={t('actions.config.notifyPlaceholder')}
+            ></textarea>
+          </div>
+          <div class="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="include_link"
+              checked={selectedNode.data?.config?.include_link ?? true}
+              onchange={handleIncludeLinkChange}
+            />
+            <label for="include_link" class="text-sm">{t('actions.config.includeLink')}</label>
+          </div>
+        {:else if selectedNode.type === 'update_asset'}
+          <UpdateAssetConfigPanel {selectedNode} bind:showPlaceholderModal />
+        {:else if selectedNode.type === 'create_asset'}
+          <CreateAssetConfigPanel {selectedNode} bind:showPlaceholderModal />
         {/if}
       </div>
     </div>

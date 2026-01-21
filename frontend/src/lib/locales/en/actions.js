@@ -24,6 +24,7 @@ export default {
       itemCreated: 'Item Created',
       itemUpdated: 'Item Updated',
       itemLinked: 'Item Linked',
+      manual: 'Manual',
       respondToCascades: 'Respond to action-triggered changes',
       respondToCascadesHint: 'When enabled, this action will also run when triggered by other actions, not just user changes.'
     },
@@ -35,7 +36,9 @@ export default {
       setStatus: 'Set Status',
       addComment: 'Add Comment',
       notifyUser: 'Notify User',
-      condition: 'Condition'
+      condition: 'Condition',
+      updateAsset: 'Update Asset',
+      createAsset: 'Create Asset'
     },
 
     // Node palette and tips
@@ -68,7 +71,39 @@ export default {
       triggerType: 'Trigger Type',
       fromStatus: 'From Status',
       toStatus: 'To Status',
-      anyStatus: 'Any Status'
+      anyStatus: 'Any Status',
+      recipientType: 'Recipient',
+      notifyMessage: 'Message',
+      notifyPlaceholder: 'Enter message. Use {{item.title}} for variables.',
+      includeLink: 'Include link to item',
+      // Update Asset config
+      sourceAssetField: 'Asset Field on Item',
+      selectAssetField: 'Select asset field...',
+      sourceAssetFieldHint: 'Select the item field that contains the linked asset',
+      targetAssetType: 'Target Asset Type',
+      selectAssetType: 'Select asset type...',
+      fieldMappingsLabel: 'Field Mappings',
+      fieldMappings: '{count} field mapping(s)',
+      configureAssetUpdate: 'Configure asset update...',
+      fromField: 'From field',
+      sourceTypeVariable: 'Variable/Template',
+      sourceTypeItemField: 'Item Field',
+      sourceTypeLiteral: 'Literal Value',
+      selectTargetField: 'Select target field...',
+      addMapping: 'Add Mapping',
+      // Create Asset config
+      assetSet: 'Asset Set',
+      selectAssetSet: 'Select asset set...',
+      assetTitle: 'Asset Title',
+      assetTitleHint: 'Use {{item.title}} or other variables',
+      assetDescription: 'Description',
+      assetTagLabel: 'Asset Tag',
+      assetCategory: 'Category',
+      selectCategory: 'Select category (optional)...',
+      assetStatus: 'Status',
+      selectStatusOptional: 'Select status (optional)...',
+      requiredField: 'Required',
+      configureAssetCreation: 'Configure asset creation...'
     },
 
     // Recipients
@@ -120,7 +155,11 @@ export default {
       addComment: 'Added {prefix}comment: "{content}"',
       notifyUser: 'Sent notification to {count} user(s)',
       notifySkipped: 'Notification skipped: {reason}',
-      conditionResult: 'Condition evaluated to {result}'
+      conditionResult: 'Condition evaluated to {result}',
+      updateAsset: 'Updated asset #{asset_id}',
+      updateAssetSkipped: 'Asset update skipped: {reason}',
+      createAsset: 'Created asset #{asset_id}: {title}',
+      createAssetFailed: 'Asset creation failed: {reason}'
     },
 
     // Test/manual execution

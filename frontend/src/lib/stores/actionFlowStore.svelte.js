@@ -380,9 +380,22 @@ class ActionFlowStore {
       case 'add_comment':
         return { content: '', is_private: false };
       case 'notify_user':
-        return { recipients: [], message: '', include_link: true };
+        return { recipient_type: 'assignee', recipients: [], message: '', include_link: true };
       case 'condition':
         return { field_name: '', operator: 'eq', value: '' };
+      case 'update_asset':
+        return { source_field_id: '', asset_set_id: 0, asset_type_id: 0, field_mappings: [] };
+      case 'create_asset':
+        return {
+          asset_set_id: 0,
+          asset_type_id: 0,
+          title: '',
+          description: '',
+          asset_tag: '',
+          category_id: null,
+          status_id: null,
+          field_mappings: []
+        };
       default:
         return {};
     }

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -717,6 +718,10 @@ func (as *ActionService) executeNode(node *models.ActionNode, ctx *models.Execut
 		return as.executeNotifyUser(node, ctx, stepResult)
 	case models.ActionNodeCondition:
 		return as.executeCondition(node, ctx, stepResult)
+	case models.ActionNodeUpdateAsset:
+		return as.executeUpdateAsset(node, ctx, stepResult)
+	case models.ActionNodeCreateAsset:
+		return as.executeCreateAsset(node, ctx, stepResult)
 	default:
 		return fmt.Errorf("unknown node type: %s", node.NodeType)
 	}
@@ -1099,6 +1104,298 @@ func (as *ActionService) getStatusName(statusID int) string {
 		return fmt.Sprintf("Status #%d", statusID)
 	}
 	return name
+}
+
+// executeUpdateAsset executes an update_asset node
+func (as *ActionService) executeUpdateAsset(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
+	var config models.UpdateAssetNodeConfig
+	if err := json.Unmarshal([]byte(node.NodeConfig), &config); err != nil {
+		return fmt.Errorf("failed to parse update_asset config: %w", err)
+	}
+
+	// Skip if no field mappings configured
+	if len(config.FieldMappings) == 0 {
+		stepResult.Output = map[string]interface{}{
+			"skipped": true,
+			"reason":  "no field mappings configured",
+		}
+		return nil
+	}
+
+	// Get the item's custom_field_values to find the asset reference
+	var customFieldValuesJSON sql.NullString
+	err := as.db.QueryRow(`SELECT custom_field_values FROM items WHERE id = ?`, ctx.Event.ItemID).Scan(&customFieldValuesJSON)
+	if err != nil {
+		return fmt.Errorf("failed to get item custom_field_values: %w", err)
+	}
+
+	var customFieldValues map[string]interface{}
+	if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
+		if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &customFieldValues); err != nil {
+			return fmt.Errorf("failed to parse item custom_field_values: %w", err)
+		}
+	}
+
+	// Extract asset ID from source field
+	assetFieldValue, exists := customFieldValues[config.SourceFieldID]
+	if !exists || assetFieldValue == nil {
+		stepResult.Output = map[string]interface{}{
+			"skipped": true,
+			"reason":  "no asset linked in source field",
+		}
+		return nil
+	}
+
+	// Handle both integer and object formats for asset field value
+	var assetID int
+	switch v := assetFieldValue.(type) {
+	case float64:
+		assetID = int(v)
+	case int:
+		assetID = v
+	case map[string]interface{}:
+		// Object format: { "id": 123, ... }
+		if idVal, ok := v["id"]; ok {
+			switch id := idVal.(type) {
+			case float64:
+				assetID = int(id)
+			case int:
+				assetID = id
+			}
+		}
+	}
+
+	if assetID == 0 {
+		stepResult.Output = map[string]interface{}{
+			"skipped": true,
+			"reason":  "invalid asset reference format",
+		}
+		return nil
+	}
+
+	// Get the asset and validate it exists with expected type/set
+	var asset struct {
+		ID                int
+		SetID             int
+		AssetTypeID       int
+		CustomFieldValues sql.NullString
+	}
+	err = as.db.QueryRow(`
+		SELECT id, set_id, asset_type_id, custom_field_values
+		FROM assets WHERE id = ?
+	`, assetID).Scan(&asset.ID, &asset.SetID, &asset.AssetTypeID, &asset.CustomFieldValues)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("asset not found: %d", assetID)
+		}
+		return fmt.Errorf("failed to get asset: %w", err)
+	}
+
+	// Validate asset type if specified
+	if config.AssetTypeID > 0 && asset.AssetTypeID != config.AssetTypeID {
+		return fmt.Errorf("asset type mismatch: expected %d, got %d", config.AssetTypeID, asset.AssetTypeID)
+	}
+
+	// Validate asset set if specified
+	if config.AssetSetID > 0 && asset.SetID != config.AssetSetID {
+		return fmt.Errorf("asset set mismatch: expected %d, got %d", config.AssetSetID, asset.SetID)
+	}
+
+	// Parse existing asset custom_field_values
+	var assetCustomFields map[string]interface{}
+	if asset.CustomFieldValues.Valid && asset.CustomFieldValues.String != "" {
+		if err := json.Unmarshal([]byte(asset.CustomFieldValues.String), &assetCustomFields); err != nil {
+			assetCustomFields = make(map[string]interface{})
+		}
+	} else {
+		assetCustomFields = make(map[string]interface{})
+	}
+
+	// Track old values for logging
+	oldValues := make(map[string]interface{})
+	newValues := make(map[string]interface{})
+
+	// Apply field mappings
+	for _, mapping := range config.FieldMappings {
+		var sourceValue interface{}
+
+		switch mapping.SourceType {
+		case "variable":
+			// Substitute variables in the template
+			sourceValue = as.substituteVariables(mapping.SourceValue, ctx)
+		case "item_field":
+			// Get value from item's custom fields or context
+			if val, ok := ctx.Variables["new_"+mapping.SourceValue]; ok {
+				sourceValue = val
+			} else if val, ok := customFieldValues[mapping.SourceValue]; ok {
+				sourceValue = val
+			}
+		case "literal":
+			sourceValue = mapping.SourceValue
+		default:
+			// Default to variable substitution
+			sourceValue = as.substituteVariables(mapping.SourceValue, ctx)
+		}
+
+		// Track changes
+		oldValues[mapping.TargetFieldID] = assetCustomFields[mapping.TargetFieldID]
+		newValues[mapping.TargetFieldID] = sourceValue
+
+		// Update the asset field
+		assetCustomFields[mapping.TargetFieldID] = sourceValue
+	}
+
+	// Serialize updated custom_field_values
+	updatedJSON, err := json.Marshal(assetCustomFields)
+	if err != nil {
+		return fmt.Errorf("failed to serialize asset custom_field_values: %w", err)
+	}
+
+	// Update the asset
+	_, err = as.db.Exec(`
+		UPDATE assets SET custom_field_values = ?, updated_at = ? WHERE id = ?
+	`, string(updatedJSON), time.Now(), assetID)
+	if err != nil {
+		return fmt.Errorf("failed to update asset: %w", err)
+	}
+
+	// Populate step result output
+	stepResult.Output = map[string]interface{}{
+		"asset_id":      assetID,
+		"old_values":    oldValues,
+		"new_values":    newValues,
+		"mapping_count": len(config.FieldMappings),
+	}
+
+	slog.Debug("updated asset via action",
+		slog.String("component", "actions"),
+		slog.Int("asset_id", assetID),
+		slog.Int("item_id", ctx.Event.ItemID),
+		slog.Any("mappings", len(config.FieldMappings)),
+	)
+
+	return nil
+}
+
+// executeCreateAsset executes a create_asset node
+func (as *ActionService) executeCreateAsset(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
+	var config models.CreateAssetNodeConfig
+	if err := json.Unmarshal([]byte(node.NodeConfig), &config); err != nil {
+		return fmt.Errorf("failed to parse create_asset config: %w", err)
+	}
+
+	// Validate required fields
+	if config.AssetSetID == 0 {
+		return fmt.Errorf("asset_set_id is required")
+	}
+	if config.AssetTypeID == 0 {
+		return fmt.Errorf("asset_type_id is required")
+	}
+
+	// Substitute variables in title, description, and asset_tag
+	title := as.substituteVariables(config.Title, ctx)
+	if title == "" {
+		return fmt.Errorf("title is required and cannot be empty after substitution")
+	}
+	description := as.substituteVariables(config.Description, ctx)
+	assetTag := as.substituteVariables(config.AssetTag, ctx)
+
+	// Get item's custom field values for field mapping
+	var customFieldValuesJSON sql.NullString
+	err := as.db.QueryRow(`SELECT custom_field_values FROM items WHERE id = ?`, ctx.Event.ItemID).Scan(&customFieldValuesJSON)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("failed to get item custom_field_values: %w", err)
+	}
+
+	var itemCustomFields map[string]interface{}
+	if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
+		if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &itemCustomFields); err != nil {
+			itemCustomFields = make(map[string]interface{})
+		}
+	} else {
+		itemCustomFields = make(map[string]interface{})
+	}
+
+	// Build custom_field_values from field mappings
+	assetCustomFields := make(map[string]interface{})
+	for _, mapping := range config.FieldMappings {
+		var sourceValue interface{}
+
+		switch mapping.SourceType {
+		case "variable":
+			sourceValue = as.substituteVariables(mapping.SourceValue, ctx)
+		case "item_field":
+			if val, ok := ctx.Variables["new_"+mapping.SourceValue]; ok {
+				sourceValue = val
+			} else if val, ok := itemCustomFields[mapping.SourceValue]; ok {
+				sourceValue = val
+			}
+		case "literal":
+			sourceValue = mapping.SourceValue
+		default:
+			sourceValue = as.substituteVariables(mapping.SourceValue, ctx)
+		}
+
+		assetCustomFields[mapping.TargetFieldID] = sourceValue
+	}
+
+	// Serialize custom_field_values
+	customFieldsJSON, err := json.Marshal(assetCustomFields)
+	if err != nil {
+		return fmt.Errorf("failed to serialize custom_field_values: %w", err)
+	}
+
+	// Determine status_id - use config value or get default from asset set
+	var statusID int
+	if config.StatusID != nil {
+		statusID = *config.StatusID
+	} else {
+		// Get default status from asset set
+		err := as.db.QueryRow(`SELECT default_status_id FROM asset_sets WHERE id = ?`, config.AssetSetID).Scan(&statusID)
+		if err != nil {
+			slog.Warn("failed to get default status for asset set, using 0",
+				slog.String("component", "actions"),
+				slog.Int("asset_set_id", config.AssetSetID),
+				slog.Any("error", err),
+			)
+			statusID = 0
+		}
+	}
+
+	// Insert the new asset
+	now := time.Now()
+	result, err := as.db.Exec(`
+		INSERT INTO assets (set_id, asset_type_id, title, description, asset_tag, category_id, status_id, custom_field_values, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, config.AssetSetID, config.AssetTypeID, title, description, assetTag, config.CategoryID, statusID, string(customFieldsJSON), now, now)
+	if err != nil {
+		return fmt.Errorf("failed to create asset: %w", err)
+	}
+
+	assetID, err := result.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("failed to get created asset ID: %w", err)
+	}
+
+	// Populate step result output
+	stepResult.Output = map[string]interface{}{
+		"asset_id":      assetID,
+		"title":         title,
+		"description":   description,
+		"asset_tag":     assetTag,
+		"asset_set_id":  config.AssetSetID,
+		"asset_type_id": config.AssetTypeID,
+		"mapping_count": len(config.FieldMappings),
+	}
+
+	slog.Debug("created asset via action",
+		slog.String("component", "actions"),
+		slog.Int64("asset_id", assetID),
+		slog.Int("item_id", ctx.Event.ItemID),
+		slog.String("title", title),
+	)
+
+	return nil
 }
 
 // GetStats returns service statistics

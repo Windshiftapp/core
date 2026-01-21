@@ -112,7 +112,7 @@
     {required}
     {disabled}
     {className}
-    onsave={handleSave}
+    on:save={handleSave}
   />
 {:else if fieldType === 'date'}
   <InlineDateEditor
@@ -124,8 +124,8 @@
     {className}
     {enableSingleClick}
     {enableDoubleClick}
-    onsave={handleSave}
-    onclick={handleClick}
+    on:save={handleSave}
+    on:click={handleClick}
   />
 {:else}
   <InlineTextEditor
@@ -137,7 +137,7 @@
     {className}
     {enableSingleClick}
     {enableDoubleClick}
-    onsave={handleSave}
-    onclick={handleClick}
+    on:save={handleSave}
+    on:click={handleClick}
   />
 {/if}

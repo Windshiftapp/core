@@ -77,6 +77,7 @@ import {
   jiraImport
 } from './misc.js';
 import { tests } from './tests/index.js';
+import { actions } from './actions.js';
 
 // Assemble the api object with the same structure as the original
 export const api = {
@@ -299,6 +300,9 @@ export const api = {
 
   // Jira Cloud Import
   jiraImport,
+
+  // Workspace Actions (automation)
+  actions,
 };
 
 // Export helper functions for backward compatibility

@@ -157,7 +157,8 @@ export default {
       applyFiltersTitle: 'Apply the selected filters to the time entries list',
       clearFiltersTitle: 'Clear all filters and show all time entries',
       noEntries: 'No time entries found. Log your first time entry to get started.',
-      clickToView: 'Click to view {key}-{number}'
+      clickToView: 'Click to view {key}-{number}',
+      budgetExceeded: '- budget exceeded'
     },
 
     // Organizations (formerly Customers)
@@ -183,8 +184,10 @@ export default {
     none: 'None',
     categoryOptional: 'Category (Optional)',
     hourlyRate: 'Hourly Rate ($)',
+    maxHours: 'Max Hours',
+    maxHoursPlaceholder: 'No limit',
+    maxHoursHint: 'Optional budget for reporting',
     projectColor: 'Project Color',
-    activeProject: 'Active Project',
     updateProject: 'Update Project',
     createProject: 'Create Project'
   },

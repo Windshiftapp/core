@@ -67,6 +67,16 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 		item.Description = utils.SanitizeDescription(description)
 	}
 
+	// is_task validation - can only be true for personal workspaces
+	if isTaskValue, ok := updateData["is_task"]; ok {
+		if isTaskBool, ok := isTaskValue.(bool); ok {
+			if err := v.ValidateIsTask(item.WorkspaceID, isTaskBool); err != nil {
+				return err
+			}
+			item.IsTask = isTaskBool
+		}
+	}
+
 	// Status ID validation
 	if err := v.ValidateNullableIDField(updateData, "status_id", &item.StatusID, "statuses", "Status"); err != nil {
 		return err
@@ -328,22 +338,64 @@ func (v *ItemFieldValidator) ValidateHierarchyLevels(itemID, itemTypeID, parentI
 	return nil
 }
 
+// IsPersonalWorkspace checks if a workspace is a personal workspace
+func (v *ItemFieldValidator) IsPersonalWorkspace(workspaceID int) (bool, error) {
+	var isPersonal bool
+	err := v.db.QueryRow(`
+		SELECT is_personal FROM workspaces WHERE id = ?
+	`, workspaceID).Scan(&isPersonal)
+	if err != nil {
+		return false, fmt.Errorf("failed to check workspace: %w", err)
+	}
+	return isPersonal, nil
+}
+
 // ValidatePersonalWorkspace validates that a workspace is personal and belongs to the user
 func (v *ItemFieldValidator) ValidatePersonalWorkspace(workspaceID, userID int) error {
-	var isPersonal bool
-	var ownerID *int
-	err := v.db.QueryRow(`
-		SELECT is_personal, owner_id FROM workspaces WHERE id = ?
-	`, workspaceID).Scan(&isPersonal, &ownerID)
-
+	isPersonal, err := v.IsPersonalWorkspace(workspaceID)
 	if err != nil {
-		return fmt.Errorf("failed to validate workspace: %w", err)
+		return err
 	}
 
-	if !isPersonal || ownerID == nil || *ownerID != userID {
+	if !isPersonal {
 		return &ValidationError{
 			Field:   "related_work_item_id",
 			Message: "Personal tasks must be created in your own personal workspace",
+		}
+	}
+
+	// Also check ownership
+	var ownerID *int
+	err = v.db.QueryRow(`SELECT owner_id FROM workspaces WHERE id = ?`, workspaceID).Scan(&ownerID)
+	if err != nil {
+		return fmt.Errorf("failed to validate workspace owner: %w", err)
+	}
+
+	if ownerID == nil || *ownerID != userID {
+		return &ValidationError{
+			Field:   "related_work_item_id",
+			Message: "Personal tasks must be created in your own personal workspace",
+		}
+	}
+
+	return nil
+}
+
+// ValidateIsTask validates that is_task can only be true for personal workspaces
+func (v *ItemFieldValidator) ValidateIsTask(workspaceID int, isTask bool) error {
+	if !isTask {
+		return nil // is_task: false is always allowed
+	}
+
+	isPersonal, err := v.IsPersonalWorkspace(workspaceID)
+	if err != nil {
+		return err
+	}
+
+	if !isPersonal {
+		return &ValidationError{
+			Field:   "is_task",
+			Message: "Tasks can only be created in personal workspaces",
 		}
 	}
 
@@ -381,6 +433,13 @@ func (v *ItemFieldValidator) ValidateCreateRequest(item *models.Item) error {
 	}
 	if !exists {
 		return &ValidationError{Field: "workspace_id", Message: "Workspace not found"}
+	}
+
+	// Validate is_task can only be true for personal workspaces
+	if item.IsTask {
+		if err := v.ValidateIsTask(item.WorkspaceID, item.IsTask); err != nil {
+			return err
+		}
 	}
 
 	// Validate item type if provided
