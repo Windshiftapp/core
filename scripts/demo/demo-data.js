@@ -425,8 +425,7 @@ export const workItems = {
               status_id: 5,
               priority: 'Medium',
               milestoneName: 'MVP Release',
-              iterationName: 'Sprint 2025-01',
-              is_task: true
+              iterationName: 'Sprint 2025-01'
             },
             {
               title: 'Setup CI/CD pipeline',
@@ -434,8 +433,7 @@ export const workItems = {
               status_id: 5,
               priority: 'Medium',
               milestoneName: 'MVP Release',
-              iterationName: 'Sprint 2025-01',
-              is_task: true
+              iterationName: 'Sprint 2025-01'
             }
           ]
         },
@@ -457,8 +455,7 @@ export const workItems = {
               status_id: 5,
               priority: 'Medium',
               milestoneName: 'Beta Launch',
-              iterationName: 'Sprint 2025-01',
-              is_task: true
+              iterationName: 'Sprint 2025-01'
             },
             {
               title: 'Integrate OAuth providers',
@@ -466,8 +463,7 @@ export const workItems = {
               status_id: 1,
               priority: 'Critical',
               milestoneName: 'Beta Launch',
-              iterationName: 'Sprint 2025-02',
-              is_task: true
+              iterationName: 'Sprint 2025-02'
             },
             {
               title: 'Implement secure token storage',
@@ -475,8 +471,7 @@ export const workItems = {
               status_id: 1,
               priority: 'Critical',
               milestoneName: 'Beta Launch',
-              iterationName: 'Sprint 2025-02',
-              is_task: true
+              iterationName: 'Sprint 2025-02'
             }
           ]
         },
@@ -537,8 +532,7 @@ export const workItems = {
               status_id: 5,
               priority: 'Medium',
               milestoneName: 'API v2 Release',
-              iterationName: 'Sprint 2025-01',
-              is_task: true
+              iterationName: 'Sprint 2025-01'
             },
             {
               title: 'Workspace resolver',
@@ -546,8 +540,7 @@ export const workItems = {
               status_id: 1,
               priority: 'Low',
               milestoneName: 'API v2 Release',
-              iterationName: 'Sprint 2025-02',
-              is_task: true
+              iterationName: 'Sprint 2025-02'
             }
           ]
         },
@@ -751,16 +744,14 @@ export const workItems = {
               description: 'Setup SAML integration with their IdP',
               status_id: 1,
               priority: 'High',
-              iterationName: 'Support Onboarding Sprint',
-              is_task: true
+              iterationName: 'Support Onboarding Sprint'
             },
             {
               title: 'Import user list',
               description: 'Bulk import 200 users from CSV',
               status_id: 1,
               priority: 'Medium',
-              iterationName: 'Support Onboarding Sprint',
-              is_task: true
+              iterationName: 'Support Onboarding Sprint'
             }
           ]
         },
@@ -956,8 +947,7 @@ export const workItems = {
               status_id: 5,
               priority: 'Medium',
               milestoneName: 'Q1 Campaign Launch',
-              iterationName: 'Q1 Campaign Sprint',
-              is_task: true
+              iterationName: 'Q1 Campaign Sprint'
             },
             {
               title: 'Write email copy',
@@ -965,8 +955,7 @@ export const workItems = {
               status_id: 1,
               priority: 'Medium',
               milestoneName: 'Q1 Campaign Launch',
-              iterationName: 'Q1 Campaign Sprint',
-              is_task: true
+              iterationName: 'Q1 Campaign Sprint'
             },
             {
               title: 'Setup A/B tests',
@@ -974,8 +963,7 @@ export const workItems = {
               status_id: 1,
               priority: 'Low',
               milestoneName: 'Q1 Campaign Launch',
-              iterationName: 'Q1 Campaign Sprint',
-              is_task: true
+              iterationName: 'Q1 Campaign Sprint'
             }
           ]
         },
@@ -997,8 +985,7 @@ export const workItems = {
               status_id: 1,
               priority: 'Medium',
               milestoneName: 'Q1 Campaign Launch',
-              iterationName: 'Q1 Campaign Sprint',
-              is_task: true
+              iterationName: 'Q1 Campaign Sprint'
             },
             {
               title: 'Twitter thread',
@@ -1006,8 +993,7 @@ export const workItems = {
               status_id: 1,
               priority: 'Low',
               milestoneName: 'Q1 Campaign Launch',
-              iterationName: 'Q1 Campaign Sprint',
-              is_task: true
+              iterationName: 'Q1 Campaign Sprint'
             }
           ]
         },

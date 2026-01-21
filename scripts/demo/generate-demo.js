@@ -108,7 +108,8 @@ function parseArgs() {
     startServer: true,
     baseURL: null,
     keepServer: true,
-    cleanDb: false
+    cleanDb: false,
+    challenge: false
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -138,6 +139,9 @@ function parseArgs() {
       case '--clean':
         options.cleanDb = true;
         break;
+      case '--challenge':
+        options.challenge = true;
+        break;
       case '--help':
         console.log(`
 ${colors.bright}${APP_NAME} Demo Content Generator${colors.reset}
@@ -154,6 +158,7 @@ ${colors.cyan}Options:${colors.reset}
   --keep-server          Keep server running after completion (default)
   --stop-server          Stop server after completion (for CI/e2e tests)
   --clean                Delete existing database before generating demo
+  --challenge            Include edge-case and security test data
   --help                 Show this help message
 
 ${colors.cyan}Examples:${colors.reset}
@@ -528,12 +533,12 @@ async function getBearerToken(baseURL) {
 }
 
 // Create demo users
-async function createUsers(baseURL, token) {
+async function createUsers(baseURL, token, usersData = demoUsers) {
   logSection('Creating Demo Users');
 
   const createdUsers = {};
 
-  for (const user of demoUsers) {
+  for (const user of usersData) {
     try {
       const response = await makeAuthRequest(baseURL, 'POST', '/api/users', user, token);
 
@@ -555,12 +560,12 @@ async function createUsers(baseURL, token) {
 }
 
 // Create workspaces
-async function createWorkspaces(baseURL, token) {
+async function createWorkspaces(baseURL, token, workspacesData = workspaces) {
   logSection('Creating Workspaces');
 
   const createdWorkspaces = {};
 
-  for (const workspace of workspaces) {
+  for (const workspace of workspacesData) {
     try {
       const response = await makeAuthRequest(baseURL, 'POST', '/api/workspaces', workspace, token);
 
@@ -579,12 +584,12 @@ async function createWorkspaces(baseURL, token) {
 }
 
 // Create projects
-async function createProjects(baseURL, token, workspaceMap, customerMap) {
+async function createProjects(baseURL, token, workspaceMap, customerMap, projectsData = projects) {
   logSection('Creating Projects');
 
   const createdProjects = {};
 
-  for (const project of projects) {
+  for (const project of projectsData) {
     const customerId = customerMap[project.customerName];
     if (!customerId) {
       logError(`Customer ${project.customerName} not found for project ${project.name}`);
@@ -761,12 +766,12 @@ async function createMilestoneCategories(baseURL, token) {
 }
 
 // Create milestones (supports both global and local)
-async function createMilestones(baseURL, token, workspaceMap, categoryMap = {}) {
+async function createMilestones(baseURL, token, workspaceMap, categoryMap = {}, milestonesData = milestones) {
   logSection('Creating Milestones');
 
   const createdMilestones = {};
 
-  for (const milestone of milestones) {
+  for (const milestone of milestonesData) {
     // Handle global vs local milestones
     let workspaceId = null;
     if (!milestone.is_global) {
@@ -815,7 +820,7 @@ async function createMilestones(baseURL, token, workspaceMap, categoryMap = {}) 
 }
 
 // Create iterations (supports both global and local, with different types)
-async function createIterations(baseURL, token, workspaceMap) {
+async function createIterations(baseURL, token, workspaceMap, iterationsData = iterations) {
   logSection('Creating Iterations');
 
   const createdIterations = {};
@@ -827,7 +832,7 @@ async function createIterations(baseURL, token, workspaceMap) {
     'Release': 3
   };
 
-  for (const iteration of iterations) {
+  for (const iteration of iterationsData) {
     // Handle global vs local iterations
     let workspaceId = null;
     if (!iteration.is_global) {
@@ -927,12 +932,12 @@ function determineItemType(item, depth, itemTypes) {
 }
 
 // Create time tracking customers
-async function createTimeCustomers(baseURL, token) {
+async function createTimeCustomers(baseURL, token, customersData = timeCustomers) {
   logSection('Creating Time Tracking Customers');
 
   const createdCustomers = {};
 
-  for (const customer of timeCustomers) {
+  for (const customer of customersData) {
     try {
       const customerData = {
         name: customer.name,
@@ -1090,12 +1095,12 @@ async function createWorkItem(baseURL, token, item, workspaceId, workspaceKey, i
 }
 
 // Create all work items for all workspaces
-async function createWorkItems(baseURL, token, workspaceMap, projectMap, priorityMap, itemTypes, milestoneMap = {}, iterationMap = {}) {
+async function createWorkItems(baseURL, token, workspaceMap, projectMap, priorityMap, itemTypes, milestoneMap = {}, iterationMap = {}, workItemsData = workItems) {
   logSection('Creating Work Items');
 
   const itemMap = {};
 
-  for (const [workspaceKey, items] of Object.entries(workItems)) {
+  for (const [workspaceKey, items] of Object.entries(workItemsData)) {
     const workspaceId = workspaceMap[workspaceKey];
     if (!workspaceId) {
       logError(`Workspace ${workspaceKey} not found`);
@@ -1122,12 +1127,12 @@ async function createWorkItems(baseURL, token, workspaceMap, projectMap, priorit
 }
 
 // Create test labels
-async function createTestLabels(baseURL, token, workspaceId) {
+async function createTestLabels(baseURL, token, workspaceId, labelsData = testLabels) {
   logSection('Creating Test Labels');
 
   const createdLabels = {};
 
-  for (const label of testLabels) {
+  for (const label of labelsData) {
     try {
       const response = await makeAuthRequest(baseURL, 'POST', `/api/workspaces/${workspaceId}/test-labels`, label, token);
 
@@ -1187,12 +1192,12 @@ async function createTestFolder(baseURL, token, workspaceId, folder, parentId = 
 }
 
 // Create all test folders
-async function createTestFolders(baseURL, token, workspaceId) {
+async function createTestFolders(baseURL, token, workspaceId, foldersData = testFolders) {
   logSection('Creating Test Folders');
 
   const folderMap = {};
 
-  for (const folder of testFolders) {
+  for (const folder of foldersData) {
     await createTestFolder(baseURL, token, workspaceId, folder, null, folderMap, 0);
   }
 
@@ -1200,12 +1205,12 @@ async function createTestFolders(baseURL, token, workspaceId) {
 }
 
 // Create test cases with steps
-async function createTestCases(baseURL, token, workspaceId, folderMap, labelMap) {
+async function createTestCases(baseURL, token, workspaceId, folderMap, labelMap, testCasesData = testCases) {
   logSection('Creating Test Cases');
 
   const testCaseMap = {};
 
-  for (const testCase of testCases) {
+  for (const testCase of testCasesData) {
     try {
       // Find folder ID from path
       const folderId = folderMap[testCase.folderPath];
@@ -1756,12 +1761,12 @@ async function createAssetTypeFields(baseURL, token, typeMap, fieldMap) {
 }
 
 // Create assets
-async function createAssets(baseURL, token, setMap, typeMap, categoryMap, userMap = {}, fieldMap = {}) {
+async function createAssets(baseURL, token, setMap, typeMap, categoryMap, userMap = {}, fieldMap = {}, assetsData = assets) {
   logSection('Creating Assets');
 
   let createdCount = 0;
 
-  for (const [setName, assetList] of Object.entries(assets)) {
+  for (const [setName, assetList] of Object.entries(assetsData)) {
     const setId = setMap[setName];
     if (!setId) {
       logError(`Asset set ${setName} not found`);
@@ -1839,7 +1844,7 @@ async function getCurrentUser(baseURL, token) {
 }
 
 // Create personal tasks for admin user
-async function createPersonalTasks(baseURL, token) {
+async function createPersonalTasks(baseURL, token, personalTasksData = personalTasks) {
   logSection('Creating Personal Tasks');
 
   // Get admin user info to get personal workspace ID
@@ -1857,7 +1862,7 @@ async function createPersonalTasks(baseURL, token) {
   logInfo(`Using personal workspace ID: ${personalWorkspaceId}`);
   logInfo(`Week start (Monday): ${getRelativeDate(0)}`);
 
-  for (const taskData of personalTasks) {
+  for (const taskData of personalTasksData) {
     try {
       // Prepare item data
       const itemData = {
@@ -1929,6 +1934,28 @@ async function main() {
 ╚═══════════════════════════════════════════════════════╝
 ${colors.reset}`);
 
+  // Conditionally load challenge data
+  let challengeData = null;
+  if (options.challenge) {
+    challengeData = await import('./challenge-data.js');
+    logInfo('Challenge mode enabled - including edge-case and security test data');
+  }
+
+  // Helper to merge normal + challenge data
+  function getMergedData(normalData, challengeKey) {
+    if (!challengeData || !challengeData[challengeKey]) return normalData;
+
+    if (Array.isArray(normalData)) {
+      return [...normalData, ...challengeData[challengeKey]];
+    }
+    // For object-keyed data (like workItems, assets)
+    const merged = { ...normalData };
+    for (const [key, items] of Object.entries(challengeData[challengeKey])) {
+      merged[key] = [...(merged[key] || []), ...items];
+    }
+    return merged;
+  }
+
   let serverProcess = null;
 
   try {
@@ -1960,19 +1987,19 @@ ${colors.reset}`);
       throw new Error('Failed to get bearer token');
     }
 
-    // Create all demo content
-    const users = await createUsers(options.baseURL, token);
-    const workspaceMap = await createWorkspaces(options.baseURL, token);
-    const customerMap = await createTimeCustomers(options.baseURL, token);
-    const projectMap = await createProjects(options.baseURL, token, workspaceMap, customerMap);
+    // Create all demo content (merge with challenge data if enabled)
+    const users = await createUsers(options.baseURL, token, getMergedData(demoUsers, 'challengeUsers'));
+    const workspaceMap = await createWorkspaces(options.baseURL, token, getMergedData(workspaces, 'challengeWorkspaces'));
+    const customerMap = await createTimeCustomers(options.baseURL, token, getMergedData(timeCustomers, 'challengeTimeCustomers'));
+    const projectMap = await createProjects(options.baseURL, token, workspaceMap, customerMap, getMergedData(projects, 'challengeProjects'));
     const fieldMap = await createCustomFields(options.baseURL, token);
     const screenMap = await createScreens(options.baseURL, token, fieldMap);
     const priorityMap = await createPriorities(options.baseURL, token);
     const categoryMap = await createMilestoneCategories(options.baseURL, token);
-    const milestoneMap = await createMilestones(options.baseURL, token, workspaceMap, categoryMap);
-    const iterationMap = await createIterations(options.baseURL, token, workspaceMap);
+    const milestoneMap = await createMilestones(options.baseURL, token, workspaceMap, categoryMap, getMergedData(milestones, 'challengeMilestones'));
+    const iterationMap = await createIterations(options.baseURL, token, workspaceMap, getMergedData(iterations, 'challengeIterations'));
     const itemTypes = await getItemTypes(options.baseURL, token);
-    const itemMap = await createWorkItems(options.baseURL, token, workspaceMap, projectMap, priorityMap, itemTypes, milestoneMap, iterationMap);
+    const itemMap = await createWorkItems(options.baseURL, token, workspaceMap, projectMap, priorityMap, itemTypes, milestoneMap, iterationMap, getMergedData(workItems, 'challengeWorkItems'));
     const worklogCount = await createWorkLogs(options.baseURL, token, itemMap, projectMap);
 
     // Create test management data
@@ -1989,9 +2016,9 @@ ${colors.reset}`);
     if (!softwareDevWorkspaceId) {
       logError('Software Development workspace not found - skipping test data creation');
     } else {
-      labelMap = await createTestLabels(options.baseURL, token, softwareDevWorkspaceId);
-      folderMap = await createTestFolders(options.baseURL, token, softwareDevWorkspaceId);
-      testCaseMap = await createTestCases(options.baseURL, token, softwareDevWorkspaceId, folderMap, labelMap);
+      labelMap = await createTestLabels(options.baseURL, token, softwareDevWorkspaceId, getMergedData(testLabels, 'challengeTestLabels'));
+      folderMap = await createTestFolders(options.baseURL, token, softwareDevWorkspaceId, getMergedData(testFolders, 'challengeTestFolders'));
+      testCaseMap = await createTestCases(options.baseURL, token, softwareDevWorkspaceId, folderMap, labelMap, getMergedData(testCases, 'challengeTestCases'));
       testSetMap = await createTestSets(options.baseURL, token, softwareDevWorkspaceId, milestoneMap, testCaseMap, labelMap);
       templateMap = await createTestRunTemplates(options.baseURL, token, softwareDevWorkspaceId, testSetMap);
       testRunMap = await executeTestRuns(options.baseURL, token, softwareDevWorkspaceId, templateMap, itemMap);
@@ -2003,10 +2030,10 @@ ${colors.reset}`);
     const assetTypeMap = await createAssetTypes(options.baseURL, token, assetSetMap);
     await createAssetTypeFields(options.baseURL, token, assetTypeMap, fieldMap);
     const assetCategoryMap = await createAssetCategories(options.baseURL, token, assetSetMap);
-    const assetCount = await createAssets(options.baseURL, token, assetSetMap, assetTypeMap, assetCategoryMap, users, fieldMap);
+    const assetCount = await createAssets(options.baseURL, token, assetSetMap, assetTypeMap, assetCategoryMap, users, fieldMap, getMergedData(assets, 'challengeAssets'));
 
     // Personal Tasks for admin user (with calendar scheduling)
-    const personalTaskCount = await createPersonalTasks(options.baseURL, token);
+    const personalTaskCount = await createPersonalTasks(options.baseURL, token, getMergedData(personalTasks, 'challengePersonalTasks'));
 
     // Summary
     logSection('Summary');
@@ -2021,8 +2048,9 @@ ${colors.reset}`);
     logSuccess(`Created ${Object.keys(iterationMap).length} iterations (global + local)`);
     logSuccess(`Created ${Object.keys(customerMap).length} time customers`);
 
+    const mergedWorkItems = getMergedData(workItems, 'challengeWorkItems');
     let totalItems = 0;
-    for (const items of Object.values(workItems)) {
+    for (const items of Object.values(mergedWorkItems)) {
       const countItems = (itemList) => {
         let count = itemList.length;
         for (const item of itemList) {
@@ -2049,7 +2077,8 @@ ${colors.reset}`);
     logSuccess(`Created ${assetCount} assets`);
     logSuccess(`Created ${personalTaskCount} personal tasks`);
 
-    log(`\n${colors.bright}${colors.green}✓ Demo content generated successfully!${colors.reset}\n`);
+    const modeText = options.challenge ? ' (with challenge data)' : '';
+    log(`\n${colors.bright}${colors.green}✓ Demo content generated successfully${modeText}!${colors.reset}\n`);
     logInfo(`Access the application at: ${options.baseURL}`);
     logInfo(`Login with: admin / admin`);
 
