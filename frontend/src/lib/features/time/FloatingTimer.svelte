@@ -9,13 +9,13 @@
   const timer = useTimer();
   const { activeTimer, formattedDuration, timerSyncing } = timer;
 
-  let dragging = false;
-  let dragOffset = { x: 0, y: 0 };
-  let timerElement;
-  let position = { x: 20, y: 20 }; // Default position, will be updated on mount
-  let collapsed = false;
-  let animationFrameId = null;
-  let pendingPosition = null;
+  let dragging = $state(false);
+  let dragOffset = $state({ x: 0, y: 0 });
+  let timerElement = $state();
+  let position = $state({ x: 20, y: 20 }); // Default position, will be updated on mount
+  let collapsed = $state(false);
+  let animationFrameId = $state(null);
+  let pendingPosition = $state(null);
 
   // Initialize timer on mount
   onMount(async () => {
@@ -168,8 +168,7 @@
   });
 
   // Reactive position style
-  $: positionStyle = `left: ${position.x}px; top: ${position.y}px;`;
-  
+  const positionStyle = $derived(`left: ${position.x}px; top: ${position.y}px;`);
 </script>
 
 {#if $activeTimer}
@@ -177,10 +176,10 @@
     bind:this={timerElement}
     class="fixed z-50 select-none {dragging ? 'cursor-grabbing' : 'cursor-grab transition-all duration-200 ease-in-out'}"
     style={positionStyle}
-    on:mousedown={handleMouseDown}
+    onmousedown={handleMouseDown}
     role="button"
     tabindex="0"
-    on:keydown={(e) => {
+    onkeydown={(e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         toggleCollapsed();
       }
@@ -206,7 +205,7 @@
           
           {#if !collapsed && getWorkItemKey()}
             <button
-              on:click|stopPropagation={navigateToItem}
+              onclick={(e) => { e.stopPropagation(); navigateToItem(); }}
               class="text-xs font-mono bg-blue-400 bg-opacity-30 text-blue-100 px-1.5 py-0.5 rounded hover:bg-opacity-50 transition-colors flex items-center gap-1"
               title={t('time.timer.goToWorkItem', { title: $activeTimer.item_title || t('items.workItem') })}
               type="button"
@@ -219,7 +218,7 @@
 
         <div class="flex items-center gap-1 flex-shrink-0">
           <button
-            on:click|stopPropagation={toggleCollapsed}
+            onclick={(e) => { e.stopPropagation(); toggleCollapsed(); }}
             class="p-1 rounded hover:bg-blue-400 hover:bg-opacity-50 transition-colors text-white"
             title={collapsed ? t('time.timer.expandTimer') : t('time.timer.collapseTimer')}
             type="button"
@@ -232,7 +231,7 @@
           </button>
 
           <button
-            on:click|stopPropagation={handleStopTimer}
+            onclick={(e) => { e.stopPropagation(); handleStopTimer(); }}
             class="p-1 rounded hover:bg-red-500 hover:bg-opacity-80 text-white transition-colors"
             title={t('time.stopTimer')}
             disabled={$timerSyncing}

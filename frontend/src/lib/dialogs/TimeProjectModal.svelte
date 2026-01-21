@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import Modal from './Modal.svelte';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
@@ -8,24 +7,26 @@
   import Label from '../components/Label.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  const dispatch = createEventDispatcher();
-
   // Props
-  export let isOpen = false;
-  export let formData = {
-    customer_id: '',
-    category_id: '',
-    name: '',
-    description: '',
-    status: 'Active',
-    color: '',
-    hourly_rate: 0,
-    active: true
-  };
-  export let customers = [];
-  export let categories = [];
-  export let statusOptions = ['Active', 'On Hold', 'Completed', 'Archived'];
-  export let isEditing = false;
+  let {
+    isOpen = false,
+    formData = $bindable({
+      customer_id: '',
+      category_id: '',
+      name: '',
+      description: '',
+      status: 'Active',
+      color: '',
+      hourly_rate: 0,
+      settings: { max_hours: '' }
+    }),
+    customers = [],
+    categories = [],
+    statusOptions = ['Active', 'On Hold', 'Completed', 'Archived'],
+    isEditing = false,
+    onsave = () => {},
+    oncancel = () => {}
+  } = $props();
 
   // Color options - matching IconSelector's palette
   const colorOptions = [
@@ -42,12 +43,12 @@
 
   function handleSubmit() {
     if (formData.name.trim()) {
-      dispatch('save');
+      onsave();
     }
   }
 
   function handleCancel() {
-    dispatch('cancel');
+    oncancel();
   }
 </script>
 
@@ -106,6 +107,14 @@
         <Input type="number" bind:value={formData.hourly_rate} min="0" step="0.01" />
       </div>
 
+      <div class="mt-6">
+        <Label class="mb-2">{t('timeProject.maxHours')}</Label>
+        <Input type="number" bind:value={formData.settings.max_hours} min="0" step="0.5" placeholder={t('timeProject.maxHoursPlaceholder')} />
+        <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+          {t('timeProject.maxHoursHint')}
+        </div>
+      </div>
+
       <!-- Color Picker -->
       <div class="mt-6">
         <Label class="mb-2">{t('timeProject.projectColor')}</Label>
@@ -146,16 +155,6 @@
       <div class="mt-6">
         <Label class="mb-2">{t('common.description')}</Label>
         <Textarea bind:value={formData.description} rows={3} />
-      </div>
-
-      <div class="mt-6 flex items-center">
-        <input
-          type="checkbox"
-          bind:checked={formData.active}
-          id="active"
-          class="mr-3 w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-        />
-        <label for="active" class="text-sm font-medium" style="color: var(--ds-text);">{t('timeProject.activeProject')}</label>
       </div>
 
       <div class="mt-8 flex gap-3">

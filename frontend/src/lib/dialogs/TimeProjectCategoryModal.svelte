@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import Modal from './Modal.svelte';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
@@ -7,24 +6,23 @@
   import Label from '../components/Label.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  const dispatch = createEventDispatcher();
-
   // Props
-  export let isOpen = false;
-  export let formData = {
-    name: '',
-    description: ''
-  };
-  export let isEditing = false;
+  let {
+    isOpen = false,
+    formData = $bindable({ name: '', description: '' }),
+    isEditing = false,
+    onsave = () => {},
+    oncancel = () => {}
+  } = $props();
 
   function handleSubmit() {
     if (formData.name.trim()) {
-      dispatch('save');
+      onsave();
     }
   }
 
   function handleCancel() {
-    dispatch('cancel');
+    oncancel();
   }
 </script>
 

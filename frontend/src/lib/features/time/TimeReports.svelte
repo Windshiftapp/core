@@ -15,29 +15,29 @@
     return div.innerHTML;
   }
 
-  let worklogs = [];
-  let customers = [];
-  let projects = [];
-  let loading = false;
-  let exportLoading = false;
+  let worklogs = $state([]);
+  let customers = $state([]);
+  let projects = $state([]);
+  let loading = $state(false);
+  let exportLoading = $state(false);
 
   // Filters
-  let filters = {
+  let filters = $state({
     customer_id: '',
     project_id: '',
     date_from: '',
     date_to: '',
     description_filter: ''
-  };
+  });
 
   // Summary data
-  let summary = {
+  let summary = $state({
     totalHours: 0,
     totalEntries: 0,
     averageHoursPerDay: 0,
     topProject: null,
     topCustomer: null
-  };
+  });
 
   onMount(async () => {
     await Promise.all([loadCustomers(), loadProjects()]);
@@ -351,14 +351,14 @@
 
 
   // Reactive filtering for projects based on selected customer
-  $: filteredProjects = filters.customer_id 
+  const filteredProjects = $derived(filters.customer_id
     ? projects.filter(p => p.customer_id === parseInt(filters.customer_id))
-    : projects;
+    : projects);
 
   // Filter worklogs by description if filter is set
-  $: filteredWorklogs = filters.description_filter 
-    ? worklogs.filter(w => w.description.toLowerCase().includes(filters.description_filter.toLowerCase()))
-    : worklogs;
+  const filteredWorklogs = $derived(filters.description_filter
+    ? worklogs.filter(w => w.description?.toLowerCase().includes(filters.description_filter.toLowerCase()))
+    : worklogs);
 </script>
 
 <!-- Header -->

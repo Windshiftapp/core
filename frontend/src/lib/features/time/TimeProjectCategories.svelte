@@ -7,13 +7,13 @@
   import { createShortcutHandler, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
 
-  let categories = [];
-  let showCreateForm = false;
-  let editingCategory = null;
-  let formData = {
+  let categories = $state([]);
+  let showCreateForm = $state(false);
+  let editingCategory = $state(null);
+  let formData = $state({
     name: '',
     description: ''
-  };
+  });
 
   const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899', '#06b6d4', '#84cc16'];
 
@@ -96,7 +96,7 @@
   }
 
   // Drag and drop reordering
-  let draggedItem = null;
+  let draggedItem = $state(null);
 
   function handleDragStart(event, category) {
     draggedItem = category;
@@ -238,7 +238,7 @@
   isOpen={showCreateForm}
   bind:formData
   isEditing={!!editingCategory}
-  on:save={saveCategory}
-  on:cancel={cancelForm}
+  onsave={saveCategory}
+  oncancel={cancelForm}
 />
 

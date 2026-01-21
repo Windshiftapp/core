@@ -11,22 +11,22 @@
   import { Plus, Trash2, Edit, Users } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
-  let customers = [];
-  let customFields = [];
-  let customerOrgFields = [];
-  let showModal = false;
-  let editingCustomer = null;
-  let formData = {
+  let customers = $state([]);
+  let customFields = $state([]);
+  let customerOrgFields = $state([]);
+  let showModal = $state(false);
+  let editingCustomer = $state(null);
+  let formData = $state({
     name: '',
     email: '',
     description: '',
     active: true,
     avatar_url: null,
     custom_field_values: {}
-  };
+  });
 
   // Check if attachments are enabled
-  let attachmentsEnabled = false;
+  let attachmentsEnabled = $state(false);
 
   onMount(async () => {
     await Promise.all([loadCustomers(), loadCustomFields(), checkAttachmentsEnabled()]);

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Filter, Plus, Edit, Trash2, MoreHorizontal } from 'lucide-svelte';
+  import { Filter, Plus, Edit, Trash2, MoreHorizontal, AlertTriangle } from 'lucide-svelte';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import Button from '../../components/Button.svelte';
@@ -177,6 +177,11 @@
     return `${hours}h ${mins}m`;
   }
 
+  function isProjectOverBudget(worklog) {
+    if (!worklog.project_max_hours || worklog.project_max_hours <= 0) return false;
+    return (worklog.project_total_hours || 0) > worklog.project_max_hours;
+  }
+
   async function applyFilters() {
     await loadWorklogs();
   }
@@ -323,9 +328,16 @@
                 {new Date(worklog.date * 1000).toLocaleDateString()}
               </td>
               <td class="px-6 py-4">
-                <div class="text-sm">
-                  <div class="font-semibold" style="color: var(--ds-text);">{worklog.project_name}</div>
-                  <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">{worklog.customer_name}</div>
+                <div class="flex items-center gap-2">
+                  <div class="text-sm">
+                    <div class="font-semibold" style="color: var(--ds-text);">{worklog.project_name}</div>
+                    <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">{worklog.customer_name}</div>
+                  </div>
+                  {#if isProjectOverBudget(worklog)}
+                    <div title="{worklog.project_total_hours?.toFixed(1)}h / {worklog.project_max_hours?.toFixed(1)}h {t('time.entry.budgetExceeded')}">
+                      <AlertTriangle size={16} class="text-amber-500" />
+                    </div>
+                  {/if}
                 </div>
               </td>
               <td class="px-6 py-4 text-sm" style="color: var(--ds-text);">

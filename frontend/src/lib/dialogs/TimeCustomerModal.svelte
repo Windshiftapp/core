@@ -11,25 +11,27 @@
   import { t } from '../stores/i18n.svelte.js';
 
   // Props
-  export let isOpen = false;
-  export let formData = {
-    name: '',
-    email: '',
-    description: '',
-    active: true,
-    avatar_url: null,
-    custom_field_values: {}
-  };
-  export let customerOrgFields = [];
-  export let attachmentsEnabled = false;
-  export let isEditing = false;
-  export let onsave = () => {};
-  export let oncancel = () => {};
+  let {
+    isOpen = false,
+    formData = $bindable({
+      name: '',
+      email: '',
+      description: '',
+      active: true,
+      avatar_url: null,
+      custom_field_values: {}
+    }),
+    customerOrgFields = [],
+    attachmentsEnabled = false,
+    isEditing = false,
+    onsave = () => {},
+    oncancel = () => {}
+  } = $props();
 
-  let uploadingAvatar = false;
-  let showAvatarUpload = false;
+  let uploadingAvatar = $state(false);
+  let showAvatarUpload = $state(false);
   const nameInputId = 'customer-name-input';
-  let nameInputRef = null;
+  let nameInputRef = $state(null);
 
   // Avatar upload functionality
   async function handleAvatarUpload(files) {
@@ -101,9 +103,11 @@
     }, 120);
   }
 
-  $: if (isOpen) {
-    focusNameInput();
-  }
+  $effect(() => {
+    if (isOpen) {
+      focusNameInput();
+    }
+  });
 </script>
 
 {#if isOpen}

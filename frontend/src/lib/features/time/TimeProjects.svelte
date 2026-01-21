@@ -14,18 +14,18 @@
   import { createShortcutHandler, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
 
-  let activeTab = 'projects';
-  let projects = [];
-  let customers = [];
-  let categories = [];
-  let showCreateForm = false;
-  let editingProject = null;
+  let activeTab = $state('projects');
+  let projects = $state([]);
+  let customers = $state([]);
+  let categories = $state([]);
+  let showCreateForm = $state(false);
+  let editingProject = $state(null);
 
   // Filter state
-  let selectedCategoryId = null;
-  let selectedStatuses = ['Active']; // Default to showing only active projects
-  let searchQuery = '';
-  let formData = {
+  let selectedCategoryId = $state(null);
+  let selectedStatuses = $state(['Active']); // Default to showing only active projects
+  let searchQuery = $state('');
+  let formData = $state({
     customer_id: '',
     category_id: '',
     name: '',
@@ -33,8 +33,8 @@
     status: 'Active',
     color: '',
     hourly_rate: 0,
-    active: true
-  };
+    settings: { max_hours: '' }
+  });
 
   const statusOptions = ['Active', 'On Hold', 'Completed', 'Archived'];
 
@@ -88,7 +88,7 @@
       status: project.status || 'Active',
       color: project.color || '',
       hourly_rate: project.hourly_rate,
-      active: project.active
+      settings: { max_hours: project.settings?.max_hours || '' }
     };
     showCreateForm = true;
   }
@@ -102,7 +102,7 @@
       status: 'Active',
       color: '',
       hourly_rate: 0,
-      active: true
+      settings: { max_hours: '' }
     };
   }
 
@@ -114,11 +114,22 @@
 
   async function saveProject() {
     try {
+      // Build settings object - only include max_hours if it has a valid value
+      const settings = {};
+      const maxHoursValue = formData.settings?.max_hours;
+      if (maxHoursValue !== '' && maxHoursValue !== null && maxHoursValue !== undefined) {
+        const parsed = parseFloat(maxHoursValue);
+        if (!isNaN(parsed) && parsed > 0) {
+          settings.max_hours = parsed;
+        }
+      }
+
       const data = {
         ...formData,
         customer_id: formData.customer_id ? parseInt(formData.customer_id) : null,
         category_id: formData.category_id ? parseInt(formData.category_id) : null,
-        hourly_rate: Number(formData.hourly_rate) || 0
+        hourly_rate: Number(formData.hourly_rate) || 0,
+        settings: Object.keys(settings).length > 0 ? settings : null
       };
 
       if (editingProject) {
@@ -421,7 +432,7 @@
   {categories}
   {statusOptions}
   isEditing={!!editingProject}
-  on:save={saveProject}
-  on:cancel={cancelForm}
+  onsave={saveProject}
+  oncancel={cancelForm}
 />
 

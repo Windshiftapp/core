@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -21,8 +22,9 @@ func NewTimeProjectHandler(db database.Database) *TimeProjectHandler {
 func (h *TimeProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(`
 		SELECT p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color,
-		       p.hourly_rate, p.active, p.created_at, p.updated_at,
-		       c.name as customer_name, cat.name as category_name, cat.color as category_color
+		       p.hourly_rate, p.settings, p.created_at, p.updated_at,
+		       c.name as customer_name, cat.name as category_name, cat.color as category_color,
+		       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = p.id) as total_hours
 		FROM time_projects p
 		LEFT JOIN customer_organisations c ON p.customer_id = c.id
 		LEFT JOIN time_project_categories cat ON p.category_id = cat.id
@@ -37,10 +39,11 @@ func (h *TimeProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	var projects []models.TimeProject
 	for rows.Next() {
 		var p models.TimeProject
-		var customerName, categoryName, categoryColor, status, color sql.NullString
+		var customerName, categoryName, categoryColor, status, color, settingsStr sql.NullString
+		var totalHours sql.NullFloat64
 
 		err := rows.Scan(&p.ID, &p.CustomerID, &p.CategoryID, &p.Name, &p.Description, &status, &color,
-			&p.HourlyRate, &p.Active, &p.CreatedAt, &p.UpdatedAt, &customerName, &categoryName, &categoryColor)
+			&p.HourlyRate, &settingsStr, &p.CreatedAt, &p.UpdatedAt, &customerName, &categoryName, &categoryColor, &totalHours)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -51,6 +54,14 @@ func (h *TimeProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		p.CustomerName = customerName.String
 		p.CategoryName = categoryName.String
 		p.CategoryColor = categoryColor.String
+		if totalHours.Valid {
+			p.TotalHours = &totalHours.Float64
+		}
+		if settingsStr.Valid && settingsStr.String != "" {
+			if err := json.Unmarshal([]byte(settingsStr.String), &p.Settings); err != nil {
+				slog.Warn("failed to parse project settings", slog.Int("project_id", p.ID), slog.Any("error", err))
+			}
+		}
 
 		projects = append(projects, p)
 	}
@@ -65,15 +76,17 @@ func (h *TimeProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var p models.TimeProject
-	var status, color sql.NullString
+	var status, color, settingsStr sql.NullString
+	var totalHours sql.NullFloat64
 
 	err := h.db.QueryRow(`
 		SELECT id, customer_id, category_id, name, description, status, color,
-		       hourly_rate, active, created_at, updated_at
+		       hourly_rate, settings, created_at, updated_at,
+		       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = time_projects.id) as total_hours
 		FROM time_projects
 		WHERE id = ?
 	`, id).Scan(&p.ID, &p.CustomerID, &p.CategoryID, &p.Name, &p.Description, &status, &color,
-		&p.HourlyRate, &p.Active, &p.CreatedAt, &p.UpdatedAt)
+		&p.HourlyRate, &settingsStr, &p.CreatedAt, &p.UpdatedAt, &totalHours)
 
 	if err == sql.ErrNoRows {
 		http.Error(w, "Project not found", http.StatusNotFound)
@@ -86,6 +99,14 @@ func (h *TimeProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	p.Status = status.String
 	p.Color = color.String
+	if totalHours.Valid {
+		p.TotalHours = &totalHours.Float64
+	}
+	if settingsStr.Valid && settingsStr.String != "" {
+		if err := json.Unmarshal([]byte(settingsStr.String), &p.Settings); err != nil {
+			slog.Warn("failed to parse project settings", slog.Int("project_id", p.ID), slog.Any("error", err))
+		}
+	}
 
 	respondJSONOK(w, p)
 }
@@ -95,11 +116,6 @@ func (h *TimeProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
-	}
-
-	// Set default active status if not provided
-	if !p.Active {
-		p.Active = true
 	}
 
 	// Set default status if not provided
@@ -135,11 +151,21 @@ func (h *TimeProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Serialize settings to JSON
+	var settingsJSON *string
+	if p.Settings != nil && len(p.Settings) > 0 {
+		b, err := json.Marshal(p.Settings)
+		if err == nil {
+			s := string(b)
+			settingsJSON = &s
+		}
+	}
+
 	now := time.Now()
 	result, err := h.db.Exec(`
-		INSERT INTO time_projects (customer_id, category_id, name, description, status, color, hourly_rate, active, created_at, updated_at)
+		INSERT INTO time_projects (customer_id, category_id, name, description, status, color, hourly_rate, settings, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, p.CustomerID, p.CategoryID, p.Name, p.Description, p.Status, p.Color, p.HourlyRate, p.Active, now, now)
+	`, p.CustomerID, p.CategoryID, p.Name, p.Description, p.Status, p.Color, p.HourlyRate, settingsJSON, now, now)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -199,13 +225,23 @@ func (h *TimeProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Serialize settings to JSON
+	var settingsJSON *string
+	if p.Settings != nil && len(p.Settings) > 0 {
+		b, err := json.Marshal(p.Settings)
+		if err == nil {
+			s := string(b)
+			settingsJSON = &s
+		}
+	}
+
 	now := time.Now()
 	_, err := h.db.Exec(`
 		UPDATE time_projects
 		SET customer_id = ?, category_id = ?, name = ?, description = ?, status = ?, color = ?,
-		    hourly_rate = ?, active = ?, updated_at = ?
+		    hourly_rate = ?, settings = ?, updated_at = ?
 		WHERE id = ?
-	`, p.CustomerID, p.CategoryID, p.Name, p.Description, p.Status, p.Color, p.HourlyRate, p.Active, now, id)
+	`, p.CustomerID, p.CategoryID, p.Name, p.Description, p.Status, p.Color, p.HourlyRate, settingsJSON, now, id)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -241,8 +277,9 @@ func (h *TimeProjectHandler) GetByCustomer(w http.ResponseWriter, r *http.Reques
 
 	rows, err := h.db.Query(`
 		SELECT p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color,
-		       p.hourly_rate, p.active, p.created_at, p.updated_at,
-		       c.name as customer_name, cat.name as category_name, cat.color as category_color
+		       p.hourly_rate, p.settings, p.created_at, p.updated_at,
+		       c.name as customer_name, cat.name as category_name, cat.color as category_color,
+		       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = p.id) as total_hours
 		FROM time_projects p
 		LEFT JOIN customer_organisations c ON p.customer_id = c.id
 		LEFT JOIN time_project_categories cat ON p.category_id = cat.id
@@ -258,10 +295,11 @@ func (h *TimeProjectHandler) GetByCustomer(w http.ResponseWriter, r *http.Reques
 	var projects []models.TimeProject
 	for rows.Next() {
 		var p models.TimeProject
-		var customerName, categoryName, categoryColor, status, color sql.NullString
+		var customerName, categoryName, categoryColor, status, color, settingsStr sql.NullString
+		var totalHours sql.NullFloat64
 
 		err := rows.Scan(&p.ID, &p.CustomerID, &p.CategoryID, &p.Name, &p.Description, &status, &color,
-			&p.HourlyRate, &p.Active, &p.CreatedAt, &p.UpdatedAt, &customerName, &categoryName, &categoryColor)
+			&p.HourlyRate, &settingsStr, &p.CreatedAt, &p.UpdatedAt, &customerName, &categoryName, &categoryColor, &totalHours)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -272,6 +310,14 @@ func (h *TimeProjectHandler) GetByCustomer(w http.ResponseWriter, r *http.Reques
 		p.CustomerName = customerName.String
 		p.CategoryName = categoryName.String
 		p.CategoryColor = categoryColor.String
+		if totalHours.Valid {
+			p.TotalHours = &totalHours.Float64
+		}
+		if settingsStr.Valid && settingsStr.String != "" {
+			if err := json.Unmarshal([]byte(settingsStr.String), &p.Settings); err != nil {
+				slog.Warn("failed to parse project settings", slog.Int("project_id", p.ID), slog.Any("error", err))
+			}
+		}
 
 		projects = append(projects, p)
 	}
@@ -326,8 +372,9 @@ func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Reque
 
 		query = `
 			SELECT p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color,
-			       p.hourly_rate, p.active, p.created_at, p.updated_at,
-			       c.name as customer_name, cat.name as category_name, cat.color as category_color
+			       p.hourly_rate, p.settings, p.created_at, p.updated_at,
+			       c.name as customer_name, cat.name as category_name, cat.color as category_color,
+			       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = p.id) as total_hours
 			FROM time_projects p
 			LEFT JOIN customer_organisations c ON p.customer_id = c.id
 			LEFT JOIN time_project_categories cat ON p.category_id = cat.id
@@ -338,8 +385,9 @@ func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Reque
 		// No category restrictions - return all projects
 		query = `
 			SELECT p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color,
-			       p.hourly_rate, p.active, p.created_at, p.updated_at,
-			       c.name as customer_name, cat.name as category_name, cat.color as category_color
+			       p.hourly_rate, p.settings, p.created_at, p.updated_at,
+			       c.name as customer_name, cat.name as category_name, cat.color as category_color,
+			       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = p.id) as total_hours
 			FROM time_projects p
 			LEFT JOIN customer_organisations c ON p.customer_id = c.id
 			LEFT JOIN time_project_categories cat ON p.category_id = cat.id
@@ -357,10 +405,11 @@ func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Reque
 	var projects []models.TimeProject
 	for rows.Next() {
 		var p models.TimeProject
-		var customerName, categoryName, categoryColor, status, color sql.NullString
+		var customerName, categoryName, categoryColor, status, color, settingsStr sql.NullString
+		var totalHours sql.NullFloat64
 
 		err := rows.Scan(&p.ID, &p.CustomerID, &p.CategoryID, &p.Name, &p.Description, &status, &color,
-			&p.HourlyRate, &p.Active, &p.CreatedAt, &p.UpdatedAt, &customerName, &categoryName, &categoryColor)
+			&p.HourlyRate, &settingsStr, &p.CreatedAt, &p.UpdatedAt, &customerName, &categoryName, &categoryColor, &totalHours)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -371,6 +420,14 @@ func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Reque
 		p.CustomerName = customerName.String
 		p.CategoryName = categoryName.String
 		p.CategoryColor = categoryColor.String
+		if totalHours.Valid {
+			p.TotalHours = &totalHours.Float64
+		}
+		if settingsStr.Valid && settingsStr.String != "" {
+			if err := json.Unmarshal([]byte(settingsStr.String), &p.Settings); err != nil {
+				slog.Warn("failed to parse project settings", slog.Int("project_id", p.ID), slog.Any("error", err))
+			}
+		}
 
 		projects = append(projects, p)
 	}

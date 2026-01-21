@@ -258,6 +258,18 @@
                     <slot name="step_expected" {item} {column}>
                       {getCellValue(item, column) || '—'}
                     </slot>
+                  {:else if column.slot === 'project'}
+                    <slot name="project" {item} {column}>
+                      {getCellValue(item, column) || '—'}
+                    </slot>
+                  {:else if column.slot === 'customer'}
+                    <slot name="customer" {item} {column}>
+                      {getCellValue(item, column) || '—'}
+                    </slot>
+                  {:else if column.slot === 'rate'}
+                    <slot name="rate" {item} {column}>
+                      {getCellValue(item, column) || '—'}
+                    </slot>
                   {:else}
                     <!-- Default cell content -->
                     {#if column.render && column.html}
