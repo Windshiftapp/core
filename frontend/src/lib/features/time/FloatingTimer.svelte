@@ -1,13 +1,16 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { useTimer } from '../../composables/useTimer.svelte.js';
+  import {
+    activeTimer,
+    formattedDuration,
+    timerSyncing,
+    stop as stopTimerAction,
+    initialize as initializeTimer,
+    cleanup as cleanupTimer
+  } from '../../stores/timerStore.js';
   import { Clock, Square, Maximize2, Minimize2, ExternalLink } from 'lucide-svelte';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
-
-  // Initialize timer composable with reactive stores
-  const timer = useTimer();
-  const { activeTimer, formattedDuration, timerSyncing } = timer;
 
   let dragging = $state(false);
   let dragOffset = $state({ x: 0, y: 0 });
@@ -19,7 +22,7 @@
 
   // Initialize timer on mount
   onMount(async () => {
-    await timer.initialize();
+    await initializeTimer();
     
     // Load saved position and collapsed state from localStorage
     const savedPosition = localStorage.getItem('windshift-timer-position');
@@ -125,10 +128,10 @@
 
   async function handleStopTimer() {
     try {
-      await timer.stop();
+      await stopTimerAction();
     } catch (error) {
       console.error('Failed to stop timer:', error);
-      // Error is already handled in the composable
+      // Error is already handled in the store
     }
   }
 
@@ -164,7 +167,7 @@
     }
 
     // Cleanup timer intervals
-    timer.cleanup();
+    cleanupTimer();
   });
 
   // Reactive position style

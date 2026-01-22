@@ -7,7 +7,7 @@
   import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
   import Spinner from '../../components/Spinner.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
-  import { getStatusBadgeCSS, getStatusLabel } from '../../utils/testStatusColors.js';
+  import { getStatusBadgeCSS, getStatusLabel } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
 
   let testRun = null;

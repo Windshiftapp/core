@@ -1,7 +1,6 @@
 <script>
-  import { AlertCircle, RefreshCw } from 'lucide-svelte';
-  import Button from './Button.svelte';
-  import { t } from '../stores/i18n.svelte.js';
+  import { AlertCircle } from 'lucide-svelte';
+  import StateDisplay from './StateDisplay.svelte';
 
   /**
    * ErrorState - Error display with optional retry button
@@ -29,16 +28,12 @@
   } = $props();
 </script>
 
-<div class="text-center py-8 {className}">
-  <svelte:component this={IconComponent} class="w-10 h-10 mx-auto mb-3" style="color: var(--ds-icon-danger);" />
-  <h3 class="text-lg font-medium mb-1" style="color: var(--ds-text);">{title || t('components.errorState.title')}</h3>
-  {#if message}
-    <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">{message}</p>
-  {/if}
-  {#if onRetry}
-    <Button variant="default" onclick={onRetry}>
-      <RefreshCw class="w-4 h-4 mr-2" />
-      {retryLabel || t('common.retry')}
-    </Button>
-  {/if}
-</div>
+<StateDisplay
+  type="error"
+  icon={IconComponent}
+  {title}
+  {message}
+  {onRetry}
+  {retryLabel}
+  class={className}
+/>

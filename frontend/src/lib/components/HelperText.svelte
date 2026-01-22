@@ -1,21 +1,26 @@
 <script>
+  import Text from './Text.svelte';
+
+  /**
+   * @deprecated Use Text component instead:
+   *   <Text as="p" variant="subtle" size="xs" class="mt-1">...</Text>
+   *   <Text as="p" variant="danger" size="xs" class="mt-1">...</Text>
+   */
   let {
     variant = 'default',  // 'default' | 'error' | 'success' | 'warning'
     class: className = '',
     children
   } = $props();
 
-  const colorToken = $derived({
-    default: '--ds-text-subtle',
-    error: '--ds-text-danger',
-    success: '--ds-text-success',
-    warning: '--ds-text-warning'
-  }[variant] || '--ds-text-subtle');
+  // Map HelperText variants to Text variants
+  const textVariant = $derived({
+    default: 'subtle',
+    error: 'danger',
+    success: 'success',
+    warning: 'warning'
+  }[variant] || 'subtle');
 </script>
 
-<p
-  class="text-xs mt-1 {className}"
-  style="color: var({colorToken});"
->
+<Text as="p" variant={textVariant} size="xs" class="mt-1 {className}">
   {@render children?.()}
-</p>
+</Text>

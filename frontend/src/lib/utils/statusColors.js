@@ -2,6 +2,14 @@
  * Shared utility functions for status category colors and styling
  */
 
+import { getTextColorForBackground as _getTextColorForBackground } from './colorUtils.js';
+
+// Re-export getTextColorForBackground from colorUtils for backward compatibility
+export { getTextColorForBackground } from './colorUtils.js';
+
+// Local reference for use in this module
+const getTextColorForBackground = _getTextColorForBackground;
+
 /**
  * Find status category for a given status name
  * @param {string} statusName - The status name to look up
@@ -175,42 +183,138 @@ export function getStatusColor(status, statuses, statusCategories) {
   return getStatusInlineStyle(status, statuses, statusCategories);
 }
 
+// ============================================
+// Test Status Colors (merged from testStatusColors.js)
+// ============================================
+
+export const TEST_STATUS = {
+  NOT_RUN: 'not_run',
+  PASSED: 'passed',
+  FAILED: 'failed',
+  BLOCKED: 'blocked',
+  SKIPPED: 'skipped',
+  IN_PROGRESS: 'in_progress',
+  COMPLETED: 'completed'
+};
+
 /**
- * Utility function to determine text color based on background brightness
- * @param {string} backgroundColor - Hex color code (with or without #)
- * @returns {string} CSS color value
+ * Get test status badge styles (inline CSS for theme support)
  */
-export function getTextColorForBackground(backgroundColor) {
-  if (!backgroundColor) return 'var(--ds-text)';
+export function getTestStatusBadgeStyle(status) {
+  const styles = {
+    not_run: {
+      background: 'var(--ds-status-neutral-bg)',
+      color: 'var(--ds-status-neutral-text)',
+      border: 'var(--ds-status-neutral-border)'
+    },
+    passed: {
+      background: 'var(--ds-status-success-bg)',
+      color: 'var(--ds-status-success-text)',
+      border: 'var(--ds-status-success-border)'
+    },
+    failed: {
+      background: 'var(--ds-status-danger-bg)',
+      color: 'var(--ds-status-danger-text)',
+      border: 'var(--ds-status-danger-border)'
+    },
+    blocked: {
+      background: 'var(--ds-status-warning-bg)',
+      color: 'var(--ds-status-warning-text)',
+      border: 'var(--ds-status-warning-border)'
+    },
+    skipped: {
+      background: 'var(--ds-status-neutral-bg)',
+      color: 'var(--ds-status-neutral-text)',
+      border: 'var(--ds-status-neutral-border)'
+    },
+    in_progress: {
+      background: 'var(--ds-status-info-bg)',
+      color: 'var(--ds-status-info-text)',
+      border: 'var(--ds-status-info-border)'
+    },
+    completed: {
+      background: 'var(--ds-status-success-bg)',
+      color: 'var(--ds-status-success-text)',
+      border: 'var(--ds-status-success-border)'
+    }
+  };
+  return styles[status] || styles.not_run;
+}
 
-  // If it's a CSS variable, return appropriate fallback
-  if (backgroundColor.startsWith('var(')) {
-    return 'var(--ds-text)';
+// Alias for backward compatibility
+export const getStatusBadgeStyle = getTestStatusBadgeStyle;
+
+/**
+ * Get CSS string for test status badge
+ */
+export function getStatusBadgeCSS(status) {
+  const style = getTestStatusBadgeStyle(status);
+  return `background-color: ${style.background}; color: ${style.color}; border: 1px solid ${style.border};`;
+}
+
+/**
+ * Get test status button styles (for Pass/Fail/Blocked/Skip buttons)
+ */
+export function getStatusButtonStyle(status, isSelected) {
+  const colors = {
+    passed: { active: 'var(--ds-status-success-solid)', border: 'var(--ds-status-success-border)', text: 'var(--ds-status-success-text)' },
+    failed: { active: 'var(--ds-status-danger-solid)', border: 'var(--ds-status-danger-border)', text: 'var(--ds-status-danger-text)' },
+    blocked: { active: 'var(--ds-status-warning-solid)', border: 'var(--ds-status-warning-border)', text: 'var(--ds-status-warning-text)' },
+    skipped: { active: 'var(--ds-status-neutral-solid)', border: 'var(--ds-status-neutral-border)', text: 'var(--ds-status-neutral-text)' }
+  };
+
+  const color = colors[status] || colors.skipped;
+
+  if (isSelected) {
+    return `background-color: ${color.active}; color: white; border: 1px solid ${color.active};`;
   }
+  return `background-color: transparent; color: ${color.text}; border: 1px solid ${color.border};`;
+}
 
-  // Remove # if present
-  const hex = backgroundColor.replace('#', '');
+/**
+ * Get hover style for test status buttons
+ */
+export function getStatusButtonHoverStyle(status) {
+  const colors = {
+    passed: 'var(--ds-status-success-bg)',
+    failed: 'var(--ds-status-danger-bg)',
+    blocked: 'var(--ds-status-warning-bg)',
+    skipped: 'var(--ds-status-neutral-bg)'
+  };
+  return `background-color: ${colors[status] || colors.skipped};`;
+}
 
-  // Convert to RGB
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
+/**
+ * Get human-readable test status label
+ */
+export function getStatusLabel(status) {
+  const labels = {
+    not_run: 'Not Run',
+    passed: 'Passed',
+    failed: 'Failed',
+    blocked: 'Blocked',
+    skipped: 'Skipped',
+    in_progress: 'In Progress',
+    completed: 'Completed'
+  };
+  return labels[status] || status;
+}
 
-  // Calculate luminance using WCAG formula
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+/**
+ * Generate test status badge HTML for DataTable render functions
+ */
+export function renderStatusBadge(status) {
+  const style = getStatusBadgeCSS(status);
+  const label = getStatusLabel(status);
+  return `<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full" style="${style}">${label}</span>`;
+}
 
-  // Calculate saturation to distinguish grey colors from saturated colors
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const saturation = max === 0 ? 0 : (max - min) / max;
-
-  // For grey/desaturated colors (low saturation), use lower luminance threshold
-  // For saturated colors, use higher luminance threshold
-  if (saturation < 0.15) {
-    // Grey color - use dark text if luminance > 0.4
-    return luminance > 0.4 ? 'var(--ds-text)' : 'var(--ds-text-inverse)';
-  } else {
-    // Saturated color - use dark text only if luminance > 0.65
-    return luminance > 0.65 ? 'var(--ds-text)' : 'var(--ds-text-inverse)';
+/**
+ * Generate milestone badge HTML for DataTable render functions
+ */
+export function renderMilestoneBadge(name) {
+  if (!name) {
+    return `<span style="color: var(--ds-text-subtle);">No milestone</span>`;
   }
+  return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" style="background-color: var(--ds-status-info-bg); color: var(--ds-status-info-text);">${name}</span>`;
 }

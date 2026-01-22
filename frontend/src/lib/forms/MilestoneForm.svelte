@@ -1,7 +1,7 @@
 <script>
   import { Calendar, Target } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
-  import MilkdownEditor from '../editors/MilkdownEditor.svelte';
+  import MilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
   import FieldChip from '../components/FieldChip.svelte';
 
   let {

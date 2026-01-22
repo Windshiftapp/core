@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import { AlertCircle } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import ItemDetailBreadcrumbs from '../items/ItemDetailBreadcrumbs.svelte';
@@ -8,7 +8,26 @@
   import ItemDetailLinks from './ItemDetailLinks.svelte';
   import ItemDetailTabs from '../items/ItemDetailTabs.svelte';
   import ItemDetailSidebar from '../items/ItemDetailSidebar.svelte';
-  import DiagramModal from '../../components/DiagramModal.svelte';
+
+  // Lazy-load DiagramModal with background preload (Excalidraw is ~1.2MB)
+  let DiagramModal = null;
+  let diagramPromise = null;
+
+  onMount(() => {
+    // Preload in background after component mounts
+    const preload = () => {
+      diagramPromise = import('../../components/DiagramModal.svelte');
+      diagramPromise.then(module => {
+        DiagramModal = module.default;
+      });
+    };
+
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(preload);
+    } else {
+      setTimeout(preload, 1000); // Fallback: preload after 1s
+    }
+  });
 
   const dispatch = createEventDispatcher();
 
@@ -215,12 +234,20 @@
   }
 
   // Diagram handlers
-  function handleNewDiagram() {
+  async function handleNewDiagram() {
+    // Ensure DiagramModal is loaded
+    if (!DiagramModal && diagramPromise) {
+      DiagramModal = (await diagramPromise).default;
+    }
     editingDiagram = null;
     showDiagramModal = true;
   }
 
-  function handleEditDiagram(diagram) {
+  async function handleEditDiagram(diagram) {
+    // Ensure DiagramModal is loaded
+    if (!DiagramModal && diagramPromise) {
+      DiagramModal = (await diagramPromise).default;
+    }
     editingDiagram = diagram;
     showDiagramModal = true;
   }
@@ -439,9 +466,10 @@
   </div>
 {/if}
 
-<!-- Diagram Modal -->
-{#if showDiagramModal && item}
-  <DiagramModal
+<!-- Diagram Modal (lazy-loaded) -->
+{#if showDiagramModal && item && DiagramModal}
+  <svelte:component
+    this={DiagramModal}
     itemId={item.id}
     diagram={editingDiagram}
     onClose={handleCloseDiagramModal}

@@ -2,7 +2,7 @@
   import { Link2, Plus, Paperclip, PenTool, Zap, ChevronDown } from 'lucide-svelte';
   import { tick, onMount, onDestroy } from 'svelte';
   import Button from '../../components/Button.svelte';
-  import MilkdownEditor from '../../editors/MilkdownEditor.svelte';
+  import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import AttachmentDiagramList from '../assets/AttachmentDiagramList.svelte';
   import { createEventDispatcher } from 'svelte';
   import { getShortcut, matchesShortcut, getDisplayString } from '../../utils/keyboardShortcuts.js';

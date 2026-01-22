@@ -3,16 +3,27 @@
  */
 
 /**
+ * Convert hex color to RGB values
+ * @param {string} hexColor - Hex color code (with or without #)
+ * @returns {{ r: number, g: number, b: number }} RGB values (0-255)
+ */
+export function hexToRgb(hexColor) {
+  const hex = hexColor.replace('#', '');
+  return {
+    r: parseInt(hex.substr(0, 2), 16),
+    g: parseInt(hex.substr(2, 2), 16),
+    b: parseInt(hex.substr(4, 2), 16)
+  };
+}
+
+/**
  * Calculate luminance of a hex color (0-1 scale)
  * @param {string} hexColor - Hex color code (with or without #)
  * @returns {number} Luminance value between 0 and 1
  */
 export function getLuminance(hexColor) {
   if (!hexColor) return 0.5;
-  const hex = hexColor.replace('#', '');
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
+  const { r, g, b } = hexToRgb(hexColor);
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 }
 
@@ -23,11 +34,11 @@ export function getLuminance(hexColor) {
  * @returns {string} Darkened hex color
  */
 export function darkenColor(hexColor, factor) {
-  const hex = hexColor.replace('#', '');
-  const r = Math.round(parseInt(hex.substr(0, 2), 16) * (1 - factor));
-  const g = Math.round(parseInt(hex.substr(2, 2), 16) * (1 - factor));
-  const b = Math.round(parseInt(hex.substr(4, 2), 16) * (1 - factor));
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  const { r, g, b } = hexToRgb(hexColor);
+  const dr = Math.round(r * (1 - factor));
+  const dg = Math.round(g * (1 - factor));
+  const db = Math.round(b * (1 - factor));
+  return `#${dr.toString(16).padStart(2, '0')}${dg.toString(16).padStart(2, '0')}${db.toString(16).padStart(2, '0')}`;
 }
 
 /**
@@ -81,11 +92,11 @@ export function getVisibleColor(hexColor, isDarkMode = null) {
  * @returns {string} Lightened hex color
  */
 export function lightenColor(hexColor, factor) {
-  const hex = hexColor.replace('#', '');
-  const r = Math.round(parseInt(hex.substr(0, 2), 16) + (255 - parseInt(hex.substr(0, 2), 16)) * factor);
-  const g = Math.round(parseInt(hex.substr(2, 2), 16) + (255 - parseInt(hex.substr(2, 2), 16)) * factor);
-  const b = Math.round(parseInt(hex.substr(4, 2), 16) + (255 - parseInt(hex.substr(4, 2), 16)) * factor);
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  const { r, g, b } = hexToRgb(hexColor);
+  const lr = Math.round(r + (255 - r) * factor);
+  const lg = Math.round(g + (255 - g) * factor);
+  const lb = Math.round(b + (255 - b) * factor);
+  return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`;
 }
 
 /**
@@ -95,12 +106,45 @@ export function lightenColor(hexColor, factor) {
  */
 export function isGrayColor(hexColor) {
   if (!hexColor) return false;
-  const hex = hexColor.replace('#', '');
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
+  const { r, g, b } = hexToRgb(hexColor);
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   const saturation = max === 0 ? 0 : (max - min) / max;
   return saturation < 0.2;
+}
+
+/**
+ * Determine text color based on background brightness
+ * Uses WCAG luminance formula with saturation awareness
+ * @param {string} backgroundColor - Hex color code (with or without #)
+ * @returns {string} CSS color value
+ */
+export function getTextColorForBackground(backgroundColor) {
+  if (!backgroundColor) return 'var(--ds-text)';
+
+  // If it's a CSS variable, return appropriate fallback
+  if (backgroundColor.startsWith('var(')) {
+    return 'var(--ds-text)';
+  }
+
+  // Convert to RGB
+  const { r, g, b } = hexToRgb(backgroundColor);
+
+  // Calculate luminance using WCAG formula
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+  // Calculate saturation to distinguish grey colors from saturated colors
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const saturation = max === 0 ? 0 : (max - min) / max;
+
+  // For grey/desaturated colors (low saturation), use lower luminance threshold
+  // For saturated colors, use higher luminance threshold
+  if (saturation < 0.15) {
+    // Grey color - use dark text if luminance > 0.4
+    return luminance > 0.4 ? 'var(--ds-text)' : 'var(--ds-text-inverse)';
+  } else {
+    // Saturated color - use dark text only if luminance > 0.65
+    return luminance > 0.65 ? 'var(--ds-text)' : 'var(--ds-text-inverse)';
+  }
 }

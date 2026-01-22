@@ -1,6 +1,6 @@
 <script>
   import Label from './Label.svelte';
-  import HelperText from './HelperText.svelte';
+  import Text from './Text.svelte';
 
   let {
     label = '',
@@ -21,9 +21,9 @@
   {/if}
   {@render children()}
   {#if helper && !error}
-    <HelperText>{helper}</HelperText>
+    <Text as="p" variant="subtle" size="xs" class="mt-1">{helper}</Text>
   {/if}
   {#if error}
-    <HelperText variant="error">{error}</HelperText>
+    <Text as="p" variant="danger" size="xs" class="mt-1">{error}</Text>
   {/if}
 </div>

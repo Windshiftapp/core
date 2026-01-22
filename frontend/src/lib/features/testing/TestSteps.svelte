@@ -1,7 +1,7 @@
 <script>
   import { ArrowLeft, Plus, Edit, Trash2, ClipboardList, X } from 'lucide-svelte';
   import { api } from '../../api.js';
-  import MilkdownEditor from '../../editors/MilkdownEditor.svelte';
+  import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import { navigate, currentRoute } from '../../router.js';
   import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
   import Button from '../../components/Button.svelte';

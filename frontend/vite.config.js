@@ -42,7 +42,6 @@ export default defineConfig({
             '@milkdown/kit/preset/gfm',
             '@milkdown/theme-nord'
           ],
-          'mermaid': ['mermaid'],
           'd3': ['d3-scale', 'd3-shape', 'd3-time-format'],
           'excalidraw': ['@excalidraw/excalidraw'],
           'svelteflow': ['@xyflow/svelte'],

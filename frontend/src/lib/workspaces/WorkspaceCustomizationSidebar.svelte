@@ -3,7 +3,7 @@
   import { X, BarChart3, Package, GripVertical, Palette } from 'lucide-svelte';
   import { widgetRegistry, widgetCategories, getWidgetsByCategory } from '../services/widgetRegistry.js';
   import { gradients } from '../utils/gradients.js';
-  import * as LucideIcons from 'lucide-svelte';
+  import { workspaceIconMap } from '../utils/icons.js';
 
   export let isOpen = false;
   export let activeCategory = 'built-in';
@@ -67,7 +67,7 @@
 
   // Get Lucide icon component by name
   function getIconComponent(iconName) {
-    return LucideIcons[iconName] || BarChart3;
+    return workspaceIconMap[iconName] || BarChart3;
   }
 </script>
 

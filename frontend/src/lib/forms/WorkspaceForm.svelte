@@ -1,6 +1,6 @@
 <script>
   import { t } from '../stores/i18n.svelte.js';
-  import MilkdownEditor from '../editors/MilkdownEditor.svelte';
+  import MilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
 
   let {
     formData = $bindable({

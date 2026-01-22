@@ -1,7 +1,18 @@
 <script>
   import { Inbox } from 'lucide-svelte';
-  import { t } from '../stores/i18n.svelte.js';
+  import StateDisplay from './StateDisplay.svelte';
 
+  /**
+   * EmptyState - Empty data display with optional action
+   *
+   * @example
+   * <EmptyState title="No items" description="Add your first item" />
+   *
+   * @example with action
+   * <EmptyState title="No results">
+   *   {#snippet action()}<Button>Add item</Button>{/snippet}
+   * </EmptyState>
+   */
   let {
     icon: IconComponent = Inbox,
     title = '',
@@ -11,21 +22,11 @@
   } = $props();
 </script>
 
-<div class="text-center py-12 {className}">
-  {#if IconComponent}
-    <IconComponent class="w-6 h-6 mx-auto mb-3" style="color: var(--ds-icon-disabled);" />
-  {/if}
-  <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text-subtle);">
-    {title || t('common.noData')}
-  </h3>
-  {#if description}
-    <p class="text-sm" style="color: var(--ds-text-subtle);">
-      {description}
-    </p>
-  {/if}
-  {#if action}
-    <div class="mt-4">
-      {@render action()}
-    </div>
-  {/if}
-</div>
+<StateDisplay
+  type="empty"
+  icon={IconComponent}
+  {title}
+  {description}
+  {action}
+  class={className}
+/>

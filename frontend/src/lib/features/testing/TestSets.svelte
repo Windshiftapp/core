@@ -14,7 +14,7 @@
   import Label from '../../components/Label.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import TestCasePicker from '../../pickers/TestCasePicker.svelte';
-  import { renderStatusBadge, renderMilestoneBadge } from '../../utils/testStatusColors.js';
+  import { renderStatusBadge, renderMilestoneBadge } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
 
   let { workspaceId = null } = $props();

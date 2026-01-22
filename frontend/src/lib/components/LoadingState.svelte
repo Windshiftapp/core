@@ -1,6 +1,5 @@
 <script>
-  import Spinner from './Spinner.svelte';
-  import { t } from '../stores/i18n.svelte.js';
+  import StateDisplay from './StateDisplay.svelte';
 
   /**
    * LoadingState - Centered loading spinner with optional message
@@ -22,14 +21,10 @@
   } = $props();
 </script>
 
-{#if inline}
-  <div class="flex items-center gap-2 {className}">
-    <Spinner {size} />
-    <span class="text-sm" style="color: var(--ds-text-subtle);">{message || t('common.loading')}</span>
-  </div>
-{:else}
-  <div class="flex flex-col items-center justify-center py-8 {className}">
-    <Spinner {size} />
-    <p class="mt-3 text-sm" style="color: var(--ds-text-subtle);">{message || t('common.loading')}</p>
-  </div>
-{/if}
+<StateDisplay
+  type="loading"
+  {message}
+  {size}
+  {inline}
+  class={className}
+/>

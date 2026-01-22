@@ -4,7 +4,7 @@
   import { api } from '../api.js';
   import { workspacesStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
-  import MilkdownEditor from '../editors/MilkdownEditor.svelte';
+  import MilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
   import CompactWorkspaceSelector from '../pickers/CompactWorkspaceSelector.svelte';
   import FieldChip from '../components/FieldChip.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';

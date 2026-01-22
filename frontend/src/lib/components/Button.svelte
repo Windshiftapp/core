@@ -15,10 +15,11 @@
     keyboardHint = null, // Keyboard shortcut hint (e.g., "C", "⌃L")
     title = null,
     onclick = null, // Svelte 5 style click handler
-    class: className = ''
+    class: className = '',
+    children
   } = $props();
   export { className as class };
-  
+
   // Base styles
   const baseClasses = $derived([
     'inline-flex items-center justify-center font-medium transition-all duration-200 cursor-pointer',
@@ -27,17 +28,17 @@
     fullWidth ? 'w-full' : '',
     className
   ].filter(Boolean).join(' '));
-  
+
   // Normalize size aliases
   const normalizedSize = $derived(size === 'sm' ? 'small' : size);
-  
+
   // Size variants
   const sizeClasses = $derived({
     small: 'px-3.5 py-1.5 text-sm rounded gap-2',
     medium: 'px-4 py-1.5 text-sm rounded gap-2',
     large: 'px-6 py-2.5 text-base rounded gap-2'
   }[normalizedSize]);
-  
+
   // Color variants using Tailwind arbitrary values with CSS variables
   // Using design system tokens for dark mode support
   const variantClasses = $derived({
@@ -49,16 +50,14 @@
     ghost: 'bg-transparent hover:bg-[var(--ds-background-neutral-hovered,#f3f4f6)] focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 text-[var(--ds-text,#374151)]',
     link: 'bg-transparent hover:underline focus:ring-0 text-[var(--ds-text-link)] hover:text-[var(--ds-text-link-hovered)] border-none p-0'
   }[variant]);
-  
-  // No custom styles needed anymore
-  
+
   // Combine all classes
   const allClasses = $derived(`${baseClasses} ${sizeClasses} ${variantClasses}`);
-  
+
   // Icon size based on button size
   const iconSize = $derived({
     small: 'w-4 h-4',
-    medium: 'w-4 h-4', 
+    medium: 'w-4 h-4',
     large: 'w-5 h-5'
   }[normalizedSize]);
 
@@ -74,118 +73,67 @@
   }[variant]);
 </script>
 
+<!-- Snippet for button inner content -->
+{#snippet buttonContent()}
+  {#if loading}
+    <svg class="animate-spin -ml-1 mr-2 {iconSize} text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+  {:else if icon && iconPosition === 'left'}
+    <svelte:component this={icon} class={iconSize} />
+  {/if}
+
+  {#if children}{@render children()}{/if}
+
+  {#if keyboardHint}
+    <kbd class="ml-auto px-1.5 text-xs rounded border {kbdClasses}">
+      {keyboardHint}
+    </kbd>
+  {/if}
+
+  {#if !loading && icon && iconPosition === 'right'}
+    <svelte:component this={icon} class={iconSize} />
+  {/if}
+{/snippet}
+
+<!-- Snippet for link inner content (no loading state) -->
+{#snippet linkContent()}
+  {#if icon && iconPosition === 'left'}
+    <svelte:component this={icon} class={iconSize} />
+  {/if}
+
+  {#if children}{@render children()}{/if}
+
+  {#if keyboardHint}
+    <kbd class="ml-auto px-1.5 text-xs rounded border {kbdClasses}">
+      {keyboardHint}
+    </kbd>
+  {/if}
+
+  {#if icon && iconPosition === 'right'}
+    <svelte:component this={icon} class={iconSize} />
+  {/if}
+{/snippet}
+
+<!-- Snippet for the button/link element -->
+{#snippet buttonElement()}
+  {#if href}
+    <a {href} {target} class={allClasses} onclick={(e) => onclick?.(e)}>
+      {@render linkContent()}
+    </a>
+  {:else}
+    <button {type} {disabled} class={allClasses} onclick={(e) => onclick?.(e)}>
+      {@render buttonContent()}
+    </button>
+  {/if}
+{/snippet}
+
+<!-- Main render: wrap with tooltip if title is provided -->
 {#if title}
-<Tooltip content={title}>
-  {#if href}
-    <!-- Render as link -->
-    <a
-      {href}
-      {target}
-      class={allClasses}
-      onclick={(e) => onclick?.(e)}
-    >
-      {#if icon && iconPosition === 'left'}
-        <svelte:component this={icon} class={iconSize} />
-      {/if}
-
-      <slot />
-
-      {#if keyboardHint}
-        <kbd class="ml-auto px-1.5 text-xs rounded border {kbdClasses}">
-          {keyboardHint}
-        </kbd>
-      {/if}
-
-      {#if icon && iconPosition === 'right'}
-        <svelte:component this={icon} class={iconSize} />
-      {/if}
-    </a>
-  {:else}
-    <!-- Render as button -->
-    <button
-      {type}
-      {disabled}
-      class={allClasses}
-      onclick={(e) => onclick?.(e)}
-    >
-      {#if loading}
-        <!-- Loading spinner -->
-        <svg class="animate-spin -ml-1 mr-2 {iconSize} text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-      {:else if icon && iconPosition === 'left'}
-        <svelte:component this={icon} class={iconSize} />
-      {/if}
-
-      <slot />
-
-      {#if keyboardHint}
-        <kbd class="ml-auto px-1.5 text-xs rounded border {kbdClasses}">
-          {keyboardHint}
-        </kbd>
-      {/if}
-
-      {#if !loading && icon && iconPosition === 'right'}
-        <svelte:component this={icon} class={iconSize} />
-      {/if}
-    </button>
-  {/if}
-</Tooltip>
+  <Tooltip content={title}>
+    {@render buttonElement()}
+  </Tooltip>
 {:else}
-  {#if href}
-    <!-- Render as link -->
-    <a
-      {href}
-      {target}
-      class={allClasses}
-      onclick={(e) => onclick?.(e)}
-    >
-      {#if icon && iconPosition === 'left'}
-        <svelte:component this={icon} class={iconSize} />
-      {/if}
-
-      <slot />
-
-      {#if keyboardHint}
-        <kbd class="ml-auto px-1.5 text-xs rounded border {kbdClasses}">
-          {keyboardHint}
-        </kbd>
-      {/if}
-
-      {#if icon && iconPosition === 'right'}
-        <svelte:component this={icon} class={iconSize} />
-      {/if}
-    </a>
-  {:else}
-    <!-- Render as button -->
-    <button
-      {type}
-      {disabled}
-      class={allClasses}
-      onclick={(e) => onclick?.(e)}
-    >
-      {#if loading}
-        <!-- Loading spinner -->
-        <svg class="animate-spin -ml-1 mr-2 {iconSize} text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-      {:else if icon && iconPosition === 'left'}
-        <svelte:component this={icon} class={iconSize} />
-      {/if}
-
-      <slot />
-
-      {#if keyboardHint}
-        <kbd class="ml-auto px-1.5 text-xs rounded border {kbdClasses}">
-          {keyboardHint}
-        </kbd>
-      {/if}
-
-      {#if !loading && icon && iconPosition === 'right'}
-        <svelte:component this={icon} class={iconSize} />
-      {/if}
-    </button>
-  {/if}
+  {@render buttonElement()}
 {/if}

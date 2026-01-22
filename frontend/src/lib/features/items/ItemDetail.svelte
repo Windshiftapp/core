@@ -11,7 +11,16 @@
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { addToast, successToast, errorToast } from '../../stores/toasts.svelte.js';
-  import { useTimer } from '../../composables/useTimer.svelte.js';
+  import {
+    activeTimer,
+    canStartTimer,
+    canStopTimer,
+    timerSyncing,
+    start as startTimerAction,
+    initialize as initializeTimer,
+    cleanup as cleanupTimer,
+    getCurrentTimer
+  } from '../../stores/timerStore.js';
   import { useItemAttachments } from '../../composables/useItemAttachments.svelte.js';
   import { createEventDispatcher } from 'svelte';
 import { 
@@ -44,10 +53,6 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     isModal = false,
     onclose = null
   } = $props();
-
-  // Initialize timer composable with reactive stores
-  const timer = useTimer();
-  const { activeTimer, canStartTimer, canStopTimer } = timer;
 
   // Initialize attachment composable
   const attachmentManager = useItemAttachments(
@@ -778,7 +783,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 
     // Guard: Use reactive store values
     if (!$canStartTimer) {
-      if (timer.syncing) {
+      if ($timerSyncing) {
         showError(t('items.timerBusy'), t('items.timerSyncingMessage'));
       } else if ($activeTimer) {
         showError(t('items.timerAlreadyRunning'), t('items.stopTimerFirst'));
@@ -813,7 +818,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
         description: t('items.workingOn', { title: item.title })
       };
 
-      await timer.start(timerData);
+      await startTimerAction(timerData);
     } catch (error) {
       console.error('Failed to start timer:', error);
       // Only show error if it's not a 409 conflict (already running)
@@ -1103,14 +1108,14 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 
   onMount(async () => {
     // Initialize timer state from server
-    await timer.initialize();
+    await initializeTimer();
 
     await loadData();
     document.addEventListener('keydown', handleKeydown);
 
     // Register context-sensitive commands for this item
     // Pass current timer status to avoid creating reactive dependency
-    registerItemContextCommands(!!timer.getCurrentTimer());
+    registerItemContextCommands(!!getCurrentTimer());
   });
   
   // Register context commands for this work item
@@ -1219,7 +1224,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     if (item && item.id !== previousCommandItemId) {
       previousCommandItemId = item.id;
       // Pass current timer status to avoid creating reactive dependency
-      registerItemContextCommands(!!timer.getCurrentTimer());
+      registerItemContextCommands(!!getCurrentTimer());
       populateDropdownItems();
     }
   });
@@ -1266,7 +1271,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     // Unregister context commands when component is destroyed
     unregisterContextCommands('item-detail');
     // Cleanup timer intervals
-    timer.cleanup();
+    cleanupTimer();
   });
 
   async function loadData() {

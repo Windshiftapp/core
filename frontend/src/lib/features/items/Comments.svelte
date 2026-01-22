@@ -2,7 +2,7 @@
 	import { onMount, createEventDispatcher, tick } from 'svelte';
 	import { api } from '../../api.js';
 	import { authStore } from '../../stores';
-	import MilkdownEditor from '../../editors/MilkdownEditor.svelte';
+	import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
 	import Button from '../../components/Button.svelte';
 	import Avatar from '../../components/Avatar.svelte';
 	import { formatRelativeTime } from '../../utils/dateFormatter.js';

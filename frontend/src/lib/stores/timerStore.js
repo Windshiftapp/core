@@ -27,6 +27,20 @@ export const timerDurationFormatted = derived(
   }
 );
 
+// Alias for backward compatibility with useTimer
+export const formattedDuration = timerDurationFormatted;
+
+// Derived stores for guard conditions
+export const canStartTimer = derived(
+  [activeTimer, timerSyncing],
+  ([$active, $syncing]) => !$active && !$syncing
+);
+
+export const canStopTimer = derived(
+  [activeTimer, timerSyncing],
+  ([$active, $syncing]) => !!$active && !$syncing
+);
+
 let syncInterval = null;
 
 /**
@@ -65,19 +79,27 @@ function stopTimerInterval() {
  * @returns {Promise<Object>} Started timer object
  */
 export async function startTimer(timerData) {
+  // Guard: Check if we can start
+  const active = get(activeTimer);
+  const syncing = get(timerSyncing);
+  if (active || syncing) {
+    console.warn('Cannot start timer:', { active: !!active, syncing });
+    return null;
+  }
+
   try {
     timerSyncing.set(true);
     timerError.set(null);
-    
+
     const timer = await api.timer.start(timerData);
     activeTimer.set(timer);
-    
+
     // Start timer interval for live updates
     startTimerInterval(timer.start_time_utc);
-    
+
     // Start sync interval (every 30 seconds)
     startSyncInterval();
-    
+
     return timer;
   } catch (error) {
     console.error('Failed to start timer:', error);
@@ -93,26 +115,29 @@ export async function startTimer(timerData) {
  * @returns {Promise<Object>} Stop result with worklog data
  */
 export async function stopTimer() {
+  // Guard: Check if we can stop
+  const active = get(activeTimer);
+  const syncing = get(timerSyncing);
+  if (!active || syncing) {
+    console.warn('Cannot stop timer:', { active: !!active, syncing });
+    return null;
+  }
+
   try {
-    const timer = get(activeTimer);
-    if (!timer) {
-      throw new Error('No active timer to stop');
-    }
-    
     timerSyncing.set(true);
     timerError.set(null);
-    
-    const result = await api.timer.stop(timer.id);
-    
+
+    const result = await api.timer.stop(active.id);
+
     // Clear active timer
     activeTimer.set(null);
-    
+
     // Stop timer interval
     stopTimerInterval();
-    
+
     // Stop sync interval
     stopSyncInterval();
-    
+
     return result;
   } catch (error) {
     console.error('Failed to stop timer:', error);
@@ -196,6 +221,21 @@ export function hasActiveTimer() {
 export function getCurrentTimer() {
   return get(activeTimer);
 }
+
+/**
+ * Cleanup function to call on component unmount
+ * Note: Intervals are singleton and continue running - cleanup is handled by beforeunload
+ */
+export function cleanup() {
+  // Intervals are singleton - they should continue running even if a component unmounts
+  // Cleanup is handled by beforeunload event
+}
+
+// Function aliases for backward compatibility with useTimer API
+export const start = startTimer;
+export const stop = stopTimer;
+export const sync = syncTimer;
+export const initialize = initializeTimer;
 
 // Clean up intervals when the page is unloaded
 if (typeof window !== 'undefined') {

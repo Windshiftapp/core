@@ -6,12 +6,12 @@
   import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
   import Button from '../../components/Button.svelte';
   import Spinner from '../../components/Spinner.svelte';
-  import MilkdownEditor from '../../editors/MilkdownEditor.svelte';
+  import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import CreateModal from '../../dialogs/CreateModal.svelte';
   import Label from '../../components/Label.svelte';
   import Textarea from '../../components/Textarea.svelte';
-  import { getStatusBadgeCSS, getStatusLabel, getStatusButtonStyle, getStatusButtonHoverStyle } from '../../utils/testStatusColors.js';
+  import { getStatusBadgeCSS, getStatusLabel, getStatusButtonStyle, getStatusButtonHoverStyle } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
 
   let testRun = null;

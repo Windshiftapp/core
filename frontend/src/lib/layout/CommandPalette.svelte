@@ -7,12 +7,17 @@
   import { api } from '../api.js';
   import { contextCommands } from '../utils/contextCommands.js';
   import { isSystemAdmin } from '../stores';
-  import { useTimer } from '../composables/useTimer.svelte.js';
+  import {
+    activeTimer,
+    canStartTimer,
+    canStopTimer,
+    timerSyncing,
+    stop as stopTimerAction,
+    initialize as initializeTimer
+  } from '../stores/timerStore.js';
   import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
-  const timer = useTimer();
-  const { activeTimer, canStartTimer, canStopTimer, timerSyncing } = timer;
   
   export let isOpen = false;
   export let additionalCommands = [];
@@ -393,10 +398,10 @@
           alert(t('dialogs.alerts.timerAlreadyRunning'));
         }
       } else if (command.action === 'stop-timer') {
-        // Stop the timer directly using the timer composable
+        // Stop the timer directly using the timer store
         if ($canStopTimer) {
           try {
-            await timer.stop();
+            await stopTimerAction();
           } catch (error) {
             console.error('Failed to stop timer:', error);
             alert(t('dialogs.alerts.stopTimerFailed', { error: error.message }));
@@ -472,7 +477,7 @@
   $: if (isOpen) {
     loadData();
     // Initialize timer to get latest state
-    timer.initialize();
+    initializeTimer();
   }
   
   // Focus the search input when opened
