@@ -1299,7 +1299,12 @@ func main() {
 
 	// Apply security headers to all routes as final wrapper
 	securityMiddleware := createSecurityHeaders(enableHTTPS, useProxy, additionalProxyIPs)
-	handler := securityMiddleware(mux)
+
+	// Add compression middleware (only if not behind proxy - proxies handle compression)
+	compressionMiddleware := middleware.CreateCompressionMiddleware(useProxy)
+
+	// Apply in order: compression wraps security wraps mux
+	handler := compressionMiddleware(securityMiddleware(mux))
 
 	// Start HTTP or HTTPS server
 	httpServer := &http.Server{
