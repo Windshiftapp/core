@@ -1,13 +1,15 @@
 package handlers
 
 import (
-	"windshift/internal/database"
-	"windshift/internal/services"
 	"database/sql"
 	"encoding/json"
-	"windshift/internal/models"
+	"log/slog"
 	"net/http"
 	"time"
+
+	"windshift/internal/database"
+	"windshift/internal/models"
+	"windshift/internal/services"
 )
 
 type ProjectHandler struct {
@@ -132,7 +134,11 @@ func (h *ProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Load milestone categories
-		project.MilestoneCategories, _ = h.loadMilestoneCategories(project.ID)
+		categories, err := h.loadMilestoneCategories(project.ID)
+		if err != nil {
+			slog.Warn("failed to load milestone categories", slog.String("component", "projects"), slog.Int("project_id", project.ID), slog.Any("error", err))
+		}
+		project.MilestoneCategories = categories
 
 		projects = append(projects, project)
 	}
@@ -192,7 +198,11 @@ func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Load milestone categories
-	project.MilestoneCategories, _ = h.loadMilestoneCategories(project.ID)
+	categories, err := h.loadMilestoneCategories(project.ID)
+	if err != nil {
+		slog.Warn("failed to load milestone categories", slog.String("component", "projects"), slog.Int("project_id", project.ID), slog.Any("error", err))
+	}
+	project.MilestoneCategories = categories
 
 	respondJSONOK(w, project)
 }
@@ -275,9 +285,13 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if workspaceName.Valid {
 		project.WorkspaceName = workspaceName.String
 	}
-	
+
 	// Load the saved categories
-	project.MilestoneCategories, _ = h.loadMilestoneCategories(int(id))
+	categories, err := h.loadMilestoneCategories(int(id))
+	if err != nil {
+		slog.Warn("failed to load milestone categories after create", slog.String("component", "projects"), slog.Int64("project_id", id), slog.Any("error", err))
+	}
+	project.MilestoneCategories = categories
 
 	respondJSONCreated(w, project)
 }
@@ -390,9 +404,13 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if workspaceName.Valid {
 		project.WorkspaceName = workspaceName.String
 	}
-	
+
 	// Load milestone categories
-	project.MilestoneCategories, _ = h.loadMilestoneCategories(id)
+	categories, err := h.loadMilestoneCategories(id)
+	if err != nil {
+		slog.Warn("failed to load milestone categories after update", slog.String("component", "projects"), slog.Int("project_id", id), slog.Any("error", err))
+	}
+	project.MilestoneCategories = categories
 
 	respondJSONOK(w, project)
 }

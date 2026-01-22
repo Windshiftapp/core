@@ -17,39 +17,34 @@ import (
 )
 
 type PermissionSetHandler struct {
-	db                database.Database
+	BaseHandler
 	permissionService *services.PermissionService
 }
 
 func NewPermissionSetHandler(db database.Database) *PermissionSetHandler {
-	return &PermissionSetHandler{db: db}
+	return &PermissionSetHandler{BaseHandler: BaseHandler{db: db}}
 }
 
 func NewPermissionSetHandlerWithPool(db database.Database, permissionService *services.PermissionService) *PermissionSetHandler {
 	return &PermissionSetHandler{
-		db:                db,
+		BaseHandler:       BaseHandler{db: db},
 		permissionService: permissionService,
 	}
 }
 
-// getReadDB returns the database connection for read operations
-func (h *PermissionSetHandler) getReadDB() *sql.DB {
-	return h.db.GetDB()
-}
-
-// getWriteDB returns the database connection for write operations
-func (h *PermissionSetHandler) getWriteDB() *sql.DB {
-	return h.db.GetDB()
-}
-
 // GetAll returns all permission sets
 func (h *PermissionSetHandler) GetAll(w http.ResponseWriter, r *http.Request) {
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	query := `
 		SELECT id, name, description, is_system, created_by, created_at, updated_at
 		FROM permission_sets
 		ORDER BY is_system DESC, name ASC`
 
-	rows, err := h.getReadDB().Query(query)
+	rows, err := db.Query(query)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -78,6 +73,11 @@ func (h *PermissionSetHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 // Get returns a single permission set with its permissions
 func (h *PermissionSetHandler) Get(w http.ResponseWriter, r *http.Request) {
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
@@ -85,7 +85,7 @@ func (h *PermissionSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var ps models.PermissionSet
-	err = h.getReadDB().QueryRow(`
+	err = db.QueryRow(`
 		SELECT id, name, description, is_system, created_by, created_at, updated_at
 		FROM permission_sets
 		WHERE id = ?
@@ -102,7 +102,7 @@ func (h *PermissionSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Load permissions for this set
-	permRows, err := h.getReadDB().Query(`
+	permRows, err := db.Query(`
 		SELECT p.id, p.permission_key, p.permission_name, p.description, p.scope, p.is_system, p.created_at, p.updated_at
 		FROM permissions p
 		JOIN permission_set_permissions psp ON p.id = psp.permission_id
@@ -131,6 +131,15 @@ func (h *PermissionSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // Create creates a new permission set
 func (h *PermissionSetHandler) Create(w http.ResponseWriter, r *http.Request) {
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+	readDB, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	var req models.PermissionSetCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -150,7 +159,7 @@ func (h *PermissionSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create permission set
-	result, err := h.getWriteDB().Exec(`
+	result, err := writeDB.Exec(`
 		INSERT INTO permission_sets (name, description, is_system, created_by, created_at, updated_at)
 		VALUES (?, ?, 0, ?, ?, ?)
 	`, req.Name, req.Description, userID, time.Now(), time.Now())
@@ -164,7 +173,7 @@ func (h *PermissionSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Add permissions to the set
 	for _, permID := range req.PermissionIDs {
-		_, err = h.getWriteDB().Exec(`
+		_, err = writeDB.Exec(`
 			INSERT INTO permission_set_permissions (permission_set_id, permission_id, granted_by, granted_at)
 			VALUES (?, ?, ?, ?)
 		`, permSetID, permID, userID, time.Now())
@@ -176,7 +185,7 @@ func (h *PermissionSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Return the created permission set
 	var ps models.PermissionSet
-	err = h.getReadDB().QueryRow(`
+	err = readDB.QueryRow(`
 		SELECT id, name, description, is_system, created_by, created_at, updated_at
 		FROM permission_sets
 		WHERE id = ?
@@ -216,6 +225,15 @@ func (h *PermissionSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // Update updates a permission set
 func (h *PermissionSetHandler) Update(w http.ResponseWriter, r *http.Request) {
+	readDB, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
@@ -224,7 +242,7 @@ func (h *PermissionSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Get the old permission set for audit logging
 	var oldPS models.PermissionSet
-	err = h.getReadDB().QueryRow(`
+	err = readDB.QueryRow(`
 		SELECT id, name, description, is_system, created_by, created_at, updated_at
 		FROM permission_sets
 		WHERE id = ?
@@ -250,7 +268,7 @@ func (h *PermissionSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	userID := h.getSessionUserID(r)
 
 	// Update permission set metadata
-	_, err = h.getWriteDB().Exec(`
+	_, err = writeDB.Exec(`
 		UPDATE permission_sets
 		SET name = ?, description = ?, updated_at = ?
 		WHERE id = ?
@@ -262,14 +280,14 @@ func (h *PermissionSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Replace permissions - delete old ones and insert new ones
-	_, err = h.getWriteDB().Exec("DELETE FROM permission_set_permissions WHERE permission_set_id = ?", id)
+	_, err = writeDB.Exec("DELETE FROM permission_set_permissions WHERE permission_set_id = ?", id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	for _, permID := range req.PermissionIDs {
-		_, err = h.getWriteDB().Exec(`
+		_, err = writeDB.Exec(`
 			INSERT INTO permission_set_permissions (permission_set_id, permission_id, granted_by, granted_at)
 			VALUES (?, ?, ?, ?)
 		`, id, permID, userID, time.Now())
@@ -288,7 +306,7 @@ func (h *PermissionSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Return updated permission set
 	var ps models.PermissionSet
-	err = h.getReadDB().QueryRow(`
+	err = readDB.QueryRow(`
 		SELECT id, name, description, is_system, created_by, created_at, updated_at
 		FROM permission_sets
 		WHERE id = ?
@@ -339,6 +357,15 @@ func (h *PermissionSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 // Delete deletes a permission set
 func (h *PermissionSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	readDB, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
@@ -348,7 +375,7 @@ func (h *PermissionSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Get the permission set details for audit logging before deletion
 	var psName, description string
 	var isSystem bool
-	err = h.getReadDB().QueryRow(`
+	err = readDB.QueryRow(`
 		SELECT name, description, is_system
 		FROM permission_sets
 		WHERE id = ?
@@ -365,7 +392,7 @@ func (h *PermissionSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	// Check if permission set is in use by configuration sets
 	var usageCount int
-	err = h.getReadDB().QueryRow("SELECT COUNT(*) FROM configuration_sets WHERE permission_set_id = ?", id).Scan(&usageCount)
+	err = readDB.QueryRow("SELECT COUNT(*) FROM configuration_sets WHERE permission_set_id = ?", id).Scan(&usageCount)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -377,7 +404,7 @@ func (h *PermissionSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Delete permission set (permissions will be cascade deleted)
-	_, err = h.getWriteDB().Exec("DELETE FROM permission_sets WHERE id = ?", id)
+	_, err = writeDB.Exec("DELETE FROM permission_sets WHERE id = ?", id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -408,6 +435,11 @@ func (h *PermissionSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // GetAssignments returns all assignments (roles/groups/users) for a permission set
 func (h *PermissionSetHandler) GetAssignments(w http.ResponseWriter, r *http.Request) {
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	setID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
@@ -416,7 +448,7 @@ func (h *PermissionSetHandler) GetAssignments(w http.ResponseWriter, r *http.Req
 
 	// Check if permission set exists
 	var exists bool
-	err = h.getReadDB().QueryRow("SELECT EXISTS(SELECT 1 FROM permission_sets WHERE id = ?)", setID).Scan(&exists)
+	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM permission_sets WHERE id = ?)", setID).Scan(&exists)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -439,7 +471,7 @@ func (h *PermissionSetHandler) GetAssignments(w http.ResponseWriter, r *http.Req
 	}
 
 	// Get role assignments
-	roleRows, err := h.getReadDB().Query(`
+	roleRows, err := db.Query(`
 		SELECT ra.id, ra.permission_set_id, ra.permission_id, ra.role_id, ra.created_by, ra.created_at,
 		       p.permission_key, p.permission_name, p.description,
 		       r.name as role_name
@@ -469,7 +501,7 @@ func (h *PermissionSetHandler) GetAssignments(w http.ResponseWriter, r *http.Req
 	}
 
 	// Get group assignments
-	groupRows, err := h.getReadDB().Query(`
+	groupRows, err := db.Query(`
 		SELECT ga.id, ga.permission_set_id, ga.permission_id, ga.group_id, ga.created_by, ga.created_at,
 		       p.permission_key, p.permission_name, p.description,
 		       g.name as group_name
@@ -499,7 +531,7 @@ func (h *PermissionSetHandler) GetAssignments(w http.ResponseWriter, r *http.Req
 	}
 
 	// Get user assignments
-	userRows, err := h.getReadDB().Query(`
+	userRows, err := db.Query(`
 		SELECT ua.id, ua.permission_set_id, ua.permission_id, ua.user_id, ua.created_by, ua.created_at,
 		       p.permission_key, p.permission_name, p.description,
 		       u.username, u.first_name, u.last_name
@@ -534,6 +566,11 @@ func (h *PermissionSetHandler) GetAssignments(w http.ResponseWriter, r *http.Req
 
 // CreateAssignment adds a role/group/user assignment to a permission in the set
 func (h *PermissionSetHandler) CreateAssignment(w http.ResponseWriter, r *http.Request) {
+	db, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
 	setID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
@@ -571,17 +608,17 @@ func (h *PermissionSetHandler) CreateAssignment(w http.ResponseWriter, r *http.R
 
 	// Create the appropriate assignment
 	if req.RoleID != nil {
-		_, err = h.getWriteDB().Exec(`
+		_, err = db.Exec(`
 			INSERT INTO permission_set_role_assignments (permission_set_id, permission_id, role_id, created_by, created_at)
 			VALUES (?, ?, ?, ?, ?)
 		`, setID, req.PermissionID, *req.RoleID, userID, time.Now())
 	} else if req.GroupID != nil {
-		_, err = h.getWriteDB().Exec(`
+		_, err = db.Exec(`
 			INSERT INTO permission_set_group_assignments (permission_set_id, permission_id, group_id, created_by, created_at)
 			VALUES (?, ?, ?, ?, ?)
 		`, setID, req.PermissionID, *req.GroupID, userID, time.Now())
 	} else if req.UserID != nil {
-		_, err = h.getWriteDB().Exec(`
+		_, err = db.Exec(`
 			INSERT INTO permission_set_user_assignments (permission_set_id, permission_id, user_id, created_by, created_at)
 			VALUES (?, ?, ?, ?, ?)
 		`, setID, req.PermissionID, *req.UserID, userID, time.Now())
@@ -611,6 +648,11 @@ func (h *PermissionSetHandler) CreateAssignment(w http.ResponseWriter, r *http.R
 
 // DeleteAssignment removes an assignment
 func (h *PermissionSetHandler) DeleteAssignment(w http.ResponseWriter, r *http.Request) {
+	db, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
 	setID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		http.Error(w, "Invalid permission set ID", http.StatusBadRequest)
@@ -636,14 +678,14 @@ func (h *PermissionSetHandler) DeleteAssignment(w http.ResponseWriter, r *http.R
 		"user":  "permission_set_user_assignments",
 	}
 
-	table, ok := tableMap[assignmentType]
-	if !ok {
+	table, tableOk := tableMap[assignmentType]
+	if !tableOk {
 		http.Error(w, "Invalid assignment type", http.StatusBadRequest)
 		return
 	}
 
 	query := fmt.Sprintf("DELETE FROM %s WHERE id = ? AND permission_set_id = ?", table)
-	result, err := h.getWriteDB().Exec(query, assignmentID, setID)
+	result, err := db.Exec(query, assignmentID, setID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

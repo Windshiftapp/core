@@ -16,7 +16,6 @@ import (
 // Search items across workspaces with advanced filtering
 func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	// Get user from context
 	user := h.getUserFromContext(r)

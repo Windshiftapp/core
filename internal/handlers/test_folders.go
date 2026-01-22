@@ -12,8 +12,6 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/services"
-	"windshift/internal/utils"
-
 )
 
 type TestFolderHandler struct {
@@ -28,11 +26,6 @@ var (
 	errParentHasChildren    = errors.New("folders with subfolders cannot be nested under another folder")
 )
 
-func NewTestFolderHandler(db database.Database) *TestFolderHandler {
-	// Legacy constructor for backward compatibility
-	panic("Use NewTestFolderHandlerWithPool instead")
-}
-
 func NewTestFolderHandlerWithPool(db database.Database, permissionService *services.PermissionService) *TestFolderHandler {
 	return &TestFolderHandler{
 		BaseHandler:       NewBaseHandler(db),
@@ -40,7 +33,7 @@ func NewTestFolderHandlerWithPool(db database.Database, permissionService *servi
 	}
 }
 
-func (h *TestFolderHandler) validateParentFolder(workspaceID int, parentID *int, currentFolderID *int) error {
+func (h *TestFolderHandler) validateParentFolder(db *sql.DB, workspaceID int, parentID *int, currentFolderID *int) error {
 	if parentID == nil {
 		return nil
 	}
@@ -50,7 +43,7 @@ func (h *TestFolderHandler) validateParentFolder(workspaceID int, parentID *int,
 	}
 
 	var parentParentID sql.NullInt64
-	err := h.getReadDB().QueryRow("SELECT parent_id FROM test_folders WHERE id = ? AND workspace_id = ?", *parentID, workspaceID).Scan(&parentParentID)
+	err := db.QueryRow("SELECT parent_id FROM test_folders WHERE id = ? AND workspace_id = ?", *parentID, workspaceID).Scan(&parentParentID)
 	if err == sql.ErrNoRows {
 		return errParentFolderNotFound
 	}
@@ -64,7 +57,7 @@ func (h *TestFolderHandler) validateParentFolder(workspaceID int, parentID *int,
 
 	if currentFolderID != nil {
 		var childCount int
-		err = h.getReadDB().QueryRow("SELECT COUNT(*) FROM test_folders WHERE parent_id = ? AND workspace_id = ?", *currentFolderID, workspaceID).Scan(&childCount)
+		err = db.QueryRow("SELECT COUNT(*) FROM test_folders WHERE parent_id = ? AND workspace_id = ?", *currentFolderID, workspaceID).Scan(&childCount)
 		if err != nil {
 			return err
 		}
@@ -109,15 +102,17 @@ func (h *TestFolderHandler) GetAllFolders(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
+		return
+	}
+
+	db, ok := h.requireReadDB(w)
+	if !ok {
 		return
 	}
 
@@ -131,7 +126,7 @@ func (h *TestFolderHandler) GetAllFolders(w http.ResponseWriter, r *http.Request
 		ORDER BY tf.sort_order, tf.name
 	`
 
-	rows, err := h.getReadDB().Query(query, workspaceID)
+	rows, err := db.Query(query, workspaceID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -170,15 +165,17 @@ func (h *TestFolderHandler) GetFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
+		return
+	}
+
+	db, ok := h.requireReadDB(w)
+	if !ok {
 		return
 	}
 
@@ -192,7 +189,7 @@ func (h *TestFolderHandler) GetFolder(w http.ResponseWriter, r *http.Request) {
 	`
 
 	var folder models.TestFolder
-	err = h.getReadDB().QueryRow(query, id, workspaceID).Scan(
+	err = db.QueryRow(query, id, workspaceID).Scan(
 		&folder.ID, &folder.WorkspaceID, &folder.ParentID, &folder.Name, &folder.Description, &folder.SortOrder,
 		&folder.CreatedAt, &folder.UpdatedAt, &folder.TestCaseCount,
 	)
@@ -217,15 +214,12 @@ func (h *TestFolderHandler) CreateFolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestManage)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
 		return
 	}
 
@@ -242,14 +236,19 @@ func (h *TestFolderHandler) CreateFolder(w http.ResponseWriter, r *http.Request)
 
 	folder.WorkspaceID = workspaceID
 
-	if err := h.validateParentFolder(workspaceID, folder.ParentID, nil); err != nil {
+	readDB, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
+	if err := h.validateParentFolder(readDB, workspaceID, folder.ParentID, nil); err != nil {
 		h.writeParentValidationError(w, err)
 		return
 	}
 
 	// Get the highest sort_order for new folder ordering
 	var maxSortOrder sql.NullInt64
-	err = h.getReadDB().QueryRow("SELECT MAX(sort_order) FROM test_folders WHERE workspace_id = ?", workspaceID).Scan(&maxSortOrder)
+	err = readDB.QueryRow("SELECT MAX(sort_order) FROM test_folders WHERE workspace_id = ?", workspaceID).Scan(&maxSortOrder)
 	if err != nil && err != sql.ErrNoRows {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -259,13 +258,18 @@ func (h *TestFolderHandler) CreateFolder(w http.ResponseWriter, r *http.Request)
 	folder.CreatedAt = time.Now()
 	folder.UpdatedAt = time.Now()
 
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
 	query := `
 		INSERT INTO test_folders (workspace_id, name, parent_id, description, sort_order, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`
 
 	var id int64
-	err = h.getWriteDB().QueryRow(
+	err = writeDB.QueryRow(
 		query,
 		folder.WorkspaceID,
 		folder.Name,
@@ -302,15 +306,12 @@ func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestManage)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
 		return
 	}
 
@@ -337,9 +338,14 @@ func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	readDB, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	var existingParent sql.NullInt64
 	var existingSortOrder int
-	err = h.getReadDB().QueryRow("SELECT parent_id, sort_order FROM test_folders WHERE id = ? AND workspace_id = ?", id, workspaceID).Scan(&existingParent, &existingSortOrder)
+	err = readDB.QueryRow("SELECT parent_id, sort_order FROM test_folders WHERE id = ? AND workspace_id = ?", id, workspaceID).Scan(&existingParent, &existingSortOrder)
 	if err == sql.ErrNoRows {
 		http.Error(w, "Folder not found", http.StatusNotFound)
 		return
@@ -361,7 +367,7 @@ func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request)
 	}
 
 	if parentProvided && folder.ParentID != nil {
-		if err := h.validateParentFolder(workspaceID, folder.ParentID, &id); err != nil {
+		if err := h.validateParentFolder(readDB, workspaceID, folder.ParentID, &id); err != nil {
 			h.writeParentValidationError(w, err)
 			return
 		}
@@ -369,13 +375,18 @@ func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request)
 
 	folder.UpdatedAt = time.Now()
 
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
 	query := `
 		UPDATE test_folders
 		SET name = ?, description = ?, parent_id = ?, sort_order = ?, updated_at = ?
 		WHERE id = ? AND workspace_id = ?
 	`
 
-	result, err := h.getWriteDB().Exec(
+	result, err := writeDB.Exec(
 		query,
 		folder.Name,
 		folder.Description,
@@ -416,20 +427,22 @@ func (h *TestFolderHandler) DeleteFolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestManage)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
+		return
+	}
+
+	db, ok := h.requireWriteDB(w)
+	if !ok {
 		return
 	}
 
 	// Start transaction to move test cases and delete folder
-	tx, err := h.getWriteDB().Begin()
+	tx, err := db.Begin()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -480,15 +493,12 @@ func (h *TestFolderHandler) ReorderFolders(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestManage)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
 		return
 	}
 
@@ -501,8 +511,13 @@ func (h *TestFolderHandler) ReorderFolders(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	db, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
 	// Start transaction for atomic reordering
-	tx, err := h.getWriteDB().Begin()
+	tx, err := db.Begin()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -227,7 +227,7 @@ func (pm *CachedPermissionMiddleware) RequireAnyWorkspaceAccess() func(http.Hand
 
 // getUserFromContext extracts user from request context
 func (pm *CachedPermissionMiddleware) getUserFromContext(r *http.Request) *models.User {
-	if user := r.Context().Value("user"); user != nil {
+	if user := r.Context().Value(ContextKeyUser); user != nil {
 		if u, ok := user.(*models.User); ok {
 			return u
 		}

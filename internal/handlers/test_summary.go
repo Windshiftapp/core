@@ -21,11 +21,6 @@ type TestSummaryHandler struct {
 	permissionService *services.PermissionService
 }
 
-func NewTestSummaryHandler(db database.Database) *TestSummaryHandler {
-	// Legacy constructor for backward compatibility
-	panic("Use NewTestSummaryHandlerWithPool instead")
-}
-
 func NewTestSummaryHandlerWithPool(db database.Database, permissionService *services.PermissionService) *TestSummaryHandler {
 	return &TestSummaryHandler{
 		BaseHandler:       NewBaseHandler(db),
@@ -40,10 +35,15 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	// Get run details
 	var runName, setName string
 	var startedAt, endedAt sql.NullTime
-	err = h.getReadDB().QueryRow(`
+	err = db.QueryRow(`
 		SELECT tr.name, tr.started_at, tr.ended_at, ts.name
 		FROM test_runs tr
 		JOIN test_sets ts ON tr.set_id = ts.id
@@ -56,7 +56,7 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 	}
 
 	// Get test results
-	rows, err := h.getReadDB().Query(`
+	rows, err := db.Query(`
 		SELECT tc.title, tr.status, tr.actual_result, tr.notes
 		FROM test_results tr
 		JOIN test_cases tc ON tr.test_case_id = tc.id
@@ -258,6 +258,11 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 		days = d
 	}
 
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	// Calculate date range
 	endDate := time.Now()
 	startDate := endDate.AddDate(0, 0, -days)
@@ -294,7 +299,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 
 	var totalRuns, totalTests int
 	var passed, failed, blocked, skipped, notRun sql.NullInt64
-	err = h.getReadDB().QueryRow(statsQuery, baseArgs...).Scan(
+	err = db.QueryRow(statsQuery, baseArgs...).Scan(
 		&totalRuns, &totalTests, &passed, &failed, &blocked, &skipped, &notRun,
 	)
 	if err != nil {
@@ -320,7 +325,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 		ORDER BY date
 	`
 
-	trendRows, err := h.getReadDB().Query(trendQuery, baseArgs...)
+	trendRows, err := db.Query(trendQuery, baseArgs...)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -371,7 +376,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 		LIMIT 20
 	`
 
-	failureRows, err := h.getReadDB().Query(failuresQuery, baseArgs...)
+	failureRows, err := db.Query(failuresQuery, baseArgs...)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -417,7 +422,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 		LIMIT 20
 	`
 
-	blockedRows, err := h.getReadDB().Query(blockedQuery, baseArgs...)
+	blockedRows, err := db.Query(blockedQuery, baseArgs...)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

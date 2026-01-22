@@ -337,7 +337,9 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 				INSERT INTO portal_customer_channels (portal_customer_id, channel_id, created_at)
 				VALUES (?, ?, ?)
 			`
-			_, _ = h.db.ExecWriteContext(ctx, insertAccessQuery, customerID, channel.ID, now)
+			if _, err := h.db.ExecWriteContext(ctx, insertAccessQuery, customerID, channel.ID, now); err != nil {
+				slog.Warn("failed to grant channel access to portal customer", slog.String("component", "portal"), slog.Int("customer_id", customerID), slog.Int("channel_id", channel.ID), slog.Any("error", err))
+			}
 		}
 	} else {
 		// Authenticated submission: find or create portal customer linked to user
@@ -390,7 +392,9 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 				INSERT INTO portal_customer_channels (portal_customer_id, channel_id, created_at)
 				VALUES (?, ?, ?)
 			`
-			_, _ = h.db.ExecWriteContext(ctx, insertAccessQuery, customerID, channel.ID, now)
+			if _, err := h.db.ExecWriteContext(ctx, insertAccessQuery, customerID, channel.ID, now); err != nil {
+				slog.Warn("failed to grant channel access to portal customer", slog.String("component", "portal"), slog.Int("customer_id", customerID), slog.Int("channel_id", channel.ID), slog.Any("error", err))
+			}
 		}
 	}
 
@@ -542,7 +546,9 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 					VALUES (?, ?, ?, ?, ?)
 					ON CONFLICT(item_id, custom_field_id) DO UPDATE SET value = ?, updated_at = ?
 				`
-				_, _ = h.db.ExecWriteContext(ctx, cfvQuery, itemID, fieldIDStr, valueStr, now, now, valueStr, now)
+				if _, err := h.db.ExecWriteContext(ctx, cfvQuery, itemID, fieldIDStr, valueStr, now, now, valueStr, now); err != nil {
+					slog.Warn("failed to save custom field value", slog.String("component", "portal"), slog.Int64("item_id", itemID), slog.String("field_id", fieldIDStr), slog.Any("error", err))
+				}
 			}
 		}
 
@@ -550,7 +556,9 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 		customFieldsJSON, err := json.Marshal(submission.CustomFields)
 		if err == nil {
 			updateItemQuery := `UPDATE items SET custom_field_values = ? WHERE id = ?`
-			_, _ = h.db.ExecWriteContext(ctx, updateItemQuery, string(customFieldsJSON), itemID)
+			if _, err := h.db.ExecWriteContext(ctx, updateItemQuery, string(customFieldsJSON), itemID); err != nil {
+				slog.Warn("failed to update item custom_field_values", slog.String("component", "portal"), slog.Int64("item_id", itemID), slog.Any("error", err))
+			}
 		}
 	}
 
@@ -559,7 +567,9 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 		virtualFieldsJSON, err := json.Marshal(virtualFieldValues)
 		if err == nil {
 			updateVirtualFieldsQuery := `UPDATE items SET virtual_field_data = ? WHERE id = ?`
-			_, _ = h.db.ExecWriteContext(ctx, updateVirtualFieldsQuery, string(virtualFieldsJSON), itemID)
+			if _, err := h.db.ExecWriteContext(ctx, updateVirtualFieldsQuery, string(virtualFieldsJSON), itemID); err != nil {
+				slog.Warn("failed to update item virtual_field_data", slog.String("component", "portal"), slog.Int64("item_id", itemID), slog.Any("error", err))
+			}
 		}
 	}
 
@@ -568,7 +578,9 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 
 	// Update channel last activity
 	updateChannelQuery := `UPDATE channels SET last_activity = ? WHERE id = ?`
-	_, _ = h.db.ExecWriteContext(ctx, updateChannelQuery, now, channel.ID)
+	if _, err := h.db.ExecWriteContext(ctx, updateChannelQuery, now, channel.ID); err != nil {
+		slog.Warn("failed to update channel last_activity", slog.String("component", "portal"), slog.Int("channel_id", channel.ID), slog.Any("error", err))
+	}
 
 	// Return success response
 	response := map[string]interface{}{

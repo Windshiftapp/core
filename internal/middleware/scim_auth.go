@@ -49,9 +49,9 @@ func (m *SCIMAuthMiddleware) RequireSCIMAuth(next http.Handler) http.Handler {
 		}
 
 		// Add SCIM token to context
-		ctx := context.WithValue(r.Context(), "scim_token", scimToken)
-		ctx = context.WithValue(ctx, "auth_method", "scim")
-		ctx = context.WithValue(ctx, "csrf_exempt", true) // SCIM requests are CSRF exempt
+		ctx := context.WithValue(r.Context(), ContextKeySCIMToken, scimToken)
+		ctx = context.WithValue(ctx, ContextKeyAuthMethod, "scim")
+		ctx = context.WithValue(ctx, ContextKeyCSRFExempt, true) // SCIM requests are CSRF exempt
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -59,7 +59,7 @@ func (m *SCIMAuthMiddleware) RequireSCIMAuth(next http.Handler) http.Handler {
 
 // GetSCIMToken retrieves the SCIM token from the request context
 func GetSCIMToken(r *http.Request) *models.SCIMToken {
-	if token, ok := r.Context().Value("scim_token").(*models.SCIMToken); ok {
+	if token, ok := r.Context().Value(ContextKeySCIMToken).(*models.SCIMToken); ok {
 		return token
 	}
 	return nil

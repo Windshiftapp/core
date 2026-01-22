@@ -105,7 +105,7 @@ func (cm *CSRFMiddleware) ConsumeToken(token string) bool {
 func (cm *CSRFMiddleware) CSRFProtection(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip CSRF check if request is marked as exempt (bearer token auth)
-		if exempt, ok := r.Context().Value("csrf_exempt").(bool); ok && exempt {
+		if exempt, ok := r.Context().Value(ContextKeyCSRFExempt).(bool); ok && exempt {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -201,7 +201,7 @@ func (cm *CSRFMiddleware) Stop() {
 func (cm *CSRFMiddleware) AddCSRFTokenToContext(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip for bearer token requests
-		if exempt, ok := r.Context().Value("csrf_exempt").(bool); ok && exempt {
+		if exempt, ok := r.Context().Value(ContextKeyCSRFExempt).(bool); ok && exempt {
 			next.ServeHTTP(w, r)
 			return
 		}

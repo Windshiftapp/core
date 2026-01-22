@@ -7,18 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"windshift/internal/models"
 	"windshift/internal/database"
-
+	"windshift/internal/models"
 )
 
 type AttachmentSettingsHandler struct {
 	*BaseHandler
-}
-
-func NewAttachmentSettingsHandler(db database.Database) *AttachmentSettingsHandler {
-	// Legacy constructor for backward compatibility
-	panic("Use NewAttachmentSettingsHandlerWithPool instead")
 }
 
 func NewAttachmentSettingsHandlerWithPool(db database.Database) *AttachmentSettingsHandler {
@@ -37,8 +31,13 @@ func (h *AttachmentSettingsHandler) Get(w http.ResponseWriter, r *http.Request) 
 		Enabled:          false, // Disabled by default if no path is set
 	}
 
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	// Try to get settings from database
-	err := h.getReadDB().QueryRow(`
+	err := db.QueryRow(`
 		SELECT id, max_file_size, allowed_mime_types, attachment_path, enabled, created_at, updated_at
 		FROM attachment_settings ORDER BY id DESC LIMIT 1
 	`).Scan(
@@ -89,9 +88,19 @@ func (h *AttachmentSettingsHandler) Update(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	readDB, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
 	// Check if settings record exists
 	var exists bool
-	err = h.getReadDB().QueryRow("SELECT EXISTS(SELECT 1 FROM attachment_settings WHERE id = ?)", settingsID).Scan(&exists)
+	err = readDB.QueryRow("SELECT EXISTS(SELECT 1 FROM attachment_settings WHERE id = ?)", settingsID).Scan(&exists)
 	if err != nil {
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
@@ -99,14 +108,14 @@ func (h *AttachmentSettingsHandler) Update(w http.ResponseWriter, r *http.Reques
 
 	if exists {
 		// Update existing settings
-		_, err = h.getWriteDB().Exec(`
-			UPDATE attachment_settings 
+		_, err = writeDB.Exec(`
+			UPDATE attachment_settings
 			SET max_file_size = ?, allowed_mime_types = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP
 			WHERE id = ?
 		`, req.MaxFileSize, string(allowedMimeTypesJSON), req.Enabled, settingsID)
 	} else {
 		// Create new settings record
-		_, err = h.getWriteDB().Exec(`
+		_, err = writeDB.Exec(`
 			INSERT INTO attachment_settings (id, max_file_size, allowed_mime_types, attachment_path, enabled)
 			VALUES (?, ?, ?, ?, ?)
 		`, settingsID, req.MaxFileSize, string(allowedMimeTypesJSON), "", req.Enabled)
@@ -130,10 +139,15 @@ func (h *AttachmentSettingsHandler) GetStatus(w http.ResponseWriter, r *http.Req
 		"writable":        false,
 	}
 
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	// Try to get current settings
 	var enabled bool
 	var attachmentPath string
-	err := h.getReadDB().QueryRow(`
+	err := db.QueryRow(`
 		SELECT enabled, attachment_path FROM attachment_settings ORDER BY id DESC LIMIT 1
 	`).Scan(&enabled, &attachmentPath)
 

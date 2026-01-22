@@ -40,7 +40,12 @@ func (h *NotificationTemplateHandler) GetAllTemplates(w http.ResponseWriter, r *
 
 	query += " ORDER BY template_type, name"
 
-	rows, err := h.getReadDB().Query(query, args...)
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
+	rows, err := db.Query(query, args...)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -92,10 +97,15 @@ func (h *NotificationTemplateHandler) GetTemplate(w http.ResponseWriter, r *http
 		return
 	}
 
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	var template models.NotificationTemplate
 	var subject sql.NullString
 
-	err = h.getReadDB().QueryRow(`
+	err = db.QueryRow(`
 		SELECT id, name, template_type, subject, content, description, is_active, created_at, updated_at
 		FROM notification_templates
 		WHERE id = ?
@@ -154,9 +164,14 @@ func (h *NotificationTemplateHandler) CreateTemplate(w http.ResponseWriter, r *h
 	template.Content = utils.StripHTMLTags(template.Content)
 	template.Description = utils.StripHTMLTags(template.Description)
 
+	db, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
 	now := time.Now()
 	var id int64
-	err := h.getWriteDB().QueryRow(`
+	err := db.QueryRow(`
 		INSERT INTO notification_templates (name, template_type, subject, content, description, is_active, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`, template.Name, template.TemplateType, nullableString(template.Subject), template.Content, template.Description, template.IsActive, now, now).Scan(&id)
@@ -211,8 +226,13 @@ func (h *NotificationTemplateHandler) UpdateTemplate(w http.ResponseWriter, r *h
 	template.Content = utils.StripHTMLTags(template.Content)
 	template.Description = utils.StripHTMLTags(template.Description)
 
+	db, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
 	now := time.Now()
-	result, err := h.getWriteDB().Exec(`
+	result, err := db.Exec(`
 		UPDATE notification_templates
 		SET name = ?, template_type = ?, subject = ?, content = ?, description = ?, is_active = ?, updated_at = ?
 		WHERE id = ?
@@ -254,7 +274,12 @@ func (h *NotificationTemplateHandler) DeleteTemplate(w http.ResponseWriter, r *h
 		return
 	}
 
-	result, err := h.getWriteDB().Exec(`DELETE FROM notification_templates WHERE id = ?`, id)
+	db, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
+	result, err := db.Exec(`DELETE FROM notification_templates WHERE id = ?`, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

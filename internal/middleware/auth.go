@@ -2,16 +2,16 @@ package middleware
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"log/slog"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
 	"sync/atomic"
-	"windshift/internal/database"
 
 	"windshift/internal/auth"
+	"windshift/internal/database"
 )
 
 // AuthMiddleware handles authentication for protected routes
@@ -56,6 +56,76 @@ func NewAuthMiddleware(sessionManager *auth.SessionManager, tokenManager *auth.T
 	return am
 }
 
+// authResult represents the outcome of an authentication attempt
+type authResult struct {
+	ctx             context.Context // The context with auth info added (nil if not authenticated)
+	authenticated   bool            // Whether authentication succeeded
+	errorMessage    string          // Error message (only for bearer token failures)
+	shouldClearCookie bool          // Whether to clear the session cookie
+}
+
+// tryAuthenticate attempts to authenticate the request using all available methods.
+// Returns an authResult indicating the outcome. This method does not write any HTTP response.
+func (am *AuthMiddleware) tryAuthenticate(r *http.Request) authResult {
+	clientIP := am.getClientIP(r)
+
+	// Try X-Session-Token header (used by TUI/internal services)
+	if sessionToken := r.Header.Get("X-Session-Token"); sessionToken != "" {
+		session, err := am.sessionManager.ValidateSession(sessionToken, clientIP)
+		if err == nil {
+			ctx := context.WithValue(r.Context(), ContextKeySession, session)
+			ctx = context.WithValue(ctx, ContextKeyUser, session.User)
+			ctx = context.WithValue(ctx, ContextKeyAuthMethod, "session-header")
+			ctx = context.WithValue(ctx, ContextKeyCSRFExempt, true)
+			return authResult{ctx: ctx, authenticated: true}
+		}
+		// Fall through to try other auth methods
+	}
+
+	// Try Bearer token (API tokens for external integrations)
+	authHeader := r.Header.Get("Authorization")
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		token := strings.TrimPrefix(authHeader, "Bearer ")
+		user, apiToken, err := am.tokenManager.ValidateToken(token)
+		if err != nil {
+			// Bearer token was provided but invalid - this is an explicit error
+			return authResult{errorMessage: "Invalid API token"}
+		}
+		ctx := context.WithValue(r.Context(), ContextKeyUser, user)
+		ctx = context.WithValue(ctx, ContextKeyAPIToken, apiToken)
+		ctx = context.WithValue(ctx, ContextKeyAuthMethod, "bearer")
+		ctx = context.WithValue(ctx, ContextKeyCSRFExempt, true)
+		return authResult{ctx: ctx, authenticated: true}
+	}
+
+	// Try session cookie
+	token, err := am.sessionManager.GetSessionFromRequest(r)
+	if err != nil {
+		// No session found
+		return authResult{}
+	}
+
+	session, err := am.sessionManager.ValidateSession(token, clientIP)
+	if err != nil {
+		// Invalid session
+		errMsg := "Authentication failed"
+		switch err {
+		case auth.ErrSessionNotFound:
+			errMsg = "Session not found"
+		case auth.ErrSessionExpired:
+			errMsg = "Session expired"
+		case auth.ErrInvalidSession:
+			errMsg = "Invalid session"
+		}
+		return authResult{errorMessage: errMsg, shouldClearCookie: true}
+	}
+
+	ctx := context.WithValue(r.Context(), ContextKeySession, session)
+	ctx = context.WithValue(ctx, ContextKeyUser, session.User)
+	ctx = context.WithValue(ctx, ContextKeyAuthMethod, "session")
+	return authResult{ctx: ctx, authenticated: true}
+}
+
 // RequireAuth middleware that requires authentication for all routes except setup
 func (am *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -66,145 +136,47 @@ func (am *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 		}
 
 		// Check if OptionalAuth already authenticated the user (avoid duplicate validation)
-		if user := r.Context().Value("user"); user != nil {
-			// User already authenticated by OptionalAuth, continue
+		if user := r.Context().Value(ContextKeyUser); user != nil {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		// Check for X-Session-Token header (used by TUI/internal services)
-		if sessionToken := r.Header.Get("X-Session-Token"); sessionToken != "" {
-			clientIP := am.getClientIP(r)
-			session, err := am.sessionManager.ValidateSession(sessionToken, clientIP)
-			if err == nil {
-				ctx := context.WithValue(r.Context(), "session", session)
-				ctx = context.WithValue(ctx, "user", session.User)
-				ctx = context.WithValue(ctx, "auth_method", "session-header")
-				ctx = context.WithValue(ctx, "csrf_exempt", true) // Internal services are CSRF exempt
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
-			}
-			// Fall through to try other auth methods if session validation fails
-		}
+		result := am.tryAuthenticate(r)
 
-		// Check for Bearer token (API tokens for external integrations)
-		authHeader := r.Header.Get("Authorization")
-		if strings.HasPrefix(authHeader, "Bearer ") {
-			token := strings.TrimPrefix(authHeader, "Bearer ")
-			user, apiToken, err := am.tokenManager.ValidateToken(token)
-			if err != nil {
-				am.handleAuthError(w, r, "Invalid API token")
-				return
-			}
-
-			// Add user and token info to context
-			ctx := context.WithValue(r.Context(), "user", user)
-			ctx = context.WithValue(ctx, "api_token", apiToken)
-			ctx = context.WithValue(ctx, "auth_method", "bearer")
-			ctx = context.WithValue(ctx, "csrf_exempt", true) // Mark as CSRF exempt
-
-			next.ServeHTTP(w, r.WithContext(ctx))
-			return
-		}
-
-		// Fall back to session authentication
-		token, err := am.sessionManager.GetSessionFromRequest(r)
-		if err != nil {
-			am.handleAuthError(w, r, "No session token found")
-			return
-		}
-
-		// Get client IP for validation
-		clientIP := am.getClientIP(r)
-
-		// Validate session
-		session, err := am.sessionManager.ValidateSession(token, clientIP)
-		if err != nil {
-			// Clear invalid session cookie
+		if result.shouldClearCookie {
 			am.sessionManager.ClearSessionCookie(w, r)
+		}
 
-			switch err {
-			case auth.ErrSessionNotFound:
-				am.handleAuthError(w, r, "Session not found")
-			case auth.ErrSessionExpired:
-				am.handleAuthError(w, r, "Session expired")
-			case auth.ErrInvalidSession:
-				am.handleAuthError(w, r, "Invalid session")
-			default:
-				am.handleAuthError(w, r, "Authentication failed")
-			}
+		if result.authenticated {
+			next.ServeHTTP(w, r.WithContext(result.ctx))
 			return
 		}
 
-		// Add session to request context
-		ctx := context.WithValue(r.Context(), "session", session)
-		ctx = context.WithValue(ctx, "user", session.User)
-		ctx = context.WithValue(ctx, "auth_method", "session")
-
-		next.ServeHTTP(w, r.WithContext(ctx))
+		// Authentication failed - return error
+		errMsg := result.errorMessage
+		if errMsg == "" {
+			errMsg = "No session token found"
+		}
+		am.handleAuthError(w, r, errMsg)
 	})
 }
 
 // OptionalAuth middleware that adds user context if authenticated but doesn't require it
 func (am *AuthMiddleware) OptionalAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check for X-Session-Token header (used by TUI/internal services)
-		if sessionToken := r.Header.Get("X-Session-Token"); sessionToken != "" {
-			clientIP := am.getClientIP(r)
-			session, err := am.sessionManager.ValidateSession(sessionToken, clientIP)
-			if err == nil {
-				ctx := context.WithValue(r.Context(), "session", session)
-				ctx = context.WithValue(ctx, "user", session.User)
-				ctx = context.WithValue(ctx, "auth_method", "session-header")
-				ctx = context.WithValue(ctx, "csrf_exempt", true)
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
-			}
-			// Fall through to try other auth methods
-		}
+		result := am.tryAuthenticate(r)
 
-		// Check for Bearer token (API tokens for external integrations)
-		authHeader := r.Header.Get("Authorization")
-		if strings.HasPrefix(authHeader, "Bearer ") {
-			token := strings.TrimPrefix(authHeader, "Bearer ")
-			user, apiToken, err := am.tokenManager.ValidateToken(token)
-			if err == nil {
-				// Valid token, add to context
-				ctx := context.WithValue(r.Context(), "user", user)
-				ctx = context.WithValue(ctx, "api_token", apiToken)
-				ctx = context.WithValue(ctx, "auth_method", "bearer")
-				ctx = context.WithValue(ctx, "csrf_exempt", true)
-
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
-			}
-			// Invalid token, continue without authentication
-		}
-
-		// Try to get session token
-		token, err := am.sessionManager.GetSessionFromRequest(r)
-		if err != nil {
-			// No session found, continue without authentication
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		// Try to validate session
-		clientIP := am.getClientIP(r)
-		session, err := am.sessionManager.ValidateSession(token, clientIP)
-		if err != nil {
-			// Invalid session, clear cookie and continue without authentication
+		if result.shouldClearCookie {
 			am.sessionManager.ClearSessionCookie(w, r)
-			next.ServeHTTP(w, r)
+		}
+
+		if result.authenticated {
+			next.ServeHTTP(w, r.WithContext(result.ctx))
 			return
 		}
 
-		// Add session to context if valid
-		ctx := context.WithValue(r.Context(), "session", session)
-		ctx = context.WithValue(ctx, "user", session.User)
-		ctx = context.WithValue(ctx, "auth_method", "session")
-
-		next.ServeHTTP(w, r.WithContext(ctx))
+		// Not authenticated - continue without user context (optional auth)
+		next.ServeHTTP(w, r)
 	})
 }
 
@@ -253,7 +225,7 @@ func (am *AuthMiddleware) shouldSkipAuth(r *http.Request) bool {
 
 	// Allow listed auth endpoints (login flows) even after setup
 	if publicAuthEndpoints[path] {
-		fmt.Printf("Skipping auth for path: %s\n", path)
+		slog.Debug("skipping auth for public endpoint", slog.String("path", path))
 		return true
 	}
 
@@ -275,13 +247,25 @@ func (am *AuthMiddleware) MarkSetupCompleted() {
 	}
 }
 
+// authErrorResponse represents a JSON error response for authentication failures
+type authErrorResponse struct {
+	Error string `json:"error"`
+	Code  string `json:"code"`
+}
+
 // handleAuthError handles authentication errors
 func (am *AuthMiddleware) handleAuthError(w http.ResponseWriter, r *http.Request, message string) {
 	// For API requests, return JSON error
 	if strings.HasPrefix(r.URL.Path, "/api/") {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write([]byte(`{"error": "` + message + `", "code": "AUTHENTICATION_REQUIRED"}`))
+		response := authErrorResponse{
+			Error: message,
+			Code:  "AUTHENTICATION_REQUIRED",
+		}
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			slog.Error("failed to encode auth error response", slog.Any("error", err))
+		}
 		return
 	}
 
@@ -398,7 +382,7 @@ func (am *AuthMiddleware) RequireVerifiedEmail(next http.Handler) http.Handler {
 		}
 
 		// Get session from context
-		session, ok := r.Context().Value("session").(*auth.Session)
+		session, ok := r.Context().Value(ContextKeySession).(*auth.Session)
 		if !ok || session == nil {
 			// No session - let RequireAuth handle it
 			next.ServeHTTP(w, r)
@@ -410,8 +394,11 @@ func (am *AuthMiddleware) RequireVerifiedEmail(next http.Handler) http.Handler {
 		var emailVerified bool
 		err := am.db.QueryRow("SELECT email_verified FROM users WHERE id = ?", session.UserID).Scan(&emailVerified)
 		if err != nil {
-			// On error, allow access (fail open for backwards compatibility)
-			next.ServeHTTP(w, r)
+			// Fail closed: deny access on database error for security
+			slog.Error("failed to check email verification status", slog.Int("user_id", session.UserID), slog.Any("error", err))
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"error": "Failed to verify email status", "code": "VERIFICATION_CHECK_FAILED"}`))
 			return
 		}
 

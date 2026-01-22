@@ -1,10 +1,12 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/services"
@@ -12,6 +14,9 @@ import (
 	"github.com/charmbracelet/ssh"
 	gossh "golang.org/x/crypto/ssh"
 )
+
+// backgroundUpdateTimeout is the maximum time allowed for background credential updates
+const backgroundUpdateTimeout = 5 * time.Second
 
 // SSHAuthMiddleware provides SSH public key authentication
 type SSHAuthMiddleware struct {
@@ -62,15 +67,34 @@ func (m *SSHAuthMiddleware) PublicKeyHandler() ssh.PublicKeyHandler {
 		ctx.SetValue("user_first_name", userCredential.FirstName)
 		ctx.SetValue("user_last_name", userCredential.LastName)
 
-		// Update last used timestamp in background
+		// Update last used timestamp in background with timeout
+		// Capture credential info for the goroutine to avoid closure issues
+		credentialID := userCredential.ID
 		go func() {
+			// Create a timeout context to prevent indefinite hanging
+			ctx, cancel := context.WithTimeout(context.Background(), backgroundUpdateTimeout)
+			defer cancel()
+
 			// Convert string ID to int for legacy SSH credentials
-			if credID, err := strconv.Atoi(userCredential.ID); err == nil {
-				if err := m.sshAuthService.UpdateLastUsed(credID); err != nil {
-					slog.Error("failed to update last_used_at for credential", slog.String("component", "ssh_auth"), slog.String("credential_id", userCredential.ID), slog.Any("error", err))
+			credID, err := strconv.Atoi(credentialID)
+			if err != nil {
+				slog.Error("invalid credential ID format", slog.String("component", "ssh_auth"), slog.String("credential_id", credentialID))
+				return
+			}
+
+			// Run the update with timeout monitoring
+			done := make(chan error, 1)
+			go func() {
+				done <- m.sshAuthService.UpdateLastUsed(credID)
+			}()
+
+			select {
+			case err := <-done:
+				if err != nil {
+					slog.Error("failed to update last_used_at for credential", slog.String("component", "ssh_auth"), slog.String("credential_id", credentialID), slog.Any("error", err))
 				}
-			} else {
-				slog.Error("invalid credential ID format", slog.String("component", "ssh_auth"), slog.String("credential_id", userCredential.ID))
+			case <-ctx.Done():
+				slog.Warn("timeout updating last_used_at for credential", slog.String("component", "ssh_auth"), slog.String("credential_id", credentialID))
 			}
 		}()
 

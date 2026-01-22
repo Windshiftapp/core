@@ -33,25 +33,27 @@ func (h *TestRunHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
 		return
 	}
 
 	// Support filtering by assignee_id
 	assigneeFilter := r.URL.Query().Get("assignee_id")
 
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	var rows *sql.Rows
 	if assigneeFilter != "" {
 		if assigneeFilter == "unassigned" {
-			rows, err = h.getReadDB().Query(`
+			rows, err = db.Query(`
 				SELECT tr.id, tr.workspace_id, tr.template_id, tr.set_id, tr.name, tr.assignee_id,
 				       tr.started_at, tr.ended_at, tr.created_at,
 				       COALESCE(u.first_name || ' ' || u.last_name, '') as assignee_name,
@@ -64,7 +66,7 @@ func (h *TestRunHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			`, workspaceID)
 		} else {
 			assigneeID, _ := strconv.Atoi(assigneeFilter)
-			rows, err = h.getReadDB().Query(`
+			rows, err = db.Query(`
 				SELECT tr.id, tr.workspace_id, tr.template_id, tr.set_id, tr.name, tr.assignee_id,
 				       tr.started_at, tr.ended_at, tr.created_at,
 				       COALESCE(u.first_name || ' ' || u.last_name, '') as assignee_name,
@@ -77,7 +79,7 @@ func (h *TestRunHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			`, workspaceID, assigneeID)
 		}
 	} else {
-		rows, err = h.getReadDB().Query(`
+		rows, err = db.Query(`
 			SELECT tr.id, tr.workspace_id, tr.template_id, tr.set_id, tr.name, tr.assignee_id,
 			       tr.started_at, tr.ended_at, tr.created_at,
 			       COALESCE(u.first_name || ' ' || u.last_name, '') as assignee_name,
@@ -135,22 +137,24 @@ func (h *TestRunHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
+		return
+	}
+
+	db, ok := h.requireReadDB(w)
+	if !ok {
 		return
 	}
 
 	var run models.TestRun
 	var templateID, assigneeID sql.NullInt64
 	var assigneeName, assigneeEmail, assigneeAvatar string
-	err = h.getReadDB().QueryRow(`
+	err = db.QueryRow(`
 		SELECT tr.id, tr.workspace_id, tr.template_id, tr.set_id, tr.name, tr.assignee_id,
 		       tr.started_at, tr.ended_at, tr.created_at,
 		       COALESCE(u.first_name || ' ' || u.last_name, '') as assignee_name,
@@ -191,15 +195,12 @@ func (h *TestRunHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestExecute)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
 		return
 	}
 
@@ -209,10 +210,15 @@ func (h *TestRunHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	// Verify test set belongs to workspace
 	if run.SetID > 0 {
 		var count int
-		err = h.getReadDB().QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", run.SetID, workspaceID).Scan(&count)
+		err = db.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", run.SetID, workspaceID).Scan(&count)
 		if err != nil || count == 0 {
 			http.Error(w, "Test set not found in workspace", http.StatusNotFound)
 			return
@@ -222,7 +228,7 @@ func (h *TestRunHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Validate assignee belongs to workspace if provided
 	if run.AssigneeID != nil && *run.AssigneeID > 0 {
 		var count int
-		err = h.getReadDB().QueryRow(`
+		err = db.QueryRow(`
 			SELECT COUNT(*) FROM user_workspace_roles WHERE user_id = ? AND workspace_id = ?
 		`, *run.AssigneeID, workspaceID).Scan(&count)
 		if err != nil || count == 0 {
@@ -312,20 +318,22 @@ func (h *TestRunHandler) End(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestExecute)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
+		return
+	}
+
+	db, ok := h.requireWriteDB(w)
+	if !ok {
 		return
 	}
 
 	now := time.Now()
-	_, err = h.getWriteDB().Exec(`
+	_, err = db.Exec(`
 		UPDATE test_runs
 		SET ended_at = ?
 		WHERE id = ? AND workspace_id = ?
@@ -353,15 +361,12 @@ func (h *TestRunHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestExecute)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
 		return
 	}
 
@@ -376,8 +381,12 @@ func (h *TestRunHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Validate assignee belongs to workspace if provided
 	if update.AssigneeID != nil && *update.AssigneeID > 0 {
+		readDB, ok := h.requireReadDB(w)
+		if !ok {
+			return
+		}
 		var count int
-		err = h.getReadDB().QueryRow(`
+		err = readDB.QueryRow(`
 			SELECT COUNT(*) FROM user_workspace_roles WHERE user_id = ? AND workspace_id = ?
 		`, *update.AssigneeID, workspaceID).Scan(&count)
 		if err != nil || count == 0 {
@@ -386,7 +395,11 @@ func (h *TestRunHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_, err = h.getWriteDB().Exec(`
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+	_, err = writeDB.Exec(`
 		UPDATE test_runs
 		SET name = COALESCE(NULLIF(?, ''), name), assignee_id = ?
 		WHERE id = ? AND workspace_id = ?
@@ -414,27 +427,29 @@ func (h *TestRunHandler) GetResults(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
+		return
+	}
+
+	db, ok := h.requireReadDB(w)
+	if !ok {
 		return
 	}
 
 	// Verify test run belongs to workspace
 	var count int
-	err = h.getReadDB().QueryRow("SELECT COUNT(*) FROM test_runs WHERE id = ? AND workspace_id = ?", runID, workspaceID).Scan(&count)
+	err = db.QueryRow("SELECT COUNT(*) FROM test_runs WHERE id = ? AND workspace_id = ?", runID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
 		http.Error(w, "Test run not found", http.StatusNotFound)
 		return
 	}
 
-	rows, err := h.getReadDB().Query(`
+	rows, err := db.Query(`
 		SELECT tr.id, tr.run_id, tr.test_case_id, tr.status, tr.actual_result, tr.notes, tr.executed_at, tr.created_at, tr.updated_at,
 		       tc.title
 		FROM test_results tr
@@ -506,21 +521,23 @@ func (h *TestRunHandler) UpdateResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestExecute)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
+		return
+	}
+
+	readDB, ok := h.requireReadDB(w)
+	if !ok {
 		return
 	}
 
 	// Verify test run belongs to workspace
 	var count int
-	err = h.getReadDB().QueryRow("SELECT COUNT(*) FROM test_runs WHERE id = ? AND workspace_id = ?", runID, workspaceID).Scan(&count)
+	err = readDB.QueryRow("SELECT COUNT(*) FROM test_runs WHERE id = ? AND workspace_id = ?", runID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
 		http.Error(w, "Test run not found", http.StatusNotFound)
 		return
@@ -536,8 +553,12 @@ func (h *TestRunHandler) UpdateResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
 	now := time.Now()
-	_, err = h.getWriteDB().Exec(`
+	_, err = writeDB.Exec(`
 		UPDATE test_results
 		SET status = ?, actual_result = ?, notes = ?, executed_at = ?, updated_at = ?
 		WHERE id = ? AND run_id = ?
@@ -564,27 +585,29 @@ func (h *TestRunHandler) GetBySet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
+		return
+	}
+
+	db, ok := h.requireReadDB(w)
+	if !ok {
 		return
 	}
 
 	// Verify test set belongs to workspace
 	var count int
-	err = h.getReadDB().QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
+	err = db.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
 		http.Error(w, "Test set not found", http.StatusNotFound)
 		return
 	}
 
-	rows, err := h.getReadDB().Query(`
+	rows, err := db.Query(`
 		SELECT tr.id, tr.workspace_id, tr.template_id, tr.set_id, tr.name, tr.assignee_id,
 		       tr.started_at, tr.ended_at, tr.created_at,
 		       COALESCE(u.first_name || ' ' || u.last_name, '') as assignee_name,
@@ -649,15 +672,12 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestExecute)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
 		return
 	}
 
@@ -672,10 +692,15 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	readDB, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	// Verify item belongs to same workspace if provided
 	if update.ItemID != nil {
 		var count int
-		err = h.getReadDB().QueryRow("SELECT COUNT(*) FROM items WHERE id = ? AND workspace_id = ?", *update.ItemID, workspaceID).Scan(&count)
+		err = readDB.QueryRow("SELECT COUNT(*) FROM items WHERE id = ? AND workspace_id = ?", *update.ItemID, workspaceID).Scan(&count)
 		if err != nil || count == 0 {
 			http.Error(w, "Item not found in workspace", http.StatusNotFound)
 			return
@@ -685,7 +710,7 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 	// First, get the test result ID for this run and step
 	// Make sure we get the correct test case that actually owns this step
 	var testResultID int
-	err = h.getReadDB().QueryRow(`
+	err = readDB.QueryRow(`
 		SELECT tr.id
 		FROM test_results tr
 		JOIN test_runs run ON tr.run_id = run.id
@@ -702,22 +727,26 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 
 	// Check if step result already exists
 	var existingID int
-	err = h.getReadDB().QueryRow(`
+	err = readDB.QueryRow(`
 		SELECT id FROM test_step_results
 		WHERE test_result_id = ? AND test_step_id = ?
 	`, testResultID, stepID).Scan(&existingID)
 
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
 	now := time.Now()
 	if err == sql.ErrNoRows {
 		// Create new step result
-		_, err = h.getWriteDB().Exec(`
+		_, err = writeDB.Exec(`
 			INSERT INTO test_step_results
 			(test_result_id, test_step_id, status, actual_result, notes, item_id, executed_at, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`, testResultID, stepID, update.Status, update.ActualResult, update.Notes, update.ItemID, now, now, now)
 	} else if err == nil {
 		// Update existing step result
-		_, err = h.getWriteDB().Exec(`
+		_, err = writeDB.Exec(`
 			UPDATE test_step_results
 			SET status = ?, actual_result = ?, notes = ?, item_id = ?, executed_at = ?, updated_at = ?
 			WHERE id = ?
@@ -754,27 +783,29 @@ func (h *TestRunHandler) GetStepResults(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
+		return
+	}
+
+	db, ok := h.requireReadDB(w)
+	if !ok {
 		return
 	}
 
 	// Verify test run belongs to workspace
 	var count int
-	err = h.getReadDB().QueryRow("SELECT COUNT(*) FROM test_runs WHERE id = ? AND workspace_id = ?", runID, workspaceID).Scan(&count)
+	err = db.QueryRow("SELECT COUNT(*) FROM test_runs WHERE id = ? AND workspace_id = ?", runID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
 		http.Error(w, "Test run not found", http.StatusNotFound)
 		return
 	}
 
-	rows, err := h.getReadDB().Query(`
+	rows, err := db.Query(`
 		SELECT tsr.test_step_id, tsr.status, tsr.actual_result, tsr.notes, tsr.item_id, tsr.executed_at,
 		       tc.id as test_case_id, tc.title as test_case_title
 		FROM test_step_results tsr
@@ -822,8 +853,13 @@ func (h *TestRunHandler) GetStepResults(w http.ResponseWriter, r *http.Request) 
 
 // updateTestCaseStatus updates the test case status based on its step results
 func (h *TestRunHandler) updateTestCaseStatus(testResultID int) error {
+	readDB, err := h.getReadDB()
+	if err != nil {
+		return err
+	}
+
 	// Get all step results for this test case
-	rows, err := h.getReadDB().Query(`
+	rows, err := readDB.Query(`
 		SELECT status FROM test_step_results
 		WHERE test_result_id = ?
 	`, testResultID)
@@ -883,7 +919,11 @@ func (h *TestRunHandler) updateTestCaseStatus(testResultID int) error {
 	}
 
 	// Update the test result status
-	_, err = h.getWriteDB().Exec(`
+	writeDB, err := h.getWriteDB()
+	if err != nil {
+		return err
+	}
+	_, err = writeDB.Exec(`
 		UPDATE test_results
 		SET status = ?, updated_at = ?
 		WHERE id = ?
@@ -906,19 +946,20 @@ func (h *TestRunHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestManage)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
 		return
 	}
 
-	_, err = h.getWriteDB().Exec("DELETE FROM test_runs WHERE id = ? AND workspace_id = ?", id, workspaceID)
+	db, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+	_, err = db.Exec("DELETE FROM test_runs WHERE id = ? AND workspace_id = ?", id, workspaceID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -941,15 +982,12 @@ func (h *TestRunHandler) LinkItemToTestResult(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestExecute)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
 		return
 	}
 
@@ -961,16 +999,21 @@ func (h *TestRunHandler) LinkItemToTestResult(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	readDB, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	// Verify item belongs to same workspace
 	var count int
-	err = h.getReadDB().QueryRow("SELECT COUNT(*) FROM items WHERE id = ? AND workspace_id = ?", data.ItemID, workspaceID).Scan(&count)
+	err = readDB.QueryRow("SELECT COUNT(*) FROM items WHERE id = ? AND workspace_id = ?", data.ItemID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
 		http.Error(w, "Item not found in workspace", http.StatusNotFound)
 		return
 	}
 
 	// Verify test result belongs to workspace (via test_runs)
-	err = h.getReadDB().QueryRow(`
+	err = readDB.QueryRow(`
 		SELECT COUNT(*) FROM test_results tr
 		JOIN test_runs run ON tr.run_id = run.id
 		WHERE tr.id = ? AND run.workspace_id = ?
@@ -980,8 +1023,12 @@ func (h *TestRunHandler) LinkItemToTestResult(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
 	// Insert into test_result_items
-	_, err = h.getWriteDB().Exec(`
+	_, err = writeDB.Exec(`
 		INSERT INTO test_result_items (test_result_id, item_id, created_at)
 		VALUES (?, ?, ?)
 	`, resultID, data.ItemID, time.Now())
@@ -1015,21 +1062,23 @@ func (h *TestRunHandler) UnlinkItemFromTestResult(w http.ResponseWriter, r *http
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestExecute)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
+		return
+	}
+
+	readDB, ok := h.requireReadDB(w)
+	if !ok {
 		return
 	}
 
 	// Verify workspace ownership
 	var count int
-	err = h.getReadDB().QueryRow(`
+	err = readDB.QueryRow(`
 		SELECT COUNT(*) FROM test_results tr
 		JOIN test_runs run ON tr.run_id = run.id
 		WHERE tr.id = ? AND run.workspace_id = ?
@@ -1039,7 +1088,11 @@ func (h *TestRunHandler) UnlinkItemFromTestResult(w http.ResponseWriter, r *http
 		return
 	}
 
-	_, err = h.getWriteDB().Exec(`
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+	_, err = writeDB.Exec(`
 		DELETE FROM test_result_items
 		WHERE test_result_id = ? AND item_id = ?
 	`, resultID, itemID)
@@ -1066,15 +1119,17 @@ func (h *TestRunHandler) GetTestResultItems(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
-	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
+		return
+	}
+
+	db, ok := h.requireReadDB(w)
+	if !ok {
 		return
 	}
 
@@ -1088,7 +1143,7 @@ func (h *TestRunHandler) GetTestResultItems(w http.ResponseWriter, r *http.Reque
 		ORDER BY tri.created_at DESC
 	`
 
-	rows, err := h.getReadDB().Query(query, resultID, workspaceID)
+	rows, err := db.Query(query, resultID, workspaceID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

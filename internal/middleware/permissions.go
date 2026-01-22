@@ -1,12 +1,12 @@
 package middleware
 
 import (
-	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 
-	"windshift/internal/models"
 	"windshift/internal/database"
+	"windshift/internal/models"
 )
 
 // PermissionMiddleware handles permission checking for protected routes
@@ -38,7 +38,7 @@ func (pm *PermissionMiddleware) RequireGlobalPermission(permissionKey string) fu
 			// Check if user has the specific permission
 			hasPermission, err := pm.hasGlobalPermission(user.ID, permissionKey)
 			if err != nil {
-				fmt.Printf("Error checking global permission: %v\n", err)
+				slog.Error("error checking global permission", slog.Any("error", err))
 				http.Error(w, "Permission check failed", http.StatusInternalServerError)
 				return
 			}
@@ -89,7 +89,7 @@ func (pm *PermissionMiddleware) RequireWorkspacePermission(permissionKey string)
 			// Check if user has the specific workspace permission
 			hasPermission, err := pm.hasWorkspacePermission(user.ID, workspaceID, permissionKey)
 			if err != nil {
-				fmt.Printf("Error checking workspace permission: %v\n", err)
+				slog.Error("error checking workspace permission", slog.Any("error", err))
 				http.Error(w, "Permission check failed", http.StatusInternalServerError)
 				return
 			}
@@ -145,7 +145,7 @@ func (pm *PermissionMiddleware) RequireAnyWorkspacePermission() func(http.Handle
 			// Check if user has any workspace permission
 			hasAnyPermission, err := pm.hasAnyWorkspacePermission(user.ID, workspaceID)
 			if err != nil {
-				fmt.Printf("Error checking workspace permissions: %v\n", err)
+				slog.Error("error checking workspace permissions", slog.Any("error", err))
 				http.Error(w, "Permission check failed", http.StatusInternalServerError)
 				return
 			}
@@ -207,7 +207,7 @@ func (pm *PermissionMiddleware) RequireChannelManagement() func(http.Handler) ht
 			// For non-default channels, check if user is a channel manager
 			hasPermission, err := pm.isChannelManager(user.ID, channelID)
 			if err != nil {
-				fmt.Printf("Error checking channel management permission: %v\n", err)
+				slog.Error("error checking channel management permission", slog.Any("error", err))
 				http.Error(w, "Permission check failed", http.StatusInternalServerError)
 				return
 			}
@@ -225,7 +225,7 @@ func (pm *PermissionMiddleware) RequireChannelManagement() func(http.Handler) ht
 // Helper functions
 
 func (pm *PermissionMiddleware) getUserFromContext(r *http.Request) *models.User {
-	if user := r.Context().Value("user"); user != nil {
+	if user := r.Context().Value(ContextKeyUser); user != nil {
 		if u, ok := user.(*models.User); ok {
 			return u
 		}
@@ -244,7 +244,7 @@ func (pm *PermissionMiddleware) isSystemAdmin(userID int) bool {
 		)
 	`, userID).Scan(&hasPermission)
 	if err != nil {
-		fmt.Printf("Error checking system admin permission: %v\n", err)
+		slog.Error("error checking system admin permission", slog.Any("error", err))
 		return false
 	}
 	return hasPermission
@@ -362,7 +362,7 @@ func (pm *PermissionMiddleware) RequireSetupNotComplete() func(http.Handler) htt
 			var setupCompleted string
 			err := pm.db.QueryRow(`SELECT value FROM system_settings WHERE key = 'setup_completed'`).Scan(&setupCompleted)
 			if err != nil {
-				fmt.Printf("Error checking setup status: %v\n", err)
+				slog.Error("error checking setup status", slog.Any("error", err))
 				http.Error(w, "Failed to check setup status", http.StatusInternalServerError)
 				return
 			}

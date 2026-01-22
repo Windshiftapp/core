@@ -325,7 +325,11 @@ func (h *EmailProviderHandler) StartEmailOAuth(w http.ResponseWriter, r *http.Re
 	// Decrypt client secret
 	var clientSecret string
 	if clientSecretEnc != nil && *clientSecretEnc != "" && h.encryption != nil {
-		clientSecret, _ = h.encryption.Decrypt(*clientSecretEnc)
+		var err error
+		clientSecret, err = h.encryption.Decrypt(*clientSecretEnc)
+		if err != nil {
+			slog.Warn("failed to decrypt OAuth client secret", slog.String("component", "email_providers"), slog.Int("provider_id", provider.ID), slog.Any("error", err))
+		}
 	}
 
 	// Generate state token
@@ -429,7 +433,11 @@ func (h *EmailProviderHandler) EmailOAuthCallback(w http.ResponseWriter, r *http
 	// Decrypt client secret
 	var clientSecret string
 	if clientSecretEnc != nil && *clientSecretEnc != "" && h.encryption != nil {
-		clientSecret, _ = h.encryption.Decrypt(*clientSecretEnc)
+		var err error
+		clientSecret, err = h.encryption.Decrypt(*clientSecretEnc)
+		if err != nil {
+			slog.Warn("failed to decrypt OAuth client secret in callback", slog.String("component", "email_providers"), slog.Int("provider_id", provider.ID), slog.Any("error", err))
+		}
 	}
 
 	// Build redirect URI (must match the one used in StartOAuth)
@@ -451,7 +459,10 @@ func (h *EmailProviderHandler) EmailOAuthCallback(w http.ResponseWriter, r *http
 			http.Redirect(w, r, "/admin/channels?oauth_error=exchange_failed", http.StatusFound)
 			return
 		}
-		userEmail, _ = p.GetUserEmail(ctx, tokens.AccessToken)
+		userEmail, err = p.GetUserEmail(ctx, tokens.AccessToken)
+		if err != nil {
+			slog.Warn("failed to get user email from Microsoft", slog.String("component", "email_providers"), slog.Int("provider_id", provider.ID), slog.Any("error", err))
+		}
 
 	case models.EmailProviderTypeGoogle:
 		p := email.NewGoogleProvider(provider.OAuthClientID, clientSecret, scopes)
@@ -461,7 +472,10 @@ func (h *EmailProviderHandler) EmailOAuthCallback(w http.ResponseWriter, r *http
 			http.Redirect(w, r, "/admin/channels?oauth_error=exchange_failed", http.StatusFound)
 			return
 		}
-		userEmail, _ = p.GetUserEmail(ctx, tokens.AccessToken)
+		userEmail, err = p.GetUserEmail(ctx, tokens.AccessToken)
+		if err != nil {
+			slog.Warn("failed to get user email from Google", slog.String("component", "email_providers"), slog.Int("provider_id", provider.ID), slog.Any("error", err))
+		}
 
 	default:
 		http.Redirect(w, r, "/admin/channels?oauth_error=unsupported_provider", http.StatusFound)

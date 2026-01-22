@@ -45,7 +45,12 @@ func (h *TestRunTemplateHandler) GetAll(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	rows, err := h.getReadDB().Query(`
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
+	rows, err := db.Query(`
 		SELECT
 			trt.id, trt.workspace_id, trt.set_id, trt.name, trt.description, trt.created_at, trt.updated_at,
 			ts.name as set_name
@@ -112,10 +117,15 @@ func (h *TestRunTemplateHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	var template models.TestRunTemplate
 	var setName sql.NullString
 
-	err = h.getReadDB().QueryRow(`
+	err = db.QueryRow(`
 		SELECT
 			trt.id, trt.workspace_id, trt.set_id, trt.name, trt.description, trt.created_at, trt.updated_at,
 			ts.name as set_name
@@ -170,10 +180,20 @@ func (h *TestRunTemplateHandler) Create(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	readDB, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
 	// Verify test set belongs to workspace if provided
 	if template.SetID > 0 {
 		var count int
-		err = h.getReadDB().QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", template.SetID, workspaceID).Scan(&count)
+		err = readDB.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", template.SetID, workspaceID).Scan(&count)
 		if err != nil || count == 0 {
 			http.Error(w, "Test set not found in workspace", http.StatusNotFound)
 			return
@@ -182,7 +202,7 @@ func (h *TestRunTemplateHandler) Create(w http.ResponseWriter, r *http.Request) 
 
 	now := time.Now()
 	var id int64
-	err = h.getWriteDB().QueryRow(`
+	err = writeDB.QueryRow(`
 		INSERT INTO test_run_templates (workspace_id, set_id, name, description, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
 	`, workspaceID, template.SetID, template.Name, template.Description, now, now).Scan(&id)
@@ -234,10 +254,20 @@ func (h *TestRunTemplateHandler) Update(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	readDB, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
 	// Verify test set belongs to workspace if provided
 	if template.SetID > 0 {
 		var count int
-		err = h.getReadDB().QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", template.SetID, workspaceID).Scan(&count)
+		err = readDB.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", template.SetID, workspaceID).Scan(&count)
 		if err != nil || count == 0 {
 			http.Error(w, "Test set not found in workspace", http.StatusNotFound)
 			return
@@ -245,7 +275,7 @@ func (h *TestRunTemplateHandler) Update(w http.ResponseWriter, r *http.Request) 
 	}
 
 	now := time.Now()
-	_, err = h.getWriteDB().Exec(`
+	_, err = writeDB.Exec(`
 		UPDATE test_run_templates
 		SET set_id = ?, name = ?, description = ?, updated_at = ?
 		WHERE id = ? AND workspace_id = ?
@@ -290,7 +320,12 @@ func (h *TestRunTemplateHandler) Delete(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	_, err = h.getWriteDB().Exec("DELETE FROM test_run_templates WHERE id = ? AND workspace_id = ?", id, workspaceID)
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
+	_, err = writeDB.Exec("DELETE FROM test_run_templates WHERE id = ? AND workspace_id = ?", id, workspaceID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -325,15 +360,20 @@ func (h *TestRunTemplateHandler) GetExecutions(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	// Verify template belongs to workspace
 	var count int
-	err = h.getReadDB().QueryRow("SELECT COUNT(*) FROM test_run_templates WHERE id = ? AND workspace_id = ?", templateID, workspaceID).Scan(&count)
+	err = db.QueryRow("SELECT COUNT(*) FROM test_run_templates WHERE id = ? AND workspace_id = ?", templateID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
 		http.Error(w, "Test run template not found", http.StatusNotFound)
 		return
 	}
 
-	rows, err := h.getReadDB().Query(`
+	rows, err := db.Query(`
 		SELECT id, workspace_id, template_id, set_id, name, started_at, ended_at, created_at
 		FROM test_runs
 		WHERE template_id = ? AND workspace_id = ?
@@ -392,9 +432,19 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	readDB, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
 	// Get the template to retrieve set_id and verify workspace ownership
 	var template models.TestRunTemplate
-	err = h.getReadDB().QueryRow(`
+	err = readDB.QueryRow(`
 		SELECT id, workspace_id, set_id, name, description
 		FROM test_run_templates
 		WHERE id = ? AND workspace_id = ?
@@ -411,7 +461,7 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 
 	// Get count of existing runs for this template to generate sequential name
 	var runCount int
-	err = h.getReadDB().QueryRow(`
+	err = readDB.QueryRow(`
 		SELECT COUNT(*) FROM test_runs WHERE template_id = ? AND workspace_id = ?
 	`, templateID, workspaceID).Scan(&runCount)
 	if err != nil {
@@ -424,7 +474,7 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 	runName := template.Name + " - Run " + strconv.Itoa(runCount+1)
 
 	var runID int64
-	err = h.getWriteDB().QueryRow(`
+	err = writeDB.QueryRow(`
 		INSERT INTO test_runs (workspace_id, template_id, set_id, name, started_at, created_at)
 		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
 	`, workspaceID, templateID, template.SetID, runName, now, now).Scan(&runID)
@@ -435,7 +485,7 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Get test cases for this test set (workspace-scoped)
-	rows, err := h.getReadDB().Query(`
+	rows, err := readDB.Query(`
 		SELECT tc.id
 		FROM test_cases tc
 		JOIN set_test_cases stc ON tc.id = stc.test_case_id
@@ -456,7 +506,7 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 			return
 		}
 
-		_, err = h.getWriteDB().Exec(`
+		_, err = writeDB.Exec(`
 			INSERT INTO test_results (run_id, test_case_id, status, created_at, updated_at)
 			VALUES (?, ?, 'pending', ?, ?)
 		`, runID, testCaseID, time.Now(), time.Now())
@@ -469,7 +519,7 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 	// Return the created run
 	var run models.TestRun
 	var templateIDNullable sql.NullInt64
-	err = h.getReadDB().QueryRow(`
+	err = readDB.QueryRow(`
 		SELECT id, workspace_id, template_id, set_id, name, started_at, ended_at, created_at
 		FROM test_runs
 		WHERE id = ?

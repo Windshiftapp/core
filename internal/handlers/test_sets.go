@@ -44,7 +44,12 @@ func (h *TestSetHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := h.getReadDB().Query(`
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
+	rows, err := db.Query(`
 		SELECT
 			ts.id, ts.workspace_id, ts.name, ts.description, ts.milestone_id, ts.created_at, ts.updated_at,
 			m.name as milestone_name,
@@ -148,10 +153,15 @@ func (h *TestSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	var set models.TestSet
 	var milestoneName sql.NullString
 
-	err = h.getReadDB().QueryRow(`
+	err = db.QueryRow(`
 		SELECT ts.id, ts.workspace_id, ts.name, ts.description, ts.milestone_id, ts.created_at, ts.updated_at,
 		       m.name as milestone_name
 		FROM test_sets ts
@@ -201,9 +211,14 @@ func (h *TestSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
 	now := time.Now()
 	var id int64
-	err = h.getWriteDB().QueryRow(`
+	err = db.QueryRow(`
 		INSERT INTO test_sets (workspace_id, name, description, milestone_id, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
 	`, workspaceID, set.Name, set.Description, set.MilestoneID, now, now).Scan(&id)
@@ -254,8 +269,13 @@ func (h *TestSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
 	now := time.Now()
-	_, err = h.getWriteDB().Exec(`
+	_, err = db.Exec(`
 		UPDATE test_sets
 		SET name = ?, description = ?, milestone_id = ?, updated_at = ?
 		WHERE id = ? AND workspace_id = ?
@@ -299,7 +319,12 @@ func (h *TestSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.getWriteDB().Exec("DELETE FROM test_sets WHERE id = ? AND workspace_id = ?", id, workspaceID)
+	db, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
+	_, err = db.Exec("DELETE FROM test_sets WHERE id = ? AND workspace_id = ?", id, workspaceID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -333,15 +358,20 @@ func (h *TestSetHandler) GetTestCases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	// Verify test set belongs to workspace
 	var count int
-	err = h.getReadDB().QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
+	err = db.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
 		http.Error(w, "Test set not found", http.StatusNotFound)
 		return
 	}
 
-	rows, err := h.getReadDB().Query(`
+	rows, err := db.Query(`
 		SELECT tc.id, tc.workspace_id, tc.title, tc.preconditions, tc.created_at, tc.updated_at
 		FROM test_cases tc
 		JOIN set_test_cases stc ON tc.id = stc.test_case_id
@@ -404,22 +434,32 @@ func (h *TestSetHandler) AddTestCase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	readDB, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	// Verify test set belongs to workspace
 	var count int
-	err = h.getReadDB().QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
+	err = readDB.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
 		http.Error(w, "Test set not found", http.StatusNotFound)
 		return
 	}
 
 	// Verify test case belongs to same workspace
-	err = h.getReadDB().QueryRow("SELECT COUNT(*) FROM test_cases WHERE id = ? AND workspace_id = ?", request.TestCaseID, workspaceID).Scan(&count)
+	err = readDB.QueryRow("SELECT COUNT(*) FROM test_cases WHERE id = ? AND workspace_id = ?", request.TestCaseID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
 		http.Error(w, "Test case not found in workspace", http.StatusNotFound)
 		return
 	}
 
-	_, err = h.getWriteDB().Exec(`
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
+	_, err = writeDB.Exec(`
 		INSERT INTO set_test_cases (set_id, test_case_id)
 		VALUES (?, ?)
 	`, setID, request.TestCaseID)
@@ -463,15 +503,25 @@ func (h *TestSetHandler) RemoveTestCase(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	readDB, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	// Verify test set belongs to workspace
 	var count int
-	err = h.getReadDB().QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
+	err = readDB.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
 		http.Error(w, "Test set not found", http.StatusNotFound)
 		return
 	}
 
-	_, err = h.getWriteDB().Exec(`
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
+	_, err = writeDB.Exec(`
 		DELETE FROM set_test_cases
 		WHERE set_id = ? AND test_case_id = ?
 	`, setID, testCaseID)
@@ -509,15 +559,20 @@ func (h *TestSetHandler) GetRuns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	// Verify test set belongs to workspace
 	var count int
-	err = h.getReadDB().QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
+	err = db.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
 		http.Error(w, "Test set not found", http.StatusNotFound)
 		return
 	}
 
-	rows, err := h.getReadDB().Query(`
+	rows, err := db.Query(`
 		SELECT id, workspace_id, set_id, name, started_at, ended_at, created_at
 		FROM test_runs
 		WHERE set_id = ? AND workspace_id = ?

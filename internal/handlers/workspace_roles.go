@@ -17,39 +17,34 @@ import (
 )
 
 type WorkspaceRoleHandler struct {
-	db                database.Database
+	*BaseHandler
 	permissionService *services.PermissionService
 }
 
 func NewWorkspaceRoleHandler(db database.Database) *WorkspaceRoleHandler {
-	return &WorkspaceRoleHandler{db: db}
+	return &WorkspaceRoleHandler{BaseHandler: NewBaseHandler(db)}
 }
 
 func NewWorkspaceRoleHandlerWithPool(db database.Database, permissionService *services.PermissionService) *WorkspaceRoleHandler {
 	return &WorkspaceRoleHandler{
-		db:                db,
+		BaseHandler:       NewBaseHandler(db),
 		permissionService: permissionService,
 	}
 }
 
-// getReadDB returns the database connection for read operations
-func (h *WorkspaceRoleHandler) getReadDB() *sql.DB {
-	return h.db.GetDB()
-}
-
-// getWriteDB returns the database connection for write operations
-func (h *WorkspaceRoleHandler) getWriteDB() *sql.DB {
-	return h.db.GetDB()
-}
-
 // GetAll returns all workspace roles
 func (h *WorkspaceRoleHandler) GetAll(w http.ResponseWriter, r *http.Request) {
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	query := `
 		SELECT id, name, description, is_system, display_order, created_at, updated_at
 		FROM workspace_roles
 		ORDER BY display_order ASC, name ASC`
 
-	rows, err := h.getReadDB().Query(query)
+	rows, err := db.Query(query)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -78,6 +73,11 @@ func (h *WorkspaceRoleHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 // Get returns a single workspace role with its permissions
 func (h *WorkspaceRoleHandler) Get(w http.ResponseWriter, r *http.Request) {
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
@@ -85,7 +85,7 @@ func (h *WorkspaceRoleHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var role models.WorkspaceRole
-	err = h.getReadDB().QueryRow(`
+	err = db.QueryRow(`
 		SELECT id, name, description, is_system, display_order, created_at, updated_at
 		FROM workspace_roles
 		WHERE id = ?
@@ -102,7 +102,7 @@ func (h *WorkspaceRoleHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Load permissions for this role
-	permRows, err := h.getReadDB().Query(`
+	permRows, err := db.Query(`
 		SELECT p.id, p.permission_key, p.permission_name, p.description, p.scope, p.is_system, p.created_at, p.updated_at
 		FROM permissions p
 		JOIN role_permissions rp ON p.id = rp.permission_id
@@ -131,6 +131,15 @@ func (h *WorkspaceRoleHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // AssignRoleToUser assigns a role to a user in a workspace
 func (h *WorkspaceRoleHandler) AssignRoleToUser(w http.ResponseWriter, r *http.Request) {
+	readDB, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
 	var req models.UserRoleAssignmentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -146,14 +155,14 @@ func (h *WorkspaceRoleHandler) AssignRoleToUser(w http.ResponseWriter, r *http.R
 
 	// Check if role exists
 	var roleExists bool
-	err := h.getReadDB().QueryRow("SELECT EXISTS(SELECT 1 FROM workspace_roles WHERE id = ?)", req.RoleID).Scan(&roleExists)
+	err := readDB.QueryRow("SELECT EXISTS(SELECT 1 FROM workspace_roles WHERE id = ?)", req.RoleID).Scan(&roleExists)
 	if err != nil || !roleExists {
 		http.Error(w, "Role not found", http.StatusNotFound)
 		return
 	}
 
 	// Insert or update role assignment
-	_, err = h.getWriteDB().Exec(`
+	_, err = writeDB.Exec(`
 		INSERT INTO user_workspace_roles (user_id, workspace_id, role_id, granted_by, granted_at)
 		VALUES (?, ?, ?, ?, ?)
 		ON CONFLICT(user_id, workspace_id, role_id) DO UPDATE SET granted_by = ?, granted_at = ?
@@ -177,11 +186,11 @@ func (h *WorkspaceRoleHandler) AssignRoleToUser(w http.ResponseWriter, r *http.R
 	if currentUser != nil {
 		// Get role, target user, and workspace details for audit log
 		var roleName, targetUsername, workspaceName string
-		h.getReadDB().QueryRow("SELECT name FROM workspace_roles WHERE id = ?", req.RoleID).Scan(&roleName)
-		h.getReadDB().QueryRow("SELECT username FROM users WHERE id = ?", req.UserID).Scan(&targetUsername)
-		h.getReadDB().QueryRow("SELECT name FROM workspaces WHERE id = ?", req.WorkspaceID).Scan(&workspaceName)
+		readDB.QueryRow("SELECT name FROM workspace_roles WHERE id = ?", req.RoleID).Scan(&roleName)
+		readDB.QueryRow("SELECT username FROM users WHERE id = ?", req.UserID).Scan(&targetUsername)
+		readDB.QueryRow("SELECT name FROM workspaces WHERE id = ?", req.WorkspaceID).Scan(&workspaceName)
 
-		logger.LogAudit(h.db, logger.AuditEvent{
+		logger.LogAudit(h.BaseHandler.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -207,6 +216,15 @@ func (h *WorkspaceRoleHandler) AssignRoleToUser(w http.ResponseWriter, r *http.R
 
 // RevokeRoleFromUser revokes a role from a user in a workspace
 func (h *WorkspaceRoleHandler) RevokeRoleFromUser(w http.ResponseWriter, r *http.Request) {
+	readDB, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
 	userID, err := strconv.Atoi(r.PathValue("userId"))
 	if err != nil {
 		http.Error(w, "Invalid user ID", http.StatusBadRequest)
@@ -225,7 +243,7 @@ func (h *WorkspaceRoleHandler) RevokeRoleFromUser(w http.ResponseWriter, r *http
 		return
 	}
 
-	result, err := h.getWriteDB().Exec(`
+	result, err := writeDB.Exec(`
 		DELETE FROM user_workspace_roles
 		WHERE user_id = ? AND workspace_id = ? AND role_id = ?
 	`, userID, workspaceID, roleID)
@@ -254,11 +272,11 @@ func (h *WorkspaceRoleHandler) RevokeRoleFromUser(w http.ResponseWriter, r *http
 	if currentUser != nil {
 		// Get role, target user, and workspace details for audit log
 		var roleName, targetUsername, workspaceName string
-		h.getReadDB().QueryRow("SELECT name FROM workspace_roles WHERE id = ?", roleID).Scan(&roleName)
-		h.getReadDB().QueryRow("SELECT username FROM users WHERE id = ?", userID).Scan(&targetUsername)
-		h.getReadDB().QueryRow("SELECT name FROM workspaces WHERE id = ?", workspaceID).Scan(&workspaceName)
+		readDB.QueryRow("SELECT name FROM workspace_roles WHERE id = ?", roleID).Scan(&roleName)
+		readDB.QueryRow("SELECT username FROM users WHERE id = ?", userID).Scan(&targetUsername)
+		readDB.QueryRow("SELECT name FROM workspaces WHERE id = ?", workspaceID).Scan(&workspaceName)
 
-		logger.LogAudit(h.db, logger.AuditEvent{
+		logger.LogAudit(h.BaseHandler.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -290,6 +308,11 @@ func (h *WorkspaceRoleHandler) RevokeRoleFromUser(w http.ResponseWriter, r *http
 
 // GetUserRolesInWorkspace returns all roles assigned to a user in a workspace
 func (h *WorkspaceRoleHandler) GetUserRolesInWorkspace(w http.ResponseWriter, r *http.Request) {
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	userID, err := strconv.Atoi(r.PathValue("userId"))
 	if err != nil {
 		http.Error(w, "Invalid user ID", http.StatusBadRequest)
@@ -302,7 +325,7 @@ func (h *WorkspaceRoleHandler) GetUserRolesInWorkspace(w http.ResponseWriter, r 
 		return
 	}
 
-	rows, err := h.getReadDB().Query(`
+	rows, err := db.Query(`
 		SELECT wr.id, wr.name, wr.description, wr.is_system, wr.display_order, wr.created_at, wr.updated_at
 		FROM workspace_roles wr
 		JOIN user_workspace_roles uwr ON wr.id = uwr.role_id
@@ -336,6 +359,11 @@ func (h *WorkspaceRoleHandler) GetUserRolesInWorkspace(w http.ResponseWriter, r 
 
 // GetWorkspaceRoleAssignments returns all users with their role assignments for a workspace
 func (h *WorkspaceRoleHandler) GetWorkspaceRoleAssignments(w http.ResponseWriter, r *http.Request) {
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
 		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
@@ -343,7 +371,7 @@ func (h *WorkspaceRoleHandler) GetWorkspaceRoleAssignments(w http.ResponseWriter
 	}
 
 	// Get all role assignments for this workspace with user details
-	rows, err := h.getReadDB().Query(`
+	rows, err := db.Query(`
 		SELECT
 			u.id, u.username, u.email, u.first_name, u.last_name, u.avatar_url,
 			wr.id, wr.name, wr.description,
@@ -444,6 +472,11 @@ type everyoneRoleResponse struct {
 
 // GetEveryoneRole returns the role assigned to the implicit Everyone principal for a workspace.
 func (h *WorkspaceRoleHandler) GetEveryoneRole(w http.ResponseWriter, r *http.Request) {
+	db, ok := h.requireReadDB(w)
+	if !ok {
+		return
+	}
+
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
 		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
@@ -451,7 +484,7 @@ func (h *WorkspaceRoleHandler) GetEveryoneRole(w http.ResponseWriter, r *http.Re
 	}
 
 	var storedRole sql.NullInt64
-	err = h.getReadDB().QueryRow(`
+	err = db.QueryRow(`
 		SELECT role_id FROM workspace_everyone_roles WHERE workspace_id = ?
 	`, workspaceID).Scan(&storedRole)
 
@@ -508,6 +541,11 @@ type setEveryoneRoleRequest struct {
 
 // SetEveryoneRole assigns or removes the Everyone role for a workspace.
 func (h *WorkspaceRoleHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Request) {
+	writeDB, ok := h.requireWriteDB(w)
+	if !ok {
+		return
+	}
+
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
 		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
@@ -562,7 +600,7 @@ func (h *WorkspaceRoleHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Re
 		roleValue = sql.NullInt64{Valid: false}
 	}
 
-	_, err = h.getWriteDB().Exec(`
+	_, err = writeDB.Exec(`
 		INSERT INTO workspace_everyone_roles (workspace_id, role_id, granted_by, granted_at)
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT(workspace_id) DO UPDATE SET role_id=excluded.role_id, granted_by=excluded.granted_by, granted_at=excluded.granted_at
@@ -586,8 +624,12 @@ func (h *WorkspaceRoleHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Re
 }
 
 func (h *WorkspaceRoleHandler) getWorkspaceRoleByID(roleID int) (*models.WorkspaceRole, error) {
+	db, err := h.getReadDB()
+	if err != nil {
+		return nil, err
+	}
 	var role models.WorkspaceRole
-	err := h.getReadDB().QueryRow(`
+	err = db.QueryRow(`
 		SELECT id, name, description, is_system, display_order, created_at, updated_at
 		FROM workspace_roles
 		WHERE id = ?
@@ -599,8 +641,12 @@ func (h *WorkspaceRoleHandler) getWorkspaceRoleByID(roleID int) (*models.Workspa
 }
 
 func (h *WorkspaceRoleHandler) getViewerRole() (*models.WorkspaceRole, error) {
+	db, err := h.getReadDB()
+	if err != nil {
+		return nil, err
+	}
 	var role models.WorkspaceRole
-	err := h.getReadDB().QueryRow(`
+	err = db.QueryRow(`
 		SELECT id, name, description, is_system, display_order, created_at, updated_at
 		FROM workspace_roles
 		WHERE name = 'Viewer'
@@ -614,8 +660,12 @@ func (h *WorkspaceRoleHandler) getViewerRole() (*models.WorkspaceRole, error) {
 
 // hasWorkspaceViewerAssignment returns true if any user/group has viewer-level access (item.view) in the workspace.
 func (h *WorkspaceRoleHandler) hasWorkspaceViewerAssignment(workspaceID int) (bool, error) {
+	db, err := h.getReadDB()
+	if err != nil {
+		return false, err
+	}
 	var exists bool
-	err := h.getReadDB().QueryRow(`
+	err = db.QueryRow(`
 		SELECT EXISTS(
 			SELECT 1 FROM user_workspace_roles uwr
 			JOIN role_permissions rp ON uwr.role_id = rp.role_id
