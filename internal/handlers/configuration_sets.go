@@ -12,6 +12,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
@@ -35,6 +36,7 @@ const notificationSettingColumns = `
 
 type ConfigurationSetHandler struct {
 	db                  database.Database
+	repo                *repository.ConfigurationSetRepository
 	notificationService interface {
 		ForceRefreshCache() error
 	} // Notification service for cache refresh (optional, can be nil)
@@ -43,6 +45,7 @@ type ConfigurationSetHandler struct {
 func NewConfigurationSetHandler(db database.Database, notificationService interface{ ForceRefreshCache() error }) *ConfigurationSetHandler {
 	return &ConfigurationSetHandler{
 		db:                  db,
+		repo:                repository.NewConfigurationSetRepository(db),
 		notificationService: notificationService,
 	}
 }
@@ -74,271 +77,11 @@ func (h *ConfigurationSetHandler) GetAll(w http.ResponseWriter, r *http.Request)
 	// Parse search parameter
 	search := r.URL.Query().Get("search")
 
-	// Build WHERE clause for search
-	whereClause := ""
-	args := []interface{}{}
-	if search != "" {
-		whereClause = "WHERE LOWER(cs.name) LIKE ?"
-		args = append(args, "%"+strings.ToLower(search)+"%")
-	}
-
-	// Build count query
-	countQuery := fmt.Sprintf(`
-		SELECT COUNT(*)
-		FROM configuration_sets cs
-		%s`, whereClause)
-
-	var totalCount int
-	err := h.db.QueryRow(countQuery, args...).Scan(&totalCount)
+	// Use repository to fetch configuration sets with all relations
+	configSets, totalCount, err := h.repo.List(page, limit, search)
 	if err != nil {
-		http.Error(w, "Failed to get total count: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to list configuration sets: "+err.Error(), http.StatusInternalServerError)
 		return
-	}
-
-	// Build data query with pagination
-	offset := (page - 1) * limit
-	query := fmt.Sprintf(`
-		SELECT cs.id, cs.name, cs.description, cs.is_default, cs.differentiate_by_item_type, cs.workflow_id,
-		       cs.default_item_type_id,
-		       %s,
-		       cs.created_at, cs.updated_at,
-		       wf.name as workflow_name,
-		       dit.name as default_item_type_name
-		FROM configuration_sets cs
-		LEFT JOIN workflows wf ON cs.workflow_id = wf.id
-		LEFT JOIN item_types dit ON cs.default_item_type_id = dit.id
-		%s
-		ORDER BY cs.is_default DESC, cs.name
-		LIMIT ? OFFSET ?`, notificationSettingColumns, whereClause)
-
-	// Add pagination parameters to args
-	paginationArgs := append(args, limit, offset)
-
-	rows, err := h.db.Query(query, paginationArgs...)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
-	var configSets []models.ConfigurationSet
-	for rows.Next() {
-		var cs models.ConfigurationSet
-		var workflowName sql.NullString
-		var workflowID sql.NullInt64
-		var defaultItemTypeID sql.NullInt64
-		var notificationSettingID sql.NullInt64
-		var notificationSettingName sql.NullString
-		var defaultItemTypeName sql.NullString
-		err := rows.Scan(&cs.ID, &cs.Name, &cs.Description,
-			&cs.IsDefault, &cs.DifferentiateByItemType, &workflowID, &defaultItemTypeID, &notificationSettingID, &notificationSettingName, &cs.CreatedAt, &cs.UpdatedAt, &workflowName, &defaultItemTypeName)
-
-		cs.WorkflowName = workflowName.String
-		cs.NotificationSettingName = notificationSettingName.String
-		cs.DefaultItemTypeName = defaultItemTypeName.String
-		cs.WorkflowID = utils.NullInt64ToPtr(workflowID)
-		cs.NotificationSettingID = utils.NullInt64ToPtr(notificationSettingID)
-		cs.DefaultItemTypeID = utils.NullInt64ToPtr(defaultItemTypeID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// Load workspace assignments for this configuration set
-		workspaceQuery := `
-			SELECT w.id, w.name
-			FROM workspace_configuration_sets wcs
-			JOIN workspaces w ON wcs.workspace_id = w.id
-			WHERE wcs.configuration_set_id = ?
-			ORDER BY w.name`
-
-		workspaceRows, err := h.db.Query(workspaceQuery, cs.ID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		var workspaceIDs []int
-		var workspaceNames []string
-		for workspaceRows.Next() {
-			var workspaceID int
-			var workspaceName string
-			if err := workspaceRows.Scan(&workspaceID, &workspaceName); err != nil {
-				workspaceRows.Close()
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			workspaceIDs = append(workspaceIDs, workspaceID)
-			workspaceNames = append(workspaceNames, workspaceName)
-		}
-		workspaceRows.Close()
-
-		cs.WorkspaceIDs = workspaceIDs
-		cs.Workspaces = workspaceNames
-
-		// Load screen assignments for this configuration set
-		screenQuery := `
-			SELECT css.context, css.screen_id, s.name
-			FROM configuration_set_screens css
-			JOIN screens s ON css.screen_id = s.id
-			WHERE css.configuration_set_id = ?`
-
-		screenRows, err := h.db.Query(screenQuery, cs.ID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		for screenRows.Next() {
-			var context string
-			var screenID int
-			var screenName string
-			if err := screenRows.Scan(&context, &screenID, &screenName); err != nil {
-				screenRows.Close()
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			// Assign to appropriate context field
-			switch context {
-			case "create":
-				cs.CreateScreenID = &screenID
-				cs.CreateScreenName = screenName
-			case "edit":
-				cs.EditScreenID = &screenID
-				cs.EditScreenName = screenName
-			case "view":
-				cs.ViewScreenID = &screenID
-				cs.ViewScreenName = screenName
-			}
-		}
-		screenRows.Close()
-
-		// Load item types for this configuration set via junction table with override information
-		itemTypeQuery := `
-			SELECT
-				it.id, it.name, it.icon, it.color, it.hierarchy_level,
-				csit.workflow_id, wf.name as workflow_name,
-				csit.create_screen_id, cs_create.name as create_screen_name,
-				csit.edit_screen_id, cs_edit.name as edit_screen_name,
-				csit.view_screen_id, cs_view.name as view_screen_name
-			FROM configuration_set_item_types csit
-			JOIN item_types it ON csit.item_type_id = it.id
-			LEFT JOIN workflows wf ON csit.workflow_id = wf.id
-			LEFT JOIN screens cs_create ON csit.create_screen_id = cs_create.id
-			LEFT JOIN screens cs_edit ON csit.edit_screen_id = cs_edit.id
-			LEFT JOIN screens cs_view ON csit.view_screen_id = cs_view.id
-			WHERE csit.configuration_set_id = ?
-			ORDER BY it.hierarchy_level, it.sort_order`
-
-		itemTypeRows, err := h.db.Query(itemTypeQuery, cs.ID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		var itemTypeNames []string
-		var itemTypesDetailed []models.ItemTypeDisplay
-		var itemTypeConfigs []models.ItemTypeConfig
-		for itemTypeRows.Next() {
-			var config models.ItemTypeConfig
-			var workflowID sql.NullInt64
-			var workflowName sql.NullString
-			var createScreenID sql.NullInt64
-			var createScreenName sql.NullString
-			var editScreenID sql.NullInt64
-			var editScreenName sql.NullString
-			var viewScreenID sql.NullInt64
-			var viewScreenName sql.NullString
-
-			if err := itemTypeRows.Scan(
-				&config.ItemTypeID, &config.ItemTypeName, &config.ItemTypeIcon, &config.ItemTypeColor, &config.HierarchyLevel,
-				&workflowID, &workflowName,
-				&createScreenID, &createScreenName,
-				&editScreenID, &editScreenName,
-				&viewScreenID, &viewScreenName,
-			); err != nil {
-				itemTypeRows.Close()
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			// Populate override fields (NULL means use config set default)
-			config.WorkflowID = utils.NullInt64ToPtr(workflowID)
-			config.WorkflowName = "Default"
-			if workflowName.Valid {
-				config.WorkflowName = workflowName.String
-			}
-			config.CreateScreenID = utils.NullInt64ToPtr(createScreenID)
-			config.CreateScreenName = "Default"
-			if createScreenName.Valid {
-				config.CreateScreenName = createScreenName.String
-			}
-			config.EditScreenID = utils.NullInt64ToPtr(editScreenID)
-			config.EditScreenName = "Default"
-			if editScreenName.Valid {
-				config.EditScreenName = editScreenName.String
-			}
-			config.ViewScreenID = utils.NullInt64ToPtr(viewScreenID)
-			config.ViewScreenName = "Default"
-			if viewScreenName.Valid {
-				config.ViewScreenName = viewScreenName.String
-			}
-
-			itemTypeNames = append(itemTypeNames, config.ItemTypeName)
-			itemTypesDetailed = append(itemTypesDetailed, models.ItemTypeDisplay{
-				Name:           config.ItemTypeName,
-				Icon:           config.ItemTypeIcon,
-				Color:          config.ItemTypeColor,
-				HierarchyLevel: config.HierarchyLevel,
-			})
-			itemTypeConfigs = append(itemTypeConfigs, config)
-		}
-		itemTypeRows.Close()
-
-		cs.ItemTypes = itemTypeNames             // Keep for backward compatibility
-		cs.ItemTypesDetailed = itemTypesDetailed // Keep for backward compatibility
-		cs.ItemTypeConfigs = itemTypeConfigs     // New field with override information
-
-		// Load priorities for this configuration set via junction table
-		priorityQuery := `
-			SELECT p.id, p.name, p.icon, p.color, p.sort_order
-			FROM configuration_set_priorities csp
-			JOIN priorities p ON csp.priority_id = p.id
-			WHERE csp.configuration_set_id = ?
-			ORDER BY p.sort_order`
-
-		priorityRows, err := h.db.Query(priorityQuery, cs.ID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		var priorityIDs []int
-		var priorityNames []string
-		var prioritiesDetailed []models.PriorityDisplay
-		for priorityRows.Next() {
-			var priority models.PriorityDisplay
-			if err := priorityRows.Scan(&priority.ID, &priority.Name, &priority.Icon, &priority.Color, &priority.SortOrder); err != nil {
-				priorityRows.Close()
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			priorityIDs = append(priorityIDs, priority.ID)
-			priorityNames = append(priorityNames, priority.Name)
-			prioritiesDetailed = append(prioritiesDetailed, priority)
-		}
-		priorityRows.Close()
-
-		cs.PriorityIDs = priorityIDs
-		cs.Priorities = priorityNames // Keep for backward compatibility
-		cs.PrioritiesDetailed = prioritiesDetailed
-
-		configSets = append(configSets, cs)
-	}
-
-	if configSets == nil {
-		configSets = []models.ConfigurationSet{}
 	}
 
 	// Create paginated response
@@ -361,36 +104,9 @@ func (h *ConfigurationSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var cs models.ConfigurationSet
-	var workflowName sql.NullString
-	var workflowID sql.NullInt64
-	var defaultItemTypeID sql.NullInt64
-	var notificationSettingID sql.NullInt64
-	var notificationSettingName sql.NullString
-	var defaultItemTypeName sql.NullString
-	query := fmt.Sprintf(`
-		SELECT cs.id, cs.name, cs.description, cs.is_default, cs.differentiate_by_item_type, cs.workflow_id,
-		       cs.default_item_type_id,
-		       %s,
-		       cs.created_at, cs.updated_at,
-		       wf.name as workflow_name,
-		       dit.name as default_item_type_name
-		FROM configuration_sets cs
-		LEFT JOIN workflows wf ON cs.workflow_id = wf.id
-		LEFT JOIN item_types dit ON cs.default_item_type_id = dit.id
-		WHERE cs.id = ?
-	`, notificationSettingColumns)
-	err := h.db.QueryRow(query, id).Scan(&cs.ID, &cs.Name, &cs.Description,
-		&cs.IsDefault, &cs.DifferentiateByItemType, &workflowID, &defaultItemTypeID, &notificationSettingID, &notificationSettingName, &cs.CreatedAt, &cs.UpdatedAt, &workflowName, &defaultItemTypeName)
-
-	cs.WorkflowName = workflowName.String
-	cs.NotificationSettingName = notificationSettingName.String
-	cs.DefaultItemTypeName = defaultItemTypeName.String
-	cs.WorkflowID = utils.NullInt64ToPtr(workflowID)
-	cs.NotificationSettingID = utils.NullInt64ToPtr(notificationSettingID)
-	cs.DefaultItemTypeID = utils.NullInt64ToPtr(defaultItemTypeID)
-
-	if err == sql.ErrNoRows {
+	// Use repository to fetch configuration set with all relations
+	cs, err := h.repo.FindByID(id)
+	if err == repository.ErrNotFound {
 		http.Error(w, "Configuration set not found", http.StatusNotFound)
 		return
 	}
@@ -398,192 +114,6 @@ func (h *ConfigurationSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	// Load workspace assignments
-	workspaceQuery := `
-		SELECT w.id, w.name
-		FROM workspace_configuration_sets wcs
-		JOIN workspaces w ON wcs.workspace_id = w.id
-		WHERE wcs.configuration_set_id = ?
-		ORDER BY w.name`
-
-	workspaceRows, err := h.db.Query(workspaceQuery, cs.ID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer workspaceRows.Close()
-
-	var workspaceIDs []int
-	var workspaceNames []string
-	for workspaceRows.Next() {
-		var workspaceID int
-		var workspaceName string
-		if err := workspaceRows.Scan(&workspaceID, &workspaceName); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		workspaceIDs = append(workspaceIDs, workspaceID)
-		workspaceNames = append(workspaceNames, workspaceName)
-	}
-
-	cs.WorkspaceIDs = workspaceIDs
-	cs.Workspaces = workspaceNames
-
-	// Load screen assignments
-	screenQuery := `
-		SELECT css.context, css.screen_id, s.name
-		FROM configuration_set_screens css
-		JOIN screens s ON css.screen_id = s.id
-		WHERE css.configuration_set_id = ?`
-
-	screenRows, err := h.db.Query(screenQuery, cs.ID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer screenRows.Close()
-
-	for screenRows.Next() {
-		var context string
-		var screenID int
-		var screenName string
-		if err := screenRows.Scan(&context, &screenID, &screenName); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// Assign to appropriate context field
-		switch context {
-		case "create":
-			cs.CreateScreenID = &screenID
-			cs.CreateScreenName = screenName
-		case "edit":
-			cs.EditScreenID = &screenID
-			cs.EditScreenName = screenName
-		case "view":
-			cs.ViewScreenID = &screenID
-			cs.ViewScreenName = screenName
-		}
-	}
-
-	// Load item types for this configuration set with override information
-	itemTypeQuery := `
-		SELECT
-			it.id, it.name, it.icon, it.color, it.hierarchy_level,
-			csit.workflow_id, wf.name as workflow_name,
-			csit.create_screen_id, cs_create.name as create_screen_name,
-			csit.edit_screen_id, cs_edit.name as edit_screen_name,
-			csit.view_screen_id, cs_view.name as view_screen_name
-		FROM configuration_set_item_types csit
-		JOIN item_types it ON csit.item_type_id = it.id
-		LEFT JOIN workflows wf ON csit.workflow_id = wf.id
-		LEFT JOIN screens cs_create ON csit.create_screen_id = cs_create.id
-		LEFT JOIN screens cs_edit ON csit.edit_screen_id = cs_edit.id
-		LEFT JOIN screens cs_view ON csit.view_screen_id = cs_view.id
-		WHERE csit.configuration_set_id = ?
-		ORDER BY it.hierarchy_level, it.sort_order`
-
-	itemTypeRows, err := h.db.Query(itemTypeQuery, cs.ID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer itemTypeRows.Close()
-
-	var itemTypeNames []string
-	var itemTypesDetailed []models.ItemTypeDisplay
-	var itemTypeConfigs []models.ItemTypeConfig
-	for itemTypeRows.Next() {
-		var config models.ItemTypeConfig
-		var workflowID sql.NullInt64
-		var workflowName sql.NullString
-		var createScreenID sql.NullInt64
-		var createScreenName sql.NullString
-		var editScreenID sql.NullInt64
-		var editScreenName sql.NullString
-		var viewScreenID sql.NullInt64
-		var viewScreenName sql.NullString
-
-		if err := itemTypeRows.Scan(
-			&config.ItemTypeID, &config.ItemTypeName, &config.ItemTypeIcon, &config.ItemTypeColor, &config.HierarchyLevel,
-			&workflowID, &workflowName,
-			&createScreenID, &createScreenName,
-			&editScreenID, &editScreenName,
-			&viewScreenID, &viewScreenName,
-		); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// Populate override fields (NULL means use config set default)
-		config.WorkflowID = utils.NullInt64ToPtr(workflowID)
-		config.WorkflowName = "Default"
-		if workflowName.Valid {
-			config.WorkflowName = workflowName.String
-		}
-		config.CreateScreenID = utils.NullInt64ToPtr(createScreenID)
-		config.CreateScreenName = "Default"
-		if createScreenName.Valid {
-			config.CreateScreenName = createScreenName.String
-		}
-		config.EditScreenID = utils.NullInt64ToPtr(editScreenID)
-		config.EditScreenName = "Default"
-		if editScreenName.Valid {
-			config.EditScreenName = editScreenName.String
-		}
-		config.ViewScreenID = utils.NullInt64ToPtr(viewScreenID)
-		config.ViewScreenName = "Default"
-		if viewScreenName.Valid {
-			config.ViewScreenName = viewScreenName.String
-		}
-
-		itemTypeNames = append(itemTypeNames, config.ItemTypeName)
-		itemTypesDetailed = append(itemTypesDetailed, models.ItemTypeDisplay{
-			Name:           config.ItemTypeName,
-			Icon:           config.ItemTypeIcon,
-			Color:          config.ItemTypeColor,
-			HierarchyLevel: config.HierarchyLevel,
-		})
-		itemTypeConfigs = append(itemTypeConfigs, config)
-	}
-
-	cs.ItemTypes = itemTypeNames             // Keep for backward compatibility
-	cs.ItemTypesDetailed = itemTypesDetailed // Keep for backward compatibility
-	cs.ItemTypeConfigs = itemTypeConfigs     // New field with override information
-
-	// Load priorities for this configuration set via junction table
-	priorityQuery := `
-		SELECT p.id, p.name, p.icon, p.color, p.sort_order
-		FROM configuration_set_priorities csp
-		JOIN priorities p ON csp.priority_id = p.id
-		WHERE csp.configuration_set_id = ?
-		ORDER BY p.sort_order`
-
-	priorityRows, err := h.db.Query(priorityQuery, cs.ID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer priorityRows.Close()
-
-	var priorityIDs []int
-	var priorityNames []string
-	var prioritiesDetailed []models.PriorityDisplay
-	for priorityRows.Next() {
-		var priority models.PriorityDisplay
-		if err := priorityRows.Scan(&priority.ID, &priority.Name, &priority.Icon, &priority.Color, &priority.SortOrder); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		priorityIDs = append(priorityIDs, priority.ID)
-		priorityNames = append(priorityNames, priority.Name)
-		prioritiesDetailed = append(prioritiesDetailed, priority)
-	}
-
-	cs.PriorityIDs = priorityIDs
-	cs.Priorities = priorityNames // Keep for backward compatibility
-	cs.PrioritiesDetailed = prioritiesDetailed
 
 	respondJSONOK(w, cs)
 }
@@ -603,9 +133,8 @@ func (h *ConfigurationSetHandler) Create(w http.ResponseWriter, r *http.Request)
 
 	// Verify workspaces exist
 	for _, workspaceID := range cs.WorkspaceIDs {
-		var workspaceExists bool
-		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", workspaceID).Scan(&workspaceExists)
-		if err != nil || !workspaceExists {
+		exists, err := h.repo.WorkspaceExists(workspaceID)
+		if err != nil || !exists {
 			http.Error(w, "One or more workspaces not found", http.StatusBadRequest)
 			return
 		}
@@ -619,93 +148,47 @@ func (h *ConfigurationSetHandler) Create(w http.ResponseWriter, r *http.Request)
 	}
 	defer tx.Rollback()
 
-	now := time.Now()
-	var id int64
-	err = tx.QueryRow(`
-		INSERT INTO configuration_sets (name, description, is_default, differentiate_by_item_type, workflow_id, default_item_type_id, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-	`, cs.Name, cs.Description, cs.IsDefault, cs.DifferentiateByItemType, cs.WorkflowID, cs.DefaultItemTypeID, now, now).Scan(&id)
-
+	// Create the configuration set
+	id, err := h.repo.Create(tx, &cs)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	configSetID := int(id)
 
-	// Insert notification setting into join table if provided
+	// Save notification setting
+	var notificationSettingID *int
 	if cs.NotificationSettingID != nil {
-		_, err = tx.Exec(`
-			INSERT INTO configuration_set_notification_settings (configuration_set_id, notification_setting_id, created_at)
-			VALUES (?, ?, ?)
-		`, id, *cs.NotificationSettingID, now)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		nsID := int(*cs.NotificationSettingID)
+		notificationSettingID = &nsID
+	}
+	if err := h.repo.SaveNotificationSetting(tx, configSetID, notificationSettingID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	// Insert workspace assignments
-	for _, workspaceID := range cs.WorkspaceIDs {
-		_, err = tx.Exec(`
-			INSERT INTO workspace_configuration_sets (workspace_id, configuration_set_id, created_at)
-			VALUES (?, ?, ?)
-		`, workspaceID, id, now)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+	// Save workspace assignments
+	if err := h.repo.SaveWorkspaceAssignments(tx, configSetID, cs.WorkspaceIDs); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	// Insert screen assignments
-	screenAssignments := []struct {
-		screenID *int
-		context  string
-	}{
-		{cs.CreateScreenID, "create"},
-		{cs.EditScreenID, "edit"},
-		{cs.ViewScreenID, "view"},
+	// Save screen assignments
+	if err := h.repo.SaveScreenAssignments(tx, configSetID, cs.CreateScreenID, cs.EditScreenID, cs.ViewScreenID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	for _, assignment := range screenAssignments {
-		if assignment.screenID != nil {
-			_, err = tx.Exec(`
-				INSERT INTO configuration_set_screens (configuration_set_id, screen_id, context, created_at)
-				VALUES (?, ?, ?, ?)
-			`, id, *assignment.screenID, assignment.context, now)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		}
+	// Save item type configurations
+	if err := h.repo.SaveItemTypeConfigs(tx, configSetID, cs.ItemTypeConfigs); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	// Insert item type configurations with overrides
-	for _, itemTypeConfig := range cs.ItemTypeConfigs {
-		_, err = tx.Exec(`
-			INSERT INTO configuration_set_item_types (
-				configuration_set_id, item_type_id,
-				workflow_id, create_screen_id, edit_screen_id, view_screen_id,
-				created_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?)
-		`, id, itemTypeConfig.ItemTypeID,
-			itemTypeConfig.WorkflowID, itemTypeConfig.CreateScreenID,
-			itemTypeConfig.EditScreenID, itemTypeConfig.ViewScreenID,
-			now)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-
-	// Insert priority associations
-	for _, priorityID := range cs.PriorityIDs {
-		_, err = tx.Exec(`
-			INSERT INTO configuration_set_priorities (configuration_set_id, priority_id, created_at)
-			VALUES (?, ?, ?)
-		`, id, priorityID, now)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+	// Save priority assignments
+	if err := h.repo.SavePriorityAssignments(tx, configSetID, cs.PriorityIDs); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	// Commit transaction
@@ -722,190 +205,16 @@ func (h *ConfigurationSetHandler) Create(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	// Return the created configuration set
-	var workflowName sql.NullString
-	var workflowID sql.NullInt64
-	var notificationSettingID sql.NullInt64
-	var notificationSettingName sql.NullString
-	query := fmt.Sprintf(`
-		SELECT cs.id, cs.name, cs.description, cs.is_default, cs.workflow_id,
-		       %s,
-		       cs.created_at, cs.updated_at,
-		       wf.name as workflow_name
-		FROM configuration_sets cs
-		LEFT JOIN workflows wf ON cs.workflow_id = wf.id
-		WHERE cs.id = ?
-	`, notificationSettingColumns)
-	err = h.db.QueryRow(query, id).Scan(&cs.ID, &cs.Name, &cs.Description,
-		&cs.IsDefault, &workflowID, &notificationSettingID, &notificationSettingName, &cs.CreatedAt, &cs.UpdatedAt, &workflowName)
-
-	cs.WorkflowName = workflowName.String
-	cs.NotificationSettingName = notificationSettingName.String
-	cs.WorkflowID = utils.NullInt64ToPtr(workflowID)
-	cs.NotificationSettingID = utils.NullInt64ToPtr(notificationSettingID)
-
+	// Load and return the created configuration set with all relations
+	createdCS, err := h.repo.FindByID(configSetID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	// Load workspace assignments
-	workspaceQuery := `
-		SELECT w.id, w.name
-		FROM workspace_configuration_sets wcs
-		JOIN workspaces w ON wcs.workspace_id = w.id
-		WHERE wcs.configuration_set_id = ?
-		ORDER BY w.name`
-
-	workspaceRows, err := h.db.Query(workspaceQuery, cs.ID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer workspaceRows.Close()
-
-	var workspaceIDs []int
-	var workspaceNames []string
-	for workspaceRows.Next() {
-		var workspaceID int
-		var workspaceName string
-		if err := workspaceRows.Scan(&workspaceID, &workspaceName); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		workspaceIDs = append(workspaceIDs, workspaceID)
-		workspaceNames = append(workspaceNames, workspaceName)
-	}
-
-	cs.WorkspaceIDs = workspaceIDs
-	cs.Workspaces = workspaceNames
-
-	// Load screen assignments
-	screenQuery := `
-		SELECT css.context, css.screen_id, s.name
-		FROM configuration_set_screens css
-		JOIN screens s ON css.screen_id = s.id
-		WHERE css.configuration_set_id = ?`
-
-	screenRows, err := h.db.Query(screenQuery, cs.ID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer screenRows.Close()
-
-	for screenRows.Next() {
-		var context string
-		var screenID int
-		var screenName string
-		if err := screenRows.Scan(&context, &screenID, &screenName); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// Assign to appropriate context field
-		switch context {
-		case "create":
-			cs.CreateScreenID = &screenID
-			cs.CreateScreenName = screenName
-		case "edit":
-			cs.EditScreenID = &screenID
-			cs.EditScreenName = screenName
-		case "view":
-			cs.ViewScreenID = &screenID
-			cs.ViewScreenName = screenName
-		}
-	}
-
-	// Load item types for this configuration set with override information
-	itemTypeQuery := `
-		SELECT
-			it.id, it.name, it.icon, it.color, it.hierarchy_level,
-			csit.workflow_id, wf.name as workflow_name,
-			csit.create_screen_id, cs_create.name as create_screen_name,
-			csit.edit_screen_id, cs_edit.name as edit_screen_name,
-			csit.view_screen_id, cs_view.name as view_screen_name
-		FROM configuration_set_item_types csit
-		JOIN item_types it ON csit.item_type_id = it.id
-		LEFT JOIN workflows wf ON csit.workflow_id = wf.id
-		LEFT JOIN screens cs_create ON csit.create_screen_id = cs_create.id
-		LEFT JOIN screens cs_edit ON csit.edit_screen_id = cs_edit.id
-		LEFT JOIN screens cs_view ON csit.view_screen_id = cs_view.id
-		WHERE csit.configuration_set_id = ?
-		ORDER BY it.hierarchy_level, it.sort_order`
-
-	itemTypeRows, err := h.db.Query(itemTypeQuery, cs.ID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer itemTypeRows.Close()
-
-	var itemTypeNames []string
-	var itemTypesDetailed []models.ItemTypeDisplay
-	var itemTypeConfigs []models.ItemTypeConfig
-	for itemTypeRows.Next() {
-		var config models.ItemTypeConfig
-		var workflowID sql.NullInt64
-		var workflowName sql.NullString
-		var createScreenID sql.NullInt64
-		var createScreenName sql.NullString
-		var editScreenID sql.NullInt64
-		var editScreenName sql.NullString
-		var viewScreenID sql.NullInt64
-		var viewScreenName sql.NullString
-
-		if err := itemTypeRows.Scan(
-			&config.ItemTypeID, &config.ItemTypeName, &config.ItemTypeIcon, &config.ItemTypeColor, &config.HierarchyLevel,
-			&workflowID, &workflowName,
-			&createScreenID, &createScreenName,
-			&editScreenID, &editScreenName,
-			&viewScreenID, &viewScreenName,
-		); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// Populate override fields (NULL means use config set default)
-		config.WorkflowID = utils.NullInt64ToPtr(workflowID)
-		config.WorkflowName = "Default"
-		if workflowName.Valid {
-			config.WorkflowName = workflowName.String
-		}
-		config.CreateScreenID = utils.NullInt64ToPtr(createScreenID)
-		config.CreateScreenName = "Default"
-		if createScreenName.Valid {
-			config.CreateScreenName = createScreenName.String
-		}
-		config.EditScreenID = utils.NullInt64ToPtr(editScreenID)
-		config.EditScreenName = "Default"
-		if editScreenName.Valid {
-			config.EditScreenName = editScreenName.String
-		}
-		config.ViewScreenID = utils.NullInt64ToPtr(viewScreenID)
-		config.ViewScreenName = "Default"
-		if viewScreenName.Valid {
-			config.ViewScreenName = viewScreenName.String
-		}
-
-		itemTypeNames = append(itemTypeNames, config.ItemTypeName)
-		itemTypesDetailed = append(itemTypesDetailed, models.ItemTypeDisplay{
-			Name:           config.ItemTypeName,
-			Icon:           config.ItemTypeIcon,
-			Color:          config.ItemTypeColor,
-			HierarchyLevel: config.HierarchyLevel,
-		})
-		itemTypeConfigs = append(itemTypeConfigs, config)
-	}
-
-	cs.ItemTypes = itemTypeNames             // Keep for backward compatibility
-	cs.ItemTypesDetailed = itemTypesDetailed // Keep for backward compatibility
-	cs.ItemTypeConfigs = itemTypeConfigs     // New field with override information
 
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		csID := int(id)
 		logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
@@ -913,18 +222,18 @@ func (h *ConfigurationSetHandler) Create(w http.ResponseWriter, r *http.Request)
 			UserAgent:    r.UserAgent(),
 			ActionType:   logger.ActionConfigSetCreate,
 			ResourceType: logger.ResourceConfigurationSet,
-			ResourceID:   &csID,
-			ResourceName: cs.Name,
+			ResourceID:   &configSetID,
+			ResourceName: createdCS.Name,
 			Details: map[string]interface{}{
-				"description":     cs.Description,
-				"workflow_id":     cs.WorkflowID,
-				"workspace_count": len(cs.WorkspaceIDs),
+				"description":     createdCS.Description,
+				"workflow_id":     createdCS.WorkflowID,
+				"workspace_count": len(createdCS.WorkspaceIDs),
 			},
 			Success: true,
 		})
 	}
 
-	respondJSONCreatedWithWarnings(w, cs, warnings)
+	respondJSONCreatedWithWarnings(w, createdCS, warnings)
 }
 
 func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -934,14 +243,8 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Get the old configuration set for audit logging
-	var oldCS models.ConfigurationSet
-	err := h.db.QueryRow(`
-		SELECT id, name, description, is_default, differentiate_by_item_type, workflow_id
-		FROM configuration_sets
-		WHERE id = ?
-	`, id).Scan(&oldCS.ID, &oldCS.Name, &oldCS.Description, &oldCS.IsDefault, &oldCS.DifferentiateByItemType, &oldCS.WorkflowID)
-
-	if err == sql.ErrNoRows {
+	oldCS, err := h.repo.FindByIDBasic(id)
+	if err == repository.ErrNotFound {
 		http.Error(w, "Configuration set not found", http.StatusNotFound)
 		return
 	}
@@ -962,11 +265,10 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Verify workspaces exist (only if workspaces are provided)
+	// Verify workspaces exist
 	for _, workspaceID := range cs.WorkspaceIDs {
-		var workspaceExists bool
-		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", workspaceID).Scan(&workspaceExists)
-		if err != nil || !workspaceExists {
+		exists, err := h.repo.WorkspaceExists(workspaceID)
+		if err != nil || !exists {
 			http.Error(w, "One or more workspaces not found", http.StatusBadRequest)
 			return
 		}
@@ -977,15 +279,16 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 	skipMigrationCheck := r.URL.Query().Get("skip_migration_check") == "true"
 	if !skipMigrationCheck {
 		for _, workspaceID := range cs.WorkspaceIDs {
-			var currentConfigSetID sql.NullInt64
-			h.db.QueryRow(`
-				SELECT configuration_set_id FROM workspace_configuration_sets WHERE workspace_id = ?
-			`, workspaceID).Scan(&currentConfigSetID)
+			currentConfigSetID, err := h.repo.GetWorkspaceConfigSetID(workspaceID)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 
 			// If workspace is currently assigned to a different config set
-			if currentConfigSetID.Valid && int(currentConfigSetID.Int64) != id {
+			if currentConfigSetID != nil && *currentConfigSetID != id {
 				// Analyze migration requirements
-				sourceID := int(currentConfigSetID.Int64)
+				sourceID := *currentConfigSetID
 
 				itemTypeMigrations, _, requiresItemTypeMigration := h.analyzeItemTypeMigration(workspaceID, sourceID, id)
 				customFieldMigrations, requiresFieldMigration := h.analyzeCustomFieldMigration(workspaceID, sourceID, id)
@@ -1043,128 +346,45 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 	}
 	defer tx.Rollback()
 
-	now := time.Now()
-	_, err = tx.Exec(`
-		UPDATE configuration_sets
-		SET name = ?, description = ?, is_default = ?, differentiate_by_item_type = ?, workflow_id = ?, default_item_type_id = ?, updated_at = ?
-		WHERE id = ?
-	`, cs.Name, cs.Description, cs.IsDefault, cs.DifferentiateByItemType, cs.WorkflowID, cs.DefaultItemTypeID, now, id)
-
-	if err != nil {
+	// Update the configuration set
+	if err := h.repo.Update(tx, id, &cs); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Delete existing notification setting assignments from join table
-	_, err = tx.Exec("DELETE FROM configuration_set_notification_settings WHERE configuration_set_id = ?", id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Insert new notification setting into join table if provided
+	// Save notification setting
+	var notificationSettingID *int
 	if cs.NotificationSettingID != nil {
-		_, err = tx.Exec(`
-			INSERT INTO configuration_set_notification_settings (configuration_set_id, notification_setting_id, created_at)
-			VALUES (?, ?, ?)
-		`, id, *cs.NotificationSettingID, now)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		nsID := int(*cs.NotificationSettingID)
+		notificationSettingID = &nsID
 	}
-
-	// Delete existing workspace assignments
-	_, err = tx.Exec("DELETE FROM workspace_configuration_sets WHERE configuration_set_id = ?", id)
-	if err != nil {
+	if err := h.repo.SaveNotificationSetting(tx, id, notificationSettingID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Insert new workspace assignments
-	for _, workspaceID := range cs.WorkspaceIDs {
-		_, err = tx.Exec(`
-			INSERT INTO workspace_configuration_sets (workspace_id, configuration_set_id, created_at)
-			VALUES (?, ?, ?)
-		`, workspaceID, id, now)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-
-	// Delete existing screen assignments
-	_, err = tx.Exec("DELETE FROM configuration_set_screens WHERE configuration_set_id = ?", id)
-	if err != nil {
+	// Save workspace assignments
+	if err := h.repo.SaveWorkspaceAssignments(tx, id, cs.WorkspaceIDs); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Insert new screen assignments
-	screenAssignments := []struct {
-		screenID *int
-		context  string
-	}{
-		{cs.CreateScreenID, "create"},
-		{cs.EditScreenID, "edit"},
-		{cs.ViewScreenID, "view"},
-	}
-
-	for _, assignment := range screenAssignments {
-		if assignment.screenID != nil {
-			_, err = tx.Exec(`
-				INSERT INTO configuration_set_screens (configuration_set_id, screen_id, context, created_at)
-				VALUES (?, ?, ?, ?)
-			`, id, *assignment.screenID, assignment.context, now)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		}
-	}
-
-	// Delete existing item type configurations
-	_, err = tx.Exec("DELETE FROM configuration_set_item_types WHERE configuration_set_id = ?", id)
-	if err != nil {
+	// Save screen assignments
+	if err := h.repo.SaveScreenAssignments(tx, id, cs.CreateScreenID, cs.EditScreenID, cs.ViewScreenID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Insert new item type configurations with overrides
-	for _, itemTypeConfig := range cs.ItemTypeConfigs {
-		_, err = tx.Exec(`
-			INSERT INTO configuration_set_item_types (
-				configuration_set_id, item_type_id,
-				workflow_id, create_screen_id, edit_screen_id, view_screen_id,
-				created_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?)
-		`, id, itemTypeConfig.ItemTypeID,
-			itemTypeConfig.WorkflowID, itemTypeConfig.CreateScreenID,
-			itemTypeConfig.EditScreenID, itemTypeConfig.ViewScreenID,
-			now)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-
-	// Delete existing priority associations
-	_, err = tx.Exec("DELETE FROM configuration_set_priorities WHERE configuration_set_id = ?", id)
-	if err != nil {
+	// Save item type configurations
+	if err := h.repo.SaveItemTypeConfigs(tx, id, cs.ItemTypeConfigs); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Insert new priority associations
-	for _, priorityID := range cs.PriorityIDs {
-		_, err = tx.Exec(`
-			INSERT INTO configuration_set_priorities (configuration_set_id, priority_id, created_at)
-			VALUES (?, ?, ?)
-		`, id, priorityID, now)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+	// Save priority assignments
+	if err := h.repo.SavePriorityAssignments(tx, id, cs.PriorityIDs); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	// Commit transaction
@@ -1181,185 +401,12 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	// Return the updated configuration set
-	var workflowName sql.NullString
-	var workflowID sql.NullInt64
-	var notificationSettingID sql.NullInt64
-	var notificationSettingName sql.NullString
-	query := fmt.Sprintf(`
-		SELECT cs.id, cs.name, cs.description, cs.is_default, cs.workflow_id,
-		       %s,
-		       cs.created_at, cs.updated_at,
-		       wf.name as workflow_name
-		FROM configuration_sets cs
-		LEFT JOIN workflows wf ON cs.workflow_id = wf.id
-		WHERE cs.id = ?
-	`, notificationSettingColumns)
-	err = h.db.QueryRow(query, id).Scan(&cs.ID, &cs.Name, &cs.Description,
-		&cs.IsDefault, &workflowID, &notificationSettingID, &notificationSettingName, &cs.CreatedAt, &cs.UpdatedAt, &workflowName)
-
-	cs.WorkflowName = workflowName.String
-	cs.NotificationSettingName = notificationSettingName.String
-	cs.WorkflowID = utils.NullInt64ToPtr(workflowID)
-	cs.NotificationSettingID = utils.NullInt64ToPtr(notificationSettingID)
-
+	// Load and return the updated configuration set with all relations
+	updatedCS, err := h.repo.FindByID(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	// Load workspace assignments
-	workspaceQuery := `
-		SELECT w.id, w.name
-		FROM workspace_configuration_sets wcs
-		JOIN workspaces w ON wcs.workspace_id = w.id
-		WHERE wcs.configuration_set_id = ?
-		ORDER BY w.name`
-
-	workspaceRows, err := h.db.Query(workspaceQuery, cs.ID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer workspaceRows.Close()
-
-	var workspaceIDs []int
-	var workspaceNames []string
-	for workspaceRows.Next() {
-		var workspaceID int
-		var workspaceName string
-		if err := workspaceRows.Scan(&workspaceID, &workspaceName); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		workspaceIDs = append(workspaceIDs, workspaceID)
-		workspaceNames = append(workspaceNames, workspaceName)
-	}
-
-	cs.WorkspaceIDs = workspaceIDs
-	cs.Workspaces = workspaceNames
-
-	// Load screen assignments
-	screenQuery := `
-		SELECT css.context, css.screen_id, s.name
-		FROM configuration_set_screens css
-		JOIN screens s ON css.screen_id = s.id
-		WHERE css.configuration_set_id = ?`
-
-	screenRows, err := h.db.Query(screenQuery, cs.ID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer screenRows.Close()
-
-	for screenRows.Next() {
-		var context string
-		var screenID int
-		var screenName string
-		if err := screenRows.Scan(&context, &screenID, &screenName); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// Assign to appropriate context field
-		switch context {
-		case "create":
-			cs.CreateScreenID = &screenID
-			cs.CreateScreenName = screenName
-		case "edit":
-			cs.EditScreenID = &screenID
-			cs.EditScreenName = screenName
-		case "view":
-			cs.ViewScreenID = &screenID
-			cs.ViewScreenName = screenName
-		}
-	}
-
-	// Load item types for this configuration set with override information
-	itemTypeQuery := `
-		SELECT
-			it.id, it.name, it.icon, it.color, it.hierarchy_level,
-			csit.workflow_id, wf.name as workflow_name,
-			csit.create_screen_id, cs_create.name as create_screen_name,
-			csit.edit_screen_id, cs_edit.name as edit_screen_name,
-			csit.view_screen_id, cs_view.name as view_screen_name
-		FROM configuration_set_item_types csit
-		JOIN item_types it ON csit.item_type_id = it.id
-		LEFT JOIN workflows wf ON csit.workflow_id = wf.id
-		LEFT JOIN screens cs_create ON csit.create_screen_id = cs_create.id
-		LEFT JOIN screens cs_edit ON csit.edit_screen_id = cs_edit.id
-		LEFT JOIN screens cs_view ON csit.view_screen_id = cs_view.id
-		WHERE csit.configuration_set_id = ?
-		ORDER BY it.hierarchy_level, it.sort_order`
-
-	itemTypeRows, err := h.db.Query(itemTypeQuery, cs.ID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer itemTypeRows.Close()
-
-	var itemTypeNames []string
-	var itemTypesDetailed []models.ItemTypeDisplay
-	var itemTypeConfigs []models.ItemTypeConfig
-	for itemTypeRows.Next() {
-		var config models.ItemTypeConfig
-		var workflowID sql.NullInt64
-		var workflowName sql.NullString
-		var createScreenID sql.NullInt64
-		var createScreenName sql.NullString
-		var editScreenID sql.NullInt64
-		var editScreenName sql.NullString
-		var viewScreenID sql.NullInt64
-		var viewScreenName sql.NullString
-
-		if err := itemTypeRows.Scan(
-			&config.ItemTypeID, &config.ItemTypeName, &config.ItemTypeIcon, &config.ItemTypeColor, &config.HierarchyLevel,
-			&workflowID, &workflowName,
-			&createScreenID, &createScreenName,
-			&editScreenID, &editScreenName,
-			&viewScreenID, &viewScreenName,
-		); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// Populate override fields (NULL means use config set default)
-		config.WorkflowID = utils.NullInt64ToPtr(workflowID)
-		config.WorkflowName = "Default"
-		if workflowName.Valid {
-			config.WorkflowName = workflowName.String
-		}
-		config.CreateScreenID = utils.NullInt64ToPtr(createScreenID)
-		config.CreateScreenName = "Default"
-		if createScreenName.Valid {
-			config.CreateScreenName = createScreenName.String
-		}
-		config.EditScreenID = utils.NullInt64ToPtr(editScreenID)
-		config.EditScreenName = "Default"
-		if editScreenName.Valid {
-			config.EditScreenName = editScreenName.String
-		}
-		config.ViewScreenID = utils.NullInt64ToPtr(viewScreenID)
-		config.ViewScreenName = "Default"
-		if viewScreenName.Valid {
-			config.ViewScreenName = viewScreenName.String
-		}
-
-		itemTypeNames = append(itemTypeNames, config.ItemTypeName)
-		itemTypesDetailed = append(itemTypesDetailed, models.ItemTypeDisplay{
-			Name:           config.ItemTypeName,
-			Icon:           config.ItemTypeIcon,
-			Color:          config.ItemTypeColor,
-			HierarchyLevel: config.HierarchyLevel,
-		})
-		itemTypeConfigs = append(itemTypeConfigs, config)
-	}
-
-	cs.ItemTypes = itemTypeNames             // Keep for backward compatibility
-	cs.ItemTypesDetailed = itemTypesDetailed // Keep for backward compatibility
-	cs.ItemTypeConfigs = itemTypeConfigs     // New field with override information
 
 	// Log audit event with change tracking
 	currentUser := utils.GetCurrentUser(r)
@@ -1367,26 +414,26 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 		details := make(map[string]interface{})
 
 		// Track what changed
-		if oldCS.Name != cs.Name {
+		if oldCS.Name != updatedCS.Name {
 			details["name_changed"] = map[string]interface{}{
 				"old": oldCS.Name,
-				"new": cs.Name,
+				"new": updatedCS.Name,
 			}
 		}
-		if oldCS.Description != cs.Description {
+		if oldCS.Description != updatedCS.Description {
 			details["description_changed"] = map[string]interface{}{
 				"old": oldCS.Description,
-				"new": cs.Description,
+				"new": updatedCS.Description,
 			}
 		}
 		// Track workflow change
 		oldWorkflowID := 0
 		if oldCS.WorkflowID != nil {
-			oldWorkflowID = *oldCS.WorkflowID
+			oldWorkflowID = int(*oldCS.WorkflowID)
 		}
 		newWorkflowID := 0
-		if cs.WorkflowID != nil {
-			newWorkflowID = *cs.WorkflowID
+		if updatedCS.WorkflowID != nil {
+			newWorkflowID = int(*updatedCS.WorkflowID)
 		}
 		if oldWorkflowID != newWorkflowID {
 			details["workflow_changed"] = map[string]interface{}{
@@ -1394,7 +441,7 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 				"new": newWorkflowID,
 			}
 		}
-		details["workspace_count"] = len(cs.WorkspaceIDs)
+		details["workspace_count"] = len(updatedCS.WorkspaceIDs)
 
 		logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
@@ -1404,13 +451,13 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 			ActionType:   logger.ActionConfigSetUpdate,
 			ResourceType: logger.ResourceConfigurationSet,
 			ResourceID:   &id,
-			ResourceName: cs.Name,
+			ResourceName: updatedCS.Name,
 			Details:      details,
 			Success:      true,
 		})
 	}
 
-	respondJSONOKWithWarnings(w, cs, warnings)
+	respondJSONOKWithWarnings(w, updatedCS, warnings)
 }
 
 func (h *ConfigurationSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -1420,15 +467,8 @@ func (h *ConfigurationSetHandler) Delete(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Get the configuration set details for audit logging before deletion
-	var csName, description string
-	var isDefault bool
-	err := h.db.QueryRow(`
-		SELECT name, description, is_default
-		FROM configuration_sets
-		WHERE id = ?
-	`, id).Scan(&csName, &description, &isDefault)
-
-	if err == sql.ErrNoRows {
+	cs, err := h.repo.FindByIDBasic(id)
+	if err == repository.ErrNotFound {
 		http.Error(w, "Configuration set not found", http.StatusNotFound)
 		return
 	}
@@ -1437,8 +477,12 @@ func (h *ConfigurationSetHandler) Delete(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	_, err = h.db.ExecWrite("DELETE FROM configuration_sets WHERE id = ?", id)
-	if err != nil {
+	// Delete the configuration set (including all associations)
+	if err := h.repo.Delete(id); err != nil {
+		if err == repository.ErrNotFound {
+			http.Error(w, "Configuration set not found", http.StatusNotFound)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -1454,10 +498,10 @@ func (h *ConfigurationSetHandler) Delete(w http.ResponseWriter, r *http.Request)
 			ActionType:   logger.ActionConfigSetDelete,
 			ResourceType: logger.ResourceConfigurationSet,
 			ResourceID:   &id,
-			ResourceName: csName,
+			ResourceName: cs.Name,
 			Details: map[string]interface{}{
-				"description": description,
-				"is_default":  isDefault,
+				"description": cs.Description,
+				"is_default":  cs.IsDefault,
 			},
 			Success: true,
 		})

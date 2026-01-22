@@ -10,14 +10,15 @@ import (
 	"windshift/internal/cql"
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/utils"
-
 )
 
 // AssetHandler handles asset management operations
 type AssetHandler struct {
 	db                database.Database
+	repo              *repository.AssetRepository
 	permissionService *services.PermissionService
 }
 
@@ -25,6 +26,7 @@ type AssetHandler struct {
 func NewAssetHandler(db database.Database, permissionService *services.PermissionService) *AssetHandler {
 	return &AssetHandler{
 		db:                db,
+		repo:              repository.NewAssetRepository(db),
 		permissionService: permissionService,
 	}
 }

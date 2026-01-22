@@ -15,12 +15,14 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
 
 type WorkspaceHandler struct {
 	db                database.Database
+	repo              *repository.WorkspaceRepository
 	permissionService *services.PermissionService
 	activityTracker   *services.ActivityTracker
 }
@@ -59,6 +61,7 @@ type UpdateWorkspaceRequest struct {
 func NewWorkspaceHandler(db database.Database, permissionService *services.PermissionService, activityTracker *services.ActivityTracker) *WorkspaceHandler {
 	return &WorkspaceHandler{
 		db:                db,
+		repo:              repository.NewWorkspaceRepository(db),
 		permissionService: permissionService,
 		activityTracker:   activityTracker,
 	}
