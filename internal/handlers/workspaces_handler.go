@@ -8,6 +8,7 @@ import (
 	"time"
 	"windshift/internal/database"
 	"windshift/internal/logger"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -63,7 +64,7 @@ func NewWorkspaceHandler(db database.Database, permissionService *services.Permi
 
 func (h *WorkspaceHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Get user from context
-	user := r.Context().Value("user")
+	user := r.Context().Value(middleware.ContextKeyUser)
 	if user == nil {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
@@ -168,7 +169,7 @@ func (h *WorkspaceHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Get user from context
-	user := r.Context().Value("user")
+	user := r.Context().Value(middleware.ContextKeyUser)
 	if user == nil {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
@@ -657,7 +658,7 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // getUserFromContext retrieves the authenticated user from the request context
 func (h *WorkspaceHandler) getUserFromContext(r *http.Request) *models.User {
-	if user := r.Context().Value("user"); user != nil {
+	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
 		if u, ok := user.(*models.User); ok {
 			return u
 		}

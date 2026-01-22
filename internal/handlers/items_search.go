@@ -13,6 +13,14 @@ import (
 	"windshift/internal/utils"
 )
 
+// Search filter limits to prevent abuse
+const (
+	maxSearchQueryLength  = 500 // Maximum characters for search query
+	maxWorkspaceFilters   = 50  // Maximum number of workspace IDs in filter
+	maxStatusFilters      = 20  // Maximum number of statuses in filter
+	maxPriorityFilters    = 10  // Maximum number of priorities in filter
+)
+
 // Search items across workspaces with advanced filtering
 func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -44,8 +52,8 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 	priorities := r.URL.Query()["priority"]       // Allow multiple priorities
 
 	// Validate and sanitize inputs
-	if len(textQuery) > 500 { // Reasonable limit for search queries
-		http.Error(w, "Search query too long (max 500 characters)", http.StatusBadRequest)
+	if len(textQuery) > maxSearchQueryLength {
+		http.Error(w, fmt.Sprintf("Search query too long (max %d characters)", maxSearchQueryLength), http.StatusBadRequest)
 		return
 	}
 
@@ -84,16 +92,16 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Limit array sizes to prevent abuse
-	if len(workspaceIDs) > 50 {
-		http.Error(w, "Too many workspace filters (max 50)", http.StatusBadRequest)
+	if len(workspaceIDs) > maxWorkspaceFilters {
+		http.Error(w, fmt.Sprintf("Too many workspace filters (max %d)", maxWorkspaceFilters), http.StatusBadRequest)
 		return
 	}
-	if len(statuses) > 20 {
-		http.Error(w, "Too many status filters (max 20)", http.StatusBadRequest)
+	if len(statuses) > maxStatusFilters {
+		http.Error(w, fmt.Sprintf("Too many status filters (max %d)", maxStatusFilters), http.StatusBadRequest)
 		return
 	}
-	if len(priorities) > 10 {
-		http.Error(w, "Too many priority filters (max 10)", http.StatusBadRequest)
+	if len(priorities) > maxPriorityFilters {
+		http.Error(w, fmt.Sprintf("Too many priority filters (max %d)", maxPriorityFilters), http.StatusBadRequest)
 		return
 	}
 

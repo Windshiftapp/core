@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 	"windshift/internal/cql"
+	"windshift/internal/middleware"
 	"windshift/internal/utils"
 )
 
@@ -74,7 +75,7 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user from context for permission check
-	user := r.Context().Value("user")
+	user := r.Context().Value(middleware.ContextKeyUser)
 	if user == nil {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return

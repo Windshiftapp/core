@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 	"windshift/internal/database"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/sso"
 )
@@ -41,7 +42,7 @@ func NewUserSCMTokenHandler(db database.Database, encryption *sso.SecretEncrypti
 
 // GetUserConnections returns all SCM providers the user has connected
 func (h *UserSCMTokenHandler) GetUserConnections(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
@@ -93,7 +94,7 @@ func (h *UserSCMTokenHandler) GetUserConnections(w http.ResponseWriter, r *http.
 
 // GetConnectionStatus returns the user's connection status for a specific provider
 func (h *UserSCMTokenHandler) GetConnectionStatus(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
@@ -174,7 +175,7 @@ func (h *UserSCMTokenHandler) GetConnectionStatus(w http.ResponseWriter, r *http
 
 // DisconnectProvider removes the user's connection to an SCM provider
 func (h *UserSCMTokenHandler) DisconnectProvider(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
@@ -210,7 +211,7 @@ func (h *UserSCMTokenHandler) DisconnectProvider(w http.ResponseWriter, r *http.
 
 // GetAvailableProviders returns all OAuth SCM providers that the user can connect to
 func (h *UserSCMTokenHandler) GetAvailableProviders(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return

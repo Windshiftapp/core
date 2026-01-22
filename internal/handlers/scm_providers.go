@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 	"windshift/internal/database"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/scm"
 	"windshift/internal/sso"
@@ -193,16 +194,7 @@ func (h *SCMProviderHandler) refreshOAuthTokenIfNeeded(
 
 // GetProviders returns all SCM providers
 func (h *SCMProviderHandler) GetProviders(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.db.Query(`
-		SELECT id, slug, name, provider_type, auth_method, enabled, is_default,
-			   base_url, oauth_client_id, oauth_client_secret_encrypted,
-			   personal_access_token_encrypted, github_app_id,
-			   github_app_private_key_encrypted, github_app_installation_id, github_org_id,
-			   oauth_access_token_encrypted, oauth_token_expires_at,
-			   scopes, workspace_restriction_mode, created_at, updated_at
-		FROM scm_providers
-		ORDER BY name
-	`)
+	rows, err := h.db.Query(providerListQuery + " ORDER BY name")
 	if err != nil {
 		slog.Error("failed to get providers", slog.String("component", "scm"), slog.Any("error", err))
 		http.Error(w, "Failed to get providers", http.StatusInternalServerError)
@@ -212,61 +204,12 @@ func (h *SCMProviderHandler) GetProviders(w http.ResponseWriter, r *http.Request
 
 	providers := []SCMProviderResponse{}
 	for rows.Next() {
-		var p models.SCMProvider
-		var baseURL, oauthClientID, oauthClientSecretEnc sql.NullString
-		var patEnc, ghAppID, ghAppKeyEnc, ghAppInstallID sql.NullString
-		var oauthAccessTokenEnc, workspaceRestrictionMode sql.NullString
-		var oauthTokenExpiresAt sql.NullTime
-		var ghOrgID sql.NullInt64
-
-		err := rows.Scan(
-			&p.ID, &p.Slug, &p.Name, &p.ProviderType, &p.AuthMethod,
-			&p.Enabled, &p.IsDefault, &baseURL, &oauthClientID, &oauthClientSecretEnc,
-			&patEnc, &ghAppID, &ghAppKeyEnc, &ghAppInstallID, &ghOrgID,
-			&oauthAccessTokenEnc, &oauthTokenExpiresAt,
-			&p.Scopes, &workspaceRestrictionMode, &p.CreatedAt, &p.UpdatedAt,
-		)
-		if err != nil {
+		var row providerRowScanResult
+		if err := rows.Scan(row.scanDestinations()...); err != nil {
 			slog.Error("failed to scan provider", slog.String("component", "scm"), slog.Any("error", err))
 			continue
 		}
-
-		// Default to unrestricted if not set
-		restrictionMode := "unrestricted"
-		if workspaceRestrictionMode.Valid && workspaceRestrictionMode.String != "" {
-			restrictionMode = workspaceRestrictionMode.String
-		}
-
-		resp := SCMProviderResponse{
-			ID:                       p.ID,
-			Slug:                     p.Slug,
-			Name:                     p.Name,
-			ProviderType:             p.ProviderType,
-			AuthMethod:               p.AuthMethod,
-			Enabled:                  p.Enabled,
-			IsDefault:                p.IsDefault,
-			BaseURL:                  baseURL.String,
-			OAuthClientID:            oauthClientID.String,
-			HasOAuthClientSecret:     oauthClientSecretEnc.Valid && oauthClientSecretEnc.String != "",
-			HasPAT:                   patEnc.Valid && patEnc.String != "",
-			GitHubAppID:              ghAppID.String,
-			HasGitHubAppPrivateKey:   ghAppKeyEnc.Valid && ghAppKeyEnc.String != "",
-			GitHubAppInstallationID:  ghAppInstallID.String,
-			HasOAuthToken:            oauthAccessTokenEnc.Valid && oauthAccessTokenEnc.String != "",
-			Scopes:                   p.Scopes,
-			WorkspaceRestrictionMode: restrictionMode,
-			CreatedAt:                p.CreatedAt,
-			UpdatedAt:                p.UpdatedAt,
-		}
-
-		if oauthTokenExpiresAt.Valid {
-			resp.OAuthTokenExpiresAt = &oauthTokenExpiresAt.Time
-		}
-		if ghOrgID.Valid {
-			resp.GitHubOrgID = &ghOrgID.Int64
-		}
-
-		providers = append(providers, resp)
+		providers = append(providers, row.toResponse())
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -378,7 +321,9 @@ func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Reque
 	if req.IsDefault {
 		_, err = h.db.Exec("UPDATE scm_providers SET is_default = 0 WHERE is_default = 1")
 		if err != nil {
-			slog.Warn("failed to unset default providers", slog.String("component", "scm"), slog.Any("error", err))
+			slog.Error("failed to unset default providers", slog.String("component", "scm"), slog.Any("error", err))
+			http.Error(w, "Failed to update default provider", http.StatusInternalServerError)
+			return
 		}
 	}
 
@@ -515,7 +460,9 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 	if req.IsDefault {
 		_, err = h.db.Exec("UPDATE scm_providers SET is_default = 0 WHERE is_default = 1 AND id != ?", id)
 		if err != nil {
-			slog.Warn("failed to unset default providers", slog.String("component", "scm"), slog.Int("provider_id", id), slog.Any("error", err))
+			slog.Error("failed to unset default providers", slog.String("component", "scm"), slog.Int("provider_id", id), slog.Any("error", err))
+			http.Error(w, "Failed to update default provider", http.StatusInternalServerError)
+			return
 		}
 	}
 
@@ -586,8 +533,11 @@ func (h *SCMProviderHandler) DeleteProvider(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		slog.Warn("failed to get rows affected", slog.String("component", "scm"), slog.Int("provider_id", id), slog.Any("error", err))
+		// Continue - the delete likely succeeded
+	} else if rowsAffected == 0 {
 		http.Error(w, "Provider not found", http.StatusNotFound)
 		return
 	}
@@ -804,7 +754,7 @@ func (h *SCMProviderHandler) StartOAuth(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Get user from context (requires authentication)
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
@@ -897,7 +847,7 @@ func (h *SCMProviderHandler) OAuthCallback(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Validate state and get provider info (now includes workspace_id)
+	// Validate state and get provider info
 	var providerID, userID int
 	var redirectURI string
 	var workspaceID sql.NullInt64
@@ -911,12 +861,14 @@ func (h *SCMProviderHandler) OAuthCallback(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Delete used state
-	h.db.Exec("DELETE FROM scm_oauth_state WHERE state = ?", state)
+	// Delete used state (check error)
+	if _, err := h.db.Exec("DELETE FROM scm_oauth_state WHERE state = ?", state); err != nil {
+		slog.Warn("failed to delete OAuth state", slog.String("component", "scm"), slog.Any("error", err))
+	}
 
 	slog.Debug("OAuth state validated", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.String("redirect_uri", redirectURI), slog.Any("workspace_id", workspaceID))
 
-	// Get provider details (fetch slug from DB to use in redirect, not from URL)
+	// Get provider details
 	var providerType models.SCMProviderType
 	var clientID, clientSecretEnc, providerBaseURL sql.NullString
 	var providerSlug string
@@ -939,85 +891,174 @@ func (h *SCMProviderHandler) OAuthCallback(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Exchange code for token based on provider
-	var accessToken, refreshToken string
-	var expiresAt *time.Time
-
-	switch providerType {
-	case models.SCMProviderTypeGitHub:
-		cfg := scm.ProviderConfig{
-			ProviderType:      providerType,
-			AuthMethod:        models.SCMAuthMethodOAuth,
-			OAuthClientID:     clientID.String,
-			OAuthClientSecret: clientSecret,
-		}
-		ghProvider, err := scm.NewGitHubProvider(cfg)
-		if err != nil {
-			slog.Error("failed to create GitHub provider", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Any("error", err))
-			h.redirectWithOAuthError(w, r, "Failed to exchange token")
-			return
-		}
-
-		tokens, err := ghProvider.ExchangeCode(r.Context(), code, redirectURI)
-		if err != nil {
-			slog.Error("failed to exchange OAuth code", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Any("error", err))
-			h.redirectWithOAuthError(w, r, "Failed to exchange token")
-			return
-		}
-
-		accessToken = tokens.AccessToken
-		refreshToken = tokens.RefreshToken
-		expiresAt = tokens.ExpiresAt
-	case models.SCMProviderTypeGitea:
-		cfg := scm.ProviderConfig{
-			ProviderType:      providerType,
-			AuthMethod:        models.SCMAuthMethodOAuth,
-			BaseURL:           providerBaseURL.String,
-			OAuthClientID:     clientID.String,
-			OAuthClientSecret: clientSecret,
-		}
-		giteaProvider, err := scm.NewGiteaProvider(cfg)
-		if err != nil {
-			slog.Error("failed to create Gitea provider", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Any("error", err))
-			h.redirectWithOAuthError(w, r, "Failed to exchange token")
-			return
-		}
-
-		tokens, err := giteaProvider.ExchangeCode(r.Context(), code, redirectURI)
-		if err != nil {
-			slog.Error("failed to exchange OAuth code", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Any("error", err))
-			h.redirectWithOAuthError(w, r, "Failed to exchange token")
-			return
-		}
-
-		accessToken = tokens.AccessToken
-		refreshToken = tokens.RefreshToken
-		expiresAt = tokens.ExpiresAt
-	default:
-		h.redirectWithOAuthError(w, r, "OAuth not supported for this provider type")
+	// Exchange code for tokens
+	tokenResult, err := h.exchangeOAuthCode(r.Context(), oauthTokenExchangeParams{
+		providerType: providerType,
+		baseURL:      providerBaseURL.String,
+		clientID:     clientID.String,
+		clientSecret: clientSecret,
+		code:         code,
+		redirectURI:  redirectURI,
+	})
+	if err != nil {
+		slog.Error("failed to exchange OAuth code", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Any("error", err))
+		h.redirectWithOAuthError(w, r, "Failed to exchange token")
 		return
 	}
 
 	// Encrypt tokens
-	accessTokenEnc, err := h.encryption.Encrypt(accessToken)
+	encTokens, err := h.encryptOAuthTokens(tokenResult.accessToken, tokenResult.refreshToken)
 	if err != nil {
-		slog.Error("failed to encrypt access token", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Any("error", err))
+		slog.Error("failed to encrypt tokens", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Any("error", err))
 		h.redirectWithOAuthError(w, r, "Failed to store token")
 		return
+	}
+
+	slog.Debug("OAuth token exchange successful", slog.String("component", "scm"), slog.String("slug", providerSlug), slog.Bool("has_refresh", tokenResult.refreshToken != ""))
+
+	// Fetch SCM user info
+	userInfo := h.fetchSCMUserInfo(r.Context(), providerType, providerBaseURL.String, tokenResult.accessToken)
+
+	// Store token at user level
+	slog.Debug("storing token at user level", slog.String("component", "scm"), slog.Int("user_id", userID), slog.Int("provider_id", providerID), slog.String("slug", providerSlug))
+	err = h.storeUserOAuthToken(r.Context(), userID, providerID, encTokens, tokenResult.expiresAt, userInfo)
+	if err != nil {
+		slog.Error("failed to store user OAuth token", slog.String("component", "scm"), slog.Int("user_id", userID), slog.Int("provider_id", providerID), slog.Any("error", err))
+		h.redirectWithOAuthError(w, r, "Failed to store token")
+		return
+	}
+
+	slog.Info("OAuth token stored successfully at user level", slog.String("component", "scm"), slog.Int("user_id", userID), slog.String("slug", providerSlug), slog.String("scm_username", userInfo.username))
+
+	// Redirect based on context
+	if workspaceID.Valid {
+		// Came from workspace settings - redirect back there
+		var workspaceKey string
+		if err := h.db.QueryRow("SELECT key FROM workspaces WHERE id = ?", workspaceID.Int64).Scan(&workspaceKey); err != nil {
+			slog.Warn("failed to get workspace key for redirect", slog.String("component", "scm"), slog.Any("error", err))
+		}
+		http.Redirect(w, r, fmt.Sprintf("/workspaces/%s/settings?tab=scm&oauth=success&provider=%s",
+			url.QueryEscape(workspaceKey), url.QueryEscape(providerSlug)), http.StatusFound)
+		return
+	}
+
+	// Default: redirect to user profile connected accounts
+	http.Redirect(w, r, "/profile?tab=connected-accounts&oauth=success&provider="+url.QueryEscape(providerSlug), http.StatusFound)
+}
+
+// Helper methods
+
+// oauthTokenExchangeParams contains parameters for OAuth token exchange
+type oauthTokenExchangeParams struct {
+	providerType models.SCMProviderType
+	baseURL      string
+	clientID     string
+	clientSecret string
+	code         string
+	redirectURI  string
+}
+
+// oauthTokenResult contains the result of OAuth token exchange
+type oauthTokenResult struct {
+	accessToken  string
+	refreshToken string
+	expiresAt    *time.Time
+}
+
+// exchangeOAuthCode exchanges an OAuth code for tokens based on provider type
+func (h *SCMProviderHandler) exchangeOAuthCode(ctx context.Context, params oauthTokenExchangeParams) (*oauthTokenResult, error) {
+	switch params.providerType {
+	case models.SCMProviderTypeGitHub:
+		cfg := scm.ProviderConfig{
+			ProviderType:      params.providerType,
+			AuthMethod:        models.SCMAuthMethodOAuth,
+			OAuthClientID:     params.clientID,
+			OAuthClientSecret: params.clientSecret,
+		}
+		ghProvider, err := scm.NewGitHubProvider(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create GitHub provider: %w", err)
+		}
+
+		tokens, err := ghProvider.ExchangeCode(ctx, params.code, params.redirectURI)
+		if err != nil {
+			return nil, fmt.Errorf("failed to exchange code: %w", err)
+		}
+
+		return &oauthTokenResult{
+			accessToken:  tokens.AccessToken,
+			refreshToken: tokens.RefreshToken,
+			expiresAt:    tokens.ExpiresAt,
+		}, nil
+
+	case models.SCMProviderTypeGitea:
+		cfg := scm.ProviderConfig{
+			ProviderType:      params.providerType,
+			AuthMethod:        models.SCMAuthMethodOAuth,
+			BaseURL:           params.baseURL,
+			OAuthClientID:     params.clientID,
+			OAuthClientSecret: params.clientSecret,
+		}
+		giteaProvider, err := scm.NewGiteaProvider(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Gitea provider: %w", err)
+		}
+
+		tokens, err := giteaProvider.ExchangeCode(ctx, params.code, params.redirectURI)
+		if err != nil {
+			return nil, fmt.Errorf("failed to exchange code: %w", err)
+		}
+
+		return &oauthTokenResult{
+			accessToken:  tokens.AccessToken,
+			refreshToken: tokens.RefreshToken,
+			expiresAt:    tokens.ExpiresAt,
+		}, nil
+
+	default:
+		return nil, fmt.Errorf("OAuth not supported for provider type: %s", params.providerType)
+	}
+}
+
+// encryptedTokens contains encrypted OAuth tokens
+type encryptedTokens struct {
+	accessToken  string
+	refreshToken string
+}
+
+// encryptOAuthTokens encrypts OAuth access and refresh tokens
+func (h *SCMProviderHandler) encryptOAuthTokens(accessToken, refreshToken string) (*encryptedTokens, error) {
+	accessTokenEnc, err := h.encryption.Encrypt(accessToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt access token: %w", err)
 	}
 
 	var refreshTokenEnc string
 	if refreshToken != "" {
 		refreshTokenEnc, err = h.encryption.Encrypt(refreshToken)
 		if err != nil {
-			slog.Warn("failed to encrypt refresh token", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Any("error", err))
+			slog.Warn("failed to encrypt refresh token", slog.String("component", "scm"), slog.Any("error", err))
+			// Continue anyway - access token is the important one
 		}
 	}
 
-	slog.Debug("OAuth token exchange successful", slog.String("component", "scm"), slog.String("slug", providerSlug), slog.Bool("has_refresh", refreshToken != ""))
+	return &encryptedTokens{
+		accessToken:  accessTokenEnc,
+		refreshToken: refreshTokenEnc,
+	}, nil
+}
 
-	// Fetch SCM user info to store username/avatar
-	var scmUsername, scmUserID, scmAvatarURL string
+// scmUserInfo contains user information from an SCM provider
+type scmUserInfo struct {
+	username  string
+	userID    string
+	avatarURL string
+}
+
+// fetchSCMUserInfo fetches user information from the SCM provider
+func (h *SCMProviderHandler) fetchSCMUserInfo(ctx context.Context, providerType models.SCMProviderType, baseURL, accessToken string) *scmUserInfo {
+	info := &scmUserInfo{}
+
 	switch providerType {
 	case models.SCMProviderTypeGitHub:
 		cfg := scm.ProviderConfig{
@@ -1026,39 +1067,51 @@ func (h *SCMProviderHandler) OAuthCallback(w http.ResponseWriter, r *http.Reques
 			OAuthAccessToken: accessToken,
 		}
 		ghProvider, err := scm.NewGitHubProvider(cfg)
-		if err == nil {
-			if scmUser, err := ghProvider.GetCurrentUser(r.Context()); err == nil {
-				scmUsername = scmUser.Username
-				scmUserID = scmUser.ID
-				scmAvatarURL = scmUser.AvatarURL
-				slog.Debug("got user info", slog.String("component", "scm"), slog.String("username", scmUsername), slog.String("scm_user_id", scmUserID))
-			} else {
-				slog.Warn("failed to get user info", slog.String("component", "scm"), slog.Any("error", err))
-			}
+		if err != nil {
+			slog.Warn("failed to create GitHub provider for user info", slog.String("component", "scm"), slog.Any("error", err))
+			return info
 		}
+		scmUser, err := ghProvider.GetCurrentUser(ctx)
+		if err != nil {
+			slog.Warn("failed to get GitHub user info", slog.String("component", "scm"), slog.Any("error", err))
+			return info
+		}
+		info.username = scmUser.Username
+		info.userID = scmUser.ID
+		info.avatarURL = scmUser.AvatarURL
+
 	case models.SCMProviderTypeGitea:
 		cfg := scm.ProviderConfig{
 			ProviderType:     providerType,
 			AuthMethod:       models.SCMAuthMethodOAuth,
-			BaseURL:          providerBaseURL.String,
+			BaseURL:          baseURL,
 			OAuthAccessToken: accessToken,
 		}
 		giteaProvider, err := scm.NewGiteaProvider(cfg)
-		if err == nil {
-			if scmUser, err := giteaProvider.GetCurrentUser(r.Context()); err == nil {
-				scmUsername = scmUser.Username
-				scmUserID = scmUser.ID
-				scmAvatarURL = scmUser.AvatarURL
-				slog.Debug("got user info", slog.String("component", "scm"), slog.String("username", scmUsername), slog.String("scm_user_id", scmUserID))
-			} else {
-				slog.Warn("failed to get user info", slog.String("component", "scm"), slog.Any("error", err))
-			}
+		if err != nil {
+			slog.Warn("failed to create Gitea provider for user info", slog.String("component", "scm"), slog.Any("error", err))
+			return info
 		}
+		scmUser, err := giteaProvider.GetCurrentUser(ctx)
+		if err != nil {
+			slog.Warn("failed to get Gitea user info", slog.String("component", "scm"), slog.Any("error", err))
+			return info
+		}
+		info.username = scmUser.Username
+		info.userID = scmUser.ID
+		info.avatarURL = scmUser.AvatarURL
 	}
 
-	// Always store at user level
-	slog.Debug("storing token at user level", slog.String("component", "scm"), slog.Int("user_id", userID), slog.Int("provider_id", providerID), slog.String("slug", providerSlug))
-	_, err = h.db.Exec(`
+	if info.username != "" {
+		slog.Debug("got user info", slog.String("component", "scm"), slog.String("username", info.username), slog.String("scm_user_id", info.userID))
+	}
+
+	return info
+}
+
+// storeUserOAuthToken stores OAuth tokens at the user level
+func (h *SCMProviderHandler) storeUserOAuthToken(ctx context.Context, userID, providerID int, tokens *encryptedTokens, expiresAt *time.Time, userInfo *scmUserInfo) error {
+	_, err := h.db.ExecWriteContext(ctx, `
 		INSERT INTO user_scm_oauth_tokens (
 			user_id, scm_provider_id, oauth_access_token_encrypted,
 			oauth_refresh_token_encrypted, oauth_token_expires_at,
@@ -1072,91 +1125,97 @@ func (h *SCMProviderHandler) OAuthCallback(w http.ResponseWriter, r *http.Reques
 			scm_user_id = excluded.scm_user_id,
 			scm_avatar_url = excluded.scm_avatar_url,
 			updated_at = CURRENT_TIMESTAMP
-	`, userID, providerID, accessTokenEnc, nullString(refreshTokenEnc), expiresAt,
-		nullString(scmUsername), nullString(scmUserID), nullString(scmAvatarURL))
-	if err != nil {
-		slog.Error("failed to store user OAuth token", slog.String("component", "scm"), slog.Int("user_id", userID), slog.Int("provider_id", providerID), slog.Any("error", err))
-		h.redirectWithOAuthError(w, r, "Failed to store token")
-		return
-	}
-
-	slog.Info("OAuth token stored successfully at user level", slog.String("component", "scm"), slog.Int("user_id", userID), slog.String("slug", providerSlug), slog.String("scm_username", scmUsername))
-
-	// Redirect based on context
-	if workspaceID.Valid {
-		// Came from workspace settings - redirect back there
-		var workspaceKey string
-		h.db.QueryRow("SELECT key FROM workspaces WHERE id = ?", workspaceID.Int64).Scan(&workspaceKey)
-		http.Redirect(w, r, fmt.Sprintf("/workspaces/%s/settings?tab=scm&oauth=success&provider=%s",
-			url.QueryEscape(workspaceKey), url.QueryEscape(providerSlug)), http.StatusFound)
-		return
-	}
-
-	// Default: redirect to user profile connected accounts
-	http.Redirect(w, r, "/profile?tab=connected-accounts&oauth=success&provider="+url.QueryEscape(providerSlug), http.StatusFound)
+	`, userID, providerID, tokens.accessToken, nullString(tokens.refreshToken), expiresAt,
+		nullString(userInfo.username), nullString(userInfo.userID), nullString(userInfo.avatarURL))
+	return err
 }
 
-// Helper methods
+// providerRowScanResult holds scanned values from a provider database row
+type providerRowScanResult struct {
+	Provider                 models.SCMProvider
+	BaseURL                  sql.NullString
+	OAuthClientID            sql.NullString
+	OAuthClientSecretEnc     sql.NullString
+	PATEnc                   sql.NullString
+	GHAppID                  sql.NullString
+	GHAppKeyEnc              sql.NullString
+	GHAppInstallID           sql.NullString
+	GHOrgID                  sql.NullInt64
+	OAuthAccessTokenEnc      sql.NullString
+	OAuthTokenExpiresAt      sql.NullTime
+	WorkspaceRestrictionMode sql.NullString
+}
+
+// scanDestinations returns the scan destinations for a provider query row
+func (r *providerRowScanResult) scanDestinations() []interface{} {
+	return []interface{}{
+		&r.Provider.ID, &r.Provider.Slug, &r.Provider.Name, &r.Provider.ProviderType, &r.Provider.AuthMethod,
+		&r.Provider.Enabled, &r.Provider.IsDefault, &r.BaseURL, &r.OAuthClientID, &r.OAuthClientSecretEnc,
+		&r.PATEnc, &r.GHAppID, &r.GHAppKeyEnc, &r.GHAppInstallID, &r.GHOrgID,
+		&r.OAuthAccessTokenEnc, &r.OAuthTokenExpiresAt,
+		&r.Provider.Scopes, &r.WorkspaceRestrictionMode, &r.Provider.CreatedAt, &r.Provider.UpdatedAt,
+	}
+}
+
+// toResponse converts scanned row data to an SCMProviderResponse
+func (r *providerRowScanResult) toResponse() SCMProviderResponse {
+	// Default to unrestricted if not set
+	restrictionMode := "unrestricted"
+	if r.WorkspaceRestrictionMode.Valid && r.WorkspaceRestrictionMode.String != "" {
+		restrictionMode = r.WorkspaceRestrictionMode.String
+	}
+
+	resp := SCMProviderResponse{
+		ID:                       r.Provider.ID,
+		Slug:                     r.Provider.Slug,
+		Name:                     r.Provider.Name,
+		ProviderType:             r.Provider.ProviderType,
+		AuthMethod:               r.Provider.AuthMethod,
+		Enabled:                  r.Provider.Enabled,
+		IsDefault:                r.Provider.IsDefault,
+		BaseURL:                  r.BaseURL.String,
+		OAuthClientID:            r.OAuthClientID.String,
+		HasOAuthClientSecret:     r.OAuthClientSecretEnc.Valid && r.OAuthClientSecretEnc.String != "",
+		HasPAT:                   r.PATEnc.Valid && r.PATEnc.String != "",
+		GitHubAppID:              r.GHAppID.String,
+		HasGitHubAppPrivateKey:   r.GHAppKeyEnc.Valid && r.GHAppKeyEnc.String != "",
+		GitHubAppInstallationID:  r.GHAppInstallID.String,
+		HasOAuthToken:            r.OAuthAccessTokenEnc.Valid && r.OAuthAccessTokenEnc.String != "",
+		Scopes:                   r.Provider.Scopes,
+		WorkspaceRestrictionMode: restrictionMode,
+		CreatedAt:                r.Provider.CreatedAt,
+		UpdatedAt:                r.Provider.UpdatedAt,
+	}
+
+	if r.OAuthTokenExpiresAt.Valid {
+		resp.OAuthTokenExpiresAt = &r.OAuthTokenExpiresAt.Time
+	}
+	if r.GHOrgID.Valid {
+		resp.GitHubOrgID = &r.GHOrgID.Int64
+	}
+
+	return resp
+}
+
+// providerListQuery is the SQL query for fetching provider list data
+const providerListQuery = `
+	SELECT id, slug, name, provider_type, auth_method, enabled, is_default,
+		   base_url, oauth_client_id, oauth_client_secret_encrypted,
+		   personal_access_token_encrypted, github_app_id,
+		   github_app_private_key_encrypted, github_app_installation_id, github_org_id,
+		   oauth_access_token_encrypted, oauth_token_expires_at,
+		   scopes, workspace_restriction_mode, created_at, updated_at
+	FROM scm_providers`
 
 func (h *SCMProviderHandler) getProviderByID(id int) (*SCMProviderResponse, error) {
-	var p models.SCMProvider
-	var baseURL, oauthClientID, oauthClientSecretEnc sql.NullString
-	var patEnc, ghAppID, ghAppKeyEnc, ghAppInstallID sql.NullString
-	var oauthAccessTokenEnc, workspaceRestrictionMode sql.NullString
-	var oauthTokenExpiresAt sql.NullTime
-
-	err := h.db.QueryRow(`
-		SELECT id, slug, name, provider_type, auth_method, enabled, is_default,
-			   base_url, oauth_client_id, oauth_client_secret_encrypted,
-			   personal_access_token_encrypted, github_app_id,
-			   github_app_private_key_encrypted, github_app_installation_id,
-			   oauth_access_token_encrypted, oauth_token_expires_at,
-			   scopes, workspace_restriction_mode, created_at, updated_at
-		FROM scm_providers WHERE id = ?
-	`, id).Scan(
-		&p.ID, &p.Slug, &p.Name, &p.ProviderType, &p.AuthMethod,
-		&p.Enabled, &p.IsDefault, &baseURL, &oauthClientID, &oauthClientSecretEnc,
-		&patEnc, &ghAppID, &ghAppKeyEnc, &ghAppInstallID,
-		&oauthAccessTokenEnc, &oauthTokenExpiresAt,
-		&p.Scopes, &workspaceRestrictionMode, &p.CreatedAt, &p.UpdatedAt,
-	)
+	var row providerRowScanResult
+	err := h.db.QueryRow(providerListQuery+" WHERE id = ?", id).Scan(row.scanDestinations()...)
 	if err != nil {
 		return nil, err
 	}
 
-	// Default to unrestricted if not set
-	restrictionMode := "unrestricted"
-	if workspaceRestrictionMode.Valid && workspaceRestrictionMode.String != "" {
-		restrictionMode = workspaceRestrictionMode.String
-	}
-
-	resp := &SCMProviderResponse{
-		ID:                       p.ID,
-		Slug:                     p.Slug,
-		Name:                     p.Name,
-		ProviderType:             p.ProviderType,
-		AuthMethod:               p.AuthMethod,
-		Enabled:                  p.Enabled,
-		IsDefault:                p.IsDefault,
-		BaseURL:                  baseURL.String,
-		OAuthClientID:            oauthClientID.String,
-		HasOAuthClientSecret:     oauthClientSecretEnc.Valid && oauthClientSecretEnc.String != "",
-		HasPAT:                   patEnc.Valid && patEnc.String != "",
-		GitHubAppID:              ghAppID.String,
-		HasGitHubAppPrivateKey:   ghAppKeyEnc.Valid && ghAppKeyEnc.String != "",
-		GitHubAppInstallationID:  ghAppInstallID.String,
-		HasOAuthToken:            oauthAccessTokenEnc.Valid && oauthAccessTokenEnc.String != "",
-		Scopes:                   p.Scopes,
-		WorkspaceRestrictionMode: restrictionMode,
-		CreatedAt:                p.CreatedAt,
-		UpdatedAt:                p.UpdatedAt,
-	}
-
-	if oauthTokenExpiresAt.Valid {
-		resp.OAuthTokenExpiresAt = &oauthTokenExpiresAt.Time
-	}
-
-	return resp, nil
+	resp := row.toResponse()
+	return &resp, nil
 }
 
 func (h *SCMProviderHandler) getOAuthRedirectURI(r *http.Request, slug string) string {
@@ -1299,7 +1358,7 @@ func (h *SCMProviderHandler) AddWorkspaceToProviderAllowlist(w http.ResponseWrit
 
 	// Get user ID from context if available
 	var createdBy interface{}
-	if user, ok := r.Context().Value("user").(*models.User); ok && user != nil {
+	if user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User); ok && user != nil {
 		createdBy = user.ID
 	}
 
@@ -1395,7 +1454,7 @@ func (h *SCMProviderHandler) UpdateProviderAllowedWorkspaces(w http.ResponseWrit
 
 	// Get user ID from context if available
 	var createdBy interface{}
-	if user, ok := r.Context().Value("user").(*models.User); ok && user != nil {
+	if user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User); ok && user != nil {
 		createdBy = user.ID
 	}
 
@@ -1410,7 +1469,9 @@ func (h *SCMProviderHandler) UpdateProviderAllowedWorkspaces(w http.ResponseWrit
 	// Delete all existing entries for this provider
 	_, err = tx.Exec("DELETE FROM scm_provider_workspace_allowlist WHERE provider_id = ?", providerID)
 	if err != nil {
-		tx.Rollback()
+		if rbErr := tx.Rollback(); rbErr != nil {
+			slog.Error("failed to rollback transaction", slog.String("component", "scm"), slog.Any("error", rbErr))
+		}
 		slog.Error("failed to clear allowlist", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Any("error", err))
 		http.Error(w, "Failed to update allowlist", http.StatusInternalServerError)
 		return
@@ -1423,7 +1484,9 @@ func (h *SCMProviderHandler) UpdateProviderAllowedWorkspaces(w http.ResponseWrit
 			VALUES (?, ?, ?)
 		`, providerID, workspaceID, createdBy)
 		if err != nil {
-			tx.Rollback()
+			if rbErr := tx.Rollback(); rbErr != nil {
+				slog.Error("failed to rollback transaction", slog.String("component", "scm"), slog.Any("error", rbErr))
+			}
 			slog.Error("failed to add workspace to allowlist", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Int("workspace_id", workspaceID), slog.Any("error", err))
 			http.Error(w, "Failed to update allowlist", http.StatusInternalServerError)
 			return

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -608,7 +609,7 @@ func (h *CommentHandler) getCommentByID(commentID int) (*models.Comment, error) 
 
 // getUserFromContext extracts the user from the request context
 func (h *CommentHandler) getUserFromContext(r *http.Request) *models.User {
-	if user := r.Context().Value("user"); user != nil {
+	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
 		if u, ok := user.(*models.User); ok {
 			return u
 		}

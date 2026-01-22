@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"time"
 	"windshift/internal/database"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
-
 )
 
 type ItemLinkHandler struct {
@@ -730,7 +730,7 @@ func isValidLinkType(linkType string) bool {
 
 // getUserFromContext retrieves the authenticated user from request context
 func (h *ItemLinkHandler) getUserFromContext(r *http.Request) *models.User {
-	if user := r.Context().Value("user"); user != nil {
+	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
 		if u, ok := user.(*models.User); ok {
 			return u
 		}

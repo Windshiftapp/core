@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"windshift/internal/database"
-	"windshift/internal/services"
-
 	"windshift/internal/auth"
+	"windshift/internal/database"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
+	"windshift/internal/services"
 )
 
 // ApiTokenHandler handles API token management
@@ -30,7 +30,7 @@ func NewApiTokenHandler(db database.Database, tokenManager *auth.TokenManager, p
 // CreateToken creates a new API token for a user
 func (ath *ApiTokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) {
 	// Get user from context (set by auth middleware)
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok || user == nil {
 		http.Error(w, "User not found in context", http.StatusUnauthorized)
 		return
@@ -92,7 +92,7 @@ func (ath *ApiTokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) 
 // GetUserTokens retrieves all tokens for the current user
 func (ath *ApiTokenHandler) GetUserTokens(w http.ResponseWriter, r *http.Request) {
 	// Get user from context (set by auth middleware)
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok || user == nil {
 		http.Error(w, "User not found in context", http.StatusUnauthorized)
 		return
@@ -119,7 +119,7 @@ func (ath *ApiTokenHandler) GetToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user from context (set by auth middleware)
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok || user == nil {
 		http.Error(w, "User not found in context", http.StatusUnauthorized)
 		return
@@ -152,7 +152,7 @@ func (ath *ApiTokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Get user from context (set by auth middleware)
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok || user == nil {
 		http.Error(w, "User not found in context", http.StatusUnauthorized)
 		return
@@ -177,7 +177,7 @@ func (ath *ApiTokenHandler) ValidateToken(w http.ResponseWriter, r *http.Request
 	// If they can call this successfully, their token is valid
 
 	// Get user and token info from context (set by auth middleware)
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok || user == nil {
 		http.Error(w, "Token validation failed", http.StatusUnauthorized)
 		return

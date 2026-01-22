@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 	"windshift/internal/database"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/scm"
 	"windshift/internal/sso"
@@ -506,7 +507,7 @@ func (h *SCMItemLinksHandler) CreateBranchForItem(w http.ResponseWriter, r *http
 	}
 
 	// Get authenticated user for per-user OAuth tokens
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
@@ -785,7 +786,7 @@ func (h *SCMItemLinksHandler) GetSCMConnectionStatus(w http.ResponseWriter, r *h
 		return
 	}
 
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return

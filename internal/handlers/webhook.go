@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/webhook"
-
 )
 
 // WebhookHandler handles HTTP requests for webhook operations
@@ -35,7 +35,7 @@ func NewWebhookHandler(db database.Database, webhookSender *webhook.WebhookSende
 // Body: { "item_id": 123 }
 func (h *WebhookHandler) TriggerWebhook(w http.ResponseWriter, r *http.Request) {
 	// Get current user for permission check
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
 		return
@@ -112,7 +112,7 @@ func (h *WebhookHandler) TriggerWebhook(w http.ResponseWriter, r *http.Request) 
 // GET /api/items/{id}/webhooks
 func (h *WebhookHandler) GetWebhooksForItem(w http.ResponseWriter, r *http.Request) {
 	// Get current user for permission check
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
 		return

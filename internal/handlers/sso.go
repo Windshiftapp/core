@@ -20,6 +20,7 @@ import (
 	"time"
 	"windshift/internal/auth"
 	"windshift/internal/database"
+	"windshift/internal/middleware"
 	"windshift/internal/services"
 	"windshift/internal/sso"
 	"windshift/internal/utils"
@@ -694,7 +695,7 @@ func (h *SSOHandler) TestProvider(w http.ResponseWriter, r *http.Request) {
 
 // GetExternalAccounts returns the external accounts linked to the current user
 func (h *SSOHandler) GetExternalAccounts(w http.ResponseWriter, r *http.Request) {
-	session, ok := r.Context().Value("session").(*auth.Session)
+	session, ok := r.Context().Value(middleware.ContextKeySession).(*auth.Session)
 	if !ok || session == nil {
 		http.Error(w, "Not authenticated", http.StatusUnauthorized)
 		return
@@ -712,7 +713,7 @@ func (h *SSOHandler) GetExternalAccounts(w http.ResponseWriter, r *http.Request)
 
 // UnlinkExternalAccount removes a linked external account
 func (h *SSOHandler) UnlinkExternalAccount(w http.ResponseWriter, r *http.Request) {
-	session, ok := r.Context().Value("session").(*auth.Session)
+	session, ok := r.Context().Value(middleware.ContextKeySession).(*auth.Session)
 	if !ok || session == nil {
 		http.Error(w, "Not authenticated", http.StatusUnauthorized)
 		return

@@ -293,7 +293,7 @@ func (h *AuthHandler) RefreshSession(w http.ResponseWriter, r *http.Request) {
 // LogoutAll invalidates all sessions for the current user
 func (h *AuthHandler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 	// Get session from context
-	session, ok := r.Context().Value("session").(*auth.Session)
+	session, ok := r.Context().Value(middleware.ContextKeySession).(*auth.Session)
 	if !ok || session == nil {
 		http.Error(w, "Not authenticated", http.StatusUnauthorized)
 		return
@@ -353,7 +353,7 @@ func (h *AuthHandler) getClientIP(r *http.Request) string {
 // ChangePassword allows authenticated users to change their password
 func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	// Get session from context
-	session, ok := r.Context().Value("session").(*auth.Session)
+	session, ok := r.Context().Value(middleware.ContextKeySession).(*auth.Session)
 	if !ok || session == nil {
 		http.Error(w, "Not authenticated", http.StatusUnauthorized)
 		return
@@ -470,7 +470,7 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 // ResendVerification resends the verification email to the current user
 func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request) {
 	// Get session from context
-	session, ok := r.Context().Value("session").(*auth.Session)
+	session, ok := r.Context().Value(middleware.ContextKeySession).(*auth.Session)
 	if !ok || session == nil {
 		http.Error(w, "Not authenticated", http.StatusUnauthorized)
 		return
@@ -512,7 +512,7 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 // GetVerificationStatus returns the email verification status for the current user
 func (h *AuthHandler) GetVerificationStatus(w http.ResponseWriter, r *http.Request) {
 	// Get session from context
-	session, ok := r.Context().Value("session").(*auth.Session)
+	session, ok := r.Context().Value(middleware.ContextKeySession).(*auth.Session)
 	if !ok || session == nil {
 		http.Error(w, "Not authenticated", http.StatusUnauthorized)
 		return

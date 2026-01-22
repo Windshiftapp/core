@@ -13,6 +13,7 @@ import (
 
 	"github.com/allegro/bigcache/v3"
 	"windshift/internal/database"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 )
 
@@ -379,7 +380,7 @@ func (nm *NotificationManager) Stop() {
 
 // getUserFromContext extracts the authenticated user from request context
 func (nh *NotificationHandler) getUserFromContext(r *http.Request) *models.User {
-	if user := r.Context().Value("user"); user != nil {
+	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
 		if u, ok := user.(*models.User); ok {
 			return u
 		}

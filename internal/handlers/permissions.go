@@ -10,6 +10,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
@@ -111,12 +112,12 @@ func (h *PermissionHandler) GetUserPermissions(w http.ResponseWriter, r *http.Re
 	}
 	
 	// Get current user from context
-	currentUser := r.Context().Value("user")
+	currentUser := r.Context().Value(middleware.ContextKeyUser)
 	if currentUser == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	
+
 	user, ok := currentUser.(*models.User)
 	if !ok {
 		http.Error(w, "Invalid user context", http.StatusInternalServerError)
@@ -670,7 +671,7 @@ func (h *PermissionHandler) getUserPermissionSummary(userID int) (*models.UserPe
 
 // getSessionUserID extracts user ID from session context
 func (h *PermissionHandler) getSessionUserID(r *http.Request) int {
-	if user := r.Context().Value("user"); user != nil {
+	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
 		if u, ok := user.(*models.User); ok {
 			return u.ID
 		}

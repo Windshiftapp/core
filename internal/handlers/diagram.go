@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 	"windshift/internal/database"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 )
 
@@ -53,7 +54,7 @@ func (h *DiagramHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Get current user from context
 	var createdBy *int
-	if user := r.Context().Value("user"); user != nil {
+	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
 		if u, ok := user.(*models.User); ok {
 			createdBy = &u.ID
 		}
@@ -250,7 +251,7 @@ func (h *DiagramHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Get user from context for history tracking
 	var userID *int
-	if user := r.Context().Value("user"); user != nil {
+	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
 		if u, ok := user.(*models.User); ok {
 			userID = &u.ID
 		}
@@ -364,7 +365,7 @@ func (h *DiagramHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	// Get user from context for history tracking
 	var userID *int
-	if user := r.Context().Value("user"); user != nil {
+	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
 		if u, ok := user.(*models.User); ok {
 			userID = &u.ID
 		}

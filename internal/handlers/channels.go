@@ -1,12 +1,6 @@
 package handlers
 
 import (
-	"windshift/internal/database"
-	"windshift/internal/email"
-	"windshift/internal/logger"
-	"windshift/internal/scheduler"
-	"windshift/internal/services"
-	"windshift/internal/webhook"
 	"context"
 	"crypto/rand"
 	"crypto/tls"
@@ -23,8 +17,14 @@ import (
 	"strings"
 	"time"
 
+	"windshift/internal/database"
+	"windshift/internal/email"
+	"windshift/internal/logger"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
-
+	"windshift/internal/scheduler"
+	"windshift/internal/services"
+	"windshift/internal/webhook"
 )
 
 // ChannelHandler handles HTTP requests for channels
@@ -64,7 +64,7 @@ func (h *ChannelHandler) SetEmailScheduler(es *scheduler.EmailScheduler) {
 // GetChannels returns all channels (admins) or only managed channels (non-admins)
 func (h *ChannelHandler) GetChannels(w http.ResponseWriter, r *http.Request) {
 	// Get current user
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
 		return
@@ -826,7 +826,7 @@ func (h *ChannelHandler) updateChannelActivity(ctx context.Context, channelID in
 // UpdateChannelConfig updates only the configuration of a channel
 func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Request) {
 	// Get current user
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
 		return
@@ -1080,7 +1080,7 @@ func (h *ChannelHandler) GetChannelManagers(w http.ResponseWriter, r *http.Reque
 // AddChannelManager adds managers to a channel
 func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Request) {
 	// Get current user
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
 		return
@@ -1191,7 +1191,7 @@ func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Reques
 // RemoveChannelManager removes a manager from a channel
 func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Request) {
 	// Get current user
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
 		return
@@ -1296,7 +1296,7 @@ func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Req
 // POST /api/channels/{id}/process-emails
 func (h *ChannelHandler) ProcessEmailsNow(w http.ResponseWriter, r *http.Request) {
 	// Get current user
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
 		return
@@ -1382,7 +1382,7 @@ var defaultEmailOAuthScopes = map[string][]string{
 // POST /api/channels/{id}/email-oauth/start
 func (h *ChannelHandler) StartChannelEmailOAuth(w http.ResponseWriter, r *http.Request) {
 	// Get user ID
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

@@ -88,6 +88,8 @@
                 // Item has no status, add it to backlog (at the end)
                 backlogItems = [...backlogItems, newItem];
               }
+              // Preload transitions for the new item before setting up drag and drop
+              await loadStatusTransitions(newItem.id);
               // Re-setup drag and drop for the new item
               setTimeout(() => {
                 setupDragAndDrop();
@@ -527,12 +529,8 @@
       return false;
     }
 
-    // Find the target status in available transitions
-    const targetStatus = statuses.find(s => s.id === toStatusId);
-    if (!targetStatus) return false;
-
-    const targetStatusValue = targetStatus.name.toLowerCase().replace(' ', '_');
-    return availableTransitions.some(transition => transition.value === targetStatusValue);
+    // Check if target status ID is in the available transitions (compare by ID for reliability)
+    return availableTransitions.some(transition => transition.id === toStatusId);
   }
 
   // Async function to check if a status transition is valid for an item
@@ -544,12 +542,8 @@
     const availableTransitions = await loadStatusTransitions(itemId);
     if (!availableTransitions) return false;
 
-    // Find the target status in available transitions
-    const targetStatus = statuses.find(s => s.id === toStatusId);
-    if (!targetStatus) return false;
-
-    const targetStatusValue = targetStatus.name.toLowerCase().replace(' ', '_');
-    return availableTransitions.some(transition => transition.value === targetStatusValue);
+    // Check if target status ID is in the available transitions (compare by ID for reliability)
+    return availableTransitions.some(transition => transition.id === toStatusId);
   }
 
   async function updateItemStatus(itemId, newStatus) {

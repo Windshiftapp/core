@@ -1,11 +1,6 @@
 package handlers
 
 import (
-	"windshift/internal/database"
-	"windshift/internal/logger"
-	"windshift/internal/models"
-	"windshift/internal/services"
-	"windshift/internal/utils"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -13,7 +8,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
+	"windshift/internal/database"
+	"windshift/internal/logger"
+	"windshift/internal/middleware"
+	"windshift/internal/models"
+	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 type PermissionSetHandler struct {
@@ -715,7 +715,7 @@ func (h *PermissionSetHandler) DeleteAssignment(w http.ResponseWriter, r *http.R
 
 // getSessionUserID extracts user ID from session context
 func (h *PermissionSetHandler) getSessionUserID(r *http.Request) int {
-	if user := r.Context().Value("user"); user != nil {
+	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
 		if u, ok := user.(*models.User); ok {
 			return u.ID
 		}

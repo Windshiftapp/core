@@ -10,10 +10,10 @@ import (
 	"time"
 	"windshift/internal/database"
 	"windshift/internal/logger"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
-
 )
 
 type WorkspaceRoleHandler struct {
@@ -684,7 +684,7 @@ func (h *WorkspaceRoleHandler) hasWorkspaceViewerAssignment(workspaceID int) (bo
 
 // getSessionUserID extracts user ID from session context
 func (h *WorkspaceRoleHandler) getSessionUserID(r *http.Request) int {
-	if user := r.Context().Value("user"); user != nil {
+	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
 		if u, ok := user.(*models.User); ok {
 			return u.ID
 		}

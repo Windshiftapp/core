@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 	"windshift/internal/database"
-
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 )
 
@@ -24,7 +24,7 @@ func NewReviewHandler(db database.Database) *ReviewHandler {
 
 // GetReviews retrieves reviews for a user with optional filtering
 func (h *ReviewHandler) GetReviews(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
 		return
@@ -112,7 +112,7 @@ func (h *ReviewHandler) GetReviews(w http.ResponseWriter, r *http.Request) {
 
 // GetReview retrieves a specific review by ID
 func (h *ReviewHandler) GetReview(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
 		return
@@ -160,7 +160,7 @@ func (h *ReviewHandler) GetReview(w http.ResponseWriter, r *http.Request) {
 
 // CreateReview creates a new review
 func (h *ReviewHandler) CreateReview(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
 		return
@@ -240,7 +240,7 @@ func (h *ReviewHandler) CreateReview(w http.ResponseWriter, r *http.Request) {
 
 // UpdateReview updates an existing review
 func (h *ReviewHandler) UpdateReview(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
 		return
@@ -320,7 +320,7 @@ func (h *ReviewHandler) UpdateReview(w http.ResponseWriter, r *http.Request) {
 
 // DeleteReview deletes a review
 func (h *ReviewHandler) DeleteReview(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
 		return
@@ -355,7 +355,7 @@ func (h *ReviewHandler) DeleteReview(w http.ResponseWriter, r *http.Request) {
 
 // GetCompletedItems gets completed items for a user within a date range
 func (h *ReviewHandler) GetCompletedItems(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
 		return

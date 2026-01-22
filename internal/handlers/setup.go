@@ -1,15 +1,16 @@
 package handlers
 
 import (
-	"windshift/internal/database"
-	"windshift/internal/logger"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
-	"windshift/internal/models"
 	"windshift/internal/auth"
+	"windshift/internal/database"
+	"windshift/internal/logger"
+	"windshift/internal/middleware"
+	"windshift/internal/models"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -229,7 +230,7 @@ func (h *SetupHandler) GetModuleSettings(w http.ResponseWriter, r *http.Request)
 // UpdateModuleSettings updates module visibility settings
 func (h *SetupHandler) UpdateModuleSettings(w http.ResponseWriter, r *http.Request) {
 	// Get current user from context (required by middleware)
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
 		return

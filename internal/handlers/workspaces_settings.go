@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 )
 
@@ -71,7 +72,7 @@ func (h *WorkspaceHandler) GetHomepageLayout(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Get user from context
-	user := r.Context().Value("user")
+	user := r.Context().Value(middleware.ContextKeyUser)
 	if user == nil {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
@@ -134,7 +135,7 @@ func (h *WorkspaceHandler) UpdateHomepageLayout(w http.ResponseWriter, r *http.R
 	}
 
 	// Get user from context
-	user := r.Context().Value("user")
+	user := r.Context().Value(middleware.ContextKeyUser)
 	if user == nil {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
@@ -219,7 +220,7 @@ func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user from context for permission check
-	user := r.Context().Value("user")
+	user := r.Context().Value(middleware.ContextKeyUser)
 	if user == nil {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return

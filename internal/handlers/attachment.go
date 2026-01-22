@@ -1,16 +1,14 @@
 package handlers
 
 import (
-	"windshift/internal/database"
-	"windshift/internal/services"
 	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"image"
 	"image/jpeg"
-	_ "image/png" // Register PNG decoder
 	_ "image/gif" // Register GIF decoder
+	_ "image/png" // Register PNG decoder
 	"io"
 	"log/slog"
 	"mime"
@@ -20,7 +18,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"windshift/internal/database"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
+	"windshift/internal/services"
 
 	"golang.org/x/image/draw"
 )
@@ -41,7 +42,7 @@ func NewAttachmentHandler(db database.Database, attachmentPath string, permissio
 
 // getUserFromContext extracts the authenticated user from request context
 func (h *AttachmentHandler) getUserFromContext(r *http.Request) *models.User {
-	if user := r.Context().Value("user"); user != nil {
+	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
 		if u, ok := user.(*models.User); ok {
 			return u
 		}
@@ -284,7 +285,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Get uploader ID from context/session
 	var uploaderID *int
-	if user := r.Context().Value("user"); user != nil {
+	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
 		if u, ok := user.(*models.User); ok {
 			uploaderID = &u.ID
 		}
@@ -670,7 +671,7 @@ func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	// Get user from context for history tracking
 	var userID *int
-	if user := r.Context().Value("user"); user != nil {
+	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
 		if u, ok := user.(*models.User); ok {
 			userID = &u.ID
 		}

@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"windshift/internal/contextkeys"
 	"windshift/internal/models"
 )
 
@@ -123,21 +124,10 @@ func GetClientIP(r *http.Request) string {
 	return remoteAddr
 }
 
-// contextKey is a typed key for context values to avoid string key collisions.
-type contextKey string
-
-// ContextKeyUser is the typed context key for the authenticated user.
-const ContextKeyUser contextKey = "user"
-
 // GetCurrentUser retrieves the authenticated user from request context
 // Returns nil if no user is authenticated
 func GetCurrentUser(r *http.Request) *models.User {
-	// Try typed key first (new pattern)
-	userVal := r.Context().Value(ContextKeyUser)
-	if userVal == nil {
-		// Fallback to string key for backward compatibility
-		userVal = r.Context().Value("user")
-	}
+	userVal := r.Context().Value(contextkeys.User)
 	if userVal == nil {
 		return nil
 	}

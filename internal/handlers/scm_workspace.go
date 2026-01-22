@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 	"windshift/internal/database"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/scm"
 	"windshift/internal/sso"
@@ -944,7 +945,7 @@ func (h *SCMWorkspaceHandler) StartWorkspaceOAuth(w http.ResponseWriter, r *http
 	}
 
 	// Get user from context
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return

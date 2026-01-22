@@ -19,6 +19,11 @@ import (
 	"windshift/internal/utils"
 )
 
+// Portal constants
+const (
+	defaultItemStatus = "open" // Default status for new portal submissions
+)
+
 // PortalHandler handles public portal submissions
 type PortalHandler struct {
 	db                   database.Database
@@ -86,15 +91,14 @@ func NewPortalHandler(db database.Database, sessionManager *auth.SessionManager,
 	}
 }
 
-// GetPortal returns the portal configuration for public display
-func (h *PortalHandler) GetPortal(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
+// portalChannelResult contains the result of finding a portal channel
+type portalChannelResult struct {
+	channel models.Channel
+	config  models.ChannelConfig
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	// Find channel by portal slug
-	var channel models.Channel
+// findChannelByPortalSlug finds and validates a portal channel by slug
+func (h *PortalHandler) findChannelByPortalSlug(ctx context.Context, slug string) (*portalChannelResult, error) {
 	query := `
 		SELECT id, name, type, config, status
 		FROM channels
@@ -104,18 +108,16 @@ func (h *PortalHandler) GetPortal(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.QueryContext(ctx, query)
 	if err != nil {
-		http.Error(w, "Portal not found", http.StatusNotFound)
-		return
+		return nil, fmt.Errorf("failed to query portals: %w", err)
 	}
 	defer rows.Close()
 
-	var found bool
 	for rows.Next() {
+		var channel models.Channel
 		if err := rows.Scan(&channel.ID, &channel.Name, &channel.Type, &channel.Config, &channel.Status); err != nil {
 			continue
 		}
 
-		// Parse config to check slug
 		var config models.ChannelConfig
 		if channel.Config != "" {
 			if err := json.Unmarshal([]byte(channel.Config), &config); err != nil {
@@ -124,24 +126,257 @@ func (h *PortalHandler) GetPortal(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if config.PortalSlug == slug && config.PortalEnabled {
-			found = true
-			break
+			return &portalChannelResult{
+				channel: channel,
+				config:  config,
+			}, nil
 		}
 	}
 
-	if !found {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+	return nil, fmt.Errorf("portal not found")
+}
+
+// getOrCreatePortalCustomer finds or creates a portal customer for the given user or email
+func (h *PortalHandler) getOrCreatePortalCustomer(ctx context.Context, userID *int, name, email string) (int, error) {
+	now := time.Now()
+
+	if userID != nil {
+		// Authenticated user - find or create linked portal customer
+		var customerID int
+		err := h.db.QueryRowContext(ctx, `SELECT id FROM portal_customers WHERE user_id = ?`, *userID).Scan(&customerID)
+
+		if err == sql.ErrNoRows {
+			// Get user details to create portal customer
+			var userName, userEmail string
+			err := h.db.QueryRowContext(ctx, `SELECT first_name || ' ' || last_name, email FROM users WHERE id = ?`, *userID).Scan(&userName, &userEmail)
+			if err != nil {
+				return 0, fmt.Errorf("failed to get user details: %w", err)
+			}
+
+			result, err := h.db.ExecWriteContext(ctx, `
+				INSERT INTO portal_customers (name, email, user_id, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?)
+			`, userName, userEmail, *userID, now, now)
+			if err != nil {
+				return 0, fmt.Errorf("failed to create portal customer: %w", err)
+			}
+
+			customerIDInt64, err := result.LastInsertId()
+			if err != nil {
+				return 0, fmt.Errorf("failed to get customer ID: %w", err)
+			}
+			return int(customerIDInt64), nil
+		} else if err != nil {
+			return 0, fmt.Errorf("failed to find portal customer: %w", err)
+		}
+
+		return customerID, nil
+	}
+
+	// Anonymous user - find or create by email
+	var customerID int
+	err := h.db.QueryRowContext(ctx, `SELECT id FROM portal_customers WHERE email = ?`, email).Scan(&customerID)
+
+	if err == sql.ErrNoRows {
+		result, err := h.db.ExecWriteContext(ctx, `
+			INSERT INTO portal_customers (name, email, created_at, updated_at)
+			VALUES (?, ?, ?, ?)
+		`, name, email, now, now)
+		if err != nil {
+			return 0, fmt.Errorf("failed to create portal customer: %w", err)
+		}
+
+		customerIDInt64, err := result.LastInsertId()
+		if err != nil {
+			return 0, fmt.Errorf("failed to get customer ID: %w", err)
+		}
+		return int(customerIDInt64), nil
+	} else if err != nil {
+		return 0, fmt.Errorf("failed to find portal customer: %w", err)
+	}
+
+	return customerID, nil
+}
+
+// grantChannelAccess grants a portal customer access to a channel if not already granted
+func (h *PortalHandler) grantChannelAccess(ctx context.Context, customerID, channelID int) {
+	var accessID int
+	err := h.db.QueryRowContext(ctx, `SELECT id FROM portal_customer_channels WHERE portal_customer_id = ? AND channel_id = ?`, customerID, channelID).Scan(&accessID)
+
+	if err == sql.ErrNoRows {
+		if _, err := h.db.ExecWriteContext(ctx, `
+			INSERT INTO portal_customer_channels (portal_customer_id, channel_id, created_at)
+			VALUES (?, ?, ?)
+		`, customerID, channelID, time.Now()); err != nil {
+			slog.Warn("failed to grant channel access to portal customer", slog.String("component", "portal"), slog.Int("customer_id", customerID), slog.Int("channel_id", channelID), slog.Any("error", err))
+		}
+	}
+}
+
+// requestTypeValidationResult contains the result of request type field validation
+type requestTypeValidationResult struct {
+	itemTypeID         *int
+	virtualFieldValues map[string]interface{}
+	customFieldValues  map[string]interface{}
+}
+
+// validateAndSeparateFields validates request type fields and separates virtual from custom fields
+func (h *PortalHandler) validateAndSeparateFields(ctx context.Context, requestTypeID *int, title, description string, customFields map[string]interface{}) (*requestTypeValidationResult, error) {
+	result := &requestTypeValidationResult{}
+
+	if requestTypeID == nil {
+		// Legacy validation for submissions without request type
+		if title == "" {
+			return nil, fmt.Errorf("title is required")
+		}
+		return result, nil
+	}
+
+	// Look up request type to get item_type_id
+	var rtID int
+	var rtName string
+	var itemTypeID int
+	err := h.db.QueryRowContext(ctx, `SELECT id, name, item_type_id FROM request_types WHERE id = ? AND is_active = true`, *requestTypeID).Scan(
+		&rtID, &rtName, &itemTypeID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("invalid request type (ID: %d): %w", *requestTypeID, err)
+	}
+	result.itemTypeID = &itemTypeID
+
+	// Load request type fields for validation
+	virtualFieldIDs := make(map[string]bool)
+	rows, err := h.db.QueryContext(ctx, `SELECT field_identifier, field_type, is_required FROM request_type_fields WHERE request_type_id = ? ORDER BY display_order`, *requestTypeID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load request type fields: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var fieldID, fieldType string
+		var isRequired bool
+		if err := rows.Scan(&fieldID, &fieldType, &isRequired); err != nil {
+			continue
+		}
+
+		if fieldType == "virtual" {
+			virtualFieldIDs[fieldID] = true
+		}
+
+		if isRequired {
+			if fieldType == "default" {
+				if fieldID == "title" && title == "" {
+					return nil, fmt.Errorf("title is required")
+				}
+				if fieldID == "description" && description == "" {
+					return nil, fmt.Errorf("description is required")
+				}
+			} else if fieldType == "custom" || fieldType == "virtual" {
+				if customFields == nil || customFields[fieldID] == nil || customFields[fieldID] == "" {
+					return nil, fmt.Errorf("field %s is required", fieldID)
+				}
+			}
+		}
+	}
+
+	// Separate virtual fields from custom fields
+	if len(virtualFieldIDs) > 0 && customFields != nil {
+		result.virtualFieldValues = make(map[string]interface{})
+		result.customFieldValues = make(map[string]interface{})
+
+		for fieldID, value := range customFields {
+			if virtualFieldIDs[fieldID] {
+				result.virtualFieldValues[fieldID] = value
+			} else {
+				result.customFieldValues[fieldID] = value
+			}
+		}
+	} else {
+		result.customFieldValues = customFields
+	}
+
+	return result, nil
+}
+
+// storeCustomFieldValues stores custom field values for an item
+func (h *PortalHandler) storeCustomFieldValues(ctx context.Context, itemID int64, customFields map[string]interface{}) {
+	if customFields == nil || len(customFields) == 0 {
 		return
 	}
 
-	// Parse config
-	var config models.ChannelConfig
-	if channel.Config != "" {
-		if err := json.Unmarshal([]byte(channel.Config), &config); err != nil {
-			http.Error(w, "Invalid portal configuration", http.StatusInternalServerError)
-			return
+	now := time.Now()
+	for fieldIDStr, value := range customFields {
+		if value == nil || value == "" {
+			continue
+		}
+
+		var valueStr string
+		switch v := value.(type) {
+		case string:
+			valueStr = v
+		case float64:
+			valueStr = fmt.Sprintf("%v", v)
+		case bool:
+			valueStr = fmt.Sprintf("%v", v)
+		default:
+			valueBytes, err := json.Marshal(v)
+			if err == nil {
+				valueStr = string(valueBytes)
+			}
+		}
+
+		if valueStr != "" {
+			if _, err := h.db.ExecWriteContext(ctx, `
+				INSERT INTO custom_field_values (item_id, custom_field_id, value, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?)
+				ON CONFLICT(item_id, custom_field_id) DO UPDATE SET value = ?, updated_at = ?
+			`, itemID, fieldIDStr, valueStr, now, now, valueStr, now); err != nil {
+				slog.Warn("failed to save custom field value", slog.String("component", "portal"), slog.Int64("item_id", itemID), slog.String("field_id", fieldIDStr), slog.Any("error", err))
+			}
 		}
 	}
+
+	// Update item's custom_field_values JSON column
+	customFieldsJSON, err := json.Marshal(customFields)
+	if err == nil {
+		if _, err := h.db.ExecWriteContext(ctx, `UPDATE items SET custom_field_values = ? WHERE id = ?`, string(customFieldsJSON), itemID); err != nil {
+			slog.Warn("failed to update item custom_field_values", slog.String("component", "portal"), slog.Int64("item_id", itemID), slog.Any("error", err))
+		}
+	}
+}
+
+// storeVirtualFieldValues stores virtual field values for an item
+func (h *PortalHandler) storeVirtualFieldValues(ctx context.Context, itemID int64, virtualFields map[string]interface{}) {
+	if virtualFields == nil || len(virtualFields) == 0 {
+		return
+	}
+
+	virtualFieldsJSON, err := json.Marshal(virtualFields)
+	if err != nil {
+		slog.Warn("failed to marshal virtual field values", slog.String("component", "portal"), slog.Int64("item_id", itemID), slog.Any("error", err))
+		return
+	}
+
+	if _, err := h.db.ExecWriteContext(ctx, `UPDATE items SET virtual_field_data = ? WHERE id = ?`, string(virtualFieldsJSON), itemID); err != nil {
+		slog.Warn("failed to update item virtual_field_data", slog.String("component", "portal"), slog.Int64("item_id", itemID), slog.Any("error", err))
+	}
+}
+
+// GetPortal returns the portal configuration for public display
+func (h *PortalHandler) GetPortal(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Find channel by portal slug
+	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
+	if err != nil {
+		http.Error(w, "Portal not found", http.StatusNotFound)
+		return
+	}
+	channel := portalResult.channel
+	config := portalResult.config
 
 	// Get workspace info (use first workspace for backward compatibility)
 	var workspace models.Workspace
@@ -151,8 +386,7 @@ func (h *PortalHandler) GetPortal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if workspaceID > 0 {
-		workspaceQuery := `SELECT id, name, key FROM workspaces WHERE id = ?`
-		err = h.db.QueryRowContext(ctx, workspaceQuery, workspaceID).Scan(
+		err = h.db.QueryRowContext(ctx, `SELECT id, name, key FROM workspaces WHERE id = ?`, workspaceID).Scan(
 			&workspace.ID, &workspace.Name, &workspace.Key,
 		)
 		if err != nil {
@@ -194,45 +428,13 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Find channel by portal slug
-	var channel models.Channel
-	query := `
-		SELECT id, name, type, config, status
-		FROM channels
-		WHERE type = 'portal'
-		ORDER BY created_at DESC
-	`
-
-	rows, err := h.db.QueryContext(ctx, query)
+	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
 	if err != nil {
 		http.Error(w, "Portal not found", http.StatusNotFound)
 		return
 	}
-	defer rows.Close()
-
-	var found bool
-	var config models.ChannelConfig
-	for rows.Next() {
-		if err := rows.Scan(&channel.ID, &channel.Name, &channel.Type, &channel.Config, &channel.Status); err != nil {
-			continue
-		}
-
-		// Parse config to check slug
-		if channel.Config != "" {
-			if err := json.Unmarshal([]byte(channel.Config), &config); err != nil {
-				continue
-			}
-		}
-
-		if config.PortalSlug == slug && config.PortalEnabled {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		http.Error(w, "Portal not found", http.StatusNotFound)
-		return
-	}
+	channel := portalResult.channel
+	config := portalResult.config
 
 	// Parse submission
 	var submission struct {
@@ -254,31 +456,13 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 	submission.Description = utils.StripHTMLTags(submission.Description)
 	submission.Name = utils.StripHTMLTags(submission.Name)
 
-	// Initialize timestamp for use in customer creation and item creation
-	now := time.Now()
-
-	// Track virtual field values for storage after item creation
-	var virtualFieldValues map[string]interface{}
-
 	// Check if user is authenticated
 	var authenticatedUserID *int
-	var portalCustomerID *int
-
-	// Try to get session from request
 	sessionToken, err := h.sessionManager.GetSessionFromRequest(r)
-	if err != nil {
-		slog.Debug("no session token found", slog.String("component", "portal"), slog.Any("error", err))
-	} else {
-		slog.Debug("session token found", slog.String("component", "portal"))
-		// Validate session
+	if err == nil {
 		clientIP := h.getClientIP(r)
 		session, err := h.sessionManager.ValidateSession(sessionToken, clientIP)
-		if err != nil {
-			slog.Debug("session validation failed", slog.String("component", "portal"), slog.Any("error", err))
-		} else if session == nil {
-			slog.Debug("session is nil", slog.String("component", "portal"))
-		} else {
-			// User is authenticated
+		if err == nil && session != nil {
 			slog.Debug("user authenticated", slog.String("component", "portal"), slog.Int("user_id", session.UserID))
 			authenticatedUserID = &session.UserID
 		}
@@ -286,7 +470,7 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 
 	// Handle portal customer for authenticated vs anonymous users
 	if authenticatedUserID == nil {
-		// Anonymous submission: require name and email, and create/find portal customer
+		// Anonymous submission: require name and email
 		if strings.TrimSpace(submission.Name) == "" {
 			http.Error(w, "Name is required for portal submissions", http.StatusBadRequest)
 			return
@@ -295,187 +479,23 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Email is required for portal submissions", http.StatusBadRequest)
 			return
 		}
-
-		// Find or create portal customer
-		var customerID int
-		findCustomerQuery := `SELECT id FROM portal_customers WHERE email = ?`
-		err := h.db.QueryRowContext(ctx, findCustomerQuery, submission.Email).Scan(&customerID)
-
-		if err == sql.ErrNoRows {
-			// Create new portal customer
-			insertCustomerQuery := `
-				INSERT INTO portal_customers (name, email, created_at, updated_at)
-				VALUES (?, ?, ?, ?)
-			`
-			result, err := h.db.ExecWriteContext(ctx, insertCustomerQuery, submission.Name, submission.Email, now, now)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("Failed to create portal customer: %v", err), http.StatusInternalServerError)
-				return
-			}
-
-			customerIDInt64, err := result.LastInsertId()
-			if err != nil {
-				http.Error(w, "Failed to get customer ID", http.StatusInternalServerError)
-				return
-			}
-			customerID = int(customerIDInt64)
-		} else if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to find portal customer: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		portalCustomerID = &customerID
-
-		// Grant channel access if not already granted
-		var accessID int
-		checkAccessQuery := `SELECT id FROM portal_customer_channels WHERE portal_customer_id = ? AND channel_id = ?`
-		err = h.db.QueryRowContext(ctx, checkAccessQuery, customerID, channel.ID).Scan(&accessID)
-
-		if err == sql.ErrNoRows {
-			// Grant access
-			insertAccessQuery := `
-				INSERT INTO portal_customer_channels (portal_customer_id, channel_id, created_at)
-				VALUES (?, ?, ?)
-			`
-			if _, err := h.db.ExecWriteContext(ctx, insertAccessQuery, customerID, channel.ID, now); err != nil {
-				slog.Warn("failed to grant channel access to portal customer", slog.String("component", "portal"), slog.Int("customer_id", customerID), slog.Int("channel_id", channel.ID), slog.Any("error", err))
-			}
-		}
-	} else {
-		// Authenticated submission: find or create portal customer linked to user
-		var customerID int
-		findCustomerQuery := `SELECT id FROM portal_customers WHERE user_id = ?`
-		err := h.db.QueryRowContext(ctx, findCustomerQuery, *authenticatedUserID).Scan(&customerID)
-
-		if err == sql.ErrNoRows {
-			// Get user details to create portal customer
-			var userName, userEmail string
-			userQuery := `SELECT first_name || ' ' || last_name, email FROM users WHERE id = ?`
-			err := h.db.QueryRowContext(ctx, userQuery, *authenticatedUserID).Scan(&userName, &userEmail)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("Failed to get user details: %v", err), http.StatusInternalServerError)
-				return
-			}
-
-			// Create portal customer linked to user
-			insertCustomerQuery := `
-				INSERT INTO portal_customers (name, email, user_id, created_at, updated_at)
-				VALUES (?, ?, ?, ?, ?)
-			`
-			result, err := h.db.ExecWriteContext(ctx, insertCustomerQuery, userName, userEmail, *authenticatedUserID, now, now)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("Failed to create portal customer: %v", err), http.StatusInternalServerError)
-				return
-			}
-
-			customerIDInt64, err := result.LastInsertId()
-			if err != nil {
-				http.Error(w, "Failed to get customer ID", http.StatusInternalServerError)
-				return
-			}
-			customerID = int(customerIDInt64)
-		} else if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to find portal customer: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		portalCustomerID = &customerID
-
-		// Grant channel access if not already granted
-		var accessID int
-		checkAccessQuery := `SELECT id FROM portal_customer_channels WHERE portal_customer_id = ? AND channel_id = ?`
-		err = h.db.QueryRowContext(ctx, checkAccessQuery, customerID, channel.ID).Scan(&accessID)
-
-		if err == sql.ErrNoRows {
-			// Grant access
-			insertAccessQuery := `
-				INSERT INTO portal_customer_channels (portal_customer_id, channel_id, created_at)
-				VALUES (?, ?, ?)
-			`
-			if _, err := h.db.ExecWriteContext(ctx, insertAccessQuery, customerID, channel.ID, now); err != nil {
-				slog.Warn("failed to grant channel access to portal customer", slog.String("component", "portal"), slog.Int("customer_id", customerID), slog.Int("channel_id", channel.ID), slog.Any("error", err))
-			}
-		}
 	}
 
-	// Get item type ID from request type if provided
-	var itemTypeID *int
-	if submission.RequestTypeID != nil {
-		// Look up request type to get item_type_id
-		var requestType models.RequestType
-		rtQuery := `SELECT id, name, item_type_id FROM request_types WHERE id = ? AND is_active = true`
-		err := h.db.QueryRowContext(ctx, rtQuery, *submission.RequestTypeID).Scan(
-			&requestType.ID, &requestType.Name, &requestType.ItemTypeID,
-		)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Invalid request type (ID: %d): %v", *submission.RequestTypeID, err), http.StatusBadRequest)
-			return
-		}
-		itemTypeID = &requestType.ItemTypeID
+	// Get or create portal customer
+	customerID, err := h.getOrCreatePortalCustomer(ctx, authenticatedUserID, submission.Name, submission.Email)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-		// Load request type fields for validation
-		// Track which fields are virtual for later separation
-		virtualFieldIDs := make(map[string]bool)
-		fieldsQuery := `SELECT field_identifier, field_type, is_required FROM request_type_fields WHERE request_type_id = ? ORDER BY display_order`
-		rows, err := h.db.QueryContext(ctx, fieldsQuery, *submission.RequestTypeID)
-		if err == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var fieldID string
-				var fieldType string
-				var isRequired bool
-				if err := rows.Scan(&fieldID, &fieldType, &isRequired); err != nil {
-					continue
-				}
+	// Grant channel access
+	h.grantChannelAccess(ctx, customerID, channel.ID)
 
-				// Track virtual fields for later separation
-				if fieldType == "virtual" {
-					virtualFieldIDs[fieldID] = true
-				}
-
-				// Validate required fields
-				if isRequired {
-					if fieldType == "default" {
-						if fieldID == "title" && submission.Title == "" {
-							http.Error(w, "Title is required", http.StatusBadRequest)
-							return
-						}
-						if fieldID == "description" && submission.Description == "" {
-							http.Error(w, "Description is required", http.StatusBadRequest)
-							return
-						}
-					} else if fieldType == "custom" || fieldType == "virtual" {
-						if submission.CustomFields == nil || submission.CustomFields[fieldID] == nil || submission.CustomFields[fieldID] == "" {
-							http.Error(w, fmt.Sprintf("Field %s is required", fieldID), http.StatusBadRequest)
-							return
-						}
-					}
-				}
-			}
-		}
-
-		// Separate virtual fields from custom fields
-		if len(virtualFieldIDs) > 0 && submission.CustomFields != nil {
-			virtualFieldValues = make(map[string]interface{})
-			customFieldValues := make(map[string]interface{})
-
-			for fieldID, value := range submission.CustomFields {
-				if virtualFieldIDs[fieldID] {
-					virtualFieldValues[fieldID] = value
-				} else {
-					customFieldValues[fieldID] = value
-				}
-			}
-
-			// Update submission.CustomFields to only contain custom fields (not virtual)
-			submission.CustomFields = customFieldValues
-		}
-	} else {
-		// Legacy validation for submissions without request type
-		if submission.Title == "" {
-			http.Error(w, "Title is required", http.StatusBadRequest)
-			return
-		}
+	// Validate and separate fields
+	validationResult, err := h.validateAndSeparateFields(ctx, submission.RequestTypeID, submission.Title, submission.Description, submission.CustomFields)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	// Get target workspace (use first workspace for submission)
@@ -486,112 +506,51 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 	targetWorkspaceID := config.PortalWorkspaceIDs[0]
 
 	// Determine initial status from workflow if item type is specified
-	initialStatus := "open" // Default fallback status
-	if itemTypeID != nil {
-		status, err := services.GetInitialStatusForItemType(h.db, *itemTypeID)
+	initialStatus := defaultItemStatus // Default fallback status
+	if validationResult.itemTypeID != nil {
+		status, err := services.GetInitialStatusForItemType(h.db, *validationResult.itemTypeID)
 		if err != nil {
-			// Log the error but continue with default status
-			slog.Warn("could not determine initial status for item type", slog.String("component", "portal"), slog.Int("item_type_id", *itemTypeID), slog.Any("error", err))
+			slog.Warn("could not determine initial status for item type", slog.String("component", "portal"), slog.Int("item_type_id", *validationResult.itemTypeID), slog.Any("error", err))
 		} else {
 			initialStatus = status
 		}
 	}
 
-	// Create item using centralized service (handles transaction, numbering, frac_index, etc.)
+	// Create item using centralized service
 	itemID, err := services.CreateItem(h.db, services.ItemCreationParams{
-		WorkspaceID:              targetWorkspaceID,
-		Title:                    submission.Title,
-		Description:              submission.Description,
-		Status:                   initialStatus,
-		ItemTypeID:               itemTypeID,
-		Priority:                 "medium", // Not customizable yet
-		CreatorID:                authenticatedUserID,
-		CreatorPortalCustomerID:  portalCustomerID,
-		ChannelID:                &channel.ID,          // Track which portal/channel this came from
-		RequestTypeID:            submission.RequestTypeID, // Track which request type was used
+		WorkspaceID:             targetWorkspaceID,
+		Title:                   submission.Title,
+		Description:             submission.Description,
+		Status:                  initialStatus,
+		ItemTypeID:              validationResult.itemTypeID,
+		Priority:                "medium",
+		CreatorID:               authenticatedUserID,
+		CreatorPortalCustomerID: &customerID,
+		ChannelID:               &channel.ID,
+		RequestTypeID:           submission.RequestTypeID,
 	})
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to create item: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	// Store custom field values (after transaction commit)
-	if submission.CustomFields != nil && len(submission.CustomFields) > 0 {
-		for fieldIDStr, value := range submission.CustomFields {
-			// Skip empty values
-			if value == nil || value == "" {
-				continue
-			}
-
-			// Convert value to string for storage
-			var valueStr string
-			switch v := value.(type) {
-			case string:
-				valueStr = v
-			case float64:
-				valueStr = fmt.Sprintf("%v", v)
-			case bool:
-				valueStr = fmt.Sprintf("%v", v)
-			default:
-				valueBytes, err := json.Marshal(v)
-				if err == nil {
-					valueStr = string(valueBytes)
-				}
-			}
-
-			if valueStr != "" {
-				// Insert custom field value
-				cfvQuery := `
-					INSERT INTO custom_field_values (item_id, custom_field_id, value, created_at, updated_at)
-					VALUES (?, ?, ?, ?, ?)
-					ON CONFLICT(item_id, custom_field_id) DO UPDATE SET value = ?, updated_at = ?
-				`
-				if _, err := h.db.ExecWriteContext(ctx, cfvQuery, itemID, fieldIDStr, valueStr, now, now, valueStr, now); err != nil {
-					slog.Warn("failed to save custom field value", slog.String("component", "portal"), slog.Int64("item_id", itemID), slog.String("field_id", fieldIDStr), slog.Any("error", err))
-				}
-			}
-		}
-
-		// Also update the item's custom_field_values JSON column for retrieval compatibility
-		customFieldsJSON, err := json.Marshal(submission.CustomFields)
-		if err == nil {
-			updateItemQuery := `UPDATE items SET custom_field_values = ? WHERE id = ?`
-			if _, err := h.db.ExecWriteContext(ctx, updateItemQuery, string(customFieldsJSON), itemID); err != nil {
-				slog.Warn("failed to update item custom_field_values", slog.String("component", "portal"), slog.Int64("item_id", itemID), slog.Any("error", err))
-			}
-		}
-	}
-
-	// Store virtual field values (separate from custom fields)
-	if virtualFieldValues != nil && len(virtualFieldValues) > 0 {
-		virtualFieldsJSON, err := json.Marshal(virtualFieldValues)
-		if err == nil {
-			updateVirtualFieldsQuery := `UPDATE items SET virtual_field_data = ? WHERE id = ?`
-			if _, err := h.db.ExecWriteContext(ctx, updateVirtualFieldsQuery, string(virtualFieldsJSON), itemID); err != nil {
-				slog.Warn("failed to update item virtual_field_data", slog.String("component", "portal"), slog.Int64("item_id", itemID), slog.Any("error", err))
-			}
-		}
-	}
-
-	// Note: Creator information is now properly tracked via creator_id or creator_portal_customer_id
-	// No need to add email as a comment anymore
+	// Store custom and virtual field values
+	h.storeCustomFieldValues(ctx, itemID, validationResult.customFieldValues)
+	h.storeVirtualFieldValues(ctx, itemID, validationResult.virtualFieldValues)
 
 	// Update channel last activity
-	updateChannelQuery := `UPDATE channels SET last_activity = ? WHERE id = ?`
-	if _, err := h.db.ExecWriteContext(ctx, updateChannelQuery, now, channel.ID); err != nil {
+	if _, err := h.db.ExecWriteContext(ctx, `UPDATE channels SET last_activity = ? WHERE id = ?`, time.Now(), channel.ID); err != nil {
 		slog.Warn("failed to update channel last_activity", slog.String("component", "portal"), slog.Int("channel_id", channel.ID), slog.Any("error", err))
 	}
 
 	// Return success response
-	response := map[string]interface{}{
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"item_id": itemID,
 		"message": "Submission received successfully",
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	})
 }
 
 // SearchKnowledgeBase proxies knowledge base search requests to Docmost
