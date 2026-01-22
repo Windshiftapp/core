@@ -44,6 +44,7 @@ import (
 	"github.com/charmbracelet/wish"
 	wishbubbletea "github.com/charmbracelet/wish/bubbletea"
 	"github.com/charmbracelet/wish/logging"
+	"github.com/jub0bs/cors"
 )
 
 //go:embed all:frontend/dist
@@ -155,104 +156,77 @@ func checkSetupStatusWithRetry(db database.Database, maxRetries int, initialDela
 }
 
 func createCORSMiddleware(allowedHosts string, serverPort string, disableCSRF bool) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			origin := r.Header.Get("Origin")
+	// Build origin patterns from allowed hosts
+	var origins []string
 
-			// Development mode: Allow all origins when CSRF is disabled
-			if disableCSRF {
-				w.Header().Set("Access-Control-Allow-Origin", "*")
-				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token, Authorization")
-				// Note: Cannot set Allow-Credentials with wildcard origin
+	if disableCSRF {
+		// Development mode: Allow all origins
+		origins = []string{"*"}
+	} else if allowedHosts != "" {
+		// Production mode: Build origin patterns from allowed hosts
+		hosts := strings.Split(allowedHosts, ",")
+		for _, host := range hosts {
+			host = strings.TrimSpace(host)
+			if host == "" {
+				continue
+			}
 
-				if r.Method == "OPTIONS" {
-					w.WriteHeader(http.StatusOK)
+			// If host already includes scheme, use as-is
+			if strings.HasPrefix(host, "http://") || strings.HasPrefix(host, "https://") {
+				origins = append(origins, host)
+				continue
+			}
+
+			// Build patterns for both HTTP and HTTPS with various port configurations
+			// Allow standard HTTPS (no port needed)
+			origins = append(origins, "https://"+host)
+
+			// Allow HTTP on server port (for local dev behind proxy)
+			if serverPort != "80" && serverPort != "443" {
+				origins = append(origins, "http://"+host+":"+serverPort)
+			}
+			origins = append(origins, "http://"+host)
+		}
+	}
+
+	// If no origins configured in production, return a middleware that blocks cross-origin requests
+	if len(origins) == 0 {
+		return func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if origin := r.Header.Get("Origin"); origin != "" {
+					http.Error(w, "CORS: Origin not allowed. Configure --allowed-hosts for cross-origin requests.", http.StatusForbidden)
 					return
 				}
-
 				next.ServeHTTP(w, r)
-				return
-			}
-
-			// Production mode: Strict origin validation
-
-			// If no origin header, it's a same-origin request - allow it
-			if origin == "" {
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			// If origin header present but no allowed hosts configured, deny
-			if allowedHosts == "" {
-				http.Error(w, "CORS: Origin not allowed. Configure --allowed-hosts for cross-origin requests.", http.StatusForbidden)
-				return
-			}
-
-			// Check if origin is in allowed hosts list
-			if !isOriginAllowed(origin, allowedHosts, serverPort) {
-				http.Error(w, "CORS: Origin not allowed", http.StatusForbidden)
-				return
-			}
-
-			// Origin is allowed - set CORS headers with specific origin
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token, Authorization")
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
-
-			if r.Method == "OPTIONS" {
-				w.WriteHeader(http.StatusOK)
-				return
-			}
-
-			next.ServeHTTP(w, r)
-		})
+			})
+		}
 	}
-}
 
-func isOriginAllowed(origin, allowedHosts, serverPort string) bool {
-	// Parse origin URL
-	originURL, err := url.Parse(origin)
+	// Configure CORS middleware
+	cfg := cors.Config{
+		Origins:         origins,
+		Methods:         []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete},
+		RequestHeaders:  []string{"Content-Type", "X-CSRF-Token", "Authorization"},
+		Credentialed:    !disableCSRF, // Enable credentials in production mode
+		MaxAgeInSeconds: 86400,        // Cache preflight for 24 hours
+	}
+
+	corsMw, err := cors.NewMiddleware(cfg)
 	if err != nil {
-		return false
-	}
-
-	// Split allowed hosts
-	hosts := strings.Split(allowedHosts, ",")
-
-	for _, host := range hosts {
-		host = strings.TrimSpace(host)
-		if host == "" {
-			continue
-		}
-
-		// Check if host matches (with or without port)
-		if originURL.Hostname() == host {
-			// Check port
-			originPort := originURL.Port()
-			if originPort == "" {
-				// Default ports based on scheme
-				if originURL.Scheme == "https" {
-					originPort = "443"
-				} else {
-					originPort = "80"
+		slog.Error("Failed to create CORS middleware", "error", err)
+		// Fall back to blocking middleware on config error
+		return func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if origin := r.Header.Get("Origin"); origin != "" {
+					http.Error(w, "CORS configuration error", http.StatusInternalServerError)
+					return
 				}
-			}
-
-			// Allow if same port as server or if origin uses standard HTTP/HTTPS ports
-			if originPort == serverPort || originPort == "80" || originPort == "443" {
-				return true
-			}
-		}
-
-		// Also check if full host:port matches
-		if originURL.Host == host {
-			return true
+				next.ServeHTTP(w, r)
+			})
 		}
 	}
 
-	return false
+	return corsMw.Wrap
 }
 
 // isPrivateIP checks if an IP is a private/internal address
