@@ -287,6 +287,7 @@
   function handleSaveField(event) {
     const { field, value } = event.detail;
     if (field === 'description') {
+      editDescription = value;
       saveDescription();
     }
   }
@@ -462,10 +463,10 @@
           {attachments}
           diagrams={[]}
           {attachmentSettings}
-          onsave-field={handleSaveField}
-          oncancel-edit={handleCancelEdit}
-          onattachment-upload-files={handleAttachmentUploadFiles}
-          onattachment-delete={handleAttachmentDelete}
+          on:save-field={handleSaveField}
+          on:cancel-edit={handleCancelEdit}
+          on:attachment-upload-files={handleAttachmentUploadFiles}
+          on:attachment-delete={handleAttachmentDelete}
         />
       </div>
 

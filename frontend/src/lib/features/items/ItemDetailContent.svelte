@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher } from 'svelte';
-  import { AlertCircle, Workflow } from 'lucide-svelte';
+  import { AlertCircle } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import ItemDetailBreadcrumbs from '../items/ItemDetailBreadcrumbs.svelte';
   import ItemDetailHeader from '../items/ItemDetailHeader.svelte';
@@ -8,9 +8,7 @@
   import ItemDetailLinks from './ItemDetailLinks.svelte';
   import ItemDetailTabs from '../items/ItemDetailTabs.svelte';
   import ItemDetailSidebar from '../items/ItemDetailSidebar.svelte';
-  import DiagramList from '../../components/DiagramList.svelte';
   import DiagramModal from '../../components/DiagramModal.svelte';
-  import Button from '../../components/Button.svelte';
 
   const dispatch = createEventDispatcher();
 
@@ -52,13 +50,7 @@
   export let savingTimeEntry = false;
   export let timeProjects = [];
   export let activeTimer = null;
-  export let editingStatus = false;
-  export let editingPriority = false;
   export let editingDueDate = false;
-  export let editingProject = false;
-  export let editingAssignee = false;
-  export let editingMilestone = false;
-  export let editingIteration = false;
   export let editingCustomFields = {};
   export let editCustomFieldValues = {};
   export let workspaceScreenFields = [];
@@ -68,10 +60,8 @@
   export let iterations = [];
   export let priorities = [];
   export let attachments = [];
-  export let attachmentPagination = null;
   export let attachmentSettings = null;
   export let diagrams = [];
-  export let loadingDiagrams = false;
   export let manualActions = [];
 
   // Component references
@@ -409,13 +399,7 @@
             {item}
             {workspace}
             {statusOptions}
-            {editingStatus}
-            {editingPriority}
             {editingDueDate}
-            {editingProject}
-            {editingAssignee}
-            {editingMilestone}
-            {editingIteration}
             {editingCustomFields}
             {editCustomFieldValues}
             {workspaceScreenFields}
@@ -426,7 +410,6 @@
             {priorities}
             {timeProjects}
             {moduleSettings}
-            {saving}
             {dropdownItems}
             on:save-field={handleSaveField}
             on:cancel-edit={handleCancelEdit}
