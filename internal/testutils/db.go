@@ -8,42 +8,46 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
 	"windshift/internal/database"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// SharedMemoryDSN is the recommended DSN for in-memory test databases.
+// Uses shared cache so multiple connections see the same data.
+// Required because DB struct uses separate read pool and write connection.
+const SharedMemoryDSN = "file::memory:?cache=shared&mode=memory"
+
 // TestDB wraps a database connection for testing
 type TestDB struct {
 	*database.DB
-	TempFile string
-	IsMemory bool
+	TempFile    string
+	IsMemory    bool
 	dbInterface database.Database // Cached Database interface for service layer tests
 }
 
-// CreateTestDB creates a new test database instance
-// If inMemory is true, uses an in-memory SQLite database
-// Otherwise creates a temporary file database
+// CreateTestDB creates a new test database instance.
+// If inMemory is true, uses an in-memory SQLite database with shared cache.
+// Otherwise creates a temporary file database.
 func CreateTestDB(t *testing.T, inMemory bool) *TestDB {
 	var dsn string
 	var tempFile string
-	
+
 	if inMemory {
-		// Use shared in-memory database so multiple connections see the same data
-		// Required because DB struct uses separate read pool and write connection
-		dsn = "file::memory:?cache=shared&mode=memory"
+		dsn = SharedMemoryDSN
 	} else {
 		// Create temporary database file
 		tempDir := t.TempDir()
 		tempFile = filepath.Join(tempDir, "test.db")
 		dsn = tempFile
 	}
-	
+
 	db, err := database.NewDB(dsn)
 	if err != nil {
 		t.Fatalf("Failed to create test database: %v", err)
 	}
-	
+
 	// Initialize the database schema
 	if err := db.Initialize(); err != nil {
 		t.Fatalf("Failed to initialize test database: %v", err)
@@ -66,9 +70,7 @@ func CreateFreshDB(t *testing.T, inMemory bool) *TestDB {
 	var tempFile string
 
 	if inMemory {
-		// Use shared in-memory database so multiple connections see the same data
-		// Required because DB struct uses separate read pool and write connection
-		dsn = "file::memory:?cache=shared&mode=memory"
+		dsn = SharedMemoryDSN
 	} else {
 		tempDir := t.TempDir()
 		tempFile = filepath.Join(tempDir, "fresh.db")
@@ -101,14 +103,14 @@ func (tdb *TestDB) Close() error {
 	if err := tdb.DB.Close(); err != nil {
 		return err
 	}
-	
+
 	if !tdb.IsMemory && tdb.TempFile != "" {
 		// Clean up temp file if it exists
 		if _, err := os.Stat(tdb.TempFile); err == nil {
 			os.Remove(tdb.TempFile)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -120,7 +122,7 @@ func (tdb *TestDB) AssertTableExists(t *testing.T, tableName string) {
 	if err != nil {
 		t.Fatalf("Failed to check if table %s exists: %v", tableName, err)
 	}
-	
+
 	if !exists {
 		t.Fatalf("Table %s does not exist", tableName)
 	}
@@ -134,7 +136,7 @@ func (tdb *TestDB) AssertTableNotExists(t *testing.T, tableName string) {
 	if err != nil {
 		t.Fatalf("Failed to check if table %s exists: %v", tableName, err)
 	}
-	
+
 	if exists {
 		t.Fatalf("Table %s should not exist but does", tableName)
 	}
@@ -148,7 +150,7 @@ func (tdb *TestDB) AssertColumnExists(t *testing.T, tableName, columnName string
 	if err != nil {
 		t.Fatalf("Failed to check column %s.%s: %v", tableName, columnName, err)
 	}
-	
+
 	if count == 0 {
 		t.Fatalf("Column %s.%s does not exist", tableName, columnName)
 	}
@@ -162,7 +164,7 @@ func (tdb *TestDB) AssertIndexExists(t *testing.T, indexName string) {
 	if err != nil {
 		t.Fatalf("Failed to check if index %s exists: %v", indexName, err)
 	}
-	
+
 	if !exists {
 		t.Fatalf("Index %s does not exist", indexName)
 	}
@@ -175,7 +177,7 @@ func (tdb *TestDB) AssertForeignKeyEnabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to check foreign key status: %v", err)
 	}
-	
+
 	if !enabled {
 		t.Fatal("Foreign key constraints are not enabled")
 	}
@@ -189,30 +191,39 @@ func (tdb *TestDB) GetTableCount() (int, error) {
 	return count, err
 }
 
+// TestDataSet contains IDs of seeded test data
+type TestDataSet struct {
+	WorkspaceID      int
+	UserID           int
+	StatusCategoryID int
+	StatusID         int
+	PriorityID       int
+}
+
 // SeedTestData populates the database with basic test data
 func (tdb *TestDB) SeedTestData(t *testing.T) TestDataSet {
 	data := TestDataSet{}
-	
+
 	// Create test workspace
 	_, err := tdb.Exec(`
-		INSERT INTO workspaces (id, name, key, description, active) 
+		INSERT INTO workspaces (id, name, key, description, active)
 		VALUES (1, 'Test Workspace', 'TEST', 'Test workspace for unit tests', 1)
 	`)
 	if err != nil {
 		t.Fatalf("Failed to seed workspace: %v", err)
 	}
 	data.WorkspaceID = 1
-	
+
 	// Create test user
 	_, err = tdb.Exec(`
-		INSERT INTO users (id, email, username, first_name, last_name, role, password_hash, is_active) 
-		VALUES (1, 'test@example.com', 'testuser', 'Test', 'User', 'admin', '$2a$10$hash', 1)
+		INSERT INTO users (id, email, username, first_name, last_name, password_hash, is_active)
+		VALUES (1, 'test@example.com', 'testuser', 'Test', 'User', '$2a$10$hash', 1)
 	`)
 	if err != nil {
 		t.Fatalf("Failed to seed user: %v", err)
 	}
 	data.UserID = 1
-	
+
 	// Use existing default status category (created during database initialization)
 	var categoryID int
 	err = tdb.QueryRow("SELECT id FROM status_categories WHERE is_default = true LIMIT 1").Scan(&categoryID)
@@ -228,30 +239,49 @@ func (tdb *TestDB) SeedTestData(t *testing.T) TestDataSet {
 		t.Fatalf("Failed to find default status: %v", err)
 	}
 	data.StatusID = statusID
-	
-	return data
-}
 
-// TestDataSet contains IDs of seeded test data
-type TestDataSet struct {
-	WorkspaceID      int
-	UserID           int
-	StatusCategoryID int
-	StatusID         int
+	// Use existing default priority (created during database initialization)
+	var priorityID int
+	err = tdb.QueryRow("SELECT id FROM priorities WHERE is_default = true LIMIT 1").Scan(&priorityID)
+	if err != nil {
+		// If no default priority exists, try to get any priority
+		err = tdb.QueryRow("SELECT id FROM priorities LIMIT 1").Scan(&priorityID)
+		if err != nil {
+			t.Fatalf("Failed to find any priority: %v", err)
+		}
+	}
+	data.PriorityID = priorityID
+
+	// Grant test user Administrator role on test workspace
+	var adminRoleID int
+	err = tdb.QueryRow(`SELECT id FROM workspace_roles WHERE name = 'Administrator'`).Scan(&adminRoleID)
+	if err != nil {
+		t.Fatalf("Failed to get Administrator role: %v", err)
+	}
+
+	_, err = tdb.Exec(`
+		INSERT INTO user_workspace_roles (user_id, workspace_id, role_id, granted_at)
+		VALUES (?, ?, ?, datetime('now'))
+	`, data.UserID, data.WorkspaceID, adminRoleID)
+	if err != nil {
+		t.Fatalf("Failed to assign workspace role: %v", err)
+	}
+
+	return data
 }
 
 // ClearAllTables removes all data from all tables (for cleanup)
 func (tdb *TestDB) ClearAllTables(t *testing.T) {
 	// Get all table names
 	rows, err := tdb.Query(`
-		SELECT name FROM sqlite_master 
+		SELECT name FROM sqlite_master
 		WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'migrations'
 	`)
 	if err != nil {
 		t.Fatalf("Failed to get table names: %v", err)
 	}
 	defer rows.Close()
-	
+
 	var tables []string
 	for rows.Next() {
 		var tableName string
@@ -260,19 +290,19 @@ func (tdb *TestDB) ClearAllTables(t *testing.T) {
 		}
 		tables = append(tables, tableName)
 	}
-	
+
 	// Disable foreign key constraints temporarily
 	if _, err := tdb.Exec("PRAGMA foreign_keys = OFF"); err != nil {
 		t.Fatalf("Failed to disable foreign keys: %v", err)
 	}
-	
+
 	// Clear all tables
 	for _, table := range tables {
 		if _, err := tdb.Exec(fmt.Sprintf("DELETE FROM %s", table)); err != nil {
 			t.Fatalf("Failed to clear table %s: %v", table, err)
 		}
 	}
-	
+
 	// Re-enable foreign key constraints
 	if _, err := tdb.Exec("PRAGMA foreign_keys = ON"); err != nil {
 		t.Fatalf("Failed to re-enable foreign keys: %v", err)
@@ -285,21 +315,21 @@ func (tdb *TestDB) ExecuteInTransaction(t *testing.T, fn func(*sql.Tx) error) {
 	if err != nil {
 		t.Fatalf("Failed to begin transaction: %v", err)
 	}
-	
+
 	defer func() {
 		if r := recover(); r != nil {
 			tx.Rollback()
 			panic(r)
 		}
 	}()
-	
+
 	if err := fn(tx); err != nil {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
 			t.Fatalf("Failed to rollback transaction: %v (original error: %v)", rollbackErr, err)
 		}
 		t.Fatalf("Transaction function failed: %v", err)
 	}
-	
+
 	if err := tx.Commit(); err != nil {
 		t.Fatalf("Failed to commit transaction: %v", err)
 	}

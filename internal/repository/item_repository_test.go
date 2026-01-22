@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"windshift/internal/handlers/testutils"
 	"windshift/internal/models"
+	"windshift/internal/testutils"
 )
 
 func TestItemRepository(t *testing.T) {
@@ -115,7 +115,7 @@ func TestItemRepository(t *testing.T) {
 			WorkspaceItemNumber: nextNum,
 			Title:               "New Test Item",
 			Description:         "Test description",
-			Status:              "open",
+			StatusID:            &testData.StatusID,
 			FracIndex:           &fracIndex,
 		}
 
@@ -406,10 +406,10 @@ func setupRepositoryTestData(t *testing.T, tdb *testutils.TestDB) *RepositoryTes
 
 	// Create test item
 	itemResult, err := tdb.DB.Exec(`
-		INSERT INTO items (workspace_id, workspace_item_number, title, description, status, is_task,
+		INSERT INTO items (workspace_id, workspace_item_number, title, description, status_id, is_task,
 		                   frac_index, path, created_at, updated_at)
-		VALUES (?, 1, 'Test Item', 'Test Description', 'open', 0, 'a0', '/1/', ?, ?)
-	`, workspaceID, now, now)
+		VALUES (?, 1, 'Test Item', 'Test Description', ?, 0, 'a0', '/1/', ?, ?)
+	`, workspaceID, statusID, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create test item: %v", err)
 	}
@@ -447,6 +447,13 @@ func setupHierarchyTestData(t *testing.T, tdb *testutils.TestDB) *HierarchyTestD
 	workspaceID64, _ := result.LastInsertId()
 	workspaceID := int(workspaceID64)
 
+	// Get status from default data
+	var statusID int
+	err = tdb.DB.QueryRow("SELECT id FROM statuses LIMIT 1").Scan(&statusID)
+	if err != nil {
+		t.Fatalf("Failed to get status: %v", err)
+	}
+
 	// Get or create user
 	var userID int
 	err = tdb.DB.QueryRow("SELECT id FROM users LIMIT 1").Scan(&userID)
@@ -464,10 +471,10 @@ func setupHierarchyTestData(t *testing.T, tdb *testutils.TestDB) *HierarchyTestD
 
 	// Create parent item
 	parentResult, err := tdb.DB.Exec(`
-		INSERT INTO items (workspace_id, workspace_item_number, title, description, status, is_task,
+		INSERT INTO items (workspace_id, workspace_item_number, title, description, status_id, is_task,
 		                   frac_index, path, created_at, updated_at)
-		VALUES (?, 1, 'Parent Item', 'Parent Description', 'open', 0, 'a0', '/1/', ?, ?)
-	`, workspaceID, now, now)
+		VALUES (?, 1, 'Parent Item', 'Parent Description', ?, 0, 'a0', '/1/', ?, ?)
+	`, workspaceID, statusID, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create parent item: %v", err)
 	}
@@ -476,10 +483,10 @@ func setupHierarchyTestData(t *testing.T, tdb *testutils.TestDB) *HierarchyTestD
 
 	// Create child items
 	child1Result, err := tdb.DB.Exec(`
-		INSERT INTO items (workspace_id, workspace_item_number, title, description, status, is_task,
+		INSERT INTO items (workspace_id, workspace_item_number, title, description, status_id, is_task,
 		                   parent_id, frac_index, path, created_at, updated_at)
-		VALUES (?, 2, 'Child Item 1', 'Child 1 Description', 'open', 0, ?, 'a0', '/1/2/', ?, ?)
-	`, workspaceID, parentID, now, now)
+		VALUES (?, 2, 'Child Item 1', 'Child 1 Description', ?, 0, ?, 'a0', '/1/2/', ?, ?)
+	`, workspaceID, statusID, parentID, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create child item 1: %v", err)
 	}
@@ -487,10 +494,10 @@ func setupHierarchyTestData(t *testing.T, tdb *testutils.TestDB) *HierarchyTestD
 	childID1 := int(childID1Int64)
 
 	child2Result, err := tdb.DB.Exec(`
-		INSERT INTO items (workspace_id, workspace_item_number, title, description, status, is_task,
+		INSERT INTO items (workspace_id, workspace_item_number, title, description, status_id, is_task,
 		                   parent_id, frac_index, path, created_at, updated_at)
-		VALUES (?, 3, 'Child Item 2', 'Child 2 Description', 'open', 0, ?, 'a1', '/1/3/', ?, ?)
-	`, workspaceID, parentID, now, now)
+		VALUES (?, 3, 'Child Item 2', 'Child 2 Description', ?, 0, ?, 'a1', '/1/3/', ?, ?)
+	`, workspaceID, statusID, parentID, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create child item 2: %v", err)
 	}

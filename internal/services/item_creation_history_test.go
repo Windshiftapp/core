@@ -5,7 +5,7 @@ package services
 import (
 	"testing"
 
-	"windshift/internal/handlers/testutils"
+	"windshift/internal/testutils"
 )
 
 func TestRecordItemCreationHistory(t *testing.T) {

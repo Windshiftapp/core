@@ -6,10 +6,16 @@ import (
 	"net/http"
 	"testing"
 	"time"
-	"windshift/internal/handlers/testutils"
-	"windshift/internal/models"
 
+	"windshift/internal/models"
+	"windshift/internal/services"
+	"windshift/internal/testutils"
 )
+
+// mockNotifService is a no-op notification service for time tracking tests
+type mockNotifService struct{}
+
+func (m *mockNotifService) EmitEvent(event *services.NotificationEvent) {}
 
 func TestTimeWorklogHandler_Create_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
@@ -36,20 +42,21 @@ func TestTimeWorklogHandler_Create_Success(t *testing.T) {
 	}
 
 	// Create work item for linking
-	itemHandler := NewItemHandler(tdb.DB.DB)
+	mockNotificationService := &mockNotifService{}
+	itemHandler := NewItemHandler(tdb.GetDatabase(), nil, nil, mockNotificationService)
 	item := models.Item{
 		WorkspaceID: data.WorkspaceID,
 		Title:       "Test Work Item",
 		Description: "Test description",
-		Status:      "open",
-		Priority:    "medium",
+		StatusID:    &data.StatusID,
+		PriorityID:  &data.PriorityID,
 	}
 	createReq := testutils.CreateJSONRequest(t, "POST", "/api/items", item)
-	createRR := testutils.ExecuteRequest(t, itemHandler.Create, createReq)
+	createRR := testutils.ExecuteAuthenticatedRequest(t, itemHandler.Create, createReq, nil)
 	var createdItem models.Item
 	createRR.AssertJSONResponse(&createdItem)
 
-	handler := NewTimeWorklogHandler(tdb.DB, nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
 
 	worklogReq := WorklogRequest{
 		ProjectID:     1,
@@ -62,7 +69,7 @@ func TestTimeWorklogHandler_Create_Success(t *testing.T) {
 	}
 
 	req := testutils.CreateJSONRequest(t, "POST", "/api/worklogs", worklogReq)
-	rr := testutils.ExecuteRequest(t, handler.Create, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 
 	rr.AssertStatusCode(http.StatusCreated).
 		AssertContentType("application/json")
@@ -105,7 +112,7 @@ func TestTimeWorklogHandler_Create_DurationOnly(t *testing.T) {
 		t.Fatalf("Failed to create test project: %v", err)
 	}
 
-	handler := NewTimeWorklogHandler(tdb.DB, nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
 
 	worklogReq := WorklogRequest{
 		ProjectID:     1,
@@ -115,7 +122,7 @@ func TestTimeWorklogHandler_Create_DurationOnly(t *testing.T) {
 	}
 
 	req := testutils.CreateJSONRequest(t, "POST", "/api/worklogs", worklogReq)
-	rr := testutils.ExecuteRequest(t, handler.Create, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 
 	rr.AssertStatusCode(http.StatusCreated)
 
@@ -217,10 +224,10 @@ func TestTimeWorklogHandler_GetAll_Success(t *testing.T) {
 		}
 	}
 
-	handler := NewTimeWorklogHandler(tdb.DB, nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
 
 	req := testutils.CreateJSONRequest(t, "GET", "/api/worklogs", nil)
-	rr := testutils.ExecuteRequest(t, handler.GetAll, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.GetAll, req, nil)
 
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
@@ -292,11 +299,11 @@ func TestTimeWorklogHandler_GetAll_WithFilters(t *testing.T) {
 		}
 	}
 
-	handler := NewTimeWorklogHandler(tdb.DB, nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
 
 	// Test project filter
 	req := testutils.CreateJSONRequest(t, "GET", "/api/worklogs?project_id=1", nil)
-	rr := testutils.ExecuteRequest(t, handler.GetAll, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.GetAll, req, nil)
 
 	rr.AssertStatusCode(http.StatusOK)
 
@@ -309,7 +316,7 @@ func TestTimeWorklogHandler_GetAll_WithFilters(t *testing.T) {
 
 	// Test date range filter
 	req2 := testutils.CreateJSONRequest(t, "GET", "/api/worklogs?date_from=2024-01-15&date_to=2024-01-15", nil)
-	rr2 := testutils.ExecuteRequest(t, handler.GetAll, req2)
+	rr2 := testutils.ExecuteAuthenticatedRequest(t, handler.GetAll, req2, nil)
 
 	rr2.AssertStatusCode(http.StatusOK)
 
@@ -357,11 +364,11 @@ func TestTimeWorklogHandler_Get_Success(t *testing.T) {
 	}
 	worklogID, _ := result.LastInsertId()
 
-	handler := NewTimeWorklogHandler(tdb.DB, nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
 
 	req := testutils.CreateJSONRequest(t, "GET", "/api/worklogs/"+testutils.IntToString(int(worklogID)), nil)
 	req.SetPathValue("id", testutils.IntToString(int(worklogID)))
-	rr := testutils.ExecuteRequest(t, handler.Get, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Get, req, nil)
 
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
@@ -401,7 +408,7 @@ func TestTimeWorklogHandler_ValidationErrors(t *testing.T) {
 		t.Fatalf("Failed to create test project: %v", err)
 	}
 
-	handler := NewTimeWorklogHandler(tdb.DB, nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
 
 	tests := []struct {
 		name        string
@@ -411,24 +418,24 @@ func TestTimeWorklogHandler_ValidationErrors(t *testing.T) {
 		{
 			name:        "Missing project ID",
 			request:     WorklogRequest{Description: "Test", Date: "2024-01-15", DurationInput: "1h"},
-			expectedErr: "Project not found",
+			expectedErr: "project not found",
 		},
 		{
 			name:        "Invalid date format",
 			request:     WorklogRequest{ProjectID: 1, Description: "Test", Date: "invalid-date", DurationInput: "1h"},
-			expectedErr: "Invalid date format",
+			expectedErr: "invalid date format",
 		},
 		{
 			name:        "Invalid duration",
 			request:     WorklogRequest{ProjectID: 1, Description: "Test", Date: "2024-01-15", DurationInput: "invalid"},
-			expectedErr: "Invalid duration",
+			expectedErr: "invalid duration",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := testutils.CreateJSONRequest(t, "POST", "/api/worklogs", tt.request)
-			rr := testutils.ExecuteRequest(t, handler.Create, req)
+			rr := testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 
 			testutils.AssertValidationError(t, rr, tt.expectedErr)
 		})
@@ -472,7 +479,7 @@ func TestTimeWorklogHandler_Update_Success(t *testing.T) {
 	}
 	worklogID, _ := result.LastInsertId()
 
-	handler := NewTimeWorklogHandler(tdb.DB, nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
 
 	updateReq := WorklogRequest{
 		ProjectID:     1,
@@ -483,7 +490,7 @@ func TestTimeWorklogHandler_Update_Success(t *testing.T) {
 
 	req := testutils.CreateJSONRequest(t, "PUT", "/api/worklogs/"+testutils.IntToString(int(worklogID)), updateReq)
 	req.SetPathValue("id", testutils.IntToString(int(worklogID)))
-	rr := testutils.ExecuteRequest(t, handler.Update, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Update, req, nil)
 
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
@@ -521,7 +528,7 @@ func TestTimeWorklogHandler_Update_InvalidID(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewTimeWorklogHandler(tdb.DB, nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
 
 	updateReq := WorklogRequest{
 		ProjectID:     1,
@@ -532,7 +539,7 @@ func TestTimeWorklogHandler_Update_InvalidID(t *testing.T) {
 
 	req := testutils.CreateJSONRequest(t, "PUT", "/api/worklogs/invalid", updateReq)
 	req.SetPathValue("id", "invalid")
-	rr := testutils.ExecuteRequest(t, handler.Update, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Update, req, nil)
 
 	rr.AssertStatusCode(http.StatusBadRequest)
 }
@@ -574,11 +581,11 @@ func TestTimeWorklogHandler_Delete_Success(t *testing.T) {
 	}
 	worklogID, _ := result.LastInsertId()
 
-	handler := NewTimeWorklogHandler(tdb.DB, nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
 
 	req := testutils.CreateJSONRequest(t, "DELETE", "/api/worklogs/"+testutils.IntToString(int(worklogID)), nil)
 	req.SetPathValue("id", testutils.IntToString(int(worklogID)))
-	rr := testutils.ExecuteRequest(t, handler.Delete, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Delete, req, nil)
 
 	rr.AssertStatusCode(http.StatusNoContent)
 
@@ -597,11 +604,11 @@ func TestTimeWorklogHandler_Delete_InvalidID(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewTimeWorklogHandler(tdb.DB, nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
 
 	req := testutils.CreateJSONRequest(t, "DELETE", "/api/worklogs/invalid", nil)
 	req.SetPathValue("id", "invalid")
-	rr := testutils.ExecuteRequest(t, handler.Delete, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Delete, req, nil)
 
 	rr.AssertStatusCode(http.StatusBadRequest)
 }
@@ -610,11 +617,11 @@ func TestTimeWorklogHandler_Delete_NotFound(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewTimeWorklogHandler(tdb.DB, nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
 
 	req := testutils.CreateJSONRequest(t, "DELETE", "/api/worklogs/99999", nil)
 	req.SetPathValue("id", "99999")
-	rr := testutils.ExecuteRequest(t, handler.Delete, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Delete, req, nil)
 
 	// Should still return 204 even if worklog doesn't exist
 	// This is standard REST behavior for idempotent deletes

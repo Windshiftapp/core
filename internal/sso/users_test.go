@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"windshift/internal/handlers/testutils"
+	"windshift/internal/testutils"
 )
 
 func TestFindOrCreateUser_AccountLinking_RequiresVerifiedEmail(t *testing.T) {

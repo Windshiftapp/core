@@ -1,14 +1,17 @@
 //go:build test
 
-package database
+package database_test
 
 import (
 	"testing"
+
+	"windshift/internal/database"
+	"windshift/internal/testutils"
 )
 
 func TestDatabase_Initialize_FreshDatabase(t *testing.T) {
 	// Create fresh database without initialization
-	tdb := CreateFreshDB(t, true)
+	tdb := testutils.CreateFreshDB(t, true)
 	defer tdb.Close()
 
 	// Initialize the database
@@ -44,7 +47,7 @@ func TestDatabase_Initialize_FreshDatabase(t *testing.T) {
 
 func TestDatabase_Initialize_ExistingDatabase(t *testing.T) {
 	// Create and initialize database
-	tdb := CreateTestDB(t, true)
+	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
 	// Get initial table count
@@ -94,7 +97,7 @@ func TestDatabase_NewDB_ConnectionString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db, err := NewDB(tt.dsn)
+			db, err := database.NewDB(tt.dsn)
 			
 			if tt.shouldFail {
 				if err == nil {
@@ -134,20 +137,20 @@ func TestDatabase_NewDB_ConnectionString(t *testing.T) {
 
 func TestDatabase_DefaultData_SystemSettings(t *testing.T) {
 	// Create and initialize database
-	tdb := CreateTestDB(t, true)
+	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
 	// Verify system settings were created
-	expectedSettings := map[string]struct{
+	expectedSettings := map[string]struct {
 		value     string
 		valueType string
 		category  string
 	}{
-		"setup_completed":        {"false", "boolean", "setup"},
-		"admin_user_created":     {"false", "boolean", "setup"},
-		"time_tracking_enabled":  {"true", "boolean", "modules"},
+		"setup_completed":         {"false", "boolean", "setup"},
+		"admin_user_created":      {"false", "boolean", "setup"},
+		"time_tracking_enabled":   {"true", "boolean", "modules"},
 		"test_management_enabled": {"true", "boolean", "modules"},
-		"app_name":               {"windshift", "string", "general"},
+		"calendar_feed_enabled":   {"true", "boolean", "security"},
 	}
 
 	for key, expected := range expectedSettings {
@@ -176,7 +179,7 @@ func TestDatabase_DefaultData_SystemSettings(t *testing.T) {
 
 func TestDatabase_DefaultData_StatusSystem(t *testing.T) {
 	// Create and initialize database
-	tdb := CreateTestDB(t, true)
+	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
 	// Verify status categories were created
@@ -222,7 +225,7 @@ func TestDatabase_DefaultData_StatusSystem(t *testing.T) {
 
 func TestDatabase_DefaultData_ScreenSystem(t *testing.T) {
 	// Create and initialize database
-	tdb := CreateTestDB(t, true)
+	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
 	// Verify default screen exists
@@ -258,7 +261,7 @@ func TestDatabase_DefaultData_ScreenSystem(t *testing.T) {
 
 func TestDatabase_DefaultData_LinkTypes(t *testing.T) {
 	// Create and initialize database
-	tdb := CreateTestDB(t, true)
+	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
 	// Verify link types were created
@@ -287,7 +290,7 @@ func TestDatabase_DefaultData_LinkTypes(t *testing.T) {
 
 func TestDatabase_SchemaColumns(t *testing.T) {
 	// Create fresh database
-	tdb := CreateFreshDB(t, true)
+	tdb := testutils.CreateFreshDB(t, true)
 	defer tdb.Close()
 
 	// Initialize database

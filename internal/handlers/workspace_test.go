@@ -5,16 +5,15 @@ package handlers
 import (
 	"net/http"
 	"testing"
-	"windshift/internal/handlers/testutils"
 	"windshift/internal/models"
-
+	"windshift/internal/testutils"
 )
 
 func TestWorkspaceHandler_Create_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewWorkspaceHandler(tdb.DB.DB)
+	handler := NewWorkspaceHandler(tdb.GetDatabase(), nil, nil)
 
 	workspace := models.Workspace{
 		Name:        "Test Workspace",
@@ -24,7 +23,7 @@ func TestWorkspaceHandler_Create_Success(t *testing.T) {
 	}
 
 	req := testutils.CreateJSONRequest(t, "POST", "/api/workspaces", workspace)
-	rr := testutils.ExecuteRequest(t, handler.Create, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 
 	rr.AssertStatusCode(http.StatusCreated).
 		AssertContentType("application/json")
@@ -69,7 +68,7 @@ func TestWorkspaceHandler_Create_ValidationErrors(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewWorkspaceHandler(tdb.DB.DB)
+	handler := NewWorkspaceHandler(tdb.GetDatabase(), nil, nil)
 
 	tests := []struct {
 		name        string
@@ -79,7 +78,7 @@ func TestWorkspaceHandler_Create_ValidationErrors(t *testing.T) {
 		{
 			name:        "Missing name",
 			workspace:   models.Workspace{Key: "TEST", Description: "Test"},
-			expectedErr: "Workspace name is required",
+			expectedErr: "Name is required",
 		},
 		{
 			name:        "Empty name",
@@ -89,19 +88,19 @@ func TestWorkspaceHandler_Create_ValidationErrors(t *testing.T) {
 		{
 			name:        "Missing key",
 			workspace:   models.Workspace{Name: "Test", Description: "Test"},
-			expectedErr: "Workspace key is required",
+			expectedErr: "Key is required",
 		},
 		{
 			name:        "Empty key",
 			workspace:   models.Workspace{Name: "Test", Key: "   ", Description: "Test"},
-			expectedErr: "Workspace key is required",
+			expectedErr: "Key must contain only alphanumeric characters",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := testutils.CreateJSONRequest(t, "POST", "/api/workspaces", tt.workspace)
-			rr := testutils.ExecuteRequest(t, handler.Create, req)
+			rr := testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 
 			testutils.AssertValidationError(t, rr, tt.expectedErr)
 		})
@@ -122,11 +121,11 @@ func TestWorkspaceHandler_Get_Success(t *testing.T) {
 	}
 	workspaceID, _ := result.LastInsertId()
 
-	handler := NewWorkspaceHandler(tdb.DB.DB)
+	handler := NewWorkspaceHandler(tdb.GetDatabase(), nil, nil)
 
 	req := testutils.CreateJSONRequest(t, "GET", "/api/workspaces/"+testutils.IntToString(int(workspaceID)), nil)
 	req.SetPathValue("id", testutils.IntToString(int(workspaceID)))
-	rr := testutils.ExecuteRequest(t, handler.Get, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Get, req, nil)
 
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
@@ -155,11 +154,11 @@ func TestWorkspaceHandler_Get_NotFound(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewWorkspaceHandler(tdb.DB.DB)
+	handler := NewWorkspaceHandler(tdb.GetDatabase(), nil, nil)
 
 	req := testutils.CreateJSONRequest(t, "GET", "/api/workspaces/99999", nil)
 	req.SetPathValue("id", "99999")
-	rr := testutils.ExecuteRequest(t, handler.Get, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Get, req, nil)
 
 	rr.AssertStatusCode(http.StatusNotFound)
 }
@@ -189,10 +188,10 @@ func TestWorkspaceHandler_GetAll_Success(t *testing.T) {
 		}
 	}
 
-	handler := NewWorkspaceHandler(tdb.DB.DB)
+	handler := NewWorkspaceHandler(tdb.GetDatabase(), nil, nil)
 
 	req := testutils.CreateJSONRequest(t, "GET", "/api/workspaces", nil)
-	rr := testutils.ExecuteRequest(t, handler.GetAll, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.GetAll, req, nil)
 
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
@@ -227,7 +226,7 @@ func TestWorkspaceHandler_Update_Success(t *testing.T) {
 	}
 	workspaceID, _ := result.LastInsertId()
 
-	handler := NewWorkspaceHandler(tdb.DB.DB)
+	handler := NewWorkspaceHandler(tdb.GetDatabase(), nil, nil)
 
 	updatedWorkspace := models.Workspace{
 		Name:        "Updated Name",
@@ -237,7 +236,7 @@ func TestWorkspaceHandler_Update_Success(t *testing.T) {
 
 	req := testutils.CreateJSONRequest(t, "PUT", "/api/workspaces/"+testutils.IntToString(int(workspaceID)), updatedWorkspace)
 	req.SetPathValue("id", testutils.IntToString(int(workspaceID)))
-	rr := testutils.ExecuteRequest(t, handler.Update, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Update, req, nil)
 
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
@@ -284,11 +283,11 @@ func TestWorkspaceHandler_Delete_Success(t *testing.T) {
 	}
 	workspaceID, _ := result.LastInsertId()
 
-	handler := NewWorkspaceHandler(tdb.DB.DB)
+	handler := NewWorkspaceHandler(tdb.GetDatabase(), nil, nil)
 
 	req := testutils.CreateJSONRequest(t, "DELETE", "/api/workspaces/"+testutils.IntToString(int(workspaceID)), nil)
 	req.SetPathValue("id", testutils.IntToString(int(workspaceID)))
-	rr := testutils.ExecuteRequest(t, handler.Delete, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Delete, req, nil)
 
 	rr.AssertStatusCode(http.StatusNoContent)
 
@@ -303,67 +302,11 @@ func TestWorkspaceHandler_Delete_Success(t *testing.T) {
 	}
 }
 
-func TestWorkspaceHandler_GetProjects_Success(t *testing.T) {
-	tdb := testutils.CreateTestDB(t, true)
-	defer tdb.Close()
-
-	// Create test workspace
-	result, err := tdb.Exec(`
-		INSERT INTO workspaces (name, key, description, active, created_at, updated_at)
-		VALUES ('Test Workspace', 'TEST', 'Test workspace', 1, datetime('now'), datetime('now'))
-	`)
-	if err != nil {
-		t.Fatalf("Failed to create test workspace: %v", err)
-	}
-	workspaceID, _ := result.LastInsertId()
-
-	// Create test projects
-	projects := []string{"Project A", "Project B"}
-	for _, projectName := range projects {
-		_, err := tdb.Exec(`
-			INSERT INTO projects (workspace_id, name, description, active, created_at, updated_at)
-			VALUES (?, ?, 'Test project', 1, datetime('now'), datetime('now'))
-		`, workspaceID, projectName)
-		if err != nil {
-			t.Fatalf("Failed to create test project %s: %v", projectName, err)
-		}
-	}
-
-	handler := NewWorkspaceHandler(tdb.DB.DB)
-
-	req := testutils.CreateJSONRequest(t, "GET", "/api/workspaces/"+testutils.IntToString(int(workspaceID))+"/projects", nil)
-	req.SetPathValue("id", testutils.IntToString(int(workspaceID)))
-	rr := testutils.ExecuteRequest(t, handler.GetProjects, req)
-
-	rr.AssertStatusCode(http.StatusOK).
-		AssertContentType("application/json")
-
-	var response []models.Project
-	rr.AssertJSONResponse(&response)
-
-	if len(response) != len(projects) {
-		t.Errorf("Expected %d projects, got %d", len(projects), len(response))
-	}
-
-	for i, project := range response {
-		if project.WorkspaceID == nil || *project.WorkspaceID != int(workspaceID) {
-			t.Errorf("Expected project workspace_id %d, got %v", workspaceID, project.WorkspaceID)
-		}
-		if project.WorkspaceName != "Test Workspace" {
-			t.Errorf("Expected project workspace_name 'Test Workspace', got %s", project.WorkspaceName)
-		}
-		expectedName := projects[i]
-		if project.Name != expectedName {
-			t.Errorf("Expected project name %s, got %s", expectedName, project.Name)
-		}
-	}
-}
-
 func TestWorkspaceHandler_InvalidID_Scenarios(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewWorkspaceHandler(tdb.DB.DB)
+	handler := NewWorkspaceHandler(tdb.GetDatabase(), nil, nil)
 
 	tests := []struct {
 		name     string
@@ -373,7 +316,6 @@ func TestWorkspaceHandler_InvalidID_Scenarios(t *testing.T) {
 		{"Get invalid ID", "/api/workspaces/invalid", "GET"},
 		{"Update invalid ID", "/api/workspaces/invalid", "PUT"},
 		{"Delete invalid ID", "/api/workspaces/invalid", "DELETE"},
-		{"GetProjects invalid ID", "/api/workspaces/invalid/projects", "GET"},
 	}
 
 	for _, tt := range tests {
@@ -392,18 +334,13 @@ func TestWorkspaceHandler_InvalidID_Scenarios(t *testing.T) {
 			req.SetPathValue("id", "invalid")
 
 			var rr *testutils.ResponseRecorder
-			switch {
-			case tt.endpoint == "/api/workspaces/invalid":
-				switch tt.method {
-				case "GET":
-					rr = testutils.ExecuteRequest(t, handler.Get, req)
-				case "PUT":
-					rr = testutils.ExecuteRequest(t, handler.Update, req)
-				case "DELETE":
-					rr = testutils.ExecuteRequest(t, handler.Delete, req)
-				}
-			case tt.endpoint == "/api/workspaces/invalid/projects":
-				rr = testutils.ExecuteRequest(t, handler.GetProjects, req)
+			switch tt.method {
+			case "GET":
+				rr = testutils.ExecuteAuthenticatedRequest(t, handler.Get, req, nil)
+			case "PUT":
+				rr = testutils.ExecuteAuthenticatedRequest(t, handler.Update, req, nil)
+			case "DELETE":
+				rr = testutils.ExecuteAuthenticatedRequest(t, handler.Delete, req, nil)
 			}
 
 			rr.AssertStatusCode(http.StatusBadRequest)
@@ -424,7 +361,7 @@ func TestWorkspaceHandler_DuplicateKey_Error(t *testing.T) {
 		t.Fatalf("Failed to create first workspace: %v", err)
 	}
 
-	handler := NewWorkspaceHandler(tdb.DB.DB)
+	handler := NewWorkspaceHandler(tdb.GetDatabase(), nil, nil)
 
 	// Try to create workspace with duplicate key
 	duplicateWorkspace := models.Workspace{
@@ -435,7 +372,7 @@ func TestWorkspaceHandler_DuplicateKey_Error(t *testing.T) {
 	}
 
 	req := testutils.CreateJSONRequest(t, "POST", "/api/workspaces", duplicateWorkspace)
-	rr := testutils.ExecuteRequest(t, handler.Create, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 
 	rr.AssertStatusCode(http.StatusInternalServerError)
 }

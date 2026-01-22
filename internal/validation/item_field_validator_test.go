@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"windshift/internal/handlers/testutils"
 	"windshift/internal/models"
+	"windshift/internal/testutils"
 )
 
 // TestData holds IDs for test entities

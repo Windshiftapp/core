@@ -358,6 +358,16 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	req.Key = utils.SanitizeName(req.Key)
 	req.Description = utils.SanitizeDescription(req.Description)
 
+	// Post-sanitization validation: ensure name and key are not empty after sanitization
+	if req.Name == "" {
+		http.Error(w, "Workspace name is required", http.StatusBadRequest)
+		return
+	}
+	if req.Key == "" {
+		http.Error(w, "Workspace key is required", http.StatusBadRequest)
+		return
+	}
+
 	// Default active to true if not specified
 	isActive := true
 	if req.Active != nil {

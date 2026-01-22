@@ -1,14 +1,15 @@
 //go:build test
 
-package database
+package database_test
 
 import (
-	"database/sql"
 	"testing"
+
+	"windshift/internal/testutils"
 )
 
 func TestDatabaseIntegrity_ForeignKeyConstraints(t *testing.T) {
-	tdb := CreateTestDB(t, true)
+	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
 	// Seed test data
@@ -25,16 +26,16 @@ func TestDatabaseIntegrity_ForeignKeyConstraints(t *testing.T) {
 		{
 			name:        "Valid workspace reference in items",
 			table:       "items",
-			query:       "INSERT INTO items (workspace_id, title, status, priority) VALUES (?, ?, ?, ?)",
-			args:        []interface{}{data.WorkspaceID, "Test Item", "open", "medium"},
+			query:       "INSERT INTO items (workspace_id, workspace_item_number, title, status_id) VALUES (?, 1, ?, ?)",
+			args:        []interface{}{data.WorkspaceID, "Test Item", data.StatusID},
 			shouldFail:  false,
 			description: "Should allow valid workspace_id",
 		},
 		{
 			name:        "Invalid workspace reference in items",
 			table:       "items",
-			query:       "INSERT INTO items (workspace_id, title, status, priority) VALUES (?, ?, ?, ?)",
-			args:        []interface{}{9999, "Test Item", "open", "medium"},
+			query:       "INSERT INTO items (workspace_id, workspace_item_number, title, status_id) VALUES (?, 2, ?, ?)",
+			args:        []interface{}{9999, "Test Item", data.StatusID},
 			shouldFail:  true,
 			description: "Should reject invalid workspace_id",
 		},
@@ -57,16 +58,16 @@ func TestDatabaseIntegrity_ForeignKeyConstraints(t *testing.T) {
 		{
 			name:        "Valid user reference in items",
 			table:       "items",
-			query:       "INSERT INTO items (workspace_id, title, status, priority, assignee_id) VALUES (?, ?, ?, ?, ?)",
-			args:        []interface{}{data.WorkspaceID, "Assigned Item", "open", "medium", data.UserID},
+			query:       "INSERT INTO items (workspace_id, workspace_item_number, title, status_id, assignee_id) VALUES (?, 3, ?, ?, ?)",
+			args:        []interface{}{data.WorkspaceID, "Assigned Item", data.StatusID, data.UserID},
 			shouldFail:  false,
 			description: "Should allow valid assignee_id",
 		},
 		{
 			name:        "Invalid user reference in items",
 			table:       "items",
-			query:       "INSERT INTO items (workspace_id, title, status, priority, assignee_id) VALUES (?, ?, ?, ?, ?)",
-			args:        []interface{}{data.WorkspaceID, "Assigned Item", "open", "medium", 9999},
+			query:       "INSERT INTO items (workspace_id, workspace_item_number, title, status_id, assignee_id) VALUES (?, 4, ?, ?, ?)",
+			args:        []interface{}{data.WorkspaceID, "Assigned Item", data.StatusID, 9999},
 			shouldFail:  true,
 			description: "Should reject invalid assignee_id",
 		},
@@ -75,7 +76,7 @@ func TestDatabaseIntegrity_ForeignKeyConstraints(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := tdb.Exec(tt.query, tt.args...)
-			
+
 			if tt.shouldFail && err == nil {
 				t.Errorf("%s: Expected query to fail but it succeeded", tt.description)
 			} else if !tt.shouldFail && err != nil {
@@ -86,7 +87,7 @@ func TestDatabaseIntegrity_ForeignKeyConstraints(t *testing.T) {
 }
 
 func TestDatabaseIntegrity_CascadeDeletes(t *testing.T) {
-	tdb := CreateTestDB(t, true)
+	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
 	// Seed test data
@@ -94,25 +95,25 @@ func TestDatabaseIntegrity_CascadeDeletes(t *testing.T) {
 
 	// Create test items hierarchy: workspace -> item -> child item
 	itemResult, err := tdb.Exec(`
-		INSERT INTO items (workspace_id, title, status, priority, creator_id) 
-		VALUES (?, 'Parent Item', 'open', 'medium', ?)
-	`, data.WorkspaceID, data.UserID)
+		INSERT INTO items (workspace_id, workspace_item_number, title, status_id, creator_id)
+		VALUES (?, 1, 'Parent Item', ?, ?)
+	`, data.WorkspaceID, data.StatusID, data.UserID)
 	if err != nil {
 		t.Fatalf("Failed to create parent item: %v", err)
 	}
 	parentItemID, _ := itemResult.LastInsertId()
 
 	_, err = tdb.Exec(`
-		INSERT INTO items (workspace_id, title, status, priority, parent_id, creator_id) 
-		VALUES (?, 'Child Item', 'open', 'medium', ?, ?)
-	`, data.WorkspaceID, parentItemID, data.UserID)
+		INSERT INTO items (workspace_id, workspace_item_number, title, status_id, parent_id, creator_id)
+		VALUES (?, 2, 'Child Item', ?, ?, ?)
+	`, data.WorkspaceID, data.StatusID, parentItemID, data.UserID)
 	if err != nil {
 		t.Fatalf("Failed to create child item: %v", err)
 	}
 
 	// Create comments on the parent item
 	_, err = tdb.Exec(`
-		INSERT INTO comments (item_id, author_id, content) 
+		INSERT INTO comments (item_id, author_id, content)
 		VALUES (?, ?, 'Test comment')
 	`, parentItemID, data.UserID)
 	if err != nil {
@@ -150,7 +151,7 @@ func TestDatabaseIntegrity_CascadeDeletes(t *testing.T) {
 }
 
 func TestDatabaseIntegrity_UniqueConstraints(t *testing.T) {
-	tdb := CreateTestDB(t, true)
+	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
 	tests := []struct {
@@ -216,7 +217,7 @@ func TestDatabaseIntegrity_UniqueConstraints(t *testing.T) {
 }
 
 func TestDatabaseIntegrity_SystemSettingsTypes(t *testing.T) {
-	tdb := CreateTestDB(t, true)
+	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
 	// Test system settings have correct types
@@ -239,9 +240,9 @@ func TestDatabaseIntegrity_SystemSettingsTypes(t *testing.T) {
 			shouldWork:   true, // SQLite is flexible with types
 		},
 		{
-			key:          "app_name",
-			expectedType: "string",
-			testValue:    "Test App",
+			key:          "time_tracking_enabled",
+			expectedType: "boolean",
+			testValue:    "false",
 			shouldWork:   true,
 		},
 	}
@@ -275,7 +276,7 @@ func TestDatabaseIntegrity_SystemSettingsTypes(t *testing.T) {
 }
 
 func TestDatabaseIntegrity_HierarchicalData(t *testing.T) {
-	tdb := CreateTestDB(t, true)
+	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
 	// Seed test data
@@ -283,27 +284,27 @@ func TestDatabaseIntegrity_HierarchicalData(t *testing.T) {
 
 	// Create hierarchical items: Root -> Level1 -> Level2
 	rootResult, err := tdb.Exec(`
-		INSERT INTO items (workspace_id, title, status, priority, level, path) 
-		VALUES (?, 'Root Item', 'open', 'medium', 0, '/')
-	`, data.WorkspaceID)
+		INSERT INTO items (workspace_id, workspace_item_number, title, status_id, path)
+		VALUES (?, 1, 'Root Item', ?, '/')
+	`, data.WorkspaceID, data.StatusID)
 	if err != nil {
 		t.Fatalf("Failed to create root item: %v", err)
 	}
 	rootID, _ := rootResult.LastInsertId()
 
 	level1Result, err := tdb.Exec(`
-		INSERT INTO items (workspace_id, title, status, priority, parent_id, level, path) 
-		VALUES (?, 'Level 1 Item', 'open', 'medium', ?, 1, ?)
-	`, data.WorkspaceID, rootID, "/"+string(rune(rootID))+"/")
+		INSERT INTO items (workspace_id, workspace_item_number, title, status_id, parent_id, path)
+		VALUES (?, 2, 'Level 1 Item', ?, ?, ?)
+	`, data.WorkspaceID, data.StatusID, rootID, "/"+string(rune(rootID))+"/")
 	if err != nil {
 		t.Fatalf("Failed to create level 1 item: %v", err)
 	}
 	level1ID, _ := level1Result.LastInsertId()
 
 	_, err = tdb.Exec(`
-		INSERT INTO items (workspace_id, title, status, priority, parent_id, level, path) 
-		VALUES (?, 'Level 2 Item', 'open', 'medium', ?, 2, ?)
-	`, data.WorkspaceID, level1ID, "/"+string(rune(rootID))+"/"+string(rune(level1ID))+"/")
+		INSERT INTO items (workspace_id, workspace_item_number, title, status_id, parent_id, path)
+		VALUES (?, 3, 'Level 2 Item', ?, ?, ?)
+	`, data.WorkspaceID, data.StatusID, level1ID, "/"+string(rune(rootID))+"/"+string(rune(level1ID))+"/")
 	if err != nil {
 		t.Fatalf("Failed to create level 2 item: %v", err)
 	}
@@ -319,14 +320,14 @@ func TestDatabaseIntegrity_HierarchicalData(t *testing.T) {
 		t.Errorf("Expected 1 child of root, got %d", childCount)
 	}
 
-	// Get all descendants by level
-	var level2Count int
-	err = tdb.QueryRow("SELECT COUNT(*) FROM items WHERE level = 2").Scan(&level2Count)
+	// Get all items with parent (simulating level >= 1)
+	var nestedCount int
+	err = tdb.QueryRow("SELECT COUNT(*) FROM items WHERE parent_id IS NOT NULL AND workspace_id = ?", data.WorkspaceID).Scan(&nestedCount)
 	if err != nil {
-		t.Fatalf("Failed to query level 2 items: %v", err)
+		t.Fatalf("Failed to query nested items: %v", err)
 	}
-	if level2Count != 1 {
-		t.Errorf("Expected 1 level 2 item, got %d", level2Count)
+	if nestedCount != 2 {
+		t.Errorf("Expected 2 nested items, got %d", nestedCount)
 	}
 
 	// Test cascade deletion preserves hierarchy integrity
@@ -347,33 +348,39 @@ func TestDatabaseIntegrity_HierarchicalData(t *testing.T) {
 }
 
 func TestDatabaseIntegrity_TransactionSafety(t *testing.T) {
-	tdb := CreateTestDB(t, true)
+	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	// Test transaction rollback on error
-	ExecuteInTransaction(t, tdb, func(tx *sql.Tx) error {
-		// Insert a valid workspace
-		_, err := tx.Exec("INSERT INTO workspaces (name, key, description) VALUES (?, ?, ?)",
-			"Transaction Test", "TRANS", "Test workspace")
-		if err != nil {
-			return err
-		}
+	// Test transaction rollback on error using manual transaction
+	tx, err := tdb.Begin()
+	if err != nil {
+		t.Fatalf("Failed to begin transaction: %v", err)
+	}
 
-		// Insert another workspace with the same key (should cause constraint violation)
-		_, err = tx.Exec("INSERT INTO workspaces (name, key, description) VALUES (?, ?, ?)",
-			"Duplicate Key", "TRANS", "Should fail")
-		
-		// This should fail and cause rollback
-		if err != nil {
-			return err
-		}
-		
-		return nil
-	})
+	// Insert a valid workspace
+	_, err = tx.Exec("INSERT INTO workspaces (name, key, description) VALUES (?, ?, ?)",
+		"Transaction Test", "TRANS", "Test workspace")
+	if err != nil {
+		tx.Rollback()
+		t.Fatalf("Failed to insert first workspace: %v", err)
+	}
+
+	// Insert another workspace with the same key (should cause constraint violation)
+	_, err = tx.Exec("INSERT INTO workspaces (name, key, description) VALUES (?, ?, ?)",
+		"Duplicate Key", "TRANS", "Should fail")
+
+	// This should fail and cause rollback
+	if err != nil {
+		// Expected: rollback the transaction
+		tx.Rollback()
+	} else {
+		tx.Commit()
+		t.Fatal("Expected constraint violation but insert succeeded")
+	}
 
 	// Verify no workspaces were created due to rollback
 	var workspaceCount int
-	err := tdb.QueryRow("SELECT COUNT(*) FROM workspaces WHERE key = 'TRANS'").Scan(&workspaceCount)
+	err = tdb.QueryRow("SELECT COUNT(*) FROM workspaces WHERE key = 'TRANS'").Scan(&workspaceCount)
 	if err != nil {
 		t.Fatalf("Failed to count workspaces: %v", err)
 	}
@@ -383,7 +390,7 @@ func TestDatabaseIntegrity_TransactionSafety(t *testing.T) {
 }
 
 func TestDatabaseIntegrity_IndexPerformance(t *testing.T) {
-	tdb := CreateTestDB(t, true)
+	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
 	// Seed some test data
@@ -392,9 +399,9 @@ func TestDatabaseIntegrity_IndexPerformance(t *testing.T) {
 	// Create many items to test index effectiveness
 	for i := 0; i < 100; i++ {
 		_, err := tdb.Exec(`
-			INSERT INTO items (workspace_id, title, status, priority) 
-			VALUES (?, ?, 'open', 'medium')
-		`, data.WorkspaceID, "Test Item "+string(rune(i)))
+			INSERT INTO items (workspace_id, workspace_item_number, title, status_id)
+			VALUES (?, ?, ?, ?)
+		`, data.WorkspaceID, i+1, "Test Item "+string(rune(i)), data.StatusID)
 		if err != nil {
 			t.Fatalf("Failed to create test item %d: %v", i, err)
 		}
@@ -402,7 +409,7 @@ func TestDatabaseIntegrity_IndexPerformance(t *testing.T) {
 
 	// Test that indexes are being used for common queries
 	// This is a basic test - in a real scenario you'd use EXPLAIN QUERY PLAN
-	
+
 	// Query by workspace_id (should use idx_items_workspace_id)
 	var count int
 	err := tdb.QueryRow("SELECT COUNT(*) FROM items WHERE workspace_id = ?", data.WorkspaceID).Scan(&count)
@@ -413,23 +420,22 @@ func TestDatabaseIntegrity_IndexPerformance(t *testing.T) {
 		t.Errorf("Expected 100 items, got %d", count)
 	}
 
-	// Query by status (should use idx_items_status)
-	err = tdb.QueryRow("SELECT COUNT(*) FROM items WHERE status = 'open'").Scan(&count)
+	// Query by status_id (should use idx_items_status_id)
+	err = tdb.QueryRow("SELECT COUNT(*) FROM items WHERE status_id = ?", data.StatusID).Scan(&count)
 	if err != nil {
 		t.Fatalf("Failed to query items by status: %v", err)
 	}
 	if count != 100 {
-		t.Errorf("Expected 100 open items, got %d", count)
+		t.Errorf("Expected 100 items with status, got %d", count)
 	}
 
 	// Query system settings by key (should use idx_system_settings_key)
 	var value string
-	err = tdb.QueryRow("SELECT value FROM system_settings WHERE key = 'app_name'").Scan(&value)
+	err = tdb.QueryRow("SELECT value FROM system_settings WHERE key = 'setup_completed'").Scan(&value)
 	if err != nil {
 		t.Fatalf("Failed to query system setting: %v", err)
 	}
-	if value != "windshift" {
-		t.Errorf("Expected app_name 'windshift', got '%s'", value)
+	if value != "false" {
+		t.Errorf("Expected setup_completed 'false', got '%s'", value)
 	}
 }
-

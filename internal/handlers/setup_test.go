@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 	"testing"
-	"windshift/internal/handlers/testutils"
 	"windshift/internal/models"
+	"windshift/internal/testutils"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -57,13 +57,14 @@ func TestSetupHandler_GetSetupStatus(t *testing.T) {
 				strconv.FormatBool(tt.testEnabled), "test_management_enabled")
 
 			// Create handler
-			handler := NewSetupHandler(tdb.DB.DB)
+			mockAuthMiddleware := testutils.CreateMockAuthMiddleware()
+	handler := NewSetupHandler(tdb.GetDatabase(), testutils.CreateMockSessionManager(), mockAuthMiddleware)
 
 			// Create request
 			req := testutils.CreateJSONRequest(t, "GET", "/api/setup/status", nil)
 
 			// Execute request
-			rr := testutils.ExecuteRequest(t, handler.GetSetupStatus, req)
+			rr := testutils.ExecuteAuthenticatedRequest(t, handler.GetSetupStatus, req, nil)
 
 			// Verify response
 			rr.AssertStatusCode(http.StatusOK).
@@ -95,7 +96,8 @@ func TestSetupHandler_CompleteInitialSetup_Success(t *testing.T) {
 	defer tdb.Close()
 
 	// Create handler
-	handler := NewSetupHandler(tdb.DB.DB)
+	mockAuthMiddleware := testutils.CreateMockAuthMiddleware()
+	handler := NewSetupHandler(tdb.GetDatabase(), testutils.CreateMockSessionManager(), mockAuthMiddleware)
 
 	// Create valid setup request
 	setupReq := models.SetupRequest{
@@ -116,7 +118,7 @@ func TestSetupHandler_CompleteInitialSetup_Success(t *testing.T) {
 	req := testutils.CreateJSONRequest(t, "POST", "/api/setup/complete", setupReq)
 
 	// Execute request
-	rr := testutils.ExecuteRequest(t, handler.CompleteInitialSetup, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.CompleteInitialSetup, req, nil)
 
 	// Verify response
 	rr.AssertStatusCode(http.StatusOK).
@@ -176,13 +178,14 @@ func TestSetupHandler_CompleteInitialSetup_Success(t *testing.T) {
 	}
 
 	// Check module settings
+	// Note: time_tracking is always enabled by the handler regardless of request
 	var timeEnabled string
 	err = tdb.QueryRow("SELECT value FROM system_settings WHERE key = 'time_tracking_enabled'").Scan(&timeEnabled)
 	if err != nil {
 		t.Fatalf("Failed to query time_tracking_enabled: %v", err)
 	}
-	if timeEnabled != "false" {
-		t.Errorf("Expected time_tracking_enabled to be 'false', got '%s'", timeEnabled)
+	if timeEnabled != "true" {
+		t.Errorf("Expected time_tracking_enabled to be 'true' (always enabled), got '%s'", timeEnabled)
 	}
 
 	var testEnabled string
@@ -283,13 +286,14 @@ func TestSetupHandler_CompleteInitialSetup_ValidationErrors(t *testing.T) {
 			defer tdb.Close()
 
 			// Create handler
-			handler := NewSetupHandler(tdb.DB.DB)
+			mockAuthMiddleware := testutils.CreateMockAuthMiddleware()
+	handler := NewSetupHandler(tdb.GetDatabase(), testutils.CreateMockSessionManager(), mockAuthMiddleware)
 
 			// Create request
 			req := testutils.CreateJSONRequest(t, "POST", "/api/setup/complete", tt.setupReq)
 
 			// Execute request
-			rr := testutils.ExecuteRequest(t, handler.CompleteInitialSetup, req)
+			rr := testutils.ExecuteAuthenticatedRequest(t, handler.CompleteInitialSetup, req, nil)
 
 			// Verify error response
 			testutils.AssertValidationError(t, rr, tt.expectedErr)
@@ -309,7 +313,8 @@ func TestSetupHandler_CompleteInitialSetup_AlreadyCompleted(t *testing.T) {
 	}
 
 	// Create handler
-	handler := NewSetupHandler(tdb.DB.DB)
+	mockAuthMiddleware := testutils.CreateMockAuthMiddleware()
+	handler := NewSetupHandler(tdb.GetDatabase(), testutils.CreateMockSessionManager(), mockAuthMiddleware)
 
 	// Create setup request
 	setupReq := models.SetupRequest{
@@ -326,7 +331,7 @@ func TestSetupHandler_CompleteInitialSetup_AlreadyCompleted(t *testing.T) {
 	req := testutils.CreateJSONRequest(t, "POST", "/api/setup/complete", setupReq)
 
 	// Execute request
-	rr := testutils.ExecuteRequest(t, handler.CompleteInitialSetup, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.CompleteInitialSetup, req, nil)
 
 	// Verify error response
 	testutils.AssertValidationError(t, rr, "Setup has already been completed")
@@ -342,13 +347,14 @@ func TestSetupHandler_GetModuleSettings(t *testing.T) {
 	tdb.Exec("UPDATE system_settings SET value = 'true' WHERE key = 'test_management_enabled'")
 
 	// Create handler
-	handler := NewSetupHandler(tdb.DB.DB)
+	mockAuthMiddleware := testutils.CreateMockAuthMiddleware()
+	handler := NewSetupHandler(tdb.GetDatabase(), testutils.CreateMockSessionManager(), mockAuthMiddleware)
 
 	// Create request
 	req := testutils.CreateJSONRequest(t, "GET", "/api/setup/modules", nil)
 
 	// Execute request
-	rr := testutils.ExecuteRequest(t, handler.GetModuleSettings, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.GetModuleSettings, req, nil)
 
 	// Verify response
 	rr.AssertStatusCode(http.StatusOK).
@@ -372,7 +378,8 @@ func TestSetupHandler_UpdateModuleSettings(t *testing.T) {
 	defer tdb.Close()
 
 	// Create handler
-	handler := NewSetupHandler(tdb.DB.DB)
+	mockAuthMiddleware := testutils.CreateMockAuthMiddleware()
+	handler := NewSetupHandler(tdb.GetDatabase(), testutils.CreateMockSessionManager(), mockAuthMiddleware)
 
 	// Create update request
 	updateReq := models.ModuleSettings{
@@ -384,7 +391,7 @@ func TestSetupHandler_UpdateModuleSettings(t *testing.T) {
 	req := testutils.CreateJSONRequest(t, "PUT", "/api/setup/modules", updateReq)
 
 	// Execute request
-	rr := testutils.ExecuteRequest(t, handler.UpdateModuleSettings, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.UpdateModuleSettings, req, nil)
 
 	// Verify response
 	rr.AssertStatusCode(http.StatusOK).
@@ -426,15 +433,16 @@ func TestSetupHandler_TransactionRollback(t *testing.T) {
 	// Create a setup request that will cause a database error after user creation
 	// We'll simulate this by creating a user with a duplicate email first
 	_, err := tdb.Exec(`
-		INSERT INTO users (email, username, first_name, last_name, role, password_hash, is_active) 
-		VALUES ('admin@example.com', 'existing', 'Existing', 'User', 'user', 'hash', 1)
+		INSERT INTO users (email, username, first_name, last_name, password_hash, is_active)
+		VALUES ('admin@example.com', 'existing', 'Existing', 'User', 'hash', 1)
 	`)
 	if err != nil {
 		t.Fatalf("Failed to create existing user: %v", err)
 	}
 
 	// Create handler
-	handler := NewSetupHandler(tdb.DB.DB)
+	mockAuthMiddleware := testutils.CreateMockAuthMiddleware()
+	handler := NewSetupHandler(tdb.GetDatabase(), testutils.CreateMockSessionManager(), mockAuthMiddleware)
 
 	// Create setup request with duplicate email
 	setupReq := models.SetupRequest{
@@ -455,7 +463,7 @@ func TestSetupHandler_TransactionRollback(t *testing.T) {
 	req := testutils.CreateJSONRequest(t, "POST", "/api/setup/complete", setupReq)
 
 	// Execute request
-	rr := testutils.ExecuteRequest(t, handler.CompleteInitialSetup, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.CompleteInitialSetup, req, nil)
 
 	// Should get an internal server error due to constraint violation
 	testutils.AssertInternalServerError(t, rr)
@@ -487,14 +495,15 @@ func TestSetupHandler_InvalidJSON(t *testing.T) {
 	defer tdb.Close()
 
 	// Create handler
-	handler := NewSetupHandler(tdb.DB.DB)
+	mockAuthMiddleware := testutils.CreateMockAuthMiddleware()
+	handler := NewSetupHandler(tdb.GetDatabase(), testutils.CreateMockSessionManager(), mockAuthMiddleware)
 
 	// Create request with invalid JSON
 	req, _ := testutils.MockHTTPRequest("POST", "/api/setup/complete", nil)
 	req.Body = http.NoBody
 
 	// Execute request
-	rr := testutils.ExecuteRequest(t, handler.CompleteInitialSetup, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.CompleteInitialSetup, req, nil)
 
 	// Should get bad request error
 	testutils.AssertValidationError(t, rr, "Invalid request body")

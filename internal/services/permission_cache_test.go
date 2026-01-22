@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"windshift/internal/models"
-	"windshift/internal/handlers/testutils"
+	"windshift/internal/testutils"
 )
 
 func TestPermissionServiceBasicOperations(t *testing.T) {

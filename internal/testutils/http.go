@@ -15,7 +15,7 @@ import (
 // MockHTTPRequest creates a mock HTTP request for testing handlers
 func MockHTTPRequest(method, url string, body interface{}) (*http.Request, error) {
 	var reqBody *bytes.Buffer
-	
+
 	if body != nil {
 		jsonBody, err := json.Marshal(body)
 		if err != nil {
@@ -25,12 +25,12 @@ func MockHTTPRequest(method, url string, body interface{}) (*http.Request, error
 	} else {
 		reqBody = bytes.NewBuffer([]byte{})
 	}
-	
+
 	req, err := http.NewRequest(method, url, reqBody)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	req.Header.Set("Content-Type", "application/json")
 	return req, nil
 }
@@ -69,11 +69,11 @@ func (r *ResponseRecorder) AssertContentType(expected string) *ResponseRecorder 
 // AssertJSONResponse verifies the response is valid JSON and unmarshals it
 func (r *ResponseRecorder) AssertJSONResponse(target interface{}) *ResponseRecorder {
 	r.AssertContentType("application/json")
-	
+
 	if err := json.Unmarshal(r.Body.Bytes(), target); err != nil {
 		r.t.Fatalf("Failed to unmarshal JSON response: %v. Body: %s", err, r.Body.String())
 	}
-	
+
 	return r
 }
 
@@ -118,7 +118,7 @@ func (r *ResponseRecorder) GetJSONField(fieldPath string) interface{} {
 	if err := json.Unmarshal(r.Body.Bytes(), &result); err != nil {
 		r.t.Fatalf("Failed to unmarshal JSON for field extraction: %v", err)
 	}
-	
+
 	// Simple field path extraction (supports only top-level fields for now)
 	return result[fieldPath]
 }
@@ -169,7 +169,7 @@ type TestData struct {
 		LastName  string
 		Password  string
 	}
-	
+
 	InvalidUser struct {
 		Email     string
 		Username  string
@@ -177,9 +177,9 @@ type TestData struct {
 		LastName  string
 		Password  string
 	}
-	
+
 	ValidModuleSettings struct {
-		TimeTrackingEnabled  bool
+		TimeTrackingEnabled   bool
 		TestManagementEnabled bool
 	}
 }
@@ -187,40 +187,40 @@ type TestData struct {
 // GetTestData returns a TestData instance with predefined test data
 func GetTestData() TestData {
 	data := TestData{}
-	
+
 	data.ValidUser.Email = "admin@example.com"
 	data.ValidUser.Username = "admin"
 	data.ValidUser.FirstName = "Admin"
 	data.ValidUser.LastName = "User"
 	data.ValidUser.Password = "password123"
-	
+
 	data.InvalidUser.Email = "invalid-email"
 	data.InvalidUser.Username = ""
 	data.InvalidUser.FirstName = ""
 	data.InvalidUser.LastName = ""
 	data.InvalidUser.Password = "123" // Too short
-	
+
 	data.ValidModuleSettings.TimeTrackingEnabled = true
 	data.ValidModuleSettings.TestManagementEnabled = false
-	
+
 	return data
 }
 
 // JSONEqual compares two JSON strings for equality (ignoring formatting)
 func JSONEqual(t *testing.T, expected, actual string) {
 	var expectedMap, actualMap interface{}
-	
+
 	if err := json.Unmarshal([]byte(expected), &expectedMap); err != nil {
 		t.Fatalf("Failed to unmarshal expected JSON: %v", err)
 	}
-	
+
 	if err := json.Unmarshal([]byte(actual), &actualMap); err != nil {
 		t.Fatalf("Failed to unmarshal actual JSON: %v", err)
 	}
-	
+
 	expectedBytes, _ := json.Marshal(expectedMap)
 	actualBytes, _ := json.Marshal(actualMap)
-	
+
 	if string(expectedBytes) != string(actualBytes) {
 		t.Fatalf("JSON not equal.\nExpected: %s\nActual: %s", expectedBytes, actualBytes)
 	}

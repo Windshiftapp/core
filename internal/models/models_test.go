@@ -204,7 +204,6 @@ func TestUser_PasswordHashHidden(t *testing.T) {
 		Username:     "testuser",
 		FirstName:    "Test",
 		LastName:     "User",
-		Role:         "admin",
 		IsActive:     true,
 		PasswordHash: "secret-hash",
 	}

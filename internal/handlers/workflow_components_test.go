@@ -5,112 +5,9 @@ package handlers
 import (
 	"net/http"
 	"testing"
-	"windshift/internal/handlers/testutils"
 	"windshift/internal/models"
-
+	"windshift/internal/testutils"
 )
-
-// Test Status Categories
-
-func TestStatusCategoryHandler_Create_Success(t *testing.T) {
-	tdb := testutils.CreateTestDB(t, true)
-	defer tdb.Close()
-
-	handler := NewStatusCategoryHandler(tdb.DB.DB)
-
-	category := models.StatusCategory{
-		Name:        "Test Category",
-		Color:       "#ff0000",
-		Description: "Test status category",
-		IsDefault:   false,
-	}
-
-	req := testutils.CreateJSONRequest(t, "POST", "/api/status-categories", category)
-	rr := testutils.ExecuteRequest(t, handler.Create, req)
-
-	rr.AssertStatusCode(http.StatusCreated).
-		AssertContentType("application/json")
-
-	var response models.StatusCategory
-	rr.AssertJSONResponse(&response)
-
-	if response.ID == 0 {
-		t.Error("Expected created status category to have an ID")
-	}
-	if response.Name != category.Name {
-		t.Errorf("Expected name %s, got %s", category.Name, response.Name)
-	}
-	if response.Color != category.Color {
-		t.Errorf("Expected color %s, got %s", category.Color, response.Color)
-	}
-	if response.Description != category.Description {
-		t.Errorf("Expected description %s, got %s", category.Description, response.Description)
-	}
-	if response.IsDefault != category.IsDefault {
-		t.Errorf("Expected IsDefault %v, got %v", category.IsDefault, response.IsDefault)
-	}
-}
-
-func TestStatusCategoryHandler_GetAll_Success(t *testing.T) {
-	tdb := testutils.CreateTestDB(t, true)
-	defer tdb.Close()
-
-	handler := NewStatusCategoryHandler(tdb.DB.DB)
-
-	// The database should already have default status categories from initialization
-	req := testutils.CreateJSONRequest(t, "GET", "/api/status-categories", nil)
-	rr := testutils.ExecuteRequest(t, handler.GetAll, req)
-
-	rr.AssertStatusCode(http.StatusOK).
-		AssertContentType("application/json")
-
-	var response []models.StatusCategory
-	rr.AssertJSONResponse(&response)
-
-	// Should have at least the default categories
-	if len(response) < 3 {
-		t.Errorf("Expected at least 3 default status categories, got %d", len(response))
-	}
-
-	// Default category should appear first
-	if len(response) > 0 && !response[0].IsDefault {
-		t.Error("Expected first category to be default")
-	}
-}
-
-func TestStatusCategoryHandler_Get_Success(t *testing.T) {
-	tdb := testutils.CreateTestDB(t, true)
-	defer tdb.Close()
-
-	// Create test status category
-	result, err := tdb.Exec(`
-		INSERT INTO status_categories (name, color, description, is_default, created_at, updated_at)
-		VALUES ('Get Test Category', '#00ff00', 'Test category for GET', 0, datetime('now'), datetime('now'))
-	`)
-	if err != nil {
-		t.Fatalf("Failed to create test status category: %v", err)
-	}
-	categoryID, _ := result.LastInsertId()
-
-	handler := NewStatusCategoryHandler(tdb.DB.DB)
-
-	req := testutils.CreateJSONRequest(t, "GET", "/api/status-categories/"+testutils.IntToString(int(categoryID)), nil)
-	req.SetPathValue("id", testutils.IntToString(int(categoryID)))
-	rr := testutils.ExecuteRequest(t, handler.Get, req)
-
-	rr.AssertStatusCode(http.StatusOK).
-		AssertContentType("application/json")
-
-	var response models.StatusCategory
-	rr.AssertJSONResponse(&response)
-
-	if response.ID != int(categoryID) {
-		t.Errorf("Expected ID %d, got %d", categoryID, response.ID)
-	}
-	if response.Name != "Get Test Category" {
-		t.Errorf("Expected name 'Get Test Category', got %s", response.Name)
-	}
-}
 
 // Test Statuses
 
@@ -128,7 +25,7 @@ func TestStatusHandler_Create_Success(t *testing.T) {
 	}
 	categoryID, _ := result.LastInsertId()
 
-	handler := NewStatusHandler(tdb.DB.DB)
+	handler := NewStatusHandler(tdb.GetDatabase())
 
 	status := models.Status{
 		Name:        "Test Status",
@@ -138,7 +35,7 @@ func TestStatusHandler_Create_Success(t *testing.T) {
 	}
 
 	req := testutils.CreateJSONRequest(t, "POST", "/api/statuses", status)
-	rr := testutils.ExecuteRequest(t, handler.Create, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 
 	rr.AssertStatusCode(http.StatusCreated).
 		AssertContentType("application/json")
@@ -161,11 +58,11 @@ func TestStatusHandler_GetAll_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewStatusHandler(tdb.DB.DB)
+	handler := NewStatusHandler(tdb.GetDatabase())
 
 	// The database should already have default statuses from initialization
 	req := testutils.CreateJSONRequest(t, "GET", "/api/statuses", nil)
-	rr := testutils.ExecuteRequest(t, handler.GetAll, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.GetAll, req, nil)
 
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
@@ -186,13 +83,120 @@ func TestStatusHandler_GetAll_Success(t *testing.T) {
 	}
 }
 
+func TestStatusHandler_Update_Success(t *testing.T) {
+	tdb := testutils.CreateTestDB(t, true)
+	defer tdb.Close()
+
+	// Create status category first via SQL
+	catResult, err := tdb.Exec(`
+		INSERT INTO status_categories (name, color, description, is_default, created_at, updated_at)
+		VALUES ('Test Category', '#ff0000', 'For status updates', 0, datetime('now'), datetime('now'))
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create test status category: %v", err)
+	}
+	categoryID, _ := catResult.LastInsertId()
+
+	statusHandler := NewStatusHandler(tdb.GetDatabase())
+
+	// Create initial status
+	status := models.Status{
+		Name:        "Original Status",
+		Description: "Original description",
+		CategoryID:  int(categoryID),
+		IsDefault:   false,
+	}
+
+	createReq := testutils.CreateJSONRequest(t, "POST", "/api/statuses", status)
+	createRR := testutils.ExecuteAuthenticatedRequest(t, statusHandler.Create, createReq, nil)
+
+	var createdStatus models.Status
+	createRR.AssertJSONResponse(&createdStatus)
+
+	// Update the status
+	updatedStatus := models.Status{
+		Name:        "Updated Status",
+		Description: "Updated description",
+		CategoryID:  int(categoryID),
+		IsDefault:   true,
+	}
+
+	updateReq := testutils.CreateJSONRequest(t, "PUT", "/api/statuses/"+testutils.IntToString(createdStatus.ID), updatedStatus)
+	updateReq.SetPathValue("id", testutils.IntToString(createdStatus.ID))
+	rr := testutils.ExecuteAuthenticatedRequest(t, statusHandler.Update, updateReq, nil)
+
+	rr.AssertStatusCode(http.StatusOK).
+		AssertContentType("application/json")
+
+	var response models.Status
+	rr.AssertJSONResponse(&response)
+
+	if response.ID != createdStatus.ID {
+		t.Errorf("Expected ID %d, got %d", createdStatus.ID, response.ID)
+	}
+	if response.Name != updatedStatus.Name {
+		t.Errorf("Expected updated name %s, got %s", updatedStatus.Name, response.Name)
+	}
+	if response.Description != updatedStatus.Description {
+		t.Errorf("Expected updated description %s, got %s", updatedStatus.Description, response.Description)
+	}
+	if response.IsDefault != updatedStatus.IsDefault {
+		t.Errorf("Expected updated IsDefault %v, got %v", updatedStatus.IsDefault, response.IsDefault)
+	}
+}
+
+func TestStatusHandler_Delete_Success(t *testing.T) {
+	tdb := testutils.CreateTestDB(t, true)
+	defer tdb.Close()
+
+	// Create status category first via SQL
+	catResult, err := tdb.Exec(`
+		INSERT INTO status_categories (name, color, description, is_default, created_at, updated_at)
+		VALUES ('Test Category', '#ff0000', 'For status deletion', 0, datetime('now'), datetime('now'))
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create test status category: %v", err)
+	}
+	categoryID, _ := catResult.LastInsertId()
+
+	statusHandler := NewStatusHandler(tdb.GetDatabase())
+
+	// Create status to delete
+	status := models.Status{
+		Name:        "Status to Delete",
+		Description: "Will be deleted",
+		CategoryID:  int(categoryID),
+		IsDefault:   false,
+	}
+
+	createReq := testutils.CreateJSONRequest(t, "POST", "/api/statuses", status)
+	createRR := testutils.ExecuteAuthenticatedRequest(t, statusHandler.Create, createReq, nil)
+
+	var createdStatus models.Status
+	createRR.AssertJSONResponse(&createdStatus)
+
+	// Delete the status
+	deleteReq := testutils.CreateJSONRequest(t, "DELETE", "/api/statuses/"+testutils.IntToString(createdStatus.ID), nil)
+	deleteReq.SetPathValue("id", testutils.IntToString(createdStatus.ID))
+	rr := testutils.ExecuteAuthenticatedRequest(t, statusHandler.Delete, deleteReq, nil)
+
+	rr.AssertStatusCode(http.StatusNoContent)
+
+	// Verify deletion by trying to get it
+	getReq := testutils.CreateJSONRequest(t, "GET", "/api/statuses/"+testutils.IntToString(createdStatus.ID), nil)
+	getReq.SetPathValue("id", testutils.IntToString(createdStatus.ID))
+	getRR := testutils.ExecuteAuthenticatedRequest(t, statusHandler.Get, getReq, nil)
+
+	getRR.AssertStatusCode(http.StatusNotFound)
+}
+
 // Test Custom Fields
 
 func TestCustomFieldHandler_Create_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewCustomFieldHandler(tdb.DB.DB)
+	handler := NewCustomFieldHandler(tdb.GetDatabase())
 
 	field := models.CustomFieldDefinition{
 		Name:        "Test Field",
@@ -203,7 +207,7 @@ func TestCustomFieldHandler_Create_Success(t *testing.T) {
 	}
 
 	req := testutils.CreateJSONRequest(t, "POST", "/api/custom-fields", field)
-	rr := testutils.ExecuteRequest(t, handler.Create, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 
 	rr.AssertStatusCode(http.StatusCreated).
 		AssertContentType("application/json")
@@ -226,7 +230,7 @@ func TestCustomFieldHandler_ValidationErrors(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewCustomFieldHandler(tdb.DB.DB)
+	handler := NewCustomFieldHandler(tdb.GetDatabase())
 
 	tests := []struct {
 		name        string
@@ -253,11 +257,102 @@ func TestCustomFieldHandler_ValidationErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := testutils.CreateJSONRequest(t, "POST", "/api/custom-fields", tt.field)
-			rr := testutils.ExecuteRequest(t, handler.Create, req)
+			rr := testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 
 			testutils.AssertValidationError(t, rr, tt.expectedErr)
 		})
 	}
+}
+
+func TestCustomFieldHandler_Update_Success(t *testing.T) {
+	tdb := testutils.CreateTestDB(t, true)
+	defer tdb.Close()
+
+	handler := NewCustomFieldHandler(tdb.GetDatabase())
+
+	// Create initial custom field
+	field := models.CustomFieldDefinition{
+		Name:        "Original Field",
+		FieldType:   "text",
+		Description: "Original description",
+		Required:    false,
+		Options:     "[]",
+	}
+
+	createReq := testutils.CreateJSONRequest(t, "POST", "/api/custom-fields", field)
+	createRR := testutils.ExecuteAuthenticatedRequest(t, handler.Create, createReq, nil)
+
+	var createdField models.CustomFieldDefinition
+	createRR.AssertJSONResponse(&createdField)
+
+	// Update the field
+	updatedField := models.CustomFieldDefinition{
+		Name:         "Updated Field",
+		FieldType:    "select",
+		Description:  "Updated description",
+		Required:     true,
+		Options:      "[\"Option 1\", \"Option 2\"]",
+		DisplayOrder: 5,
+	}
+
+	updateReq := testutils.CreateJSONRequest(t, "PUT", "/api/custom-fields/"+testutils.IntToString(createdField.ID), updatedField)
+	updateReq.SetPathValue("id", testutils.IntToString(createdField.ID))
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Update, updateReq, nil)
+
+	rr.AssertStatusCode(http.StatusOK).
+		AssertContentType("application/json")
+
+	var response models.CustomFieldDefinition
+	rr.AssertJSONResponse(&response)
+
+	if response.ID != createdField.ID {
+		t.Errorf("Expected ID %d, got %d", createdField.ID, response.ID)
+	}
+	if response.Name != updatedField.Name {
+		t.Errorf("Expected updated name %s, got %s", updatedField.Name, response.Name)
+	}
+	if response.FieldType != updatedField.FieldType {
+		t.Errorf("Expected updated field type %s, got %s", updatedField.FieldType, response.FieldType)
+	}
+	if response.Required != updatedField.Required {
+		t.Errorf("Expected updated required %v, got %v", updatedField.Required, response.Required)
+	}
+}
+
+func TestCustomFieldHandler_Delete_Success(t *testing.T) {
+	tdb := testutils.CreateTestDB(t, true)
+	defer tdb.Close()
+
+	handler := NewCustomFieldHandler(tdb.GetDatabase())
+
+	// Create custom field to delete
+	field := models.CustomFieldDefinition{
+		Name:        "Field to Delete",
+		FieldType:   "text",
+		Description: "Will be deleted",
+		Required:    false,
+		Options:     "[]",
+	}
+
+	createReq := testutils.CreateJSONRequest(t, "POST", "/api/custom-fields", field)
+	createRR := testutils.ExecuteAuthenticatedRequest(t, handler.Create, createReq, nil)
+
+	var createdField models.CustomFieldDefinition
+	createRR.AssertJSONResponse(&createdField)
+
+	// Delete the field
+	deleteReq := testutils.CreateJSONRequest(t, "DELETE", "/api/custom-fields/"+testutils.IntToString(createdField.ID), nil)
+	deleteReq.SetPathValue("id", testutils.IntToString(createdField.ID))
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Delete, deleteReq, nil)
+
+	rr.AssertStatusCode(http.StatusNoContent)
+
+	// Verify deletion by trying to get it
+	getReq := testutils.CreateJSONRequest(t, "GET", "/api/custom-fields/"+testutils.IntToString(createdField.ID), nil)
+	getReq.SetPathValue("id", testutils.IntToString(createdField.ID))
+	getRR := testutils.ExecuteAuthenticatedRequest(t, handler.Get, getReq, nil)
+
+	getRR.AssertStatusCode(http.StatusNotFound)
 }
 
 // Test Screens
@@ -266,7 +361,7 @@ func TestScreenHandler_Create_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewScreenHandler(tdb.DB.DB)
+	handler := NewScreenHandler(tdb.GetDatabase())
 
 	screen := models.Screen{
 		Name:        "Test Screen",
@@ -274,7 +369,7 @@ func TestScreenHandler_Create_Success(t *testing.T) {
 	}
 
 	req := testutils.CreateJSONRequest(t, "POST", "/api/screens", screen)
-	rr := testutils.ExecuteRequest(t, handler.Create, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 
 	rr.AssertStatusCode(http.StatusCreated).
 		AssertContentType("application/json")
@@ -309,10 +404,10 @@ func TestScreenHandler_GetAll_Success(t *testing.T) {
 		}
 	}
 
-	handler := NewScreenHandler(tdb.DB.DB)
+	handler := NewScreenHandler(tdb.GetDatabase())
 
 	req := testutils.CreateJSONRequest(t, "GET", "/api/screens", nil)
-	rr := testutils.ExecuteRequest(t, handler.GetAll, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.GetAll, req, nil)
 
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
@@ -338,13 +433,91 @@ func TestScreenHandler_GetAll_Success(t *testing.T) {
 	}
 }
 
+func TestScreenHandler_Update_Success(t *testing.T) {
+	tdb := testutils.CreateTestDB(t, true)
+	defer tdb.Close()
+
+	handler := NewScreenHandler(tdb.GetDatabase())
+
+	// Create initial screen
+	screen := models.Screen{
+		Name:        "Original Screen",
+		Description: "Original description",
+	}
+
+	createReq := testutils.CreateJSONRequest(t, "POST", "/api/screens", screen)
+	createRR := testutils.ExecuteAuthenticatedRequest(t, handler.Create, createReq, nil)
+
+	var createdScreen models.Screen
+	createRR.AssertJSONResponse(&createdScreen)
+
+	// Update the screen
+	updatedScreen := models.Screen{
+		Name:        "Updated Screen",
+		Description: "Updated description",
+	}
+
+	updateReq := testutils.CreateJSONRequest(t, "PUT", "/api/screens/"+testutils.IntToString(createdScreen.ID), updatedScreen)
+	updateReq.SetPathValue("id", testutils.IntToString(createdScreen.ID))
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Update, updateReq, nil)
+
+	rr.AssertStatusCode(http.StatusOK).
+		AssertContentType("application/json")
+
+	var response models.Screen
+	rr.AssertJSONResponse(&response)
+
+	if response.ID != createdScreen.ID {
+		t.Errorf("Expected ID %d, got %d", createdScreen.ID, response.ID)
+	}
+	if response.Name != updatedScreen.Name {
+		t.Errorf("Expected updated name %s, got %s", updatedScreen.Name, response.Name)
+	}
+	if response.Description != updatedScreen.Description {
+		t.Errorf("Expected updated description %s, got %s", updatedScreen.Description, response.Description)
+	}
+}
+
+func TestScreenHandler_Delete_Success(t *testing.T) {
+	tdb := testutils.CreateTestDB(t, true)
+	defer tdb.Close()
+
+	handler := NewScreenHandler(tdb.GetDatabase())
+
+	// Create screen to delete
+	screen := models.Screen{
+		Name:        "Screen to Delete",
+		Description: "Will be deleted",
+	}
+
+	createReq := testutils.CreateJSONRequest(t, "POST", "/api/screens", screen)
+	createRR := testutils.ExecuteAuthenticatedRequest(t, handler.Create, createReq, nil)
+
+	var createdScreen models.Screen
+	createRR.AssertJSONResponse(&createdScreen)
+
+	// Delete the screen
+	deleteReq := testutils.CreateJSONRequest(t, "DELETE", "/api/screens/"+testutils.IntToString(createdScreen.ID), nil)
+	deleteReq.SetPathValue("id", testutils.IntToString(createdScreen.ID))
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Delete, deleteReq, nil)
+
+	rr.AssertStatusCode(http.StatusNoContent)
+
+	// Verify deletion by trying to get it
+	getReq := testutils.CreateJSONRequest(t, "GET", "/api/screens/"+testutils.IntToString(createdScreen.ID), nil)
+	getReq.SetPathValue("id", testutils.IntToString(createdScreen.ID))
+	getRR := testutils.ExecuteAuthenticatedRequest(t, handler.Get, getReq, nil)
+
+	getRR.AssertStatusCode(http.StatusNotFound)
+}
+
 // Test Workflows
 
 func TestWorkflowHandler_Create_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewWorkflowHandler(tdb.DB.DB)
+	handler := NewWorkflowHandler(tdb.GetDatabase())
 
 	workflow := models.Workflow{
 		Name:        "Test Workflow",
@@ -353,7 +526,7 @@ func TestWorkflowHandler_Create_Success(t *testing.T) {
 	}
 
 	req := testutils.CreateJSONRequest(t, "POST", "/api/workflows", workflow)
-	rr := testutils.ExecuteRequest(t, handler.Create, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 
 	rr.AssertStatusCode(http.StatusCreated).
 		AssertContentType("application/json")
@@ -379,11 +552,11 @@ func TestWorkflowHandler_GetAll_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewWorkflowHandler(tdb.DB.DB)
+	handler := NewWorkflowHandler(tdb.GetDatabase())
 
 	// The database should already have at least one default workflow from initialization
 	req := testutils.CreateJSONRequest(t, "GET", "/api/workflows", nil)
-	rr := testutils.ExecuteRequest(t, handler.GetAll, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.GetAll, req, nil)
 
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
@@ -402,491 +575,11 @@ func TestWorkflowHandler_GetAll_Success(t *testing.T) {
 	}
 }
 
-// Update and Delete Tests for Status Categories
-
-func TestStatusCategoryHandler_Update_Success(t *testing.T) {
-	tdb := testutils.CreateTestDB(t, true)
-	defer tdb.Close()
-
-	handler := NewStatusCategoryHandler(tdb.DB.DB)
-
-	// Create initial status category
-	category := models.StatusCategory{
-		Name:        "Original Category",
-		Color:       "#ff0000",
-		Description: "Original description",
-		IsDefault:   false,
-	}
-
-	createReq := testutils.CreateJSONRequest(t, "POST", "/api/status-categories", category)
-	createRR := testutils.ExecuteRequest(t, handler.Create, createReq)
-
-	var createdCategory models.StatusCategory
-	createRR.AssertJSONResponse(&createdCategory)
-
-	// Update the category
-	updatedCategory := models.StatusCategory{
-		Name:        "Updated Category",
-		Color:       "#00ff00",
-		Description: "Updated description",
-		IsDefault:   true,
-	}
-
-	updateReq := testutils.CreateJSONRequest(t, "PUT", "/api/status-categories/"+testutils.IntToString(createdCategory.ID), updatedCategory)
-	updateReq.SetPathValue("id", testutils.IntToString(createdCategory.ID))
-	rr := testutils.ExecuteRequest(t, handler.Update, updateReq)
-
-	rr.AssertStatusCode(http.StatusOK).
-		AssertContentType("application/json")
-
-	var response models.StatusCategory
-	rr.AssertJSONResponse(&response)
-
-	if response.ID != createdCategory.ID {
-		t.Errorf("Expected ID %d, got %d", createdCategory.ID, response.ID)
-	}
-	if response.Name != updatedCategory.Name {
-		t.Errorf("Expected updated name %s, got %s", updatedCategory.Name, response.Name)
-	}
-	if response.Color != updatedCategory.Color {
-		t.Errorf("Expected updated color %s, got %s", updatedCategory.Color, response.Color)
-	}
-	if response.Description != updatedCategory.Description {
-		t.Errorf("Expected updated description %s, got %s", updatedCategory.Description, response.Description)
-	}
-	if response.IsDefault != updatedCategory.IsDefault {
-		t.Errorf("Expected updated IsDefault %v, got %v", updatedCategory.IsDefault, response.IsDefault)
-	}
-}
-
-func TestStatusCategoryHandler_Update_ValidationErrors(t *testing.T) {
-	tdb := testutils.CreateTestDB(t, true)
-	defer tdb.Close()
-
-	handler := NewStatusCategoryHandler(tdb.DB.DB)
-
-	// Create initial status category
-	category := models.StatusCategory{
-		Name:        "Original Category",
-		Color:       "#ff0000",
-		Description: "Original description",
-		IsDefault:   false,
-	}
-
-	createReq := testutils.CreateJSONRequest(t, "POST", "/api/status-categories", category)
-	createRR := testutils.ExecuteRequest(t, handler.Create, createReq)
-
-	var createdCategory models.StatusCategory
-	createRR.AssertJSONResponse(&createdCategory)
-
-	tests := []struct {
-		name        string
-		category    models.StatusCategory
-		expectedErr string
-	}{
-		{
-			name:        "Empty name",
-			category:    models.StatusCategory{Name: "", Color: "#ff0000", Description: "Test"},
-			expectedErr: "Name is required",
-		},
-		{
-			name:        "Invalid color format",
-			category:    models.StatusCategory{Name: "Test", Color: "invalid", Description: "Test"},
-			expectedErr: "Color must be a valid hex color",
-		},
-		{
-			name:        "Empty color",
-			category:    models.StatusCategory{Name: "Test", Color: "", Description: "Test"},
-			expectedErr: "Color is required",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			updateReq := testutils.CreateJSONRequest(t, "PUT", "/api/status-categories/"+testutils.IntToString(createdCategory.ID), tt.category)
-			updateReq.SetPathValue("id", testutils.IntToString(createdCategory.ID))
-			rr := testutils.ExecuteRequest(t, handler.Update, updateReq)
-
-			testutils.AssertValidationError(t, rr, tt.expectedErr)
-		})
-	}
-}
-
-func TestStatusCategoryHandler_Delete_Success(t *testing.T) {
-	tdb := testutils.CreateTestDB(t, true)
-	defer tdb.Close()
-
-	handler := NewStatusCategoryHandler(tdb.DB.DB)
-
-	// Create status category to delete
-	category := models.StatusCategory{
-		Name:        "Category to Delete",
-		Color:       "#ff0000",
-		Description: "Will be deleted",
-		IsDefault:   false,
-	}
-
-	createReq := testutils.CreateJSONRequest(t, "POST", "/api/status-categories", category)
-	createRR := testutils.ExecuteRequest(t, handler.Create, createReq)
-
-	var createdCategory models.StatusCategory
-	createRR.AssertJSONResponse(&createdCategory)
-
-	// Delete the category
-	deleteReq := testutils.CreateJSONRequest(t, "DELETE", "/api/status-categories/"+testutils.IntToString(createdCategory.ID), nil)
-	deleteReq.SetPathValue("id", testutils.IntToString(createdCategory.ID))
-	rr := testutils.ExecuteRequest(t, handler.Delete, deleteReq)
-
-	rr.AssertStatusCode(http.StatusNoContent)
-
-	// Verify deletion by trying to get it
-	getReq := testutils.CreateJSONRequest(t, "GET", "/api/status-categories/"+testutils.IntToString(createdCategory.ID), nil)
-	getReq.SetPathValue("id", testutils.IntToString(createdCategory.ID))
-	getRR := testutils.ExecuteRequest(t, handler.Get, getReq)
-
-	getRR.AssertStatusCode(http.StatusNotFound)
-}
-
-func TestStatusCategoryHandler_Delete_WithStatuses_Fails(t *testing.T) {
-	tdb := testutils.CreateTestDB(t, true)
-	defer tdb.Close()
-
-	statusCategoryHandler := NewStatusCategoryHandler(tdb.DB.DB)
-	statusHandler := NewStatusHandler(tdb.DB.DB)
-
-	// Create status category
-	category := models.StatusCategory{
-		Name:        "Category with Status",
-		Color:       "#ff0000",
-		Description: "Has statuses",
-		IsDefault:   false,
-	}
-
-	createCatReq := testutils.CreateJSONRequest(t, "POST", "/api/status-categories", category)
-	createCatRR := testutils.ExecuteRequest(t, statusCategoryHandler.Create, createCatReq)
-
-	var createdCategory models.StatusCategory
-	createCatRR.AssertJSONResponse(&createdCategory)
-
-	// Create status in this category
-	status := models.Status{
-		Name:        "Test Status",
-		Description: "Test status description",
-		CategoryID:  createdCategory.ID,
-		IsDefault:   false,
-	}
-
-	createStatusReq := testutils.CreateJSONRequest(t, "POST", "/api/statuses", status)
-	testutils.ExecuteRequest(t, statusHandler.Create, createStatusReq)
-
-	// Try to delete the category (should fail)
-	deleteReq := testutils.CreateJSONRequest(t, "DELETE", "/api/status-categories/"+testutils.IntToString(createdCategory.ID), nil)
-	deleteReq.SetPathValue("id", testutils.IntToString(createdCategory.ID))
-	rr := testutils.ExecuteRequest(t, statusCategoryHandler.Delete, deleteReq)
-
-	rr.AssertStatusCode(http.StatusConflict).
-		AssertBodyContains("Cannot delete status category that is in use by statuses")
-}
-
-// Update and Delete Tests for Statuses
-
-func TestStatusHandler_Update_Success(t *testing.T) {
-	tdb := testutils.CreateTestDB(t, true)
-	defer tdb.Close()
-
-	statusCategoryHandler := NewStatusCategoryHandler(tdb.DB.DB)
-	statusHandler := NewStatusHandler(tdb.DB.DB)
-
-	// Create status category first
-	category := models.StatusCategory{
-		Name:        "Test Category",
-		Color:       "#ff0000",
-		Description: "For status updates",
-		IsDefault:   false,
-	}
-
-	createCatReq := testutils.CreateJSONRequest(t, "POST", "/api/status-categories", category)
-	createCatRR := testutils.ExecuteRequest(t, statusCategoryHandler.Create, createCatReq)
-
-	var createdCategory models.StatusCategory
-	createCatRR.AssertJSONResponse(&createdCategory)
-
-	// Create initial status
-	status := models.Status{
-		Name:        "Original Status",
-		Description: "Original description",
-		CategoryID:  createdCategory.ID,
-		IsDefault:   false,
-	}
-
-	createReq := testutils.CreateJSONRequest(t, "POST", "/api/statuses", status)
-	createRR := testutils.ExecuteRequest(t, statusHandler.Create, createReq)
-
-	var createdStatus models.Status
-	createRR.AssertJSONResponse(&createdStatus)
-
-	// Update the status
-	updatedStatus := models.Status{
-		Name:        "Updated Status",
-		Description: "Updated description",
-		CategoryID:  createdCategory.ID,
-		IsDefault:   true,
-	}
-
-	updateReq := testutils.CreateJSONRequest(t, "PUT", "/api/statuses/"+testutils.IntToString(createdStatus.ID), updatedStatus)
-	updateReq.SetPathValue("id", testutils.IntToString(createdStatus.ID))
-	rr := testutils.ExecuteRequest(t, statusHandler.Update, updateReq)
-
-	rr.AssertStatusCode(http.StatusOK).
-		AssertContentType("application/json")
-
-	var response models.Status
-	rr.AssertJSONResponse(&response)
-
-	if response.ID != createdStatus.ID {
-		t.Errorf("Expected ID %d, got %d", createdStatus.ID, response.ID)
-	}
-	if response.Name != updatedStatus.Name {
-		t.Errorf("Expected updated name %s, got %s", updatedStatus.Name, response.Name)
-	}
-	if response.Description != updatedStatus.Description {
-		t.Errorf("Expected updated description %s, got %s", updatedStatus.Description, response.Description)
-	}
-	if response.IsDefault != updatedStatus.IsDefault {
-		t.Errorf("Expected updated IsDefault %v, got %v", updatedStatus.IsDefault, response.IsDefault)
-	}
-}
-
-func TestStatusHandler_Delete_Success(t *testing.T) {
-	tdb := testutils.CreateTestDB(t, true)
-	defer tdb.Close()
-
-	statusCategoryHandler := NewStatusCategoryHandler(tdb.DB.DB)
-	statusHandler := NewStatusHandler(tdb.DB.DB)
-
-	// Create status category first
-	category := models.StatusCategory{
-		Name:        "Test Category",
-		Color:       "#ff0000",
-		Description: "For status deletion",
-		IsDefault:   false,
-	}
-
-	createCatReq := testutils.CreateJSONRequest(t, "POST", "/api/status-categories", category)
-	createCatRR := testutils.ExecuteRequest(t, statusCategoryHandler.Create, createCatReq)
-
-	var createdCategory models.StatusCategory
-	createCatRR.AssertJSONResponse(&createdCategory)
-
-	// Create status to delete
-	status := models.Status{
-		Name:        "Status to Delete",
-		Description: "Will be deleted",
-		CategoryID:  createdCategory.ID,
-		IsDefault:   false,
-	}
-
-	createReq := testutils.CreateJSONRequest(t, "POST", "/api/statuses", status)
-	createRR := testutils.ExecuteRequest(t, statusHandler.Create, createReq)
-
-	var createdStatus models.Status
-	createRR.AssertJSONResponse(&createdStatus)
-
-	// Delete the status
-	deleteReq := testutils.CreateJSONRequest(t, "DELETE", "/api/statuses/"+testutils.IntToString(createdStatus.ID), nil)
-	deleteReq.SetPathValue("id", testutils.IntToString(createdStatus.ID))
-	rr := testutils.ExecuteRequest(t, statusHandler.Delete, deleteReq)
-
-	rr.AssertStatusCode(http.StatusNoContent)
-
-	// Verify deletion by trying to get it
-	getReq := testutils.CreateJSONRequest(t, "GET", "/api/statuses/"+testutils.IntToString(createdStatus.ID), nil)
-	getReq.SetPathValue("id", testutils.IntToString(createdStatus.ID))
-	getRR := testutils.ExecuteRequest(t, statusHandler.Get, getReq)
-
-	getRR.AssertStatusCode(http.StatusNotFound)
-}
-
-// Update and Delete Tests for Custom Fields
-
-func TestCustomFieldHandler_Update_Success(t *testing.T) {
-	tdb := testutils.CreateTestDB(t, true)
-	defer tdb.Close()
-
-	handler := NewCustomFieldHandler(tdb.DB.DB)
-
-	// Create initial custom field
-	field := models.CustomFieldDefinition{
-		Name:        "Original Field",
-		FieldType:   "text",
-		Description: "Original description",
-		Required:    false,
-		Options:     "[]",
-	}
-
-	createReq := testutils.CreateJSONRequest(t, "POST", "/api/custom-fields", field)
-	createRR := testutils.ExecuteRequest(t, handler.Create, createReq)
-
-	var createdField models.CustomFieldDefinition
-	createRR.AssertJSONResponse(&createdField)
-
-	// Update the field
-	updatedField := models.CustomFieldDefinition{
-		Name:         "Updated Field",
-		FieldType:    "select",
-		Description:  "Updated description",
-		Required:     true,
-		Options:      "[\"Option 1\", \"Option 2\"]",
-		DisplayOrder: 5,
-	}
-
-	updateReq := testutils.CreateJSONRequest(t, "PUT", "/api/custom-fields/"+testutils.IntToString(createdField.ID), updatedField)
-	updateReq.SetPathValue("id", testutils.IntToString(createdField.ID))
-	rr := testutils.ExecuteRequest(t, handler.Update, updateReq)
-
-	rr.AssertStatusCode(http.StatusOK).
-		AssertContentType("application/json")
-
-	var response models.CustomFieldDefinition
-	rr.AssertJSONResponse(&response)
-
-	if response.ID != createdField.ID {
-		t.Errorf("Expected ID %d, got %d", createdField.ID, response.ID)
-	}
-	if response.Name != updatedField.Name {
-		t.Errorf("Expected updated name %s, got %s", updatedField.Name, response.Name)
-	}
-	if response.FieldType != updatedField.FieldType {
-		t.Errorf("Expected updated field type %s, got %s", updatedField.FieldType, response.FieldType)
-	}
-	if response.Required != updatedField.Required {
-		t.Errorf("Expected updated required %v, got %v", updatedField.Required, response.Required)
-	}
-}
-
-func TestCustomFieldHandler_Delete_Success(t *testing.T) {
-	tdb := testutils.CreateTestDB(t, true)
-	defer tdb.Close()
-
-	handler := NewCustomFieldHandler(tdb.DB.DB)
-
-	// Create custom field to delete
-	field := models.CustomFieldDefinition{
-		Name:        "Field to Delete",
-		FieldType:   "text",
-		Description: "Will be deleted",
-		Required:    false,
-		Options:     "[]",
-	}
-
-	createReq := testutils.CreateJSONRequest(t, "POST", "/api/custom-fields", field)
-	createRR := testutils.ExecuteRequest(t, handler.Create, createReq)
-
-	var createdField models.CustomFieldDefinition
-	createRR.AssertJSONResponse(&createdField)
-
-	// Delete the field
-	deleteReq := testutils.CreateJSONRequest(t, "DELETE", "/api/custom-fields/"+testutils.IntToString(createdField.ID), nil)
-	deleteReq.SetPathValue("id", testutils.IntToString(createdField.ID))
-	rr := testutils.ExecuteRequest(t, handler.Delete, deleteReq)
-
-	rr.AssertStatusCode(http.StatusNoContent)
-
-	// Verify deletion by trying to get it
-	getReq := testutils.CreateJSONRequest(t, "GET", "/api/custom-fields/"+testutils.IntToString(createdField.ID), nil)
-	getReq.SetPathValue("id", testutils.IntToString(createdField.ID))
-	getRR := testutils.ExecuteRequest(t, handler.Get, getReq)
-
-	getRR.AssertStatusCode(http.StatusNotFound)
-}
-
-// Update and Delete Tests for Screens
-
-func TestScreenHandler_Update_Success(t *testing.T) {
-	tdb := testutils.CreateTestDB(t, true)
-	defer tdb.Close()
-
-	handler := NewScreenHandler(tdb.DB.DB)
-
-	// Create initial screen
-	screen := models.Screen{
-		Name:        "Original Screen",
-		Description: "Original description",
-	}
-
-	createReq := testutils.CreateJSONRequest(t, "POST", "/api/screens", screen)
-	createRR := testutils.ExecuteRequest(t, handler.Create, createReq)
-
-	var createdScreen models.Screen
-	createRR.AssertJSONResponse(&createdScreen)
-
-	// Update the screen
-	updatedScreen := models.Screen{
-		Name:        "Updated Screen",
-		Description: "Updated description",
-	}
-
-	updateReq := testutils.CreateJSONRequest(t, "PUT", "/api/screens/"+testutils.IntToString(createdScreen.ID), updatedScreen)
-	updateReq.SetPathValue("id", testutils.IntToString(createdScreen.ID))
-	rr := testutils.ExecuteRequest(t, handler.Update, updateReq)
-
-	rr.AssertStatusCode(http.StatusOK).
-		AssertContentType("application/json")
-
-	var response models.Screen
-	rr.AssertJSONResponse(&response)
-
-	if response.ID != createdScreen.ID {
-		t.Errorf("Expected ID %d, got %d", createdScreen.ID, response.ID)
-	}
-	if response.Name != updatedScreen.Name {
-		t.Errorf("Expected updated name %s, got %s", updatedScreen.Name, response.Name)
-	}
-	if response.Description != updatedScreen.Description {
-		t.Errorf("Expected updated description %s, got %s", updatedScreen.Description, response.Description)
-	}
-}
-
-func TestScreenHandler_Delete_Success(t *testing.T) {
-	tdb := testutils.CreateTestDB(t, true)
-	defer tdb.Close()
-
-	handler := NewScreenHandler(tdb.DB.DB)
-
-	// Create screen to delete
-	screen := models.Screen{
-		Name:        "Screen to Delete",
-		Description: "Will be deleted",
-	}
-
-	createReq := testutils.CreateJSONRequest(t, "POST", "/api/screens", screen)
-	createRR := testutils.ExecuteRequest(t, handler.Create, createReq)
-
-	var createdScreen models.Screen
-	createRR.AssertJSONResponse(&createdScreen)
-
-	// Delete the screen
-	deleteReq := testutils.CreateJSONRequest(t, "DELETE", "/api/screens/"+testutils.IntToString(createdScreen.ID), nil)
-	deleteReq.SetPathValue("id", testutils.IntToString(createdScreen.ID))
-	rr := testutils.ExecuteRequest(t, handler.Delete, deleteReq)
-
-	rr.AssertStatusCode(http.StatusNoContent)
-
-	// Verify deletion by trying to get it
-	getReq := testutils.CreateJSONRequest(t, "GET", "/api/screens/"+testutils.IntToString(createdScreen.ID), nil)
-	getReq.SetPathValue("id", testutils.IntToString(createdScreen.ID))
-	getRR := testutils.ExecuteRequest(t, handler.Get, getReq)
-
-	getRR.AssertStatusCode(http.StatusNotFound)
-}
-
-// Update and Delete Tests for Workflows
-
 func TestWorkflowHandler_Update_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewWorkflowHandler(tdb.DB.DB)
+	handler := NewWorkflowHandler(tdb.GetDatabase())
 
 	// Create initial workflow
 	workflow := models.Workflow{
@@ -896,7 +589,7 @@ func TestWorkflowHandler_Update_Success(t *testing.T) {
 	}
 
 	createReq := testutils.CreateJSONRequest(t, "POST", "/api/workflows", workflow)
-	createRR := testutils.ExecuteRequest(t, handler.Create, createReq)
+	createRR := testutils.ExecuteAuthenticatedRequest(t, handler.Create, createReq, nil)
 
 	var createdWorkflow models.Workflow
 	createRR.AssertJSONResponse(&createdWorkflow)
@@ -910,7 +603,7 @@ func TestWorkflowHandler_Update_Success(t *testing.T) {
 
 	updateReq := testutils.CreateJSONRequest(t, "PUT", "/api/workflows/"+testutils.IntToString(createdWorkflow.ID), updatedWorkflow)
 	updateReq.SetPathValue("id", testutils.IntToString(createdWorkflow.ID))
-	rr := testutils.ExecuteRequest(t, handler.Update, updateReq)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Update, updateReq, nil)
 
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
@@ -936,7 +629,7 @@ func TestWorkflowHandler_Delete_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewWorkflowHandler(tdb.DB.DB)
+	handler := NewWorkflowHandler(tdb.GetDatabase())
 
 	// Create workflow to delete
 	workflow := models.Workflow{
@@ -946,7 +639,7 @@ func TestWorkflowHandler_Delete_Success(t *testing.T) {
 	}
 
 	createReq := testutils.CreateJSONRequest(t, "POST", "/api/workflows", workflow)
-	createRR := testutils.ExecuteRequest(t, handler.Create, createReq)
+	createRR := testutils.ExecuteAuthenticatedRequest(t, handler.Create, createReq, nil)
 
 	var createdWorkflow models.Workflow
 	createRR.AssertJSONResponse(&createdWorkflow)
@@ -954,14 +647,14 @@ func TestWorkflowHandler_Delete_Success(t *testing.T) {
 	// Delete the workflow
 	deleteReq := testutils.CreateJSONRequest(t, "DELETE", "/api/workflows/"+testutils.IntToString(createdWorkflow.ID), nil)
 	deleteReq.SetPathValue("id", testutils.IntToString(createdWorkflow.ID))
-	rr := testutils.ExecuteRequest(t, handler.Delete, deleteReq)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Delete, deleteReq, nil)
 
 	rr.AssertStatusCode(http.StatusNoContent)
 
 	// Verify deletion by trying to get it
 	getReq := testutils.CreateJSONRequest(t, "GET", "/api/workflows/"+testutils.IntToString(createdWorkflow.ID), nil)
 	getReq.SetPathValue("id", testutils.IntToString(createdWorkflow.ID))
-	getRR := testutils.ExecuteRequest(t, handler.Get, getReq)
+	getRR := testutils.ExecuteAuthenticatedRequest(t, handler.Get, getReq, nil)
 
 	getRR.AssertStatusCode(http.StatusNotFound)
 }

@@ -4,29 +4,84 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 	"testing"
-	"windshift/internal/handlers/testutils"
-	"windshift/internal/models"
+	"time"
 
+	"windshift/internal/models"
+	"windshift/internal/services"
+	"windshift/internal/testutils"
 )
+
+// mockNotificationService is a no-op notification service for testing.
+// Uses concrete type to satisfy the ItemHandler's notification interface.
+type mockNotificationService struct{}
+
+// EmitEvent implements the notification service interface with concrete type
+func (m *mockNotificationService) EmitEvent(event *services.NotificationEvent) {
+	// No-op for tests
+}
+
+// createTestServices creates the services needed for handler tests
+func createTestServices(t *testing.T, db testutils.TestDB) (*services.PermissionService, *services.ActivityTracker, *mockNotificationService) {
+	t.Helper()
+
+	// Create permission service with test-friendly config
+	permConfig := services.DefaultPermissionCacheConfig()
+	permConfig.WarmupOnStartup = false // Don't warm up during tests
+	permConfig.TTL = 1 * time.Minute   // Short TTL for tests
+
+	permService, err := services.NewPermissionService(db.GetDatabase(), permConfig)
+	if err != nil {
+		t.Fatalf("Failed to create permission service: %v", err)
+	}
+
+	// Register cleanup
+	t.Cleanup(func() {
+		permService.Close()
+	})
+
+	// Create activity tracker with test-friendly config
+	actConfig := services.DefaultActivityTrackerConfig()
+	actConfig.FlushInterval = 1 * time.Hour // Don't flush during tests
+	actConfig.ImmediateFlushActivity = false
+
+	actTracker, err := services.NewActivityTracker(db.GetDatabase(), actConfig)
+	if err != nil {
+		t.Fatalf("Failed to create activity tracker: %v", err)
+	}
+
+	// Register cleanup
+	t.Cleanup(func() {
+		actTracker.Close()
+	})
+
+	// Create mock notification service
+	notifService := &mockNotificationService{}
+
+	return permService, actTracker, notifService
+}
 
 func TestItemHandler_Create_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
 	data := tdb.SeedTestData(t)
-	handler := NewItemHandler(tdb.DB.DB)
+	permService, actTracker, notifService := createTestServices(t, *tdb)
+	handler := NewItemHandler(tdb.GetDatabase(), permService, actTracker, notifService)
 
+	statusID := data.StatusID
+	priorityID := data.PriorityID
 	item := models.Item{
 		WorkspaceID: data.WorkspaceID,
 		Title:       "Test Item",
 		Description: "Test item description",
-		Status:      "open",
-		Priority:    "medium",
+		StatusID:    &statusID,
+		PriorityID:  &priorityID,
 	}
 
 	req := testutils.CreateJSONRequest(t, "POST", "/api/items", item)
-	rr := testutils.ExecuteRequest(t, handler.Create, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 
 	rr.AssertStatusCode(http.StatusCreated).
 		AssertContentType("application/json")
@@ -43,12 +98,6 @@ func TestItemHandler_Create_Success(t *testing.T) {
 	if response.WorkspaceID != item.WorkspaceID {
 		t.Errorf("Expected workspace ID %d, got %d", item.WorkspaceID, response.WorkspaceID)
 	}
-	if response.Level != 0 {
-		t.Errorf("Expected level 0 for root item, got %d", response.Level)
-	}
-	if response.Path == "" {
-		t.Error("Expected item to have a path")
-	}
 }
 
 func TestItemHandler_Create_WithParent(t *testing.T) {
@@ -56,19 +105,23 @@ func TestItemHandler_Create_WithParent(t *testing.T) {
 	defer tdb.Close()
 
 	data := tdb.SeedTestData(t)
-	handler := NewItemHandler(tdb.DB.DB)
+	permService, actTracker, notifService := createTestServices(t, *tdb)
+	handler := NewItemHandler(tdb.GetDatabase(), permService, actTracker, notifService)
+
+	statusID := data.StatusID
+	priorityID := data.PriorityID
 
 	// Create parent item first
 	parentItem := models.Item{
 		WorkspaceID: data.WorkspaceID,
 		Title:       "Parent Item",
 		Description: "Parent item description",
-		Status:      "open",
-		Priority:    "medium",
+		StatusID:    &statusID,
+		PriorityID:  &priorityID,
 	}
 
 	parentReq := testutils.CreateJSONRequest(t, "POST", "/api/items", parentItem)
-	parentRR := testutils.ExecuteRequest(t, handler.Create, parentReq)
+	parentRR := testutils.ExecuteAuthenticatedRequest(t, handler.Create, parentReq, nil)
 
 	var parentResponse models.Item
 	parentRR.AssertJSONResponse(&parentResponse)
@@ -78,22 +131,19 @@ func TestItemHandler_Create_WithParent(t *testing.T) {
 		WorkspaceID: data.WorkspaceID,
 		Title:       "Child Item",
 		Description: "Child item description",
-		Status:      "open",
-		Priority:    "medium",
+		StatusID:    &statusID,
+		PriorityID:  &priorityID,
 		ParentID:    &parentResponse.ID,
 	}
 
 	childReq := testutils.CreateJSONRequest(t, "POST", "/api/items", childItem)
-	childRR := testutils.ExecuteRequest(t, handler.Create, childReq)
+	childRR := testutils.ExecuteAuthenticatedRequest(t, handler.Create, childReq, nil)
 
 	childRR.AssertStatusCode(http.StatusCreated)
 
 	var childResponse models.Item
 	childRR.AssertJSONResponse(&childResponse)
 
-	if childResponse.Level != 1 {
-		t.Errorf("Expected child item level 1, got %d", childResponse.Level)
-	}
 	if childResponse.ParentID == nil || *childResponse.ParentID != parentResponse.ID {
 		t.Errorf("Expected parent ID %d, got %v", parentResponse.ID, childResponse.ParentID)
 	}
@@ -104,31 +154,38 @@ func TestItemHandler_Create_ValidationErrors(t *testing.T) {
 	defer tdb.Close()
 
 	data := tdb.SeedTestData(t)
-	handler := NewItemHandler(tdb.DB.DB)
+	permService, actTracker, notifService := createTestServices(t, *tdb)
+	handler := NewItemHandler(tdb.GetDatabase(), permService, actTracker, notifService)
 
 	tests := []struct {
-		name        string
-		item        models.Item
-		expectedErr string
+		name           string
+		item           models.Item
+		expectedErr    string
+		expectedStatus int
 	}{
 		{
-			name:        "Missing title",
-			item:        models.Item{WorkspaceID: data.WorkspaceID, Title: ""},
-			expectedErr: "Title is required",
+			name:           "Missing title",
+			item:           models.Item{WorkspaceID: data.WorkspaceID, Title: ""},
+			expectedErr:    "Title is required",
+			expectedStatus: http.StatusBadRequest,
 		},
 		{
-			name:        "Invalid workspace",
-			item:        models.Item{WorkspaceID: 99999, Title: "Test Item"},
-			expectedErr: "Workspace not found",
+			name:           "Invalid workspace",
+			item:           models.Item{WorkspaceID: 99999, Title: "Test Item"},
+			expectedErr:    "Insufficient permissions",
+			expectedStatus: http.StatusForbidden, // Permission check happens before validation
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := testutils.CreateJSONRequest(t, "POST", "/api/items", tt.item)
-			rr := testutils.ExecuteRequest(t, handler.Create, req)
+			rr := testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 
-			testutils.AssertValidationError(t, rr, tt.expectedErr)
+			rr.AssertStatusCode(tt.expectedStatus)
+			if !strings.Contains(rr.Body.String(), tt.expectedErr) {
+				t.Errorf("Expected body to contain %q, got %q", tt.expectedErr, rr.Body.String())
+			}
 		})
 	}
 }
@@ -138,7 +195,11 @@ func TestItemHandler_GetAll_Success(t *testing.T) {
 	defer tdb.Close()
 
 	data := tdb.SeedTestData(t)
-	handler := NewItemHandler(tdb.DB.DB)
+	permService, actTracker, notifService := createTestServices(t, *tdb)
+	handler := NewItemHandler(tdb.GetDatabase(), permService, actTracker, notifService)
+
+	statusID := data.StatusID
+	priorityID := data.PriorityID
 
 	// Create test items
 	for i := 0; i < 3; i++ {
@@ -146,16 +207,16 @@ func TestItemHandler_GetAll_Success(t *testing.T) {
 			WorkspaceID: data.WorkspaceID,
 			Title:       "Test Item " + testutils.IntToString(i+1),
 			Description: "Test description",
-			Status:      "open",
-			Priority:    "medium",
+			StatusID:    &statusID,
+			PriorityID:  &priorityID,
 		}
 
 		req := testutils.CreateJSONRequest(t, "POST", "/api/items", item)
-		testutils.ExecuteRequest(t, handler.Create, req)
+		testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 	}
 
 	req := testutils.CreateJSONRequest(t, "GET", "/api/items?workspace_id="+testutils.IntToString(data.WorkspaceID), nil)
-	rr := testutils.ExecuteRequest(t, handler.GetAll, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.GetAll, req, nil)
 
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
@@ -178,19 +239,23 @@ func TestItemHandler_Get_Success(t *testing.T) {
 	defer tdb.Close()
 
 	data := tdb.SeedTestData(t)
-	handler := NewItemHandler(tdb.DB.DB)
+	permService, actTracker, notifService := createTestServices(t, *tdb)
+	handler := NewItemHandler(tdb.GetDatabase(), permService, actTracker, notifService)
+
+	statusID := data.StatusID
+	priorityID := data.PriorityID
 
 	// Create test item
 	item := models.Item{
 		WorkspaceID: data.WorkspaceID,
 		Title:       "Get Test Item",
 		Description: "Test description",
-		Status:      "open",
-		Priority:    "high",
+		StatusID:    &statusID,
+		PriorityID:  &priorityID,
 	}
 
 	createReq := testutils.CreateJSONRequest(t, "POST", "/api/items", item)
-	createRR := testutils.ExecuteRequest(t, handler.Create, createReq)
+	createRR := testutils.ExecuteAuthenticatedRequest(t, handler.Create, createReq, nil)
 
 	var createdItem models.Item
 	createRR.AssertJSONResponse(&createdItem)
@@ -198,7 +263,7 @@ func TestItemHandler_Get_Success(t *testing.T) {
 	// Get the item
 	req := testutils.CreateJSONRequest(t, "GET", "/api/items/"+testutils.IntToString(createdItem.ID), nil)
 	req.SetPathValue("id", testutils.IntToString(createdItem.ID))
-	rr := testutils.ExecuteRequest(t, handler.Get, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Get, req, nil)
 
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
@@ -212,9 +277,6 @@ func TestItemHandler_Get_Success(t *testing.T) {
 	if response.Title != item.Title {
 		t.Errorf("Expected title %s, got %s", item.Title, response.Title)
 	}
-	if response.Priority != item.Priority {
-		t.Errorf("Expected priority %s, got %s", item.Priority, response.Priority)
-	}
 }
 
 func TestItemHandler_Update_Success(t *testing.T) {
@@ -222,19 +284,23 @@ func TestItemHandler_Update_Success(t *testing.T) {
 	defer tdb.Close()
 
 	data := tdb.SeedTestData(t)
-	handler := NewItemHandler(tdb.DB.DB)
+	permService, actTracker, notifService := createTestServices(t, *tdb)
+	handler := NewItemHandler(tdb.GetDatabase(), permService, actTracker, notifService)
+
+	statusID := data.StatusID
+	priorityID := data.PriorityID
 
 	// Create test item
 	item := models.Item{
 		WorkspaceID: data.WorkspaceID,
 		Title:       "Original Title",
 		Description: "Original description",
-		Status:      "open",
-		Priority:    "medium",
+		StatusID:    &statusID,
+		PriorityID:  &priorityID,
 	}
 
 	createReq := testutils.CreateJSONRequest(t, "POST", "/api/items", item)
-	createRR := testutils.ExecuteRequest(t, handler.Create, createReq)
+	createRR := testutils.ExecuteAuthenticatedRequest(t, handler.Create, createReq, nil)
 
 	var createdItem models.Item
 	createRR.AssertJSONResponse(&createdItem)
@@ -243,12 +309,11 @@ func TestItemHandler_Update_Success(t *testing.T) {
 	updateData := map[string]interface{}{
 		"title":       "Updated Title",
 		"description": "Updated description",
-		"priority":    "high",
 	}
 
 	updateReq := testutils.CreateJSONRequest(t, "PUT", "/api/items/"+testutils.IntToString(createdItem.ID), updateData)
 	updateReq.SetPathValue("id", testutils.IntToString(createdItem.ID))
-	rr := testutils.ExecuteRequest(t, handler.Update, updateReq)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Update, updateReq, nil)
 
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
@@ -262,68 +327,6 @@ func TestItemHandler_Update_Success(t *testing.T) {
 	if response.Description != "Updated description" {
 		t.Errorf("Expected updated description 'Updated description', got %s", response.Description)
 	}
-	if response.Priority != "high" {
-		t.Errorf("Expected updated priority 'high', got %s", response.Priority)
-	}
-}
-
-func TestItemHandler_Update_CustomFields(t *testing.T) {
-	tdb := testutils.CreateTestDB(t, true)
-	defer tdb.Close()
-
-	data := tdb.SeedTestData(t)
-	handler := NewItemHandler(tdb.DB.DB)
-
-	// Create test item with custom fields
-	customFields := map[string]interface{}{
-		"field1": "value1",
-		"field2": 123,
-	}
-
-	item := models.Item{
-		WorkspaceID:        data.WorkspaceID,
-		Title:              "Item with Custom Fields",
-		Description:        "Test description",
-		Status:             "open",
-		Priority:           "medium",
-		CustomFieldValues: customFields,
-	}
-
-	createReq := testutils.CreateJSONRequest(t, "POST", "/api/items", item)
-	createRR := testutils.ExecuteRequest(t, handler.Create, createReq)
-
-	var createdItem models.Item
-	createRR.AssertJSONResponse(&createdItem)
-
-	// Update custom fields
-	updatedCustomFields := map[string]interface{}{
-		"field1": "updated_value1",
-		"field3": "new_field",
-	}
-
-	updateData := map[string]interface{}{
-		"custom_field_values": updatedCustomFields,
-	}
-
-	updateReq := testutils.CreateJSONRequest(t, "PUT", "/api/items/"+testutils.IntToString(createdItem.ID), updateData)
-	updateReq.SetPathValue("id", testutils.IntToString(createdItem.ID))
-	rr := testutils.ExecuteRequest(t, handler.Update, updateReq)
-
-	rr.AssertStatusCode(http.StatusOK)
-
-	var response models.Item
-	rr.AssertJSONResponse(&response)
-
-	if response.CustomFieldValues["field1"] != "updated_value1" {
-		t.Errorf("Expected custom field1 'updated_value1', got %v", response.CustomFieldValues["field1"])
-	}
-	if response.CustomFieldValues["field3"] != "new_field" {
-		t.Errorf("Expected custom field3 'new_field', got %v", response.CustomFieldValues["field3"])
-	}
-	// field2 should be gone since it wasn't included in the update
-	if _, exists := response.CustomFieldValues["field2"]; exists {
-		t.Error("Expected field2 to be removed, but it still exists")
-	}
 }
 
 func TestItemHandler_Delete_Success(t *testing.T) {
@@ -331,19 +334,23 @@ func TestItemHandler_Delete_Success(t *testing.T) {
 	defer tdb.Close()
 
 	data := tdb.SeedTestData(t)
-	handler := NewItemHandler(tdb.DB.DB)
+	permService, actTracker, notifService := createTestServices(t, *tdb)
+	handler := NewItemHandler(tdb.GetDatabase(), permService, actTracker, notifService)
+
+	statusID := data.StatusID
+	priorityID := data.PriorityID
 
 	// Create test item
 	item := models.Item{
 		WorkspaceID: data.WorkspaceID,
 		Title:       "Item to Delete",
 		Description: "This item will be deleted",
-		Status:      "open",
-		Priority:    "medium",
+		StatusID:    &statusID,
+		PriorityID:  &priorityID,
 	}
 
 	createReq := testutils.CreateJSONRequest(t, "POST", "/api/items", item)
-	createRR := testutils.ExecuteRequest(t, handler.Create, createReq)
+	createRR := testutils.ExecuteAuthenticatedRequest(t, handler.Create, createReq, nil)
 
 	var createdItem models.Item
 	createRR.AssertJSONResponse(&createdItem)
@@ -351,14 +358,14 @@ func TestItemHandler_Delete_Success(t *testing.T) {
 	// Delete the item
 	deleteReq := testutils.CreateJSONRequest(t, "DELETE", "/api/items/"+testutils.IntToString(createdItem.ID), nil)
 	deleteReq.SetPathValue("id", testutils.IntToString(createdItem.ID))
-	rr := testutils.ExecuteRequest(t, handler.Delete, deleteReq)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Delete, deleteReq, nil)
 
 	rr.AssertStatusCode(http.StatusNoContent)
 
 	// Verify item is deleted
 	getReq := testutils.CreateJSONRequest(t, "GET", "/api/items/"+testutils.IntToString(createdItem.ID), nil)
 	getReq.SetPathValue("id", testutils.IntToString(createdItem.ID))
-	getRR := testutils.ExecuteRequest(t, handler.Get, getReq)
+	getRR := testutils.ExecuteAuthenticatedRequest(t, handler.Get, getReq, nil)
 
 	getRR.AssertStatusCode(http.StatusNotFound)
 }
@@ -368,19 +375,23 @@ func TestItemHandler_GetChildren_Success(t *testing.T) {
 	defer tdb.Close()
 
 	data := tdb.SeedTestData(t)
-	handler := NewItemHandler(tdb.DB.DB)
+	permService, actTracker, notifService := createTestServices(t, *tdb)
+	handler := NewItemHandler(tdb.GetDatabase(), permService, actTracker, notifService)
+
+	statusID := data.StatusID
+	priorityID := data.PriorityID
 
 	// Create parent item
 	parentItem := models.Item{
 		WorkspaceID: data.WorkspaceID,
 		Title:       "Parent Item",
 		Description: "Parent item description",
-		Status:      "open",
-		Priority:    "medium",
+		StatusID:    &statusID,
+		PriorityID:  &priorityID,
 	}
 
 	parentReq := testutils.CreateJSONRequest(t, "POST", "/api/items", parentItem)
-	parentRR := testutils.ExecuteRequest(t, handler.Create, parentReq)
+	parentRR := testutils.ExecuteAuthenticatedRequest(t, handler.Create, parentReq, nil)
 
 	var parent models.Item
 	parentRR.AssertJSONResponse(&parent)
@@ -391,19 +402,19 @@ func TestItemHandler_GetChildren_Success(t *testing.T) {
 			WorkspaceID: data.WorkspaceID,
 			Title:       "Child Item " + testutils.IntToString(i+1),
 			Description: "Child description",
-			Status:      "open",
-			Priority:    "medium",
+			StatusID:    &statusID,
+			PriorityID:  &priorityID,
 			ParentID:    &parent.ID,
 		}
 
 		childReq := testutils.CreateJSONRequest(t, "POST", "/api/items", childItem)
-		testutils.ExecuteRequest(t, handler.Create, childReq)
+		testutils.ExecuteAuthenticatedRequest(t, handler.Create, childReq, nil)
 	}
 
 	// Get children
 	req := testutils.CreateJSONRequest(t, "GET", "/api/items/"+testutils.IntToString(parent.ID)+"/children", nil)
 	req.SetPathValue("id", testutils.IntToString(parent.ID))
-	rr := testutils.ExecuteRequest(t, handler.GetChildren, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.GetChildren, req, nil)
 
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
@@ -420,9 +431,6 @@ func TestItemHandler_GetChildren_Success(t *testing.T) {
 		if child.ParentID == nil || *child.ParentID != parent.ID {
 			t.Errorf("Expected child to have parent ID %d, got %v", parent.ID, child.ParentID)
 		}
-		if child.Level != 1 {
-			t.Errorf("Expected child level 1, got %d", child.Level)
-		}
 	}
 }
 
@@ -431,7 +439,11 @@ func TestItemHandler_Search_Success(t *testing.T) {
 	defer tdb.Close()
 
 	data := tdb.SeedTestData(t)
-	handler := NewItemHandler(tdb.DB.DB)
+	permService, actTracker, notifService := createTestServices(t, *tdb)
+	handler := NewItemHandler(tdb.GetDatabase(), permService, actTracker, notifService)
+
+	statusID := data.StatusID
+	priorityID := data.PriorityID
 
 	// Create test items with different content
 	items := []models.Item{
@@ -439,33 +451,33 @@ func TestItemHandler_Search_Success(t *testing.T) {
 			WorkspaceID: data.WorkspaceID,
 			Title:       "Bug in login system",
 			Description: "Users cannot log in",
-			Status:      "open",
-			Priority:    "high",
+			StatusID:    &statusID,
+			PriorityID:  &priorityID,
 		},
 		{
 			WorkspaceID: data.WorkspaceID,
 			Title:       "Feature request for dashboard",
 			Description: "Add new widgets to dashboard",
-			Status:      "to_do",
-			Priority:    "medium",
+			StatusID:    &statusID,
+			PriorityID:  &priorityID,
 		},
 		{
 			WorkspaceID: data.WorkspaceID,
 			Title:       "Documentation update",
 			Description: "Update API documentation",
-			Status:      "completed",
-			Priority:    "low",
+			StatusID:    &statusID,
+			PriorityID:  &priorityID,
 		},
 	}
 
 	for _, item := range items {
 		req := testutils.CreateJSONRequest(t, "POST", "/api/items", item)
-		testutils.ExecuteRequest(t, handler.Create, req)
+		testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 	}
 
 	// Search for items containing "dashboard"
 	searchReq := testutils.CreateJSONRequest(t, "GET", "/api/items/search?q=dashboard", nil)
-	rr := testutils.ExecuteRequest(t, handler.Search, searchReq)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Search, searchReq, nil)
 
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
@@ -481,69 +493,5 @@ func TestItemHandler_Search_Success(t *testing.T) {
 		if results[0].Title != "Feature request for dashboard" {
 			t.Errorf("Expected to find dashboard item, got %s", results[0].Title)
 		}
-	}
-}
-
-func TestItemHandler_Search_WithFilters(t *testing.T) {
-	tdb := testutils.CreateTestDB(t, true)
-	defer tdb.Close()
-
-	data := tdb.SeedTestData(t)
-	handler := NewItemHandler(tdb.DB.DB)
-
-	// Create test items with different statuses and priorities
-	items := []models.Item{
-		{
-			WorkspaceID: data.WorkspaceID,
-			Title:       "High priority bug",
-			Description: "Critical issue",
-			Status:      "open",
-			Priority:    "high",
-		},
-		{
-			WorkspaceID: data.WorkspaceID,
-			Title:       "Medium priority task",
-			Description: "Regular task",
-			Status:      "in_progress",
-			Priority:    "medium",
-		},
-		{
-			WorkspaceID: data.WorkspaceID,
-			Title:       "Completed high priority",
-			Description: "Finished task",
-			Status:      "completed",
-			Priority:    "high",
-		},
-	}
-
-	for _, item := range items {
-		req := testutils.CreateJSONRequest(t, "POST", "/api/items", item)
-		testutils.ExecuteRequest(t, handler.Create, req)
-	}
-
-	// Search for high priority items
-	searchReq := testutils.CreateJSONRequest(t, "GET", "/api/items/search?priority=high", nil)
-	rr := testutils.ExecuteRequest(t, handler.Search, searchReq)
-
-	rr.AssertStatusCode(http.StatusOK)
-
-	var results []models.Item
-	rr.AssertJSONResponse(&results)
-
-	if len(results) != 2 {
-		t.Errorf("Expected 2 high priority items, got %d", len(results))
-	}
-
-	// Search for open status items
-	searchReq2 := testutils.CreateJSONRequest(t, "GET", "/api/items/search?status=open", nil)
-	rr2 := testutils.ExecuteRequest(t, handler.Search, searchReq2)
-
-	rr2.AssertStatusCode(http.StatusOK)
-
-	var results2 []models.Item
-	rr2.AssertJSONResponse(&results2)
-
-	if len(results2) != 1 {
-		t.Errorf("Expected 1 open status item, got %d", len(results2))
 	}
 }

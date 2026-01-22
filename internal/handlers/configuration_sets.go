@@ -601,7 +601,7 @@ func (h *ConfigurationSetHandler) Create(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Verify workspaces exist (only if workspaces are provided)
+	// Verify workspaces exist
 	for _, workspaceID := range cs.WorkspaceIDs {
 		var workspaceExists bool
 		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", workspaceID).Scan(&workspaceExists)

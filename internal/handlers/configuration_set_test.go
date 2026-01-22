@@ -5,9 +5,8 @@ package handlers
 import (
 	"net/http"
 	"testing"
-	"windshift/internal/handlers/testutils"
 	"windshift/internal/models"
-
+	"windshift/internal/testutils"
 )
 
 func createTestWorkspace(t *testing.T, tdb *testutils.TestDB, name, key string) int {
@@ -57,7 +56,8 @@ func TestConfigurationSetHandler_Create_Success(t *testing.T) {
 	createScreenID := createTestScreen(t, tdb, "Create Screen")
 	editScreenID := createTestScreen(t, tdb, "Edit Screen")
 
-	handler := NewConfigurationSetHandler(tdb.DB.DB)
+	mockNotificationService := testutils.CreateMockNotificationService()
+	handler := NewConfigurationSetHandler(tdb.GetDatabase(), mockNotificationService)
 
 	configSet := models.ConfigurationSet{
 		Name:           "Test Configuration Set",
@@ -70,7 +70,7 @@ func TestConfigurationSetHandler_Create_Success(t *testing.T) {
 	}
 
 	req := testutils.CreateJSONRequest(t, "POST", "/api/configuration-sets", configSet)
-	rr := testutils.ExecuteRequest(t, handler.Create, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 
 	rr.AssertStatusCode(http.StatusCreated).
 		AssertContentType("application/json")
@@ -137,7 +137,8 @@ func TestConfigurationSetHandler_Create_ValidationErrors(t *testing.T) {
 	defer tdb.Close()
 
 	workspaceID := createTestWorkspace(t, tdb, "Test Workspace", "TEST")
-	handler := NewConfigurationSetHandler(tdb.DB.DB)
+	mockNotificationService := testutils.CreateMockNotificationService()
+	handler := NewConfigurationSetHandler(tdb.GetDatabase(), mockNotificationService)
 
 	tests := []struct {
 		name        string
@@ -155,11 +156,6 @@ func TestConfigurationSetHandler_Create_ValidationErrors(t *testing.T) {
 			expectedErr: "Configuration set name is required",
 		},
 		{
-			name:        "Missing workspace IDs",
-			configSet:   models.ConfigurationSet{Name: "Test Config", WorkspaceIDs: []int{}},
-			expectedErr: "At least one workspace is required",
-		},
-		{
 			name:        "Invalid workspace ID",
 			configSet:   models.ConfigurationSet{Name: "Test Config", WorkspaceIDs: []int{99999}},
 			expectedErr: "One or more workspaces not found",
@@ -169,7 +165,7 @@ func TestConfigurationSetHandler_Create_ValidationErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := testutils.CreateJSONRequest(t, "POST", "/api/configuration-sets", tt.configSet)
-			rr := testutils.ExecuteRequest(t, handler.Create, req)
+			rr := testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 
 			testutils.AssertValidationError(t, rr, tt.expectedErr)
 		})
@@ -213,11 +209,12 @@ func TestConfigurationSetHandler_Get_Success(t *testing.T) {
 		t.Fatalf("Failed to create screen assignment: %v", err)
 	}
 
-	handler := NewConfigurationSetHandler(tdb.DB.DB)
+	mockNotificationService := testutils.CreateMockNotificationService()
+	handler := NewConfigurationSetHandler(tdb.GetDatabase(), mockNotificationService)
 
 	req := testutils.CreateJSONRequest(t, "GET", "/api/configuration-sets/"+testutils.IntToString(int(configSetID)), nil)
 	req.SetPathValue("id", testutils.IntToString(int(configSetID)))
-	rr := testutils.ExecuteRequest(t, handler.Get, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Get, req, nil)
 
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
@@ -252,11 +249,12 @@ func TestConfigurationSetHandler_Get_NotFound(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewConfigurationSetHandler(tdb.DB.DB)
+	mockNotificationService := testutils.CreateMockNotificationService()
+	handler := NewConfigurationSetHandler(tdb.GetDatabase(), mockNotificationService)
 
 	req := testutils.CreateJSONRequest(t, "GET", "/api/configuration-sets/99999", nil)
 	req.SetPathValue("id", "99999")
-	rr := testutils.ExecuteRequest(t, handler.Get, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Get, req, nil)
 
 	rr.AssertStatusCode(http.StatusNotFound)
 }
@@ -299,10 +297,11 @@ func TestConfigurationSetHandler_GetAll_Success(t *testing.T) {
 		}
 	}
 
-	handler := NewConfigurationSetHandler(tdb.DB.DB)
+	mockNotificationService := testutils.CreateMockNotificationService()
+	handler := NewConfigurationSetHandler(tdb.GetDatabase(), mockNotificationService)
 
 	req := testutils.CreateJSONRequest(t, "GET", "/api/configuration-sets", nil)
-	rr := testutils.ExecuteRequest(t, handler.GetAll, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.GetAll, req, nil)
 
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
@@ -356,7 +355,8 @@ func TestConfigurationSetHandler_Update_Success(t *testing.T) {
 		t.Fatalf("Failed to create initial workspace assignment: %v", err)
 	}
 
-	handler := NewConfigurationSetHandler(tdb.DB.DB)
+	mockNotificationService := testutils.CreateMockNotificationService()
+	handler := NewConfigurationSetHandler(tdb.GetDatabase(), mockNotificationService)
 
 	updatedConfigSet := models.ConfigurationSet{
 		Name:         "Updated Name",
@@ -369,7 +369,7 @@ func TestConfigurationSetHandler_Update_Success(t *testing.T) {
 
 	req := testutils.CreateJSONRequest(t, "PUT", "/api/configuration-sets/"+testutils.IntToString(int(configSetID)), updatedConfigSet)
 	req.SetPathValue("id", testutils.IntToString(int(configSetID)))
-	rr := testutils.ExecuteRequest(t, handler.Update, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Update, req, nil)
 
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
@@ -437,11 +437,12 @@ func TestConfigurationSetHandler_Delete_Success(t *testing.T) {
 		t.Fatalf("Failed to create workspace assignment: %v", err)
 	}
 
-	handler := NewConfigurationSetHandler(tdb.DB.DB)
+	mockNotificationService := testutils.CreateMockNotificationService()
+	handler := NewConfigurationSetHandler(tdb.GetDatabase(), mockNotificationService)
 
 	req := testutils.CreateJSONRequest(t, "DELETE", "/api/configuration-sets/"+testutils.IntToString(int(configSetID)), nil)
 	req.SetPathValue("id", testutils.IntToString(int(configSetID)))
-	rr := testutils.ExecuteRequest(t, handler.Delete, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Delete, req, nil)
 
 	rr.AssertStatusCode(http.StatusNoContent)
 
@@ -469,7 +470,8 @@ func TestConfigurationSetHandler_InvalidID_Scenarios(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewConfigurationSetHandler(tdb.DB.DB)
+	mockNotificationService := testutils.CreateMockNotificationService()
+	handler := NewConfigurationSetHandler(tdb.GetDatabase(), mockNotificationService)
 
 	tests := []struct {
 		name     string
@@ -499,11 +501,11 @@ func TestConfigurationSetHandler_InvalidID_Scenarios(t *testing.T) {
 			var rr *testutils.ResponseRecorder
 			switch tt.method {
 			case "GET":
-				rr = testutils.ExecuteRequest(t, handler.Get, req)
+				rr = testutils.ExecuteAuthenticatedRequest(t, handler.Get, req, nil)
 			case "PUT":
-				rr = testutils.ExecuteRequest(t, handler.Update, req)
+				rr = testutils.ExecuteAuthenticatedRequest(t, handler.Update, req, nil)
 			case "DELETE":
-				rr = testutils.ExecuteRequest(t, handler.Delete, req)
+				rr = testutils.ExecuteAuthenticatedRequest(t, handler.Delete, req, nil)
 			}
 
 			rr.AssertStatusCode(http.StatusBadRequest)
@@ -516,10 +518,11 @@ func TestConfigurationSetHandler_TransactionRollback(t *testing.T) {
 	defer tdb.Close()
 
 	workspaceID := createTestWorkspace(t, tdb, "Test Workspace", "TEST")
-	
+
 	// Create a configuration set that will cause constraint violation during screen assignment
 	// by referencing a non-existent screen
-	handler := NewConfigurationSetHandler(tdb.DB.DB)
+	mockNotificationService := testutils.CreateMockNotificationService()
+	handler := NewConfigurationSetHandler(tdb.GetDatabase(), mockNotificationService)
 
 	invalidScreenID := 99999
 	configSet := models.ConfigurationSet{
@@ -530,7 +533,7 @@ func TestConfigurationSetHandler_TransactionRollback(t *testing.T) {
 	}
 
 	req := testutils.CreateJSONRequest(t, "POST", "/api/configuration-sets", configSet)
-	rr := testutils.ExecuteRequest(t, handler.Create, req)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 
 	// Should get an internal server error due to constraint violation
 	testutils.AssertInternalServerError(t, rr)

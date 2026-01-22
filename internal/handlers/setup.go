@@ -19,13 +19,19 @@ type AuthMiddleware interface {
 	MarkSetupCompleted()
 }
 
+// SessionCreator interface for session management (allows mocking in tests)
+type SessionCreator interface {
+	CreateSession(userID int, clientIP, userAgent string, rememberMe bool) (*auth.Session, error)
+	SetSessionCookie(w http.ResponseWriter, r *http.Request, token string, rememberMe bool) error
+}
+
 type SetupHandler struct {
 	DB             database.Database
-	SessionManager *auth.SessionManager
+	SessionManager SessionCreator
 	AuthMiddleware AuthMiddleware
 }
 
-func NewSetupHandler(db database.Database, sessionManager *auth.SessionManager, authMiddleware AuthMiddleware) *SetupHandler {
+func NewSetupHandler(db database.Database, sessionManager SessionCreator, authMiddleware AuthMiddleware) *SetupHandler {
 	return &SetupHandler{
 		DB:             db,
 		SessionManager: sessionManager,
