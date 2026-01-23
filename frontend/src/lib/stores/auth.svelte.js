@@ -79,6 +79,18 @@ function createAuthStore() {
       try {
         const response = await api.auth.login(credentials);
 
+        // Handle policy-related responses
+        if (response.sso_required) {
+          isAuthenticated.set(false);
+          loading.set(false);
+          error.set(response.policy_message || 'SSO login required');
+          return {
+            success: false,
+            sso_required: true,
+            policy_message: response.policy_message || 'Password login is disabled. Please use SSO.'
+          };
+        }
+
         if (response.success) {
           user.set(response.user);
           isAuthenticated.set(true);
@@ -89,7 +101,12 @@ function createAuthStore() {
           const sessionResponse = await api.auth.getCurrentUser();
           session.set(sessionResponse.session);
 
-          return { success: true };
+          // Return enrollment status if required
+          return {
+            success: true,
+            enrollment_required: response.enrollment_required || false,
+            policy_message: response.policy_message
+          };
         } else {
           isAuthenticated.set(false);
           loading.set(false);
@@ -97,6 +114,18 @@ function createAuthStore() {
           return { success: false, message: response.message || 'Login failed' };
         }
       } catch (err) {
+        // Check if error response contains policy info
+        if (err.sso_required) {
+          isAuthenticated.set(false);
+          loading.set(false);
+          error.set(err.policy_message || 'SSO login required');
+          return {
+            success: false,
+            sso_required: true,
+            policy_message: err.policy_message || 'Password login is disabled. Please use SSO.'
+          };
+        }
+
         isAuthenticated.set(false);
         loading.set(false);
         error.set(err.message || 'Login failed');

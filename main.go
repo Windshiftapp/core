@@ -331,6 +331,7 @@ func main() {
 	var tlsCertPath string
 	var tlsKeyPath string
 	var disablePlugins bool
+	var enableAdminFallback bool
 	flag.StringVar(&port, "port", "8080", "Port to run the HTTP server on")
 	flag.StringVar(&port, "p", "8080", "Port to run the HTTP server on (shorthand)")
 	flag.StringVar(&dbPath, "db", "windshift.db", "Database file path (SQLite)")
@@ -353,6 +354,7 @@ func main() {
 	flag.StringVar(&tlsCertPath, "tls-cert", "", "Path to TLS certificate file (enables HTTPS)")
 	flag.StringVar(&tlsKeyPath, "tls-key", "", "Path to TLS key file (enables HTTPS)")
 	flag.BoolVar(&disablePlugins, "disable-plugins", false, "Disable the plugin system (prevents loading and uploading plugins)")
+	flag.BoolVar(&enableAdminFallback, "enable-fallback", false, "Enable admin password fallback for restrictive auth policies (disabled by default for security)")
 	flag.Parse()
 
 	// Initialize logger early, before any other operations
@@ -458,6 +460,11 @@ func main() {
 	// Plugin system environment variable
 	if os.Getenv("DISABLE_PLUGINS") == "true" {
 		disablePlugins = true
+	}
+
+	// Admin fallback environment variable
+	if os.Getenv("ENABLE_ADMIN_FALLBACK") == "true" {
+		enableAdminFallback = true
 	}
 
 	// Determine which database to use
@@ -728,8 +735,7 @@ func main() {
 	// Initialize magic link service for portal customer authentication
 	magicLinkService := services.NewMagicLinkService(db, smtpSender, emailVerificationBaseURL)
 
-	// Initialize auth handler with email verification service
-	authHandler = handlers.NewAuthHandler(db, sessionManager, loginRateLimiter, permService, emailVerificationService, ipExtractor)
+	// Note: authHandler is created later after authPolicyHandler and adminRateLimiter are initialized
 
 	itemHandler := handlers.NewItemHandler(db, permService, activityTracker, notificationService)
 	customFieldHandler := handlers.NewCustomFieldHandler(db)
@@ -829,6 +835,21 @@ func main() {
 	reviewHandler := handlers.NewReviewHandler(db)
 	calendarFeedHandler := handlers.NewCalendarFeedHandler(db, permService)
 	securitySettingsHandler := handlers.NewSecuritySettingsHandler(db, disablePlugins)
+
+	// Only create admin rate limiter if fallback is enabled
+	var adminRateLimiter *middleware.AdminFallbackRateLimiter
+	if enableAdminFallback {
+		adminRateLimiter = middleware.NewAdminFallbackRateLimiter(db)
+		slog.Info("Admin password fallback enabled (use only for emergency recovery)", slog.String("component", "auth"))
+	} else {
+		slog.Info("Admin password fallback disabled (admins must comply with auth policy)", slog.String("component", "auth"))
+	}
+
+	authPolicyHandler := handlers.NewAuthPolicyHandlerWithFallback(db, enableAdminFallback)
+
+	// Initialize auth handler with email verification service and auth policy support
+	authHandler = handlers.NewAuthHandler(db, sessionManager, loginRateLimiter, permService, emailVerificationService, ipExtractor, authPolicyHandler, adminRateLimiter)
+
 	themeHandler := handlers.NewThemeHandler(db)
 	userPreferencesHandler := handlers.NewUserPreferencesHandler(db)
 	homepageHandler := handlers.NewHomepageHandler(db, activityTracker)
@@ -1117,6 +1138,7 @@ func main() {
 		},
 		Admin: routes.AdminHandlers{
 			SecuritySettings: securitySettingsHandler,
+			AuthPolicy:       authPolicyHandler,
 			Theme:            themeHandler,
 			UserPreferences:  userPreferencesHandler,
 			JiraImport:       jiraImportHandler,

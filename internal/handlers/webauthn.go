@@ -218,6 +218,13 @@ func (h *WebAuthnHandler) CompleteFIDORegistrationNew(w http.ResponseWriter, r *
 		return
 	}
 
+	// Clear enrollment required flag for this user's sessions
+	// This allows the user to continue without being redirected to enrollment again
+	if err := h.sessionManager.ClearEnrollmentRequiredByUserID(userID); err != nil {
+		slog.Warn("failed to clear enrollment required flag", slog.String("component", "webauthn"), slog.Int("user_id", userID), slog.Any("error", err))
+		// Non-fatal, continue
+	}
+
 	response := map[string]interface{}{
 		"status":  "success",
 		"message": "FIDO credential registered successfully",

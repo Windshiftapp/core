@@ -1,8 +1,10 @@
 <script>
+	import { onMount } from 'svelte';
+	import { currentRoute, navigate } from '../router.js';
 	import { api } from '../api.js';
 	import { authStore } from '../stores';
 	import { t } from '../stores/i18n.svelte.js';
-	import { User, Shield, Key, Smartphone, Plus, Trash2, Calendar, CheckCircle, PlayCircle, Code, Copy, Eye, EyeOff, Terminal } from 'lucide-svelte';
+	import { User, Shield, Key, Smartphone, Plus, Trash2, Calendar, CheckCircle, PlayCircle, Code, Copy, Eye, EyeOff, Terminal, AlertTriangle, X } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
 	import SectionHeader from '../layout/SectionHeader.svelte';
 	import ConfirmDialog from '../dialogs/ConfirmDialog.svelte';
@@ -13,7 +15,7 @@
 	import AlertBox from '../components/AlertBox.svelte';
 	import Label from '../components/Label.svelte';
 	import { formatDate, formatDateShort } from '../utils/dateFormatter.js';
-	import { errorToast } from '../stores/toasts.svelte.js';
+	import { errorToast, successToast } from '../stores/toasts.svelte.js';
 	import {
 		isWebAuthnSupported,
 		prepareCredentialCreationOptions,
@@ -45,6 +47,32 @@
 		message: '',
 		action: null
 	});
+
+	// Enrollment banner state
+	let showEnrollmentBanner = $state(false);
+	let enrollmentType = $state('');
+
+	// Check for enrollment query parameter
+	onMount(() => {
+		const unsubscribe = currentRoute.subscribe(route => {
+			if (route.query?.enroll === 'passkey') {
+				showEnrollmentBanner = true;
+				enrollmentType = 'passkey';
+				// Auto-open the add credential modal
+				setTimeout(() => {
+					credentialType = 'fido';
+					showAddCredential = true;
+				}, 500);
+			}
+		});
+		return unsubscribe;
+	});
+
+	function dismissEnrollmentBanner() {
+		showEnrollmentBanner = false;
+		// Remove the query parameter from URL
+		navigate('/security');
+	}
 
 	// Change password state
 	let showChangePassword = $state(false);
@@ -146,6 +174,12 @@
 
 			await api.completeFIDORegistration(currentUserId, completionData);
 			await loadCredentials();
+
+			// If this was an enrollment requirement, show success and clear banner
+			if (showEnrollmentBanner) {
+				successToast('Passkey registered successfully! Your account is now secured.');
+				dismissEnrollmentBanner();
+			}
 
 			newCredentialName = '';
 			showAddCredential = false;
@@ -357,6 +391,47 @@
 		</h1>
 		<p class="mt-2" style="color: var(--ds-text-subtle);">{t('security.subtitle')}</p>
 	</div>
+
+	<!-- Enrollment Banner -->
+	{#if showEnrollmentBanner}
+		<div class="rounded-lg p-4 border" style="background-color: var(--ds-background-warning-bold); border-color: var(--ds-border-warning);">
+			<div class="flex items-start justify-between">
+				<div class="flex items-start gap-3">
+					<AlertTriangle class="w-6 h-6 flex-shrink-0 mt-0.5" style="color: var(--ds-text-warning-inverse);" />
+					<div>
+						<h3 class="font-semibold" style="color: var(--ds-text-warning-inverse);">
+							Passkey Enrollment Required
+						</h3>
+						<p class="text-sm mt-1" style="color: var(--ds-text-warning-inverse); opacity: 0.9;">
+							{#if enrollmentType === 'passkey'}
+								Your organization requires passkey authentication. Please register a security key or use your device's built-in authenticator (like Touch ID or Windows Hello) to continue using this account.
+							{:else}
+								Please complete your security enrollment to continue.
+							{/if}
+						</p>
+						<div class="mt-3">
+							<Button
+								variant="default"
+								size="small"
+								icon={Key}
+								onclick={() => { credentialType = 'fido'; showAddCredential = true; }}
+							>
+								Register Passkey Now
+							</Button>
+						</div>
+					</div>
+				</div>
+				<button
+					type="button"
+					onclick={dismissEnrollmentBanner}
+					class="p-1 rounded hover:bg-black/10"
+					style="color: var(--ds-text-warning-inverse);"
+				>
+					<X class="w-5 h-5" />
+				</button>
+			</div>
+		</div>
+	{/if}
 
 	<!-- Security Credentials -->
 	<div class="shadow rounded-lg border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">

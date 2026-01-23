@@ -801,28 +801,13 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 	// Cache for role permissions (lazy-loaded per role ID)
 	rolePermissionCache := make(map[int]map[string]bool)
 
-	// Preload Viewer permissions for default Everyone access
-	viewerPermissions, err := ps.getRolePermissionsByName("Viewer")
-	if err != nil {
-		return nil, fmt.Errorf("error loading Viewer role permissions: %v", err)
-	}
-
 	// Load workspace active flags once
 	activeWorkspaces, err := ps.getWorkspaceActiveMap()
 	if err != nil {
 		return nil, fmt.Errorf("error loading workspace states: %v", err)
 	}
 
-	// Default: All active workspaces grant Viewer permissions to everyone
-	// This can be overridden by explicit entries in workspace_everyone_roles
-	for workspaceID, active := range activeWorkspaces {
-		if !active {
-			continue // inactive workspaces stay restricted
-		}
-		cached.WorkspaceEveryone[workspaceID] = clonePermissionSet(viewerPermissions)
-	}
-
-	// Load explicit Everyone role overrides (these take precedence over the default)
+	// Load explicit Everyone role assignments (workspace access must be explicitly granted)
 	everyoneRows, err := ps.db.Query(`
 		SELECT workspace_id, role_id FROM workspace_everyone_roles
 	`)

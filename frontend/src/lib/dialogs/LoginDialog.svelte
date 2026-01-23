@@ -1,8 +1,10 @@
 <script>
   import { createEventDispatcher, onMount, tick } from 'svelte';
+  import { navigate } from '../router.js';
   import { authStore, ssoStore } from '../stores';
   import { api } from '../api.js';
-  import { Eye, EyeOff, Lock, User, AlertCircle, LogIn } from 'lucide-svelte';
+  import { authPolicy } from '../api/admin.js';
+  import { Eye, EyeOff, Lock, User, AlertCircle, LogIn, Key } from 'lucide-svelte';
   import { APP_NAME } from '../constants.js';
   import Button from '../components/Button.svelte';
   import Label from '../components/Label.svelte';
@@ -30,16 +32,38 @@
   let tryingFido = false;
   let showFidoOption = false;
   let ssoError = null;
+  let ssoRequiredMessage = null;
+
+  // Auth policy status (fetched on mount)
+  let policyStatus = {
+    hide_password_form: false,
+    sso_enabled: false,
+    passkey_required: false
+  };
 
   // Focus the first input when dialog opens
   let emailInput;
 
-  // Initialize SSO status on mount
+  // Initialize SSO status and auth policy on mount
   onMount(async () => {
-    await ssoStore.initStatus();
+    await Promise.all([
+      ssoStore.initStatus(),
+      loadPolicyStatus()
+    ]);
     // Check for SSO error in URL (after callback redirect)
     ssoError = ssoStore.checkForError();
   });
+
+  // Load public policy status
+  async function loadPolicyStatus() {
+    try {
+      policyStatus = await authPolicy.getPublicStatus();
+    } catch (err) {
+      console.warn('Failed to load auth policy status:', err);
+      // Default to showing password form on error
+      policyStatus = { hide_password_form: false, sso_enabled: false, passkey_required: false };
+    }
+  }
 
   $: if (isOpen && emailInput) {
     setTimeout(() => {
@@ -67,6 +91,7 @@
     tryingFido = baseState.tryingFido;
     showFidoOption = baseState.showFidoOption;
     ssoError = null;
+    ssoRequiredMessage = null;
     authStore.clearError();
   }
 
@@ -122,29 +147,42 @@
   async function handleSubmit() {
     // Clear previous errors
     validationError = '';
+    ssoRequiredMessage = null;
     authStore.clearError();
-    
+
     // Basic validation
     if (!emailOrUsername.trim()) {
       validationError = 'Email or username is required';
       return;
     }
-    
+
     if (!password) {
       validationError = 'Password is required';
       return;
     }
-    
+
     // Attempt login
     const result = await authStore.login({
       email_or_username: emailOrUsername.trim(),
       password: password,
       remember_me: rememberMe
     });
-    
+
     if (result.success) {
+      // Check if enrollment is required
+      if (result.enrollment_required) {
+        isOpen = false;
+        dispatch('success');
+        // Redirect to security settings for passkey enrollment
+        navigate('/security?enroll=passkey');
+        return;
+      }
+
       isOpen = false;
       dispatch('success');
+    } else if (result.sso_required) {
+      // Show SSO required message instead of regular error
+      ssoRequiredMessage = result.policy_message;
     }
   }
   
@@ -179,6 +217,20 @@
       </div>
     {/if}
 
+    {#if ssoRequiredMessage}
+      <div class="mb-4 p-3 bg-[var(--ds-warning-subtle)] border border-[var(--ds-border-warning)] rounded-md">
+        <div class="flex items-start">
+          <Key class="w-4 h-4 text-[var(--ds-text-warning)] mr-2 flex-shrink-0 mt-0.5" />
+          <div>
+            <p class="text-sm text-[var(--ds-text-warning)]">{ssoRequiredMessage}</p>
+            {#if $ssoStore.enabled}
+              <p class="text-xs text-[var(--ds-text-subtle)] mt-1">Use the SSO button above to sign in.</p>
+            {/if}
+          </div>
+        </div>
+      </div>
+    {/if}
+
     {#if validationError}
       <div class="mb-4 p-3 bg-[var(--ds-danger-subtle)] border border-[var(--ds-border-danger)] rounded-md">
         <div class="flex items-center">
@@ -188,7 +240,7 @@
       </div>
     {/if}
 
-    {#if $authStore.error}
+    {#if $authStore.error && !ssoRequiredMessage}
       <div class="mb-4 p-3 bg-[var(--ds-danger-subtle)] border border-[var(--ds-border-danger)] rounded-md">
         <div class="flex items-center">
           <AlertCircle class="w-4 h-4 text-[var(--ds-text-danger)] mr-2 flex-shrink-0" />
@@ -221,8 +273,65 @@
       {/if}
     {/if}
 
-    <!-- Password Login Form (hidden if SSO-only mode) -->
-    {#if !$ssoStore.enabled || $ssoStore.allowPasswordLogin}
+    <!-- Password Login Form (hidden if SSO-only mode or policy requires it) -->
+    {#if policyStatus.hide_password_form}
+      <!-- Password form hidden by auth policy -->
+      <div class="p-4 bg-[var(--ds-background-neutral)] border border-[var(--ds-border)] rounded-md">
+        <div class="flex items-start gap-3">
+          <Key class="w-5 h-5 text-[var(--ds-icon)] flex-shrink-0 mt-0.5" />
+          <div>
+            <p class="text-sm text-[var(--ds-text)] font-medium">Password login is disabled</p>
+            <p class="text-xs text-[var(--ds-text-subtle)] mt-1">
+              {#if policyStatus.sso_enabled}
+                Please use Single Sign-On (SSO) to sign in.
+              {:else if policyStatus.passkey_required}
+                Please use a passkey to sign in.
+              {:else}
+                Contact your administrator for access.
+              {/if}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Passkey login option when password is hidden -->
+      {#if policyStatus.passkey_required}
+        <div class="mt-4">
+          <Label for="emailOrUsernamePasskey" color="default" class="mb-1">
+            {t('auth.emailOrUsername')}
+          </Label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <User class="h-4 w-4 text-[var(--ds-icon)]" />
+            </div>
+            <input
+              id="emailOrUsernamePasskey"
+              type="text"
+              bind:value={emailOrUsername}
+              onblur={checkFidoAvailability}
+              disabled={$authStore.loading || tryingFido}
+              class="block w-full pl-10 pr-3 py-2 border border-[var(--ds-border)] rounded-md leading-5 bg-[var(--ds-background-input)] placeholder-[var(--ds-text-subtlest)] text-[var(--ds-text)] focus:outline-none focus:placeholder-[var(--ds-text-disabled)] focus:ring-1 focus:ring-[var(--ds-border-focused)] focus:border-[var(--ds-border-focused)] disabled:bg-[var(--ds-background-disabled)] disabled:text-[var(--ds-text-disabled)]"
+              placeholder={t('placeholders.enterEmailOrUsername')}
+              autocomplete="username"
+            />
+          </div>
+        </div>
+
+        <Button
+          variant="primary"
+          fullWidth={true}
+          loading={tryingFido}
+          disabled={$authStore.loading || tryingFido || !emailOrUsername.trim()}
+          onclick={handleFidoLogin}
+          class="mt-4"
+        >
+          {#if !tryingFido}
+            <Key class="w-4 h-4 mr-2" />
+          {/if}
+          {tryingFido ? t('auth.touchSecurityKey') : t('auth.signInWithSecurityKey')}
+        </Button>
+      {/if}
+    {:else if !$ssoStore.enabled || $ssoStore.allowPasswordLogin}
 
     <!-- Login Form -->
     <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-4">

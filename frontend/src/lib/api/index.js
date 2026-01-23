@@ -54,7 +54,7 @@ import {
 } from './users.js';
 import { collections, collectionCategories } from './collections.js';
 import { sso } from './sso.js';
-import { setup, system, themes, securitySettings } from './admin.js';
+import { setup, system, themes, securitySettings, authPolicy } from './admin.js';
 import {
   projects,
   issues,
@@ -316,7 +316,7 @@ export {
 } from './notifications.js';
 
 // Security settings exports
-export { getSecuritySettings, updateSecuritySettings } from './admin.js';
+export { getSecuritySettings, updateSecuritySettings, authPolicy, getAuthPolicy, updateAuthPolicy, getAuthPolicyStats, getAuthPolicyAffected, getAuthPolicyPublicStatus } from './admin.js';
 
 // Calendar feed exports
 export { getCalendarFeedToken, createCalendarFeedToken, revokeCalendarFeedToken } from './misc.js';

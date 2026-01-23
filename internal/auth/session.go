@@ -390,3 +390,40 @@ func (sm *SessionManager) GetSessionFromRequest(r *http.Request) (string, error)
 
 	return "", errors.New("no session token found")
 }
+
+// SetEnrollmentRequired marks a session as requiring passkey enrollment
+func (sm *SessionManager) SetEnrollmentRequired(sessionID int, required bool) error {
+	query := `UPDATE user_sessions SET enrollment_required = ? WHERE id = ?`
+	_, err := sm.db.ExecWrite(query, required, sessionID)
+	if err != nil {
+		return fmt.Errorf("failed to set enrollment required: %w", err)
+	}
+	return nil
+}
+
+// ClearEnrollmentRequired clears the enrollment required flag for a session
+func (sm *SessionManager) ClearEnrollmentRequired(sessionID int) error {
+	return sm.SetEnrollmentRequired(sessionID, false)
+}
+
+// IsEnrollmentRequired checks if a session requires passkey enrollment
+func (sm *SessionManager) IsEnrollmentRequired(sessionID int) (bool, error) {
+	var required bool
+	query := `SELECT COALESCE(enrollment_required, 0) FROM user_sessions WHERE id = ?`
+	err := sm.db.QueryRow(query, sessionID).Scan(&required)
+	if err != nil {
+		return false, fmt.Errorf("failed to check enrollment required: %w", err)
+	}
+	return required, nil
+}
+
+// ClearEnrollmentRequiredByUserID clears enrollment required for all sessions of a user
+// Called after successful passkey enrollment
+func (sm *SessionManager) ClearEnrollmentRequiredByUserID(userID int) error {
+	query := `UPDATE user_sessions SET enrollment_required = 0 WHERE user_id = ? AND is_active = 1`
+	_, err := sm.db.ExecWrite(query, userID)
+	if err != nil {
+		return fmt.Errorf("failed to clear enrollment required: %w", err)
+	}
+	return nil
+}

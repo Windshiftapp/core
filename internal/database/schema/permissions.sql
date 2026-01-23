@@ -209,7 +209,8 @@ INSERT OR IGNORE INTO permissions (permission_key, permission_name, description,
 	('comment.edit_others', 'Edit Other Comments', 'Can edit comments created by other users', 'workspace', 0),
 	('test.view', 'View Tests', 'Can view test cases, test runs, and test results', 'workspace', 0),
 	('test.execute', 'Execute Tests', 'Can execute test runs and record test results', 'workspace', 0),
-	('test.manage', 'Manage Tests', 'Can create, edit, and delete test cases, sets, and folders', 'workspace', 0);
+	('test.manage', 'Manage Tests', 'Can create, edit, and delete test cases, sets, and folders', 'workspace', 0),
+	('action.manage', 'Manage Actions', 'Can create, edit, delete, and execute workspace actions', 'workspace', 0);
 
 -- Default workspace roles
 INSERT OR IGNORE INTO workspace_roles (name, description, is_system, display_order)
@@ -348,6 +349,13 @@ INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM workspace_roles r
 JOIN permissions p ON p.permission_key = 'test.manage'
+WHERE r.name = 'Administrator';
+
+-- Administrator role action permissions
+INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM workspace_roles r
+JOIN permissions p ON p.permission_key = 'action.manage'
 WHERE r.name = 'Administrator';
 
 -- Editor role can view tests (read-only)

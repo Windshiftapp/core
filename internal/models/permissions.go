@@ -84,6 +84,9 @@ const (
 	PermissionTestView    = "test.view"    // View test cases, runs, and results
 	PermissionTestExecute = "test.execute" // Execute test runs and record results
 	PermissionTestManage  = "test.manage"  // Create, edit, delete test cases, sets, and folders
+
+	// Action management permissions
+	PermissionActionManage = "action.manage" // Create, edit, delete, and execute workspace actions
 )
 
 // UserPermissionSummary provides a complete overview of a user's permissions

@@ -96,6 +96,11 @@ class WorkspacePermissionStore {
     return this.hasPermission(workspaceId, 'workspace.admin');
   }
 
+  // Action management permission
+  canManageActions(workspaceId) {
+    return this.hasPermission(workspaceId, 'action.manage');
+  }
+
   // Get all permission keys for a workspace (useful for debugging)
   getWorkspacePermissions(workspaceId) {
     if (this.isSystemAdmin) return new Set(['*']); // System admin has all

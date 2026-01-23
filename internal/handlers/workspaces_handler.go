@@ -343,6 +343,15 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("failed to create item sequence for workspace", slog.String("component", "workspaces"), slog.Int64("workspace_id", id), slog.Any("error", err))
 	}
 
+	// Grant Administrator role to the workspace creator
+	_, err = h.db.ExecWrite(`
+		INSERT INTO user_workspace_roles (workspace_id, user_id, role_id, granted_by, granted_at)
+		SELECT ?, ?, id, ?, CURRENT_TIMESTAMP FROM workspace_roles WHERE name = 'Administrator'
+	`, id, user.ID, user.ID)
+	if err != nil {
+		slog.Warn("failed to grant admin role to workspace creator", slog.Int64("workspace_id", id), slog.Any("error", err))
+	}
+
 	// Return the created workspace with joined data
 	var workspace models.Workspace
 	var timeProjectName, icon, color, defaultViewStr sql.NullString

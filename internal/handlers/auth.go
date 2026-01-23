@@ -26,6 +26,8 @@ type AuthHandler struct {
 	permissionService        *services.PermissionService
 	emailVerificationService *services.EmailVerificationService
 	ipExtractor              *utils.IPExtractor
+	authPolicyHandler        *AuthPolicyHandler
+	adminRateLimiter         *middleware.AdminFallbackRateLimiter
 }
 
 // LoginRequest represents the login request payload
@@ -44,9 +46,12 @@ type ChangePasswordRequest struct {
 
 // LoginResponse represents the login response
 type LoginResponse struct {
-	Success bool          `json:"success"`
-	User    *models.User  `json:"user,omitempty"`
-	Message string        `json:"message,omitempty"`
+	Success            bool          `json:"success"`
+	User               *models.User  `json:"user,omitempty"`
+	Message            string        `json:"message,omitempty"`
+	EnrollmentRequired bool          `json:"enrollment_required,omitempty"`
+	SSORequired        bool          `json:"sso_required,omitempty"`
+	PolicyMessage      string        `json:"policy_message,omitempty"`
 }
 
 // UserResponse represents the current user response
@@ -64,7 +69,8 @@ type SessionInfo struct {
 
 // NewAuthHandler creates a new authentication handler
 // emailVerificationService can be nil if SMTP is not configured
-func NewAuthHandler(db database.Database, sessionManager *auth.SessionManager, rateLimiter *middleware.RateLimiter, permissionService *services.PermissionService, emailVerificationService *services.EmailVerificationService, ipExtractor *utils.IPExtractor) *AuthHandler {
+// authPolicyHandler and adminRateLimiter can be nil for backwards compatibility
+func NewAuthHandler(db database.Database, sessionManager *auth.SessionManager, rateLimiter *middleware.RateLimiter, permissionService *services.PermissionService, emailVerificationService *services.EmailVerificationService, ipExtractor *utils.IPExtractor, authPolicyHandler *AuthPolicyHandler, adminRateLimiter *middleware.AdminFallbackRateLimiter) *AuthHandler {
 	return &AuthHandler{
 		db:                       db,
 		sessionManager:           sessionManager,
@@ -72,6 +78,8 @@ func NewAuthHandler(db database.Database, sessionManager *auth.SessionManager, r
 		permissionService:        permissionService,
 		emailVerificationService: emailVerificationService,
 		ipExtractor:              ipExtractor,
+		authPolicyHandler:        authPolicyHandler,
+		adminRateLimiter:         adminRateLimiter,
 	}
 }
 
@@ -88,7 +96,7 @@ func (h *AuthHandler) populateIsSystemAdmin(user *models.User) error {
 
 // Login handles user authentication
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	// Check if password login is allowed (SSO-only mode check)
+	// Check if password login is allowed (SSO-only mode check - legacy)
 	providerStore := sso.NewProviderStore(h.db)
 	defaultProvider, err := providerStore.GetDefault()
 	if err == nil && defaultProvider != nil && defaultProvider.Enabled && !defaultProvider.AllowPasswordLogin {
@@ -148,14 +156,98 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Clear failed attempts on successful login
+	// Clear failed attempts on successful password validation
 	h.rateLimiter.RecordSuccessfulLogin(ipAddress)
 
-	// Create session
+	// Populate system admin status early (needed for policy checks)
+	if err := h.populateIsSystemAdmin(user); err != nil {
+		slog.Warn("failed to populate system admin status", slog.String("component", "auth"), slog.Any("error", err))
+	}
+
+	// Check auth policy (if handler is available)
+	var enrollmentRequired bool
+	if h.authPolicyHandler != nil && !h.authPolicyHandler.IsPreviewMode() {
+		policy := h.authPolicyHandler.GetCurrentPolicy()
+
+		switch policy {
+		case AuthPolicySSOPrimary:
+			// SSO required - check if admin fallback is allowed
+			if user.IsSystemAdmin && h.adminRateLimiter != nil {
+				// Admin using fallback - check rate limits (fallback enabled)
+				allowed, _, lockedUntil := h.adminRateLimiter.IsAllowed(user.ID, ipAddress)
+				if !allowed {
+					var msg string
+					if lockedUntil != nil {
+						msg = fmt.Sprintf("Admin fallback rate limit exceeded. Try again after %s", lockedUntil.Format(time.RFC3339))
+					} else {
+						msg = "Admin fallback rate limit exceeded. Try again later."
+					}
+					http.Error(w, msg, http.StatusTooManyRequests)
+					return
+				}
+				h.adminRateLimiter.RecordAttempt(user.ID, ipAddress)
+				h.authPolicyHandler.LogAuditEvent(user.ID, "admin_fallback_used", ipAddress, r.UserAgent(), map[string]interface{}{
+					"policy": string(policy),
+				})
+			} else {
+				// Either not admin OR fallback is disabled - must use SSO
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusForbidden)
+				json.NewEncoder(w).Encode(LoginResponse{
+					Success:       false,
+					SSORequired:   true,
+					PolicyMessage: "Password login is disabled. Please use SSO to sign in.",
+				})
+				return
+			}
+
+		case AuthPolicyPasskeyOnly, AuthPolicyPasswordPasskey2FA:
+			// Check if user has passkey enrolled
+			hasPasskey := h.userHasPasskey(user.ID)
+
+			if user.IsSystemAdmin && h.adminRateLimiter != nil {
+				// Admin with fallback enabled - allow password with rate limiting
+				allowed, _, lockedUntil := h.adminRateLimiter.IsAllowed(user.ID, ipAddress)
+				if !allowed {
+					var msg string
+					if lockedUntil != nil {
+						msg = fmt.Sprintf("Admin fallback rate limit exceeded. Try again after %s", lockedUntil.Format(time.RFC3339))
+					} else {
+						msg = "Admin fallback rate limit exceeded. Try again later."
+					}
+					http.Error(w, msg, http.StatusTooManyRequests)
+					return
+				}
+				if !hasPasskey {
+					h.adminRateLimiter.RecordAttempt(user.ID, ipAddress)
+					h.authPolicyHandler.LogAuditEvent(user.ID, "admin_fallback_used", ipAddress, r.UserAgent(), map[string]interface{}{
+						"policy": string(policy),
+					})
+				}
+			} else if !hasPasskey {
+				// Non-admin without passkey (or admin with fallback disabled) needs to enroll
+				enrollmentRequired = true
+				h.authPolicyHandler.LogAuditEvent(user.ID, "enrollment_started", ipAddress, r.UserAgent(), map[string]interface{}{
+					"policy": string(policy),
+				})
+			}
+			// If user has passkey and policy is password_passkey_2fa, they still need to verify with passkey
+			// But for now, we allow password login and mark enrollment_required for the frontend to handle
+		}
+	}
+
+	// Create session with enrollment flag if needed
 	session, err := h.sessionManager.CreateSession(user.ID, ipAddress, r.UserAgent(), req.RememberMe)
 	if err != nil {
 		http.Error(w, "Failed to create session", http.StatusInternalServerError)
 		return
+	}
+
+	// Mark session as requiring enrollment if needed
+	if enrollmentRequired {
+		if err := h.sessionManager.SetEnrollmentRequired(session.ID, true); err != nil {
+			slog.Warn("failed to set enrollment required", slog.String("component", "auth"), slog.Any("error", err))
+		}
 	}
 
 	// Set session cookie
@@ -168,16 +260,15 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	user.FullName = fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 	user.PasswordHash = "" // Never send password hash
 
-	// Populate system admin status (cached for frontend)
-	if err := h.populateIsSystemAdmin(user); err != nil {
-		slog.Warn("failed to populate system admin status", slog.String("component", "auth"), slog.Any("error", err))
-		// Continue anyway - user can still login, just without admin flag
+	response := LoginResponse{
+		Success:            true,
+		User:               user,
+		Message:            "Login successful",
+		EnrollmentRequired: enrollmentRequired,
 	}
 
-	response := LoginResponse{
-		Success: true,
-		User:    user,
-		Message: "Login successful",
+	if enrollmentRequired {
+		response.PolicyMessage = "Please enroll a passkey to complete your account setup."
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -348,6 +439,16 @@ func (h *AuthHandler) findUserByEmailOrUsername(emailOrUsername string) (*models
 // getClientIP extracts the client IP with proxy validation
 func (h *AuthHandler) getClientIP(r *http.Request) string {
 	return h.ipExtractor.GetClientIP(r)
+}
+
+// userHasPasskey checks if a user has an active FIDO/passkey credential
+func (h *AuthHandler) userHasPasskey(userID int) bool {
+	var count int
+	err := h.db.QueryRow(`
+		SELECT COUNT(*) FROM user_credentials
+		WHERE user_id = ? AND credential_type = 'fido' AND is_active = 1
+	`, userID).Scan(&count)
+	return err == nil && count > 0
 }
 
 // ChangePassword allows authenticated users to change their password

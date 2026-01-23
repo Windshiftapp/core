@@ -12,6 +12,15 @@ func RegisterAdminRoutes(deps *Deps) {
 	api.HandleH("GET /admin/security-settings", admin(http.HandlerFunc(deps.Admin.SecuritySettings.GetSecuritySettings)))
 	api.HandleH("PUT /admin/security-settings", admin(http.HandlerFunc(deps.Admin.SecuritySettings.UpdateSecuritySettings)))
 
+	// Authentication policy endpoints (admin only)
+	api.HandleH("GET /admin/auth-policy", admin(http.HandlerFunc(deps.Admin.AuthPolicy.GetAuthPolicy)))
+	api.HandleH("PUT /admin/auth-policy", admin(http.HandlerFunc(deps.Admin.AuthPolicy.UpdateAuthPolicy)))
+	api.HandleH("GET /admin/auth-policy/stats", admin(http.HandlerFunc(deps.Admin.AuthPolicy.GetAuthPolicyStats)))
+	api.HandleH("GET /admin/auth-policy/affected", admin(http.HandlerFunc(deps.Admin.AuthPolicy.GetAffectedUsers)))
+
+	// Public auth policy status endpoint (no auth required - for login page)
+	api.HandleH("GET /auth/policy-status", deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Admin.AuthPolicy.GetPublicPolicyStatus)))
+
 	// Theme management endpoints
 	api.HandleH("GET /themes", auth(http.HandlerFunc(deps.Admin.Theme.GetThemes)))
 	api.HandleH("GET /themes/active", auth(http.HandlerFunc(deps.Admin.Theme.GetActiveTheme)))

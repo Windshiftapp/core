@@ -126,6 +126,7 @@ type UserHandlers struct {
 // AdminHandlers groups admin-related handlers.
 type AdminHandlers struct {
 	SecuritySettings *handlers.SecuritySettingsHandler
+	AuthPolicy       *handlers.AuthPolicyHandler
 	Theme            *handlers.ThemeHandler
 	UserPreferences  *handlers.UserPreferencesHandler
 	JiraImport       *handlers.JiraImportHandler

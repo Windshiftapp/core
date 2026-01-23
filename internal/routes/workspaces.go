@@ -1,6 +1,10 @@
 package routes
 
-import "net/http"
+import (
+	"net/http"
+
+	"windshift/internal/models"
+)
 
 // RegisterWorkspaceRoutes registers workspace-related routes (workspaces, screens, config sets, statuses, workflows).
 func RegisterWorkspaceRoutes(deps *Deps) {
@@ -110,16 +114,18 @@ func RegisterWorkspaceRoutes(deps *Deps) {
 	api.HandleH("PUT /workflows/{id}/transitions", admin(http.HandlerFunc(deps.Workspaces.Workflow.UpdateTransitions)))
 	api.HandleH("GET /workflows/{id}/available-transitions/{statusId}", auth(http.HandlerFunc(deps.Workspaces.Workflow.GetAvailableTransitions)))
 
-	// Actions automation endpoints (workspace-scoped)
+	// Actions automation endpoints (workspace-scoped, requires action.manage permission)
 	if deps.Workspaces.Actions != nil {
-		api.HandleH("GET /workspaces/{workspaceId}/actions", auth(http.HandlerFunc(deps.Workspaces.Actions.ListActions)))
-		api.HandleH("POST /workspaces/{workspaceId}/actions", auth(http.HandlerFunc(deps.Workspaces.Actions.CreateAction)))
-		api.HandleH("GET /workspaces/{workspaceId}/actions/{id}", auth(http.HandlerFunc(deps.Workspaces.Actions.GetAction)))
-		api.HandleH("PUT /workspaces/{workspaceId}/actions/{id}", auth(http.HandlerFunc(deps.Workspaces.Actions.UpdateAction)))
-		api.HandleH("DELETE /workspaces/{workspaceId}/actions/{id}", auth(http.HandlerFunc(deps.Workspaces.Actions.DeleteAction)))
-		api.HandleH("POST /workspaces/{workspaceId}/actions/{id}/toggle", auth(http.HandlerFunc(deps.Workspaces.Actions.ToggleAction)))
-		api.HandleH("POST /workspaces/{workspaceId}/actions/{id}/execute", auth(http.HandlerFunc(deps.Workspaces.Actions.ExecuteAction)))
-		api.HandleH("GET /workspaces/{workspaceId}/actions/{id}/logs", auth(http.HandlerFunc(deps.Workspaces.Actions.GetActionLogs)))
-		api.HandleH("GET /workspaces/{workspaceId}/action-logs", auth(http.HandlerFunc(deps.Workspaces.Actions.GetWorkspaceLogs)))
+		actionManage := deps.PermissionMiddleware.RequireWorkspacePermission(models.PermissionActionManage)
+
+		api.HandleH("GET /workspaces/{workspaceId}/actions", auth(actionManage(http.HandlerFunc(deps.Workspaces.Actions.ListActions))))
+		api.HandleH("POST /workspaces/{workspaceId}/actions", auth(actionManage(http.HandlerFunc(deps.Workspaces.Actions.CreateAction))))
+		api.HandleH("GET /workspaces/{workspaceId}/actions/{id}", auth(actionManage(http.HandlerFunc(deps.Workspaces.Actions.GetAction))))
+		api.HandleH("PUT /workspaces/{workspaceId}/actions/{id}", auth(actionManage(http.HandlerFunc(deps.Workspaces.Actions.UpdateAction))))
+		api.HandleH("DELETE /workspaces/{workspaceId}/actions/{id}", auth(actionManage(http.HandlerFunc(deps.Workspaces.Actions.DeleteAction))))
+		api.HandleH("POST /workspaces/{workspaceId}/actions/{id}/toggle", auth(actionManage(http.HandlerFunc(deps.Workspaces.Actions.ToggleAction))))
+		api.HandleH("POST /workspaces/{workspaceId}/actions/{id}/execute", auth(actionManage(http.HandlerFunc(deps.Workspaces.Actions.ExecuteAction))))
+		api.HandleH("GET /workspaces/{workspaceId}/actions/{id}/logs", auth(actionManage(http.HandlerFunc(deps.Workspaces.Actions.GetActionLogs))))
+		api.HandleH("GET /workspaces/{workspaceId}/action-logs", auth(actionManage(http.HandlerFunc(deps.Workspaces.Actions.GetWorkspaceLogs))))
 	}
 }
