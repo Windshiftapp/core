@@ -119,3 +119,4 @@ tests/cmd/testreport/testreport
 # Runtime plugins directory (plugins are loaded at runtime, not committed)
 plugins/
 !plugins/.gitkeep
+bin

@@ -730,6 +730,10 @@ func (h *ItemHandler) queryItems(r *http.Request, workspaceIDs []int, pagination
 		whereClause += " AND i.item_type_id = ?"
 		args = append(args, itemTypeID)
 	}
+	if creatorID := r.URL.Query().Get("creator_id"); creatorID != "" {
+		whereClause += " AND i.creator_id = ?"
+		args = append(args, creatorID)
+	}
 
 	// Count total
 	countQuery := "SELECT COUNT(*) FROM items i " + whereClause

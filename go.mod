@@ -3,6 +3,7 @@ module windshift
 go 1.24.5
 
 require (
+	github.com/BurntSushi/toml v1.3.2
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.4.0
 	github.com/allegro/bigcache/v3 v3.1.0
 	github.com/charmbracelet/bubbles v0.21.0
@@ -20,8 +21,11 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/securecookie v1.1.2
+	github.com/jub0bs/cors v0.9.2
+	github.com/klauspost/compress v1.18.3
 	github.com/lib/pq v1.10.9
 	github.com/mattn/go-sqlite3 v1.14.30
+	github.com/spf13/cobra v1.8.0
 	github.com/teambition/rrule-go v1.8.2
 	github.com/zitadel/oidc/v3 v3.45.0
 	golang.org/x/crypto v0.45.0
@@ -61,8 +65,7 @@ require (
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/google/go-tpm v0.9.6 // indirect
 	github.com/ianlancetaylor/demangle v0.0.0-20240805132620-81f5be970eca // indirect
-	github.com/jub0bs/cors v0.9.2 // indirect
-	github.com/klauspost/compress v1.18.3 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.3.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -74,6 +77,7 @@ require (
 	github.com/muhlemmer/gu v0.3.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
+	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/tetratelabs/wabin v0.0.0-20230304001439-f6f874872834 // indirect
 	github.com/tetratelabs/wazero v1.9.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
