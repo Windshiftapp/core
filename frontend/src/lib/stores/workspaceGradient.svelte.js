@@ -1,0 +1,170 @@
+import { writable, get } from 'svelte/store';
+import { api } from '../api.js';
+import { gradients } from '../utils/gradients.js';
+
+// Store for workspace gradient settings (using writable for compatibility with components using $ syntax)
+export const workspaceGradientIndex = writable(0); // Default to 0 (None)
+export const applyToAllViews = writable(false);
+
+// Internal runes-based state for useGradientStyles function
+let _gradientIndex = $state(0);
+let _applyToAll = $state(false);
+
+// Sync stores to internal state
+workspaceGradientIndex.subscribe(value => { _gradientIndex = value; });
+applyToAllViews.subscribe(value => { _applyToAll = value; });
+
+// Load gradient settings from workspace homepage layout
+export async function loadWorkspaceGradient(workspaceId) {
+    try {
+        const layout = await api.workspaces.getHomepageLayout(workspaceId);
+        // Default to 0 (None) if not set
+        workspaceGradientIndex.set(layout?.gradient ?? 0);
+        applyToAllViews.set(layout?.applyToAllViews ?? false);
+    } catch (error) {
+        console.error('Failed to load workspace gradient:', error);
+        // Default to no gradient
+        workspaceGradientIndex.set(0);
+        applyToAllViews.set(false);
+    }
+}
+
+// Get gradient CSS value from index
+export function getGradientStyle(index) {
+    // Index 0 is "None", no gradient
+    if (index === 0 || !gradients[index]) {
+        return null;
+    }
+    return gradients[index].value;
+}
+
+/**
+ * Creates a reactive gradient styles object for use in Svelte 5 components.
+ * Must be called at component initialization (top-level of <script>).
+ *
+ * @returns {Object} An object with reactive getters for all gradient-related styles
+ *
+ * @example
+ * ```svelte
+ * <script>
+ *   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
+ *
+ *   const styles = useGradientStyles();
+ *
+ *   onMount(() => loadWorkspaceGradient(workspaceId));
+ * </script>
+ *
+ * <div style="{styles.backgroundStyle}">
+ *   <h1 style="{styles.textStyle}">Title</h1>
+ *   <p style="{styles.subtleTextStyle}">Subtitle</p>
+ *   <div style="{styles.glassStyle(12)}">Glass card</div>
+ * </div>
+ * ```
+ */
+export function useGradientStyles() {
+    // Reactive gradient computation using Svelte 5 runes with internal state
+    const gradientStyle = $derived(
+        (_applyToAll && _gradientIndex > 0)
+            ? getGradientStyle(_gradientIndex)
+            : null
+    );
+
+    const hasGradient = $derived(gradientStyle !== null);
+
+    return {
+        /** Whether a gradient is currently active */
+        get hasGradient() { return hasGradient; },
+
+        /** The raw gradient CSS value (or null if no gradient) */
+        get gradientStyle() { return gradientStyle; },
+
+        /** Background style for the main container */
+        get backgroundStyle() {
+            return hasGradient
+                ? `background: ${gradientStyle};`
+                : 'background-color: var(--ds-surface);';
+        },
+
+        /** Text color for content directly on gradient background */
+        get textStyle() {
+            return hasGradient ? 'color: white;' : 'color: var(--ds-text);';
+        },
+
+        /** Subtle text color for secondary content on gradient background */
+        get subtleTextStyle() {
+            return hasGradient
+                ? 'color: rgba(255, 255, 255, 0.8);'
+                : 'color: var(--ds-text-subtle);';
+        },
+
+        /** Empty state text color (more subtle than subtleTextStyle) */
+        get emptyStateStyle() {
+            return hasGradient
+                ? 'color: rgba(255, 255, 255, 0.6);'
+                : 'color: var(--ds-text-subtlest);';
+        },
+
+        /** Text color for content inside glass containers */
+        get glassTextStyle() { return 'color: var(--ds-text);'; },
+
+        /** Subtle text color for content inside glass containers */
+        get glassSubtleTextStyle() { return 'color: var(--ds-text-subtle);'; },
+
+        /** Drag handle color */
+        get dragHandleStyle() { return 'color: var(--ds-text-subtlest);'; },
+
+        /**
+         * Glass container style with configurable blur
+         * @param {number} blur - Blur amount in pixels (default: 12)
+         * @returns {string} CSS style string for glass effect
+         */
+        glassStyle(blur = 12) {
+            return hasGradient
+                ? `background-color: var(--ds-glass-bg); border-color: var(--ds-glass-border); backdrop-filter: blur(${blur}px);`
+                : 'background-color: var(--ds-surface-raised); border-color: var(--ds-border);';
+        },
+
+        /**
+         * Card background style with configurable blur (for smaller elements like cards)
+         * @param {number} blur - Blur amount in pixels (default: 8)
+         * @returns {string} CSS style string for card background
+         */
+        cardStyle(blur = 8) {
+            return hasGradient
+                ? `background-color: var(--ds-glass-bg); backdrop-filter: blur(${blur}px); border-color: var(--ds-glass-border);`
+                : 'background-color: var(--ds-surface-raised); border-color: var(--ds-border);';
+        },
+
+        /**
+         * Column background style (for board columns with higher blur)
+         * @param {number} blur - Blur amount in pixels (default: 12)
+         * @returns {string} CSS style string for column background
+         */
+        columnStyle(blur = 12) {
+            return hasGradient
+                ? `backdrop-filter: blur(${blur}px); background-color: var(--ds-glass-bg); border-color: var(--ds-glass-border);`
+                : 'background-color: var(--ds-surface-raised); border-color: var(--ds-border);';
+        },
+
+        /**
+         * Table container style
+         * @param {number} blur - Blur amount in pixels (default: 12)
+         * @returns {string} CSS style string for table container
+         */
+        tableStyle(blur = 12) {
+            return hasGradient
+                ? `background-color: var(--ds-glass-bg); backdrop-filter: blur(${blur}px); border-color: var(--ds-glass-border);`
+                : 'background-color: var(--ds-surface-raised); border-color: var(--ds-border);';
+        },
+
+        /** Table header background style */
+        get tableHeaderStyle() {
+            return 'background-color: var(--ds-surface);';
+        },
+
+        /** Border color for separators and dividers */
+        get borderColor() {
+            return hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
+        }
+    };
+}

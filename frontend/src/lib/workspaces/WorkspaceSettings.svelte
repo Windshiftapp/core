@@ -21,6 +21,7 @@
   import Label from '../components/Label.svelte';
   import { getHexFromColorName } from '../utils/colors.js';
   import Toggle from '../components/Toggle.svelte';
+  import Tabs from '../components/Tabs.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   
@@ -50,6 +51,17 @@
     color: '#3b82f6',
     avatar_url: null
   };
+
+  // Settings tabs configuration
+  $: settingsTabs = [
+    { id: 'general', label: t('workspaceSettings.tabs.general') },
+    { id: 'appearance', label: t('workspaceSettings.tabs.appearance') },
+    { id: 'categories', label: t('workspaceSettings.tabs.categories') },
+    { id: 'members', label: t('workspaceSettings.tabs.members') },
+    { id: 'configuration', label: t('workspaceSettings.tabs.configurationSets') },
+    { id: 'source-control', label: t('workspaceSettings.tabs.sourceControl') },
+    { id: 'danger', label: t('workspaceSettings.tabs.removeWorkspace'), className: 'tab-danger' }
+  ];
 
   // Avatar upload state
   let uploadingAvatar = false;
@@ -337,68 +349,12 @@
       />
     </div>
 
-    <!-- Tab Navigation -->
-    <div class="rounded border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-      <div class="flex border-b" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-        <button
-          class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative settings-tab"
-          style="color: {activeTab === 'general' ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; {activeTab === 'general' ? 'margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : ''}"
-          on:click={() => switchTab('general')}
-        >
-          {t('workspaceSettings.tabs.general')}
-        </button>
-        <button
-          class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative settings-tab"
-          style="color: {activeTab === 'appearance' ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; {activeTab === 'appearance' ? 'margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : ''}"
-          on:click={() => switchTab('appearance')}
-        >
-          {t('workspaceSettings.tabs.appearance')}
-        </button>
-        <button
-          class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative settings-tab"
-          style="color: {activeTab === 'categories' ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; {activeTab === 'categories' ? 'margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : ''}"
-          on:click={() => switchTab('categories')}
-        >
-          {t('workspaceSettings.tabs.categories')}
-        </button>
-        <button
-          class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative settings-tab"
-          style="color: {activeTab === 'members' ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; {activeTab === 'members' ? 'margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : ''}"
-          on:click={() => switchTab('members')}
-        >
-          {t('workspaceSettings.tabs.members')}
-        </button>
-        <button
-          class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative settings-tab"
-          style="color: {activeTab === 'configuration' ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; {activeTab === 'configuration' ? 'margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : ''}"
-          on:click={() => switchTab('configuration')}
-        >
-          {t('workspaceSettings.tabs.configurationSets')}
-        </button>
-        <button
-          class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative settings-tab"
-          style="color: {activeTab === 'source-control' ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; {activeTab === 'source-control' ? 'margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : ''}"
-          on:click={() => switchTab('source-control')}
-        >
-          {t('workspaceSettings.tabs.sourceControl')}
-        </button>
-        <button
-          class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative settings-tab-danger"
-          style="color: {activeTab === 'danger' ? 'var(--ds-text-danger)' : 'var(--ds-text-subtle)'}; {activeTab === 'danger' ? 'margin-bottom: -1px; border-bottom: 2px solid var(--ds-text-danger);' : ''}"
-          on:click={() => switchTab('danger')}
-        >
-          {t('workspaceSettings.tabs.removeWorkspace')}
-        </button>
-      </div>
-    </div>
-
-    <!-- Tab Content -->
-    {#if activeTab === 'general'}
-      <!-- Basic Information -->
-      <div class="rounded-xl p-8 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+    <Tabs tabs={settingsTabs} bind:activeTab on:tab-change={(e) => switchTab(e.detail.tab)}>
+      {#if activeTab === 'general'}
+        <!-- Basic Information -->
         <h3 class="text-lg font-medium mb-6" style="color: var(--ds-text);">{t('workspaceSettings.basicInformation')}</h3>
 
-      <div class="space-y-6">
+        <div class="space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Label for="workspace-name" required class="mb-2">{t('workspaceSettings.workspaceName')}</Label>
@@ -480,11 +436,10 @@
             </p>
           </div>
 <Toggle bind:checked={formData.active} />
+          </div>
         </div>
-      </div>
-      </div>
 
-      <div class="flex items-center gap-3 mt-6">
+        <div class="flex items-center gap-3 mt-6">
         <Button
           variant="primary"
           size="medium"
@@ -502,8 +457,7 @@
         </Button>
       </div>
     {:else if activeTab === 'appearance'}
-      <!-- Visual Identity Settings -->
-      <div class="rounded-xl p-8 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+        <!-- Visual Identity Settings -->
         <div class="flex items-center gap-3 mb-6">
           <Palette class="w-5 h-5" style="color: var(--ds-text-subtle);" />
           <h3 class="text-lg font-medium" style="color: var(--ds-text);">{t('workspaceSettings.visualIdentity')}</h3>
@@ -602,28 +556,26 @@
             </p>
           </div>
         </div>
-      </div>
 
-      <div class="flex items-center gap-3 mt-6">
-        <Button
-          variant="primary"
-          size="medium"
-          onclick={saveWorkspace}
-          disabled={saving || !formData.name.trim() || !formData.key.trim()}
-        >
-          {#if saving}{t('workspaceSettings.saving')}{:else}{t('workspaceSettings.saveChanges')}{/if}
-        </Button>
-        <Button
-          variant="secondary"
-          size="medium"
-          onclick={loadWorkspace}
-        >
-          {t('workspaceSettings.reset')}
-        </Button>
-      </div>
+        <div class="flex items-center gap-3 mt-6">
+          <Button
+            variant="primary"
+            size="medium"
+            onclick={saveWorkspace}
+            disabled={saving || !formData.name.trim() || !formData.key.trim()}
+          >
+            {#if saving}{t('workspaceSettings.saving')}{:else}{t('workspaceSettings.saveChanges')}{/if}
+          </Button>
+          <Button
+            variant="secondary"
+            size="medium"
+            onclick={loadWorkspace}
+          >
+            {t('workspaceSettings.reset')}
+          </Button>
+        </div>
     {:else if activeTab === 'categories'}
-      <!-- Project Category Restrictions -->
-      <div class="rounded-xl border shadow-sm p-8" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+        <!-- Project Category Restrictions -->
         <div class="flex items-center gap-3 mb-6">
           <Clock class="w-5 h-5" style="color: var(--ds-text-subtle);" />
           <h3 class="text-lg font-medium" style="color: var(--ds-text);">{t('workspaceSettings.projectCategoryRestrictions')}</h3>
@@ -639,53 +591,45 @@
         <p class="text-xs mt-3" style="color: var(--ds-text-subtle);">
           {t('workspaceSettings.leaveEmptyNote')}
         </p>
-      </div>
 
-      <div class="flex items-center gap-3 mt-6">
-        <Button
-          variant="primary"
-          size="medium"
-          onclick={saveWorkspace}
-          disabled={saving || !formData.name.trim() || !formData.key.trim()}
-        >
-          {#if saving}{t('workspaceSettings.saving')}{:else}{t('workspaceSettings.saveChanges')}{/if}
-        </Button>
-        <Button
-          variant="secondary"
-          size="medium"
-          onclick={loadWorkspace}
-        >
-          {t('workspaceSettings.reset')}
-        </Button>
-      </div>
+        <div class="flex items-center gap-3 mt-6">
+          <Button
+            variant="primary"
+            size="medium"
+            onclick={saveWorkspace}
+            disabled={saving || !formData.name.trim() || !formData.key.trim()}
+          >
+            {#if saving}{t('workspaceSettings.saving')}{:else}{t('workspaceSettings.saveChanges')}{/if}
+          </Button>
+          <Button
+            variant="secondary"
+            size="medium"
+            onclick={loadWorkspace}
+          >
+            {t('workspaceSettings.reset')}
+          </Button>
+        </div>
     {:else if activeTab === 'members'}
-      <!-- Workspace Members -->
-      <div class="rounded-xl border shadow-sm p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+        <!-- Workspace Members -->
         <WorkspaceMembers {workspaceId} />
-      </div>
     {:else if activeTab === 'configuration'}
-      <!-- Configuration Sets -->
-      <div class="rounded-xl border shadow-sm p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+        <!-- Configuration Sets -->
         <WorkspaceConfigurationAssigner workspaceId={workspaceId} on:configurationChanged={() => configurationRefreshKey++} />
-      </div>
 
-      <!-- Active Configuration Preview -->
-      <div class="rounded-xl border shadow-sm p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-        <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">{t('workspaceSettings.activeConfiguration')}</h3>
-        {#key configurationRefreshKey}
-          <WorkspaceConfigurationPreview {workspaceId} />
-        {/key}
-      </div>
+        <!-- Active Configuration Preview -->
+        <div class="mt-6 pt-6 border-t" style="border-color: var(--ds-border);">
+          <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">{t('workspaceSettings.activeConfiguration')}</h3>
+          {#key configurationRefreshKey}
+            <WorkspaceConfigurationPreview {workspaceId} />
+          {/key}
+        </div>
 
     {:else if activeTab === 'source-control'}
-      <!-- Source Control Settings -->
-      <div class="rounded-xl border shadow-sm p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+        <!-- Source Control Settings -->
         <WorkspaceSCMSettings {workspaceId} />
-      </div>
 
     {:else if activeTab === 'danger'}
-      <!-- Remove Workspace -->
-      <div class="rounded-xl p-8 border border-red-200 shadow-sm" style="background-color: #fef2f2;">
+        <!-- Remove Workspace -->
         <div class="flex items-center gap-3 mb-6">
           <AlertTriangle class="w-5 h-5 text-red-600" />
           <h3 class="text-lg font-medium text-red-900">{t('workspaceSettings.permanentRemoval')}</h3>
@@ -742,8 +686,8 @@
             </div>
           </div>
         {/if}
-      </div>
     {/if}
+    </Tabs>
 
   </div>
 {:else}
@@ -753,19 +697,18 @@
 {/if}
 
 <style>
-  .settings-tab:hover {
-    color: var(--ds-text) !important;
-  }
-
-  .settings-tab-danger:hover {
-    color: var(--ds-text-danger) !important;
-  }
-
   .breadcrumb-link:hover {
     color: var(--ds-text) !important;
   }
 
   .toggle-off {
     background-color: var(--ds-surface);
+  }
+
+  :global(.tab-danger) {
+    color: var(--ds-text-danger) !important;
+  }
+  :global(.tab-danger:hover) {
+    color: var(--ds-text-danger) !important;
   }
 </style>

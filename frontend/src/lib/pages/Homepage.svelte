@@ -7,8 +7,6 @@
   import ColorDot from '../components/ColorDot.svelte';
   import ItemCard from '../features/items/ItemCard.svelte';
   import Text from '../components/Text.svelte';
-  import Card from '../components/Card.svelte';
-  import CardHeader from '../components/CardHeader.svelte';
   import { Clock, Eye, Edit, MessageSquare, Bookmark, Bell, Briefcase, Calendar, Target, Search, Grip, Info, CheckCircle, AlertCircle, XCircle } from 'lucide-svelte';
   import { workspaceIconMap } from '../utils/icons.js';
 

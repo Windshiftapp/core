@@ -1,11 +1,9 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import Button from '../components/Button.svelte';
+  import StatusCircle from '../components/StatusCircle.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import {
-    Check,
-    Circle,
-    Plus,
     X
   } from 'lucide-svelte';
 
@@ -146,28 +144,17 @@
       <div class="space-y-2">
         <!-- Step 1: Create Workspace -->
         <div
-          class="rounded-lg py-3 px-4 transition-all"
-          class:border-l-4={activeStep === 1}
-          class:border-l-blue-500={activeStep === 1}
+          class="rounded py-3 px-4 transition-all"
+          class:border-l-6={activeStep === 1}
+          class:border-l-sky-600={activeStep === 1}
           style={activeStep === 1 ? 'background-color: rgba(19, 136, 231, 0.05);' : ''}
         >
           <div class="flex items-start gap-3">
             <!-- Step Icon -->
             <div class="flex-shrink-0 mt-0.5">
-              {#if workspaceCount > 0}
-                <!-- Completed: checkmark in blue circle -->
-                <div class="w-6 h-6 rounded-full flex items-center justify-center" style="background-color: #1388E7;">
-                  <Check class="w-3.5 h-3.5 text-white" />
-                </div>
-              {:else if activeStep === 1}
-                <!-- Active: circle with inner dot -->
-                <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center" style="border-color: #1388E7;">
-                  <div class="w-2 h-2 rounded-full" style="background-color: #1388E7;"></div>
-                </div>
-              {:else}
-                <!-- Pending: empty circle -->
-                <div class="w-6 h-6 rounded-full border-2" style="border-color: var(--ds-border);"></div>
-              {/if}
+              <StatusCircle 
+                status={workspaceCount > 0 ? 'completed' : (activeStep === 1 ? 'active' : 'pending')} 
+              />
             </div>
             <!-- Step Content -->
             <div class="flex-1">
@@ -197,27 +184,16 @@
         <!-- Step 2: Create Work Item -->
         <div
           class="rounded-lg py-3 px-4 transition-all"
-          class:border-l-4={activeStep === 2}
-          class:border-l-blue-500={activeStep === 2}
+          class:border-l-6={activeStep === 2}
+          class:border-l-sky-600={activeStep === 2}
           style={activeStep === 2 ? 'background-color: rgba(19, 136, 231, 0.05);' : ''}
         >
           <div class="flex items-start gap-3">
             <!-- Step Icon -->
             <div class="flex-shrink-0 mt-0.5">
-              {#if itemCount > 0}
-                <!-- Completed: checkmark in blue circle -->
-                <div class="w-6 h-6 rounded-full flex items-center justify-center" style="background-color: #1388E7;">
-                  <Check class="w-3.5 h-3.5 text-white" />
-                </div>
-              {:else if activeStep === 2}
-                <!-- Active: circle with inner dot -->
-                <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center" style="border-color: #1388E7;">
-                  <div class="w-2 h-2 rounded-full" style="background-color: #1388E7;"></div>
-                </div>
-              {:else}
-                <!-- Pending: empty circle -->
-                <div class="w-6 h-6 rounded-full border-2" style="border-color: var(--ds-border);"></div>
-              {/if}
+              <StatusCircle 
+                status={itemCount > 0 ? 'completed' : (activeStep === 2 ? 'active' : 'pending')} 
+              />
             </div>
             <!-- Step Content -->
             <div class="flex-1">

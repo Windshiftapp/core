@@ -7,7 +7,7 @@
   import { api } from '../api.js';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import Tooltip from '../components/Tooltip.svelte';
-  import { workspaceGradientIndex, applyToAllViews, loadWorkspaceGradient, getGradientStyle } from '../stores/workspaceGradient.js';
+  import { workspaceGradientIndex, applyToAllViews, loadWorkspaceGradient, getGradientStyle } from '../stores/workspaceGradient.svelte.js';
     import Rows_3 from 'lucide-svelte/icons/rows-3';
 
   let { workspaceId = null } = $props();
@@ -59,6 +59,15 @@
 
   // Permission-based visibility
   const canViewTests = $derived.by(() => workspacePermissions.canViewTests(workspaceId));
+  const canManageActions = $derived.by(() => workspacePermissions.canManageActions(workspaceId));
+
+  // Filter workspace-only views based on permissions
+  const filteredWorkspaceOnlyViews = $derived.by(() => {
+    return workspaceOnlyViews.filter(view => {
+      if (view.id === 'actions') return canManageActions;
+      return true;
+    });
+  });
 
   // Gradient detection
   const gradientStyle = $derived.by(() => ($applyToAllViews && $workspaceGradientIndex > 0) ? getGradientStyle($workspaceGradientIndex) : null);
@@ -486,7 +495,7 @@
 
       {#if workspaceToolsExpanded}
         <div class="space-y-2">
-          {#each workspaceOnlyViews as view}
+          {#each filteredWorkspaceOnlyViews as view}
             {@const isToolActive = $currentRoute.view === `workspace-${view.id}`}
             <Tooltip content={view.tooltip} placement="right">
               <button

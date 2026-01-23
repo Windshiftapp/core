@@ -4,7 +4,7 @@
   const dispatch = createEventDispatcher();
 
   // Props
-  export let tabs = []; // Array of { id, label, icon?, badge? }
+  export let tabs = []; // Array of { id, label, icon?, badge?, className? }
   export let activeTab = ''; // Current active tab ID (bindable)
 
   // Initialize activeTab to first tab if not set
@@ -18,12 +18,12 @@
   }
 </script>
 
-<div class="rounded border shadow-sm" style="background: var(--ds-surface-raised); border-color: var(--ds-border);">
+<div class="rounded-xl border shadow-sm" style="background: var(--ds-surface-raised); border-color: var(--ds-border);">
   <!-- Tab Navigation -->
-  <div class="flex border-b" style="border-color: var(--ds-border); background: var(--ds-surface-raised);">
+  <div class="flex border-b" style="border-color: var(--ds-border);">
     {#each tabs as tab}
       <button
-        class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative border-b-2"
+        class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative border-b-2 {tab.className || ''}"
         style="color: {activeTab === tab.id ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; border-bottom-color: {activeTab === tab.id ? 'var(--ds-interactive)' : 'transparent'}; {activeTab === tab.id ? 'margin-bottom: -1px;' : ''}"
         onclick={() => switchTab(tab.id)}
         onmouseenter={(e) => { if (activeTab !== tab.id) e.target.style.color = 'var(--ds-text)'; }}

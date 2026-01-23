@@ -24,7 +24,31 @@ export default {
     sprintUpdated: 'Sprint erfolgreich aktualisiert',
     sprintDeleted: 'Sprint erfolgreich gelöscht',
     sprintStarted: 'Sprint erfolgreich gestartet',
-    sprintCompleted: 'Sprint erfolgreich abgeschlossen'
+    sprintCompleted: 'Sprint erfolgreich abgeschlossen',
+
+    // Iteration modal
+    createIteration: 'Iteration erstellen',
+    editIteration: 'Iteration bearbeiten',
+    updateIteration: 'Iteration aktualisieren',
+    globalIteration: 'Globale Iteration',
+    globalIterationDescription: 'In allen Arbeitsbereichen sichtbar',
+    localIteration: 'Lokale Iteration',
+    localIterationDescription: 'Nur in diesem Arbeitsbereich sichtbar',
+    switchTo: 'Zu {scope} wechseln',
+    local: 'Lokal',
+    global: 'Global',
+    iterationNamePlaceholder: 'z.B. Sprint 24, Q1 2025, Release 2.0',
+    iterationDescriptionPlaceholder: 'Optionale Beschreibung oder Ziele für diese Iteration',
+    noType: 'Kein Typ',
+    iterationNameRequired: 'Iterationsname ist erforderlich',
+    startDateRequired: 'Startdatum ist erforderlich',
+    endDateRequired: 'Enddatum ist erforderlich',
+    endDateMustBeAfterStart: 'Enddatum muss nach Startdatum liegen',
+    failedToSaveIteration: 'Iteration konnte nicht gespeichert werden',
+    statusPlanned: 'Geplant',
+    statusActive: 'Aktiv',
+    statusCompleted: 'Abgeschlossen',
+    statusCancelled: 'Abgebrochen'
   },
 
   iterations: {
@@ -63,7 +87,10 @@ export default {
     startDate: 'Startdatum',
     endDate: 'Enddatum',
     descriptionPlaceholder: 'Optionale Beschreibung',
-    updateIteration: 'Iteration aktualisieren'
+    updateIteration: 'Iteration aktualisieren',
+    thisWorkspace: 'Dieser Arbeitsbereich',
+    dateRange: 'Zeitraum',
+    scope: 'Geltungsbereich'
   },
 
   milestones: {
