@@ -21,8 +21,9 @@ func (h *ItemHandler) getUserFromContext(r *http.Request) *models.User {
 // canViewItem checks if a user can view an item in a specific workspace
 func (h *ItemHandler) canViewItem(userID, workspaceID int) (bool, error) {
 	if h.permissionService == nil {
-		// If permission service is not available, allow access (backward compatibility)
-		return true, nil
+		// Fail closed: deny access if permission service is unavailable
+		slog.Error("permission service unavailable, denying view access", slog.String("component", "items_permissions"))
+		return false, nil
 	}
 
 	return h.permissionService.HasWorkspacePermission(userID, workspaceID, models.PermissionItemView)
@@ -31,7 +32,9 @@ func (h *ItemHandler) canViewItem(userID, workspaceID int) (bool, error) {
 // canEditItem checks if a user can edit an item in a specific workspace
 func (h *ItemHandler) canEditItem(userID, workspaceID int) (bool, error) {
 	if h.permissionService == nil {
-		return true, nil
+		// Fail closed: deny access if permission service is unavailable
+		slog.Error("permission service unavailable, denying edit access", slog.String("component", "items_permissions"))
+		return false, nil
 	}
 
 	return h.permissionService.HasWorkspacePermission(userID, workspaceID, models.PermissionItemEdit)
@@ -40,7 +43,9 @@ func (h *ItemHandler) canEditItem(userID, workspaceID int) (bool, error) {
 // canDeleteItem checks if a user can delete an item in a specific workspace
 func (h *ItemHandler) canDeleteItem(userID, workspaceID int) (bool, error) {
 	if h.permissionService == nil {
-		return true, nil
+		// Fail closed: deny access if permission service is unavailable
+		slog.Error("permission service unavailable, denying delete access", slog.String("component", "items_permissions"))
+		return false, nil
 	}
 
 	return h.permissionService.HasWorkspacePermission(userID, workspaceID, models.PermissionItemDelete)
@@ -49,8 +54,9 @@ func (h *ItemHandler) canDeleteItem(userID, workspaceID int) (bool, error) {
 // filterItemsByPermissions filters a list of items based on user's workspace view permissions
 func (h *ItemHandler) filterItemsByPermissions(userID int, items []models.Item) ([]models.Item, error) {
 	if h.permissionService == nil {
-		// No permission service, return all items (backward compatibility)
-		return items, nil
+		// Fail closed: return empty list if permission service is unavailable
+		slog.Error("permission service unavailable, denying access to all items", slog.String("component", "items_permissions"))
+		return []models.Item{}, nil
 	}
 
 	// Check if user is system admin - they can see everything
@@ -139,8 +145,9 @@ func (h *ItemHandler) getAccessibleWorkspaceIDs(user *models.User) ([]int, error
 					allowed = true
 				}
 			} else {
-				// Fallback to legacy open access if permission service is unavailable
-				allowed = true
+				// Fail closed: deny access if permission service is unavailable
+				slog.Error("permission service unavailable, denying workspace access", slog.String("component", "items_permissions"), slog.Int("workspace_id", id))
+				allowed = false
 			}
 		} else {
 			// Inactive workspaces still require admin or workspace admin access

@@ -21,10 +21,10 @@ func RegisterAuthRoutes(deps *Deps) {
 	// Authentication endpoints with rate limiting
 	api.HandleH("POST /auth/login", deps.LoginRateLimiter.Limit(http.HandlerFunc(deps.Auth.Auth.Login)))
 	api.HandleH("POST /auth/logout", deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Auth.Auth.Logout)))
-	api.Handle("GET /auth/me", deps.Auth.Auth.GetCurrentUser)
+	api.HandleH("GET /auth/me", auth(http.HandlerFunc(deps.Auth.Auth.GetCurrentUser)))
 	api.HandleH("POST /auth/refresh", deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Auth.Auth.RefreshSession)))
-	api.HandleH("POST /auth/logout-all", deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Auth.Auth.LogoutAll)))
-	api.HandleH("POST /auth/change-password", deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Auth.Auth.ChangePassword)))
+	api.HandleH("POST /auth/logout-all", auth(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Auth.Auth.LogoutAll))))
+	api.HandleH("POST /auth/change-password", auth(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Auth.Auth.ChangePassword))))
 
 	// Email verification endpoints
 	api.HandleH("GET /auth/verify-email", deps.EmailVerifyLimiter.Limit(http.HandlerFunc(deps.Auth.Auth.VerifyEmail)))

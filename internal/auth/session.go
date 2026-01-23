@@ -144,7 +144,7 @@ func (sm *SessionManager) ValidateSession(token, ipAddress string) (*Session, er
 	query := `
 		SELECT
 			s.id, s.user_id, s.session_token, s.expires_at, s.ip_address, s.user_agent, s.is_active, s.created_at,
-			u.email, u.username, u.first_name, u.last_name, u.is_active, u.avatar_url, u.requires_password_reset, u.created_at, u.updated_at
+			u.email, u.username, u.first_name, u.last_name, u.is_active, u.avatar_url, u.requires_password_reset, u.timezone, u.language, u.created_at, u.updated_at
 		FROM user_sessions s
 		JOIN users u ON s.user_id = u.id
 		WHERE s.session_token = ? AND s.is_active = true
@@ -153,13 +153,13 @@ func (sm *SessionManager) ValidateSession(token, ipAddress string) (*Session, er
 	row := sm.db.QueryRow(query, token)
 
 	session := &Session{User: &models.User{}}
-	var avatarURL sql.NullString
+	var avatarURL, timezone, language sql.NullString
 
 	err := row.Scan(
 		&session.ID, &session.UserID, &session.Token, &session.ExpiresAt, &session.IPAddress, &session.UserAgent, &session.IsActive, &session.CreatedAt,
-		&session.User.Email, &session.User.Username, &session.User.FirstName, &session.User.LastName, &session.User.IsActive, &avatarURL, &session.User.RequiresPasswordReset, &session.User.CreatedAt, &session.User.UpdatedAt,
+		&session.User.Email, &session.User.Username, &session.User.FirstName, &session.User.LastName, &session.User.IsActive, &avatarURL, &session.User.RequiresPasswordReset, &timezone, &language, &session.User.CreatedAt, &session.User.UpdatedAt,
 	)
-	
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrSessionNotFound
@@ -183,6 +183,14 @@ func (sm *SessionManager) ValidateSession(token, ipAddress string) (*Session, er
 	session.User.ID = session.UserID
 	if avatarURL.Valid {
 		session.User.AvatarURL = avatarURL.String
+	}
+	if timezone.Valid {
+		session.User.Timezone = timezone.String
+	}
+	if language.Valid {
+		session.User.Language = language.String
+	} else {
+		session.User.Language = "en" // default
 	}
 	session.User.FullName = fmt.Sprintf("%s %s", session.User.FirstName, session.User.LastName)
 

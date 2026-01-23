@@ -923,14 +923,10 @@ func (h *PortalHandler) GetRequestDetail(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Verify that this request was submitted by the authenticated portal customer
-	if item.CreatorPortalCustomerID == nil || *item.CreatorPortalCustomerID != portalCustomerID {
-		http.Error(w, "You do not have permission to view this request", http.StatusForbidden)
-		return
-	}
-
-	// Verify that this request was submitted through this portal
-	if item.ChannelID == nil || *item.ChannelID != channel.ID {
-		http.Error(w, "Request not found in this portal", http.StatusNotFound)
+	// and was submitted through this portal (use same error to prevent IDOR enumeration)
+	if item.CreatorPortalCustomerID == nil || *item.CreatorPortalCustomerID != portalCustomerID ||
+		item.ChannelID == nil || *item.ChannelID != channel.ID {
+		http.Error(w, "Request not found", http.StatusNotFound)
 		return
 	}
 
@@ -1045,13 +1041,10 @@ func (h *PortalHandler) GetRequestComments(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Check ownership and channel
-	if creatorPortalCustomerID == nil || *creatorPortalCustomerID != portalCustomerID {
-		http.Error(w, "You do not have permission to view comments for this request", http.StatusForbidden)
-		return
-	}
-	if itemChannelID == nil || *itemChannelID != channel.ID {
-		http.Error(w, "Request not found in this portal", http.StatusNotFound)
+	// Check ownership and channel (use same error to prevent IDOR enumeration)
+	if creatorPortalCustomerID == nil || *creatorPortalCustomerID != portalCustomerID ||
+		itemChannelID == nil || *itemChannelID != channel.ID {
+		http.Error(w, "Request not found", http.StatusNotFound)
 		return
 	}
 
@@ -1197,13 +1190,10 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Check ownership and channel
-	if creatorPortalCustomerID == nil || *creatorPortalCustomerID != portalCustomerID {
-		http.Error(w, "You do not have permission to comment on this request", http.StatusForbidden)
-		return
-	}
-	if itemChannelID == nil || *itemChannelID != channel.ID {
-		http.Error(w, "Request not found in this portal", http.StatusNotFound)
+	// Check ownership and channel (use same error to prevent IDOR enumeration)
+	if creatorPortalCustomerID == nil || *creatorPortalCustomerID != portalCustomerID ||
+		itemChannelID == nil || *itemChannelID != channel.ID {
+		http.Error(w, "Request not found", http.StatusNotFound)
 		return
 	}
 

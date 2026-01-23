@@ -4,10 +4,10 @@
   import { getSecuritySettings, updateSecuritySettings, authPolicy } from '../api.js';
   import Toggle from '../components/Toggle.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
 
   let loading = $state(true);
   let saving = $state(false);
-  let error = $state('');
 
   let calendarFeedEnabled = $state(true);
   let pluginCliExecEnabled = $state(false);
@@ -39,13 +39,12 @@
 
   async function loadSettings() {
     loading = true;
-    error = '';
     try {
       const settings = await getSecuritySettings();
       calendarFeedEnabled = settings.calendar_feed_enabled ?? true;
       pluginCliExecEnabled = settings.plugin_cli_exec_enabled ?? false;
     } catch (err) {
-      error = t('settings.security.failedToLoad');
+      errorToast(t('settings.security.failedToLoad'));
       console.error('Failed to load security settings:', err);
     } finally {
       loading = false;
@@ -75,14 +74,13 @@
 
   async function saveSettings() {
     saving = true;
-    error = '';
     try {
       await updateSecuritySettings({
         calendar_feed_enabled: calendarFeedEnabled,
         plugin_cli_exec_enabled: pluginCliExecEnabled
       });
     } catch (err) {
-      error = t('settings.security.failedToSave');
+      errorToast(t('settings.security.failedToSave'));
       console.error('Failed to save settings:', err);
     } finally {
       saving = false;
@@ -91,7 +89,6 @@
 
   async function saveAuthPolicy() {
     savingPolicy = true;
-    error = '';
     try {
       await authPolicy.update({
         policy: authPolicyConfig.policy,
@@ -100,7 +97,7 @@
       // Reload to get updated state
       await loadAuthPolicy();
     } catch (err) {
-      error = err.message || 'Failed to save authentication policy';
+      errorToast(err.message || 'Failed to save authentication policy');
       console.error('Failed to save auth policy:', err);
     } finally {
       savingPolicy = false;
@@ -160,12 +157,6 @@
       <Loader2 class="w-6 h-6 animate-spin" style="color: var(--ds-icon-subtle);" />
     </div>
   {:else}
-    {#if error}
-      <div class="mb-4 p-3 rounded-md" style="background-color: var(--ds-background-danger-bold); color: white;">
-        {error}
-      </div>
-    {/if}
-
     <!-- Calendar Feed Settings -->
     <div class="border rounded-lg p-6" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
       <div class="flex items-start gap-4">
