@@ -24,6 +24,7 @@
   import BasePicker from '../../pickers/BasePicker.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import { createShortcutHandler } from '../../utils/keyboardShortcuts.js';
+  import EmptyState from '../../components/EmptyState.svelte';
 
   // Props for workspace-scoped view (optional)
   let { workspaceId = null } = $props();
@@ -343,25 +344,17 @@
 
       <!-- Empty State or DataTable -->
       {#if filteredMilestones.length === 0}
-        <div class="flex flex-col items-center justify-center p-12 border-2 border-dashed rounded" style="border-color: var(--ds-border);">
-          <Milestone class="w-12 h-12 mb-4" style="color: var(--ds-text-subtle);" />
-          <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">{t('common.noItems')}</h3>
-          <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">
-            {#if isGlobalView && activeCategoryId}
-              {t('categories.noCategorizedWork')}
-            {:else}
-              {t('common.noItems')}
-            {/if}
-          </p>
-          <Button
-            variant="primary"
-            icon={Plus}
-            onclick={startCreate}
-            keyboardHint="A"
-          >
-            {t('common.add')}
-          </Button>
-        </div>
+        <EmptyState
+          icon={Milestone}
+          title={t('common.noItems')}
+          description={isGlobalView && activeCategoryId ? t('categories.noCategorizedWork') : t('common.noItems')}
+        >
+          {#snippet action()}
+            <Button variant="primary" icon={Plus} onclick={startCreate} keyboardHint="A">
+              {t('common.add')}
+            </Button>
+          {/snippet}
+        </EmptyState>
       {:else}
         <DataTable
           columns={milestoneColumns}

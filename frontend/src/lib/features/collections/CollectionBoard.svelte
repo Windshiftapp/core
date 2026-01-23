@@ -4,7 +4,7 @@
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { getCollection } from '../collections/collectionService.js';
-  import { workspaceGradientIndex, applyToAllViews, loadWorkspaceGradient, getGradientStyle } from '../../stores/workspaceGradient.js';
+  import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { Plus, GripVertical } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
@@ -48,26 +48,8 @@
   // Event handler for refresh-work-items event
   let handleRefreshWorkItems = null;
 
-  // Reactive gradient styling
-  let gradientStyle = $derived(($applyToAllViews && $workspaceGradientIndex > 0) ? getGradientStyle($workspaceGradientIndex) : null);
-  let hasGradient = $derived(gradientStyle !== null);
-  let backgroundStyle = $derived(hasGradient ? `background: ${gradientStyle};` : 'background-color: var(--ds-surface);');
-
-  // Text on gradient background (white for visibility)
-  let textStyle = $derived(hasGradient ? 'color: white;' : 'color: var(--ds-text);');
-  let subtleTextStyle = $derived(hasGradient ? 'color: rgba(255, 255, 255, 0.8);' : 'color: var(--ds-text-subtle);');
-  let emptyStateStyle = $derived(hasGradient ? 'color: rgba(255, 255, 255, 0.6);' : 'color: var(--ds-text-subtlest);');
-
-  // Glass styling for columns and cards (theme-aware)
-  let columnBgStyle = $derived(hasGradient
-    ? 'backdrop-filter: blur(12px); background-color: var(--ds-glass-bg); border-color: var(--ds-glass-border);'
-    : 'background-color: var(--ds-surface-raised); border-color: var(--ds-border);');
-  let cardBgStyle = $derived(hasGradient
-    ? 'backdrop-filter: blur(4px); background-color: var(--ds-glass-bg); border-color: var(--ds-glass-border);'
-    : 'background-color: var(--ds-surface-card); border-color: var(--ds-border);');
-  let glassTextStyle = $derived('color: var(--ds-text);');
-  let glassSubtleTextStyle = $derived('color: var(--ds-text-subtle);');
-  let dragHandleStyle = $derived('color: var(--ds-text-subtlest);');
+  // Centralized gradient styling
+  const styles = useGradientStyles();
 
   onMount(async () => {
     if (workspaceId) {
@@ -443,7 +425,7 @@
         },
         onDragLeave: () => {
           // Reset styles
-          element.style.borderColor = hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
+          element.style.borderColor = styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
           element.style.boxShadow = '';
         },
         onDrop: async ({ source }) => {
@@ -479,7 +461,7 @@
     // Reset all status column styles to their default state
     const statusColumns = document.querySelectorAll('[data-status-column]');
     statusColumns.forEach(element => {
-      element.style.borderColor = hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
+      element.style.borderColor = styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
       element.style.boxShadow = '';
     });
   }
@@ -691,7 +673,7 @@
     <div class="animate-pulse">{t('common.loading')}</div>
   </div>
 {:else if workspace}
-  <div class="min-h-screen" style="{backgroundStyle}">
+  <div class="min-h-screen" style="{styles.backgroundStyle}">
     <!-- Content Container -->
     <div class="p-6">
       <!-- Header with view tabs -->
@@ -701,16 +683,16 @@
           collection={currentCollectionName}
           viewName="Board"
           itemCount={items.length}
-          hasGradient={hasGradient}
-          textStyle={textStyle}
-          subtleTextStyle={subtleTextStyle}
+          hasGradient={styles.hasGradient}
+          textStyle={styles.textStyle}
+          subtleTextStyle={styles.subtleTextStyle}
         >
           <CollectionViewSwitcher
             slot="actions"
             {workspaceId}
             {collectionId}
             activeView="board"
-            {hasGradient}
+            hasGradient={styles.hasGradient}
           />
         </ViewHeader>
       </div>
@@ -718,11 +700,11 @@
       {#if statuses.length === 0}
         <!-- No Statuses State -->
         <div class="text-center py-12">
-          <div class="mb-4" style={emptyStateStyle}>
+          <div class="mb-4" style={styles.emptyStateStyle}>
             <Plus class="w-16 h-16 mx-auto" />
           </div>
-          <h3 class="text-lg font-medium mb-2" style={textStyle}>{t('items.noItemsInFilter')}</h3>
-          <p class="text-sm mb-4" style={subtleTextStyle}>
+          <h3 class="text-lg font-medium mb-2" style={styles.textStyle}>{t('items.noItemsInFilter')}</h3>
+          <p class="text-sm mb-4" style={styles.subtleTextStyle}>
             {t('items.createToStart')}
           </p>
           <button
@@ -741,14 +723,14 @@
             {@const isOverWip = column.wip_limit && columnItems.length > column.wip_limit}
             <div
               class="rounded border shadow-sm transition-colors"
-              style="{columnBgStyle}"
+              style="{styles.columnStyle(12)}"
               data-status-column
               data-status-id={column.status_ids[0]}
             >
-              <div class="p-4 border-b border-l-4" style="border-bottom-color: {hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'}; border-left-color: {column.color};">
-                <h3 class="font-semibold" style={glassTextStyle}>{column.name}</h3>
+              <div class="p-4 border-b border-l-4" style="border-bottom-color: {styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'}; border-left-color: {column.color};">
+                <h3 class="font-semibold" style={styles.glassTextStyle}>{column.name}</h3>
                 <div class="flex items-center justify-between">
-                  <span class="text-sm" style={glassSubtleTextStyle}>{columnItems.length} {t('items.item')}</span>
+                  <span class="text-sm" style={styles.glassSubtleTextStyle}>{columnItems.length} {t('items.item')}</span>
                   {#if column.wip_limit}
                     <span class="text-xs px-2 py-0.5 rounded"
                           style={isOverWip
@@ -762,7 +744,7 @@
               <div class="p-4 min-h-32">
                 {#if columnItems.length === 0}
                   <!-- Empty column state -->
-                  <div class="text-center py-8" style={glassSubtleTextStyle}>
+                  <div class="text-center py-8" style={styles.glassSubtleTextStyle}>
                     <Plus class="w-8 h-8 mx-auto mb-2" />
                     <p class="text-sm">{t('items.noItems')}</p>
                   </div>
@@ -773,7 +755,7 @@
                       <!-- Item card with edge-based drop detection -->
                       <div
                         class="relative border rounded px-3 py-3 shadow-sm hover:shadow-md transition-shadow"
-                        style="{cardBgStyle}"
+                        style="{styles.cardStyle(4)}"
                         data-item-card
                         data-item-id={item.id}
                         role="button"
@@ -788,14 +770,14 @@
 
                         <div class="flex gap-2">
                           <!-- Drag handle -->
-                          <div class="cursor-grab active:cursor-grabbing flex-shrink-0" style={dragHandleStyle}>
+                          <div class="cursor-grab active:cursor-grabbing flex-shrink-0" style={styles.dragHandleStyle}>
                             <GripVertical class="w-4 h-4" />
                           </div>
 
                           <!-- Content -->
                           <div class="flex-1 min-w-0">
                             <!-- Title - allows wrapping -->
-                            <h4 class="font-medium text-sm mb-2 leading-snug" style={glassTextStyle}>
+                            <h4 class="font-medium text-sm mb-2 leading-snug" style={styles.glassTextStyle}>
                               {item.title}
                             </h4>
 
@@ -828,7 +810,7 @@
 
         <!-- Summary -->
         <div class="mt-8 text-center">
-          <p class="text-sm" style={subtleTextStyle}>
+          <p class="text-sm" style={styles.subtleTextStyle}>
             {t('collections.boardSummary', { itemCount: totalVisibleItems, columnCount: displayColumns.length })}
           </p>
         </div>

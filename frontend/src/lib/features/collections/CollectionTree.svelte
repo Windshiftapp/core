@@ -1,12 +1,9 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../../api.js';
-  import { navigate } from '../../router.js';
   import { getCollection } from '../collections/collectionService.js';
-  import { getStatusColor, getStatusInlineStyle, getTextColorForBackground } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { workspaceGradientIndex, applyToAllViews, loadWorkspaceGradient, getGradientStyle } from '../../stores/workspaceGradient.js';
-  import { gradients } from '../../utils/gradients.js';
+  import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { ChevronRight, ChevronDown, GitBranch, Circle, AlertCircle, Calendar, FileCheck, Minus } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import ViewHeader from '../../layout/ViewHeader.svelte';
@@ -15,6 +12,7 @@
   import LinkComponent from '../../components/Link.svelte';
   import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { formatDate } from '../../utils/dateFormatter.js';
   import { moduleSettings } from '../../stores/moduleSettings.js';
 
@@ -28,7 +26,6 @@
   let priorities = $state([]);
   let loading = $state(true);
   let currentCollectionName = $state('Default');
-  let currentView = 'tree';
   let expandedItems = $state(new Set()); // Track which items are expanded
   
   // Pagination state
@@ -44,24 +41,10 @@
   let showTestCaseModal = $state(false);
   let selectedTestCaseId = $state(null);
 
-  // Reactive gradient styling
-  let gradientStyle = $derived(($applyToAllViews && $workspaceGradientIndex > 0) ? getGradientStyle($workspaceGradientIndex) : null);
-  let hasGradient = $derived(gradientStyle !== null);
-  let backgroundStyle = $derived(hasGradient ? `background: ${gradientStyle};` : 'background-color: var(--ds-surface);');
-
-  // Text on gradient background (white for visibility)
-  let textStyle = $derived(hasGradient ? 'color: white;' : 'color: var(--ds-text);');
-  let subtleTextStyle = $derived(hasGradient ? 'color: rgba(255, 255, 255, 0.8);' : 'color: var(--ds-text-subtle);');
-
-  // Glass styling for cards/buttons/tables (theme-aware)
-  let glassStyle = $derived(hasGradient
-    ? 'background-color: var(--ds-glass-bg); border-color: var(--ds-glass-border); backdrop-filter: blur(12px);'
-    : 'background-color: var(--ds-surface-raised); border-color: var(--ds-border);');
-  let glassTextStyle = $derived('color: var(--ds-text);');
-  let glassSubtleTextStyle = $derived('color: var(--ds-text-subtle);');
+  // Centralized gradient styling
+  const styles = useGradientStyles();
 
   onMount(async () => {
-    console.log('[CollectionTree] mount workspaceId=', workspaceId, 'collectionId=', collectionId);
     // Load test case toggle preference from localStorage
     const saved = localStorage.getItem('collectionTree_showTestCases');
     if (saved !== null) {
@@ -84,15 +67,13 @@
     if (nextWorkspaceId !== lastWorkspaceId || nextCollectionId !== lastCollectionId) {
       lastWorkspaceId = nextWorkspaceId;
       lastCollectionId = nextCollectionId;
-      loadData('param-change');
+      loadData();
     }
   });
 
-  async function loadData(source = 'effect') {
-    console.log(`[CollectionTree] loadData triggered from ${source}`);
+  async function loadData() {
     loading = true;
     if (workspaceId) {
-      console.log('[CollectionTree] start loading workspace', workspaceId, 'collection', collectionId);
       await Promise.all([
         loadWorkspace(),
         loadAllItems(),
@@ -123,20 +104,16 @@
   });
 
   async function loadWorkspace() {
-    console.log('[CollectionTree] loading workspace');
     try {
       workspace = await api.workspaces.get(workspaceId);
-      console.log('[CollectionTree] workspace loaded', workspace?.id);
     } catch (error) {
       console.error('[CollectionTree] Failed to load workspace:', error);
     }
   }
 
   async function loadItemTypes() {
-    console.log('[CollectionTree] loading item types');
     try {
       itemTypes = await api.itemTypes.getAll();
-      console.log('[CollectionTree] item types loaded', itemTypes?.length);
     } catch (error) {
       console.error('[CollectionTree] Failed to load item types:', error);
       itemTypes = [];
@@ -149,8 +126,7 @@
       const filters = { workspace_id: workspaceId };
       
       if (collectionId) {
-      console.log('[CollectionTree] fetching collection info', collectionId);
-      const collection = await getCollection(collectionId);
+        const collection = await getCollection(collectionId);
       if (collection) {
         currentCollectionName = collection.name;
         if (collection.cql_query) {
@@ -162,9 +138,7 @@
       }
       
       // Load all items for this workspace
-      console.log('[CollectionTree] loading items with filters', filters);
       const response = await api.items.getAll(filters);
-      console.log('[CollectionTree] items response received', response);
       
       // Handle different response formats
       let items = [];
@@ -187,7 +161,6 @@
   }
 
   async function loadStatusData() {
-    console.log('[CollectionTree] loading statuses');
     try {
       const [statusesData, statusCategoriesData] = await Promise.all([
         api.workspaces.getStatuses(workspaceId),
@@ -195,7 +168,6 @@
       ]);
       statuses = statusesData || [];
       statusCategories = statusCategoriesData || [];
-      console.log('[CollectionTree] status data loaded', statuses.length, statusCategories.length);
     } catch (error) {
       console.error('[CollectionTree] Failed to load status data:', error);
       statuses = [];
@@ -204,10 +176,8 @@
   }
 
   async function loadPriorities() {
-    console.log('[CollectionTree] loading priorities');
     try {
       priorities = await api.priorities.getAll();
-      console.log('[CollectionTree] priorities loaded', priorities.length);
     } catch (error) {
       console.error('[CollectionTree] Failed to load priorities:', error);
       priorities = [];
@@ -367,34 +337,14 @@
     return total === 0 ? 1 : Math.ceil(total / itemsPerPage);
   }
 
-  function getRootPaginationInfo() {
-    const total = getTotalRootItems();
-    if (total === 0) {
-      return { total: 0, start: 0, end: 0 };
-    }
-    const start = (currentPage - 1) * itemsPerPage + 1;
-    const end = Math.min(currentPage * itemsPerPage, total);
-    return { total, start, end };
-  }
+  let paginationInfo = $derived({
+    start: (currentPage - 1) * itemsPerPage + 1,
+    end: Math.min(currentPage * itemsPerPage, getTotalRootItems()),
+    total: getTotalRootItems()
+  });
 
   function goToPage(page) {
     currentPage = page;
-  }
-
-  // Status color function using shared utility and official category colors
-  function getStatusColorClasses(status) {
-    return getStatusColor(status, statuses, statusCategories);
-  }
-
-  function getStatusStyle(status) {
-    return getStatusInlineStyle(status, statuses, statusCategories);
-  }
-
-  function viewItem(item) {
-    const url = collectionId 
-      ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
-      : `/workspaces/${workspaceId}/items/${item.id}`;
-    navigate(url);
   }
 
   function getIndentLevel(level) {
@@ -474,12 +424,38 @@
   );
 </script>
 
+{#snippet paginationControls()}
+  <div class="flex items-center gap-2">
+    <button
+      class="px-3 py-2 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      style="{styles.glassStyle(12)} {styles.glassTextStyle}"
+      onclick={() => goToPage(currentPage - 1)}
+      disabled={currentPage === 1}
+    >
+      {t('common.previous')}
+    </button>
+
+    <span class="px-4 py-2 text-sm" style="{styles.textStyle}">
+      {t('collectionTree.pageOfTotal', { current: currentPage, total: getTotalPages() })}
+    </span>
+
+    <button
+      class="px-3 py-2 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      style="{styles.glassStyle(12)} {styles.glassTextStyle}"
+      onclick={() => goToPage(currentPage + 1)}
+      disabled={currentPage === getTotalPages()}
+    >
+      {t('common.next')}
+    </button>
+  </div>
+{/snippet}
+
 {#if loading}
   <div class="p-6">
     <div class="animate-pulse">{t('collectionTree.loading')}</div>
   </div>
 {:else if workspace}
-  <div class="min-h-screen" style="{backgroundStyle}">
+  <div class="min-h-screen" style="{styles.backgroundStyle}">
     <!-- Content Container -->
     <div class="p-6">
       <!-- Header -->
@@ -489,26 +465,25 @@
           collection={currentCollectionName}
           viewName={t('collectionTree.tree')}
           itemCount={allItems.length}
-          hasGradient={hasGradient}
-          textStyle={textStyle}
-          subtleTextStyle={subtleTextStyle}
+          hasGradient={styles.hasGradient}
+          textStyle={styles.textStyle}
+          subtleTextStyle={styles.subtleTextStyle}
         />
       </div>
 
       <!-- Tree View -->
       {#if allItems.length === 0}
-        <div class="text-center py-12">
-          <GitBranch class="w-12 h-12 mx-auto mb-4" style="{subtleTextStyle}" />
-          <h3 class="text-lg font-medium mb-2" style="{textStyle}">{t('collectionTree.noWorkItemsYet')}</h3>
-          <p style="{subtleTextStyle}">{t('collectionTree.createFirstWorkItem')}</p>
-        </div>
+        <EmptyState
+          title={t('collectionTree.noWorkItemsYet')}
+          description={t('collectionTree.createFirstWorkItem')}
+        />
       {:else}
         <!-- Tree Controls -->
         <div class="flex justify-between items-center mb-4">
           <div class="flex items-center gap-2">
             <button
               class="flex items-center gap-2 px-3 py-2 text-sm border rounded-md transition-colors"
-              style="{glassStyle} {glassTextStyle}"
+              style="{styles.glassStyle(12)} {styles.glassTextStyle}"
               onclick={toggleExpandCollapse}
             >
               {#if expandedItems.size === 0}
@@ -524,7 +499,7 @@
             {#if $moduleSettings.test_management_enabled}
               <button
                 class="flex items-center gap-2 px-3 py-2 text-sm border rounded-md transition-colors"
-                style="{glassStyle} {showTestCases ? 'color: var(--ds-accent-green);' : glassTextStyle}"
+                style="{styles.glassStyle(12)} {showTestCases ? 'color: var(--ds-accent-green);' : styles.glassTextStyle}"
                 onclick={toggleShowTestCases}
                 disabled={loadingTestCases}
               >
@@ -541,42 +516,19 @@
           <!-- Pagination Info and Controls -->
           {#if getTotalPages() > 1}
             <div class="flex items-center gap-4">
-              <span class="text-sm" style="{textStyle}">
+              <span class="text-sm" style="{styles.textStyle}">
                 {t('collectionTree.showingRootItems', { start: paginationInfo.start, end: paginationInfo.end, total: paginationInfo.total })}
               </span>
-
-              <div class="flex items-center gap-2">
-                <button
-                  class="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  style="{glassStyle} {glassTextStyle}"
-                  onclick={() => goToPage(currentPage - 1)}
-                  disabled={currentPage === 1}
-                >
-                  {t('common.previous')}
-                </button>
-
-                <span class="px-3 py-1 text-sm" style="{textStyle}">
-                  {t('collectionTree.pageOfTotal', { current: currentPage, total: getTotalPages() })}
-                </span>
-
-                <button
-                  class="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  style="{glassStyle} {glassTextStyle}"
-                  onclick={() => goToPage(currentPage + 1)}
-                  disabled={currentPage === getTotalPages()}
-                >
-                  {t('common.next')}
-                </button>
-              </div>
+              {@render paginationControls()}
             </div>
           {/if}
         </div>
 
         <!-- Table Container -->
-        <div class="rounded-xl border shadow-sm overflow-hidden" style="{glassStyle}">
+        <div class="rounded-xl border shadow-sm overflow-hidden" style="{styles.glassStyle(12)}">
           <!-- Table Header -->
           <div class="border-b px-4 py-3" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
-            <div class="flex items-center gap-4 text-xs font-semibold uppercase tracking-wider" style="{glassSubtleTextStyle}">
+            <div class="flex items-center gap-4 text-xs font-semibold uppercase tracking-wider" style="{styles.glassSubtleTextStyle}">
               <div class="w-12"></div> <!-- Expand + Icon space -->
               <div class="min-w-24">{t('collectionTree.issue')}</div>
               <div class="flex-1">{t('common.summary')}</div>
@@ -592,8 +544,8 @@
             {#if item.isTestCase}
               <!-- Test Case Row -->
               <div
-                class="flex items-center gap-4 px-4 py-2.5 transition-colors group bg-green-50/30 {!hasGradient ? 'hover:bg-green-50/50' : ''}"
-                style="{hasGradient ? 'hover:background-color: rgba(34, 197, 94, 0.05);' : ''}"
+                class="flex items-center gap-4 px-4 py-2.5 transition-colors group bg-green-50/30 {!styles.hasGradient ? 'hover:bg-green-50/50' : ''}"
+                style="{styles.hasGradient ? 'hover:background-color: rgba(34, 197, 94, 0.05);' : ''}"
               >
                 <!-- Hierarchy Indent + Icon -->
                 <div class="flex items-center gap-1" style="margin-left: {getIndentLevel(item.level)}">
@@ -641,7 +593,7 @@
               {@const testCaseCount = showTestCases && testCaseLinks.has(item.id) ? testCaseLinks.get(item.id).length : 0}
               <div
                 class="flex items-center gap-4 px-4 py-3 transition-colors group tree-row"
-                style="{hasGradient ? '' : 'border-top: 1px solid var(--ds-border);'}{idx === 0 ? 'border-top: none;' : ''}"
+                style="{styles.hasGradient ? '' : 'border-top: 1px solid var(--ds-border);'}{idx === 0 ? 'border-top: none;' : ''}"
               >
                 <!-- Hierarchy Indent + Expand/Collapse + Icon -->
                 <div class="flex items-center gap-1" style="margin-left: {getIndentLevel(item.level)}">
@@ -653,9 +605,9 @@
                       aria-label={isExpanded(item.id) ? 'Collapse' : 'Expand'}
                     >
                       {#if isExpanded(item.id)}
-                        <ChevronDown class="w-4 h-4" style="{glassTextStyle}" />
+                        <ChevronDown class="w-4 h-4" style="{styles.glassTextStyle}" />
                       {:else}
-                        <ChevronRight class="w-4 h-4" style="{glassTextStyle}" />
+                        <ChevronRight class="w-4 h-4" style="{styles.glassTextStyle}" />
                       {/if}
                     </button>
                   {:else}
@@ -680,7 +632,7 @@
                       ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
                       : `/workspaces/${workspaceId}/items/${item.id}`}
                     className="text-xs font-mono px-1.5 py-0.5 rounded cursor-pointer transition-colors item-key"
-                    style="background-color: var(--ds-interactive-subtle); {glassSubtleTextStyle}"
+                    style="background-color: var(--ds-interactive-subtle); {styles.glassSubtleTextStyle}"
                   />
 
                   <!-- Test Case Count Badge -->
@@ -699,7 +651,7 @@
                       ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
                       : `/workspaces/${workspaceId}/items/${item.id}`}
                     class="text-left w-full font-medium transition-colors truncate cursor-pointer summary-link"
-                    style="{glassTextStyle}"
+                    style="{styles.glassTextStyle}"
                   >
                     {item.title}
                   </LinkComponent>
@@ -723,12 +675,12 @@
                       </span>
                     </div>
                   {:else}
-                    <span class="text-xs" style="{glassSubtleTextStyle}">-</span>
+                    <span class="text-xs" style="{styles.glassSubtleTextStyle}">-</span>
                   {/if}
                 </div>
 
                 <!-- Created Date -->
-                <div class="w-20 text-xs" style="{glassSubtleTextStyle}">
+                <div class="w-20 text-xs" style="{styles.glassSubtleTextStyle}">
                   {formatDate(item.created_at) || '-'}
                 </div>
               </div>
@@ -740,29 +692,7 @@
         <!-- Bottom Pagination -->
         {#if getTotalPages() > 1}
           <div class="flex justify-center items-center gap-4 mt-6 pt-4 border-t" style="border-color: var(--ds-border);">
-            <div class="flex items-center gap-2">
-              <button
-                class="px-3 py-2 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                style="{glassStyle} {glassTextStyle}"
-                onclick={() => goToPage(currentPage - 1)}
-                disabled={currentPage === 1}
-              >
-                {t('common.previous')}
-              </button>
-
-              <span class="px-4 py-2 text-sm" style="{textStyle}">
-                {t('collectionTree.pageOfTotal', { current: currentPage, total: getTotalPages() })}
-              </span>
-
-              <button
-                class="px-3 py-2 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                style="{glassStyle} {glassTextStyle}"
-                onclick={() => goToPage(currentPage + 1)}
-                disabled={currentPage === getTotalPages()}
-              >
-                {t('common.next')}
-              </button>
-            </div>
+            {@render paginationControls()}
           </div>
         {/if}
       {/if}

@@ -5,8 +5,7 @@
   import { navigate } from '../../router.js';
   import { getCollection } from '../collections/collectionService.js';
   import { getStatusCategory as getStatusCategoryUtil, getStatusColor as getStatusColorUtil, getStatusInlineStyle, getTextColorForBackground } from '../../utils/statusColors.js';
-  import { workspaceGradientIndex, applyToAllViews, loadWorkspaceGradient, getGradientStyle } from '../../stores/workspaceGradient.js';
-  import { gradients } from '../../utils/gradients.js';
+  import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { Plus, Filter, MoreHorizontal, Calendar, User, AlertCircle, Edit, Trash2, Eye } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import SearchInput from '../../components/SearchInput.svelte';
@@ -18,55 +17,39 @@
   import ItemKey from '../items/ItemKey.svelte';
   import ColorDot from '../../components/ColorDot.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { formatDate } from '../../utils/dateFormatter.js';
 
-  export let workspaceId;
-  export let collectionId = null;
+  let { workspaceId, collectionId = null } = $props();
 
-  let workspace = null;
-  let workItems = [];
-  let allItems = []; // Store all items for search filtering
-  let itemTypes = [];
-  let itemsPagination = null;
-  let statuses = [];
-  let statusCategories = [];
-  let users = [];
-  let milestones = [];
-  let priorities = [];
-  
-  let loading = true;
-  let loadingItems = false;
-  let currentCollectionName = 'Default';
-  let currentView = 'list';
-  let searchQuery = '';
-  let currentPage = 1;
-  let itemsPerPage = 50;
+  let workspace = $state(null);
+  let workItems = $state([]);
+  let allItems = $state([]); // Store all items for search filtering
+  let itemTypes = $state([]);
+  let itemsPagination = $state(null);
+  let statuses = $state([]);
+  let statusCategories = $state([]);
+  let users = $state([]);
+  let milestones = $state([]);
+  let priorities = $state([]);
+
+  let loading = $state(true);
+  let loadingItems = $state(false);
+  let currentCollectionName = $state('Default');
+  let currentView = $state('list');
+  let searchQuery = $state('');
+  let currentPage = $state(1);
+  let itemsPerPage = $state(50);
 
   // Status transition caching for lazy loading
-  let itemTransitions = new Map(); // Cache transitions per item ID
-  let loadingTransitions = new Set(); // Track which items are currently loading transitions
-  let requestQueue = new Set(); // Queue for pending requests
+  let itemTransitions = $state(new Map()); // Cache transitions per item ID
+  let loadingTransitions = $state(new Set()); // Track which items are currently loading transitions
+  let requestQueue = $state(new Set()); // Queue for pending requests
   const MAX_CONCURRENT_REQUESTS = 3; // Limit concurrent API calls
-  let activeRequests = 0;
+  let activeRequests = $state(0);
 
-  // Reactive gradient styling
-  $: gradientStyle = ($applyToAllViews && $workspaceGradientIndex > 0) ? getGradientStyle($workspaceGradientIndex) : null;
-  $: hasGradient = gradientStyle !== null;
-  $: backgroundStyle = hasGradient ? `background: ${gradientStyle};` : 'background-color: var(--ds-surface);';
-
-  // Text on gradient background (white for visibility)
-  $: textStyle = hasGradient ? 'color: white;' : 'color: var(--ds-text);';
-  $: subtleTextStyle = hasGradient ? 'color: rgba(255, 255, 255, 0.8);' : 'color: var(--ds-text-subtle);';
-
-  // Glass styling for table (theme-aware)
-  $: tableBgStyle = hasGradient
-    ? 'background-color: var(--ds-glass-bg); backdrop-filter: blur(12px); border-color: var(--ds-glass-border);'
-    : 'background-color: var(--ds-surface-raised); border-color: var(--ds-border);';
-  $: tableHeaderBgStyle = hasGradient
-    ? 'background-color: var(--ds-surface);'
-    : 'background-color: var(--ds-surface);';
-  $: glassTextStyle = 'color: var(--ds-text);';
-  $: glassSubtleTextStyle = 'color: var(--ds-text-subtle);';
+  // Centralized gradient styling
+  const styles = useGradientStyles();
 
   onMount(async () => {
     if (workspaceId) {
@@ -218,47 +201,6 @@
     };
   }
 
-  function createWorkItem() {
-    // Open create modal with work-item type and preselect current workspace
-    window.dispatchEvent(new CustomEvent('open-create-modal'));
-    
-    // Set the type to work-item
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('set-create-type', { 
-        detail: { type: 'work-item' } 
-      }));
-    }, 50);
-    
-    // Preselect current workspace
-    if (workspaceId) {
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('set-create-workspace', { 
-          detail: { workspaceId: parseInt(workspaceId) } 
-        }));
-      }, 100);
-    }
-  }
-
-  // Use shared status utility functions
-  function getStatusCategory(statusName) {
-    return getStatusCategoryUtil(statusName, statuses, statusCategories);
-  }
-
-  function getStatusColor(status) {
-    return getStatusColorUtil(status, statuses, statusCategories);
-  }
-
-  function getPriorityColor(priority) {
-    const colors = {
-      low: 'text-gray-500',
-      medium: 'text-blue-500',
-      high: 'text-orange-500',
-      critical: 'text-red-500'
-    };
-    return colors[priority] || 'text-gray-500';
-  }
-
-
   // Handle pagination events
   async function handlePageChange(event) {
     await loadWorkItems(event.detail.page, event.detail.itemsPerPage);
@@ -269,14 +211,18 @@
   }
   
 
-  // Reload items when search query changes
-  $: if (searchQuery !== undefined) {
-    currentPage = 1; // Reset to first page when search changes
-    loadWorkItems(1, itemsPerPage);
-  }
-
   // For display purposes, we now use workItems directly (no additional client-side filtering needed)
-  $: filteredItems = workItems;
+  let filteredItems = $derived(workItems);
+
+  // Reload items when search query changes
+  let lastSearchQuery = searchQuery;
+  $effect(() => {
+    if (searchQuery !== lastSearchQuery) {
+      lastSearchQuery = searchQuery;
+      currentPage = 1; // Reset to first page when search changes
+      loadWorkItems(1, itemsPerPage);
+    }
+  });
 
   function viewItem(item) {
     const url = collectionId 
@@ -469,10 +415,17 @@
   }
 
   // Reload data when workspaceId or collectionId changes
-  $: if (workspaceId && !loading) {
-    // Watch both workspaceId and collectionId for changes
-    workspaceId, collectionId, loadWorkItems();
-  }
+  let lastWorkspaceId = workspaceId;
+  let lastCollectionId = collectionId;
+  $effect(() => {
+    if (workspaceId && !loading) {
+      if (workspaceId !== lastWorkspaceId || collectionId !== lastCollectionId) {
+        lastWorkspaceId = workspaceId;
+        lastCollectionId = collectionId;
+        loadWorkItems();
+      }
+    }
+  });
 
 </script>
 
@@ -481,7 +434,7 @@
     <div class="animate-pulse">{t('common.loading')}</div>
   </div>
 {:else if workspace}
-  <div class="min-h-screen" style="{backgroundStyle}">
+  <div class="min-h-screen" style="{styles.backgroundStyle}">
     <!-- Content Container -->
     <div class="p-6">
       <div class="mb-6">
@@ -490,9 +443,9 @@
           collection={currentCollectionName}
           viewName="List"
           itemCount={itemsPagination?.total || workItems.length}
-          hasGradient={hasGradient}
-          textStyle={textStyle}
-          subtleTextStyle={subtleTextStyle}
+          hasGradient={styles.hasGradient}
+          textStyle={styles.textStyle}
+          subtleTextStyle={styles.subtleTextStyle}
         />
       </div>
 
@@ -502,8 +455,8 @@
           <!-- Search -->
           <SearchInput
             bind:value={searchQuery}
-            placeholder={t('items.noItemsInFilter')}
-            hasGradient={hasGradient}
+            placeholder={t('common.search')}
+            hasGradient={styles.hasGradient}
           />
 
         </div>
@@ -512,26 +465,26 @@
 
       <!-- Work Items Table -->
       {#if loadingItems}
-        <div class="rounded-xl border shadow-sm p-8 text-center" style="{tableBgStyle} {hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
-          <div class="animate-pulse " style="{subtleTextStyle}">{t('common.loading')}</div>
+        <div class="p-8 text-center">
+          <div class="animate-pulse" style="{styles.subtleTextStyle}">{t('common.loading')}</div>
         </div>
       {:else if filteredItems.length === 0}
-        <div class="rounded-xl border shadow-sm p-12 text-center" style="{tableBgStyle} {hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
-          {#if workItems.length === 0}
-            <AlertCircle class="w-12 h-12  mx-auto mb-4" style="{subtleTextStyle}" />
-            <h3 class="text-lg font-medium  mb-2" style="{textStyle}">{t('items.noItems')}</h3>
-            <p class="" style="{subtleTextStyle}">{t('items.createToStart')}</p>
-          {:else}
-            <AlertCircle class="w-12 h-12  mx-auto mb-4" style="{subtleTextStyle}" />
-            <h3 class="text-lg font-medium  mb-2" style="{textStyle}">{t('items.noItemsInFilter')}</h3>
-            <p class="" style="{subtleTextStyle}">{t('items.noItemsInFilter')}</p>
-          {/if}
-        </div>
+        {#if workItems.length === 0}
+          <EmptyState
+            title={t('items.noItems')}
+            description={t('items.createToStart')}
+          />
+        {:else}
+          <EmptyState
+            title={t('items.noItemsInFilter')}
+            description={t('items.noItemsInFilter')}
+          />
+        {/if}
       {:else}
-        <div class="rounded-xl border shadow-sm overflow-hidden" style="{tableBgStyle} {hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
+        <div class="rounded-xl border shadow-sm overflow-hidden" style="{styles.tableStyle(12)} {styles.hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
           <!-- Table Header -->
-          <div class="px-4 py-3 border-b" style="{tableHeaderBgStyle} {hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
-            <div class="grid grid-cols-12 gap-4 text-xs font-semibold uppercase tracking-wider" style="{glassSubtleTextStyle}">
+          <div class="px-4 py-3 border-b" style="{styles.tableHeaderStyle} {styles.hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
+            <div class="grid grid-cols-12 gap-4 text-xs font-semibold uppercase tracking-wider" style="{styles.glassSubtleTextStyle}">
               <div class="col-span-6">{t('common.title')}</div>
               <div class="col-span-2">{t('common.status')}</div>
               <div class="col-span-2">{t('common.priority')}</div>
@@ -742,14 +695,14 @@
               totalItems={itemsPagination.total}
               itemsPerPage={itemsPagination.limit}
               maxItems={100}
-              hasGradient={hasGradient}
+              hasGradient={styles.hasGradient}
               on:pageChange={handlePageChange}
               on:pageSizeChange={handlePageSizeChange}
             />
           </div>
         {:else}
           <!-- Results Summary for legacy/non-paginated responses -->
-          <div class="mt-4 text-sm  text-center" style="{subtleTextStyle}">
+          <div class="mt-4 text-sm  text-center" style="{styles.subtleTextStyle}">
             {t('collections.showingWorkItems', { count: filteredItems.length })}
           </div>
         {/if}
@@ -758,7 +711,7 @@
   </div>
 {:else}
   <div class="p-6">
-    <div class="text-center " style="{subtleTextStyle}">
+    <div class="text-center " style="{styles.subtleTextStyle}">
       {t('workspaces.noWorkspaces')}
     </div>
   </div>

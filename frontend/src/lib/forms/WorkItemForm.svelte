@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { X, MoreHorizontal, Calendar, Flag, User, Layers, ChevronDown } from 'lucide-svelte';
+  import { itemTypeIconMap } from '../utils/icons.js';
   import { api } from '../api.js';
   import { workspacesStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
@@ -91,6 +92,7 @@
 
   // Derived state
   let selectedItemType = $derived(availableItemTypes.find(t => t.id === formData.item_type_id));
+  let selectedItemTypeIcon = $derived(selectedItemType?.icon ? itemTypeIconMap[selectedItemType.icon] : Layers);
   let selectedAssignee = $derived(users.find(u => u.id === formData.assignee_id));
   let selectedMilestone = $derived(milestones.find(m => m.id === formData.milestone_id));
 
@@ -600,24 +602,26 @@
         label={t('createModal.type')}
         value={formData.item_type_id}
         displayValue={selectedItemType?.name || ''}
-        icon={Layers}
+        icon={selectedItemTypeIcon}
         placeholder={t('createModal.type')}
       >
         {#snippet children({ close: closePopover })}
           <div class="p-2 max-h-48 overflow-y-auto">
             {#each availableItemTypes as itemType}
+              {@const TypeIcon = itemType.icon ? itemTypeIconMap[itemType.icon] : Layers}
               <button
                 type="button"
-                class="w-full px-3 py-2 text-left text-sm rounded transition-colors"
-                style="color: var(--ds-text);"
+                class="w-full flex items-center gap-2 px-3 py-2 text-left text-sm rounded transition-colors"
+                style="color: var(--ds-text); background-color: {formData.item_type_id === itemType.id ? 'var(--ds-background-selected)' : 'transparent'};"
                 onmouseover={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)'}
-                onmouseout={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                onmouseout={(e) => e.currentTarget.style.backgroundColor = formData.item_type_id === itemType.id ? 'var(--ds-background-selected)' : 'transparent'}
                 onclick={() => {
                   formData.item_type_id = itemType.id;
                   closePopover();
                 }}
               >
-                {itemType.name}
+                <svelte:component this={TypeIcon} size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
+                <span>{itemType.name}</span>
               </button>
             {/each}
           </div>

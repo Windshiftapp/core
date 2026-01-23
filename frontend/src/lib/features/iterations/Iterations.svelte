@@ -16,6 +16,7 @@
   import ColorDot from '../../components/ColorDot.svelte';
   import SectionHeader from '../../layout/SectionHeader.svelte';
   import { createShortcutHandler } from '../../utils/keyboardShortcuts.js';
+  import EmptyState from '../../components/EmptyState.svelte';
 
   // Props for workspace-scoped view (backward compatibility)
   let { workspaceId = null, typeId = null } = $props();
@@ -293,26 +294,17 @@
           </div>
         </div>
       {:else if filteredIterations.length === 0}
-        <div class="flex flex-col items-center justify-center p-12 border-2 border-dashed rounded" style="border-color: var(--ds-border);">
-          <Calendar class="w-12 h-12 mb-4" style="color: var(--ds-text-subtle);" />
-          <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">{t('sprints.noSprints')}</h3>
-          <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">
-            {#if activeTypeId}
-              {t('sprints.noSprints')}
-            {:else}
-              {t('sprints.noSprints')}
-            {/if}
-          </p>
-          <Button
-            variant="primary"
-            size="medium"
-            icon={Plus}
-            keyboardHint="A"
-            onclick={startCreate}
-          >
-            {t('sprints.createSprint')}
-          </Button>
-        </div>
+        <EmptyState
+          icon={Calendar}
+          title={t('sprints.noSprints')}
+          description={t('sprints.noSprints')}
+        >
+          {#snippet action()}
+            <Button variant="primary" size="medium" icon={Plus} keyboardHint="A" onclick={startCreate}>
+              {t('sprints.createSprint')}
+            </Button>
+          {/snippet}
+        </EmptyState>
       {:else}
         <div class="flex-1 overflow-hidden">
           {#key filteredIterations.length}

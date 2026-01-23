@@ -4,8 +4,7 @@
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { getCollection, checkItemVisibility } from '../collections/collectionService.js';
-  import { workspaceGradientIndex, applyToAllViews, loadWorkspaceGradient, getGradientStyle } from '../../stores/workspaceGradient.js';
-  import { gradients } from '../../utils/gradients.js';
+  import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { FileText, Plus, ChevronDown, Package, ChevronRight, Home, MapPin } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -21,55 +20,39 @@
   import { getStatusCategory } from '../../utils/statusColors.js';
   import CollectionViewSwitcher from './CollectionViewSwitcher.svelte';
 
-  export let workspaceId;
-  export let collectionId = null;
+  let { workspaceId, collectionId = null } = $props();
 
-  let workspace = null;
-  let loading = true;
-  let backboneItems = []; // Current backbone items (horizontal)
-  let childItemsByParent = {}; // Child items grouped by parent ID
-  let itemTypes = [];
-  let statuses = [];
-  let statusCategories = [];
-  let workspaces = [];
-  let hierarchyLevels = [];
-  let currentParentId = null; // null = root level, otherwise parent ID for current backbone
-  let hierarchyBreadcrumbs = []; // Navigation breadcrumbs for hierarchy levels
+  let workspace = $state(null);
+  let loading = $state(true);
+  let backboneItems = $state([]); // Current backbone items (horizontal)
+  let childItemsByParent = $state({}); // Child items grouped by parent ID
+  let itemTypes = $state([]);
+  let statuses = $state([]);
+  let statusCategories = $state([]);
+  let workspaces = $state([]);
+  let hierarchyLevels = $state([]);
+  let currentParentId = $state(null); // null = root level, otherwise parent ID for current backbone
+  let hierarchyBreadcrumbs = $state([]); // Navigation breadcrumbs for hierarchy levels
 
   // Use centralized icon map for item types
   const iconMap = itemTypeIconMap;
 
-  let currentCollectionName = 'Default';
+  let currentCollectionName = $state('Default');
 
   // Quick-add state per parent
-  let quickAddState = {}; // { [parentId]: { show: boolean, workspace: null, itemType: null, title: '', error: null } }
+  let quickAddState = $state({}); // { [parentId]: { show: boolean, workspace: null, itemType: null, title: '', error: null } }
 
   // Inline editing state
-  let editingItemId = null;
-  let editingTitle = '';
+  let editingItemId = $state(null);
+  let editingTitle = $state('');
 
   // Item detail modal state
-  let selectedItemId = null;
-  let showItemModal = false;
+  let selectedItemId = $state(null);
+  let showItemModal = $state(false);
 
 
-  // Reactive gradient styling
-  $: gradientStyle = ($applyToAllViews && $workspaceGradientIndex > 0) ? getGradientStyle($workspaceGradientIndex) : null;
-  $: hasGradient = gradientStyle !== null;
-  $: backgroundStyle = hasGradient ? `background: ${gradientStyle};` : 'background-color: var(--ds-surface);';
-
-  // Text directly on gradient background (white for visibility)
-  $: textStyle = hasGradient ? 'color: white;' : 'color: var(--ds-text);';
-  $: subtleTextStyle = hasGradient ? 'color: rgba(255, 255, 255, 0.8);' : 'color: var(--ds-text-subtle);';
-  $: emptyStateStyle = hasGradient ? 'color: rgba(255, 255, 255, 0.6);' : 'color: var(--ds-text-subtlest);';
-
-  // Glass styling for cards (theme-aware)
-  $: cardBgStyle = hasGradient
-    ? 'background-color: var(--ds-glass-bg); backdrop-filter: blur(8px); border-color: var(--ds-glass-border);'
-    : 'background-color: var(--ds-surface-raised); border-color: var(--ds-border);';
-  $: glassTextStyle = 'color: var(--ds-text);';
-  $: glassSubtleTextStyle = 'color: var(--ds-text-subtle);';
-  $: dragHandleStyle = 'color: var(--ds-text-subtlest);';
+  // Centralized gradient styling
+  const styles = useGradientStyles();
 
   onMount(async () => {
     await loadWorkspaceGradient(workspaceId);
@@ -100,11 +83,18 @@
     };
   });
 
-  // Reactive statement to reload when workspaceId or collectionId changes
-  $: if (workspaceId) {
-    // Watch both workspaceId and collectionId for changes
-    workspaceId, collectionId, loadAllData();
-  }
+  // Reload when workspaceId or collectionId changes
+  let lastWorkspaceId = workspaceId;
+  let lastCollectionId = collectionId;
+  $effect(() => {
+    if (workspaceId) {
+      if (workspaceId !== lastWorkspaceId || collectionId !== lastCollectionId) {
+        lastWorkspaceId = workspaceId;
+        lastCollectionId = collectionId;
+        loadAllData();
+      }
+    }
+  });
 
   async function loadAllData() {
     loading = true;
@@ -169,10 +159,12 @@ async function loadStatuses() {
   }
 
   // Set up drag and drop whenever the data changes
-  $: if (backboneItems.length > 0 && !loading) {
-    // Use setTimeout to ensure DOM has been updated
-    setTimeout(setupDragAndDrop, 0);
-  }
+  $effect(() => {
+    if (backboneItems.length > 0 && !loading) {
+      // Use setTimeout to ensure DOM has been updated
+      setTimeout(setupDragAndDrop, 0);
+    }
+  });
 
   async function loadWorkspace() {
     try {
@@ -386,11 +378,11 @@ async function loadStatuses() {
           element.style.boxShadow = 'inset 0 0 0 2px var(--ds-border-focused)';
         },
         onDragLeave: () => {
-          element.style.borderColor = hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
+          element.style.borderColor = styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
           element.style.boxShadow = '';
         },
         onDrop: () => {
-          element.style.borderColor = hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
+          element.style.borderColor = styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
           element.style.boxShadow = '';
         }
       });
@@ -679,18 +671,18 @@ async function loadStatuses() {
     <div class="animate-pulse">{t('collections.loadingStoryMap')}</div>
   </div>
 {:else if workspace}
-  <div style="{backgroundStyle} min-height: 100vh;">
+  <div style="{styles.backgroundStyle} min-height: 100vh;">
     <!-- Header -->
-    <div class="p-6 border-b" style="border-color: {hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'};">
+    <div class="p-6 border-b" style="border-color: {styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'};">
 
       <ViewHeader
         workspaceName={workspace.name}
         collection={currentCollectionName}
         viewName="Map"
         itemCount={backboneItems.length + Object.values(childItemsByParent).flat().length}
-        hasGradient={hasGradient}
-        textStyle={textStyle}
-        subtleTextStyle={subtleTextStyle}
+        hasGradient={styles.hasGradient}
+        textStyle={styles.textStyle}
+        subtleTextStyle={styles.subtleTextStyle}
       />
       
       <!-- Hierarchy Breadcrumbs -->
@@ -707,8 +699,8 @@ async function loadStatuses() {
               <!-- Breadcrumb Button -->
               <button
                 onclick={() => navigateToLevel(breadcrumb.id)}
-                class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all {breadcrumb.isCurrent && !hasGradient ? 'bg-blue-50' : ''} {!breadcrumb.isCurrent && !hasGradient ? 'hover-bg' : ''} {hasGradient ? 'backdrop-blur-md' : ''} {breadcrumb.isCurrent ? 'font-medium' : ''}"
-                style="{breadcrumb.isCurrent ? `color: ${hasGradient ? 'var(--ds-text)' : 'var(--ds-interactive)'}; background-color: ${hasGradient ? 'var(--ds-glass-bg)' : ''}; border: 1px solid ${hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border-focused)'};` : `color: var(--ds-text); background-color: ${hasGradient ? 'var(--ds-glass-bg)' : ''}; border: 1px solid transparent;`}"
+                class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all {breadcrumb.isCurrent && !styles.hasGradient ? 'bg-blue-50' : ''} {!breadcrumb.isCurrent && !styles.hasGradient ? 'hover-bg' : ''} {styles.hasGradient ? 'backdrop-blur-md' : ''} {breadcrumb.isCurrent ? 'font-medium' : ''}"
+                style="{breadcrumb.isCurrent ? `color: ${styles.hasGradient ? 'var(--ds-text)' : 'var(--ds-interactive)'}; background-color: ${styles.hasGradient ? 'var(--ds-glass-bg)' : ''}; border: 1px solid ${styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border-focused)'};` : `color: var(--ds-text); background-color: ${styles.hasGradient ? 'var(--ds-glass-bg)' : ''}; border: 1px solid transparent;`}"
               >
                 <!-- Icon -->
                 {#if breadcrumb.level === 'root'}
@@ -765,12 +757,12 @@ async function loadStatuses() {
             <div class="flex-none w-64">
               <!-- Backbone Item -->
               <div class="mb-3">
-                <ItemCard {hasGradient} compact>
+                <ItemCard hasGradient={styles.hasGradient} compact>
                   <!-- Title -->
                   <button
                     onclick={() => navigateToItem(backboneItem.id)}
                     class="font-medium text-sm mb-2 leading-snug text-left w-full line-clamp-3 transition-colors"
-                    style="{glassTextStyle}"
+                    style="{styles.glassTextStyle}"
                   >
                     {backboneItem.title}
                   </button>
@@ -780,7 +772,7 @@ async function loadStatuses() {
                     <div class="flex items-center gap-2">
                       <button
                         class="text-xs font-mono flex-shrink-0 hover:underline cursor-pointer"
-                        style="{glassSubtleTextStyle}"
+                        style="{styles.glassSubtleTextStyle}"
                         onclick={(e) => handleKeyClick(backboneItem, e)}
                       >
                         <ItemKey item={backboneItem} {workspace} className="" />
@@ -822,12 +814,12 @@ async function loadStatuses() {
 
               <!-- Drop Zone for this parent -->
               <div
-                class="min-h-96 p-3 rounded border-2 border-dashed transition-all {hasGradient ? 'backdrop-blur-sm' : ''}"
-                style="{hasGradient ? 'border-color: var(--ds-glass-border); background-color: var(--ds-glass-bg);' : 'border-color: var(--ds-border); background-color: var(--ds-surface-overlay);'}"
+                class="min-h-96 p-3 rounded border-2 border-dashed transition-all {styles.hasGradient ? 'backdrop-blur-sm' : ''}"
+                style="{styles.hasGradient ? 'border-color: var(--ds-glass-border); background-color: var(--ds-glass-bg);' : 'border-color: var(--ds-border); background-color: var(--ds-surface-overlay);'}"
                 data-parent-id={backboneItem.id}
                 data-testid="drop-zone-{backboneItem.id}"
               >
-                <h3 class="text-sm font-medium mb-3 text-center" style={glassTextStyle}>
+                <h3 class="text-sm font-medium mb-3 text-center" style={styles.glassTextStyle}>
                   {t('collections.childWorkItems', { count: childItemsByParent[backboneItem.id]?.length || 0 })}
                 </h3>
 
@@ -837,7 +829,7 @@ async function loadStatuses() {
                     {@const childItemType = getItemTypeInfo(childItem.item_type_id)}
                     <div
                       class="item-card rounded-lg border p-2 cursor-move"
-                      style="{hasGradient ? 'backdrop-filter: blur(12px); background-color: var(--ds-glass-bg);' : 'background-color: var(--ds-surface-card);'} {hasGradient ? 'border-color: var(--ds-glass-border);' : 'border-color: var(--ds-border);'}"
+                      style="{styles.hasGradient ? 'backdrop-filter: blur(12px); background-color: var(--ds-glass-bg);' : 'background-color: var(--ds-surface-card);'} {styles.hasGradient ? 'border-color: var(--ds-glass-border);' : 'border-color: var(--ds-border);'}"
                       data-item-id={childItem.id}
                       data-testid="draggable-item-{childItem.id}"
                       ondblclick={(e) => startEditingItem(childItem, e)}
@@ -863,7 +855,7 @@ async function loadStatuses() {
                           onclick={(e) => e.stopPropagation()}
                         />
                       {:else}
-                        <h4 class="font-medium text-sm mb-2 leading-snug line-clamp-3" style="{glassTextStyle}">
+                        <h4 class="font-medium text-sm mb-2 leading-snug line-clamp-3" style="{styles.glassTextStyle}">
                           {childItem.title}
                         </h4>
                       {/if}
@@ -872,7 +864,7 @@ async function loadStatuses() {
                       <div class="flex items-center gap-2 flex-wrap">
                         <button
                           class="text-xs font-mono flex-shrink-0 hover:underline cursor-pointer"
-                          style="{glassSubtleTextStyle}"
+                          style="{styles.glassSubtleTextStyle}"
                           onclick={(e) => handleKeyClick(childItem, e)}
                         >
                           <ItemKey item={childItem} {workspace} className="" />
@@ -899,13 +891,13 @@ async function loadStatuses() {
                     <button
                       onclick={() => initQuickAdd(backboneItem.id)}
                       class="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded border-2 border-dashed transition-colors "
-                      style="{hasGradient ? 'border-color: var(--ds-glass-border);' : 'border-color: var(--ds-border);'} background-color: transparent; color: var(--ds-text-subtle);"
+                      style="{styles.hasGradient ? 'border-color: var(--ds-glass-border);' : 'border-color: var(--ds-border);'} background-color: transparent; color: var(--ds-text-subtle);"
                       onmouseenter={(e) => {
                         e.currentTarget.style.borderColor = 'var(--ds-border-focused)';
                         e.currentTarget.style.color = 'var(--ds-interactive)';
                       }}
                       onmouseleave={(e) => {
-                        e.currentTarget.style.borderColor = hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
+                        e.currentTarget.style.borderColor = styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
                         e.currentTarget.style.color = 'var(--ds-text-subtle)';
                       }}
                     >
@@ -917,7 +909,7 @@ async function loadStatuses() {
                   <!-- Quick Add / Empty State -->
                   {#if !quickAddState[backboneItem.id]?.show && (!childItemsByParent[backboneItem.id] || childItemsByParent[backboneItem.id].length === 0)}
                     <div class="text-center py-8">
-                      <div class="text-sm mb-3" style={glassSubtleTextStyle}>
+                      <div class="text-sm mb-3" style={styles.glassSubtleTextStyle}>
                         {#if canAddChildren(backboneItem.id)}
                           {t('collections.noChildItems')}
                         {:else}
@@ -927,10 +919,10 @@ async function loadStatuses() {
                       {#if canAddChildren(backboneItem.id)}
                         <button
                           onclick={() => initQuickAdd(backboneItem.id)}
-                          class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded border-2 border-dashed transition-colors {hasGradient ? 'backdrop-blur-sm' : ''}"
-                          style="{hasGradient ? 'border-color: var(--ds-glass-border); background-color: var(--ds-glass-bg);' : 'border-color: var(--ds-border); background-color: var(--ds-surface-overlay);'} color: var(--ds-interactive);"
+                          class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded border-2 border-dashed transition-colors {styles.hasGradient ? 'backdrop-blur-sm' : ''}"
+                          style="{styles.hasGradient ? 'border-color: var(--ds-glass-border); background-color: var(--ds-glass-bg);' : 'border-color: var(--ds-border); background-color: var(--ds-surface-overlay);'} color: var(--ds-interactive);"
                           onmouseenter={(e) => e.currentTarget.style.borderColor = 'var(--ds-border-focused)'}
-                          onmouseleave={(e) => e.currentTarget.style.borderColor = hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'}
+                          onmouseleave={(e) => e.currentTarget.style.borderColor = styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'}
                         >
                           <Plus class="w-4 h-4" />
                           {t('collections.addCard')}
@@ -944,7 +936,7 @@ async function loadStatuses() {
                     {@const state = quickAddState[backboneItem.id]}
                     {@const selectedWorkspace = workspaces.find(w => w.id === state.workspaceId)}
                     {@const selectedItemType = state.availableTypes?.find(t => t.id === state.itemTypeId)}
-                    <div class="rounded shadow-md border" style="{cardBgStyle}">
+                    <div class="rounded shadow-md border" style="{styles.cardStyle(8)}">
                       <!-- Textarea area -->
                       <div class="p-3 pb-2">
                         <!-- Title Textarea - Full width, blends in -->
@@ -968,7 +960,7 @@ async function loadStatuses() {
                       </div>
 
                       <!-- Divider -->
-                      <div class="border-t mx-3" style="border-color: {hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'};">
+                      <div class="border-t mx-3" style="border-color: {styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'};">
 </div>
 
                       <!-- Actions Footer -->

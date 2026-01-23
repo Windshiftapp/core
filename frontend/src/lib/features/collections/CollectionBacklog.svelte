@@ -6,9 +6,9 @@
   import { getCollection } from '../collections/collectionService.js';
   import { getStatusCategory } from '../../utils/statusColors.js';
   import Lozenge from '../../components/Lozenge.svelte';
-  import { workspaceGradientIndex, applyToAllViews, loadWorkspaceGradient, getGradientStyle } from '../../stores/workspaceGradient.js';
-  import { gradients } from '../../utils/gradients.js';
+  import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { Plus, GripVertical, List } from 'lucide-svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
@@ -54,23 +54,8 @@
   let dragState = $state(new Map()); // Track drag state for each item: { isDragging: boolean, closestEdge: 'top'|'bottom'|null }
   const backlogRowGap = 2; // px gap between rows to keep the list tight and align the drop indicator
 
-  // Reactive gradient styling
-  const gradientStyle = $derived(($applyToAllViews && $workspaceGradientIndex > 0) ? getGradientStyle($workspaceGradientIndex) : null);
-  const hasGradient = $derived(gradientStyle !== null);
-  const backgroundStyle = $derived(hasGradient ? `background: ${gradientStyle};` : 'background-color: var(--ds-surface);');
-
-  // Text on gradient background (white for visibility)
-  const textStyle = $derived(hasGradient ? 'color: white;' : 'color: var(--ds-text);');
-  const subtleTextStyle = $derived(hasGradient ? 'color: rgba(255, 255, 255, 0.8);' : 'color: var(--ds-text-subtle);');
-  const emptyStateStyle = $derived(hasGradient ? 'color: rgba(255, 255, 255, 0.6);' : 'color: var(--ds-text-subtlest);');
-
-  // Glass styling for cards (theme-aware)
-  const cardBgStyle = $derived(hasGradient
-    ? 'background-color: var(--ds-glass-bg); backdrop-filter: blur(8px); border-color: var(--ds-glass-border);'
-    : 'background-color: var(--ds-surface-raised); border-color: var(--ds-border);');
-  const glassTextStyle = $derived('color: var(--ds-text);');
-  const glassSubtleTextStyle = $derived('color: var(--ds-text-subtle);');
-  const dragHandleStyle = $derived('color: var(--ds-text-subtlest);');
+  // Centralized gradient styling
+  const styles = useGradientStyles();
 
   onMount(async () => {
     if (workspaceId) {
@@ -407,7 +392,7 @@
     <div class="animate-pulse">{t('common.loading')}</div>
   </div>
 {:else if workspace}
-  <div class="min-h-screen" style="{backgroundStyle}">
+  <div class="min-h-screen" style="{styles.backgroundStyle}">
     <!-- Content Container -->
     <div class="p-6">
       <!-- Header with view tabs -->
@@ -417,31 +402,26 @@
           collection={currentCollectionName}
           viewName="Backlog"
           itemCount={backlogItems.length}
-          hasGradient={hasGradient}
-          textStyle={textStyle}
-          subtleTextStyle={subtleTextStyle}
+          hasGradient={styles.hasGradient}
+          textStyle={styles.textStyle}
+          subtleTextStyle={styles.subtleTextStyle}
         >
           <CollectionViewSwitcher
             slot="actions"
             {workspaceId}
             {collectionId}
             activeView="backlog"
-            {hasGradient}
+            hasGradient={styles.hasGradient}
           />
         </ViewHeader>
       </div>
 
       {#if backlogItems.length === 0}
-        <!-- Empty backlog state -->
-        <div class="text-center py-16">
-          <div class="mb-4">
-            <List class="w-16 h-16 mx-auto" style={emptyStateStyle} />
-          </div>
-          <h3 class="text-lg font-medium mb-2" style={textStyle}>{t('collections.noItemsInBacklog')}</h3>
-          <p class="text-sm mb-4" style={subtleTextStyle}>
-            {t('collections.noItemsInBacklogDesc')}
-          </p>
-        </div>
+        <EmptyState
+          icon={List}
+          title={t('collections.noItemsInBacklog')}
+          description={t('collections.noItemsInBacklogDesc')}
+        />
       {:else}
         <!-- Backlog items list -->
         <div class="w-full">
@@ -452,7 +432,7 @@
               {@const statusCategory = statusName ? getStatusCategory(statusName, statuses, statusCategories) : null}
               <div
                 class="relative border rounded px-4 py-3 shadow-sm hover:shadow-md transition-shadow overflow-visible"
-                style="{cardBgStyle}"
+                style="{styles.cardStyle(8)}"
                 data-item-card
                 data-item-id={item.id}
                 role="button"
@@ -467,12 +447,12 @@
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-3 flex-1">
                     <!-- Drag handle -->
-                    <div class="cursor-grab active:cursor-grabbing" style={dragHandleStyle}>
+                    <div class="cursor-grab active:cursor-grabbing" style={styles.dragHandleStyle}>
                       <GripVertical class="w-4 h-4" />
                     </div>
                     <!-- Title with key and item type icon -->
                     <div class="flex items-center gap-2">
-                      <ItemKey {item} {workspace} className="text-xs font-mono" style={glassSubtleTextStyle} />
+                      <ItemKey {item} {workspace} className="text-xs font-mono" style={styles.glassSubtleTextStyle} />
                       {#if item.item_type_id && itemTypes.length > 0}
                         {@const itemType = itemTypes.find(type => type.id === item.item_type_id)}
                         {#if itemType}
@@ -504,7 +484,7 @@
           
           <!-- Summary -->
           <div class="mt-8 text-center">
-            <p class="text-sm" style={subtleTextStyle}>
+            <p class="text-sm" style={styles.subtleTextStyle}>
               {t('collections.showingItemsFromBacklog', { count: backlogItems.length })}
             </p>
           </div>
@@ -539,30 +519,5 @@
   /* During drag, reduce opacity of non-dragged items slightly */
   :global(body.is-dragging) [data-item-card] {
     transition: opacity 0.2s ease;
-  }
-
-  /* Fallback inline indicator (mirrors board behaviour) */
-  .drop-target-top::before,
-  .drop-target-bottom::after {
-    content: '';
-    position: absolute;
-    left: -8px;
-    right: -8px;
-    height: 4px;
-    background: linear-gradient(90deg, var(--ds-interactive-subtle, #60a5fa), var(--ds-interactive, #2874bb));
-    border-radius: 9999px;
-    box-shadow:
-      0 0 0 1px var(--ds-surface-raised, #ffffff),
-      0 4px 10px rgba(59, 130, 246, 0.25);
-    pointer-events: none;
-    z-index: 50;
-  }
-
-  .drop-target-top::before {
-    top: -8px;
-  }
-
-  .drop-target-bottom::after {
-    bottom: -8px;
   }
 </style>
