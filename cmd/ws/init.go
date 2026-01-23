@@ -88,23 +88,21 @@ Examples:
 		}
 		fmt.Println("Created WINDSHIFT.md")
 
-		// Create or update ws.toml if it doesn't exist
-		if _, err := os.Stat("./ws.toml"); os.IsNotExist(err) {
-			newConfig := Config{
-				Server: ServerConfig{
-					URL:   cfg.Server.URL,
-					Token: cfg.Server.Token,
-				},
-				Defaults: DefaultsConfig{
-					WorkspaceKey: workspace.Key,
-				},
-				StatusAliases: generateDefaultAliases(statuses),
-			}
-			if err := saveProjectConfig(newConfig, "./ws.toml"); err != nil {
-				return fmt.Errorf("failed to create ws.toml: %w", err)
-			}
-			fmt.Println("Created ws.toml")
+		// Update ws.toml with workspace settings (preserves existing server config)
+		projectConfig := Config{
+			Server: ServerConfig{
+				URL:   cfg.Server.URL,
+				Token: cfg.Server.Token,
+			},
+			Defaults: DefaultsConfig{
+				WorkspaceKey: workspace.Key,
+			},
+			StatusAliases: generateDefaultAliases(statuses),
 		}
+		if err := saveProjectConfig(projectConfig, "./ws.toml"); err != nil {
+			return fmt.Errorf("failed to save ws.toml: %w", err)
+		}
+		fmt.Println("Updated ws.toml")
 
 		// Update AGENTS.md or CLAUDE.md if they exist
 		updateAgentsFile("AGENTS.md")

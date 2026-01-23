@@ -151,3 +151,26 @@ type StatusTransition struct {
 	Name          string
 	CategoryColor string
 }
+
+// GetInitialStatusID returns the initial status ID for a workflow
+// The initial status is identified by from_status_id IS NULL in workflow_transitions
+func (s *WorkflowService) GetInitialStatusID(workflowID int) (*int, error) {
+	var statusID int
+	err := s.db.QueryRow(`
+		SELECT wt.to_status_id
+		FROM workflow_transitions wt
+		WHERE wt.workflow_id = ?
+		  AND wt.from_status_id IS NULL
+		ORDER BY wt.display_order ASC
+		LIMIT 1
+	`, workflowID).Scan(&statusID)
+
+	if err == sql.ErrNoRows {
+		return nil, nil // No initial status configured for this workflow
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query initial status: %w", err)
+	}
+
+	return &statusID, nil
+}

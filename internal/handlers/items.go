@@ -460,7 +460,6 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("item create request received")
-	// Performance profiling
 	createStart := time.Now()
 
 	var item models.Item
@@ -498,55 +497,39 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	item.Title = utils.SanitizeTitle(item.Title)
 	item.Description = utils.SanitizeDescription(item.Description)
 
-	// Default to status_id = 1 (Open) if not provided
-	if item.StatusID == nil {
-		defaultStatusID := 1
-		item.StatusID = &defaultStatusID
+	// Convert item type ID to *int for validation
+	var itemTypeIDPtr *int
+	if item.ItemTypeID != nil {
+		itemTypeIDPtr = item.ItemTypeID
 	}
 
-	// Default to the default priority if not provided
-	if item.PriorityID == nil {
-		var defaultPriorityID int
-		err := h.db.QueryRow("SELECT id FROM priorities WHERE is_default = true LIMIT 1").Scan(&defaultPriorityID)
-		if err == nil {
-			item.PriorityID = &defaultPriorityID
-		}
-		// If no default priority exists, leave as NULL (graceful fallback)
+	// Convert parent ID to *int for validation
+	var parentIDPtr *int
+	if item.ParentID != nil {
+		parentIDPtr = item.ParentID
 	}
 
-	// Validate required fields
-	if strings.TrimSpace(item.Title) == "" {
-		http.Error(w, "Title is required", http.StatusBadRequest)
+	// Convert related work item ID to *int
+	var relatedWorkItemIDPtr *int
+	if item.RelatedWorkItemID != nil {
+		relatedWorkItemIDPtr = item.RelatedWorkItemID
+	}
+
+	// Use centralized validation
+	validationResult := services.ValidateItemCreation(h.db, services.ItemValidationParams{
+		WorkspaceID:       item.WorkspaceID,
+		Title:             item.Title,
+		ItemTypeID:        itemTypeIDPtr,
+		ParentID:          parentIDPtr,
+		StatusID:          item.StatusID,
+		IsTask:            item.IsTask,
+		RelatedWorkItemID: relatedWorkItemIDPtr,
+		UserID:            user.ID,
+	})
+
+	if !validationResult.Valid {
+		http.Error(w, validationResult.Error, http.StatusBadRequest)
 		return
-	}
-
-	// Validate workspace exists
-	slog.Debug("validating workspace exists", slog.Int("workspace_id", item.WorkspaceID))
-	var workspaceExists bool
-	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", item.WorkspaceID).Scan(&workspaceExists)
-	if err != nil {
-		slog.Error("workspace validation query failed", slog.Int("workspace_id", item.WorkspaceID), slog.Any("error", err))
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	slog.Debug("workspace validation complete", slog.Bool("exists", workspaceExists))
-	if !workspaceExists {
-		http.Error(w, "Workspace not found", http.StatusBadRequest)
-		return
-	}
-
-	// Task-specific validation and defaults
-	if item.IsTask {
-		// Tasks have simplified status - only status_id 1 (Open) or 5 (Done) allowed
-		if item.StatusID != nil && *item.StatusID != 1 && *item.StatusID != 5 {
-			http.Error(w, "Tasks can only have status 'Open' (1) or 'Done' (5)", http.StatusBadRequest)
-			return
-		}
-		// Ensure status_id is set (should be from above, but double-check)
-		if item.StatusID == nil {
-			defaultStatusID := 1 // Open
-			item.StatusID = &defaultStatusID
-		}
 	}
 
 	// Set default project inheritance based on parent relationship
@@ -558,96 +541,12 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		// If no parent: leave as NULL (none) and InheritProject = false
 	}
 
-	// Validate parent item if specified
-	// Handle parent-child relationship and hierarchy validation
-	if item.ParentID != nil && *item.ParentID != 0 {
-		var parentItemTypeID sql.NullInt64
-		var parentItemTypeHierarchyLevel int
-		err := h.db.QueryRow(`
-			SELECT i.item_type_id, COALESCE(it.hierarchy_level, 0)
-			FROM items i
-			LEFT JOIN item_types it ON i.item_type_id = it.id
-			WHERE i.id = ?
-		`, *item.ParentID).Scan(&parentItemTypeID, &parentItemTypeHierarchyLevel)
-
-		if err == sql.ErrNoRows {
-			http.Error(w, "Parent item not found", http.StatusBadRequest)
-			return
-		}
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// Validate hierarchy relationship if item type is specified
-		if item.ItemTypeID != nil && *item.ItemTypeID != 0 {
-			var itemTypeHierarchyLevel int
-			var itemTypeName string
-			err := h.db.QueryRow(`
-				SELECT hierarchy_level, name FROM item_types 
-				WHERE id = ?
-			`, *item.ItemTypeID).Scan(&itemTypeHierarchyLevel, &itemTypeName)
-
-			if err == sql.ErrNoRows {
-				http.Error(w, "Item type not found", http.StatusBadRequest)
-				return
-			}
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			// Check if child hierarchy level is exactly one more than parent
-			if itemTypeHierarchyLevel != parentItemTypeHierarchyLevel+1 {
-				http.Error(w, fmt.Sprintf("Item type '%s' (hierarchy level %d) cannot be a child of an item at hierarchy level %d",
-					itemTypeName, itemTypeHierarchyLevel, parentItemTypeHierarchyLevel), http.StatusBadRequest)
-				return
-			}
-		}
-	} else {
-		// Root level item - no hierarchy level restrictions when no parent is specified
+	// Normalize parent ID (nil if 0)
+	if item.ParentID != nil && *item.ParentID == 0 {
 		item.ParentID = nil
 	}
 
-	// Validate related_work_item_id if provided
-	if item.RelatedWorkItemID != nil {
-		// Verify workspace is personal and belongs to the user
-		var isPersonal bool
-		var ownerID *int
-		err := h.db.QueryRow(`
-			SELECT is_personal, owner_id FROM workspaces WHERE id = ?
-		`, item.WorkspaceID).Scan(&isPersonal, &ownerID)
-
-		if err != nil {
-			http.Error(w, "Failed to validate workspace: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		if !isPersonal || ownerID == nil || *ownerID != user.ID {
-			http.Error(w, "Personal tasks must be created in your own personal workspace", http.StatusBadRequest)
-			return
-		}
-
-		// Verify the related work item exists
-		var relatedWorkspaceID int
-		err = h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", *item.RelatedWorkItemID).Scan(&relatedWorkspaceID)
-		if err != nil {
-			http.Error(w, "Related work item not found or access denied", http.StatusForbidden)
-			return
-		}
-	}
-
-	// Profiling: validation complete
 	validationTime := time.Since(createStart)
-
-	// Generate fractional index for manual ordering
-	fracIndexStart := time.Now()
-	fracIndex, err := services.GenerateFracIndexForNewItem(h.db.GetDB(), item.WorkspaceID, item.ParentID)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to generate frac_index: %v", err), http.StatusInternalServerError)
-		return
-	}
-	fracIndexTime := time.Since(fracIndexStart)
 
 	// Convert custom field values to JSON
 	var customFieldValuesJSON string
@@ -660,90 +559,34 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		customFieldValuesJSON = string(customFieldValuesBytes)
 	}
 
-	now := time.Now()
-
-	// Insert item with workspace-specific item number
-	// PostgreSQL: inline nextval() in INSERT - no separate round-trip, avoids connection pool contention
-	// SQLite: get next number via MAX+1 BEFORE starting transaction to avoid deadlock
-	var id int64
-	var nextWorkspaceItemNumber int
-
-	// For SQLite, get the next workspace item number BEFORE starting the transaction
-	// This avoids deadlock between the transaction lock and writeConn lock on Linux/ZFS
-	if h.db.GetDriverName() != "postgres" {
-		slog.Debug("getting next workspace item number")
-		var err error
-		nextWorkspaceItemNumber, err = h.db.NextWorkspaceItemNumber(int64(item.WorkspaceID))
-		if err != nil {
-			slog.Error("failed to generate workspace item number", slog.Int("workspace_id", item.WorkspaceID), slog.Any("error", err))
-			http.Error(w, fmt.Sprintf("Failed to generate workspace item number: %v", err), http.StatusInternalServerError)
-			return
-		}
-		slog.Debug("got workspace item number", slog.Int("workspace_item_number", nextWorkspaceItemNumber))
-	}
-
-	// Start transaction for hierarchy updates
-	slog.Debug("beginning transaction")
-	txStart := time.Now()
-	tx, err := h.db.Begin()
+	// Use centralized CreateItem service
+	createServiceStart := time.Now()
+	id, err := services.CreateItem(h.db, services.ItemCreationParams{
+		WorkspaceID:           item.WorkspaceID,
+		Title:                 item.Title,
+		Description:           item.Description,
+		StatusID:              item.StatusID,   // Direct ID (nil = use workflow initial status)
+		PriorityID:            item.PriorityID, // Direct ID (nil = use default priority)
+		ItemTypeID:            itemTypeIDPtr,
+		IsTask:                item.IsTask,
+		ParentID:              item.ParentID,
+		MilestoneID:           item.MilestoneID,
+		IterationID:           item.IterationID,
+		ProjectID:             item.ProjectID,
+		InheritProject:        item.InheritProject,
+		TimeProjectID:         item.TimeProjectID,
+		AssigneeID:            item.AssigneeID,
+		CreatorID:             item.CreatorID,
+		DueDate:               item.DueDate,
+		RelatedWorkItemID:     relatedWorkItemIDPtr,
+		CustomFieldValuesJSON: customFieldValuesJSON,
+	})
 	if err != nil {
-		slog.Error("failed to begin transaction", slog.Any("error", err))
+		slog.Error("failed to create item", slog.Any("error", err))
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback()
-	beginTime := time.Since(txStart)
-	slog.Debug("transaction started", slog.Duration("elapsed", beginTime))
-
-	insertStart := time.Now()
-	if h.db.GetDriverName() == "postgres" {
-		// PostgreSQL: inline nextval() directly in INSERT - sequence name built in Go to avoid type issues
-		seqName := fmt.Sprintf("workspace_%d_item_seq", item.WorkspaceID)
-		err = tx.QueryRow(`
-			INSERT INTO items (workspace_id, workspace_item_number, item_type_id, title, description, status_id, priority_id, due_date, is_task,
-			                  milestone_id, iteration_id, project_id, inherit_project, assignee_id, creator_id, custom_field_values, parent_id,
-			                  frac_index, related_work_item_id, created_at, updated_at)
-			VALUES ($1, nextval($2), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
-			RETURNING id, workspace_item_number
-		`, item.WorkspaceID, seqName, item.ItemTypeID, item.Title, item.Description, item.StatusID, item.PriorityID, item.DueDate, item.IsTask,
-			item.MilestoneID, item.IterationID, item.ProjectID, item.InheritProject, item.AssigneeID, item.CreatorID, customFieldValuesJSON, item.ParentID,
-			fracIndex, item.RelatedWorkItemID, now, now).Scan(&id, &nextWorkspaceItemNumber)
-	} else {
-		// SQLite: use the workspace item number we got earlier
-		slog.Debug("executing INSERT", slog.Int("workspace_item_number", nextWorkspaceItemNumber))
-		err = tx.QueryRow(`
-			INSERT INTO items (workspace_id, workspace_item_number, item_type_id, title, description, status_id, priority_id, due_date, is_task,
-			                  milestone_id, iteration_id, project_id, inherit_project, assignee_id, creator_id, custom_field_values, parent_id,
-			                  frac_index, related_work_item_id, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-		`, item.WorkspaceID, nextWorkspaceItemNumber, item.ItemTypeID, item.Title, item.Description, item.StatusID, item.PriorityID, item.DueDate, item.IsTask,
-			item.MilestoneID, item.IterationID, item.ProjectID, item.InheritProject, item.AssigneeID, item.CreatorID, customFieldValuesJSON, item.ParentID,
-			fracIndex, item.RelatedWorkItemID, now, now).Scan(&id)
-	}
-
-	if err != nil {
-		slog.Error("failed to insert item", slog.Any("error", err))
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	insertTime := time.Since(insertStart)
-
-	// Commit transaction
-	commitStart := time.Now()
-	if err = tx.Commit(); err != nil {
-		slog.Error("failed to commit transaction", slog.Any("error", err))
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	commitTime := time.Since(commitStart)
-	txTime := time.Since(txStart) // Time for TX operations (Begin -> Commit)
-
-	// Record item creation history
-	updateService := services.NewItemUpdateService(h.db)
-	if err := updateService.RecordItemCreationHistory(h.db, int(id), user.ID); err != nil {
-		slog.Warn("failed to record item creation history", slog.Int64("item_id", id), slog.Any("error", err))
-		// Don't fail the request, just log the error
-	}
+	createServiceTime := time.Since(createServiceStart)
 
 	// Profiling: post-insert query
 	postQueryStart := time.Now()
@@ -871,17 +714,13 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Profiling: log timing summary (all times in milliseconds for easy parsing)
 	totalTime := time.Since(createStart)
-	measuredTime := validationTime + fracIndexTime + txTime + selectQueryTime + notifyTime
+	measuredTime := validationTime + createServiceTime + selectQueryTime + notifyTime
 	gapTime := totalTime - measuredTime // Time spent in scheduler/unmeasured code
 	slog.Debug("item creation performance",
 		slog.Int("item_id", createdItem.ID),
 		slog.Group("timings_ms",
 			slog.Float64("validation", float64(validationTime.Microseconds())/1000.0),
-			slog.Float64("frac_index", float64(fracIndexTime.Microseconds())/1000.0),
-			slog.Float64("transaction", float64(txTime.Microseconds())/1000.0),
-			slog.Float64("tx_begin", float64(beginTime.Microseconds())/1000.0),
-			slog.Float64("tx_insert", float64(insertTime.Microseconds())/1000.0),
-			slog.Float64("tx_commit", float64(commitTime.Microseconds())/1000.0),
+			slog.Float64("create_service", float64(createServiceTime.Microseconds())/1000.0),
 			slog.Float64("query", float64(selectQueryTime.Microseconds())/1000.0),
 			slog.Float64("notify", float64(notifyTime.Microseconds())/1000.0),
 			slog.Float64("gap", float64(gapTime.Microseconds())/1000.0),

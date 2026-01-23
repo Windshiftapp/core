@@ -71,21 +71,26 @@ type ItemCreationParams struct {
 	WorkspaceID             int
 	Title                   string
 	Description             string
-	Status                  string
+	Status                  string // Text status (legacy) - mapped to StatusID if StatusID is nil
+	StatusID                *int   // Direct status ID - takes precedence over Status text
 	ItemTypeID              *int
-	Priority                string
+	Priority                string // Text priority (legacy) - mapped to PriorityID if PriorityID is nil
+	PriorityID              *int   // Direct priority ID - takes precedence over Priority text
 	IsTask                  bool
 	ParentID                *int
 	MilestoneID             *int
+	IterationID             *int
 	ProjectID               *int
 	InheritProject          bool
 	TimeProjectID           *int
 	AssigneeID              *int
 	CreatorID               *int
 	CreatorPortalCustomerID *int
-	ChannelID               *int   // Portal-specific: track portal/channel
-	RequestTypeID           *int   // Portal-specific: track request type
-	CustomFieldValuesJSON   string // JSON string of custom field values
+	ChannelID               *int       // Portal-specific: track portal/channel
+	RequestTypeID           *int       // Portal-specific: track request type
+	DueDate                 *time.Time // Due date for the item
+	RelatedWorkItemID       *int       // For personal tasks: related work item
+	CustomFieldValuesJSON   string     // JSON string of custom field values
 }
 
 // CreateItem creates a new item with proper transaction handling and number generation
@@ -117,20 +122,53 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 		return 0, fmt.Errorf("failed to generate workspace item number: %w", err)
 	}
 
-	// Map text status/priority to IDs
-	statusID := mapTextStatusToID(params.Status)
-	priorityID := mapTextPriorityToID(params.Priority)
+	// Resolve status ID: direct ID takes precedence, then text mapping, then workflow initial status
+	var statusID *int
+	if params.StatusID != nil {
+		statusID = params.StatusID
+	} else if params.Status != "" {
+		statusID = mapTextStatusToID(params.Status)
+	}
+
+	// If status is still nil, resolve from workflow initial status
+	if statusID == nil {
+		workflowService := NewWorkflowService(db)
+		workflowID, err := workflowService.GetWorkflowIDForItem(params.WorkspaceID, params.ItemTypeID)
+		if err == nil && workflowID != nil {
+			initialStatusID, err := workflowService.GetInitialStatusID(*workflowID)
+			if err == nil && initialStatusID != nil {
+				statusID = initialStatusID
+			}
+		}
+	}
+
+	// Resolve priority ID: direct ID takes precedence, then text mapping, then default priority
+	var priorityID *int
+	if params.PriorityID != nil {
+		priorityID = params.PriorityID
+	} else if params.Priority != "" {
+		priorityID = mapTextPriorityToID(params.Priority)
+	}
+
+	// If priority is still nil, get the default priority
+	if priorityID == nil {
+		var defaultPriorityID int
+		err := db.QueryRow("SELECT id FROM priorities WHERE is_default = true LIMIT 1").Scan(&defaultPriorityID)
+		if err == nil {
+			priorityID = &defaultPriorityID
+		}
+	}
 
 	// Insert item with all fields
 	// Note: Uses RETURNING id for both SQLite (3.35+) and PostgreSQL
 	insertQuery := `
 		INSERT INTO items (
 			workspace_id, workspace_item_number, item_type_id, title, description, status_id, priority_id, is_task,
-			milestone_id, project_id, inherit_project, time_project_id, assignee_id, creator_id, creator_portal_customer_id,
-			channel_id, request_type_id,
+			milestone_id, iteration_id, project_id, inherit_project, time_project_id, assignee_id, creator_id, creator_portal_customer_id,
+			channel_id, request_type_id, due_date, related_work_item_id,
 			custom_field_values, parent_id,
 			frac_index, created_at, updated_at, path
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING id
 	`
 
@@ -145,6 +183,7 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 		priorityID,
 		params.IsTask,
 		params.MilestoneID,
+		params.IterationID,
 		params.ProjectID,
 		params.InheritProject,
 		params.TimeProjectID,
@@ -153,6 +192,8 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 		params.CreatorPortalCustomerID,
 		params.ChannelID,
 		params.RequestTypeID,
+		params.DueDate,
+		params.RelatedWorkItemID,
 		nullString(params.CustomFieldValuesJSON),
 		params.ParentID,
 		fracIndex,

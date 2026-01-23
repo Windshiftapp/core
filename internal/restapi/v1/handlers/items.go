@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -182,27 +181,36 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	req.Title = utils.StripHTMLTags(req.Title)
 	req.Description = utils.StripHTMLTags(req.Description)
 
-	// Create the item
-	item := models.Item{
-		WorkspaceID:       req.WorkspaceID,
-		Title:             req.Title,
-		Description:       req.Description,
-		StatusID:          req.StatusID,
-		PriorityID:        req.PriorityID,
-		ItemTypeID:        req.ItemTypeID,
-		AssigneeID:        req.AssigneeID,
-		CreatorID:         &user.ID,
-		ParentID:          req.ParentID,
-		MilestoneID:       req.MilestoneID,
-		IterationID:       req.IterationID,
-		ProjectID:         req.ProjectID,
-		DueDate:           req.DueDate,
-		IsTask:            req.IsTask,
-		CustomFieldValues: req.CustomFields,
+	// Convert custom field values to JSON
+	var customFieldValuesJSON string
+	if req.CustomFields != nil {
+		customFieldValuesBytes, err := json.Marshal(req.CustomFields)
+		if err != nil {
+			restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid custom field values"))
+			return
+		}
+		customFieldValuesJSON = string(customFieldValuesBytes)
 	}
 
-	// Insert item
-	createdItem, err := h.createItem(&item)
+	// Use centralized CreateItem service
+	// StatusID and PriorityID can be nil - the service will resolve from workflow/defaults
+	itemID, err := services.CreateItem(h.db, services.ItemCreationParams{
+		WorkspaceID:           req.WorkspaceID,
+		Title:                 req.Title,
+		Description:           req.Description,
+		StatusID:              req.StatusID,   // nil = use workflow initial status
+		PriorityID:            req.PriorityID, // nil = use default priority
+		ItemTypeID:            req.ItemTypeID,
+		IsTask:                req.IsTask,
+		ParentID:              req.ParentID,
+		MilestoneID:           req.MilestoneID,
+		IterationID:           req.IterationID,
+		ProjectID:             req.ProjectID,
+		AssigneeID:            req.AssigneeID,
+		CreatorID:             &user.ID,
+		DueDate:               req.DueDate,
+		CustomFieldValuesJSON: customFieldValuesJSON,
+	})
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError.WithDetails(map[string]string{
 			"message": err.Error(),
@@ -211,7 +219,7 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Load full item details for response
-	fullItem, err := h.itemRepo.FindByIDWithDetails(createdItem.ID)
+	fullItem, err := h.itemRepo.FindByIDWithDetails(int(itemID))
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
@@ -923,34 +931,6 @@ func nullStringValue(ns sql.NullString) string {
 	return ""
 }
 
-func (h *ItemHandler) createItem(item *models.Item) (*models.Item, error) {
-	// Get next workspace item number
-	var maxNum int
-	h.db.QueryRow("SELECT COALESCE(MAX(workspace_item_number), 0) FROM items WHERE workspace_id = ?", item.WorkspaceID).Scan(&maxNum)
-	item.WorkspaceItemNumber = maxNum + 1
-
-	customFieldsJSON, _ := json.Marshal(item.CustomFieldValues)
-
-	result, err := h.db.ExecWrite(`
-		INSERT INTO items (workspace_id, workspace_item_number, item_type_id, title, description,
-		                   status_id, priority_id, due_date, is_task, milestone_id, iteration_id,
-		                   project_id, assignee_id, creator_id, custom_field_values, parent_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, item.WorkspaceID, item.WorkspaceItemNumber, item.ItemTypeID, item.Title, item.Description,
-		item.StatusID, item.PriorityID, item.DueDate, item.IsTask, item.MilestoneID, item.IterationID,
-		item.ProjectID, item.AssigneeID, item.CreatorID, string(customFieldsJSON), item.ParentID)
-	if err != nil {
-		return nil, err
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return nil, err
-	}
-	item.ID = int(id)
-
-	return item, nil
-}
 
 func (h *ItemHandler) updateItem(item *models.Item) error {
 	customFieldsJSON, _ := json.Marshal(item.CustomFieldValues)

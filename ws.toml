@@ -1,0 +1,15 @@
+[server]
+  url = "http://localhost:7777"
+  token = "crw_4f77b0add6cbcbb2ab2d97dcdf3364684a1a33cfaf1010e3a8115817"
+
+[defaults]
+  workspace_key = "WIS"
+
+[cache]
+  user_id = 0
+
+[status_aliases]
+  done = "Done"
+  progress = "In Progress"
+  review = "Under Review"
+  todo = "Open"
