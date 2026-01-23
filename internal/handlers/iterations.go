@@ -9,23 +9,49 @@ import (
 	"time"
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/services"
 	"windshift/internal/utils"
 )
 
 type IterationHandler struct {
-	db database.Database
+	db                database.Database
+	permissionService *services.PermissionService
 }
 
-func NewIterationHandler(db database.Database) *IterationHandler {
-	return &IterationHandler{db: db}
+func NewIterationHandler(db database.Database, permissionService *services.PermissionService) *IterationHandler {
+	return &IterationHandler{
+		db:                db,
+		permissionService: permissionService,
+	}
 }
 
 func (h *IterationHandler) GetAll(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	// Parse query parameters
 	workspaceID := r.URL.Query().Get("workspace_id")
 	typeID := r.URL.Query().Get("type_id")
 	status := r.URL.Query().Get("status")
 	includeGlobal := r.URL.Query().Get("include_global") != "false" // Default to true
+
+	// Check workspace permission if workspace_id is specified
+	if workspaceID != "" {
+		if wsID, err := strconv.Atoi(workspaceID); err == nil {
+			if !RequireWorkspacePermission(w, user.ID, wsID, models.PermissionItemView, h.permissionService) {
+				return
+			}
+		}
+	} else {
+		// For global-only iterations, check global iteration permission
+		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
+		if err != nil || !hasGlobalPerm {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+	}
 
 	query := `
 		SELECT i.id, i.name, i.description, i.start_date, i.end_date, i.status,
@@ -118,6 +144,11 @@ func (h *IterationHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *IterationHandler) Get(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
@@ -153,6 +184,19 @@ func (h *IterationHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check permission based on whether iteration is global or workspace-scoped
+	if iteration.IsGlobal {
+		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
+		if err != nil || !hasGlobalPerm {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+	} else if workspaceID.Valid {
+		if !RequireWorkspacePermission(w, user.ID, int(workspaceID.Int64), models.PermissionItemView, h.permissionService) {
+			return
+		}
+	}
+
 	iteration.Description = description.String
 	iteration.TypeID = utils.NullInt64ToPtr(typeID)
 	iteration.TypeName = typeName.String
@@ -164,6 +208,11 @@ func (h *IterationHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	var iteration models.Iteration
 	if err := json.NewDecoder(r.Body).Decode(&iteration); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -207,6 +256,19 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if !iteration.IsGlobal && iteration.WorkspaceID == nil {
 		http.Error(w, "Local iterations must have a workspace_id", http.StatusBadRequest)
 		return
+	}
+
+	// Check permission based on whether iteration is global or workspace-scoped
+	if iteration.IsGlobal {
+		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
+		if err != nil || !hasGlobalPerm {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+	} else {
+		if !RequireWorkspacePermission(w, user.ID, *iteration.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
+			return
+		}
 	}
 
 	// Validate type_id if provided
@@ -288,6 +350,11 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
@@ -337,6 +404,19 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if !iteration.IsGlobal && iteration.WorkspaceID == nil {
 		http.Error(w, "Local iterations must have a workspace_id", http.StatusBadRequest)
 		return
+	}
+
+	// Check permission based on whether iteration is global or workspace-scoped
+	if iteration.IsGlobal {
+		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
+		if err != nil || !hasGlobalPerm {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+	} else {
+		if !RequireWorkspacePermission(w, user.ID, *iteration.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
+			return
+		}
 	}
 
 	// Validate type_id if provided
@@ -418,12 +498,43 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *IterationHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
 	}
 
-	_, err := h.db.ExecWrite("DELETE FROM iterations WHERE id = ?", id)
+	// First, fetch the iteration to check its properties for permission validation
+	var isGlobal bool
+	var workspaceID sql.NullInt64
+	err := h.db.QueryRow("SELECT is_global, workspace_id FROM iterations WHERE id = ?", id).Scan(&isGlobal, &workspaceID)
+	if err == sql.ErrNoRows {
+		http.Error(w, "Iteration not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Check permission based on whether iteration is global or workspace-scoped
+	if isGlobal {
+		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
+		if err != nil || !hasGlobalPerm {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+	} else if workspaceID.Valid {
+		if !RequireWorkspacePermission(w, user.ID, int(workspaceID.Int64), models.PermissionItemEdit, h.permissionService) {
+			return
+		}
+	}
+
+	_, err = h.db.ExecWrite("DELETE FROM iterations WHERE id = ?", id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -473,25 +584,32 @@ type IterationProgressReport struct {
 
 // GetProgress handles GET /api/iterations/{id}/progress - returns iteration progress report
 func (h *IterationHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	iterationID, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
 	}
 
-	// Get iteration details
+	// Get iteration details including is_global and workspace_id for permission check
 	var report IterationProgressReport
 	report.IterationID = iterationID
 	report.ItemsByCategory = make(map[string][]IterationProgressItem)
 
 	var description sql.NullString
 	var typeColor sql.NullString
+	var isGlobal bool
+	var workspaceID sql.NullInt64
 
 	err := h.db.QueryRow(`
-		SELECT i.name, i.description, i.start_date, i.end_date, i.status, it.color
+		SELECT i.name, i.description, i.start_date, i.end_date, i.status, it.color, i.is_global, i.workspace_id
 		FROM iterations i
 		LEFT JOIN iteration_types it ON i.type_id = it.id
 		WHERE i.id = ?
-	`, iterationID).Scan(&report.IterationName, &description, &report.StartDate, &report.EndDate, &report.Status, &typeColor)
+	`, iterationID).Scan(&report.IterationName, &description, &report.StartDate, &report.EndDate, &report.Status, &typeColor, &isGlobal, &workspaceID)
 
 	if err == sql.ErrNoRows {
 		http.Error(w, "Iteration not found", http.StatusNotFound)
@@ -500,6 +618,19 @@ func (h *IterationHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Check permission based on whether iteration is global or workspace-scoped
+	if isGlobal {
+		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
+		if err != nil || !hasGlobalPerm {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+	} else if workspaceID.Valid {
+		if !RequireWorkspacePermission(w, user.ID, int(workspaceID.Int64), models.PermissionItemView, h.permissionService) {
+			return
+		}
 	}
 
 	report.Description = description.String

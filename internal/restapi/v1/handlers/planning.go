@@ -7,11 +7,12 @@ import (
 	"strconv"
 	"strings"
 
-
 	"windshift/internal/database"
+	"windshift/internal/models"
 	"windshift/internal/restapi"
 	"windshift/internal/restapi/v1/dto"
 	"windshift/internal/restapi/v1/middleware"
+	"windshift/internal/services"
 )
 
 // ========================================
@@ -19,11 +20,15 @@ import (
 // ========================================
 
 type MilestoneHandler struct {
-	db database.Database
+	db                database.Database
+	permissionService *services.PermissionService
 }
 
-func NewMilestoneHandler(db database.Database) *MilestoneHandler {
-	return &MilestoneHandler{db: db}
+func NewMilestoneHandler(db database.Database, permissionService *services.PermissionService) *MilestoneHandler {
+	return &MilestoneHandler{
+		db:                db,
+		permissionService: permissionService,
+	}
 }
 
 type MilestoneResponse struct {
@@ -148,6 +153,13 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check milestone.create permission (REST API v1 milestones are global)
+	hasPermission, _ := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
+	if !hasPermission {
+		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "milestone.create permission required"))
+		return
+	}
+
 	var req MilestoneCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
@@ -202,6 +214,13 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check milestone.create permission (REST API v1 milestones are global)
+	hasPermission, _ := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
+	if !hasPermission {
+		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "milestone.create permission required"))
+		return
+	}
+
 	var req MilestoneCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
@@ -242,6 +261,13 @@ func (h *MilestoneHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid milestone ID"))
+		return
+	}
+
+	// Check milestone.create permission (REST API v1 milestones are global)
+	hasPermission, _ := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
+	if !hasPermission {
+		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "milestone.create permission required"))
 		return
 	}
 
@@ -318,11 +344,15 @@ func (h *MilestoneHandler) GetItems(w http.ResponseWriter, r *http.Request) {
 // ========================================
 
 type IterationHandler struct {
-	db database.Database
+	db                database.Database
+	permissionService *services.PermissionService
 }
 
-func NewIterationHandler(db database.Database) *IterationHandler {
-	return &IterationHandler{db: db}
+func NewIterationHandler(db database.Database, permissionService *services.PermissionService) *IterationHandler {
+	return &IterationHandler{
+		db:                db,
+		permissionService: permissionService,
+	}
 }
 
 type IterationResponse struct {
@@ -470,6 +500,16 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check permission based on whether iteration is global or workspace-scoped
+	if req.IsGlobal || req.WorkspaceID == nil {
+		hasPermission, _ := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
+		if !hasPermission {
+			restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "iteration.manage permission required"))
+			return
+		}
+	}
+	// Note: Workspace-scoped iterations would need workspace permission checks via workspace role
+
 	status := req.Status
 	if status == "" {
 		status = "planned"
@@ -513,10 +553,32 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if existing iteration is global
+	var existingIsGlobal bool
+	err = h.db.QueryRow("SELECT is_global FROM iterations WHERE id = ?", id).Scan(&existingIsGlobal)
+	if err == sql.ErrNoRows {
+		restapi.RespondError(w, r, restapi.ErrNotFound)
+		return
+	}
+	if err != nil {
+		restapi.RespondError(w, r, restapi.ErrInternalError)
+		return
+	}
+
 	var req IterationCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
 		return
+	}
+
+	// Check permission based on whether iteration is global or workspace-scoped
+	// Need permission if either existing or new state is global
+	if existingIsGlobal || req.IsGlobal || req.WorkspaceID == nil {
+		hasPermission, _ := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
+		if !hasPermission {
+			restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "iteration.manage permission required"))
+			return
+		}
 	}
 
 	_, err = h.db.ExecWrite(`
@@ -554,6 +616,27 @@ func (h *IterationHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid iteration ID"))
 		return
+	}
+
+	// Check if existing iteration is global
+	var isGlobal bool
+	err = h.db.QueryRow("SELECT is_global FROM iterations WHERE id = ?", id).Scan(&isGlobal)
+	if err == sql.ErrNoRows {
+		restapi.RespondError(w, r, restapi.ErrNotFound)
+		return
+	}
+	if err != nil {
+		restapi.RespondError(w, r, restapi.ErrInternalError)
+		return
+	}
+
+	// Check permission based on whether iteration is global
+	if isGlobal {
+		hasPermission, _ := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
+		if !hasPermission {
+			restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "iteration.manage permission required"))
+			return
+		}
 	}
 
 	_, err = h.db.ExecWrite("DELETE FROM iterations WHERE id = ?", id)

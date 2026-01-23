@@ -6,16 +6,71 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"windshift/internal/models"
+	"windshift/internal/services"
 	"windshift/internal/testutils"
 )
+
+// createIterationTestServices creates the permission service needed for iteration handler tests
+// and grants the test user global iteration management permissions.
+// It also ensures the test user exists by seeding basic test data if not already seeded.
+func createIterationTestServices(t *testing.T, db testutils.TestDB) *services.PermissionService {
+	t.Helper()
+
+	// Check if test user already exists, if not seed the test data
+	var userCount int
+	err := db.GetDatabase().QueryRow("SELECT COUNT(*) FROM users WHERE id = 1").Scan(&userCount)
+	if err != nil || userCount == 0 {
+		// Seed basic test data to ensure user ID 1 exists
+		db.SeedTestData(t)
+	}
+
+	// Create permission service with test-friendly config
+	permConfig := services.DefaultPermissionCacheConfig()
+	permConfig.WarmupOnStartup = false // Don't warm up during tests
+	permConfig.TTL = 1 * time.Minute   // Short TTL for tests
+
+	permService, err := services.NewPermissionService(db.GetDatabase(), permConfig)
+	if err != nil {
+		t.Fatalf("Failed to create permission service: %v", err)
+	}
+
+	// Register cleanup
+	t.Cleanup(func() {
+		permService.Close()
+	})
+
+	// Grant the test user (ID 1) global iteration.manage permission
+	// First get the permission ID for iteration.manage
+	var permID int
+	err = db.GetDatabase().QueryRow("SELECT id FROM permissions WHERE permission_key = ?", models.PermissionIterationManage).Scan(&permID)
+	if err != nil {
+		t.Fatalf("Failed to get iteration.manage permission ID: %v", err)
+	}
+
+	// Grant global permission to user ID 1 (the default test user)
+	_, err = db.GetDatabase().ExecWrite(`
+		INSERT OR IGNORE INTO user_global_permissions (user_id, permission_id, granted_at)
+		VALUES (1, ?, datetime('now'))
+	`, permID)
+	if err != nil {
+		t.Fatalf("Failed to grant global iteration permission: %v", err)
+	}
+
+	// Invalidate the permission cache for user 1
+	permService.InvalidateUserCache(1)
+
+	return permService
+}
 
 func TestIterationHandler_Create_Success_Global(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewIterationHandler(tdb.GetDatabase())
+	permService := createIterationTestServices(t, *tdb)
+	handler := NewIterationHandler(tdb.GetDatabase(), permService)
 
 	iteration := models.Iteration{
 		Name:        "Sprint 1",
@@ -57,7 +112,8 @@ func TestIterationHandler_Create_Success_Local(t *testing.T) {
 	defer tdb.Close()
 
 	data := tdb.SeedTestData(t)
-	handler := NewIterationHandler(tdb.GetDatabase())
+	permService := createIterationTestServices(t, *tdb)
+	handler := NewIterationHandler(tdb.GetDatabase(), permService)
 
 	workspaceID := data.WorkspaceID
 	iteration := models.Iteration{
@@ -91,7 +147,8 @@ func TestIterationHandler_Create_ValidationErrors(t *testing.T) {
 	defer tdb.Close()
 
 	data := tdb.SeedTestData(t)
-	handler := NewIterationHandler(tdb.GetDatabase())
+	permService := createIterationTestServices(t, *tdb)
+	handler := NewIterationHandler(tdb.GetDatabase(), permService)
 
 	workspaceID := data.WorkspaceID
 
@@ -149,7 +206,8 @@ func TestIterationHandler_Create_DefaultStatus(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewIterationHandler(tdb.GetDatabase())
+	permService := createIterationTestServices(t, *tdb)
+	handler := NewIterationHandler(tdb.GetDatabase(), permService)
 
 	iteration := models.Iteration{
 		Name:      "Default Status Test",
@@ -176,7 +234,8 @@ func TestIterationHandler_Create_InvalidWorkspace(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewIterationHandler(tdb.GetDatabase())
+	permService := createIterationTestServices(t, *tdb)
+	handler := NewIterationHandler(tdb.GetDatabase(), permService)
 
 	invalidWorkspace := 99999
 	iteration := models.Iteration{
@@ -191,17 +250,17 @@ func TestIterationHandler_Create_InvalidWorkspace(t *testing.T) {
 	req := testutils.CreateJSONRequest(t, "POST", "/api/iterations", iteration)
 	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 
-	rr.AssertStatusCode(http.StatusBadRequest)
-	if !strings.Contains(rr.Body.String(), "Invalid workspace ID") {
-		t.Errorf("Expected 'Invalid workspace ID' error, got %s", rr.Body.String())
-	}
+	// With permission checks, we now return 403 Forbidden for workspaces the user doesn't have access to
+	// This is more secure as it doesn't reveal whether the workspace exists or not
+	rr.AssertStatusCode(http.StatusForbidden)
 }
 
 func TestIterationHandler_GetAll_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewIterationHandler(tdb.GetDatabase())
+	permService := createIterationTestServices(t, *tdb)
+	handler := NewIterationHandler(tdb.GetDatabase(), permService)
 
 	// Create global iterations
 	iterations := []models.Iteration{
@@ -233,7 +292,8 @@ func TestIterationHandler_GetAll_FilterByWorkspace(t *testing.T) {
 	defer tdb.Close()
 
 	data := tdb.SeedTestData(t)
-	handler := NewIterationHandler(tdb.GetDatabase())
+	permService := createIterationTestServices(t, *tdb)
+	handler := NewIterationHandler(tdb.GetDatabase(), permService)
 
 	workspaceID := data.WorkspaceID
 
@@ -292,7 +352,8 @@ func TestIterationHandler_GetAll_FilterByStatus(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewIterationHandler(tdb.GetDatabase())
+	permService := createIterationTestServices(t, *tdb)
+	handler := NewIterationHandler(tdb.GetDatabase(), permService)
 
 	// Create iterations with different statuses
 	iterations := []models.Iteration{
@@ -326,7 +387,8 @@ func TestIterationHandler_Get_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewIterationHandler(tdb.GetDatabase())
+	permService := createIterationTestServices(t, *tdb)
+	handler := NewIterationHandler(tdb.GetDatabase(), permService)
 
 	iteration := models.Iteration{
 		Name:        "Test Get Iteration",
@@ -369,7 +431,8 @@ func TestIterationHandler_Get_NotFound(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewIterationHandler(tdb.GetDatabase())
+	permService := createIterationTestServices(t, *tdb)
+	handler := NewIterationHandler(tdb.GetDatabase(), permService)
 
 	req := testutils.CreateJSONRequest(t, "GET", "/api/iterations/99999", nil)
 	req.SetPathValue("id", "99999")
@@ -385,7 +448,8 @@ func TestIterationHandler_Update_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewIterationHandler(tdb.GetDatabase())
+	permService := createIterationTestServices(t, *tdb)
+	handler := NewIterationHandler(tdb.GetDatabase(), permService)
 
 	// Create an iteration
 	iteration := models.Iteration{
@@ -438,7 +502,8 @@ func TestIterationHandler_Update_InvalidStatus(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewIterationHandler(tdb.GetDatabase())
+	permService := createIterationTestServices(t, *tdb)
+	handler := NewIterationHandler(tdb.GetDatabase(), permService)
 
 	// Create an iteration
 	iteration := models.Iteration{
@@ -478,7 +543,8 @@ func TestIterationHandler_Delete_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewIterationHandler(tdb.GetDatabase())
+	permService := createIterationTestServices(t, *tdb)
+	handler := NewIterationHandler(tdb.GetDatabase(), permService)
 
 	// Create an iteration
 	iteration := models.Iteration{
@@ -514,7 +580,8 @@ func TestIterationHandler_GetProgress_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewIterationHandler(tdb.GetDatabase())
+	permService := createIterationTestServices(t, *tdb)
+	handler := NewIterationHandler(tdb.GetDatabase(), permService)
 
 	// Create an iteration
 	iteration := models.Iteration{
@@ -554,7 +621,8 @@ func TestIterationHandler_GetProgress_NotFound(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewIterationHandler(tdb.GetDatabase())
+	permService := createIterationTestServices(t, *tdb)
+	handler := NewIterationHandler(tdb.GetDatabase(), permService)
 
 	req := testutils.CreateJSONRequest(t, "GET", "/api/iterations/99999/progress", nil)
 	req.SetPathValue("id", "99999")

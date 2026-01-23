@@ -9,23 +9,49 @@ import (
 	"time"
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/services"
 	"windshift/internal/utils"
 )
 
 type MilestoneHandler struct {
-	db database.Database
+	db                database.Database
+	permissionService *services.PermissionService
 }
 
-func NewMilestoneHandler(db database.Database) *MilestoneHandler {
-	return &MilestoneHandler{db: db}
+func NewMilestoneHandler(db database.Database, permissionService *services.PermissionService) *MilestoneHandler {
+	return &MilestoneHandler{
+		db:                db,
+		permissionService: permissionService,
+	}
 }
 
 func (h *MilestoneHandler) GetAll(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	// Parse query parameters
 	categoryID := r.URL.Query().Get("category_id")
 	status := r.URL.Query().Get("status")
 	workspaceID := r.URL.Query().Get("workspace_id")
 	includeGlobal := r.URL.Query().Get("include_global") != "false" // Default to true
+
+	// Check workspace permission if workspace_id is specified
+	if workspaceID != "" {
+		if wsID, err := strconv.Atoi(workspaceID); err == nil {
+			if !RequireWorkspacePermission(w, user.ID, wsID, models.PermissionItemView, h.permissionService) {
+				return
+			}
+		}
+	} else {
+		// For global-only milestones, check global milestone permission
+		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
+		if err != nil || !hasGlobalPerm {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+	}
 
 	query := `
 		SELECT m.id, m.name, m.description, m.target_date, m.status, m.category_id,
@@ -120,6 +146,11 @@ func (h *MilestoneHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MilestoneHandler) Get(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
@@ -156,6 +187,19 @@ func (h *MilestoneHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check permission based on whether milestone is global or workspace-scoped
+	if milestone.IsGlobal {
+		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
+		if err != nil || !hasGlobalPerm {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+	} else if workspaceID.Valid {
+		if !RequireWorkspacePermission(w, user.ID, int(workspaceID.Int64), models.PermissionItemView, h.permissionService) {
+			return
+		}
+	}
+
 	milestone.Description = description.String
 	milestone.TargetDate = utils.NullStringToPtr(targetDate)
 	milestone.CategoryID = utils.NullInt64ToPtr(categoryID)
@@ -168,6 +212,11 @@ func (h *MilestoneHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	var milestone models.Milestone
 	if err := json.NewDecoder(r.Body).Decode(&milestone); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -206,6 +255,19 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if !milestone.IsGlobal && milestone.WorkspaceID == nil {
 		http.Error(w, "Local milestones must have a workspace_id", http.StatusBadRequest)
 		return
+	}
+
+	// Check permission based on whether milestone is global or workspace-scoped
+	if milestone.IsGlobal {
+		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
+		if err != nil || !hasGlobalPerm {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+	} else {
+		if !RequireWorkspacePermission(w, user.ID, *milestone.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
+			return
+		}
 	}
 
 	// Validate category_id if provided
@@ -293,6 +355,11 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
@@ -337,6 +404,19 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if !milestone.IsGlobal && milestone.WorkspaceID == nil {
 		http.Error(w, "Local milestones must have a workspace_id", http.StatusBadRequest)
 		return
+	}
+
+	// Check permission based on whether milestone is global or workspace-scoped
+	if milestone.IsGlobal {
+		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
+		if err != nil || !hasGlobalPerm {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+	} else {
+		if !RequireWorkspacePermission(w, user.ID, *milestone.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
+			return
+		}
 	}
 
 	// Validate category_id if provided
@@ -424,12 +504,43 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MilestoneHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
 	}
 
-	_, err := h.db.ExecWrite("DELETE FROM milestones WHERE id = ?", id)
+	// First, fetch the milestone to check its properties for permission validation
+	var isGlobal bool
+	var workspaceID sql.NullInt64
+	err := h.db.QueryRow("SELECT is_global, workspace_id FROM milestones WHERE id = ?", id).Scan(&isGlobal, &workspaceID)
+	if err == sql.ErrNoRows {
+		http.Error(w, "Milestone not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Check permission based on whether milestone is global or workspace-scoped
+	if isGlobal {
+		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
+		if err != nil || !hasGlobalPerm {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+	} else if workspaceID.Valid {
+		if !RequireWorkspacePermission(w, user.ID, int(workspaceID.Int64), models.PermissionItemEdit, h.permissionService) {
+			return
+		}
+	}
+
+	_, err = h.db.ExecWrite("DELETE FROM milestones WHERE id = ?", id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -439,9 +550,40 @@ func (h *MilestoneHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MilestoneHandler) GetTestStatistics(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	milestoneID, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
+	}
+
+	// First, fetch the milestone to check its properties for permission validation
+	var isGlobal bool
+	var workspaceID sql.NullInt64
+	err := h.db.QueryRow("SELECT is_global, workspace_id FROM milestones WHERE id = ?", milestoneID).Scan(&isGlobal, &workspaceID)
+	if err == sql.ErrNoRows {
+		http.Error(w, "Milestone not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Check permission based on whether milestone is global or workspace-scoped
+	if isGlobal {
+		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
+		if err != nil || !hasGlobalPerm {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+	} else if workspaceID.Valid {
+		if !RequireWorkspacePermission(w, user.ID, int(workspaceID.Int64), models.PermissionItemView, h.permissionService) {
+			return
+		}
 	}
 
 	// Query test plan statistics for this milestone
@@ -455,7 +597,7 @@ func (h *MilestoneHandler) GetTestStatistics(w http.ResponseWriter, r *http.Requ
 	}{}
 
 	// Get test plan counts for this milestone
-	err := h.db.QueryRow(`
+	err = h.db.QueryRow(`
 		SELECT 
 			COUNT(DISTINCT ts.id) as total_test_plans,
 			COALESCE(SUM(run_stats.total_runs), 0) as total_test_runs,
@@ -531,12 +673,17 @@ type MilestoneProgressReport struct {
 
 // GetProgress handles GET /api/milestones/{id}/progress - returns milestone progress report
 func (h *MilestoneHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	milestoneID, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
 	}
 
-	// Get milestone details
+	// Get milestone details including is_global and workspace_id for permission check
 	var report MilestoneProgressReport
 	report.MilestoneID = milestoneID
 	report.ItemsByCategory = make(map[string][]MilestoneProgressItem)
@@ -544,13 +691,15 @@ func (h *MilestoneHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 	var description sql.NullString
 	var targetDate sql.NullString
 	var categoryColor sql.NullString
+	var isGlobal bool
+	var workspaceID sql.NullInt64
 
 	err := h.db.QueryRow(`
-		SELECT m.name, m.description, m.target_date, m.status, mc.color
+		SELECT m.name, m.description, m.target_date, m.status, mc.color, m.is_global, m.workspace_id
 		FROM milestones m
 		LEFT JOIN milestone_categories mc ON m.category_id = mc.id
 		WHERE m.id = ?
-	`, milestoneID).Scan(&report.MilestoneName, &description, &targetDate, &report.Status, &categoryColor)
+	`, milestoneID).Scan(&report.MilestoneName, &description, &targetDate, &report.Status, &categoryColor, &isGlobal, &workspaceID)
 
 	if err == sql.ErrNoRows {
 		http.Error(w, "Milestone not found", http.StatusNotFound)
@@ -559,6 +708,19 @@ func (h *MilestoneHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Check permission based on whether milestone is global or workspace-scoped
+	if isGlobal {
+		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
+		if err != nil || !hasGlobalPerm {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+	} else if workspaceID.Valid {
+		if !RequireWorkspacePermission(w, user.ID, int(workspaceID.Int64), models.PermissionItemView, h.permissionService) {
+			return
+		}
 	}
 
 	report.Description = description.String

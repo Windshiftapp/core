@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/restapi"
@@ -180,6 +179,13 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	user := middleware.GetUser(r.Context())
 	if user == nil {
 		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+		return
+	}
+
+	// Check workspace.create permission
+	hasPermission, _ := h.perms.HasGlobalPermission(user.ID, models.PermissionWorkspaceCreate)
+	if !hasPermission {
+		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "workspace.create permission required"))
 		return
 	}
 

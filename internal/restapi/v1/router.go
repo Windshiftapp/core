@@ -32,10 +32,10 @@ func RegisterRoutes(
 	itemTypeHandler := handlers.NewItemTypeHandler(db)
 	priorityHandler := handlers.NewPriorityHandler(db)
 	customFieldHandler := handlers.NewCustomFieldHandler(db)
-	userHandler := handlers.NewUserHandler(db)
+	userHandler := handlers.NewUserHandler(db, permissionService)
 	commentHandler := handlers.NewCommentHandler(db, permissionService)
-	milestoneHandler := handlers.NewMilestoneHandler(db)
-	iterationHandler := handlers.NewIterationHandler(db)
+	milestoneHandler := handlers.NewMilestoneHandler(db, permissionService)
+	iterationHandler := handlers.NewIterationHandler(db, permissionService)
 	projectHandler := handlers.NewProjectHandler(db)
 
 	// Create authenticated route group with middleware chain:

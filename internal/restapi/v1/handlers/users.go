@@ -5,20 +5,25 @@ import (
 	"net/http"
 	"strconv"
 
-
 	"windshift/internal/database"
+	"windshift/internal/models"
 	"windshift/internal/restapi"
 	"windshift/internal/restapi/v1/middleware"
+	"windshift/internal/services"
 )
 
 // UserHandler handles public API requests for users
 type UserHandler struct {
-	db database.Database
+	db                database.Database
+	permissionService *services.PermissionService
 }
 
 // NewUserHandler creates a new user handler
-func NewUserHandler(db database.Database) *UserHandler {
-	return &UserHandler{db: db}
+func NewUserHandler(db database.Database, permissionService *services.PermissionService) *UserHandler {
+	return &UserHandler{
+		db:                db,
+		permissionService: permissionService,
+	}
 }
 
 // UserResponse is the public API representation of a User
@@ -41,6 +46,13 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 	user := middleware.GetUser(r.Context())
 	if user == nil {
 		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+		return
+	}
+
+	// Check user.list permission
+	hasPermission, _ := h.permissionService.HasGlobalPermission(user.ID, models.PermissionUserList)
+	if !hasPermission {
+		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "user.list permission required"))
 		return
 	}
 

@@ -819,7 +819,7 @@ func main() {
 	milestoneCategoryHandler := handlers.NewEnumHandler(
 		services.NewEnumService(db, services.NewMilestoneCategoryConfig()),
 		func() interface{} { return &models.MilestoneCategory{} })
-	milestoneHandler := handlers.NewMilestoneHandler(db)
+	milestoneHandler := handlers.NewMilestoneHandler(db, permService)
 	channelCategoryHandler := handlers.NewEnumHandler(
 		services.NewEnumService(db, services.NewChannelCategoryConfig()),
 		func() interface{} { return &models.ChannelCategory{} })
@@ -829,7 +829,7 @@ func main() {
 	iterationTypeHandler := handlers.NewEnumHandler(
 		services.NewEnumService(db, services.NewIterationTypeConfig()),
 		func() interface{} { return &models.IterationType{} })
-	iterationHandler := handlers.NewIterationHandler(db)
+	iterationHandler := handlers.NewIterationHandler(db, permService)
 	personalLabelHandler := handlers.NewPersonalLabelHandler(db)
 	commentHandler := handlers.NewCommentHandler(db, permService, activityTracker, notificationService)
 	reviewHandler := handlers.NewReviewHandler(db)

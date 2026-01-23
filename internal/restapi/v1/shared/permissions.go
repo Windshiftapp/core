@@ -70,6 +70,14 @@ func (p *PermissionHelper) CanEditWorkspace(userID, workspaceID int) (bool, erro
 	return hasPermission == 1, nil
 }
 
+// HasGlobalPermission checks if a user has a global permission
+func (p *PermissionHelper) HasGlobalPermission(userID int, permission string) (bool, error) {
+	if p.permissionService != nil {
+		return p.permissionService.HasGlobalPermission(userID, permission)
+	}
+	return false, nil
+}
+
 // GetAccessibleWorkspaceIDs returns all workspace IDs the user can access
 func (p *PermissionHelper) GetAccessibleWorkspaceIDs(userID int) ([]int, error) {
 	// Query for accessible workspaces based on RBAC role assignments

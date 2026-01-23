@@ -32,20 +32,12 @@ func (h *WorkspaceHandler) canAdminWorkspace(userID, workspaceID int) (bool, err
 // canAccessInactiveWorkspace checks if a user can access an inactive workspace
 // Returns true if user is system admin OR has workspace.admin permission for the workspace
 func (h *WorkspaceHandler) canAccessInactiveWorkspace(user *models.User, workspaceID int) (bool, error) {
-	// System admins can always access inactive workspaces
-	if h.permissionService != nil {
-		isSystemAdmin, err := h.permissionService.IsSystemAdmin(user.ID)
-		if err == nil && isSystemAdmin {
-			return true, nil
-		}
-	}
-
-	// Check if user has workspace admin permission for this specific workspace
 	if h.permissionService == nil {
-		// If permission service is not available, deny access to inactive workspaces for non-system-admins
+		// If permission service is not available, deny access to inactive workspaces
 		return false, nil
 	}
 
+	// Check if user has workspace admin permission (system admins pass automatically)
 	return h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionWorkspaceAdmin)
 }
 

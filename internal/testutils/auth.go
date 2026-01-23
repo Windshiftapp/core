@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"testing"
 	"time"
+	"windshift/internal/contextkeys"
 	"windshift/internal/models"
 )
 
@@ -39,14 +40,14 @@ func TestUserWithID(id int) *models.User {
 }
 
 // WithAuthContext adds authenticated user to request context
-// Uses string literal "user" to match utils.GetCurrentUser
+// Uses contextkeys.User to match utils.GetCurrentUser
 func WithAuthContext(r *http.Request, user *models.User) *http.Request {
 	if user == nil {
 		user = DefaultTestUser()
 	}
-	ctx := context.WithValue(r.Context(), "user", user)
-	ctx = context.WithValue(ctx, "auth_method", "test")
-	ctx = context.WithValue(ctx, "csrf_exempt", true)
+	ctx := context.WithValue(r.Context(), contextkeys.User, user)
+	ctx = context.WithValue(ctx, contextkeys.AuthMethod, "test")
+	ctx = context.WithValue(ctx, contextkeys.CSRFExempt, true)
 	return r.WithContext(ctx)
 }
 

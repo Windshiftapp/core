@@ -6,16 +6,71 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"windshift/internal/models"
+	"windshift/internal/services"
 	"windshift/internal/testutils"
 )
+
+// createMilestoneTestServices creates the permission service needed for milestone handler tests
+// and grants the test user global milestone creation permissions.
+// It also ensures the test user exists by seeding basic test data if not already seeded.
+func createMilestoneTestServices(t *testing.T, db testutils.TestDB) *services.PermissionService {
+	t.Helper()
+
+	// Check if test user already exists, if not seed the test data
+	var userCount int
+	err := db.GetDatabase().QueryRow("SELECT COUNT(*) FROM users WHERE id = 1").Scan(&userCount)
+	if err != nil || userCount == 0 {
+		// Seed basic test data to ensure user ID 1 exists
+		db.SeedTestData(t)
+	}
+
+	// Create permission service with test-friendly config
+	permConfig := services.DefaultPermissionCacheConfig()
+	permConfig.WarmupOnStartup = false // Don't warm up during tests
+	permConfig.TTL = 1 * time.Minute   // Short TTL for tests
+
+	permService, err := services.NewPermissionService(db.GetDatabase(), permConfig)
+	if err != nil {
+		t.Fatalf("Failed to create permission service: %v", err)
+	}
+
+	// Register cleanup
+	t.Cleanup(func() {
+		permService.Close()
+	})
+
+	// Grant the test user (ID 1) global milestone.create permission
+	// First get the permission ID for milestone.create
+	var permID int
+	err = db.GetDatabase().QueryRow("SELECT id FROM permissions WHERE permission_key = ?", models.PermissionMilestoneCreate).Scan(&permID)
+	if err != nil {
+		t.Fatalf("Failed to get milestone.create permission ID: %v", err)
+	}
+
+	// Grant global permission to user ID 1 (the default test user)
+	_, err = db.GetDatabase().ExecWrite(`
+		INSERT OR IGNORE INTO user_global_permissions (user_id, permission_id, granted_at)
+		VALUES (1, ?, datetime('now'))
+	`, permID)
+	if err != nil {
+		t.Fatalf("Failed to grant global milestone permission: %v", err)
+	}
+
+	// Invalidate the permission cache for user 1
+	permService.InvalidateUserCache(1)
+
+	return permService
+}
 
 func TestMilestoneHandler_Create_Success_Global(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewMilestoneHandler(tdb.GetDatabase())
+	permService := createMilestoneTestServices(t, *tdb)
+	handler := NewMilestoneHandler(tdb.GetDatabase(), permService)
 
 	targetDate := "2025-12-31"
 	milestone := models.Milestone{
@@ -57,7 +112,8 @@ func TestMilestoneHandler_Create_Success_Local(t *testing.T) {
 	defer tdb.Close()
 
 	data := tdb.SeedTestData(t)
-	handler := NewMilestoneHandler(tdb.GetDatabase())
+	permService := createMilestoneTestServices(t, *tdb)
+	handler := NewMilestoneHandler(tdb.GetDatabase(), permService)
 
 	workspaceID := data.WorkspaceID
 	milestone := models.Milestone{
@@ -90,7 +146,8 @@ func TestMilestoneHandler_Create_ValidationErrors(t *testing.T) {
 	defer tdb.Close()
 
 	data := tdb.SeedTestData(t)
-	handler := NewMilestoneHandler(tdb.GetDatabase())
+	permService := createMilestoneTestServices(t, *tdb)
+	handler := NewMilestoneHandler(tdb.GetDatabase(), permService)
 
 	workspaceID := data.WorkspaceID
 
@@ -138,7 +195,8 @@ func TestMilestoneHandler_Create_DefaultStatus(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewMilestoneHandler(tdb.GetDatabase())
+	permService := createMilestoneTestServices(t, *tdb)
+	handler := NewMilestoneHandler(tdb.GetDatabase(), permService)
 
 	milestone := models.Milestone{
 		Name:     "No Status Specified",
@@ -163,7 +221,8 @@ func TestMilestoneHandler_Create_InvalidWorkspace(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewMilestoneHandler(tdb.GetDatabase())
+	permService := createMilestoneTestServices(t, *tdb)
+	handler := NewMilestoneHandler(tdb.GetDatabase(), permService)
 
 	invalidWorkspace := 99999
 	milestone := models.Milestone{
@@ -176,17 +235,17 @@ func TestMilestoneHandler_Create_InvalidWorkspace(t *testing.T) {
 	req := testutils.CreateJSONRequest(t, "POST", "/api/milestones", milestone)
 	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 
-	rr.AssertStatusCode(http.StatusBadRequest)
-	if !strings.Contains(rr.Body.String(), "Invalid workspace ID") {
-		t.Errorf("Expected 'Invalid workspace ID' error, got %s", rr.Body.String())
-	}
+	// With permission checks, we now return 403 Forbidden for workspaces the user doesn't have access to
+	// This is more secure as it doesn't reveal whether the workspace exists or not
+	rr.AssertStatusCode(http.StatusForbidden)
 }
 
 func TestMilestoneHandler_GetAll_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewMilestoneHandler(tdb.GetDatabase())
+	permService := createMilestoneTestServices(t, *tdb)
+	handler := NewMilestoneHandler(tdb.GetDatabase(), permService)
 
 	// Create global milestones
 	milestones := []models.Milestone{
@@ -218,7 +277,8 @@ func TestMilestoneHandler_GetAll_FilterByWorkspace(t *testing.T) {
 	defer tdb.Close()
 
 	data := tdb.SeedTestData(t)
-	handler := NewMilestoneHandler(tdb.GetDatabase())
+	permService := createMilestoneTestServices(t, *tdb)
+	handler := NewMilestoneHandler(tdb.GetDatabase(), permService)
 
 	workspaceID := data.WorkspaceID
 
@@ -273,7 +333,8 @@ func TestMilestoneHandler_GetAll_FilterByStatus(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewMilestoneHandler(tdb.GetDatabase())
+	permService := createMilestoneTestServices(t, *tdb)
+	handler := NewMilestoneHandler(tdb.GetDatabase(), permService)
 
 	// Create milestones with different statuses
 	milestones := []models.Milestone{
@@ -307,7 +368,8 @@ func TestMilestoneHandler_Get_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewMilestoneHandler(tdb.GetDatabase())
+	permService := createMilestoneTestServices(t, *tdb)
+	handler := NewMilestoneHandler(tdb.GetDatabase(), permService)
 
 	targetDate := "2025-06-30"
 	milestone := models.Milestone{
@@ -350,7 +412,8 @@ func TestMilestoneHandler_Get_NotFound(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewMilestoneHandler(tdb.GetDatabase())
+	permService := createMilestoneTestServices(t, *tdb)
+	handler := NewMilestoneHandler(tdb.GetDatabase(), permService)
 
 	req := testutils.CreateJSONRequest(t, "GET", "/api/milestones/99999", nil)
 	req.SetPathValue("id", "99999")
@@ -366,7 +429,8 @@ func TestMilestoneHandler_Update_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewMilestoneHandler(tdb.GetDatabase())
+	permService := createMilestoneTestServices(t, *tdb)
+	handler := NewMilestoneHandler(tdb.GetDatabase(), permService)
 
 	// Create a milestone
 	milestone := models.Milestone{
@@ -417,7 +481,8 @@ func TestMilestoneHandler_Update_InvalidStatus(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewMilestoneHandler(tdb.GetDatabase())
+	permService := createMilestoneTestServices(t, *tdb)
+	handler := NewMilestoneHandler(tdb.GetDatabase(), permService)
 
 	// Create a milestone
 	milestone := models.Milestone{
@@ -453,7 +518,8 @@ func TestMilestoneHandler_Delete_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewMilestoneHandler(tdb.GetDatabase())
+	permService := createMilestoneTestServices(t, *tdb)
+	handler := NewMilestoneHandler(tdb.GetDatabase(), permService)
 
 	// Create a milestone
 	milestone := models.Milestone{
@@ -487,7 +553,8 @@ func TestMilestoneHandler_GetProgress_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewMilestoneHandler(tdb.GetDatabase())
+	permService := createMilestoneTestServices(t, *tdb)
+	handler := NewMilestoneHandler(tdb.GetDatabase(), permService)
 
 	// Create a milestone
 	milestone := models.Milestone{
@@ -525,7 +592,8 @@ func TestMilestoneHandler_GetProgress_NotFound(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewMilestoneHandler(tdb.GetDatabase())
+	permService := createMilestoneTestServices(t, *tdb)
+	handler := NewMilestoneHandler(tdb.GetDatabase(), permService)
 
 	req := testutils.CreateJSONRequest(t, "GET", "/api/milestones/99999/progress", nil)
 	req.SetPathValue("id", "99999")
