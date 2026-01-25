@@ -129,8 +129,16 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 			if inheritProjectValue, hasInheritProject := updateData["inherit_project"]; !hasInheritProject || inheritProjectValue != true {
 				item.InheritProject = false
 			}
-		} else if projectIDFloat, ok := projectIDValue.(float64); ok {
-			newProjectID := int(projectIDFloat)
+		} else {
+			var newProjectID int
+			switch v := projectIDValue.(type) {
+			case float64:
+				newProjectID = int(v)
+			case int:
+				newProjectID = v
+			default:
+				return &ValidationError{Field: "project_id", Message: "Invalid project_id type"}
+			}
 			if newProjectID > 0 {
 				// Validate project exists
 				exists, err := v.EntityExists("time_projects", newProjectID)
@@ -148,8 +156,16 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 	}
 
 	// Workspace ID validation (if being changed)
-	if workspaceID, ok := updateData["workspace_id"].(float64); ok {
-		newWorkspaceID := int(workspaceID)
+	if workspaceIDValue, ok := updateData["workspace_id"]; ok && workspaceIDValue != nil {
+		var newWorkspaceID int
+		switch v := workspaceIDValue.(type) {
+		case float64:
+			newWorkspaceID = int(v)
+		case int:
+			newWorkspaceID = v
+		default:
+			return &ValidationError{Field: "workspace_id", Message: "Invalid workspace_id type"}
+		}
 		exists, err := v.EntityExists("workspaces", newWorkspaceID)
 		if err != nil {
 			return fmt.Errorf("failed to validate workspace: %w", err)
@@ -174,8 +190,16 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 	if parentIDValue, ok := updateData["parent_id"]; ok {
 		if parentIDValue == nil {
 			item.ParentID = nil
-		} else if parentIDFloat, ok := parentIDValue.(float64); ok {
-			newParentID := int(parentIDFloat)
+		} else {
+			var newParentID int
+			switch v := parentIDValue.(type) {
+			case float64:
+				newParentID = int(v)
+			case int:
+				newParentID = v
+			default:
+				return &ValidationError{Field: "parent_id", Message: "Invalid parent_id type"}
+			}
 
 			// Validate parent item exists
 			exists, err := v.EntityExists("items", newParentID)
@@ -201,8 +225,16 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 	if relatedWorkItemIDValue, ok := updateData["related_work_item_id"]; ok {
 		if relatedWorkItemIDValue == nil {
 			item.RelatedWorkItemID = nil
-		} else if relatedWorkItemIDFloat, ok := relatedWorkItemIDValue.(float64); ok {
-			newRelatedWorkItemID := int(relatedWorkItemIDFloat)
+		} else {
+			var newRelatedWorkItemID int
+			switch v := relatedWorkItemIDValue.(type) {
+			case float64:
+				newRelatedWorkItemID = int(v)
+			case int:
+				newRelatedWorkItemID = v
+			default:
+				return &ValidationError{Field: "related_work_item_id", Message: "Invalid related_work_item_id type"}
+			}
 
 			// Validate workspace is personal and belongs to the user
 			if err := v.ValidatePersonalWorkspace(item.WorkspaceID, userID); err != nil {
@@ -244,8 +276,16 @@ func (v *ItemFieldValidator) ValidateNullableIDField(
 	if value, ok := updateData[fieldName]; ok {
 		if value == nil {
 			*destination = nil
-		} else if valueFloat, ok := value.(float64); ok {
-			newID := int(valueFloat)
+		} else {
+			var newID int
+			switch val := value.(type) {
+			case float64:
+				newID = int(val)
+			case int:
+				newID = val
+			default:
+				return &ValidationError{Field: fieldName, Message: fmt.Sprintf("Invalid %s type", entityName)}
+			}
 			// Validate entity exists
 			exists, err := v.EntityExists(tableName, newID)
 			if err != nil {
@@ -270,8 +310,16 @@ func (v *ItemFieldValidator) ValidateNullableUserID(
 	if value, ok := updateData[fieldName]; ok {
 		if value == nil {
 			*destination = nil
-		} else if valueFloat, ok := value.(float64); ok {
-			newID := int(valueFloat)
+		} else {
+			var newID int
+			switch val := value.(type) {
+			case float64:
+				newID = int(val)
+			case int:
+				newID = val
+			default:
+				return &ValidationError{Field: fieldName, Message: fmt.Sprintf("Invalid %s type", entityName)}
+			}
 			// Validate user exists
 			exists, err := v.EntityExists("users", newID)
 			if err != nil {

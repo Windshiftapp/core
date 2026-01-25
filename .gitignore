@@ -120,3 +120,5 @@ tests/cmd/testreport/testreport
 plugins/
 !plugins/.gitkeep
 bin
+WINDSHIFT.md
+AGENTS.md

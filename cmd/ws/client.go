@@ -380,6 +380,44 @@ func (c *Client) ExecuteRunTemplate(workspaceID, templateID int) (*TestRun, erro
 }
 
 // ============================================
+// Comment Methods
+// ============================================
+
+// GetComments lists comments on an item
+func (c *Client) GetComments(itemID int) ([]Comment, error) {
+	var comments []Comment
+	if err := c.GET(fmt.Sprintf("/rest/api/v1/items/%d/comments", itemID), &comments); err != nil {
+		return nil, err
+	}
+	return comments, nil
+}
+
+// CreateComment adds a comment to an item
+func (c *Client) CreateComment(itemID int, content string) (*Comment, error) {
+	req := map[string]string{"content": content}
+	var comment Comment
+	if err := c.POST(fmt.Sprintf("/rest/api/v1/items/%d/comments", itemID), req, &comment); err != nil {
+		return nil, err
+	}
+	return &comment, nil
+}
+
+// UpdateComment edits an existing comment
+func (c *Client) UpdateComment(commentID int, content string) (*Comment, error) {
+	req := map[string]string{"content": content}
+	var comment Comment
+	if err := c.PUT(fmt.Sprintf("/rest/api/v1/comments/%d", commentID), req, &comment); err != nil {
+		return nil, err
+	}
+	return &comment, nil
+}
+
+// DeleteComment removes a comment
+func (c *Client) DeleteComment(commentID int) error {
+	return c.DELETE(fmt.Sprintf("/rest/api/v1/comments/%d", commentID))
+}
+
+// ============================================
 // Helper Methods
 // ============================================
 

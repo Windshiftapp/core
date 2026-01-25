@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"windshift/internal/models"
+	"windshift/internal/services"
 )
 
 // MapUserToSummary converts a models.User to a UserSummary DTO
@@ -321,6 +322,33 @@ func MapTransitionsToResponse(transitions []models.WorkflowTransition) []Transit
 	result := make([]TransitionResponse, len(transitions))
 	for i := range transitions {
 		result[i] = *MapWorkflowTransitionToResponse(&transitions[i])
+	}
+	return result
+}
+
+// MapServiceTransitionsToResponse converts WorkflowTransitionResult from services to TransitionResponse DTOs
+func MapServiceTransitionsToResponse(transitions []services.WorkflowTransitionResult) []TransitionResponse {
+	result := make([]TransitionResponse, len(transitions))
+	for i, t := range transitions {
+		resp := TransitionResponse{
+			ID:           t.ID,
+			FromStatusID: t.FromStatusID,
+			ToStatusID:   t.ToStatusID,
+		}
+
+		if t.FromStatusID != nil {
+			resp.FromStatus = &StatusSummary{
+				ID:   *t.FromStatusID,
+				Name: t.FromStatusName,
+			}
+		}
+
+		resp.ToStatus = &StatusSummary{
+			ID:   t.ToStatusID,
+			Name: t.ToStatusName,
+		}
+
+		result[i] = resp
 	}
 	return result
 }

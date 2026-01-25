@@ -516,9 +516,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Get underlying *sql.DB for legacy handlers
-	sqlDB := db.GetDB()
-
 	// Initialize permission service for caching
 	permService, err := services.NewPermissionService(db, services.PermissionCacheConfig{
 		TTL:          15 * time.Minute,
@@ -976,12 +973,13 @@ func main() {
 	if attachmentPath != "" {
 		slog.Info("attachments enabled", "path", attachmentPath)
 		attachmentHandler = handlers.NewAttachmentHandler(db, attachmentPath, permService)
-		attachmentSettingsHandler = handlers.NewAttachmentSettingsHandlerWithPool(db)
 
-		// Initialize attachment settings in database
-		if err := initializeAttachmentSettings(sqlDB, attachmentPath); err != nil {
+		// Create attachment settings service and initialize
+		attachmentSettingsService := services.NewAttachmentSettingsService(db)
+		if err := attachmentSettingsService.Initialize(attachmentPath); err != nil {
 			slog.Warn("failed to initialize attachment settings", "error", err)
 		}
+		attachmentSettingsHandler = handlers.NewAttachmentSettingsHandler(attachmentSettingsService)
 	} else {
 		slog.Info("attachments disabled (no --attachment-path specified)")
 	}
@@ -1402,31 +1400,4 @@ func main() {
 	}
 
 	slog.Info("all servers stopped successfully")
-}
-
-// initializeAttachmentSettings creates initial attachment settings in the database
-func initializeAttachmentSettings(db *sql.DB, attachmentPath string) error {
-	// Check if settings already exist
-	var exists bool
-	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM attachment_settings)").Scan(&exists)
-	if err != nil {
-		return err
-	}
-
-	if !exists {
-		// Create initial settings
-		_, err = db.Exec(`
-			INSERT INTO attachment_settings (max_file_size, allowed_mime_types, attachment_path, enabled)
-			VALUES (52428800, '[]', ?, true)
-		`, attachmentPath)
-		return err
-	}
-
-	// Update attachment path if it has changed
-	_, err = db.Exec(`
-		UPDATE attachment_settings 
-		SET attachment_path = ?, updated_at = CURRENT_TIMESTAMP 
-		WHERE id = (SELECT MIN(id) FROM attachment_settings)
-	`, attachmentPath)
-	return err
 }

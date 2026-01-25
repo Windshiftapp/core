@@ -84,6 +84,10 @@ func (o *Output) printTable(data interface{}) {
 		o.printTestSetDetailTable(w, v)
 	case []Transition:
 		o.printTransitionsTable(w, v)
+	case []Comment:
+		o.printCommentsTable(w, v)
+	case *Comment:
+		o.printCommentDetailTable(w, v)
 	default:
 		// Fallback to JSON for unknown types
 		o.printJSON(data)
@@ -325,6 +329,31 @@ func (o *Output) printTransitionsTable(w *tabwriter.Writer, transitions []Transi
 		}
 		fmt.Fprintf(w, "%d\t%s\n", t.ToStatusID, name)
 	}
+}
+
+func (o *Output) printCommentsTable(w *tabwriter.Writer, comments []Comment) {
+	fmt.Fprintln(w, "ID\tAUTHOR\tCREATED\tCONTENT")
+	fmt.Fprintln(w, "--\t------\t-------\t-------")
+	for _, c := range comments {
+		author := ""
+		if c.Author != nil {
+			author = c.Author.Name
+		}
+		created := c.CreatedAt.Format("2006-01-02 15:04")
+		content := truncateString(c.Content, 50)
+		fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", c.ID, author, created, content)
+	}
+}
+
+func (o *Output) printCommentDetailTable(w *tabwriter.Writer, c *Comment) {
+	fmt.Fprintf(w, "ID:\t%d\n", c.ID)
+	fmt.Fprintf(w, "Item ID:\t%d\n", c.ItemID)
+	if c.Author != nil {
+		fmt.Fprintf(w, "Author:\t%s\n", c.Author.Name)
+	}
+	fmt.Fprintf(w, "Created:\t%s\n", c.CreatedAt.Format("2006-01-02 15:04:05"))
+	fmt.Fprintf(w, "Updated:\t%s\n", c.UpdatedAt.Format("2006-01-02 15:04:05"))
+	fmt.Fprintf(w, "Content:\n%s\n", c.Content)
 }
 
 func truncateString(s string, maxLen int) string {

@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"database/sql"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
@@ -14,15 +14,15 @@ import (
 
 // UserHandler handles public API requests for users
 type UserHandler struct {
-	db                database.Database
 	permissionService *services.PermissionService
+	userSvc           *services.UserReadService
 }
 
 // NewUserHandler creates a new user handler
 func NewUserHandler(db database.Database, permissionService *services.PermissionService) *UserHandler {
 	return &UserHandler{
-		db:                db,
 		permissionService: permissionService,
+		userSvc:           services.NewUserReadService(db),
 	}
 }
 
@@ -58,36 +58,22 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	pagination := restapi.ParsePaginationParams(r)
 
-	rows, err := h.db.Query(`
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url, timezone, language, created_at
-		FROM users
-		WHERE is_active = 1
-		ORDER BY first_name, last_name
-		LIMIT ? OFFSET ?
-	`, pagination.Limit, pagination.Offset)
+	users, total, err := h.userSvc.List(services.PaginationParams{
+		Limit:  pagination.Limit,
+		Offset: pagination.Offset,
+	})
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
 	}
-	defer rows.Close()
 
-	var users []UserResponse
-	for rows.Next() {
-		var u UserResponse
-		var avatarURL, timezone, language sql.NullString
-		rows.Scan(&u.ID, &u.Email, &u.Username, &u.FirstName, &u.LastName, &u.IsActive,
-			&avatarURL, &timezone, &language, &u.CreatedAt)
-		u.FullName = u.FirstName + " " + u.LastName
-		u.AvatarURL = nullStringValue(avatarURL)
-		u.Timezone = nullStringValue(timezone)
-		u.Language = nullStringValue(language)
-		users = append(users, u)
+	// Map to response DTOs
+	response := make([]UserResponse, len(users))
+	for i, u := range users {
+		response[i] = mapUserToResponse(&u)
 	}
 
-	var total int
-	h.db.QueryRow("SELECT COUNT(*) FROM users WHERE is_active = 1").Scan(&total)
-
-	restapi.RespondPaginated(w, users, restapi.NewPaginationMeta(pagination, total))
+	restapi.RespondPaginated(w, response, restapi.NewPaginationMeta(pagination, total))
 }
 
 // Get handles GET /rest/api/v1/users/{id}
@@ -104,28 +90,17 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var u UserResponse
-	var avatarURL, timezone, language sql.NullString
-	err = h.db.QueryRow(`
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url, timezone, language, created_at
-		FROM users WHERE id = ?
-	`, id).Scan(&u.ID, &u.Email, &u.Username, &u.FirstName, &u.LastName, &u.IsActive,
-		&avatarURL, &timezone, &language, &u.CreatedAt)
-	if err == sql.ErrNoRows {
-		restapi.RespondError(w, r, restapi.ErrUserNotFound)
-		return
-	}
+	u, err := h.userSvc.GetByID(id)
 	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			restapi.RespondError(w, r, restapi.ErrUserNotFound)
+			return
+		}
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
 	}
 
-	u.FullName = u.FirstName + " " + u.LastName
-	u.AvatarURL = nullStringValue(avatarURL)
-	u.Timezone = nullStringValue(timezone)
-	u.Language = nullStringValue(language)
-
-	restapi.RespondOK(w, u)
+	restapi.RespondOK(w, mapUserToResponse(u))
 }
 
 // GetCurrent handles GET /rest/api/v1/users/me
@@ -136,22 +111,28 @@ func (h *UserHandler) GetCurrent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var u UserResponse
-	var avatarURL, timezone, language sql.NullString
-	err := h.db.QueryRow(`
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url, timezone, language, created_at
-		FROM users WHERE id = ?
-	`, user.ID).Scan(&u.ID, &u.Email, &u.Username, &u.FirstName, &u.LastName, &u.IsActive,
-		&avatarURL, &timezone, &language, &u.CreatedAt)
+	u, err := h.userSvc.GetByID(user.ID)
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
 	}
 
-	u.FullName = u.FirstName + " " + u.LastName
-	u.AvatarURL = nullStringValue(avatarURL)
-	u.Timezone = nullStringValue(timezone)
-	u.Language = nullStringValue(language)
+	restapi.RespondOK(w, mapUserToResponse(u))
+}
 
-	restapi.RespondOK(w, u)
+// mapUserToResponse converts a models.User to UserResponse
+func mapUserToResponse(u *models.User) UserResponse {
+	return UserResponse{
+		ID:        u.ID,
+		Email:     u.Email,
+		Username:  u.Username,
+		FirstName: u.FirstName,
+		LastName:  u.LastName,
+		FullName:  u.FullName,
+		IsActive:  u.IsActive,
+		AvatarURL: u.AvatarURL,
+		Timezone:  u.Timezone,
+		Language:  u.Language,
+		CreatedAt: u.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
 }

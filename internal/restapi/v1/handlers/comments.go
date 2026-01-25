@@ -1,12 +1,10 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
-
 
 	"windshift/internal/database"
 	"windshift/internal/restapi"
@@ -18,16 +16,23 @@ import (
 
 // CommentHandler handles public API requests for standalone comments
 type CommentHandler struct {
-	db    database.Database
-	perms *shared.PermissionHelper
+	db             database.Database
+	perms          *shared.PermissionHelper
+	commentService *services.CommentService
 }
 
 // NewCommentHandler creates a new comment handler
 func NewCommentHandler(db database.Database, permissionService *services.PermissionService) *CommentHandler {
 	return &CommentHandler{
-		db:    db,
-		perms: shared.NewPermissionHelper(db, permissionService),
+		db:             db,
+		perms:          shared.NewPermissionHelper(db, permissionService),
+		commentService: services.NewCommentService(db),
 	}
+}
+
+// SetCommentService allows injecting a configured comment service
+func (h *CommentHandler) SetCommentService(cs *services.CommentService) {
+	h.commentService = cs
 }
 
 // Get handles GET /rest/api/v1/comments/{id}
@@ -44,42 +49,32 @@ func (h *CommentHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get comment with item info for permission check
-	var comment dto.CommentResponse
-	var itemID, workspaceID int
-	var authorName, authorEmail sql.NullString
-
-	err = h.db.QueryRow(`
-		SELECT c.id, c.item_id, c.author_id, c.content, c.created_at, c.updated_at,
-		       u.first_name || ' ' || u.last_name as author_name, u.email as author_email,
-		       i.workspace_id
-		FROM comments c
-		LEFT JOIN users u ON c.author_id = u.id
-		JOIN items i ON c.item_id = i.id
-		WHERE c.id = ?
-	`, commentID).Scan(&comment.ID, &itemID, &comment.Author, &comment.Content,
-		&comment.CreatedAt, &comment.UpdatedAt, &authorName, &authorEmail, &workspaceID)
-	if err == sql.ErrNoRows {
-		restapi.RespondError(w, r, restapi.ErrNotFound)
-		return
-	}
+	// Use service to get comment
+	commentWithDetails, err := h.commentService.Get(commentID)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		restapi.RespondError(w, r, restapi.ErrNotFound)
 		return
 	}
 
 	// Check permission
-	canView, _ := h.perms.CanViewWorkspace(user.ID, workspaceID)
+	canView, _ := h.perms.CanViewWorkspace(user.ID, commentWithDetails.WorkspaceID)
 	if !canView {
 		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
 		return
 	}
 
-	comment.ItemID = itemID
-	if authorName.Valid {
+	// Convert to DTO response
+	comment := dto.CommentResponse{
+		ID:        commentWithDetails.ID,
+		ItemID:    commentWithDetails.ItemID,
+		Content:   commentWithDetails.Content,
+		CreatedAt: commentWithDetails.CreatedAt,
+		UpdatedAt: commentWithDetails.UpdatedAt,
+	}
+	if commentWithDetails.AuthorName != "" {
 		comment.Author = &dto.UserSummary{
-			FullName: authorName.String,
-			Email:    authorEmail.String,
+			FullName: commentWithDetails.AuthorName,
+			Email:    commentWithDetails.AuthorEmail,
 		}
 	}
 
@@ -100,18 +95,14 @@ func (h *CommentHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get comment to check ownership
-	var authorID, workspaceID int
-	err = h.db.QueryRow(`
-		SELECT c.author_id, i.workspace_id
-		FROM comments c
-		JOIN items i ON c.item_id = i.id
-		WHERE c.id = ?
-	`, commentID).Scan(&authorID, &workspaceID)
-	if err == sql.ErrNoRows {
+	// Get comment to check ownership using service
+	authorID, err := h.commentService.GetAuthorID(commentID)
+	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrNotFound)
 		return
 	}
+
+	workspaceID, err := h.commentService.GetWorkspaceIDForComment(commentID)
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
@@ -137,32 +128,25 @@ func (h *CommentHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.db.ExecWrite(`
-		UPDATE comments SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-	`, req.Content, commentID)
+	// Use service to update comment
+	updatedComment, err := h.commentService.Update(commentID, req.Content, user.ID)
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
 	}
 
-	// Return updated comment
-	var comment dto.CommentResponse
-	var itemID int
-	var authorName, authorEmail sql.NullString
-	h.db.QueryRow(`
-		SELECT c.id, c.item_id, c.author_id, c.content, c.created_at, c.updated_at,
-		       u.first_name || ' ' || u.last_name as author_name, u.email as author_email
-		FROM comments c
-		LEFT JOIN users u ON c.author_id = u.id
-		WHERE c.id = ?
-	`, commentID).Scan(&comment.ID, &itemID, &comment.Author, &comment.Content,
-		&comment.CreatedAt, &comment.UpdatedAt, &authorName, &authorEmail)
-
-	comment.ItemID = itemID
-	if authorName.Valid {
+	// Convert to DTO response
+	comment := dto.CommentResponse{
+		ID:        updatedComment.ID,
+		ItemID:    updatedComment.ItemID,
+		Content:   updatedComment.Content,
+		CreatedAt: updatedComment.CreatedAt,
+		UpdatedAt: updatedComment.UpdatedAt,
+	}
+	if updatedComment.AuthorName != "" {
 		comment.Author = &dto.UserSummary{
-			FullName: authorName.String,
-			Email:    authorEmail.String,
+			FullName: updatedComment.AuthorName,
+			Email:    updatedComment.AuthorEmail,
 		}
 	}
 
@@ -183,18 +167,14 @@ func (h *CommentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get comment to check ownership
-	var authorID, workspaceID int
-	err = h.db.QueryRow(`
-		SELECT c.author_id, i.workspace_id
-		FROM comments c
-		JOIN items i ON c.item_id = i.id
-		WHERE c.id = ?
-	`, commentID).Scan(&authorID, &workspaceID)
-	if err == sql.ErrNoRows {
+	// Get comment to check ownership using service
+	authorID, err := h.commentService.GetAuthorID(commentID)
+	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrNotFound)
 		return
 	}
+
+	workspaceID, err := h.commentService.GetWorkspaceIDForComment(commentID)
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
@@ -209,7 +189,8 @@ func (h *CommentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_, err = h.db.ExecWrite("DELETE FROM comments WHERE id = ?", commentID)
+	// Use service to delete comment
+	err = h.commentService.Delete(commentID)
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return

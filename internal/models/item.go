@@ -121,6 +121,7 @@ type Comment struct {
 	AuthorID         *int      `json:"author_id,omitempty"`          // User ID (nullable for portal customer comments)
 	PortalCustomerID *int      `json:"portal_customer_id,omitempty"` // Portal customer ID (for email-based comments)
 	Content          string    `json:"content"`                      // TipTap JSON content
+	IsPrivate        bool      `json:"is_private"`                   // For private notes (action automation)
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 	// Joined fields for API responses

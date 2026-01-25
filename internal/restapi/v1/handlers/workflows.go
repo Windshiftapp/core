@@ -1,25 +1,33 @@
 package handlers
 
 import (
-	"database/sql"
 	"net/http"
 	"strconv"
-
 
 	"windshift/internal/database"
 	"windshift/internal/restapi"
 	"windshift/internal/restapi/v1/dto"
 	"windshift/internal/restapi/v1/middleware"
+	"windshift/internal/services"
 )
 
 // WorkflowHandler handles public API requests for workflows
 type WorkflowHandler struct {
-	db database.Database
+	db              database.Database
+	workflowService *services.WorkflowService
 }
 
 // NewWorkflowHandler creates a new workflow handler
 func NewWorkflowHandler(db database.Database) *WorkflowHandler {
-	return &WorkflowHandler{db: db}
+	return &WorkflowHandler{
+		db:              db,
+		workflowService: services.NewWorkflowService(db),
+	}
+}
+
+// SetWorkflowService allows injecting a configured workflow service
+func (h *WorkflowHandler) SetWorkflowService(ws *services.WorkflowService) {
+	h.workflowService = ws
 }
 
 // WorkflowResponse is the public API representation of a Workflow
@@ -41,26 +49,26 @@ func (h *WorkflowHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := h.db.Query(`
-		SELECT id, name, description, is_default, created_at, updated_at
-		FROM workflows
-		ORDER BY name
-	`)
+	results, err := h.workflowService.List()
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
 	}
-	defer rows.Close()
 
 	var workflows []WorkflowResponse
-	for rows.Next() {
-		var wf WorkflowResponse
-		var description sql.NullString
-		rows.Scan(&wf.ID, &wf.Name, &description, &wf.IsDefault, &wf.CreatedAt, &wf.UpdatedAt)
-		if description.Valid {
-			wf.Description = description.String
-		}
-		workflows = append(workflows, wf)
+	for _, wf := range results {
+		workflows = append(workflows, WorkflowResponse{
+			ID:          wf.ID,
+			Name:        wf.Name,
+			Description: wf.Description,
+			IsDefault:   wf.IsDefault,
+			CreatedAt:   wf.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			UpdatedAt:   wf.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		})
+	}
+
+	if workflows == nil {
+		workflows = []WorkflowResponse{}
 	}
 
 	restapi.RespondOK(w, workflows)
@@ -80,23 +88,19 @@ func (h *WorkflowHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var wf WorkflowResponse
-	var description sql.NullString
-	err = h.db.QueryRow(`
-		SELECT id, name, description, is_default, created_at, updated_at
-		FROM workflows WHERE id = ?
-	`, id).Scan(&wf.ID, &wf.Name, &description, &wf.IsDefault, &wf.CreatedAt, &wf.UpdatedAt)
-	if err == sql.ErrNoRows {
+	wfResult, err := h.workflowService.GetByID(id)
+	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrNotFound)
 		return
 	}
-	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
-		return
-	}
 
-	if description.Valid {
-		wf.Description = description.String
+	wf := WorkflowResponse{
+		ID:          wfResult.ID,
+		Name:        wfResult.Name,
+		Description: wfResult.Description,
+		IsDefault:   wfResult.IsDefault,
+		CreatedAt:   wfResult.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:   wfResult.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 
 	// Check for expand=transitions
@@ -124,9 +128,8 @@ func (h *WorkflowHandler) GetTransitions(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Check workflow exists
-	var exists int
-	err = h.db.QueryRow("SELECT 1 FROM workflows WHERE id = ?", id).Scan(&exists)
-	if err == sql.ErrNoRows {
+	exists, err := h.workflowService.Exists(id)
+	if err != nil || !exists {
 		restapi.RespondError(w, r, restapi.ErrNotFound)
 		return
 	}
@@ -141,54 +144,39 @@ func (h *WorkflowHandler) GetTransitions(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *WorkflowHandler) getWorkflowTransitions(workflowID int) ([]dto.TransitionResponse, error) {
-	rows, err := h.db.Query(`
-		SELECT wt.id, wt.from_status_id, wt.to_status_id,
-		       fs.name as from_status_name, ts.name as to_status_name,
-		       fsc.name as from_category_name, fsc.color as from_category_color,
-		       tsc.name as to_category_name, tsc.color as to_category_color
-		FROM workflow_transitions wt
-		LEFT JOIN statuses fs ON wt.from_status_id = fs.id
-		JOIN statuses ts ON wt.to_status_id = ts.id
-		LEFT JOIN status_categories fsc ON fs.category_id = fsc.id
-		JOIN status_categories tsc ON ts.category_id = tsc.id
-		WHERE wt.workflow_id = ?
-		ORDER BY wt.display_order
-	`, workflowID)
+	results, err := h.workflowService.GetTransitions(workflowID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	var transitions []dto.TransitionResponse
-	for rows.Next() {
-		var t dto.TransitionResponse
-		var fromStatusID sql.NullInt64
-		var fromStatusName, fromCategoryName, fromCategoryColor sql.NullString
-		var toCategoryName, toCategoryColor string
+	for _, t := range results {
+		tr := dto.TransitionResponse{
+			ID:         t.ID,
+			ToStatusID: t.ToStatusID,
+			ToStatus: &dto.StatusSummary{
+				ID:            t.ToStatusID,
+				Name:          t.ToStatusName,
+				CategoryName:  t.ToCategoryName,
+				CategoryColor: t.ToCategoryColor,
+			},
+		}
 
-		rows.Scan(&t.ID, &fromStatusID, &t.ToStatusID,
-			&fromStatusName, &t.ToStatus.Name,
-			&fromCategoryName, &fromCategoryColor,
-			&toCategoryName, &toCategoryColor)
-
-		if fromStatusID.Valid {
-			id := int(fromStatusID.Int64)
-			t.FromStatusID = &id
-			t.FromStatus = &dto.StatusSummary{
-				ID:            id,
-				Name:          fromStatusName.String,
-				CategoryName:  fromCategoryName.String,
-				CategoryColor: fromCategoryColor.String,
+		if t.FromStatusID != nil {
+			tr.FromStatusID = t.FromStatusID
+			tr.FromStatus = &dto.StatusSummary{
+				ID:            *t.FromStatusID,
+				Name:          t.FromStatusName,
+				CategoryName:  t.FromCategoryName,
+				CategoryColor: t.FromCategoryColor,
 			}
 		}
 
-		t.ToStatus = &dto.StatusSummary{
-			ID:            t.ToStatusID,
-			CategoryName:  toCategoryName,
-			CategoryColor: toCategoryColor,
-		}
+		transitions = append(transitions, tr)
+	}
 
-		transitions = append(transitions, t)
+	if transitions == nil {
+		transitions = []dto.TransitionResponse{}
 	}
 
 	return transitions, nil

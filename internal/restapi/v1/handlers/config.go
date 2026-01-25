@@ -1,14 +1,13 @@
 package handlers
 
 import (
-	"database/sql"
 	"net/http"
 	"strconv"
-
 
 	"windshift/internal/database"
 	"windshift/internal/restapi"
 	"windshift/internal/restapi/v1/middleware"
+	"windshift/internal/services"
 )
 
 // ========================================
@@ -16,11 +15,11 @@ import (
 // ========================================
 
 type ItemTypeHandler struct {
-	db database.Database
+	configSvc *services.ConfigReadService
 }
 
 func NewItemTypeHandler(db database.Database) *ItemTypeHandler {
-	return &ItemTypeHandler{db: db}
+	return &ItemTypeHandler{configSvc: services.NewConfigReadService(db)}
 }
 
 type ItemTypeResponse struct {
@@ -41,26 +40,28 @@ func (h *ItemTypeHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := h.db.Query(`
-		SELECT id, name, description, icon, color, hierarchy_level, sort_order, is_default
-		FROM item_types
-		ORDER BY hierarchy_level, sort_order, name
-	`)
+	results, err := h.configSvc.ListItemTypes()
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
 	}
-	defer rows.Close()
 
 	var types []ItemTypeResponse
-	for rows.Next() {
-		var t ItemTypeResponse
-		var description, icon, color sql.NullString
-		rows.Scan(&t.ID, &t.Name, &description, &icon, &color, &t.HierarchyLevel, &t.SortOrder, &t.IsDefault)
-		t.Description = nullStringValue(description)
-		t.Icon = nullStringValue(icon)
-		t.Color = nullStringValue(color)
-		types = append(types, t)
+	for _, t := range results {
+		types = append(types, ItemTypeResponse{
+			ID:             t.ID,
+			Name:           t.Name,
+			Description:    t.Description,
+			Icon:           t.Icon,
+			Color:          t.Color,
+			HierarchyLevel: t.HierarchyLevel,
+			SortOrder:      t.SortOrder,
+			IsDefault:      t.IsDefault,
+		})
+	}
+
+	if types == nil {
+		types = []ItemTypeResponse{}
 	}
 
 	restapi.RespondOK(w, types)
@@ -79,26 +80,22 @@ func (h *ItemTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var t ItemTypeResponse
-	var description, icon, color sql.NullString
-	err = h.db.QueryRow(`
-		SELECT id, name, description, icon, color, hierarchy_level, sort_order, is_default
-		FROM item_types WHERE id = ?
-	`, id).Scan(&t.ID, &t.Name, &description, &icon, &color, &t.HierarchyLevel, &t.SortOrder, &t.IsDefault)
-	if err == sql.ErrNoRows {
+	t, err := h.configSvc.GetItemType(id)
+	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrNotFound)
 		return
 	}
-	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
-		return
-	}
 
-	t.Description = nullStringValue(description)
-	t.Icon = nullStringValue(icon)
-	t.Color = nullStringValue(color)
-
-	restapi.RespondOK(w, t)
+	restapi.RespondOK(w, ItemTypeResponse{
+		ID:             t.ID,
+		Name:           t.Name,
+		Description:    t.Description,
+		Icon:           t.Icon,
+		Color:          t.Color,
+		HierarchyLevel: t.HierarchyLevel,
+		SortOrder:      t.SortOrder,
+		IsDefault:      t.IsDefault,
+	})
 }
 
 // ========================================
@@ -106,11 +103,11 @@ func (h *ItemTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 // ========================================
 
 type PriorityHandler struct {
-	db database.Database
+	configSvc *services.ConfigReadService
 }
 
 func NewPriorityHandler(db database.Database) *PriorityHandler {
-	return &PriorityHandler{db: db}
+	return &PriorityHandler{configSvc: services.NewConfigReadService(db)}
 }
 
 type PriorityResponse struct {
@@ -130,26 +127,27 @@ func (h *PriorityHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := h.db.Query(`
-		SELECT id, name, description, icon, color, sort_order, is_default
-		FROM priorities
-		ORDER BY sort_order, name
-	`)
+	results, err := h.configSvc.ListPriorities()
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
 	}
-	defer rows.Close()
 
 	var priorities []PriorityResponse
-	for rows.Next() {
-		var p PriorityResponse
-		var description, icon, color sql.NullString
-		rows.Scan(&p.ID, &p.Name, &description, &icon, &color, &p.SortOrder, &p.IsDefault)
-		p.Description = nullStringValue(description)
-		p.Icon = nullStringValue(icon)
-		p.Color = nullStringValue(color)
-		priorities = append(priorities, p)
+	for _, p := range results {
+		priorities = append(priorities, PriorityResponse{
+			ID:          p.ID,
+			Name:        p.Name,
+			Description: p.Description,
+			Icon:        p.Icon,
+			Color:       p.Color,
+			SortOrder:   p.SortOrder,
+			IsDefault:   p.IsDefault,
+		})
+	}
+
+	if priorities == nil {
+		priorities = []PriorityResponse{}
 	}
 
 	restapi.RespondOK(w, priorities)
@@ -168,26 +166,21 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var p PriorityResponse
-	var description, icon, color sql.NullString
-	err = h.db.QueryRow(`
-		SELECT id, name, description, icon, color, sort_order, is_default
-		FROM priorities WHERE id = ?
-	`, id).Scan(&p.ID, &p.Name, &description, &icon, &color, &p.SortOrder, &p.IsDefault)
-	if err == sql.ErrNoRows {
+	p, err := h.configSvc.GetPriority(id)
+	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrNotFound)
 		return
 	}
-	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
-		return
-	}
 
-	p.Description = nullStringValue(description)
-	p.Icon = nullStringValue(icon)
-	p.Color = nullStringValue(color)
-
-	restapi.RespondOK(w, p)
+	restapi.RespondOK(w, PriorityResponse{
+		ID:          p.ID,
+		Name:        p.Name,
+		Description: p.Description,
+		Icon:        p.Icon,
+		Color:       p.Color,
+		SortOrder:   p.SortOrder,
+		IsDefault:   p.IsDefault,
+	})
 }
 
 // ========================================
@@ -195,11 +188,11 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 // ========================================
 
 type CustomFieldHandler struct {
-	db database.Database
+	configSvc *services.ConfigReadService
 }
 
 func NewCustomFieldHandler(db database.Database) *CustomFieldHandler {
-	return &CustomFieldHandler{db: db}
+	return &CustomFieldHandler{configSvc: services.NewConfigReadService(db)}
 }
 
 type CustomFieldResponse struct {
@@ -219,25 +212,27 @@ func (h *CustomFieldHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := h.db.Query(`
-		SELECT id, name, field_type, description, options, required, display_order
-		FROM custom_field_definitions
-		ORDER BY display_order, name
-	`)
+	results, err := h.configSvc.ListCustomFields()
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
 	}
-	defer rows.Close()
 
 	var fields []CustomFieldResponse
-	for rows.Next() {
-		var f CustomFieldResponse
-		var description, options sql.NullString
-		rows.Scan(&f.ID, &f.Name, &f.FieldType, &description, &options, &f.Required, &f.DisplayOrder)
-		f.Description = nullStringValue(description)
-		f.Options = nullStringValue(options)
-		fields = append(fields, f)
+	for _, f := range results {
+		fields = append(fields, CustomFieldResponse{
+			ID:           f.ID,
+			Name:         f.Name,
+			FieldType:    f.FieldType,
+			Description:  f.Description,
+			Options:      f.Options,
+			Required:     f.Required,
+			DisplayOrder: f.DisplayOrder,
+		})
+	}
+
+	if fields == nil {
+		fields = []CustomFieldResponse{}
 	}
 
 	restapi.RespondOK(w, fields)
@@ -256,23 +251,19 @@ func (h *CustomFieldHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var f CustomFieldResponse
-	var description, options sql.NullString
-	err = h.db.QueryRow(`
-		SELECT id, name, field_type, description, options, required, display_order
-		FROM custom_field_definitions WHERE id = ?
-	`, id).Scan(&f.ID, &f.Name, &f.FieldType, &description, &options, &f.Required, &f.DisplayOrder)
-	if err == sql.ErrNoRows {
+	f, err := h.configSvc.GetCustomField(id)
+	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrNotFound)
 		return
 	}
-	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
-		return
-	}
 
-	f.Description = nullStringValue(description)
-	f.Options = nullStringValue(options)
-
-	restapi.RespondOK(w, f)
+	restapi.RespondOK(w, CustomFieldResponse{
+		ID:           f.ID,
+		Name:         f.Name,
+		FieldType:    f.FieldType,
+		Description:  f.Description,
+		Options:      f.Options,
+		Required:     f.Required,
+		DisplayOrder: f.DisplayOrder,
+	})
 }

@@ -189,3 +189,211 @@ func (s *CommentService) Create(params CreateCommentParams) (*CreateCommentResul
 		CommentID: commentID,
 	}, nil
 }
+
+// CommentWithDetails contains a comment with its related details
+type CommentWithDetails struct {
+	models.Comment
+	WorkspaceID int
+	ItemTitle   string
+}
+
+// Get retrieves a comment by ID with author details
+func (s *CommentService) Get(commentID int) (*CommentWithDetails, error) {
+	var comment CommentWithDetails
+	var authorID sql.NullInt64
+	var authorFirstName, authorLastName, authorEmail sql.NullString
+
+	err := s.db.QueryRow(`
+		SELECT c.id, c.item_id, c.author_id, c.content, c.is_private, c.created_at, c.updated_at,
+		       u.first_name, u.last_name, u.email,
+		       i.workspace_id, i.title
+		FROM comments c
+		LEFT JOIN users u ON c.author_id = u.id
+		JOIN items i ON c.item_id = i.id
+		WHERE c.id = ?
+	`, commentID).Scan(
+		&comment.ID, &comment.ItemID, &authorID, &comment.Content, &comment.IsPrivate,
+		&comment.CreatedAt, &comment.UpdatedAt,
+		&authorFirstName, &authorLastName, &authorEmail,
+		&comment.WorkspaceID, &comment.ItemTitle,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("comment not found: %d", commentID)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch comment: %w", err)
+	}
+
+	if authorID.Valid {
+		id := int(authorID.Int64)
+		comment.AuthorID = &id
+	}
+	if authorFirstName.Valid && authorLastName.Valid {
+		comment.AuthorName = fmt.Sprintf("%s %s", authorFirstName.String, authorLastName.String)
+	}
+	if authorEmail.Valid {
+		comment.AuthorEmail = authorEmail.String
+	}
+
+	return &comment, nil
+}
+
+// Update updates a comment's content
+func (s *CommentService) Update(commentID int, content string, userID int) (*models.Comment, error) {
+	// Sanitize content
+	sanitizedContent := utils.StripHTMLTags(content)
+
+	// Check if comment exists and get author
+	var authorID int
+	err := s.db.QueryRow("SELECT author_id FROM comments WHERE id = ?", commentID).Scan(&authorID)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("comment not found: %d", commentID)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to check comment: %w", err)
+	}
+
+	// Update the comment
+	now := time.Now()
+	_, err = s.db.Exec(`
+		UPDATE comments SET content = ?, updated_at = ? WHERE id = ?
+	`, sanitizedContent, now, commentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update comment: %w", err)
+	}
+
+	// Fetch and return the updated comment
+	var comment models.Comment
+	var authorFirstName, authorLastName, authorEmail sql.NullString
+	var authorIDNull sql.NullInt64
+
+	err = s.db.QueryRow(`
+		SELECT c.id, c.item_id, c.author_id, c.content, c.is_private, c.created_at, c.updated_at,
+		       u.first_name, u.last_name, u.email
+		FROM comments c
+		LEFT JOIN users u ON c.author_id = u.id
+		WHERE c.id = ?
+	`, commentID).Scan(
+		&comment.ID, &comment.ItemID, &authorIDNull, &comment.Content, &comment.IsPrivate,
+		&comment.CreatedAt, &comment.UpdatedAt,
+		&authorFirstName, &authorLastName, &authorEmail,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch updated comment: %w", err)
+	}
+
+	if authorIDNull.Valid {
+		id := int(authorIDNull.Int64)
+		comment.AuthorID = &id
+	}
+	if authorFirstName.Valid && authorLastName.Valid {
+		comment.AuthorName = fmt.Sprintf("%s %s", authorFirstName.String, authorLastName.String)
+	}
+	if authorEmail.Valid {
+		comment.AuthorEmail = authorEmail.String
+	}
+
+	return &comment, nil
+}
+
+// Delete removes a comment
+func (s *CommentService) Delete(commentID int) error {
+	// Check if comment exists
+	var exists bool
+	err := s.db.QueryRow("SELECT EXISTS(SELECT 1 FROM comments WHERE id = ?)", commentID).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("failed to check comment: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("comment not found: %d", commentID)
+	}
+
+	_, err = s.db.Exec("DELETE FROM comments WHERE id = ?", commentID)
+	if err != nil {
+		return fmt.Errorf("failed to delete comment: %w", err)
+	}
+
+	return nil
+}
+
+// GetByItemID retrieves all comments for an item
+func (s *CommentService) GetByItemID(itemID int) ([]models.Comment, error) {
+	rows, err := s.db.Query(`
+		SELECT c.id, c.item_id, c.author_id, c.content, c.is_private, c.created_at, c.updated_at,
+		       u.first_name || ' ' || u.last_name as author_name, u.email as author_email
+		FROM comments c
+		LEFT JOIN users u ON c.author_id = u.id
+		WHERE c.item_id = ?
+		ORDER BY c.created_at DESC
+	`, itemID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch comments: %w", err)
+	}
+	defer rows.Close()
+
+	var comments []models.Comment
+	for rows.Next() {
+		var c models.Comment
+		var authorID sql.NullInt64
+		var authorName, authorEmail sql.NullString
+
+		err := rows.Scan(
+			&c.ID, &c.ItemID, &authorID, &c.Content, &c.IsPrivate,
+			&c.CreatedAt, &c.UpdatedAt, &authorName, &authorEmail,
+		)
+		if err != nil {
+			continue
+		}
+
+		if authorID.Valid {
+			id := int(authorID.Int64)
+			c.AuthorID = &id
+		}
+		if authorName.Valid {
+			c.AuthorName = authorName.String
+		}
+		if authorEmail.Valid {
+			c.AuthorEmail = authorEmail.String
+		}
+
+		comments = append(comments, c)
+	}
+
+	if comments == nil {
+		comments = []models.Comment{}
+	}
+
+	return comments, nil
+}
+
+// GetWorkspaceIDForComment returns the workspace ID for a comment's item
+func (s *CommentService) GetWorkspaceIDForComment(commentID int) (int, error) {
+	var workspaceID int
+	err := s.db.QueryRow(`
+		SELECT i.workspace_id
+		FROM comments c
+		JOIN items i ON c.item_id = i.id
+		WHERE c.id = ?
+	`, commentID).Scan(&workspaceID)
+	if err == sql.ErrNoRows {
+		return 0, fmt.Errorf("comment not found: %d", commentID)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to get workspace ID: %w", err)
+	}
+	return workspaceID, nil
+}
+
+// GetAuthorID returns the author ID of a comment
+func (s *CommentService) GetAuthorID(commentID int) (int, error) {
+	var authorID int
+	err := s.db.QueryRow("SELECT author_id FROM comments WHERE id = ?", commentID).Scan(&authorID)
+	if err == sql.ErrNoRows {
+		return 0, fmt.Errorf("comment not found: %d", commentID)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to get author ID: %w", err)
+	}
+	return authorID, nil
+}

@@ -221,6 +221,25 @@ func (s *ItemCRUDService) GetRootItems(workspaceID int) ([]*models.Item, error) 
 	return s.repo.GetRootItems(workspaceID)
 }
 
+// ItemListParams re-exports repository.ItemListParams for service layer consumers
+type ItemListParams = repository.ItemListParams
+
+// ItemFilters re-exports repository.ItemFilters for service layer consumers
+type ItemFilters = repository.ItemFilters
+
+// PaginationParams re-exports repository.PaginationParams for service layer consumers
+type PaginationParams = repository.PaginationParams
+
+// List retrieves items with filters and pagination using the repository
+func (s *ItemCRUDService) List(params ItemListParams) ([]models.Item, int, error) {
+	return s.repo.FindAllWithDetails(params)
+}
+
+// Search searches items by title and description
+func (s *ItemCRUDService) Search(query string, workspaceIDs []int, pagination PaginationParams) ([]models.Item, int, error) {
+	return s.repo.Search(query, workspaceIDs, pagination)
+}
+
 // GetWithEffectiveProject retrieves an item with effective project calculated
 // This is the most comprehensive Get method, used by the handler
 func (s *ItemCRUDService) GetWithEffectiveProject(id int) (*models.Item, error) {
@@ -268,4 +287,95 @@ func (s *ItemCRUDService) calculateEffectiveProject(itemID int) (*int, error) {
 	}
 
 	return nil, nil
+}
+
+// GetHistory retrieves the change history for an item
+func (s *ItemCRUDService) GetHistory(itemID int) ([]models.ItemHistory, error) {
+	rows, err := s.db.Query(`
+		SELECT h.id, h.item_id, h.user_id, h.changed_at, h.field_name, h.old_value, h.new_value,
+		       u.first_name || ' ' || u.last_name as user_name, u.email as user_email
+		FROM item_history h
+		LEFT JOIN users u ON h.user_id = u.id
+		WHERE h.item_id = ?
+		ORDER BY h.changed_at DESC
+	`, itemID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch item history: %w", err)
+	}
+	defer rows.Close()
+
+	var history []models.ItemHistory
+	for rows.Next() {
+		var h models.ItemHistory
+		var userName, userEmail sql.NullString
+		err := rows.Scan(&h.ID, &h.ItemID, &h.UserID, &h.ChangedAt, &h.FieldName, &h.OldValue, &h.NewValue,
+			&userName, &userEmail)
+		if err != nil {
+			continue
+		}
+		if userName.Valid {
+			h.UserName = userName.String
+		}
+		if userEmail.Valid {
+			h.UserEmail = userEmail.String
+		}
+		history = append(history, h)
+	}
+
+	if history == nil {
+		history = []models.ItemHistory{}
+	}
+
+	return history, nil
+}
+
+// GetAttachments retrieves all attachments for an item
+func (s *ItemCRUDService) GetAttachments(itemID int) ([]models.Attachment, error) {
+	rows, err := s.db.Query(`
+		SELECT a.id, a.item_id, a.filename, a.original_filename, a.mime_type, a.file_size,
+		       a.has_thumbnail, a.uploaded_by, a.created_at,
+		       u.first_name || ' ' || u.last_name as uploader_name, u.email as uploader_email
+		FROM attachments a
+		LEFT JOIN users u ON a.uploaded_by = u.id
+		WHERE a.item_id = ?
+		ORDER BY a.created_at DESC
+	`, itemID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch attachments: %w", err)
+	}
+	defer rows.Close()
+
+	var attachments []models.Attachment
+	for rows.Next() {
+		var a models.Attachment
+		var itemID sql.NullInt64
+		var uploaderID sql.NullInt64
+		var uploaderName, uploaderEmail sql.NullString
+		err := rows.Scan(&a.ID, &itemID, &a.Filename, &a.OriginalFilename, &a.MimeType, &a.FileSize,
+			&a.HasThumbnail, &uploaderID, &a.CreatedAt, &uploaderName, &uploaderEmail)
+		if err != nil {
+			continue
+		}
+		if itemID.Valid {
+			id := int(itemID.Int64)
+			a.ItemID = &id
+		}
+		if uploaderID.Valid {
+			id := int(uploaderID.Int64)
+			a.UploadedBy = &id
+		}
+		if uploaderName.Valid {
+			a.UploaderName = uploaderName.String
+		}
+		if uploaderEmail.Valid {
+			a.UploaderEmail = uploaderEmail.String
+		}
+		attachments = append(attachments, a)
+	}
+
+	if attachments == nil {
+		attachments = []models.Attachment{}
+	}
+
+	return attachments, nil
 }
