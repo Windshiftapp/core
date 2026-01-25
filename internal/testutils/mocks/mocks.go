@@ -1,6 +1,6 @@
 //go:build test
 
-package testutils
+package mocks
 
 import (
 	"net/http"

@@ -214,8 +214,8 @@ func (s *WorkspaceService) Update(params UpdateWorkspaceParams) (*WorkspaceListR
 		Name        string
 		Description string
 		Active      bool
-		Icon        string
-		Color       string
+		Icon        sql.NullString
+		Color       sql.NullString
 	}
 	err := s.db.QueryRow("SELECT id, name, description, active, icon, color FROM workspaces WHERE id = ?", params.ID).
 		Scan(&ws.ID, &ws.Name, &ws.Description, &ws.Active, &ws.Icon, &ws.Color)
@@ -237,16 +237,16 @@ func (s *WorkspaceService) Update(params UpdateWorkspaceParams) (*WorkspaceListR
 		ws.Active = *params.Active
 	}
 	if params.Icon != nil {
-		ws.Icon = *params.Icon
+		ws.Icon = sql.NullString{String: *params.Icon, Valid: true}
 	}
 	if params.Color != nil {
-		ws.Color = *params.Color
+		ws.Color = sql.NullString{String: *params.Color, Valid: true}
 	}
 
 	_, err = s.db.ExecWrite(`
 		UPDATE workspaces SET name = ?, description = ?, active = ?, icon = ?, color = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, ws.Name, ws.Description, ws.Active, ws.Icon, ws.Color, params.ID)
+	`, ws.Name, ws.Description, ws.Active, ws.Icon.String, ws.Color.String, params.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update workspace: %w", err)
 	}
