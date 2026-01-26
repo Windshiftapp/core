@@ -16,6 +16,13 @@ var taskCmd = &cobra.Command{
 var taskMineCmd = &cobra.Command{
 	Use:   "mine",
 	Short: "List tasks assigned to me",
+	Long: `List tasks assigned to the current user.
+
+Examples:
+  ws task mine                            # All my tasks
+  ws task mine -s ~done                   # My tasks excluding done
+  ws task mine --created today            # My tasks created today
+  ws task mine --updated -7d              # My tasks updated in last 7 days`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, err := NewClient()
 		if err != nil {
@@ -44,7 +51,39 @@ var taskMineCmd = &cobra.Command{
 
 		// Add optional filters from flags
 		if statusFilter != "" {
-			filters["status_id"] = statusFilter
+			if isNegatedFilter(statusFilter) {
+				resolved := cfg.ResolveStatus(stripNegation(statusFilter))
+				filters["status_id_not"] = resolved
+			} else {
+				resolved := cfg.ResolveStatus(statusFilter)
+				filters["status_id"] = resolved
+			}
+		}
+
+		// Add date filters
+		if createdFilter != "" {
+			from, to, err := parseRelativeDate(createdFilter)
+			if err != nil {
+				return err
+			}
+			if from != "" {
+				filters["created_after"] = from
+			}
+			if to != "" {
+				filters["created_before"] = to
+			}
+		}
+		if updatedFilter != "" {
+			from, to, err := parseRelativeDate(updatedFilter)
+			if err != nil {
+				return err
+			}
+			if from != "" {
+				filters["updated_after"] = from
+			}
+			if to != "" {
+				filters["updated_before"] = to
+			}
 		}
 
 		items, err := client.ListItems(filters)
@@ -105,9 +144,12 @@ var taskListCmd = &cobra.Command{
 
 Examples:
   ws task ls                              # List all accessible tasks
-  ws task ls --status 1                   # Filter by status ID
+  ws task ls -s 1                         # Filter by status ID
+  ws task ls -s ~done                     # Exclude done status (negation)
   ws task ls --assignee 5                 # Filter by assignee ID
-  ws task ls -w PROJ                      # Filter by workspace`,
+  ws task ls -w PROJ                      # Filter by workspace
+  ws task ls --created today              # Tasks created today
+  ws task ls --updated -7d                # Tasks updated in last 7 days`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, err := NewClient()
 		if err != nil {
@@ -127,7 +169,14 @@ Examples:
 
 		// Add optional filters from flags
 		if statusFilter != "" {
-			filters["status_id"] = statusFilter
+			if isNegatedFilter(statusFilter) {
+				// Negation: exclude this status
+				resolved := cfg.ResolveStatus(stripNegation(statusFilter))
+				filters["status_id_not"] = resolved
+			} else {
+				resolved := cfg.ResolveStatus(statusFilter)
+				filters["status_id"] = resolved
+			}
 		}
 		if assigneeFilter != "" {
 			filters["assignee_id"] = assigneeFilter
@@ -137,6 +186,32 @@ Examples:
 		}
 		if priorityFilter != "" {
 			filters["priority_id"] = priorityFilter
+		}
+
+		// Add date filters
+		if createdFilter != "" {
+			from, to, err := parseRelativeDate(createdFilter)
+			if err != nil {
+				return err
+			}
+			if from != "" {
+				filters["created_after"] = from
+			}
+			if to != "" {
+				filters["created_before"] = to
+			}
+		}
+		if updatedFilter != "" {
+			from, to, err := parseRelativeDate(updatedFilter)
+			if err != nil {
+				return err
+			}
+			if from != "" {
+				filters["updated_after"] = from
+			}
+			if to != "" {
+				filters["updated_before"] = to
+			}
 		}
 
 		items, err := client.ListItems(filters)
@@ -157,7 +232,8 @@ var taskGetCmd = &cobra.Command{
 
 Examples:
   ws task get 123                         # Get by ID
-  ws task get PROJ-45                     # Get by workspace key and item number`,
+  ws task get PROJ-45                     # Get by workspace key and item number
+  ws task get PROJ-45 --web               # Open in browser`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, err := NewClient()
@@ -176,6 +252,20 @@ Examples:
 			return fmt.Errorf("failed to get item: %w", err)
 		}
 
+		// Open in browser if requested
+		if openInBrowser {
+			wsKey := item.WorkspaceKey
+			if wsKey == "" {
+				wsKey = cfg.GetEffectiveWorkspace()
+			}
+			url := buildItemURL(wsKey, item.WorkspaceItemNumber)
+			if err := openBrowser(url); err != nil {
+				return fmt.Errorf("failed to open browser: %w", err)
+			}
+			fmt.Printf("Opened %s in browser\n", url)
+			return nil
+		}
+
 		output := NewOutput()
 		output.Print(item)
 		return nil
@@ -190,7 +280,8 @@ var taskCreateCmd = &cobra.Command{
 Examples:
   ws task create -t "Fix login bug"
   ws task create -t "Add feature" -d "Detailed description"
-  ws task create -t "Bug" --type 1 --priority 2`,
+  ws task create -t "Bug" --type 1 --priority 2
+  ws task create -t "New feature" --web    # Create and open in browser`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if createTitle == "" {
 			return fmt.Errorf("title is required: use -t or --title")
@@ -238,6 +329,15 @@ Examples:
 		item, err := client.CreateItem(req)
 		if err != nil {
 			return fmt.Errorf("failed to create item: %w", err)
+		}
+
+		// Open in browser if requested
+		if openInBrowser {
+			url := buildItemURL(wsKey, item.WorkspaceItemNumber)
+			if err := openBrowser(url); err != nil {
+				return fmt.Errorf("failed to open browser: %w", err)
+			}
+			fmt.Printf("Created %s-%d and opened in browser\n", wsKey, item.WorkspaceItemNumber)
 		}
 
 		output := NewOutput()
@@ -367,12 +467,89 @@ Examples:
 	},
 }
 
+var taskSetMilestoneCmd = &cobra.Command{
+	Use:   "set-milestone <item> [milestone]",
+	Short: "Assign item to milestone",
+	Long: `Assign an item to a milestone or remove it from its current milestone.
+
+Examples:
+  ws task set-milestone PROJ-123 5           # By milestone ID
+  ws task set-milestone PROJ-123 "v1.0"      # By milestone name
+  ws task set-milestone PROJ-123 --clear     # Remove from milestone`,
+	Args: cobra.RangeArgs(1, 2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := NewClient()
+		if err != nil {
+			return err
+		}
+
+		itemID, err := client.ResolveItemID(args[0])
+		if err != nil {
+			return fmt.Errorf("failed to resolve item: %w", err)
+		}
+
+		var milestoneID *int
+
+		if clearMilestone {
+			// Clear milestone - set to nil (use zero value)
+			zero := 0
+			milestoneID = &zero
+		} else if len(args) < 2 {
+			return fmt.Errorf("milestone argument required (or use --clear to remove)")
+		} else {
+			// Resolve workspace for milestone lookup
+			var wsID *int
+			if wsKey := cfg.GetEffectiveWorkspace(); wsKey != "" {
+				id, err := client.ResolveWorkspaceID(wsKey)
+				if err != nil {
+					return fmt.Errorf("failed to resolve workspace: %w", err)
+				}
+				wsID = &id
+			}
+
+			id, err := client.ResolveMilestoneID(args[1], wsID)
+			if err != nil {
+				return fmt.Errorf("failed to resolve milestone: %w", err)
+			}
+			milestoneID = &id
+		}
+
+		req := ItemUpdateRequest{
+			MilestoneID: milestoneID,
+		}
+
+		item, err := client.UpdateItem(itemID, req)
+		if err != nil {
+			return fmt.Errorf("failed to update item: %w", err)
+		}
+
+		// Show success message for table output
+		if outputFormat == "table" {
+			if clearMilestone {
+				fmt.Printf("Removed %s from milestone\n", args[0])
+			} else if item.Milestone != nil {
+				fmt.Printf("Assigned %s to milestone \"%s\"\n", args[0], item.Milestone.Name)
+			} else {
+				fmt.Printf("Updated %s milestone assignment\n", args[0])
+			}
+		}
+
+		output := NewOutput()
+		output.Print(item)
+		return nil
+	},
+}
+
 // Flags for task commands
 var (
 	statusFilter   string
 	assigneeFilter string
 	itemTypeFilter string
 	priorityFilter string
+	createdFilter  string
+	updatedFilter  string
+	openInBrowser  bool
+	clearMilestone bool
 
 	createTitle       string
 	createDescription string
@@ -391,13 +568,25 @@ func init() {
 	taskCmd.AddCommand(taskGetCmd)
 	taskCmd.AddCommand(taskCreateCmd)
 	taskCmd.AddCommand(taskMoveCmd)
+	taskCmd.AddCommand(taskSetMilestoneCmd)
 
 	// List filters
-	taskMineCmd.Flags().StringVar(&statusFilter, "status", "", "filter by status ID")
-	taskListCmd.Flags().StringVar(&statusFilter, "status", "", "filter by status ID")
+	taskMineCmd.Flags().StringVarP(&statusFilter, "status", "s", "", "filter by status (use ~status to exclude)")
+	taskMineCmd.Flags().StringVar(&createdFilter, "created", "", "filter by creation date (today, week, month, year, or -Nd)")
+	taskMineCmd.Flags().StringVar(&updatedFilter, "updated", "", "filter by update date (today, week, month, year, or -Nd)")
+	taskListCmd.Flags().StringVarP(&statusFilter, "status", "s", "", "filter by status (use ~status to exclude)")
 	taskListCmd.Flags().StringVar(&assigneeFilter, "assignee", "", "filter by assignee ID")
 	taskListCmd.Flags().StringVar(&itemTypeFilter, "type", "", "filter by item type ID")
 	taskListCmd.Flags().StringVar(&priorityFilter, "priority", "", "filter by priority ID")
+	taskListCmd.Flags().StringVar(&createdFilter, "created", "", "filter by creation date (today, week, month, year, or -Nd)")
+	taskListCmd.Flags().StringVar(&updatedFilter, "updated", "", "filter by update date (today, week, month, year, or -Nd)")
+
+	// Browser flags
+	taskGetCmd.Flags().BoolVar(&openInBrowser, "web", false, "open task in browser")
+	taskCreateCmd.Flags().BoolVar(&openInBrowser, "web", false, "open task in browser after creation")
+
+	// Set-milestone flags
+	taskSetMilestoneCmd.Flags().BoolVar(&clearMilestone, "clear", false, "remove item from milestone")
 
 	// Create flags
 	taskCreateCmd.Flags().StringVarP(&createTitle, "title", "t", "", "task title (required)")
