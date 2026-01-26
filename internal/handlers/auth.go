@@ -18,6 +18,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// dummyPasswordHash is a pre-computed bcrypt hash used to prevent timing attacks
+// when checking passwords for non-existent users. The actual value doesn't matter,
+// only that bcrypt.CompareHashAndPassword runs in constant time.
+var dummyPasswordHash = []byte("$2a$10$dummyHashForTimingAttackPrevention1234567890")
+
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
 	db                       database.Database
@@ -131,8 +136,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		if err == sql.ErrNoRows {
 			// Record failed attempt
 			h.rateLimiter.RecordFailedLogin(ipAddress)
-			// Don't reveal whether user exists or not
-			time.Sleep(100 * time.Millisecond) // Prevent timing attacks
+			// Always perform bcrypt comparison to prevent timing attacks
+			bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(req.Password))
 			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 			return
 		}
@@ -150,8 +155,6 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		// Record failed attempt
 		h.rateLimiter.RecordFailedLogin(ipAddress)
-		// Add delay to prevent timing attacks
-		time.Sleep(100 * time.Millisecond)
 		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}

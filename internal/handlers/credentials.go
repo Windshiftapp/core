@@ -190,12 +190,15 @@ func (h *CredentialHandler) CreateSSHKey(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Compute fingerprint for indexed lookup
+	fingerprint := services.ComputeSSHFingerprint(req.PublicKey)
+
 	// Insert into database
 	var credentialID int64
 	err = h.db.QueryRow(`
-		INSERT INTO user_credentials (user_id, credential_type, credential_name, credential_data)
-		VALUES (?, ?, ?, ?) RETURNING id
-	`, userID, "ssh", req.CredentialName, string(credentialJSON)).Scan(&credentialID)
+		INSERT INTO user_credentials (user_id, credential_type, credential_name, credential_data, public_key_fingerprint)
+		VALUES (?, ?, ?, ?, ?) RETURNING id
+	`, userID, "ssh", req.CredentialName, string(credentialJSON), fingerprint).Scan(&credentialID)
 
 	if err != nil {
 		http.Error(w, "Failed to save SSH key", http.StatusInternalServerError)

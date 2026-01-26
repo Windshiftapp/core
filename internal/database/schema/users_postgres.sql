@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS user_credentials (
 	credential_type TEXT NOT NULL, -- 'fido', 'totp', 'ssh'
 	credential_name TEXT NOT NULL, -- User-friendly name for the credential
 	credential_data TEXT NOT NULL, -- JSON data specific to credential type
+	public_key_fingerprint TEXT, -- SHA256 fingerprint for SSH keys (indexed)
 	is_active BOOLEAN DEFAULT true,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -15,6 +16,7 @@ CREATE TABLE IF NOT EXISTS user_credentials (
 
 CREATE INDEX IF NOT EXISTS idx_user_credentials_user_id ON user_credentials(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_credentials_type ON user_credentials(credential_type);
+CREATE INDEX IF NOT EXISTS idx_user_credentials_fingerprint ON user_credentials(public_key_fingerprint);
 
 CREATE TABLE IF NOT EXISTS user_sessions (
 	id SERIAL PRIMARY KEY,
