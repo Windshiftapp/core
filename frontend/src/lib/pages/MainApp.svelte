@@ -816,9 +816,10 @@
       onshow-create-modal={(event) => {
         showCreateModal = true;
         if (event.detail?.type) {
+          // Increased delay to allow CreateModal to lazy load and mount before dispatching type
           setTimeout(() => {
             window.dispatchEvent(new CustomEvent('set-create-type', { detail: { type: event.detail.type } }));
-          }, 50);
+          }, 200);
         }
       }}
     />

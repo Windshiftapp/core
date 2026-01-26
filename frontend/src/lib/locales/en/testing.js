@@ -168,6 +168,8 @@ export default {
     // Test Templates page
     testRunTemplates: 'Test Run Templates',
     testRunTemplatesSubtitle: 'Create reusable test run configurations',
+    createTestRunTemplate: 'Create Test Run Template',
+    descriptionOptional: 'Description (Optional)',
     templateName: 'Template Name',
     templateNamePlaceholder: 'e.g., Sprint Regression Template',
     createTemplate: 'Create Template',

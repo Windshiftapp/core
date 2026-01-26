@@ -19,31 +19,20 @@ export function useItemAttachments(getItemId, showError = console.error) {
   let pageSize = $state(50);
 
   /**
-   * Load attachment settings from the server (for file size limits, allowed types, etc.)
+   * Load attachment settings from the shared store
+   * The attachmentStatus store is loaded centrally and handles API calls
    */
   async function loadSettings() {
-    try {
-      settings = await api.attachmentSettings.get();
-    } catch (err) {
-      // If attachment settings endpoint doesn't exist (404), attachments are not configured
-      if (err.message.includes('Not Found')) {
-        settings = {
-          enabled: false,
-          attachment_path: null,
-          max_file_size: 52428800, // 50MB default
-          allowed_mime_types: '[]'
-        };
-      } else {
-        console.error('Failed to load attachment settings:', err);
-        // Set defaults for other errors
-        settings = {
-          enabled: false,
-          attachment_path: null,
-          max_file_size: 52428800, // 50MB
-          allowed_mime_types: '[]'
-        };
-      }
-    }
+    // Ensure the shared store is loaded
+    await attachmentStatus.load();
+
+    // Use defaults - actual enabled state comes from the store via isEnabled()
+    settings = {
+      enabled: attachmentStatus.enabled,
+      attachment_path: null,
+      max_file_size: 52428800, // 50MB default
+      allowed_mime_types: '[]'
+    };
   }
 
   /**

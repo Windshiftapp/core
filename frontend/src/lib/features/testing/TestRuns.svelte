@@ -59,9 +59,19 @@
 
     document.addEventListener('keydown', handleKeyDown);
 
+    // Add command palette trigger listener
+    const handleCommandPaletteTrigger = (e) => {
+      if (e.type === 'trigger-test-run-form') {
+        showAddForm();
+      }
+    };
+
+    window.addEventListener('trigger-test-run-form', handleCommandPaletteTrigger);
+
     // Cleanup
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('trigger-test-run-form', handleCommandPaletteTrigger);
     };
   });
 

@@ -160,6 +160,8 @@ export default {
     inProgress: 'In Bearbeitung',
     testRunTemplates: 'Testlauf-Vorlagen',
     testRunTemplatesSubtitle: 'Wiederverwendbare Testlauf-Konfigurationen erstellen',
+    createTestRunTemplate: 'Testlauf-Vorlage erstellen',
+    descriptionOptional: 'Beschreibung (Optional)',
     templateName: 'Vorlagenname',
     templateNamePlaceholder: 'z.B. Sprint Regression Vorlage',
     createTemplate: 'Vorlage erstellen',

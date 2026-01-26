@@ -223,7 +223,7 @@
         await milestonesStore.add({
           name: milestoneFormData.name,
           description: milestoneFormData.description,
-          target_date: milestoneFormData.target_date,
+          target_date: milestoneFormData.target_date || null,
           status: milestoneFormData.status,
           category_id: null
         });

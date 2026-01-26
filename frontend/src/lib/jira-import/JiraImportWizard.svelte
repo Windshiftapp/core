@@ -1,13 +1,13 @@
 <script>
-  import { onMount } from 'svelte';
   import { jiraImport } from './JiraImportStore.svelte.js';
   import Modal from '../dialogs/Modal.svelte';
+  import ModalHeader from '../dialogs/ModalHeader.svelte';
+  import DialogFooter from '../dialogs/DialogFooter.svelte';
   import Button from '../components/Button.svelte';
   import Spinner from '../components/Spinner.svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import Input from '../components/Input.svelte';
   import FormField from '../components/FormField.svelte';
-  import BasePicker from '../pickers/BasePicker.svelte';
   import {
     Cloud, Check, ChevronRight, ChevronLeft, ArrowRight,
     Briefcase, FileText, Activity, Hash, Box, AlertCircle,
@@ -137,61 +137,69 @@
     if (index === currentStep) return 'current';
     return 'pending';
   }
+
+  // Get confirm button label based on current step
+  function getConfirmLabel() {
+    if (currentStepId === 'connect') {
+      return connection.isConnected ? 'Continue' : 'Connect';
+    } else if (currentStepId === 'projects') {
+      return 'Analyze & Configure';
+    } else if (currentStepId === 'mapping') {
+      return 'Continue';
+    } else if (currentStepId === 'preview') {
+      return 'Start Import';
+    } else if (currentStepId === 'import') {
+      return 'Done';
+    }
+    return 'Next';
+  }
+
+  // Check if confirm button should be shown
+  function shouldShowConfirmButton() {
+    // Hide confirm button when showing saved connections list
+    if (currentStepId === 'connect' && savedConnections.items.length > 0 && !showNewConnectionForm && !connection.isConnected) {
+      return false;
+    }
+    return true;
+  }
 </script>
 
 <Modal bind:isOpen maxWidth="max-w-4xl" onclose={handleClose}>
   <div class="flex flex-col max-h-[90vh]">
-    <!-- Header with stepper -->
-    <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-lg flex items-center justify-center"
-               style="background: var(--ds-background-accent-blue-subtler);">
-            <Cloud class="w-5 h-5" style="color: var(--ds-text-accent-blue);" />
-          </div>
-          <div>
-            <h2 class="text-lg font-semibold" style="color: var(--ds-text);">Jira Cloud Import</h2>
-            <p class="text-sm" style="color: var(--ds-text-subtle);">
-              {connection.instanceInfo?.display_name || 'Import work items from Jira Cloud'}
-            </p>
-          </div>
-        </div>
-        <button onclick={handleClose}
-                class="p-2 rounded-lg transition-colors"
-                style="color: var(--ds-text-subtle);"
-                onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
-                onmouseleave={(e) => e.currentTarget.style.background = 'transparent'}>
-          <span class="text-xl">&times;</span>
-        </button>
-      </div>
+    <!-- Header -->
+    <ModalHeader
+      title="Jira Cloud Import"
+      subtitle={connection.instanceInfo?.display_name || 'Import work items from Jira Cloud'}
+      icon={Cloud}
+      onClose={handleClose}
+    />
 
-      <!-- Step indicator -->
-      <div class="flex items-center overflow-x-auto pb-2">
-        {#each steps as step, index}
-          {@const status = getStepStatus(index)}
-          <div class="flex items-center flex-shrink-0">
-            <div class="flex items-center gap-2">
-              <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-colors"
-                   style="background: {status !== 'pending' ? 'var(--ds-interactive)' : 'var(--ds-background-neutral)'}; color: {status !== 'pending' ? 'white' : 'var(--ds-text-subtle)'};">
-                {#if status === 'completed'}
-                  <Check size={14} />
-                {:else}
-                  {index + 1}
-                {/if}
-              </div>
-              <span class="text-xs font-medium whitespace-nowrap"
-                    style="color: {status === 'current' ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};">
-                {step.label}
-              </span>
+    <!-- Step indicator -->
+    <div class="px-6 py-3 border-b flex items-center overflow-x-auto" style="border-color: var(--ds-border);">
+      {#each steps as step, index}
+        {@const status = getStepStatus(index)}
+        <div class="flex items-center flex-shrink-0">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-colors"
+                 style="background: {status !== 'pending' ? 'var(--ds-interactive)' : 'var(--ds-background-neutral)'}; color: {status !== 'pending' ? 'white' : 'var(--ds-text-subtle)'};">
+              {#if status === 'completed'}
+                <Check size={14} />
+              {:else}
+                {index + 1}
+              {/if}
             </div>
-            {#if index < steps.length - 1}
-              <div class="w-8 h-px mx-2"
-                   style="background: {status === 'completed' ? 'var(--ds-interactive)' : 'var(--ds-border)'};">
-              </div>
-            {/if}
+            <span class="text-xs font-medium whitespace-nowrap"
+                  style="color: {status === 'current' ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};">
+              {step.label}
+            </span>
           </div>
-        {/each}
-      </div>
+          {#if index < steps.length - 1}
+            <div class="w-8 h-px mx-2"
+                 style="background: {status === 'completed' ? 'var(--ds-interactive)' : 'var(--ds-border)'};">
+            </div>
+          {/if}
+        </div>
+      {/each}
     </div>
 
     <!-- Content area -->
@@ -790,62 +798,33 @@
     </div>
 
     <!-- Footer with navigation -->
-    <div class="px-6 py-4 border-t flex items-center justify-between" style="border-color: var(--ds-border);">
-      <Button
-        variant="ghost"
-        onclick={() => currentStep > 0 ? jiraImport.prevStep() : handleClose()}
-        disabled={connection.isConnecting || isAnalyzing}
-      >
-        {#if currentStep === 0}
-          Cancel
-        {:else}
-          <ChevronLeft size={16} class="mr-1" />
-          Back
-        {/if}
-      </Button>
-
-      {#if currentStepId === 'connect' && savedConnections.items.length > 0 && !showNewConnectionForm && !connection.isConnected}
-        <!-- When showing saved connections, no primary button needed -->
-        <span></span>
-      {:else}
+    <DialogFooter
+      showCancel={false}
+      confirmLabel={getConfirmLabel()}
+      loading={connection.isConnecting || isAnalyzing || isContinueLoading}
+      disabled={
+        connection.isConnecting ||
+        isAnalyzing ||
+        isContinueLoading ||
+        (currentStepId === 'connect' && !connection.isConnected && (!jiraUrl || !email || !apiToken)) ||
+        (currentStepId === 'projects' && projects.selected.length === 0)
+      }
+      onConfirm={shouldShowConfirmButton() ? handleNext : null}
+    >
+      {#snippet extra()}
         <Button
-          variant="primary"
-          onclick={handleNext}
-          disabled={
-            connection.isConnecting ||
-            isAnalyzing ||
-            isContinueLoading ||
-            (currentStepId === 'connect' && !connection.isConnected && (!jiraUrl || !email || !apiToken)) ||
-            (currentStepId === 'projects' && projects.selected.length === 0)
-          }
-          loading={connection.isConnecting || isAnalyzing || isContinueLoading}
+          variant="ghost"
+          onclick={() => currentStep > 0 ? jiraImport.prevStep() : handleClose()}
+          disabled={connection.isConnecting || isAnalyzing}
         >
-          {#if currentStepId === 'connect'}
-            {#if connection.isConnected}
-              Continue
-              <ChevronRight size={16} class="ml-1" />
-            {:else}
-              Connect
-              <ChevronRight size={16} class="ml-1" />
-            {/if}
-          {:else if currentStepId === 'projects'}
-            Analyze & Configure
-            <ChevronRight size={16} class="ml-1" />
-          {:else if currentStepId === 'mapping'}
-            Continue
-            <ChevronRight size={16} class="ml-1" />
-          {:else if currentStepId === 'preview'}
-            Start Import
-            <Check size={16} class="ml-1" />
-          {:else if currentStepId === 'import'}
-            Done
-            <Check size={16} class="ml-1" />
+          {#if currentStep === 0}
+            Cancel
           {:else}
-            Next
-            <ChevronRight size={16} class="ml-1" />
+            <ChevronLeft size={16} class="mr-1" />
+            Back
           {/if}
         </Button>
-      {/if}
-    </div>
+      {/snippet}
+    </DialogFooter>
   </div>
 </Modal>

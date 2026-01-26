@@ -132,6 +132,9 @@ const shortcuts = {
   customers: {
     add: { key: 'a' }
   },
+  systemImport: {
+    add: { key: 'a' }
+  },
   // Pages
   screens: {
     add: { key: 'a' }

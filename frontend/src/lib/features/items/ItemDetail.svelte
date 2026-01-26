@@ -31,6 +31,7 @@ import {
   } from '../../utils/contextCommands.js';
 import Modal from '../../dialogs/Modal.svelte';
 import DeleteItemDialog from '../../dialogs/DeleteItemDialog.svelte';
+import LinkItemModal from '../../dialogs/LinkItemModal.svelte';
   
   const dispatch = createEventDispatcher();
   
@@ -102,19 +103,10 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   let itemLinks = $state([]);
   let linkTypes = $state([]);
   let loadingLinks = $state(false);
-  let showAddLinkForm = $state(false);
+  let showLinkModal = $state(false);
   const TEST_LINK_TYPE_ID = 1;
-  let addLinkData = $state({
-    link_type_id: null,
-    target_id: null,
-    target_title: '',
-    target_type: 'item'
-  });
   let showTestCaseModal = $state(false);
   let selectedTestCaseId = $state(null);
-  let searchResults = $state([]);
-  let searchQuery = $state('');
-  let searching = $state(false);
 
   // Delete dialog state
   let showDeleteDialog = $state(false);
@@ -663,16 +655,32 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     startCreateSubIssue();
   }
 
-  function handleCancelAddLink() {
-    showAddLinkForm = false;
-    addLinkData = { link_type_id: null, target_id: null, target_title: '', target_type: 'item' };
+  function handleShowLinkModal() {
+    showLinkModal = true;
   }
 
-  function handleSelectItem(event) {
-    const { selectedItem } = event.detail;
-    addLinkData.target_id = selectedItem.id;
-    addLinkData.target_title = selectedItem.title;
-    addLinkData.target_type = selectedItem.type || (Number(addLinkData.link_type_id) === TEST_LINK_TYPE_ID ? 'test_case' : 'item');
+  function handleLinkModalCancel() {
+    showLinkModal = false;
+  }
+
+  async function handleLinkCreated(event) {
+    const { link_type_id, target_id, target_type } = event.detail;
+
+    try {
+      await api.links.create({
+        source_type: "item",
+        source_id: parseInt(itemId),
+        target_type: target_type || "item",
+        target_id: parseInt(target_id),
+        link_type_id: parseInt(link_type_id)
+      });
+
+      // Reload links
+      await loadData();
+    } catch (error) {
+      console.error('Error creating link:', error);
+      showError('Failed to create link', error.message || 'Unknown error');
+    }
   }
 
   function handleViewTestCase(event) {
@@ -690,35 +698,6 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   function handleCloseTestCaseModal() {
     showTestCaseModal = false;
     selectedTestCaseId = null;
-  }
-
-  async function handleAddLink() {
-    if (!addLinkData.link_type_id || !addLinkData.target_id) {
-      console.error('Missing required data:', { link_type_id: addLinkData.link_type_id, target_id: addLinkData.target_id });
-      return;
-    }
-
-    try {
-      const result = await api.links.create({
-        source_type: "item",
-        source_id: parseInt(itemId),
-        target_type: addLinkData.target_type || (Number(addLinkData.link_type_id) === TEST_LINK_TYPE_ID ? "test_case" : "item"),
-        target_id: parseInt(addLinkData.target_id),
-        link_type_id: parseInt(addLinkData.link_type_id)
-      });
-      
-      
-      // Reset form and close
-      showAddLinkForm = false;
-      addLinkData = { link_type_id: null, target_id: null, target_title: '', target_type: 'item' };
-      
-      // Reload links
-      await loadData();
-    } catch (error) {
-      console.error('Error creating link:', error);
-      console.error('Error details:', error.message);
-      showError('Failed to create link', error.message || 'Unknown error');
-    }
   }
 
   async function handleRemoveLink(event) {
@@ -1133,7 +1112,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
       description: 'Link this work item to another item',
       keywords: ['link', 'connect', 'relate', 'add', 'reference'],
       action: () => {
-        showAddLinkForm = true;
+        showLinkModal = true;
       },
       priority: COMMAND_PRIORITIES.HIGH,
       category: 'action'
@@ -1374,46 +1353,6 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     }
   }
 
-  // Reactive search for work items when searchQuery changes
-  let searchTimeout;
-  $effect(() => {
-    const trimmedQuery = (searchQuery || '').trim();
-    const searchType = Number(addLinkData.link_type_id) === TEST_LINK_TYPE_ID ? 'test_case' : 'item';
-
-    if (trimmedQuery.length >= 2) {
-      clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(async () => {
-        try {
-          searching = true;
-          const results = await api.links.search(trimmedQuery, searchType, 10);
-          const items = Array.isArray(results) ? results : [];
-          searchResults = searchType === 'item'
-            ? items.filter(item => item.id !== parseInt(itemId))
-            : items;
-        } catch (error) {
-          console.error('Search failed:', error);
-          searchResults = [];
-        } finally {
-          searching = false;
-        }
-      }, 300);
-    } else {
-      clearTimeout(searchTimeout);
-      searchResults = [];
-      searching = false;
-    }
-  });
-
-  // Reset incompatible selections if link type changes
-  $effect(() => {
-    const isTestLink = Number(addLinkData.link_type_id) === TEST_LINK_TYPE_ID;
-    if (!isTestLink && addLinkData.target_type === 'test_case') {
-      addLinkData.target_id = null;
-      addLinkData.target_title = '';
-      addLinkData.target_type = 'item';
-    }
-  });
-
   // Parent hierarchy function (from original)
   async function loadParentHierarchy() {
     try {
@@ -1636,12 +1575,6 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     {availableSubIssueTypes}
     {childItems}
     {loadingChildItems}
-    bind:showAddLinkForm
-    bind:addLinkData
-    linkTypes={filteredLinkTypes}
-    bind:searchResults
-    bind:searchQuery
-    {searching}
     {itemTypes}
     {tab}
     {moduleSettings}
@@ -1675,11 +1608,9 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     on:cancel-edit={handleCancelEdit}
     on:switch-tab={handleSwitchTab}
     on:create-sub-issue={handleCreateSubIssue}
-    on:cancel-add-link={handleCancelAddLink}
-    on:add-link={handleAddLink}
-    on:select-item={handleSelectItem}
     on:remove-link={handleRemoveLink}
     on:view-test-case={handleViewTestCase}
+    on:show-link-modal={handleShowLinkModal}
     on:start-editing-assignee={handleStartEditingAssignee}
     on:start-editing-milestone={handleStartEditingMilestone}
     on:start-editing-iteration={handleStartEditingIteration}
@@ -1833,4 +1764,13 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   item={item}
   ondeleted={handleDeleteComplete}
   onerror={handleDeleteError}
+/>
+
+<!-- Link Item Modal -->
+<LinkItemModal
+  bind:isOpen={showLinkModal}
+  linkTypes={filteredLinkTypes}
+  currentItemId={parseInt(itemId)}
+  on:submit={handleLinkCreated}
+  on:cancel={handleLinkModalCancel}
 />

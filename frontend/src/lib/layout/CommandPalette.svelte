@@ -75,72 +75,85 @@
 
   // Define navigation commands
   function getBaseCommands() {
+    const workspaceId = $currentRoute.params?.id;
     const workspaceTestBase = getWorkspaceTestBase();
-    return [
+
+    const commands = [
       // Navigation
-      { id: 'workspaces', label: 'Workspaces', description: 'Manage project workspaces', url: '/workspaces', keywords: ['workspace', 'projects', 'organize', 'w'] },
-      { id: 'search', label: 'Search', description: 'Search work items and content', url: '/search', keywords: ['search', 'find', 'items', 's'] },
-      { id: 'dashboard', label: 'Dashboard', description: 'View analytics and reports', url: '/dashboard', keywords: ['dashboard', 'analytics', 'reports', 'overview', 'd'] },
-      { id: 'milestones', label: 'Milestones', description: 'Track project milestones', url: '/milestones', keywords: ['milestones', 'deadlines', 'targets', 'm'] },
-      { id: 'channels', label: 'Channels', description: 'Communication channels and support', url: '/channels', keywords: ['channels', 'communication', 'support', 'help', 'ch'] },
-      { id: 'collections', label: 'Collections', description: 'Manage work item collections and views', url: '/collections', keywords: ['collections', 'groups', 'organize', 'views', 'c'] },
-      { id: 'admin', label: 'Admin Panel', description: 'System administration and settings', url: '/admin', keywords: ['admin', 'settings', 'configuration', 'system', 'a'], isAdmin: true },
-      
-      // Test Management Navigation
-      { id: 'tests', label: 'Test Management', description: 'Manage test cases, plans, and execution', url: workspaceTestBase, keywords: ['test', 'testing', 'qa', 'quality', 'assurance', 't'] },
-      { id: 'test-cases', label: 'Test Cases', description: 'View and manage test cases', url: workspaceTestBase, keywords: ['test', 'cases', 'testing', 'qa', 'tc'] },
-      { id: 'test-plans', label: 'Test Plans', description: 'View and manage test plans', url: `${workspaceTestBase}/sets`, keywords: ['test', 'plans', 'suites', 'testing', 'tp'] },
-      { id: 'test-runs', label: 'Test Runs', description: 'View and manage test executions', url: `${workspaceTestBase}/runs`, keywords: ['test', 'runs', 'execution', 'results', 'tr'] },
-      { id: 'test-reports', label: 'Test Reports', description: 'View test execution reports', url: `${workspaceTestBase}/reports`, keywords: ['test', 'reports', 'results', 'analytics', 'trp'] },
-      
+      { id: 'workspaces', label: t('commandPalette.commands.workspaces.label'), description: t('commandPalette.commands.workspaces.description'), url: '/workspaces', keywords: ['workspace', 'projects', 'organize', 'w'] },
+      { id: 'search', label: t('commandPalette.commands.search.label'), description: t('commandPalette.commands.search.description'), url: '/search', keywords: ['search', 'find', 'items', 's'] },
+      { id: 'dashboard', label: t('commandPalette.commands.dashboard.label'), description: t('commandPalette.commands.dashboard.description'), url: '/dashboard', keywords: ['dashboard', 'analytics', 'reports', 'overview', 'd'] },
+      { id: 'milestones', label: t('commandPalette.commands.milestones.label'), description: t('commandPalette.commands.milestones.description'), url: '/milestones', keywords: ['milestones', 'deadlines', 'targets', 'm'] },
+      { id: 'iterations', label: t('commandPalette.commands.iterations.label'), description: t('commandPalette.commands.iterations.description'), url: '/iterations', keywords: ['iterations', 'sprints', 'cycles', 'planning', 'i'] },
+      { id: 'channels', label: t('commandPalette.commands.channels.label'), description: t('commandPalette.commands.channels.description'), url: '/channels', keywords: ['channels', 'communication', 'support', 'help', 'ch'] },
+      { id: 'collections', label: t('commandPalette.commands.collections.label'), description: t('commandPalette.commands.collections.description'), url: '/collections', keywords: ['collections', 'groups', 'organize', 'views', 'c'] },
+      { id: 'admin', label: t('commandPalette.commands.adminPanel.label'), description: t('commandPalette.commands.adminPanel.description'), url: '/admin', keywords: ['admin', 'settings', 'configuration', 'system', 'a'], isAdmin: true },
+
       // Time Management Navigation
-      { id: 'time-tracking', label: 'Time Tracking', description: 'Log and manage work time entries', url: '/time', keywords: ['time', 'tracking', 'hours', 'work', 'log', 'timesheet', 'tt'] },
-      { id: 'time-reports', label: 'Time Reports', description: 'View time tracking reports and analytics', url: '/reports', keywords: ['time', 'reports', 'analytics', 'hours', 'timesheet', 'tr'] },
-      { id: 'time-projects', label: 'Time Projects', description: 'Manage time tracking projects', url: '/projects', keywords: ['time', 'projects', 'clients', 'billing', 'tp'] },
-      
+      { id: 'time-tracking', label: t('commandPalette.commands.timeTracking.label'), description: t('commandPalette.commands.timeTracking.description'), url: '/time', keywords: ['time', 'tracking', 'hours', 'work', 'log', 'timesheet', 'tt'] },
+      { id: 'time-reports', label: t('commandPalette.commands.timeReports.label'), description: t('commandPalette.commands.timeReports.description'), url: '/reports', keywords: ['time', 'reports', 'analytics', 'hours', 'timesheet', 'tr'] },
+      { id: 'time-projects', label: t('commandPalette.commands.timeProjects.label'), description: t('commandPalette.commands.timeProjects.description'), url: '/projects', keywords: ['time', 'projects', 'clients', 'billing', 'tp'] },
+
       // Create Commands
-      { id: 'create-work-item', label: 'Create Work Item', description: 'Create a new work item or task', type: 'create', createType: 'work-item', keywords: ['create', 'new', 'work', 'item', 'task', 'issue', 'cw', 'nw'] },
-      { id: 'create-workspace', label: 'Create Workspace', description: 'Create a new project workspace', type: 'create', createType: 'workspace', keywords: ['create', 'new', 'workspace', 'project', 'space', 'cws', 'nws'] },
-      { id: 'create-milestone', label: 'Create Milestone', description: 'Create a new project milestone', type: 'create', createType: 'milestone', keywords: ['create', 'new', 'milestone', 'target', 'deadline', 'cm', 'nm'] },
-      { id: 'create-collection', label: 'Create Collection', description: 'Create a new work item collection', type: 'create', createType: 'collection', keywords: ['create', 'new', 'collection', 'group', 'cc', 'nc'] },
-      
-      // Test Management Commands
-      { id: 'create-test-case', label: 'Create Test Case', description: 'Create a new test case for quality assurance', type: 'create', createType: 'test-case', keywords: ['create', 'new', 'test', 'case', 'testing', 'qa', 'quality', 'ctc', 'ntc'] },
-      { id: 'create-test-plan', label: 'Create Test Plan', description: 'Create a new test plan with test cases', type: 'create', createType: 'test-plan', keywords: ['create', 'new', 'test', 'plan', 'testing', 'qa', 'suite', 'ctp', 'ntp'] },
-      { id: 'create-test-run', label: 'Create Test Run', description: 'Create a new test run template for execution', type: 'create', createType: 'test-run', keywords: ['create', 'new', 'test', 'run', 'execution', 'template', 'ctr', 'ntr'] },
-      
+      { id: 'create-work-item', label: t('commandPalette.commands.createWorkItem.label'), description: t('commandPalette.commands.createWorkItem.description'), type: 'create', createType: 'work-item', keywords: ['create', 'new', 'work', 'item', 'task', 'issue', 'cw', 'nw'] },
+      { id: 'create-workspace', label: t('commandPalette.commands.createWorkspace.label'), description: t('commandPalette.commands.createWorkspace.description'), type: 'create', createType: 'workspace', keywords: ['create', 'new', 'workspace', 'project', 'space', 'cws', 'nws'] },
+      { id: 'create-milestone', label: t('commandPalette.commands.createMilestone.label'), description: t('commandPalette.commands.createMilestone.description'), type: 'create', createType: 'milestone', keywords: ['create', 'new', 'milestone', 'target', 'deadline', 'cm', 'nm'] },
+      { id: 'create-collection', label: t('commandPalette.commands.createCollection.label'), description: t('commandPalette.commands.createCollection.description'), type: 'create', createType: 'collection', keywords: ['create', 'new', 'collection', 'group', 'cc', 'nc'] },
+
       // Time Management Commands
-      { id: 'log-time', label: 'Log Time', description: 'Quickly add a new time entry', type: 'time-action', action: 'log-time', keywords: ['log', 'time', 'entry', 'hours', 'work', 'track', 'lt', 'add'] },
-      { id: 'start-timer', label: 'Start Timer', description: 'Start tracking time for current work', type: 'time-action', action: 'start-timer', keywords: ['start', 'timer', 'track', 'time', 'begin', 'st'] },
-      { id: 'stop-timer', label: 'Stop Timer', description: 'Stop current time tracking', type: 'time-action', action: 'stop-timer', keywords: ['stop', 'timer', 'end', 'finish', 'complete', 'stp'] },
-      
+      { id: 'log-time', label: t('commandPalette.commands.logTime.label'), description: t('commandPalette.commands.logTime.description'), type: 'time-action', action: 'log-time', keywords: ['log', 'time', 'entry', 'hours', 'work', 'track', 'lt', 'add'] },
+      { id: 'start-timer', label: t('commandPalette.commands.startTimer.label'), description: t('commandPalette.commands.startTimer.description'), type: 'time-action', action: 'start-timer', keywords: ['start', 'timer', 'track', 'time', 'begin', 'st'] },
+      { id: 'stop-timer', label: t('commandPalette.commands.stopTimer.label'), description: t('commandPalette.commands.stopTimer.description'), type: 'time-action', action: 'stop-timer', keywords: ['stop', 'timer', 'end', 'finish', 'complete', 'stp'] },
+
       // Admin Commands (filtered by isSystemAdmin)
-      { id: 'admin-custom-fields', label: 'Custom Fields', description: 'Manage custom field definitions', url: '/admin/custom-fields', action: () => navigateToAdminTab('custom-fields'), keywords: ['admin', 'custom', 'fields', 'forms', 'acf'], isAdmin: true },
-      { id: 'admin-screens', label: 'Screen Management', description: 'Configure form screens and layouts', url: '/admin/screens', action: () => navigateToAdminTab('screens'), keywords: ['admin', 'screens', 'forms', 'layout', 'as'], isAdmin: true },
-      { id: 'admin-hierarchy-levels', label: 'Hierarchy Levels', description: 'Configure work item hierarchy levels', url: '/admin/hierarchy-levels', action: () => navigateToAdminTab('hierarchy-levels'), keywords: ['admin', 'hierarchy', 'levels', 'structure', 'ahl'], isAdmin: true },
-      { id: 'admin-item-types', label: 'Item Types', description: 'Manage work item types with icons and colors', url: '/admin/item-types', action: () => navigateToAdminTab('item-types'), keywords: ['admin', 'item', 'types', 'icons', 'colors', 'ait'], isAdmin: true },
-      { id: 'admin-priorities', label: 'Priorities', description: 'Configure priority levels with icons and colors', url: '/admin/priorities', action: () => navigateToAdminTab('priorities'), keywords: ['admin', 'priorities', 'priority', 'levels', 'icons', 'colors', 'apr'], isAdmin: true },
-      { id: 'admin-config-sets', label: 'Configuration Sets', description: 'Manage configuration sets with workflows and screens', url: '/admin/configuration-sets', action: () => navigateToAdminTab('configuration-sets'), keywords: ['admin', 'configuration', 'config', 'sets', 'acs'], isAdmin: true },
-      { id: 'admin-statuses', label: 'Statuses', description: 'Manage individual work item statuses', url: '/admin/statuses?subtab=statuses', action: () => { navigate('/admin/statuses?subtab=statuses'); close(); }, keywords: ['admin', 'status', 'statuses', 'workflow', 'ast'], isAdmin: true },
-      { id: 'admin-status-categories', label: 'Status Categories', description: 'Manage status categories and colors', url: '/admin/statuses?subtab=status-categories', action: () => { navigate('/admin/statuses?subtab=status-categories'); close(); }, keywords: ['admin', 'status', 'categories', 'colors', 'asc'], isAdmin: true },
-      { id: 'admin-workflows', label: 'Workflow Builder', description: 'Design and manage workflow transitions', url: '/admin/workflows', action: () => navigateToAdminTab('workflows'), keywords: ['admin', 'workflow', 'transitions', 'flow', 'aw'], isAdmin: true },
-      { id: 'admin-link-types', label: 'Link Types', description: 'Manage link types between work items', url: '/admin/link-types', action: () => navigateToAdminTab('link-types'), keywords: ['admin', 'link', 'types', 'relationships', 'alt'], isAdmin: true },
-      { id: 'admin-scm-providers', label: 'SCM Providers', description: 'Configure GitHub, GitLab, Gitea, and Bitbucket integrations', url: '/admin/scm-providers', action: () => navigateToAdminTab('scm-providers'), keywords: ['admin', 'scm', 'git', 'github', 'gitlab', 'gitea', 'bitbucket', 'source', 'control', 'repository', 'asc'], isAdmin: true },
-      { id: 'admin-attachments', label: 'Attachments', description: 'Manage attachment settings and configuration', url: '/admin/attachments', action: () => navigateToAdminTab('attachments'), keywords: ['admin', 'attachments', 'files', 'uploads', 'aa'], isAdmin: true },
-      { id: 'admin-modules', label: 'Module Settings', description: 'Enable or disable time tracking and test management modules', url: '/admin/modules', action: () => navigateToAdminTab('modules'), keywords: ['admin', 'modules', 'settings', 'time', 'test', 'tracking', 'management', 'am'], isAdmin: true },
-      { id: 'admin-themes', label: 'Theme Settings', description: 'Manage application themes and appearance', url: '/admin/themes', action: () => navigateToAdminTab('themes'), keywords: ['admin', 'themes', 'appearance', 'colors', 'styling', 'at'], isAdmin: true },
-      { id: 'admin-users', label: 'User Management', description: 'Manage users, roles, and permissions', url: '/admin/users', action: () => navigateToAdminTab('users'), keywords: ['admin', 'users', 'roles', 'permissions', 'au'], isAdmin: true },
-      { id: 'admin-groups', label: 'Group Management', description: 'Manage user groups and memberships', url: '/admin/groups', action: () => navigateToAdminTab('groups'), keywords: ['admin', 'groups', 'teams', 'memberships', 'ag'], isAdmin: true },
-      { id: 'admin-permissions', label: 'Permissions', description: 'Manage user permissions and access control', url: '/admin/permissions?subtab=permissions', action: () => { navigate('/admin/permissions?subtab=permissions'); close(); }, keywords: ['admin', 'permissions', 'access', 'control', 'ap'], isAdmin: true },
-      { id: 'admin-permission-sets', label: 'Permission Sets', description: 'Manage permission bundles for configuration sets', url: '/admin/permissions?subtab=permission-sets', action: () => { navigate('/admin/permissions?subtab=permission-sets'); close(); }, keywords: ['admin', 'permission', 'sets', 'bundles', 'aps'], isAdmin: true },
-      { id: 'admin-workspace-roles', label: 'Workspace Roles', description: 'View workspace roles and their permissions', url: '/admin/workspace-roles', action: () => navigateToAdminTab('workspace-roles'), keywords: ['admin', 'workspace', 'roles', 'permissions', 'awr'], isAdmin: true },
-      { id: 'admin-sso', label: 'Single Sign-On', description: 'Configure OIDC identity providers for SSO', url: '/admin/sso', action: () => navigateToAdminTab('sso'), keywords: ['admin', 'sso', 'single', 'sign', 'on', 'oidc', 'identity', 'provider', 'login', 'oauth', 'asso'], isAdmin: true },
-      { id: 'admin-workspaces', label: 'Workspaces Admin', description: 'Manage workspaces and settings', url: '/admin/workspaces', action: () => navigateToAdminTab('workspaces'), keywords: ['admin', 'workspaces', 'spaces', 'aws'], isAdmin: true },
-      { id: 'admin-notifications', label: 'Notification Settings', description: 'Manage notification configurations', url: '/admin/notification-settings', action: () => navigateToAdminTab('notification-settings'), keywords: ['admin', 'notifications', 'alerts', 'settings', 'an'], isAdmin: true },
+      { id: 'admin-custom-fields', label: t('commandPalette.commands.adminCustomFields.label'), description: t('commandPalette.commands.adminCustomFields.description'), url: '/admin/custom-fields', action: () => navigateToAdminTab('custom-fields'), keywords: ['admin', 'custom', 'fields', 'forms', 'acf'], isAdmin: true },
+      { id: 'admin-screens', label: t('commandPalette.commands.adminScreens.label'), description: t('commandPalette.commands.adminScreens.description'), url: '/admin/screens', action: () => navigateToAdminTab('screens'), keywords: ['admin', 'screens', 'forms', 'layout', 'as'], isAdmin: true },
+      { id: 'admin-hierarchy-levels', label: t('commandPalette.commands.adminHierarchyLevels.label'), description: t('commandPalette.commands.adminHierarchyLevels.description'), url: '/admin/hierarchy-levels', action: () => navigateToAdminTab('hierarchy-levels'), keywords: ['admin', 'hierarchy', 'levels', 'structure', 'ahl'], isAdmin: true },
+      { id: 'admin-item-types', label: t('commandPalette.commands.adminItemTypes.label'), description: t('commandPalette.commands.adminItemTypes.description'), url: '/admin/item-types', action: () => navigateToAdminTab('item-types'), keywords: ['admin', 'item', 'types', 'icons', 'colors', 'ait'], isAdmin: true },
+      { id: 'admin-priorities', label: t('commandPalette.commands.adminPriorities.label'), description: t('commandPalette.commands.adminPriorities.description'), url: '/admin/priorities', action: () => navigateToAdminTab('priorities'), keywords: ['admin', 'priorities', 'priority', 'levels', 'icons', 'colors', 'apr'], isAdmin: true },
+      { id: 'admin-config-sets', label: t('commandPalette.commands.adminConfigSets.label'), description: t('commandPalette.commands.adminConfigSets.description'), url: '/admin/configuration-sets', action: () => navigateToAdminTab('configuration-sets'), keywords: ['admin', 'configuration', 'config', 'sets', 'acs'], isAdmin: true },
+      { id: 'admin-statuses', label: t('commandPalette.commands.adminStatuses.label'), description: t('commandPalette.commands.adminStatuses.description'), url: '/admin/statuses?subtab=statuses', action: () => { navigate('/admin/statuses?subtab=statuses'); close(); }, keywords: ['admin', 'status', 'statuses', 'workflow', 'ast'], isAdmin: true },
+      { id: 'admin-status-categories', label: t('commandPalette.commands.adminStatusCategories.label'), description: t('commandPalette.commands.adminStatusCategories.description'), url: '/admin/statuses?subtab=status-categories', action: () => { navigate('/admin/statuses?subtab=status-categories'); close(); }, keywords: ['admin', 'status', 'categories', 'colors', 'asc'], isAdmin: true },
+      { id: 'admin-workflows', label: t('commandPalette.commands.adminWorkflows.label'), description: t('commandPalette.commands.adminWorkflows.description'), url: '/admin/workflows', action: () => navigateToAdminTab('workflows'), keywords: ['admin', 'workflow', 'transitions', 'flow', 'aw'], isAdmin: true },
+      { id: 'admin-link-types', label: t('commandPalette.commands.adminLinkTypes.label'), description: t('commandPalette.commands.adminLinkTypes.description'), url: '/admin/link-types', action: () => navigateToAdminTab('link-types'), keywords: ['admin', 'link', 'types', 'relationships', 'alt'], isAdmin: true },
+      { id: 'admin-scm-providers', label: t('commandPalette.commands.adminScmProviders.label'), description: t('commandPalette.commands.adminScmProviders.description'), url: '/admin/scm-providers', action: () => navigateToAdminTab('scm-providers'), keywords: ['admin', 'scm', 'git', 'github', 'gitlab', 'gitea', 'bitbucket', 'source', 'control', 'repository', 'asc'], isAdmin: true },
+      { id: 'admin-attachments', label: t('commandPalette.commands.adminAttachments.label'), description: t('commandPalette.commands.adminAttachments.description'), url: '/admin/attachments', action: () => navigateToAdminTab('attachments'), keywords: ['admin', 'attachments', 'files', 'uploads', 'aa'], isAdmin: true },
+      { id: 'admin-modules', label: t('commandPalette.commands.adminModules.label'), description: t('commandPalette.commands.adminModules.description'), url: '/admin/modules', action: () => navigateToAdminTab('modules'), keywords: ['admin', 'modules', 'settings', 'time', 'test', 'tracking', 'management', 'am'], isAdmin: true },
+      { id: 'admin-themes', label: t('commandPalette.commands.adminThemes.label'), description: t('commandPalette.commands.adminThemes.description'), url: '/admin/themes', action: () => navigateToAdminTab('themes'), keywords: ['admin', 'themes', 'appearance', 'colors', 'styling', 'at'], isAdmin: true },
+      { id: 'admin-users', label: t('commandPalette.commands.adminUsers.label'), description: t('commandPalette.commands.adminUsers.description'), url: '/admin/users', action: () => navigateToAdminTab('users'), keywords: ['admin', 'users', 'roles', 'permissions', 'au'], isAdmin: true },
+      { id: 'admin-groups', label: t('commandPalette.commands.adminGroups.label'), description: t('commandPalette.commands.adminGroups.description'), url: '/admin/groups', action: () => navigateToAdminTab('groups'), keywords: ['admin', 'groups', 'teams', 'memberships', 'ag'], isAdmin: true },
+      { id: 'admin-permissions', label: t('commandPalette.commands.adminPermissions.label'), description: t('commandPalette.commands.adminPermissions.description'), url: '/admin/permissions?subtab=permissions', action: () => { navigate('/admin/permissions?subtab=permissions'); close(); }, keywords: ['admin', 'permissions', 'access', 'control', 'ap'], isAdmin: true },
+      { id: 'admin-permission-sets', label: t('commandPalette.commands.adminPermissionSets.label'), description: t('commandPalette.commands.adminPermissionSets.description'), url: '/admin/permissions?subtab=permission-sets', action: () => { navigate('/admin/permissions?subtab=permission-sets'); close(); }, keywords: ['admin', 'permission', 'sets', 'bundles', 'aps'], isAdmin: true },
+      { id: 'admin-workspace-roles', label: t('commandPalette.commands.adminWorkspaceRoles.label'), description: t('commandPalette.commands.adminWorkspaceRoles.description'), url: '/admin/workspace-roles', action: () => navigateToAdminTab('workspace-roles'), keywords: ['admin', 'workspace', 'roles', 'permissions', 'awr'], isAdmin: true },
+      { id: 'admin-sso', label: t('commandPalette.commands.adminSso.label'), description: t('commandPalette.commands.adminSso.description'), url: '/admin/sso', action: () => navigateToAdminTab('sso'), keywords: ['admin', 'sso', 'single', 'sign', 'on', 'oidc', 'identity', 'provider', 'login', 'oauth', 'asso'], isAdmin: true },
+      { id: 'admin-security', label: t('commandPalette.commands.adminSecurity.label'), description: t('commandPalette.commands.adminSecurity.description'), url: '/admin/security', action: () => navigateToAdminTab('security'), keywords: ['admin', 'security', 'calendar', 'feeds', 'plugins', 'asec'], isAdmin: true },
+      { id: 'admin-system-import', label: t('commandPalette.commands.adminSystemImport.label'), description: t('commandPalette.commands.adminSystemImport.description'), url: '/admin/system-import', action: () => navigateToAdminTab('system-import'), keywords: ['admin', 'import', 'system', 'migration', 'data', 'asi'], isAdmin: true },
+      { id: 'admin-assets', label: t('commandPalette.commands.adminAssets.label'), description: t('commandPalette.commands.adminAssets.description'), url: '/admin/assets', action: () => navigateToAdminTab('assets'), keywords: ['admin', 'assets', 'inventory', 'items', 'aas'], isAdmin: true },
+      { id: 'admin-workspaces', label: t('commandPalette.commands.adminWorkspaces.label'), description: t('commandPalette.commands.adminWorkspaces.description'), url: '/admin/workspaces', action: () => navigateToAdminTab('workspaces'), keywords: ['admin', 'workspaces', 'spaces', 'aws'], isAdmin: true },
+      { id: 'admin-notifications', label: t('commandPalette.commands.adminNotifications.label'), description: t('commandPalette.commands.adminNotifications.description'), url: '/admin/notification-settings', action: () => navigateToAdminTab('notification-settings'), keywords: ['admin', 'notifications', 'alerts', 'settings', 'an'], isAdmin: true },
 
       // System Commands
-      { id: 'quit-app', label: 'Quit Application', description: 'Gracefully shut down the application server', type: 'system-action', action: 'quit', keywords: ['quit', 'exit', 'shutdown', 'close', 'stop', 'q'] },
+      { id: 'quit-app', label: t('commandPalette.commands.quitApp.label'), description: t('commandPalette.commands.quitApp.description'), type: 'system-action', action: 'quit', keywords: ['quit', 'exit', 'shutdown', 'close', 'stop', 'q'] },
     ];
+
+    // Only include test management when in workspace context
+    if (workspaceId) {
+      commands.push(
+        // Test Management Navigation (labels aligned with workspace navigation sidebar)
+        { id: 'tests', label: t('commandPalette.commands.tests.label'), description: t('commandPalette.commands.tests.description'), url: workspaceTestBase, keywords: ['test', 'testing', 'qa', 'quality', 'assurance', 't'] },
+        { id: 'test-cases', label: t('commandPalette.commands.testCases.label'), description: t('commandPalette.commands.testCases.description'), url: workspaceTestBase, keywords: ['test', 'cases', 'testing', 'qa', 'tc'] },
+        { id: 'test-plans', label: t('commandPalette.commands.testPlans.label'), description: t('commandPalette.commands.testPlans.description'), url: `${workspaceTestBase}/sets`, keywords: ['test', 'plans', 'suites', 'testing', 'tp'] },
+        { id: 'test-templates', label: t('commandPalette.commands.testTemplates.label'), description: t('commandPalette.commands.testTemplates.description'), url: `${workspaceTestBase}/templates`, keywords: ['test', 'templates', 'shared', 'steps', 'reusable', 'tt'] },
+        { id: 'test-runs', label: t('commandPalette.commands.testRuns.label'), description: t('commandPalette.commands.testRuns.description'), url: `${workspaceTestBase}/runs`, keywords: ['test', 'runs', 'execution', 'results', 'tr'] },
+        { id: 'test-reports', label: t('commandPalette.commands.testReports.label'), description: t('commandPalette.commands.testReports.description'), url: `${workspaceTestBase}/reports`, keywords: ['test', 'reports', 'results', 'analytics', 'trp'] },
+        // Test Management Create Commands
+        { id: 'create-test-case', label: t('commandPalette.commands.createTestCase.label'), description: t('commandPalette.commands.createTestCase.description'), type: 'create', createType: 'test-case', keywords: ['create', 'new', 'test', 'case', 'testing', 'qa', 'quality', 'ctc', 'ntc'] },
+        { id: 'create-test-plan', label: t('commandPalette.commands.createTestPlan.label'), description: t('commandPalette.commands.createTestPlan.description'), type: 'create', createType: 'test-plan', keywords: ['create', 'new', 'test', 'plan', 'testing', 'qa', 'suite', 'ctp', 'ntp'] },
+        { id: 'create-test-run', label: t('commandPalette.commands.createTestRun.label'), description: t('commandPalette.commands.createTestRun.description'), type: 'create', createType: 'test-run', keywords: ['create', 'new', 'test', 'run', 'execution', 'template', 'ctr', 'ntr'] },
+      );
+    }
+
+    return commands;
   }
   
   // Quick workspace navigation commands
@@ -152,8 +165,8 @@
       const url = workspace.is_personal ? '/personal' : `/workspaces/${workspace.id}`;
       workspaceCommands.push({
         id: `goto-workspace-${workspace.id}`,
-        label: `Go to ${workspace.name}`,
-        description: `Navigate to ${workspace.name} workspace`,
+        label: t('commandPalette.commands.goToWorkspace.label', { name: workspace.name }),
+        description: t('commandPalette.commands.goToWorkspace.description', { name: workspace.name }),
         keywords: ['goto', 'workspace', 'navigate', workspace.name.toLowerCase(), 'gw'],
         type: 'navigation',
         url: url
@@ -167,22 +180,22 @@
   function createWorkspaceContextCommands() {
     const currentWorkspaceId = $currentRoute.params?.id;
     const contextCommands = [];
-    
+
     if (currentWorkspaceId && ['workspace-detail', 'workspace-settings', 'workspace-board', 'workspace-list', 'workspace-tree', 'workspace-map', 'item-detail'].includes($currentRoute.view)) {
       // Find current workspace name
       const currentWorkspace = workspaces.find(w => w.id === parseInt(currentWorkspaceId));
       const workspaceName = currentWorkspace ? currentWorkspace.name : 'Current Workspace';
-      
+
       contextCommands.push({
         id: 'workspace-overview',
-        label: `${workspaceName} Overview`,
-        description: 'View workspace dashboard with stats and charts',
+        label: t('commandPalette.commands.workspaceOverview.label', { name: workspaceName }),
+        description: t('commandPalette.commands.workspaceOverview.description'),
         keywords: ['overview', 'dashboard', 'workspace', 'stats', 'charts', workspaceName.toLowerCase(), 'o'],
         type: 'workspace-context',
         url: `/workspaces/${currentWorkspaceId}`
       });
     }
-    
+
     return contextCommands;
   }
   
@@ -343,22 +356,25 @@
       // Handle test management create commands by navigating and triggering forms
       if (command.createType === 'test-case') {
         navigate(workspaceTestBase);
+        close();
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('trigger-test-case-form'));
         }, 100);
         return;
       }
-      
+
       if (command.createType === 'test-plan') {
         navigate(`${workspaceTestBase}/sets`);
+        close();
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('trigger-test-plan-form'));
         }, 100);
         return;
       }
-      
+
       if (command.createType === 'test-run') {
         navigate(`${workspaceTestBase}/runs`);
+        close();
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('trigger-test-run-form'));
         }, 100);
@@ -366,20 +382,15 @@
       }
       
       // Show create modal with specific type for other create commands
-      dispatch('show-create-modal', { type: command.createType });
-      
-      // Pre-select current workspace if we're creating a work item and we're in a workspace context
-      if (command.createType === 'work-item') {
-        const currentWorkspaceId = $currentRoute.params?.id;
-        if (currentWorkspaceId && ['workspace-detail', 'workspace-settings', 'workspace-board', 'workspace-list', 'workspace-tree', 'workspace-map', 'item-detail'].includes($currentRoute.view)) {
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('set-create-workspace', { 
-              detail: { workspaceId: parseInt(currentWorkspaceId) } 
-            }));
-          }, 50);
+      // Use window event for consistency with other components and reliability with dynamic loading
+      const currentWorkspaceId = $currentRoute.params?.id;
+      window.dispatchEvent(new CustomEvent('show-create-modal', {
+        detail: {
+          type: command.createType,
+          workspaceId: currentWorkspaceId ? parseInt(currentWorkspaceId) : undefined
         }
-      }
-      
+      }));
+
       close();
     } else if (command.type === 'time-action') {
       // Handle time management actions
@@ -495,11 +506,9 @@
     animation: scale-in var(--duration-normal, 200ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) forwards;
   }
 
-  /* Melt UI combobox styling - enhanced */
+  /* Melt UI combobox styling - highlighted/selected state */
   [data-highlighted] {
-    background-color: var(--ds-background-selected) !important;
-    border-right: 4px solid var(--ds-interactive) !important;
-    box-shadow: inset 0 0 0 1px var(--ds-glow-nav, rgba(40, 116, 187, 0.2));
+    background-color: var(--ds-background-neutral-hovered) !important;
   }
 
   /* Override Melt UI positioning to ensure proper width */

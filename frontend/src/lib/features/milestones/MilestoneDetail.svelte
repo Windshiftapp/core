@@ -143,7 +143,12 @@
 
   async function saveMilestone() {
     try {
-      await milestonesStore.update(milestoneId, formData);
+      // Convert empty strings to null for optional date fields
+      const dataToSave = {
+        ...formData,
+        target_date: formData.target_date || null
+      };
+      await milestonesStore.update(milestoneId, dataToSave);
       showEditModal = false;
       await loadProgress();
     } catch (err) {

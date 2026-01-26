@@ -166,12 +166,18 @@
 
   async function saveMilestone() {
     try {
+      // Convert empty strings to null for optional date fields
+      const dataToSave = {
+        ...formData,
+        target_date: formData.target_date || null
+      };
+
       if (editingMilestone) {
         // Update existing milestone
-        await milestonesStore.update(editingMilestone.id, formData);
+        await milestonesStore.update(editingMilestone.id, dataToSave);
       } else {
         // Create new milestone
-        await milestonesStore.add(formData);
+        await milestonesStore.add(dataToSave);
       }
 
       cancelForm();

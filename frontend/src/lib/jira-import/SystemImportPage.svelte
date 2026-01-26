@@ -1,6 +1,7 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { jiraImport } from './JiraImportStore.svelte.js';
+  import { createShortcutHandler, getShortcutDisplay } from '../utils/keyboardShortcuts.js';
   import JiraImportWizard from './JiraImportWizard.svelte';
   import Button from '../components/Button.svelte';
   import Spinner from '../components/Spinner.svelte';
@@ -19,9 +20,23 @@
   let savedConnections = $derived(jiraImport.savedConnections);
   let importJobs = $derived(jiraImport.importJobs);
 
+  // Keyboard shortcut handler
+  const shortcutHandler = createShortcutHandler({
+    add: () => {
+      if (!showWizard) {
+        openWizard();
+      }
+    }
+  }, 'systemImport');
+
   onMount(() => {
     jiraImport.loadSavedConnections();
     jiraImport.loadImportJobs();
+    document.addEventListener('keydown', shortcutHandler);
+  });
+
+  onDestroy(() => {
+    document.removeEventListener('keydown', shortcutHandler);
   });
 
   function openWizard(connectionId = null) {
@@ -103,7 +118,7 @@
         </p>
       </div>
     </div>
-    <Button variant="primary" onclick={() => openWizard()}>
+    <Button variant="primary" onclick={() => openWizard()} keyboardHint={getShortcutDisplay('systemImport', 'add')}>
       <Plus size={16} class="mr-2" />
       New Import
     </Button>

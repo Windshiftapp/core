@@ -265,12 +265,12 @@
     <div class="p-6">
       <!-- Header -->
       <SectionHeader
-        title={t('sprints.title')}
+        title={t('iterations.title')}
         subtitle={isGlobalView
           ? (activeTypeId
               ? `Showing ${iterationTypes.find(type => type.id === parseInt(activeTypeId))?.name || 'filtered'} iterations`
-              : t('sprints.subtitle'))
-          : t('sprints.subtitle')}
+              : t('iterations.subtitle'))
+          : t('iterations.subtitle')}
         class="mb-6"
       >
         {#snippet actions()}
@@ -281,7 +281,7 @@
             keyboardHint="A"
             onclick={startCreate}
           >
-            {t('sprints.createSprint')}
+            {t('iterations.createIteration')}
           </Button>
         {/snippet}
       </SectionHeader>
@@ -296,12 +296,12 @@
       {:else if filteredIterations.length === 0}
         <EmptyState
           icon={Calendar}
-          title={t('sprints.noSprints')}
-          description={t('sprints.noSprints')}
+          title={t('iterations.noIterations')}
+          description={t('iterations.noIterations')}
         >
           {#snippet action()}
             <Button variant="primary" size="medium" icon={Plus} keyboardHint="A" onclick={startCreate}>
-              {t('sprints.createSprint')}
+              {t('iterations.createIteration')}
             </Button>
           {/snippet}
         </EmptyState>

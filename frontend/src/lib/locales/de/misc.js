@@ -44,6 +44,8 @@ export default {
     startDateRequired: 'Startdatum ist erforderlich',
     endDateRequired: 'Enddatum ist erforderlich',
     endDateMustBeAfterStart: 'Enddatum muss nach Startdatum liegen',
+    typeRequired: 'Iterationstyp ist erforderlich',
+    selectType: 'Typ auswählen...',
     failedToSaveIteration: 'Iteration konnte nicht gespeichert werden',
     statusPlanned: 'Geplant',
     statusActive: 'Aktiv',
@@ -54,6 +56,8 @@ export default {
   iterations: {
     title: 'Iterationen',
     subtitle: 'Sprints und Releases verwalten',
+    createIteration: 'Iteration erstellen',
+    noIterations: 'Keine Iterationen gefunden',
     allTypes: 'Alle Typen',
     manageTypes: 'Typen verwalten',
     status: {
@@ -377,6 +381,7 @@ export default {
     newChildItem: 'Neuer Untervorgang',
     new: 'Neu',
     issueTitle: 'Vorgangtitel',
+    milestoneName: 'Meilensteinname',
     workspaceName: '{type}-Name',
     workspaceKeyPlaceholder: 'Arbeitsbereichs-Schlüssel (z.B. PROJ, TEAM)',
     addDescription: 'Beschreibung hinzufügen...',

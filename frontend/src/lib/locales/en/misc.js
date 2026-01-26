@@ -141,6 +141,8 @@ export default {
     startDateRequired: 'Start date is required',
     endDateRequired: 'End date is required',
     endDateMustBeAfterStart: 'End date must be after start date',
+    typeRequired: 'Iteration type is required',
+    selectType: 'Select type...',
     failedToSaveIteration: 'Failed to save iteration',
     statusPlanned: 'Planned',
     statusActive: 'Active',
@@ -151,6 +153,8 @@ export default {
   iterations: {
     title: 'Iterations',
     subtitle: 'Manage sprints and releases',
+    createIteration: 'Create Iteration',
+    noIterations: 'No iterations found',
     allTypes: 'All Types',
     manageTypes: 'Manage Types',
     status: {
@@ -568,6 +572,7 @@ export default {
     new: 'New',
     // Placeholders
     issueTitle: 'Issue title',
+    milestoneName: 'Milestone name',
     workspaceName: '{type} name',
     workspaceKeyPlaceholder: 'Workspace key (e.g., PROJ, TEAM)',
     addDescription: 'Add description...',

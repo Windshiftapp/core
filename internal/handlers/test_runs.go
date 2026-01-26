@@ -58,7 +58,7 @@ func (h *TestRunHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 				       tr.started_at, tr.ended_at, tr.created_at,
 				       COALESCE(u.first_name || ' ' || u.last_name, '') as assignee_name,
 				       COALESCE(u.email, '') as assignee_email,
-				       COALESCE(u.avatar, '') as assignee_avatar
+				       COALESCE(u.avatar_url, '') as assignee_avatar
 				FROM test_runs tr
 				LEFT JOIN users u ON tr.assignee_id = u.id
 				WHERE tr.workspace_id = ? AND tr.assignee_id IS NULL
@@ -71,7 +71,7 @@ func (h *TestRunHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 				       tr.started_at, tr.ended_at, tr.created_at,
 				       COALESCE(u.first_name || ' ' || u.last_name, '') as assignee_name,
 				       COALESCE(u.email, '') as assignee_email,
-				       COALESCE(u.avatar, '') as assignee_avatar
+				       COALESCE(u.avatar_url, '') as assignee_avatar
 				FROM test_runs tr
 				LEFT JOIN users u ON tr.assignee_id = u.id
 				WHERE tr.workspace_id = ? AND tr.assignee_id = ?
@@ -84,7 +84,7 @@ func (h *TestRunHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			       tr.started_at, tr.ended_at, tr.created_at,
 			       COALESCE(u.first_name || ' ' || u.last_name, '') as assignee_name,
 			       COALESCE(u.email, '') as assignee_email,
-			       COALESCE(u.avatar, '') as assignee_avatar
+			       COALESCE(u.avatar_url, '') as assignee_avatar
 			FROM test_runs tr
 			LEFT JOIN users u ON tr.assignee_id = u.id
 			WHERE tr.workspace_id = ?
@@ -159,7 +159,7 @@ func (h *TestRunHandler) Get(w http.ResponseWriter, r *http.Request) {
 		       tr.started_at, tr.ended_at, tr.created_at,
 		       COALESCE(u.first_name || ' ' || u.last_name, '') as assignee_name,
 		       COALESCE(u.email, '') as assignee_email,
-		       COALESCE(u.avatar, '') as assignee_avatar
+		       COALESCE(u.avatar_url, '') as assignee_avatar
 		FROM test_runs tr
 		LEFT JOIN users u ON tr.assignee_id = u.id
 		WHERE tr.id = ? AND tr.workspace_id = ?
@@ -612,7 +612,7 @@ func (h *TestRunHandler) GetBySet(w http.ResponseWriter, r *http.Request) {
 		       tr.started_at, tr.ended_at, tr.created_at,
 		       COALESCE(u.first_name || ' ' || u.last_name, '') as assignee_name,
 		       COALESCE(u.email, '') as assignee_email,
-		       COALESCE(u.avatar, '') as assignee_avatar
+		       COALESCE(u.avatar_url, '') as assignee_avatar
 		FROM test_runs tr
 		LEFT JOIN users u ON tr.assignee_id = u.id
 		WHERE tr.set_id = ? AND tr.workspace_id = ?

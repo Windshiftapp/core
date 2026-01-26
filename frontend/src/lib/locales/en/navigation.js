@@ -42,26 +42,83 @@ export default {
     context: 'Context',
     // Command labels and descriptions
     commands: {
+      // Navigation
       workspaces: { label: 'Workspaces', description: 'Manage project workspaces' },
       search: { label: 'Search', description: 'Search work items and content' },
       dashboard: { label: 'Dashboard', description: 'View analytics and reports' },
       milestones: { label: 'Milestones', description: 'Track project milestones' },
       channels: { label: 'Channels', description: 'Communication channels and support' },
-      collections: { label: 'Collections', description: 'Manage work item collections' },
-      adminPanel: { label: 'Admin Panel', description: 'System administration' },
-      testManagement: { label: 'Test Management', description: 'Manage test cases and runs' },
-      timeTracking: { label: 'Time Tracking', description: 'Log and manage time entries' },
+      collections: { label: 'Collections', description: 'Manage work item collections and views' },
+      adminPanel: { label: 'Admin Panel', description: 'System administration and settings' },
+
+      // Test Management (labels aligned with workspace navigation)
+      tests: { label: 'Tests', description: 'Manage test cases, plans, and execution' },
+      testCases: { label: 'Test Cases', description: 'View and manage test cases' },
+      testPlans: { label: 'Test Plans', description: 'View and manage test plans' },
+      testTemplates: { label: 'Templates', description: 'Template runs and shared steps' },
+      testRuns: { label: 'Test Runs', description: 'View and manage test executions' },
+      testReports: { label: 'Reports', description: 'View test execution reports' },
+      createTestCase: { label: 'Create Test Case', description: 'Create a new test case for quality assurance' },
+      createTestPlan: { label: 'Create Test Plan', description: 'Create a new test plan with test cases' },
+      createTestRun: { label: 'Create Test Run', description: 'Create a new test run template for execution' },
+
+      // Time Management
+      timeTracking: { label: 'Time Tracking', description: 'Log and manage work time entries' },
+      timeReports: { label: 'Time Reports', description: 'View time tracking reports and analytics' },
+      timeProjects: { label: 'Time Projects', description: 'Manage time tracking projects' },
+      logTime: { label: 'Log Time', description: 'Quickly add a new time entry' },
+      startTimer: { label: 'Start Timer', description: 'Start tracking time for current work' },
+      stopTimer: { label: 'Stop Timer', description: 'Stop current time tracking' },
+
+      // Create Commands
+      createWorkItem: { label: 'Create Work Item', description: 'Create a new work item or task' },
+      createWorkspace: { label: 'Create Workspace', description: 'Create a new project workspace' },
+      createMilestone: { label: 'Create Milestone', description: 'Create a new project milestone' },
+      createCollection: { label: 'Create Collection', description: 'Create a new work item collection' },
+
+      // Admin Commands
+      adminCustomFields: { label: 'Custom Fields', description: 'Manage custom field definitions' },
+      adminScreens: { label: 'Screen Management', description: 'Configure form screens and layouts' },
+      adminHierarchyLevels: { label: 'Hierarchy Levels', description: 'Configure work item hierarchy levels' },
+      adminItemTypes: { label: 'Item Types', description: 'Manage work item types with icons and colors' },
+      adminPriorities: { label: 'Priorities', description: 'Configure priority levels with icons and colors' },
+      adminConfigSets: { label: 'Configuration Sets', description: 'Manage configuration sets with workflows and screens' },
+      adminStatuses: { label: 'Statuses', description: 'Manage individual work item statuses' },
+      adminStatusCategories: { label: 'Status Categories', description: 'Manage status categories and colors' },
+      adminWorkflows: { label: 'Workflow Builder', description: 'Design and manage workflow transitions' },
+      adminLinkTypes: { label: 'Link Types', description: 'Manage link types between work items' },
+      adminScmProviders: { label: 'SCM Providers', description: 'Configure GitHub, GitLab, Gitea, and Bitbucket integrations' },
+      adminAttachments: { label: 'Attachments', description: 'Manage attachment settings and configuration' },
+      adminModules: { label: 'Module Settings', description: 'Enable or disable time tracking and test management modules' },
+      adminThemes: { label: 'Theme Settings', description: 'Manage application themes and appearance' },
+      adminUsers: { label: 'User Management', description: 'Manage users, roles, and permissions' },
+      adminGroups: { label: 'Group Management', description: 'Manage user groups and memberships' },
+      adminPermissions: { label: 'Permissions', description: 'Manage user permissions and access control' },
+      adminPermissionSets: { label: 'Permission Sets', description: 'Manage permission bundles for configuration sets' },
+      adminWorkspaceRoles: { label: 'Workspace Roles', description: 'View workspace roles and their permissions' },
+      adminSso: { label: 'Single Sign-On', description: 'Configure OIDC identity providers for SSO' },
+      adminSecurity: { label: 'Security Settings', description: 'Configure calendar feeds and plugin execution' },
+      adminSystemImport: { label: 'System Import', description: 'Import data from other systems' },
+      adminAssets: { label: 'Asset Management', description: 'Configure asset types and categories' },
+      adminWorkspaces: { label: 'Workspaces Admin', description: 'Manage workspaces and settings' },
+      adminNotifications: { label: 'Notification Settings', description: 'Manage notification configurations' },
+
+      // System Commands
+      quitApp: { label: 'Quit Application', description: 'Gracefully shut down the application server' },
+
+      // Other
       portal: { label: 'Portal', description: 'Customer portal management' },
       iterations: { label: 'Iterations', description: 'Sprint planning and tracking' },
-      startTimer: { label: 'Start Timer', description: 'Start tracking time' },
-      stopTimer: { label: 'Stop Timer', description: 'Stop the current timer' },
       createItem: { label: 'Create Item', description: 'Create a new work item' },
       myProfile: { label: 'My Profile', description: 'View and edit your profile' },
       notifications: { label: 'Notifications', description: 'View notifications' },
       about: { label: 'About', description: 'About this application' },
-      quitApp: { label: 'Quit Application', description: 'Shut down the server' },
       assets: { label: 'Assets', description: 'Manage asset sets and items' },
-      customers: { label: 'Customers', description: 'Manage customer organizations' }
+      customers: { label: 'Customers', description: 'Manage customer organizations' },
+
+      // Dynamic workspace commands
+      goToWorkspace: { label: 'Go to {name}', description: 'Navigate to {name} workspace' },
+      workspaceOverview: { label: '{name} Overview', description: 'View workspace dashboard with stats and charts' }
     }
   },
 

@@ -62,6 +62,11 @@
       return;
     }
 
+    if (!formData.type_id) {
+      error = t('sprints.typeRequired');
+      return;
+    }
+
     if (new Date(formData.end_date) < new Date(formData.start_date)) {
       error = t('sprints.endDateMustBeAfterStart');
       return;
@@ -174,9 +179,9 @@
 
       <!-- Type -->
       <div>
-        <Label color="default" class="mb-1.5"><Tag class="w-4 h-4 inline-block mr-1" />{t('common.type')}</Label>
-        <Select bind:value={formData.type_id}>
-          <option value={null}>{t('sprints.noType')}</option>
+        <Label color="default" required class="mb-1.5"><Tag class="w-4 h-4 inline-block mr-1" />{t('common.type')}</Label>
+        <Select bind:value={formData.type_id} required>
+          <option value={null} disabled>{t('sprints.selectType')}</option>
           {#each iterationTypes as type}
             <option value={type.id}>{type.name}</option>
           {/each}

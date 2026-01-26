@@ -1,10 +1,8 @@
 <script>
-  import { FileText, Link2, Trash2 } from 'lucide-svelte';
+  import { FileText, Link2, Trash2, Plus } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import Button from '../../components/Button.svelte';
-  import Tooltip from '../../components/Tooltip.svelte';
   import LinkComponent from '../../components/Link.svelte';
-  import BasePicker from '../../pickers/BasePicker.svelte';
   import { createEventDispatcher } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
@@ -19,25 +17,15 @@
   export let availableSubIssueTypes = [];
   export let childItems = [];
   export let loadingChildItems = false;
-  export let showAddLinkForm = false;
-  export let addLinkData = { link_type_id: null, target_id: null, target_title: '', target_type: 'item' };
-  export let linkTypes = [];
-  export let searchResults = [];
-  export let searchQuery = '';
-  export let searching = false;
   export let itemTypes = [];
   export let isModal = false;
 
   const TEST_LINK_TYPE_ID = 1;
-  $: selectedLinkTypeId = addLinkData?.link_type_id ? Number(addLinkData.link_type_id) : null;
-  $: isTestLinkTypeSelected = selectedLinkTypeId === TEST_LINK_TYPE_ID;
-  $: searchPlaceholder = isTestLinkTypeSelected ? t('items.searchTestCases') : t('items.searchWorkItems');
-  $: searchDisabled = !addLinkData?.link_type_id;
 
   // Use centralized icon map for item types
   $: currentItemId = parseInt(itemId);
   const iconMap = itemTypeIconMap;
-  
+
   function getLinkLabel(link) {
     const isCurrentSource = currentItemId === link.source_id;
     if (link.link_type_id === TEST_LINK_TYPE_ID && isCurrentSource && link.source_type === 'item' && link.target_type === 'test_case') {
@@ -65,41 +53,36 @@
     dispatch('create-sub-issue');
   }
 
-  
   function removeLink(linkId) {
     dispatch('remove-link', { linkId });
   }
-  
-  function selectItem(selectedItem) {
-    dispatch('select-item', { selectedItem });
-  }
-  
-  function addLink() {
-    dispatch('add-link');
-  }
-  
-  function cancelAddLink() {
-    showAddLinkForm = false;
-    addLinkData = { link_type_id: null, target_id: null, target_title: '', target_type: 'item' };
-    searchQuery = '';
-    searchResults = [];
-  }
-  
-  // Debug data
-  $: {
-    if (childItems && childItems.length > 0) {
-    }
+
+  function handleShowLinkModal() {
+    dispatch('show-link-modal');
   }
 </script>
 
 <!-- Links Section -->
-{#if itemLinks.length > 0 || showAddLinkForm}
+{#if itemLinks.length > 0}
   <div class="mt-6">
     <div class="pt-2">
-      <!-- Header with icon and label -->
-      <div class="flex items-center gap-2 mb-4">
-        <Link2 class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-        <h3 class="text-sm font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle); font-size: 11px;">{t('items.linkedItems')}</h3>
+      <!-- Header with icon, label, and add button -->
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <Link2 class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+          <h3 class="text-sm font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle); font-size: 11px;">{t('items.linkedItems')}</h3>
+        </div>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors cursor-pointer"
+          style="color: var(--ds-text-subtle);"
+          onmouseenter={(e) => { e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'; e.currentTarget.style.color = 'var(--ds-text)'; }}
+          onmouseleave={(e) => { e.currentTarget.style.backgroundColor = ''; e.currentTarget.style.color = 'var(--ds-text-subtle)'; }}
+          onclick={handleShowLinkModal}
+        >
+          <Plus class="w-3 h-3" />
+          {t('common.add')}
+        </button>
       </div>
 
       {#if loadingLinks}
@@ -188,120 +171,6 @@
             </div>
           </div>
         {/each}
-      </div>
-    {/if}
-    
-    <!-- Add Link Form -->
-    {#if showAddLinkForm}
-      <div class="mt-4 pt-4 border-t" style="border-color: var(--ds-border);">
-        <h4 class="text-sm font-medium mb-3" style="color: var(--ds-text);">{t('items.addLink')}</h4>
-        
-        <div class="space-y-3">
-          <div class="space-y-1">
-            <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('items.linkType')}</label>
-            <BasePicker
-              bind:value={addLinkData.link_type_id}
-              items={linkTypes}
-              placeholder={t('items.chooseRelationshipType')}
-              showUnassigned={true}
-              unassignedLabel={t('items.chooseRelationshipType')}
-              getValue={(item) => item.id}
-              getLabel={(item) => item.name}
-            />
-            {#if isTestLinkTypeSelected}
-              <p class="text-xs text-blue-600">{t('items.linkToTestCase')}</p>
-            {/if}
-          </div>
-          
-          <div>
-            <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('items.targetItem')}</label>
-            {#if addLinkData.target_id}
-              <div class="flex items-center justify-between py-2">
-                <div>
-                  <div class="text-xs uppercase tracking-wide text-gray-400">
-                    {addLinkData.target_type === 'test_case' ? t('items.testCase') : t('items.workItem')}
-                  </div>
-                  <div class="text-sm" style="color: var(--ds-text);">{addLinkData.target_title}</div>
-                </div>
-                <button
-                  class="text-red-600 hover:text-red-800 text-xs cursor-pointer"
-                  onclick={() => {
-                    addLinkData.target_id = null;
-                    addLinkData.target_title = '';
-                    addLinkData.target_type = isTestLinkTypeSelected ? 'test_case' : 'item';
-                  }}
-                >
-                  {t('common.clear')}
-                </button>
-              </div>
-            {:else}
-              <div class="relative" style="position: relative;">
-                <input
-                  type="text"
-                  bind:value={searchQuery}
-                  placeholder={searchPlaceholder}
-                  class="w-full px-3 py-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400"
-                  style="border-color: var(--ds-border); background-color: var(--ds-surface-raised); color: var(--ds-text);"
-                  disabled={searchDisabled}
-                />
-                
-                {#if searchDisabled}
-                  <p class="text-xs text-gray-400 mt-2">{t('items.selectLinkTypeToSearch')}</p>
-                {/if}
-                
-                {#if searching}
-                  <div class="absolute right-3 top-2.5">
-                    <div class="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                  </div>
-                {/if}
-                
-                {#if searchResults.length > 0}
-                  <div class="absolute z-50 w-full mt-1 border rounded shadow-lg max-h-40 overflow-y-auto" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-                    {#each searchResults as result}
-                      <button
-                        class="w-full text-left px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-                        style="color: var(--ds-text); border-color: var(--ds-border);"
-                        onclick={() => selectItem(result)}
-                      >
-                        <div class="flex items-center justify-between gap-2">
-                          <div class="font-medium text-sm truncate">{result.title}</div>
-                          <span class="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full {result.type === 'test_case' ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}">
-                            {result.type === 'test_case' ? t('items.testCase') : t('items.workItem')}
-                          </span>
-                        </div>
-                        <div class="text-xs text-gray-500 mt-0.5">
-                          {#if result.type === 'test_case'}
-                            {result.description || `Test Case #${result.id}`}
-                          {:else}
-                            {(result.workspace_name || 'Workspace')} · ID {result.id}
-                          {/if}
-                        </div>
-                      </button>
-                    {/each}
-                  </div>
-                {/if}
-              </div>
-            {/if}
-          </div>
-          
-          <div class="flex gap-2 pt-2">
-            <Button
-              variant="primary"
-              size="small"
-              disabled={!addLinkData.link_type_id || !addLinkData.target_id}
-              onclick={addLink}
-            >
-              {t('items.addLink')}
-            </Button>
-            <Button
-              variant="secondary"
-              size="small"
-              onclick={cancelAddLink}
-            >
-              {t('common.cancel')}
-            </Button>
-          </div>
-        </div>
       </div>
     {/if}
   </div>

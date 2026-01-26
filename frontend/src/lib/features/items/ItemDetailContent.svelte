@@ -53,12 +53,6 @@
   export let availableSubIssueTypes = [];
   export let childItems = [];
   export let loadingChildItems = false;
-  export let showAddLinkForm = false;
-  export let addLinkData = {};
-  export let linkTypes = [];
-  export let searchResults = [];
-  export let searchQuery = '';
-  export let searching = false;
   export let itemTypes = [];
   export let tab = 'comments';
   export let moduleSettings = {};
@@ -150,25 +144,16 @@
     dispatch('create-sub-issue');
   }
 
-
-  function handleCancelAddLink() {
-    dispatch('cancel-add-link');
-  }
-
-  function handleAddLink() {
-    dispatch('add-link');
-  }
-
-  function handleSelectItem(event) {
-    dispatch('select-item', event.detail);
-  }
-
   function handleRemoveLink(event) {
     dispatch('remove-link', event.detail);
   }
 
   function handleViewTestCase(event) {
     dispatch('view-test-case', event.detail);
+  }
+
+  function handleShowLinkModal() {
+    dispatch('show-link-modal');
   }
 
   function handleStartEditingAssignee() {
@@ -349,7 +334,7 @@
             {manualActions}
             on:save-field={handleSaveField}
             on:cancel-edit={handleCancelEdit}
-            on:show-add-link={() => showAddLinkForm = true}
+            on:show-add-link={handleShowLinkModal}
             on:create-sub-issue={handleCreateSubIssue}
             on:image-uploaded={handleImageUploaded}
             on:attachment-upload={(e) => dispatch('attachment-upload', e.detail)}
@@ -361,7 +346,7 @@
             on:execute-action={handleExecuteAction}
           />
 
-          <ItemDetailLinks 
+          <ItemDetailLinks
             {item}
             {workspace}
             {workspaceId}
@@ -372,20 +357,12 @@
             {availableSubIssueTypes}
             {childItems}
             {loadingChildItems}
-            bind:showAddLinkForm
-            bind:addLinkData
-            {linkTypes}
-            bind:searchResults
-            bind:searchQuery
-            {searching}
             {itemTypes}
             on:navigate={handleNavigate}
             on:create-sub-issue={handleCreateSubIssue}
-            on:cancel-add-link={handleCancelAddLink}
-            on:add-link={handleAddLink}
-            on:select-item={handleSelectItem}
             on:remove-link={handleRemoveLink}
             on:view-test-case={handleViewTestCase}
+            on:show-link-modal={handleShowLinkModal}
           />
 
           <ItemDetailTabs
