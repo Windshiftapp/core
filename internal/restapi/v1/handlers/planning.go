@@ -507,7 +507,7 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if existing iteration is global
-	existingIsGlobal, err := h.planningService.IsIterationGlobal(id)
+	existingIsGlobal, _, err := h.planningService.IsIterationGlobal(id)
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrNotFound)
 		return
@@ -576,7 +576,7 @@ func (h *IterationHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if existing iteration is global
-	isGlobal, err := h.planningService.IsIterationGlobal(id)
+	isGlobal, _, err := h.planningService.IsIterationGlobal(id)
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrNotFound)
 		return

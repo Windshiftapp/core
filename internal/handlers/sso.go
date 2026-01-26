@@ -814,22 +814,7 @@ func (h *SSOHandler) isTrustedRequest(r *http.Request) bool {
 		return false
 	}
 
-	return h.isTrustedProxy(clientIP)
-}
-
-// isTrustedProxy checks if an IP is a trusted proxy (private IP or in additional list)
-func (h *SSOHandler) isTrustedProxy(ip net.IP) bool {
-	// Check if IP is a private/internal address
-	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() {
-		return true
-	}
-	// Check additional trusted proxies
-	for _, trustedIP := range h.additionalProxies {
-		if ip.Equal(trustedIP) {
-			return true
-		}
-	}
-	return false
+	return utils.IsTrustedProxy(clientIP, h.useProxy, h.additionalProxies)
 }
 
 // isAllowedHost checks if a host is in the allowed hosts list

@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"time"
+	"strconv"
+	"strings"
 
 	"windshift/internal/database"
 	"windshift/internal/middleware"
@@ -16,62 +16,15 @@ import (
 type ProjectHandler struct {
 	db                database.Database
 	permissionService *services.PermissionService
+	planningService   *services.PlanningService
 }
 
 func NewProjectHandler(db database.Database, permissionService *services.PermissionService) *ProjectHandler {
 	return &ProjectHandler{
 		db:                db,
 		permissionService: permissionService,
+		planningService:   services.NewPlanningService(db),
 	}
-}
-
-// Helper function to load milestone categories for a project
-func (h *ProjectHandler) loadMilestoneCategories(projectID int) ([]int, error) {
-	var categories []int
-	rows, err := h.db.Query(`
-		SELECT category_id FROM project_milestone_categories WHERE project_id = ?
-	`, projectID)
-	if err != nil {
-		return categories, err
-	}
-	defer rows.Close()
-	
-	for rows.Next() {
-		var categoryID int
-		if err := rows.Scan(&categoryID); err != nil {
-			return categories, err
-		}
-		categories = append(categories, categoryID)
-	}
-	return categories, nil
-}
-
-// Helper function to save milestone categories for a project
-func (h *ProjectHandler) saveMilestoneCategories(projectID int, categories []int) error {
-	// Start transaction
-	tx, err := h.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	
-	// Delete existing associations
-	_, err = tx.Exec("DELETE FROM project_milestone_categories WHERE project_id = ?", projectID)
-	if err != nil {
-		return err
-	}
-	
-	// Insert new associations
-	for _, categoryID := range categories {
-		_, err = tx.Exec(`
-			INSERT INTO project_milestone_categories (project_id, category_id) VALUES (?, ?)
-		`, projectID, categoryID)
-		if err != nil {
-			return err
-		}
-	}
-	
-	return tx.Commit()
 }
 
 func (h *ProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
@@ -82,45 +35,32 @@ func (h *ProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := `
-		SELECT p.id, p.workspace_id, p.name, p.description, p.active, p.created_at, p.updated_at,
-		       w.name as workspace_name
-		FROM projects p
-		LEFT JOIN workspaces w ON p.workspace_id = w.id
-		WHERE 1=1`
-
-	args := []interface{}{}
-
-	// Filter by workspace if specified
-	if workspaceID := r.URL.Query().Get("workspace_id"); workspaceID != "" {
-		query += " AND p.workspace_id = ?"
-		args = append(args, workspaceID)
+	// Build service params
+	params := services.ProjectListParams{
+		Limit:  1000, // Large limit for backwards compatibility
+		Offset: 0,
 	}
 
-	query += " ORDER BY p.name"
+	// Parse workspace ID filter
+	if workspaceIDStr := r.URL.Query().Get("workspace_id"); workspaceIDStr != "" {
+		if wsID, err := strconv.Atoi(workspaceIDStr); err == nil {
+			params.WorkspaceID = &wsID
+		}
+	}
 
-	rows, err := h.db.Query(query, args...)
+	// Use service to list projects
+	results, _, err := h.planningService.ListProjects(params)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
 
+	// Convert service results to models and filter by permission
 	var projects []models.Project
-	for rows.Next() {
-		var project models.Project
-		var workspaceName sql.NullString
-
-		err := rows.Scan(&project.ID, &project.WorkspaceID, &project.Name, &project.Description,
-			&project.Active, &project.CreatedAt, &project.UpdatedAt, &workspaceName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
+	for _, r := range results {
 		// Check if user has permission to view projects in this workspace
-		if project.WorkspaceID != nil {
-			canView, err := h.canViewProject(user.ID, *project.WorkspaceID)
+		if r.WorkspaceID != nil {
+			canView, err := h.canViewProject(user.ID, *r.WorkspaceID)
 			if err != nil {
 				http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
 				return
@@ -130,18 +70,29 @@ func (h *ProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		if workspaceName.Valid {
-			project.WorkspaceName = workspaceName.String
+		project := models.Project{
+			ID:            r.ID,
+			Name:          r.Name,
+			Description:   r.Description,
+			Active:        r.Active,
+			WorkspaceID:   r.WorkspaceID,
+			WorkspaceName: r.WorkspaceName,
+			CreatedAt:     r.CreatedAt,
+			UpdatedAt:     r.UpdatedAt,
 		}
 
 		// Load milestone categories
-		categories, err := h.loadMilestoneCategories(project.ID)
+		categories, err := h.planningService.LoadProjectMilestoneCategories(project.ID)
 		if err != nil {
 			slog.Warn("failed to load milestone categories", slog.String("component", "projects"), slog.Int("project_id", project.ID), slog.Any("error", err))
 		}
 		project.MilestoneCategories = categories
 
 		projects = append(projects, project)
+	}
+
+	if projects == nil {
+		projects = []models.Project{}
 	}
 
 	respondJSONOK(w, projects)
@@ -160,30 +111,20 @@ func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var project models.Project
-	var workspaceName sql.NullString
-
-	err := h.db.QueryRow(`
-		SELECT p.id, p.workspace_id, p.name, p.description, p.active, p.created_at, p.updated_at,
-		       w.name as workspace_name
-		FROM projects p
-		LEFT JOIN workspaces w ON p.workspace_id = w.id
-		WHERE p.id = ?
-	`, id).Scan(&project.ID, &project.WorkspaceID, &project.Name, &project.Description,
-		&project.Active, &project.CreatedAt, &project.UpdatedAt, &workspaceName)
-
-	if err == sql.ErrNoRows {
-		http.Error(w, "Project not found", http.StatusNotFound)
-		return
-	}
+	// Use service to get project
+	result, err := h.planningService.GetProject(id)
 	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			http.Error(w, "Project not found", http.StatusNotFound)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Check if user has permission to view projects in this workspace
-	if project.WorkspaceID != nil {
-		canView, err := h.canViewProject(user.ID, *project.WorkspaceID)
+	if result.WorkspaceID != nil {
+		canView, err := h.canViewProject(user.ID, *result.WorkspaceID)
 		if err != nil {
 			http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -194,12 +135,20 @@ func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if workspaceName.Valid {
-		project.WorkspaceName = workspaceName.String
+	// Convert service result to model for response
+	project := models.Project{
+		ID:            result.ID,
+		Name:          result.Name,
+		Description:   result.Description,
+		Active:        result.Active,
+		WorkspaceID:   result.WorkspaceID,
+		WorkspaceName: result.WorkspaceName,
+		CreatedAt:     result.CreatedAt,
+		UpdatedAt:     result.UpdatedAt,
 	}
 
 	// Load milestone categories
-	categories, err := h.loadMilestoneCategories(project.ID)
+	categories, err := h.planningService.LoadProjectMilestoneCategories(project.ID)
 	if err != nil {
 		slog.Warn("failed to load milestone categories", slog.String("component", "projects"), slog.Int("project_id", project.ID), slog.Any("error", err))
 	}
@@ -224,13 +173,12 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Validate workspace exists if specified
 	if project.WorkspaceID != nil && *project.WorkspaceID != 0 {
-		var workspaceExists bool
-		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", *project.WorkspaceID).Scan(&workspaceExists)
+		exists, err := h.planningService.WorkspaceExists(*project.WorkspaceID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if !workspaceExists {
+		if !exists {
 			http.Error(w, "Workspace not found", http.StatusBadRequest)
 			return
 		}
@@ -247,54 +195,46 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	now := time.Now()
-	var id int64
-	err := h.db.QueryRow(`
-		INSERT INTO projects (workspace_id, name, description, active, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
-	`, project.WorkspaceID, project.Name, project.Description, project.Active, now, now).Scan(&id)
-
+	// Use service to create project
+	result, err := h.planningService.CreateProject(services.CreateProjectParams{
+		Name:        project.Name,
+		Description: project.Description,
+		WorkspaceID: project.WorkspaceID,
+		Active:      project.Active,
+	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	// Save milestone categories if provided
 	if len(project.MilestoneCategories) > 0 {
-		if err := h.saveMilestoneCategories(int(id), project.MilestoneCategories); err != nil {
+		if err := h.planningService.SaveProjectMilestoneCategories(result.ID, project.MilestoneCategories); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
-	
-	// Return the created project with joined data
-	var workspaceName sql.NullString
-	err = h.db.QueryRow(`
-		SELECT p.id, p.workspace_id, p.name, p.description, p.active, p.created_at, p.updated_at,
-		       w.name as workspace_name
-		FROM projects p
-		LEFT JOIN workspaces w ON p.workspace_id = w.id
-		WHERE p.id = ?
-	`, id).Scan(&project.ID, &project.WorkspaceID, &project.Name, &project.Description, 
-		&project.Active, &project.CreatedAt, &project.UpdatedAt, &workspaceName)
-	
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	
-	if workspaceName.Valid {
-		project.WorkspaceName = workspaceName.String
+
+	// Convert service result to model for response
+	createdProject := models.Project{
+		ID:            result.ID,
+		Name:          result.Name,
+		Description:   result.Description,
+		Active:        result.Active,
+		WorkspaceID:   result.WorkspaceID,
+		WorkspaceName: result.WorkspaceName,
+		CreatedAt:     result.CreatedAt,
+		UpdatedAt:     result.UpdatedAt,
 	}
 
 	// Load the saved categories
-	categories, err := h.loadMilestoneCategories(int(id))
+	categories, err := h.planningService.LoadProjectMilestoneCategories(result.ID)
 	if err != nil {
-		slog.Warn("failed to load milestone categories after create", slog.String("component", "projects"), slog.Int64("project_id", id), slog.Any("error", err))
+		slog.Warn("failed to load milestone categories after create", slog.String("component", "projects"), slog.Int("project_id", result.ID), slog.Any("error", err))
 	}
-	project.MilestoneCategories = categories
+	createdProject.MilestoneCategories = categories
 
-	respondJSONCreated(w, project)
+	respondJSONCreated(w, createdProject)
 }
 
 func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -310,11 +250,10 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get existing project to check workspace
-	var existingWorkspaceID *int
-	err := h.db.QueryRow("SELECT workspace_id FROM projects WHERE id = ?", id).Scan(&existingWorkspaceID)
+	// Get existing project's workspace_id for permission check
+	existingWorkspaceID, err := h.planningService.GetProjectWorkspaceID(id)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if strings.Contains(err.Error(), "not found") {
 			http.Error(w, "Project not found", http.StatusNotFound)
 			return
 		}
@@ -343,13 +282,12 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Validate workspace exists if specified and check permission for new workspace if changing
 	if project.WorkspaceID != nil && *project.WorkspaceID != 0 {
-		var workspaceExists bool
-		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", *project.WorkspaceID).Scan(&workspaceExists)
+		exists, err := h.planningService.WorkspaceExists(*project.WorkspaceID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if !workspaceExists {
+		if !exists {
 			http.Error(w, "Workspace not found", http.StatusBadRequest)
 			return
 		}
@@ -368,52 +306,45 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	now := time.Now()
-	_, err = h.db.ExecWrite(`
-		UPDATE projects 
-		SET workspace_id = ?, name = ?, description = ?, active = ?, updated_at = ?
-		WHERE id = ?
-	`, project.WorkspaceID, project.Name, project.Description, project.Active, now, id)
-	
+	// Use service to update project
+	result, err := h.planningService.UpdateProject(services.UpdateProjectParams{
+		ID:          id,
+		Name:        project.Name,
+		Description: project.Description,
+		WorkspaceID: project.WorkspaceID,
+		Active:      project.Active,
+	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	
-	// Update milestone categories
-	if err := h.saveMilestoneCategories(id, project.MilestoneCategories); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Return the updated project with joined data
-	var workspaceName sql.NullString
-	err = h.db.QueryRow(`
-		SELECT p.id, p.workspace_id, p.name, p.description, p.active, p.created_at, p.updated_at,
-		       w.name as workspace_name
-		FROM projects p
-		LEFT JOIN workspaces w ON p.workspace_id = w.id
-		WHERE p.id = ?
-	`, id).Scan(&project.ID, &project.WorkspaceID, &project.Name, &project.Description, 
-		&project.Active, &project.CreatedAt, &project.UpdatedAt, &workspaceName)
-	
-	if err != nil {
+	// Update milestone categories
+	if err := h.planningService.SaveProjectMilestoneCategories(id, project.MilestoneCategories); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
-	if workspaceName.Valid {
-		project.WorkspaceName = workspaceName.String
+
+	// Convert service result to model for response
+	updatedProject := models.Project{
+		ID:            result.ID,
+		Name:          result.Name,
+		Description:   result.Description,
+		Active:        result.Active,
+		WorkspaceID:   result.WorkspaceID,
+		WorkspaceName: result.WorkspaceName,
+		CreatedAt:     result.CreatedAt,
+		UpdatedAt:     result.UpdatedAt,
 	}
 
 	// Load milestone categories
-	categories, err := h.loadMilestoneCategories(id)
+	categories, err := h.planningService.LoadProjectMilestoneCategories(id)
 	if err != nil {
 		slog.Warn("failed to load milestone categories after update", slog.String("component", "projects"), slog.Int("project_id", id), slog.Any("error", err))
 	}
-	project.MilestoneCategories = categories
+	updatedProject.MilestoneCategories = categories
 
-	respondJSONOK(w, project)
+	respondJSONOK(w, updatedProject)
 }
 
 func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -430,10 +361,9 @@ func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get project's workspace_id for permission check
-	var workspaceID *int
-	err := h.db.QueryRow("SELECT workspace_id FROM projects WHERE id = ?", id).Scan(&workspaceID)
+	workspaceID, err := h.planningService.GetProjectWorkspaceID(id)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if strings.Contains(err.Error(), "not found") {
 			http.Error(w, "Project not found", http.StatusNotFound)
 			return
 		}
@@ -454,8 +384,8 @@ func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_, err = h.db.ExecWrite("DELETE FROM projects WHERE id = ?", id)
-	if err != nil {
+	// Use service to delete project
+	if err := h.planningService.DeleteProject(id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

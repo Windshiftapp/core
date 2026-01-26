@@ -203,12 +203,13 @@ func TestQLFiltering(t *testing.T) {
 		DecodeJSON(t, iterResp, &iterResult)
 		iterationID = ExtractIDFromResponse(t, iterResult)
 
-		// Create milestone (global, no workspace/project association)
+		// Create milestone (workspace-scoped)
 		milestoneData := map[string]interface{}{
-			"name":        "v1.0",
-			"description": "Test milestone",
-			"target_date": "2024-06-30",
-			"status":      "in-progress",
+			"name":         "v1.0",
+			"description":  "Test milestone",
+			"target_date":  "2024-06-30",
+			"status":       "in-progress",
+			"workspace_id": workspaceID,
 		}
 
 		msResp := MakeAuthRequest(t, server, http.MethodPost, "/milestones", milestoneData)

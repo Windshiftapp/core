@@ -593,12 +593,20 @@ func (ns *NotificationService) getNotificationType(eventType string) string {
 // Close gracefully shuts down the notification service
 func (ns *NotificationService) Close() error {
 	slog.Debug("closing notification service", slog.String("component", "notifications"))
-
-	// Stop background workers
 	close(ns.stopChan)
-	ns.wg.Wait()
 
-	slog.Debug("notification service closed successfully", slog.String("component", "notifications"))
+	done := make(chan struct{})
+	go func() {
+		ns.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		slog.Debug("notification service closed successfully", slog.String("component", "notifications"))
+	case <-time.After(3 * time.Second):
+		slog.Warn("notification service close timed out after 3s", slog.String("component", "notifications"))
+	}
 	return nil
 }
 

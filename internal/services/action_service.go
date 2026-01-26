@@ -131,8 +131,19 @@ func (as *ActionService) EmitActionEvent(event *models.ActionEvent) {
 // Stop gracefully shuts down the action service
 func (as *ActionService) Stop() {
 	close(as.stopChan)
-	as.wg.Wait()
-	slog.Debug("action service stopped", slog.String("component", "actions"))
+
+	done := make(chan struct{})
+	go func() {
+		as.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		slog.Debug("action service stopped successfully", slog.String("component", "actions"))
+	case <-time.After(3 * time.Second):
+		slog.Warn("action service stop timed out after 3s", slog.String("component", "actions"))
+	}
 }
 
 // eventProcessor runs in background and processes events from the channel

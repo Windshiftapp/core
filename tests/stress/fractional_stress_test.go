@@ -450,13 +450,27 @@ func createTestItemWithFracIndex(t *testing.T, db *sql.DB, workspaceID int, pare
 	}
 	nextItemNumber := maxItemNumber + 1
 
+	// Get default status ID (Open)
+	var statusID int
+	err = db.QueryRow("SELECT id FROM statuses WHERE is_default = 1 LIMIT 1").Scan(&statusID)
+	if err != nil {
+		t.Fatalf("Failed to get default status ID: %v", err)
+	}
+
+	// Get default priority ID (Medium)
+	var priorityID int
+	err = db.QueryRow("SELECT id FROM priorities WHERE is_default = 1 LIMIT 1").Scan(&priorityID)
+	if err != nil {
+		t.Fatalf("Failed to get default priority ID: %v", err)
+	}
+
 	var result sql.Result
 	if parentID == nil {
-		result, err = db.Exec("INSERT INTO items (workspace_id, workspace_item_number, title, status, priority, frac_index) VALUES (?, ?, ?, ?, ?, ?)",
-			workspaceID, nextItemNumber, title, "open", "medium", fracIndex)
+		result, err = db.Exec("INSERT INTO items (workspace_id, workspace_item_number, title, status_id, priority_id, frac_index) VALUES (?, ?, ?, ?, ?, ?)",
+			workspaceID, nextItemNumber, title, statusID, priorityID, fracIndex)
 	} else {
-		result, err = db.Exec("INSERT INTO items (workspace_id, workspace_item_number, parent_id, title, status, priority, frac_index) VALUES (?, ?, ?, ?, ?, ?, ?)",
-			workspaceID, nextItemNumber, *parentID, title, "open", "medium", fracIndex)
+		result, err = db.Exec("INSERT INTO items (workspace_id, workspace_item_number, parent_id, title, status_id, priority_id, frac_index) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			workspaceID, nextItemNumber, *parentID, title, statusID, priorityID, fracIndex)
 	}
 
 	if err != nil {

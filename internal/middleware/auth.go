@@ -9,9 +9,9 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-
 	"windshift/internal/auth"
 	"windshift/internal/database"
+	"windshift/internal/utils"
 )
 
 // AuthMiddleware handles authentication for protected routes
@@ -288,7 +288,7 @@ func (am *AuthMiddleware) getClientIP(r *http.Request) string {
 	}
 
 	// Only trust proxy headers if the request comes from a trusted proxy
-	if am.isTrustedProxy(clientIP) {
+	if utils.IsTrustedProxy(clientIP, am.useProxy, am.additionalProxies) {
 		// Check X-Forwarded-For header (for proxies)
 		forwarded := r.Header.Get("X-Forwarded-For")
 		if forwarded != "" {
@@ -313,27 +313,6 @@ func (am *AuthMiddleware) getClientIP(r *http.Request) string {
 
 	// Fall back to direct connection IP
 	return remoteAddr
-}
-
-// isPrivateIP checks if an IP is a private/internal address
-func isPrivateIP(ip net.IP) bool {
-	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast()
-}
-
-// isTrustedProxy checks if an IP is a trusted proxy (private IP or in additional list)
-func (am *AuthMiddleware) isTrustedProxy(ip net.IP) bool {
-	if !am.useProxy {
-		return false // Proxy mode disabled - trust nothing
-	}
-	if isPrivateIP(ip) {
-		return true
-	}
-	for _, trustedIP := range am.additionalProxies {
-		if ip.Equal(trustedIP) {
-			return true
-		}
-	}
-	return false
 }
 
 // isValidClientIP validates that an IP address is a valid client IP
@@ -389,27 +368,40 @@ func (am *AuthMiddleware) RequireVerifiedEmail(next http.Handler) http.Handler {
 			return
 		}
 
-		// Check if user's email is verified
-		// Query the database for email_verified status
-		var emailVerified bool
-		err := am.db.QueryRow("SELECT email_verified FROM users WHERE id = ?", session.UserID).Scan(&emailVerified)
-		if err != nil {
-			// Fail closed: deny access on database error for security
-			slog.Error("failed to check email verification status", slog.Int("user_id", session.UserID), slog.Any("error", err))
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte(`{"error": "Failed to verify email status", "code": "VERIFICATION_CHECK_FAILED"}`))
+		// Check if user is loaded in session
+		if session.User == nil {
+			slog.Error("session user is nil", slog.Int("user_id", session.UserID))
+			am.handleVerificationError(w, r, "Failed to verify email status", "VERIFICATION_CHECK_FAILED", http.StatusInternalServerError)
 			return
 		}
 
-		if !emailVerified {
-			// User's email is not verified
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusForbidden)
-			w.Write([]byte(`{"error": "Email verification required", "code": "EMAIL_VERIFICATION_REQUIRED"}`))
+		// Check email verification status from cached session data
+		if !session.User.EmailVerified {
+			am.handleVerificationError(w, r, "Email verification required", "EMAIL_VERIFICATION_REQUIRED", http.StatusForbidden)
 			return
 		}
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// handleVerificationError handles email verification errors with consistent formatting
+func (am *AuthMiddleware) handleVerificationError(w http.ResponseWriter, r *http.Request, message, code string, statusCode int) {
+	// For API requests, return JSON error
+	if strings.HasPrefix(r.URL.Path, "/api/") {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+		response := authErrorResponse{
+			Error: message,
+			Code:  code,
+		}
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			slog.Error("failed to encode verification error response", slog.Any("error", err))
+		}
+		return
+	}
+
+	// For web requests, return plain text
+	w.WriteHeader(statusCode)
+	_, _ = w.Write([]byte(message))
 }

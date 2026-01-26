@@ -11,9 +11,10 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"windshift/internal/database"
+	"windshift/internal/utils"
 
 	"github.com/gorilla/securecookie"
-	"windshift/internal/database"
 )
 
 const (
@@ -238,28 +239,12 @@ func (sm *PortalSessionManager) isSecureRequest(r *http.Request) bool {
 	}
 
 	// Only trust X-Forwarded-Proto if request comes from a trusted proxy
-	isTrusted := sm.isTrustedProxy(clientIP)
+	isTrusted := utils.IsTrustedProxy(clientIP, sm.useProxy, sm.additionalProxies)
 	proto := r.Header.Get("X-Forwarded-Proto")
 	if isTrusted {
 		return proto == "https"
 	}
 
-	return false
-}
-
-// isTrustedProxy checks if an IP is a trusted proxy (private IP or in additional list)
-func (sm *PortalSessionManager) isTrustedProxy(ip net.IP) bool {
-	if !sm.useProxy {
-		return false // Proxy mode disabled - trust nothing
-	}
-	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() {
-		return true
-	}
-	for _, trustedIP := range sm.additionalProxies {
-		if ip.Equal(trustedIP) {
-			return true
-		}
-	}
 	return false
 }
 

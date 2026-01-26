@@ -33,7 +33,8 @@ type ItemHandler struct {
 	actionService interface {
 		EmitActionEvent(event *models.ActionEvent)
 	} // Action service for automation workflows (optional, can be nil)
-	webhookSender *webhook.WebhookSender // Webhook sender for dispatching webhook events (optional, can be nil)
+	webhookSender    *webhook.WebhookSender      // Webhook sender for dispatching webhook events (optional, can be nil)
+	eventCoordinator *services.EventCoordinator  // Centralized event coordinator for side effects (optional, can be nil)
 }
 
 func NewItemHandler(db database.Database, permissionService *services.PermissionService, activityTracker *services.ActivityTracker, notificationService interface {
@@ -73,6 +74,11 @@ func (h *ItemHandler) SetActionService(actionService interface {
 	EmitActionEvent(event *models.ActionEvent)
 }) {
 	h.actionService = actionService
+}
+
+// SetEventCoordinator sets the event coordinator for centralized side effects
+func (h *ItemHandler) SetEventCoordinator(ec *services.EventCoordinator) {
+	h.eventCoordinator = ec
 }
 
 func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
@@ -663,54 +669,53 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		createdItem.CustomFieldValues = make(map[string]interface{})
 	}
 
-	// Emit notification event
+	// Emit side effects via EventCoordinator (notifications, webhooks, action events)
 	notifyStart := time.Now()
-	if h.notificationService != nil {
-		// Construct the item key (e.g., "TST-1")
-		itemKey := fmt.Sprintf("%s-%d", createdItem.WorkspaceKey, createdItem.WorkspaceItemNumber)
-
-		h.notificationService.EmitEvent(&services.NotificationEvent{
-			EventType:   models.EventItemCreated,
-			WorkspaceID: createdItem.WorkspaceID,
-			ActorUserID: user.ID,
-			ItemID:      createdItem.ID,
-			AssigneeID:  createdItem.AssigneeID,
-			CreatorID:   &user.ID,
-			Title:       "New Item Created",
-			TemplateData: map[string]interface{}{
-				"item.title":     createdItem.Title,
-				"item.key":       itemKey,
-				"item.id":        createdItem.ID,
-				"user.name":      user.Username,
-				"workspace.name": createdItem.WorkspaceName,
-				"workspace.key":  createdItem.WorkspaceKey,
-			},
-		})
-	}
-
-	// Emit action event for automation
-	if h.actionService != nil {
-		h.actionService.EmitActionEvent(&models.ActionEvent{
-			EventType:   models.ActionTriggerItemCreated,
-			WorkspaceID: createdItem.WorkspaceID,
-			ItemID:      createdItem.ID,
-			ActorUserID: user.ID,
-			NewValues: map[string]interface{}{
-				"title":       createdItem.Title,
-				"status_id":   createdItem.StatusID,
-				"item_type_id": createdItem.ItemTypeID,
-				"assignee_id": createdItem.AssigneeID,
-				"creator_id":  createdItem.CreatorID,
-				"priority_id": createdItem.PriorityID,
-			},
-		})
+	if h.eventCoordinator != nil {
+		h.eventCoordinator.EmitItemCreated(&createdItem, user.ID)
+	} else {
+		// Fallback to individual services if EventCoordinator not set
+		if h.notificationService != nil {
+			itemKey := fmt.Sprintf("%s-%d", createdItem.WorkspaceKey, createdItem.WorkspaceItemNumber)
+			h.notificationService.EmitEvent(&services.NotificationEvent{
+				EventType:   models.EventItemCreated,
+				WorkspaceID: createdItem.WorkspaceID,
+				ActorUserID: user.ID,
+				ItemID:      createdItem.ID,
+				AssigneeID:  createdItem.AssigneeID,
+				CreatorID:   &user.ID,
+				Title:       "New Item Created",
+				TemplateData: map[string]interface{}{
+					"item.title":     createdItem.Title,
+					"item.key":       itemKey,
+					"item.id":        createdItem.ID,
+					"user.name":      user.Username,
+					"workspace.name": createdItem.WorkspaceName,
+					"workspace.key":  createdItem.WorkspaceKey,
+				},
+			})
+		}
+		if h.actionService != nil {
+			h.actionService.EmitActionEvent(&models.ActionEvent{
+				EventType:   models.ActionTriggerItemCreated,
+				WorkspaceID: createdItem.WorkspaceID,
+				ItemID:      createdItem.ID,
+				ActorUserID: user.ID,
+				NewValues: map[string]interface{}{
+					"title":        createdItem.Title,
+					"status_id":    createdItem.StatusID,
+					"item_type_id": createdItem.ItemTypeID,
+					"assignee_id":  createdItem.AssigneeID,
+					"creator_id":   createdItem.CreatorID,
+					"priority_id":  createdItem.PriorityID,
+				},
+			})
+		}
+		if h.webhookSender != nil {
+			go h.webhookSender.DispatchEvent("item.created", &createdItem)
+		}
 	}
 	notifyTime := time.Since(notifyStart)
-
-	// Dispatch webhook event for item creation
-	if h.webhookSender != nil {
-		go h.webhookSender.DispatchEvent("item.created", &createdItem)
-	}
 
 	// Profiling: log timing summary (all times in milliseconds for easy parsing)
 	totalTime := time.Since(createStart)
@@ -841,7 +846,7 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	// Check if assignee changed (compare originalItem with updatedItem) - needed for both notifications and webhooks
+	// Check if assignee changed (compare originalItem with updatedItem)
 	assigneeChanged := false
 	if originalItem.AssigneeID == nil && updatedItem.AssigneeID != nil {
 		assigneeChanged = true
@@ -851,181 +856,117 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		assigneeChanged = true
 	}
 
-	// Emit notification events
-	if h.notificationService != nil && user != nil {
-		slog.Debug("checking for notification events",
-			slog.Int("item_id", updatedItem.ID),
-			slog.Int("user_id", user.ID),
-			slog.String("username", user.Username))
-
-		// Log assignee change details
-		if assigneeChanged {
-			if originalItem.AssigneeID == nil && updatedItem.AssigneeID != nil {
-				slog.Debug("assignee added", slog.Int("new_assignee_id", *updatedItem.AssigneeID))
-			} else if originalItem.AssigneeID != nil && updatedItem.AssigneeID == nil {
-				slog.Debug("assignee removed", slog.Int("old_assignee_id", *originalItem.AssigneeID))
-			} else if originalItem.AssigneeID != nil && updatedItem.AssigneeID != nil {
-				slog.Debug("assignee changed", slog.Int("old_assignee_id", *originalItem.AssigneeID), slog.Int("new_assignee_id", *updatedItem.AssigneeID))
+	// Emit side effects via EventCoordinator (notifications, webhooks, action events)
+	if h.eventCoordinator != nil {
+		h.eventCoordinator.EmitItemUpdated(originalItem, updatedItem, result.StatusChanged, assigneeChanged, user.ID)
+	} else {
+		// Fallback to individual services if EventCoordinator not set
+		if h.notificationService != nil && user != nil {
+			var statusName string
+			if result.StatusChanged && updatedItem.StatusID != nil {
+				h.db.QueryRow("SELECT name FROM statuses WHERE id = ?", *updatedItem.StatusID).Scan(&statusName)
 			}
-		} else {
-			// Log why it didn't change
-			originalAssignee := "nil"
-			updatedAssignee := "nil"
-			if originalItem.AssigneeID != nil {
-				originalAssignee = fmt.Sprintf("%d", *originalItem.AssigneeID)
-			}
-			if updatedItem.AssigneeID != nil {
-				updatedAssignee = fmt.Sprintf("%d", *updatedItem.AssigneeID)
-			}
-			slog.Debug("assignee not changed", slog.String("original", originalAssignee), slog.String("updated", updatedAssignee))
-		}
-
-		// Get status name if status changed
-		var statusName string
-		if result.StatusChanged && updatedItem.StatusID != nil {
-			h.db.QueryRow("SELECT name FROM statuses WHERE id = ?", *updatedItem.StatusID).Scan(&statusName)
-		}
-
-		// Emit status changed notification
-		if result.StatusChanged {
-			slog.Debug("emitting EventStatusChanged",
-				slog.Int("item_id", updatedItem.ID),
-				slog.String("status", statusName),
-				slog.Any("assignee_id", updatedItem.AssigneeID),
-				slog.Any("creator_id", originalItem.CreatorID))
-
-			// Construct the item key (e.g., "TST-1")
 			itemKey := fmt.Sprintf("%s-%d", updatedItem.WorkspaceKey, updatedItem.WorkspaceItemNumber)
 
-			h.notificationService.EmitEvent(&services.NotificationEvent{
-				EventType:   models.EventStatusChanged,
-				WorkspaceID: updatedItem.WorkspaceID,
-				ActorUserID: user.ID,
-				ItemID:      updatedItem.ID,
-				AssigneeID:  updatedItem.AssigneeID,
-				CreatorID:   originalItem.CreatorID,
-				Title:       "Status Changed",
-				TemplateData: map[string]interface{}{
-					"item.title":  updatedItem.Title,
-					"item.key":    itemKey,
-					"item.id":     updatedItem.ID,
-					"status.name": statusName,
-					"user.name":   user.Username,
-				},
-			})
-
-			slog.Debug("successfully emitted EventStatusChanged", slog.Int("item_id", updatedItem.ID))
+			if result.StatusChanged {
+				h.notificationService.EmitEvent(&services.NotificationEvent{
+					EventType:   models.EventStatusChanged,
+					WorkspaceID: updatedItem.WorkspaceID,
+					ActorUserID: user.ID,
+					ItemID:      updatedItem.ID,
+					AssigneeID:  updatedItem.AssigneeID,
+					CreatorID:   originalItem.CreatorID,
+					Title:       "Status Changed",
+					TemplateData: map[string]interface{}{
+						"item.title":  updatedItem.Title,
+						"item.key":    itemKey,
+						"item.id":     updatedItem.ID,
+						"status.name": statusName,
+						"user.name":   user.Username,
+					},
+				})
+			}
+			if assigneeChanged {
+				h.notificationService.EmitEvent(&services.NotificationEvent{
+					EventType:   models.EventItemAssigned,
+					WorkspaceID: updatedItem.WorkspaceID,
+					ActorUserID: user.ID,
+					ItemID:      updatedItem.ID,
+					AssigneeID:  updatedItem.AssigneeID,
+					CreatorID:   originalItem.CreatorID,
+					Title:       "Item Assigned",
+					TemplateData: map[string]interface{}{
+						"item.title": updatedItem.Title,
+						"item.key":   itemKey,
+						"item.id":    updatedItem.ID,
+						"user.name":  user.Username,
+					},
+				})
+			}
+			if !result.StatusChanged && !assigneeChanged {
+				h.notificationService.EmitEvent(&services.NotificationEvent{
+					EventType:   models.EventItemUpdated,
+					WorkspaceID: updatedItem.WorkspaceID,
+					ActorUserID: user.ID,
+					ItemID:      updatedItem.ID,
+					AssigneeID:  updatedItem.AssigneeID,
+					CreatorID:   originalItem.CreatorID,
+					Title:       "Item Updated",
+					TemplateData: map[string]interface{}{
+						"item.title": updatedItem.Title,
+						"item.key":   itemKey,
+						"item.id":    updatedItem.ID,
+						"user.name":  user.Username,
+					},
+				})
+			}
 		}
-
-		// Emit assignee changed notification
-		if assigneeChanged {
-			slog.Debug("emitting EventItemAssigned",
-				slog.Int("item_id", updatedItem.ID),
-				slog.Any("new_assignee_id", updatedItem.AssigneeID),
-				slog.Any("old_assignee_id", originalItem.AssigneeID),
-				slog.Any("creator_id", originalItem.CreatorID))
-
-			// Construct the item key (e.g., "TST-1")
-			itemKey := fmt.Sprintf("%s-%d", updatedItem.WorkspaceKey, updatedItem.WorkspaceItemNumber)
-
-			h.notificationService.EmitEvent(&services.NotificationEvent{
-				EventType:   models.EventItemAssigned,
-				WorkspaceID: updatedItem.WorkspaceID,
-				ActorUserID: user.ID,
-				ItemID:      updatedItem.ID,
-				AssigneeID:  updatedItem.AssigneeID,
-				CreatorID:   originalItem.CreatorID,
-				Title:       "Item Assigned",
-				TemplateData: map[string]interface{}{
-					"item.title": updatedItem.Title,
-					"item.key":   itemKey,
-					"item.id":    updatedItem.ID,
-					"user.name":  user.Username,
-				},
-			})
-
-			slog.Debug("successfully emitted EventItemAssigned", slog.Int("item_id", updatedItem.ID))
+		if h.actionService != nil && user != nil {
+			if result.StatusChanged {
+				h.actionService.EmitActionEvent(&models.ActionEvent{
+					EventType:   models.ActionTriggerStatusTransition,
+					WorkspaceID: updatedItem.WorkspaceID,
+					ItemID:      updatedItem.ID,
+					ActorUserID: user.ID,
+					OldValues:   map[string]interface{}{"status_id": originalItem.StatusID},
+					NewValues: map[string]interface{}{
+						"status_id":   updatedItem.StatusID,
+						"title":       updatedItem.Title,
+						"assignee_id": updatedItem.AssigneeID,
+						"creator_id":  updatedItem.CreatorID,
+					},
+				})
+			} else {
+				h.actionService.EmitActionEvent(&models.ActionEvent{
+					EventType:   models.ActionTriggerItemUpdated,
+					WorkspaceID: updatedItem.WorkspaceID,
+					ItemID:      updatedItem.ID,
+					ActorUserID: user.ID,
+					OldValues: map[string]interface{}{
+						"status_id":   originalItem.StatusID,
+						"assignee_id": originalItem.AssigneeID,
+						"title":       originalItem.Title,
+						"priority_id": originalItem.PriorityID,
+					},
+					NewValues: map[string]interface{}{
+						"status_id":   updatedItem.StatusID,
+						"assignee_id": updatedItem.AssigneeID,
+						"title":       updatedItem.Title,
+						"priority_id": updatedItem.PriorityID,
+						"creator_id":  updatedItem.CreatorID,
+					},
+				})
+			}
 		}
-
-		// Emit item updated notification (always, unless only status or assignee changed)
-		if !result.StatusChanged && !assigneeChanged {
-			// Construct the item key (e.g., "TST-1")
-			itemKey := fmt.Sprintf("%s-%d", updatedItem.WorkspaceKey, updatedItem.WorkspaceItemNumber)
-
-			h.notificationService.EmitEvent(&services.NotificationEvent{
-				EventType:   models.EventItemUpdated,
-				WorkspaceID: updatedItem.WorkspaceID,
-				ActorUserID: user.ID,
-				ItemID:      updatedItem.ID,
-				AssigneeID:  updatedItem.AssigneeID,
-				CreatorID:   originalItem.CreatorID,
-				Title:       "Item Updated",
-				TemplateData: map[string]interface{}{
-					"item.title": updatedItem.Title,
-					"item.key":   itemKey,
-					"item.id":    updatedItem.ID,
-					"user.name":  user.Username,
-				},
-			})
+		if h.webhookSender != nil {
+			if result.StatusChanged {
+				go h.webhookSender.DispatchEvent("status.changed", updatedItem)
+			}
+			if assigneeChanged {
+				go h.webhookSender.DispatchEvent("item.assigned", updatedItem)
+			}
+			go h.webhookSender.DispatchEvent("item.updated", updatedItem)
 		}
-	}
-
-	// Emit action events for automation
-	if h.actionService != nil && user != nil {
-		// Emit status transition event
-		if result.StatusChanged {
-			h.actionService.EmitActionEvent(&models.ActionEvent{
-				EventType:   models.ActionTriggerStatusTransition,
-				WorkspaceID: updatedItem.WorkspaceID,
-				ItemID:      updatedItem.ID,
-				ActorUserID: user.ID,
-				OldValues: map[string]interface{}{
-					"status_id": originalItem.StatusID,
-				},
-				NewValues: map[string]interface{}{
-					"status_id":   updatedItem.StatusID,
-					"title":       updatedItem.Title,
-					"assignee_id": updatedItem.AssigneeID,
-					"creator_id":  updatedItem.CreatorID,
-				},
-			})
-		}
-
-		// Emit item updated event for other changes
-		if !result.StatusChanged {
-			h.actionService.EmitActionEvent(&models.ActionEvent{
-				EventType:   models.ActionTriggerItemUpdated,
-				WorkspaceID: updatedItem.WorkspaceID,
-				ItemID:      updatedItem.ID,
-				ActorUserID: user.ID,
-				OldValues: map[string]interface{}{
-					"status_id":   originalItem.StatusID,
-					"assignee_id": originalItem.AssigneeID,
-					"title":       originalItem.Title,
-					"priority_id": originalItem.PriorityID,
-				},
-				NewValues: map[string]interface{}{
-					"status_id":   updatedItem.StatusID,
-					"assignee_id": updatedItem.AssigneeID,
-					"title":       updatedItem.Title,
-					"priority_id": updatedItem.PriorityID,
-					"creator_id":  updatedItem.CreatorID,
-				},
-			})
-		}
-	}
-
-	// Dispatch webhook events for item updates
-	if h.webhookSender != nil {
-		// Dispatch specific events based on what changed
-		if result.StatusChanged {
-			go h.webhookSender.DispatchEvent("status.changed", updatedItem)
-		}
-		if assigneeChanged {
-			go h.webhookSender.DispatchEvent("item.assigned", updatedItem)
-		}
-		// Always dispatch item.updated for any update
-		go h.webhookSender.DispatchEvent("item.updated", updatedItem)
 	}
 
 	// Process @mentions in description if it changed
@@ -1107,27 +1048,30 @@ func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Emit notification
-	if h.notificationService != nil {
-		h.notificationService.EmitEvent(&services.NotificationEvent{
-			EventType:   models.EventItemDeleted,
-			WorkspaceID: item.WorkspaceID,
-			ActorUserID: user.ID,
-			ItemID:      id,
-			AssigneeID:  item.AssigneeID,
-			CreatorID:   item.CreatorID,
-			Title:       "Item Deleted",
-			TemplateData: map[string]interface{}{
-				"item.title": item.Title,
-				"item.id":    id,
-				"user.name":  user.Username,
-			},
-		})
-	}
-
-	// Dispatch webhook event for item deletion
-	if h.webhookSender != nil {
-		go h.webhookSender.DispatchEvent("item.deleted", item)
+	// Emit side effects via EventCoordinator (notifications, webhooks)
+	if h.eventCoordinator != nil {
+		h.eventCoordinator.EmitItemDeleted(item, user.ID, 0)
+	} else {
+		// Fallback to individual services if EventCoordinator not set
+		if h.notificationService != nil {
+			h.notificationService.EmitEvent(&services.NotificationEvent{
+				EventType:   models.EventItemDeleted,
+				WorkspaceID: item.WorkspaceID,
+				ActorUserID: user.ID,
+				ItemID:      id,
+				AssigneeID:  item.AssigneeID,
+				CreatorID:   item.CreatorID,
+				Title:       "Item Deleted",
+				TemplateData: map[string]interface{}{
+					"item.title": item.Title,
+					"item.id":    id,
+					"user.name":  user.Username,
+				},
+			})
+		}
+		if h.webhookSender != nil {
+			go h.webhookSender.DispatchEvent("item.deleted", item)
+		}
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -1337,28 +1281,31 @@ func (h *ItemHandler) DeleteCascade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Emit notification for the main item
-	if h.notificationService != nil {
-		h.notificationService.EmitEvent(&services.NotificationEvent{
-			EventType:   models.EventItemDeleted,
-			WorkspaceID: item.WorkspaceID,
-			ActorUserID: user.ID,
-			ItemID:      id,
-			AssigneeID:  item.AssigneeID,
-			CreatorID:   item.CreatorID,
-			Title:       "Item Deleted",
-			TemplateData: map[string]interface{}{
-				"item.title":  item.Title,
-				"item.id":     id,
-				"user.name":   user.Username,
-				"descendants": result.DeletedCount - 1,
-			},
-		})
-	}
-
-	// Dispatch webhook event for item deletion
-	if h.webhookSender != nil {
-		go h.webhookSender.DispatchEvent("item.deleted", item)
+	// Emit side effects via EventCoordinator (notifications, webhooks)
+	if h.eventCoordinator != nil {
+		h.eventCoordinator.EmitItemDeleted(item, user.ID, result.DeletedCount-1)
+	} else {
+		// Fallback to individual services if EventCoordinator not set
+		if h.notificationService != nil {
+			h.notificationService.EmitEvent(&services.NotificationEvent{
+				EventType:   models.EventItemDeleted,
+				WorkspaceID: item.WorkspaceID,
+				ActorUserID: user.ID,
+				ItemID:      id,
+				AssigneeID:  item.AssigneeID,
+				CreatorID:   item.CreatorID,
+				Title:       "Item Deleted",
+				TemplateData: map[string]interface{}{
+					"item.title":  item.Title,
+					"item.id":     id,
+					"user.name":   user.Username,
+					"descendants": result.DeletedCount - 1,
+				},
+			})
+		}
+		if h.webhookSender != nil {
+			go h.webhookSender.DispatchEvent("item.deleted", item)
+		}
 	}
 
 	respondJSONOK(w, map[string]interface{}{

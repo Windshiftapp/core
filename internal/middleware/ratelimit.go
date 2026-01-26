@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"windshift/internal/utils"
 
 	"golang.org/x/time/rate"
 )
@@ -196,23 +197,6 @@ func (rl *RateLimiter) Stop() {
 	}
 }
 
-// isTrustedProxy checks if an IP is a trusted proxy (private IP or in additional list)
-// Uses isPrivateIP from auth.go (same package)
-func (rl *RateLimiter) isTrustedProxy(ip net.IP) bool {
-	if !rl.useProxy {
-		return false // Proxy mode disabled - trust nothing
-	}
-	if isPrivateIP(ip) {
-		return true
-	}
-	for _, trustedIP := range rl.additionalProxies {
-		if ip.Equal(trustedIP) {
-			return true
-		}
-	}
-	return false
-}
-
 // getClientIP extracts the client IP from request headers with proxy validation
 func (rl *RateLimiter) getClientIP(r *http.Request) string {
 	// Get the immediate client IP (could be proxy)
@@ -228,7 +212,7 @@ func (rl *RateLimiter) getClientIP(r *http.Request) string {
 	}
 
 	// Only trust proxy headers if the request comes from a trusted proxy
-	if rl.isTrustedProxy(clientIP) {
+	if utils.IsTrustedProxy(clientIP, rl.useProxy, rl.additionalProxies) {
 		// Check X-Forwarded-For header (for proxies)
 		forwarded := r.Header.Get("X-Forwarded-For")
 		if forwarded != "" {

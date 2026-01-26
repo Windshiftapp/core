@@ -147,8 +147,8 @@ func TestQLChildrenOf(t *testing.T) {
 
 	// Test basic childrenOf query
 	t.Run("BasicChildrenOf", func(t *testing.T) {
-		// Find all descendants of high priority items
-		qlQuery := `childrenOf("priority = high")`
+		// Find all descendants of high priority items (priority_id 2 = High)
+		qlQuery := `childrenOf("priority_id = 2")`
 		encodedQL := url.QueryEscape(qlQuery)
 
 		resp := MakeAuthRequest(t, server, http.MethodGet, fmt.Sprintf("/items?ql=%s", encodedQL), nil)
@@ -225,7 +225,7 @@ func TestQLChildrenOf(t *testing.T) {
 	// Test childrenOf combined with other filters
 	t.Run("ChildrenOfCombined", func(t *testing.T) {
 		// Find high priority descendants of high priority items
-		qlQuery := `priority = high AND childrenOf("priority = high")`
+		qlQuery := `priority_id = 2 AND childrenOf("priority_id = 2")`
 		encodedQL := url.QueryEscape(qlQuery)
 
 		resp := MakeAuthRequest(t, server, http.MethodGet, fmt.Sprintf("/items?ql=%s", encodedQL), nil)
@@ -365,7 +365,7 @@ func TestQLLinkedOf(t *testing.T) {
 	// Test linkedOf with forward direction
 	t.Run("LinkedOfForward", func(t *testing.T) {
 		// Find items blocked by high priority items
-		qlQuery := `linkedOf("blocks", "priority = high")`
+		qlQuery := `linkedOf("blocks", "priority_id = 2")`
 		encodedQL := url.QueryEscape(qlQuery)
 
 		resp := MakeAuthRequest(t, server, http.MethodGet, fmt.Sprintf("/items?ql=%s", encodedQL), nil)
@@ -397,7 +397,7 @@ func TestQLLinkedOf(t *testing.T) {
 	// Test linkedOf with reverse direction
 	t.Run("LinkedOfReverse", func(t *testing.T) {
 		// Find items that block medium priority items
-		qlQuery := `linkedOf("is blocked by", "priority = medium")`
+		qlQuery := `linkedOf("is blocked by", "priority_id = 3")`
 		encodedQL := url.QueryEscape(qlQuery)
 
 		resp := MakeAuthRequest(t, server, http.MethodGet, fmt.Sprintf("/items?ql=%s", encodedQL), nil)
@@ -450,7 +450,7 @@ func TestQLLinkedOf(t *testing.T) {
 	// Test linkedOf combined with other filters
 	t.Run("LinkedOfCombined", func(t *testing.T) {
 		// Find medium priority items linked from high priority items
-		qlQuery := `priority = medium AND linkedOf("blocks", "priority = high")`
+		qlQuery := `priority_id = 3 AND linkedOf("blocks", "priority_id = 2")`
 		encodedQL := url.QueryEscape(qlQuery)
 
 		resp := MakeAuthRequest(t, server, http.MethodGet, fmt.Sprintf("/items?ql=%s", encodedQL), nil)

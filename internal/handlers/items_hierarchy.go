@@ -177,6 +177,102 @@ func (h *ItemHandler) GetDescendantsNew(w http.ResponseWriter, r *http.Request) 
 	respondJSONOK(w, filteredDescendants)
 }
 
+// GetTree returns the item and all its descendants as a nested tree structure
+func (h *ItemHandler) GetTree(w http.ResponseWriter, r *http.Request) {
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	// Require authentication
+	user := h.getUserFromContext(r)
+	if user == nil {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
+	}
+
+	// Get the root item
+	repo := repository.NewItemRepository(h.db)
+	rootItem, err := repo.FindByID(id)
+	if err != nil {
+		if err == repository.ErrNotFound {
+			http.Error(w, "Item not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Failed to fetch item: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Check if user has permission to view item's workspace
+	canView, permErr := h.canViewItem(user.ID, rootItem.WorkspaceID)
+	if permErr != nil {
+		http.Error(w, "Permission check failed: "+permErr.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !canView {
+		http.Error(w, "Insufficient permissions to view this item", http.StatusForbidden)
+		return
+	}
+
+	// Get all descendants
+	descendants, err := h.hierarchyService.GetDescendants(id, 0)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Apply permission filtering
+	filteredDescendants, err := h.filterItemsByPermissions(user.ID, descendants)
+	if err != nil {
+		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Build tree structure
+	tree := h.buildItemTree(rootItem, filteredDescendants)
+
+	respondJSONOK(w, tree)
+}
+
+// ItemTreeNode represents an item with its children in a tree structure
+type ItemTreeNode struct {
+	*models.Item
+	Children []*ItemTreeNode `json:"children"`
+}
+
+// buildItemTree constructs a nested tree from a root item and its descendants
+func (h *ItemHandler) buildItemTree(root *models.Item, descendants []models.Item) *ItemTreeNode {
+	// Create a map for quick lookup
+	nodeMap := make(map[int]*ItemTreeNode)
+
+	// Create node for root
+	rootNode := &ItemTreeNode{
+		Item:     root,
+		Children: make([]*ItemTreeNode, 0),
+	}
+	nodeMap[root.ID] = rootNode
+
+	// Create nodes for all descendants
+	for i := range descendants {
+		item := &descendants[i]
+		nodeMap[item.ID] = &ItemTreeNode{
+			Item:     item,
+			Children: make([]*ItemTreeNode, 0),
+		}
+	}
+
+	// Build tree by linking children to parents
+	for _, item := range descendants {
+		if item.ParentID != nil {
+			if parentNode, exists := nodeMap[*item.ParentID]; exists {
+				parentNode.Children = append(parentNode.Children, nodeMap[item.ID])
+			}
+		}
+	}
+
+	return rootNode
+}
+
 // GetChildrenNew returns direct children using the new hierarchy service
 func (h *ItemHandler) GetChildrenNew(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")

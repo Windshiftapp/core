@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"windshift/internal/database"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
@@ -12,9 +11,11 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"windshift/internal/database"
+	"windshift/internal/models"
+	"windshift/internal/utils"
 
 	"github.com/gorilla/securecookie"
-	"windshift/internal/models"
 )
 
 const (
@@ -144,7 +145,7 @@ func (sm *SessionManager) ValidateSession(token, ipAddress string) (*Session, er
 	query := `
 		SELECT
 			s.id, s.user_id, s.session_token, s.expires_at, s.ip_address, s.user_agent, s.is_active, s.created_at,
-			u.email, u.username, u.first_name, u.last_name, u.is_active, u.avatar_url, u.requires_password_reset, u.timezone, u.language, u.created_at, u.updated_at
+			u.email, u.username, u.first_name, u.last_name, u.is_active, u.avatar_url, u.requires_password_reset, u.timezone, u.language, u.email_verified, u.created_at, u.updated_at
 		FROM user_sessions s
 		JOIN users u ON s.user_id = u.id
 		WHERE s.session_token = ? AND s.is_active = true
@@ -157,7 +158,7 @@ func (sm *SessionManager) ValidateSession(token, ipAddress string) (*Session, er
 
 	err := row.Scan(
 		&session.ID, &session.UserID, &session.Token, &session.ExpiresAt, &session.IPAddress, &session.UserAgent, &session.IsActive, &session.CreatedAt,
-		&session.User.Email, &session.User.Username, &session.User.FirstName, &session.User.LastName, &session.User.IsActive, &avatarURL, &session.User.RequiresPasswordReset, &timezone, &language, &session.User.CreatedAt, &session.User.UpdatedAt,
+		&session.User.Email, &session.User.Username, &session.User.FirstName, &session.User.LastName, &session.User.IsActive, &avatarURL, &session.User.RequiresPasswordReset, &timezone, &language, &session.User.EmailVerified, &session.User.CreatedAt, &session.User.UpdatedAt,
 	)
 
 	if err != nil {
@@ -270,7 +271,7 @@ func (sm *SessionManager) isSecureRequest(r *http.Request) bool {
 	}
 
 	// Only trust X-Forwarded-Proto if request comes from a trusted proxy
-	isTrusted := sm.isTrustedProxy(clientIP)
+	isTrusted := utils.IsTrustedProxy(clientIP, sm.useProxy, sm.additionalProxies)
 	proto := r.Header.Get("X-Forwarded-Proto")
 	if isTrusted {
 		result := proto == "https"
@@ -287,27 +288,6 @@ func (sm *SessionManager) isSecureRequest(r *http.Request) bool {
 		slog.String("ip", clientIP.String()),
 		slog.String("x_forwarded_proto", proto),
 		slog.Bool("result", false))
-	return false
-}
-
-// isPrivateIP checks if an IP is a private/internal address
-func isPrivateIP(ip net.IP) bool {
-	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast()
-}
-
-// isTrustedProxy checks if an IP is a trusted proxy (private IP or in additional list)
-func (sm *SessionManager) isTrustedProxy(ip net.IP) bool {
-	if !sm.useProxy {
-		return false // Proxy mode disabled - trust nothing
-	}
-	if isPrivateIP(ip) {
-		return true
-	}
-	for _, trustedIP := range sm.additionalProxies {
-		if ip.Equal(trustedIP) {
-			return true
-		}
-	}
 	return false
 }
 

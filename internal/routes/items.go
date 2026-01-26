@@ -27,6 +27,8 @@ func RegisterItemRoutes(deps *Deps) {
 	api.HandleH("GET /items/{id}/children", auth(http.HandlerFunc(deps.Items.Item.GetChildren)))
 	api.HandleH("GET /items/{id}/ancestors", auth(http.HandlerFunc(deps.Items.Item.GetAncestors)))
 	api.HandleH("GET /items/{id}/descendants-new", auth(http.HandlerFunc(deps.Items.Item.GetDescendantsNew)))
+	api.HandleH("GET /items/{id}/descendants", auth(http.HandlerFunc(deps.Items.Item.GetDescendantsNew))) // Alias for backwards compatibility
+	api.HandleH("GET /items/{id}/tree", auth(http.HandlerFunc(deps.Items.Item.GetTree)))
 	api.HandleH("GET /items/{id}/children-new", auth(http.HandlerFunc(deps.Items.Item.GetChildrenNew)))
 
 	// Item watch endpoints

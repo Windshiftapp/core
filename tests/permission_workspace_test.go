@@ -288,22 +288,36 @@ func TestWorkspaceRoles_EveryoneRole(t *testing.T) {
 	adminToken := CreateBearerToken(t, server)
 	server.BearerToken = adminToken
 
-	// Create a test workspace (starts with default Everyone role = Viewer)
+	// Create a test workspace (workspaces are locked by default - no Everyone access)
 	workspaceID, _ := CreateTestWorkspace(t, server, "Everyone Role Test", shortKey("ERTW"))
 
 	// Create a user with no explicit role assignment
 	_, noRoleUsername, noRolePassword := CreateTestUserWithCredentials(t, server, "no_role_user", "no_role@test.com")
 	noRoleToken := CreateBearerTokenForUser(t, server, noRoleUsername, noRolePassword)
 
-	t.Run("DefaultEveryoneRole_GrantsViewerAccess", func(t *testing.T) {
-		// By default, all authenticated users should have Viewer access
+	t.Run("WorkspaceLockedByDefault_DeniesAccessToNoRoleUser", func(t *testing.T) {
+		// By default, workspaces have no Everyone role - users without explicit roles cannot access
+		endpoint := fmt.Sprintf("/workspaces/%d", workspaceID)
+		resp := MakeAuthRequestWithToken(t, server, noRoleToken, http.MethodGet, endpoint, nil)
+		defer resp.Body.Close()
+		AssertStatusCode(t, resp, http.StatusForbidden)
+	})
+
+	t.Run("EveryoneRoleSetToViewer_GrantsViewerAccess", func(t *testing.T) {
+		// Set Everyone role to Viewer
+		roles := GetWorkspaceRoles(t, server)
+		viewerRoleID := roles["Viewer"]
+		SetEveryoneRole(t, server, workspaceID, &viewerRoleID)
+
+		// Now user with no explicit role should have Viewer access
 		endpoint := fmt.Sprintf("/workspaces/%d", workspaceID)
 		resp := MakeAuthRequestWithToken(t, server, noRoleToken, http.MethodGet, endpoint, nil)
 		defer resp.Body.Close()
 		AssertStatusCode(t, resp, http.StatusOK)
 	})
 
-	t.Run("DefaultEveryoneRole_CanViewItems", func(t *testing.T) {
+	t.Run("EveryoneRoleViewer_CanViewItems", func(t *testing.T) {
+		// Everyone role was set to Viewer in previous test
 		endpoint := fmt.Sprintf("/items?workspace_id=%d", workspaceID)
 		resp := MakeAuthRequestWithToken(t, server, noRoleToken, http.MethodGet, endpoint, nil)
 		defer resp.Body.Close()
@@ -402,10 +416,20 @@ func TestWorkspaceRoles_NoRole(t *testing.T) {
 	})
 
 	t.Run("NoRole_CannotViewItems", func(t *testing.T) {
+		// Items endpoint returns 200 with empty list for inaccessible workspaces
+		// (doesn't leak information about workspace existence)
 		endpoint := fmt.Sprintf("/items?workspace_id=%d", workspaceID)
 		resp := MakeAuthRequestWithToken(t, server, noRoleToken, http.MethodGet, endpoint, nil)
 		defer resp.Body.Close()
-		AssertStatusCode(t, resp, http.StatusForbidden)
+		AssertStatusCode(t, resp, http.StatusOK)
+
+		var result map[string]interface{}
+		DecodeJSON(t, resp, &result)
+
+		items, ok := result["items"].([]interface{})
+		if !ok || len(items) != 0 {
+			t.Error("Expected empty items list for inaccessible workspace")
+		}
 	})
 
 	t.Run("NoRole_CannotViewSpecificItem", func(t *testing.T) {

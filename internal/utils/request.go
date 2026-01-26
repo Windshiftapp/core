@@ -70,25 +70,35 @@ func (e *IPExtractor) GetClientIP(r *http.Request) string {
 	return remoteAddr
 }
 
-// isPrivateIP checks if an IP is a private/internal address
-func isPrivateIP(ip net.IP) bool {
+// IsPrivateIP checks if an IP is a private/internal address
+func IsPrivateIP(ip net.IP) bool {
 	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast()
 }
 
-// isTrustedProxy checks if an IP is a trusted proxy
-func (e *IPExtractor) isTrustedProxy(ip net.IP) bool {
-	if !e.useProxy {
+// IsTrustedProxy checks if an IP is a trusted proxy (private IP or in additional list)
+// This is the canonical implementation used throughout the codebase.
+// Parameters:
+//   - ip: the IP address to check
+//   - useProxy: whether proxy mode is enabled (if false, always returns false)
+//   - additionalProxies: list of additional trusted proxy IPs beyond private ranges
+func IsTrustedProxy(ip net.IP, useProxy bool, additionalProxies []net.IP) bool {
+	if !useProxy {
 		return false // Proxy mode disabled - trust nothing
 	}
-	if isPrivateIP(ip) {
+	if IsPrivateIP(ip) {
 		return true
 	}
-	for _, trustedIP := range e.additionalProxies {
+	for _, trustedIP := range additionalProxies {
 		if ip.Equal(trustedIP) {
 			return true
 		}
 	}
 	return false
+}
+
+// isTrustedProxy checks if an IP is a trusted proxy (method wrapper for IPExtractor)
+func (e *IPExtractor) isTrustedProxy(ip net.IP) bool {
+	return IsTrustedProxy(ip, e.useProxy, e.additionalProxies)
 }
 
 // isValidClientIP validates that an IP is valid for a client

@@ -1,27 +1,27 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/services"
-	"windshift/internal/utils"
 )
 
 type IterationHandler struct {
 	db                database.Database
 	permissionService *services.PermissionService
+	planningService   *services.PlanningService
 }
 
 func NewIterationHandler(db database.Database, permissionService *services.PermissionService) *IterationHandler {
 	return &IterationHandler{
 		db:                db,
 		permissionService: permissionService,
+		planningService:   services.NewPlanningService(db),
 	}
 }
 
@@ -32,14 +32,14 @@ func (h *IterationHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse query parameters
-	workspaceID := r.URL.Query().Get("workspace_id")
-	typeID := r.URL.Query().Get("type_id")
+	workspaceIDStr := r.URL.Query().Get("workspace_id")
+	typeIDStr := r.URL.Query().Get("type_id")
 	status := r.URL.Query().Get("status")
 	includeGlobal := r.URL.Query().Get("include_global") != "false" // Default to true
 
 	// Check workspace permission if workspace_id is specified
-	if workspaceID != "" {
-		if wsID, err := strconv.Atoi(workspaceID); err == nil {
+	if workspaceIDStr != "" {
+		if wsID, err := strconv.Atoi(workspaceIDStr); err == nil {
 			if !RequireWorkspacePermission(w, user.ID, wsID, models.PermissionItemView, h.permissionService) {
 				return
 			}
@@ -53,91 +53,58 @@ func (h *IterationHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	query := `
-		SELECT i.id, i.name, i.description, i.start_date, i.end_date, i.status,
-		       i.type_id, i.is_global, i.workspace_id, i.created_at, i.updated_at,
-		       it.name as type_name, it.color as type_color, w.name as workspace_name
-		FROM iterations i
-		LEFT JOIN iteration_types it ON i.type_id = it.id
-		LEFT JOIN workspaces w ON i.workspace_id = w.id
-		WHERE 1=1`
-
-	var args []interface{}
-
-	// Filter by workspace - show local iterations for this workspace + global iterations
-	if workspaceID != "" {
-		if id, err := strconv.Atoi(workspaceID); err == nil {
-			if includeGlobal {
-				query += " AND (i.workspace_id = ? OR i.is_global = ?)"
-				args = append(args, id, true)
-			} else {
-				query += " AND i.workspace_id = ?"
-				args = append(args, id)
-			}
-		}
-	} else if includeGlobal {
-		// If no workspace specified, only show global iterations
-		query += " AND i.is_global = ?"
-		args = append(args, true)
+	// Build service params
+	params := services.IterationListParams{
+		Limit:         1000, // Large limit for backwards compatibility
+		Offset:        0,
+		IncludeGlobal: includeGlobal,
+		Status:        status,
 	}
 
-	if typeID != "" {
-		if typeID == "null" || typeID == "0" {
-			query += " AND i.type_id IS NULL"
-		} else {
-			query += " AND i.type_id = ?"
-			if id, err := strconv.Atoi(typeID); err == nil {
-				args = append(args, id)
-			}
+	// Parse workspace ID
+	if workspaceIDStr != "" {
+		if wsID, err := strconv.Atoi(workspaceIDStr); err == nil {
+			params.WorkspaceID = &wsID
 		}
 	}
 
-	if status != "" {
-		query += " AND i.status = ?"
-		args = append(args, status)
+	// Parse type ID
+	if typeIDStr != "" {
+		if typeIDStr == "null" || typeIDStr == "0" {
+			zero := 0
+			params.TypeID = &zero
+		} else if typeID, err := strconv.Atoi(typeIDStr); err == nil {
+			params.TypeID = &typeID
+		}
 	}
 
-	query += " ORDER BY i.start_date DESC, i.name"
-
-	rows, err := h.db.Query(query, args...)
+	// Use service to list iterations
+	results, _, err := h.planningService.ListIterations(params)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
 
-	var iterations []models.Iteration
-	for rows.Next() {
-		var iteration models.Iteration
-		var description sql.NullString
-		var typeID sql.NullInt64
-		var typeName sql.NullString
-		var typeColor sql.NullString
-		var workspaceID sql.NullInt64
-		var workspaceName sql.NullString
-
-		err := rows.Scan(&iteration.ID, &iteration.Name, &description, &iteration.StartDate,
-			&iteration.EndDate, &iteration.Status, &typeID, &iteration.IsGlobal,
-			&workspaceID, &iteration.CreatedAt, &iteration.UpdatedAt,
-			&typeName, &typeColor, &workspaceName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+	// Convert service results to models for response
+	iterations := make([]models.Iteration, 0, len(results))
+	for _, r := range results {
+		iteration := models.Iteration{
+			ID:            r.ID,
+			Name:          r.Name,
+			Description:   r.Description,
+			StartDate:     r.StartDate,
+			EndDate:       r.EndDate,
+			Status:        r.Status,
+			TypeID:        r.TypeID,
+			TypeName:      r.TypeName,
+			TypeColor:     r.TypeColor,
+			IsGlobal:      r.IsGlobal,
+			WorkspaceID:   r.WorkspaceID,
+			WorkspaceName: r.WorkspaceName,
+			CreatedAt:     r.CreatedAt,
+			UpdatedAt:     r.UpdatedAt,
 		}
-
-		iteration.Description = description.String
-		iteration.TypeID = utils.NullInt64ToPtr(typeID)
-		iteration.TypeName = typeName.String
-		iteration.TypeColor = typeColor.String
-		iteration.WorkspaceID = utils.NullInt64ToPtr(workspaceID)
-		iteration.WorkspaceName = workspaceName.String
-
 		iterations = append(iterations, iteration)
-	}
-
-	// Always return an array, even if empty
-	if iterations == nil {
-		iterations = []models.Iteration{}
 	}
 
 	respondJSONOK(w, iterations)
@@ -154,55 +121,47 @@ func (h *IterationHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var iteration models.Iteration
-	var description sql.NullString
-	var typeID sql.NullInt64
-	var typeName sql.NullString
-	var typeColor sql.NullString
-	var workspaceID sql.NullInt64
-	var workspaceName sql.NullString
-
-	err := h.db.QueryRow(`
-		SELECT i.id, i.name, i.description, i.start_date, i.end_date, i.status,
-		       i.type_id, i.is_global, i.workspace_id, i.created_at, i.updated_at,
-		       it.name as type_name, it.color as type_color, w.name as workspace_name
-		FROM iterations i
-		LEFT JOIN iteration_types it ON i.type_id = it.id
-		LEFT JOIN workspaces w ON i.workspace_id = w.id
-		WHERE i.id = ?
-	`, id).Scan(&iteration.ID, &iteration.Name, &description, &iteration.StartDate,
-		&iteration.EndDate, &iteration.Status, &typeID, &iteration.IsGlobal,
-		&workspaceID, &iteration.CreatedAt, &iteration.UpdatedAt,
-		&typeName, &typeColor, &workspaceName)
-
-	if err == sql.ErrNoRows {
-		http.Error(w, "Iteration not found", http.StatusNotFound)
-		return
-	}
+	// Use service to get iteration
+	result, err := h.planningService.GetIteration(id)
 	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			http.Error(w, "Iteration not found", http.StatusNotFound)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Check permission based on whether iteration is global or workspace-scoped
-	if iteration.IsGlobal {
+	if result.IsGlobal {
 		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
 		if err != nil || !hasGlobalPerm {
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
-	} else if workspaceID.Valid {
-		if !RequireWorkspacePermission(w, user.ID, int(workspaceID.Int64), models.PermissionItemView, h.permissionService) {
+	} else if result.WorkspaceID != nil {
+		if !RequireWorkspacePermission(w, user.ID, *result.WorkspaceID, models.PermissionItemView, h.permissionService) {
 			return
 		}
 	}
 
-	iteration.Description = description.String
-	iteration.TypeID = utils.NullInt64ToPtr(typeID)
-	iteration.TypeName = typeName.String
-	iteration.TypeColor = typeColor.String
-	iteration.WorkspaceID = utils.NullInt64ToPtr(workspaceID)
-	iteration.WorkspaceName = workspaceName.String
+	// Convert service result to model for response
+	iteration := models.Iteration{
+		ID:            result.ID,
+		Name:          result.Name,
+		Description:   result.Description,
+		StartDate:     result.StartDate,
+		EndDate:       result.EndDate,
+		Status:        result.Status,
+		TypeID:        result.TypeID,
+		TypeName:      result.TypeName,
+		TypeColor:     result.TypeColor,
+		IsGlobal:      result.IsGlobal,
+		WorkspaceID:   result.WorkspaceID,
+		WorkspaceName: result.WorkspaceName,
+		CreatedAt:     result.CreatedAt,
+		UpdatedAt:     result.UpdatedAt,
+	}
 
 	respondJSONOK(w, iteration)
 }
@@ -271,80 +230,65 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Validate type_id if provided
+	// Validate type_id if provided (using service)
 	if iteration.TypeID != nil {
-		var typeExists int
-		err := h.db.QueryRow("SELECT COUNT(*) FROM iteration_types WHERE id = ?", *iteration.TypeID).Scan(&typeExists)
+		exists, err := h.planningService.IterationTypeExists(*iteration.TypeID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if typeExists == 0 {
+		if !exists {
 			http.Error(w, "Invalid iteration type ID", http.StatusBadRequest)
 			return
 		}
 	}
 
-	// Validate workspace_id if provided
+	// Validate workspace_id if provided (using service)
 	if iteration.WorkspaceID != nil {
-		var workspaceExists int
-		err := h.db.QueryRow("SELECT COUNT(*) FROM workspaces WHERE id = ?", *iteration.WorkspaceID).Scan(&workspaceExists)
+		exists, err := h.planningService.WorkspaceExists(*iteration.WorkspaceID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if workspaceExists == 0 {
+		if !exists {
 			http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
 			return
 		}
 	}
 
-	now := time.Now()
-	var id int64
-	err := h.db.QueryRow(`
-		INSERT INTO iterations (name, description, start_date, end_date, status, type_id, is_global, workspace_id, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-	`, iteration.Name, iteration.Description, iteration.StartDate, iteration.EndDate, iteration.Status,
-		iteration.TypeID, iteration.IsGlobal, iteration.WorkspaceID, now, now).Scan(&id)
-
+	// Use service to create iteration
+	result, err := h.planningService.CreateIteration(services.CreateIterationParams{
+		Name:        iteration.Name,
+		Description: iteration.Description,
+		StartDate:   iteration.StartDate,
+		EndDate:     iteration.EndDate,
+		Status:      iteration.Status,
+		TypeID:      iteration.TypeID,
+		IsGlobal:    iteration.IsGlobal,
+		WorkspaceID: iteration.WorkspaceID,
+	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Return the created iteration with joined data
-	var createdIteration models.Iteration
-	var description sql.NullString
-	var typeID sql.NullInt64
-	var typeName sql.NullString
-	var typeColor sql.NullString
-	var workspaceID sql.NullInt64
-	var workspaceName sql.NullString
-
-	err = h.db.QueryRow(`
-		SELECT i.id, i.name, i.description, i.start_date, i.end_date, i.status,
-		       i.type_id, i.is_global, i.workspace_id, i.created_at, i.updated_at,
-		       it.name as type_name, it.color as type_color, w.name as workspace_name
-		FROM iterations i
-		LEFT JOIN iteration_types it ON i.type_id = it.id
-		LEFT JOIN workspaces w ON i.workspace_id = w.id
-		WHERE i.id = ?
-	`, id).Scan(&createdIteration.ID, &createdIteration.Name, &description, &createdIteration.StartDate,
-		&createdIteration.EndDate, &createdIteration.Status, &typeID, &createdIteration.IsGlobal,
-		&workspaceID, &createdIteration.CreatedAt, &createdIteration.UpdatedAt,
-		&typeName, &typeColor, &workspaceName)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	// Convert service result to model for response
+	createdIteration := models.Iteration{
+		ID:            result.ID,
+		Name:          result.Name,
+		Description:   result.Description,
+		StartDate:     result.StartDate,
+		EndDate:       result.EndDate,
+		Status:        result.Status,
+		TypeID:        result.TypeID,
+		TypeName:      result.TypeName,
+		TypeColor:     result.TypeColor,
+		IsGlobal:      result.IsGlobal,
+		WorkspaceID:   result.WorkspaceID,
+		WorkspaceName: result.WorkspaceName,
+		CreatedAt:     result.CreatedAt,
+		UpdatedAt:     result.UpdatedAt,
 	}
-
-	createdIteration.Description = description.String
-	createdIteration.TypeID = utils.NullInt64ToPtr(typeID)
-	createdIteration.TypeName = typeName.String
-	createdIteration.TypeColor = typeColor.String
-	createdIteration.WorkspaceID = utils.NullInt64ToPtr(workspaceID)
-	createdIteration.WorkspaceName = workspaceName.String
 
 	respondJSONCreated(w, createdIteration)
 }
@@ -419,80 +363,66 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Validate type_id if provided
+	// Validate type_id if provided (using service)
 	if iteration.TypeID != nil {
-		var typeExists int
-		err := h.db.QueryRow("SELECT COUNT(*) FROM iteration_types WHERE id = ?", *iteration.TypeID).Scan(&typeExists)
+		exists, err := h.planningService.IterationTypeExists(*iteration.TypeID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if typeExists == 0 {
+		if !exists {
 			http.Error(w, "Invalid iteration type ID", http.StatusBadRequest)
 			return
 		}
 	}
 
-	// Validate workspace_id if provided
+	// Validate workspace_id if provided (using service)
 	if iteration.WorkspaceID != nil {
-		var workspaceExists int
-		err := h.db.QueryRow("SELECT COUNT(*) FROM workspaces WHERE id = ?", *iteration.WorkspaceID).Scan(&workspaceExists)
+		exists, err := h.planningService.WorkspaceExists(*iteration.WorkspaceID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if workspaceExists == 0 {
+		if !exists {
 			http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
 			return
 		}
 	}
 
-	now := time.Now()
-	_, err := h.db.ExecWrite(`
-		UPDATE iterations
-		SET name = ?, description = ?, start_date = ?, end_date = ?, status = ?, type_id = ?, is_global = ?, workspace_id = ?, updated_at = ?
-		WHERE id = ?
-	`, iteration.Name, iteration.Description, iteration.StartDate, iteration.EndDate, iteration.Status,
-		iteration.TypeID, iteration.IsGlobal, iteration.WorkspaceID, now, id)
-
+	// Use service to update iteration
+	result, err := h.planningService.UpdateIteration(services.UpdateIterationParams{
+		ID:          id,
+		Name:        iteration.Name,
+		Description: iteration.Description,
+		StartDate:   iteration.StartDate,
+		EndDate:     iteration.EndDate,
+		Status:      iteration.Status,
+		TypeID:      iteration.TypeID,
+		IsGlobal:    iteration.IsGlobal,
+		WorkspaceID: iteration.WorkspaceID,
+	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Return the updated iteration with joined data
-	var updatedIteration models.Iteration
-	var description sql.NullString
-	var typeID sql.NullInt64
-	var typeName sql.NullString
-	var typeColor sql.NullString
-	var workspaceID sql.NullInt64
-	var workspaceName sql.NullString
-
-	err = h.db.QueryRow(`
-		SELECT i.id, i.name, i.description, i.start_date, i.end_date, i.status,
-		       i.type_id, i.is_global, i.workspace_id, i.created_at, i.updated_at,
-		       it.name as type_name, it.color as type_color, w.name as workspace_name
-		FROM iterations i
-		LEFT JOIN iteration_types it ON i.type_id = it.id
-		LEFT JOIN workspaces w ON i.workspace_id = w.id
-		WHERE i.id = ?
-	`, id).Scan(&updatedIteration.ID, &updatedIteration.Name, &description, &updatedIteration.StartDate,
-		&updatedIteration.EndDate, &updatedIteration.Status, &typeID, &updatedIteration.IsGlobal,
-		&workspaceID, &updatedIteration.CreatedAt, &updatedIteration.UpdatedAt,
-		&typeName, &typeColor, &workspaceName)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	// Convert service result to model for response
+	updatedIteration := models.Iteration{
+		ID:            result.ID,
+		Name:          result.Name,
+		Description:   result.Description,
+		StartDate:     result.StartDate,
+		EndDate:       result.EndDate,
+		Status:        result.Status,
+		TypeID:        result.TypeID,
+		TypeName:      result.TypeName,
+		TypeColor:     result.TypeColor,
+		IsGlobal:      result.IsGlobal,
+		WorkspaceID:   result.WorkspaceID,
+		WorkspaceName: result.WorkspaceName,
+		CreatedAt:     result.CreatedAt,
+		UpdatedAt:     result.UpdatedAt,
 	}
-
-	updatedIteration.Description = description.String
-	updatedIteration.TypeID = utils.NullInt64ToPtr(typeID)
-	updatedIteration.TypeName = typeName.String
-	updatedIteration.TypeColor = typeColor.String
-	updatedIteration.WorkspaceID = utils.NullInt64ToPtr(workspaceID)
-	updatedIteration.WorkspaceName = workspaceName.String
 
 	respondJSONOK(w, updatedIteration)
 }
@@ -508,15 +438,13 @@ func (h *IterationHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// First, fetch the iteration to check its properties for permission validation
-	var isGlobal bool
-	var workspaceID sql.NullInt64
-	err := h.db.QueryRow("SELECT is_global, workspace_id FROM iterations WHERE id = ?", id).Scan(&isGlobal, &workspaceID)
-	if err == sql.ErrNoRows {
-		http.Error(w, "Iteration not found", http.StatusNotFound)
-		return
-	}
+	// First, fetch the iteration to check its properties for permission validation (using service)
+	isGlobal, wsID, err := h.planningService.IsIterationGlobal(id)
 	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			http.Error(w, "Iteration not found", http.StatusNotFound)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -528,58 +456,19 @@ func (h *IterationHandler) Delete(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
-	} else if workspaceID.Valid {
-		if !RequireWorkspacePermission(w, user.ID, int(workspaceID.Int64), models.PermissionItemEdit, h.permissionService) {
+	} else if wsID != nil {
+		if !RequireWorkspacePermission(w, user.ID, *wsID, models.PermissionItemEdit, h.permissionService) {
 			return
 		}
 	}
 
-	_, err = h.db.ExecWrite("DELETE FROM iterations WHERE id = ?", id)
-	if err != nil {
+	// Use service to delete iteration
+	if err := h.planningService.DeleteIteration(id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// IterationProgressItem represents a work item in the iteration progress report
-type IterationProgressItem struct {
-	ID             int    `json:"id"`
-	Title          string `json:"title"`
-	WorkspaceID    int    `json:"workspace_id"`
-	WorkspaceKey   string `json:"workspace_key"`
-	ItemNumber     int    `json:"item_number"`
-	StatusName     string `json:"status_name,omitempty"`
-	StatusColor    string `json:"status_color,omitempty"`
-	PriorityName   string `json:"priority_name,omitempty"`
-	PriorityColor  string `json:"priority_color,omitempty"`
-	AssigneeName   string `json:"assignee_name,omitempty"`
-	AssigneeAvatar string `json:"assignee_avatar,omitempty"`
-}
-
-// IterationStatusBreakdown represents item counts by status category
-type IterationStatusBreakdown struct {
-	CategoryName  string `json:"category_name"`
-	CategoryColor string `json:"category_color,omitempty"`
-	ItemCount     int    `json:"item_count"`
-	IsCompleted   bool   `json:"is_completed"`
-}
-
-// IterationProgressReport represents the full iteration progress data
-type IterationProgressReport struct {
-	IterationID     int                                 `json:"iteration_id"`
-	IterationName   string                              `json:"iteration_name"`
-	Description     string                              `json:"description,omitempty"`
-	StartDate       string                              `json:"start_date"`
-	EndDate         string                              `json:"end_date"`
-	Status          string                              `json:"status"`
-	TypeColor       string                              `json:"type_color,omitempty"`
-	TotalItems      int                                 `json:"total_items"`
-	CompletedItems  int                                 `json:"completed_items"`
-	PercentComplete float64                             `json:"percent_complete"`
-	StatusBreakdown []IterationStatusBreakdown          `json:"status_breakdown"`
-	ItemsByCategory map[string][]IterationProgressItem  `json:"items_by_category"`
 }
 
 // GetProgress handles GET /api/iterations/{id}/progress - returns iteration progress report
@@ -594,28 +483,13 @@ func (h *IterationHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get iteration details including is_global and workspace_id for permission check
-	var report IterationProgressReport
-	report.IterationID = iterationID
-	report.ItemsByCategory = make(map[string][]IterationProgressItem)
-
-	var description sql.NullString
-	var typeColor sql.NullString
-	var isGlobal bool
-	var workspaceID sql.NullInt64
-
-	err := h.db.QueryRow(`
-		SELECT i.name, i.description, i.start_date, i.end_date, i.status, it.color, i.is_global, i.workspace_id
-		FROM iterations i
-		LEFT JOIN iteration_types it ON i.type_id = it.id
-		WHERE i.id = ?
-	`, iterationID).Scan(&report.IterationName, &description, &report.StartDate, &report.EndDate, &report.Status, &typeColor, &isGlobal, &workspaceID)
-
-	if err == sql.ErrNoRows {
-		http.Error(w, "Iteration not found", http.StatusNotFound)
-		return
-	}
+	// First check permission for this iteration (using service)
+	isGlobal, wsID, err := h.planningService.IsIterationGlobal(iterationID)
 	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			http.Error(w, "Iteration not found", http.StatusNotFound)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -627,105 +501,21 @@ func (h *IterationHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
-	} else if workspaceID.Valid {
-		if !RequireWorkspacePermission(w, user.ID, int(workspaceID.Int64), models.PermissionItemView, h.permissionService) {
+	} else if wsID != nil {
+		if !RequireWorkspacePermission(w, user.ID, *wsID, models.PermissionItemView, h.permissionService) {
 			return
 		}
 	}
 
-	report.Description = description.String
-	report.TypeColor = typeColor.String
-
-	// Get status breakdown and items grouped by status category
-	rows, err := h.db.Query(`
-		SELECT
-			i.id, i.title, i.workspace_id, w.key as workspace_key, i.workspace_item_number,
-			COALESCE(sc.name, 'No Status') as category_name,
-			COALESCE(sc.color, '#9ca3af') as category_color,
-			COALESCE(sc.is_completed, false) as is_completed,
-			COALESCE(s.name, '') as status_name,
-			COALESCE(sc.color, '') as status_color,
-			COALESCE(p.name, '') as priority_name,
-			COALESCE(p.color, '') as priority_color,
-			COALESCE(u.first_name || ' ' || u.last_name, '') as assignee_name,
-			COALESCE(u.avatar_url, '') as assignee_avatar
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		LEFT JOIN priorities p ON i.priority_id = p.id
-		LEFT JOIN users u ON i.assignee_id = u.id
-		WHERE i.iteration_id = ?
-		ORDER BY sc.name, i.workspace_item_number
-	`, iterationID)
-
+	// Use service to get progress report
+	report, err := h.planningService.GetIterationProgress(iterationID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
-	// Track status breakdown counts
-	breakdownMap := make(map[string]*IterationStatusBreakdown)
-
-	for rows.Next() {
-		var item IterationProgressItem
-		var categoryName string
-		var categoryColorVal string
-		var isCompleted bool
-		var statusColor sql.NullString
-		var priorityColor sql.NullString
-
-		err := rows.Scan(
-			&item.ID, &item.Title, &item.WorkspaceID, &item.WorkspaceKey, &item.ItemNumber,
-			&categoryName, &categoryColorVal, &isCompleted,
-			&item.StatusName, &statusColor,
-			&item.PriorityName, &priorityColor,
-			&item.AssigneeName, &item.AssigneeAvatar,
-		)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		if strings.Contains(err.Error(), "not found") {
+			http.Error(w, "Iteration not found", http.StatusNotFound)
 			return
 		}
-
-		item.StatusColor = statusColor.String
-		item.PriorityColor = priorityColor.String
-
-		// Update breakdown counts
-		if _, exists := breakdownMap[categoryName]; !exists {
-			breakdownMap[categoryName] = &IterationStatusBreakdown{
-				CategoryName:  categoryName,
-				CategoryColor: categoryColorVal,
-				IsCompleted:   isCompleted,
-				ItemCount:     0,
-			}
-		}
-		breakdownMap[categoryName].ItemCount++
-
-		// Add item to category group
-		report.ItemsByCategory[categoryName] = append(report.ItemsByCategory[categoryName], item)
-
-		// Update totals
-		report.TotalItems++
-		if isCompleted {
-			report.CompletedItems++
-		}
-	}
-
-	if err := rows.Err(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
-
-	// Convert breakdown map to slice
-	report.StatusBreakdown = make([]IterationStatusBreakdown, 0, len(breakdownMap))
-	for _, breakdown := range breakdownMap {
-		report.StatusBreakdown = append(report.StatusBreakdown, *breakdown)
-	}
-
-	// Calculate percentage
-	if report.TotalItems > 0 {
-		report.PercentComplete = float64(report.CompletedItems) / float64(report.TotalItems) * 100.0
 	}
 
 	respondJSONOK(w, report)

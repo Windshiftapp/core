@@ -2,16 +2,12 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"embed"
 	"errors"
 	"flag"
 	"fmt"
-	"io"
-	"io/fs"
 	"log/slog"
 	"net"
-	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -19,32 +15,18 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
 	"windshift/internal/auth"
 	"windshift/internal/database"
-	"windshift/internal/handlers"
 	"windshift/internal/logger"
-	"windshift/internal/models"
 	"windshift/internal/middleware"
-	"windshift/internal/plugins"
-	"windshift/internal/restapi"
-	v1 "windshift/internal/restapi/v1"
-	"windshift/internal/scheduler"
-	"windshift/internal/email"
-	"windshift/internal/scm"
-	"windshift/internal/services"
-	"windshift/internal/smtp"
-	"windshift/internal/utils"
+	"windshift/internal/server"
 	"windshift/internal/tui"
-	"windshift/internal/webauthn"
-	"windshift/internal/webhook"
-	"windshift/internal/router"
-	"windshift/internal/routes"
 
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	wishbubbletea "github.com/charmbracelet/wish/bubbletea"
 	"github.com/charmbracelet/wish/logging"
-	"github.com/jub0bs/cors"
 )
 
 //go:embed all:frontend/dist
@@ -106,207 +88,6 @@ func printBanner() {
 	fmt.Println(colorTeal + "                                      W I N D S H I F T" + colorReset)
 	fmt.Println("                                   Work Management Platform")
 	fmt.Println()
-}
-
-// checkSetupStatusWithRetry checks the setup_completed status with exponential backoff retry logic.
-// This function implements fail-closed security: if the setup status cannot be determined,
-// the server should refuse to start rather than potentially run in an unsafe mode.
-func checkSetupStatusWithRetry(db database.Database, maxRetries int, initialDelay time.Duration) (bool, error) {
-	delay := initialDelay
-
-	for attempt := 1; attempt <= maxRetries; attempt++ {
-		slog.Info("checking setup status", "attempt", attempt, "max_retries", maxRetries)
-
-		query := `SELECT value FROM system_settings WHERE key = 'setup_completed'`
-		var value string
-		err := db.QueryRow(query).Scan(&value)
-
-		if err == nil {
-			// Successfully retrieved value
-			setupCompleted := strings.ToLower(value) == "true"
-			if setupCompleted {
-				slog.Info("✓ Setup status determined: COMPLETED - server will run in production mode with authentication required")
-			} else {
-				slog.Warn("✓ Setup status determined: NOT COMPLETED - server will run in setup mode without authentication")
-			}
-			return setupCompleted, nil
-		}
-
-		if err == sql.ErrNoRows {
-			// No row means setup not completed (this is expected on fresh install)
-			slog.Warn("✓ Setup status determined: system_settings row missing - assuming setup NOT COMPLETED")
-			return false, nil
-		}
-
-		// Database error - retry with exponential backoff
-		slog.Warn("failed to check setup status, will retry",
-			"attempt", attempt,
-			"max_retries", maxRetries,
-			"error", err,
-			"retry_delay", delay)
-
-		if attempt < maxRetries {
-			time.Sleep(delay)
-			delay *= 2 // Exponential backoff
-		}
-	}
-
-	// All retries exhausted - fail closed for security
-	return false, fmt.Errorf("failed to determine setup status after %d attempts - refusing to start for security", maxRetries)
-}
-
-func createCORSMiddleware(allowedHosts string, serverPort string, disableCSRF bool) func(http.Handler) http.Handler {
-	// Build origin patterns from allowed hosts
-	var origins []string
-
-	if disableCSRF {
-		// Development mode: Allow all origins
-		origins = []string{"*"}
-	} else if allowedHosts != "" {
-		// Production mode: Build origin patterns from allowed hosts
-		hosts := strings.Split(allowedHosts, ",")
-		for _, host := range hosts {
-			host = strings.TrimSpace(host)
-			if host == "" {
-				continue
-			}
-
-			// If host already includes scheme, use as-is
-			if strings.HasPrefix(host, "http://") || strings.HasPrefix(host, "https://") {
-				origins = append(origins, host)
-				continue
-			}
-
-			// Build patterns for both HTTP and HTTPS with various port configurations
-			// Allow standard HTTPS (no port needed)
-			origins = append(origins, "https://"+host)
-
-			// Allow HTTP on server port (for local dev behind proxy)
-			if serverPort != "80" && serverPort != "443" {
-				origins = append(origins, "http://"+host+":"+serverPort)
-			}
-			origins = append(origins, "http://"+host)
-		}
-	}
-
-	// If no origins configured in production, return a middleware that blocks cross-origin requests
-	if len(origins) == 0 {
-		return func(next http.Handler) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if origin := r.Header.Get("Origin"); origin != "" {
-					http.Error(w, "CORS: Origin not allowed. Configure --allowed-hosts for cross-origin requests.", http.StatusForbidden)
-					return
-				}
-				next.ServeHTTP(w, r)
-			})
-		}
-	}
-
-	// Configure CORS middleware
-	cfg := cors.Config{
-		Origins:         origins,
-		Methods:         []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete},
-		RequestHeaders:  []string{"Content-Type", "X-CSRF-Token", "Authorization"},
-		Credentialed:    !disableCSRF, // Enable credentials in production mode
-		MaxAgeInSeconds: 86400,        // Cache preflight for 24 hours
-	}
-
-	corsMw, err := cors.NewMiddleware(cfg)
-	if err != nil {
-		slog.Error("Failed to create CORS middleware", "error", err)
-		// Fall back to blocking middleware on config error
-		return func(next http.Handler) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if origin := r.Header.Get("Origin"); origin != "" {
-					http.Error(w, "CORS configuration error", http.StatusInternalServerError)
-					return
-				}
-				next.ServeHTTP(w, r)
-			})
-		}
-	}
-
-	return corsMw.Wrap
-}
-
-// isPrivateIP checks if an IP is a private/internal address
-func isPrivateIP(ip net.IP) bool {
-	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast()
-}
-
-// isTrustedProxy checks if a request comes from a trusted proxy
-func isTrustedProxy(ip net.IP, useProxy bool, additionalProxies []net.IP) bool {
-	if !useProxy {
-		return false // Proxy mode disabled - trust nothing
-	}
-	if isPrivateIP(ip) {
-		return true
-	}
-	for _, trusted := range additionalProxies {
-		if ip.Equal(trusted) {
-			return true
-		}
-	}
-	return false
-}
-
-func createSecurityHeaders(enableHTTPS bool, useProxy bool, additionalProxies []net.IP) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// XSS Protection
-			w.Header().Set("X-XSS-Protection", "1; mode=block")
-
-			// Content Type Options - prevents MIME type sniffing
-			w.Header().Set("X-Content-Type-Options", "nosniff")
-
-			// Frame Options - prevents clickjacking (allow same-origin for plugins)
-			w.Header().Set("X-Frame-Options", "SAMEORIGIN")
-
-			// Referrer Policy - controls referrer information
-			w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-
-			// Content Security Policy - comprehensive XSS protection
-			csp := "default-src 'self'; " +
-				"script-src 'self' 'unsafe-inline'; " + // Allow inline scripts for Svelte (removed unsafe-eval)
-				"style-src 'self' 'unsafe-inline'; " + // Allow inline styles for Tailwind
-				"img-src 'self' data: blob:; " + // Allow data URLs for images
-				"font-src 'self'; " +
-				"connect-src 'self'; " +
-				"media-src 'self'; " +
-				"object-src 'none'; " +
-				"frame-ancestors 'self'; " + // Allow same-origin iframes for plugins
-				"frame-src 'self'; " + // Allow loading iframes from same origin
-				"base-uri 'self'; " +
-				"form-action 'self'"
-			w.Header().Set("Content-Security-Policy", csp)
-
-			// Permissions Policy - restrict browser features
-			permissionsPolicy := "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
-			w.Header().Set("Permissions-Policy", permissionsPolicy)
-
-			// HSTS header - only set for HTTPS connections (direct or via proxy)
-			isSecure := r.TLS != nil || enableHTTPS
-			if !isSecure && useProxy {
-				// Check if request came via HTTPS through a trusted proxy
-				remoteAddr := r.RemoteAddr
-				if colonIndex := strings.LastIndex(remoteAddr, ":"); colonIndex != -1 {
-					remoteAddr = remoteAddr[:colonIndex]
-				}
-				clientIP := net.ParseIP(remoteAddr)
-				if clientIP != nil && isTrustedProxy(clientIP, useProxy, additionalProxies) {
-					if r.Header.Get("X-Forwarded-Proto") == "https" {
-						isSecure = true
-					}
-				}
-			}
-
-			if isSecure {
-				w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-			}
-
-			next.ServeHTTP(w, r)
-		})
-	}
 }
 
 func main() {
@@ -420,7 +201,11 @@ func main() {
 	}
 
 	// Parse BASE_URL to derive allowed-hosts and allowed-port
-	if baseURL := os.Getenv("BASE_URL"); baseURL != "" {
+	baseURL := os.Getenv("BASE_URL")
+	if baseURL == "" {
+		baseURL = os.Getenv("PUBLIC_URL")
+	}
+	if baseURL != "" {
 		parsedURL, err := url.Parse(baseURL)
 		if err == nil {
 			if allowedHosts == "" {
@@ -467,118 +252,6 @@ func main() {
 		enableAdminFallback = true
 	}
 
-	// Determine which database to use
-	var db database.Database
-	var err error
-
-	if postgresConn != "" {
-		// Use PostgreSQL if connection string is provided
-		slog.Info("connecting to PostgreSQL database")
-		db, err = database.NewDatabase("postgres", postgresConn, maxReadConns, maxWriteConns)
-		if err != nil {
-			slog.Error("failed to connect to PostgreSQL database", "error", err)
-			os.Exit(1)
-		}
-		slog.Info("PostgreSQL database initialized", "max_read_conns", maxReadConns, "max_write_conns", maxWriteConns)
-	} else {
-		// Default to SQLite
-		slog.Info("connecting to SQLite database", "path", dbPath)
-		db, err = database.NewDatabase("sqlite3", dbPath, maxReadConns, maxWriteConns)
-		if err != nil {
-			slog.Error("failed to connect to SQLite database", "error", err)
-			os.Exit(1)
-		}
-		slog.Info("SQLite database initialized", "max_read_conns", maxReadConns, "max_write_conns", maxWriteConns, "mode", "WAL")
-
-		// Initialize audit log batcher for SQLite (batches writes every 30s)
-		logger.InitAuditBatcher(db)
-		defer logger.StopAuditBatcher()
-	}
-
-	defer db.Close()
-
-	if err := db.Initialize(); err != nil {
-		slog.Error("failed to initialize database", "error", err)
-		os.Exit(1)
-	}
-
-	// Ensure default notification settings exist
-	if err := db.EnsureDefaultNotificationSettings(); err != nil {
-		slog.Warn("failed to ensure notification settings", "error", err)
-		// Don't exit - this is a non-critical initialization
-	}
-
-	// Determine setup status at startup with retry logic (fail closed on errors)
-	setupCompleted, err := checkSetupStatusWithRetry(db, 5, time.Second)
-	if err != nil {
-		slog.Error("CRITICAL: Cannot determine setup status after multiple retries - refusing to start server for security", "error", err)
-		slog.Error("Fix: Ensure database is accessible and system_settings table exists, then restart")
-		os.Exit(1)
-	}
-
-	// Initialize permission service for caching
-	permService, err := services.NewPermissionService(db, services.PermissionCacheConfig{
-		TTL:          15 * time.Minute,
-		MaxCacheSize: 512, // 512MB
-	})
-	if err != nil {
-		slog.Error("failed to initialize permission service", "error", err)
-		os.Exit(1)
-	}
-
-	// Initialize activity tracker for homepage and notifications
-	activityTracker, err := services.NewActivityTracker(db, services.DefaultActivityTrackerConfig())
-	if err != nil {
-		slog.Error("failed to initialize activity tracker", "error", err)
-		os.Exit(1)
-	}
-	defer activityTracker.Close() // Ensure graceful shutdown with pending activity flush
-
-	// Start daily cleanup scheduler for expired activities
-	cleanupTicker := time.NewTicker(24 * time.Hour)
-	cleanupStopChan := make(chan struct{})
-	go func() {
-		// Run initial cleanup after 1 hour to avoid startup overhead
-		select {
-		case <-time.After(1 * time.Hour):
-			slog.Info("running initial activity cleanup")
-			if err := activityTracker.CleanupExpiredActivities(); err != nil {
-				slog.Error("failed to cleanup expired activities", "error", err)
-			} else {
-				slog.Info("initial activity cleanup completed successfully")
-			}
-		case <-cleanupStopChan:
-			return
-		}
-
-		// Then run cleanup daily
-		for {
-			select {
-			case <-cleanupTicker.C:
-				slog.Info("running scheduled activity cleanup")
-				if err := activityTracker.CleanupExpiredActivities(); err != nil {
-					slog.Error("failed to cleanup expired activities", "error", err)
-				} else {
-					slog.Info("scheduled activity cleanup completed successfully")
-				}
-			case <-cleanupStopChan:
-				slog.Info("cleanup scheduler stopped")
-				return
-			}
-		}
-	}()
-	defer cleanupTicker.Stop()
-	defer close(cleanupStopChan)
-
-	// Determine if HTTPS is enabled (both cert and key must be provided)
-	enableHTTPS := tlsCertPath != "" && tlsKeyPath != ""
-
-	// Parse additional proxies (beyond auto-trusted private IPs)
-	var additionalProxyList []string
-	if additionalProxies != "" {
-		additionalProxyList = strings.Split(additionalProxies, ",")
-	}
-
 	// Validate additional proxies requires use-proxy
 	if additionalProxies != "" && !useProxy {
 		slog.Warn("--additional-proxies ignored: --use-proxy not enabled")
@@ -593,810 +266,137 @@ func main() {
 		}
 	}
 
-	// Create shared IP extractor for handlers that need proxy-aware IP extraction
-	ipExtractor := utils.NewIPExtractor(useProxy, additionalProxyList)
-
-	// Authentication management - need this early for middleware
-	// Use secure cookies when HTTPS is enabled or detected via X-Forwarded-Proto from trusted proxies
-	sessionManager := auth.NewSessionManager(db, enableHTTPS, useProxy, additionalProxyList)
-
-	// Determine the effective port for CORS and WebAuthn origin validation
-	// If --allowed-port is set, use it (for reverse proxy scenarios with non-standard ports)
-	// Otherwise use the server's actual port
-	effectivePort := port
-	if allowedPort != "" {
-		effectivePort = allowedPort
-	}
-
-	// Initialize WebAuthn configuration
-	// Development mode detection: use CSRF disable flag as indicator
-	isDevelopment := disableCSRF
-	webAuthnConfig, err := webauthn.NewConfig("", "", nil, isDevelopment, allowedHosts, effectivePort, enableHTTPS, useProxy)
-	if err != nil {
-		slog.Error("failed to initialize WebAuthn configuration", "error", err)
-		os.Exit(1)
-	}
-	slog.Info("WebAuthn configuration initialized",
-		"rp_id", webAuthnConfig.RPID,
-		"rp_name", webAuthnConfig.RPName,
-		"development_mode", isDevelopment,
-		"origins", webAuthnConfig.RPOrigins)
-
-	// Create rate limiters for authentication endpoints (in-memory, zero DB writes)
-	// Pass proxy config so rate limiters validate X-Forwarded-For properly
-	// Login: 5 requests per minute with burst of 10
-	loginRateLimiter := middleware.NewRateLimiter(5.0/60.0, 10, useProxy, additionalProxyList)
-	// FIDO: 10 requests per minute with burst of 15
-	fidoRateLimiter := middleware.NewRateLimiter(10.0/60.0, 15, useProxy, additionalProxyList)
-	// General auth: 20 requests per minute with burst of 30
-	authRateLimiter := middleware.NewRateLimiter(20.0/60.0, 30, useProxy, additionalProxyList)
-	// SCIM: 600 requests per minute with burst of 100
-	scimRateLimiter := middleware.NewRateLimiter(10.0, 100, useProxy, additionalProxyList)
-	// Portal submit: 5 requests per minute with burst of 10
-	portalSubmitLimiter := middleware.NewRateLimiter(5.0/60.0, 10, useProxy, additionalProxyList)
-	// Portal search: 10 requests per minute with burst of 15
-	portalSearchLimiter := middleware.NewRateLimiter(10.0/60.0, 15, useProxy, additionalProxyList)
-	// Email verification: 10 requests per minute with burst of 15
-	emailVerifyLimiter := middleware.NewRateLimiter(10.0/60.0, 15, useProxy, additionalProxyList)
-	// Setup: 5 requests per minute with burst of 10
-	setupLimiter := middleware.NewRateLimiter(5.0/60.0, 10, useProxy, additionalProxyList)
-	// SSO: 10 requests per minute with burst of 5 (stricter to prevent OIDC resource exhaustion)
-	ssoRateLimiter := middleware.NewRateLimiter(10.0/60.0, 5, useProxy, additionalProxyList)
-	// Portal auth magic link: 3 requests per minute with burst of 3 (strict to prevent abuse)
-	portalAuthLimiter := middleware.NewRateLimiter(3.0/60.0, 3, useProxy, additionalProxyList)
-
-	defer loginRateLimiter.Stop()
-	defer scimRateLimiter.Stop()
-	defer fidoRateLimiter.Stop()
-	defer authRateLimiter.Stop()
-	defer portalSubmitLimiter.Stop()
-	defer portalSearchLimiter.Stop()
-	defer emailVerifyLimiter.Stop()
-	defer setupLimiter.Stop()
-	defer ssoRateLimiter.Stop()
-	defer portalAuthLimiter.Stop()
-
-	// Note: emailVerificationService is initialized later after smtpSender
-	var authHandler *handlers.AuthHandler
-
-	// Initialize token tracker for batched API token last_used_at updates
-	tokenTracker := services.NewTokenTracker(db, services.DefaultTokenTrackerConfig())
-	defer tokenTracker.Close() // Ensure graceful shutdown with pending token update flush
-
-	// Create shared token manager (handles bearer token authentication)
-	tokenManager := auth.NewTokenManager(db, tokenTracker)
-
-	authMiddleware := middleware.NewAuthMiddleware(sessionManager, tokenManager, db, useProxy, additionalProxyList, setupCompleted)
-
-	// Parse additional proxy IPs for security headers
-	var additionalProxyIPs []net.IP
-	for _, proxyStr := range additionalProxyList {
-		if ip := net.ParseIP(strings.TrimSpace(proxyStr)); ip != nil {
-			additionalProxyIPs = append(additionalProxyIPs, ip)
-		}
-	}
-
-	mux := http.NewServeMux()
-
-	// Security headers will be applied as wrapper at the end (see httpServer Handler)
-
-	// Notification management - needs the full Database interface
-	notificationManager, err := handlers.NewNotificationManager(db)
-	if err != nil {
-		slog.Error("failed to create notification manager", "error", err)
-		os.Exit(1)
-	}
-
-	// Initialize notification service for async notification processing
-	notificationService := services.NewNotificationService(
-		db,
-		notificationManager,
-		services.DefaultNotificationServiceConfig(),
-	)
-
-	// Initialize SMTP sender and notification scheduler
-	smtpSender := smtp.NewNotificationSMTPSender(db)
-	notificationScheduler := scheduler.NewNotificationScheduler(db, smtpSender)
-	notificationScheduler.Start()
-	slog.Info("notification scheduler started")
-
-	// Initialize recurrence scheduler for recurring tasks
-	recurrenceScheduler := scheduler.NewRecurrenceScheduler(db)
-	recurrenceScheduler.Start()
-	slog.Info("recurrence scheduler started")
-
-	// Initialize action service for automation workflows
-	actionService := services.NewActionService(db, services.DefaultActionServiceConfig())
-	actionService.SetNotificationService(notificationService)
-	slog.Info("action service initialized")
-
-	// Initialize email scheduler for inbound email channel IMAP polling
-	// Uses the same encryption as SCM providers for OAuth token storage
-	var emailScheduler *scheduler.EmailScheduler
-
-	// Initialize email verification service for SSO users
-	// baseURL is used to construct verification links in emails
-	emailVerificationBaseURL := os.Getenv("BASE_URL")
-	if emailVerificationBaseURL == "" {
-		emailVerificationBaseURL = os.Getenv("PUBLIC_URL")
-	}
-	if emailVerificationBaseURL == "" {
-		// Construct from server port (for development/local)
-		emailVerificationBaseURL = fmt.Sprintf("http://localhost:%s", port)
-	}
-	emailVerificationService := services.NewEmailVerificationService(db, smtpSender, emailVerificationBaseURL)
-
-	// Initialize portal customer session manager for magic link authentication
-	portalSessionManager := auth.NewPortalSessionManager(db, enableHTTPS, useProxy, additionalProxyList)
-
-	// Initialize magic link service for portal customer authentication
-	magicLinkService := services.NewMagicLinkService(db, smtpSender, emailVerificationBaseURL)
-
-	// Note: authHandler is created later after authPolicyHandler and adminRateLimiter are initialized
-
-	itemHandler := handlers.NewItemHandler(db, permService, activityTracker, notificationService)
-	customFieldHandler := handlers.NewCustomFieldHandler(db)
-	workspaceFieldReqHandler := handlers.NewWorkspaceFieldRequirementHandler(db)
-	workspaceHandler := handlers.NewWorkspaceHandler(db, permService, activityTracker)
-	screenHandler := handlers.NewScreenHandler(db)
-	configSetHandler := handlers.NewConfigurationSetHandler(db, notificationService)
-	itemTypeHandler := handlers.NewItemTypeHandler(db)
-	priorityHandler := handlers.NewPriorityHandler(db)
-
-	// Generic enum handlers using the new service layer
-	hierarchyLevelHandler := handlers.NewEnumHandler(
-		services.NewEnumService(db, services.NewHierarchyLevelConfig()),
-		func() interface{} { return &models.HierarchyLevel{} })
-	// Note: request_types has specialized methods (GetAllForChannel, GetFields, UpdateFields)
-	// that EnumHandler doesn't support, so it keeps its original handler
-	requestTypeHandler := handlers.NewRequestTypeHandler(db)
-	statusCategoryHandler := handlers.NewEnumHandler(
-		services.NewEnumService(db, services.NewStatusCategoryConfig()),
-		func() interface{} { return &models.StatusCategory{} })
-	statusHandler := handlers.NewEnumHandler(
-		services.NewEnumService(db, services.NewStatusConfig()),
-		func() interface{} { return &models.Status{} })
-	// Keep old status handler for the custom GetNonDoneStatusIDs endpoint
-	statusHandlerLegacy := handlers.NewStatusHandler(db)
-	workflowHandler := handlers.NewWorkflowHandler(db)
-	userHandler := handlers.NewUserHandler(db, permService)
-	groupHandler := handlers.NewGroupHandler(db, permService)
-	credentialHandler := handlers.NewCredentialHandler(db, permService)
-	webAuthnHandler := handlers.NewWebAuthnHandler(db, permService, sessionManager, webAuthnConfig, ipExtractor)
-	appTokenHandler := handlers.NewAppTokenHandler(db, permService)
-	collectionHandler := handlers.NewCollectionHandler(db)
-	boardConfigHandler := handlers.NewBoardConfigurationHandler(db)
-	testCoverageHandler := handlers.NewTestCoverageHandler(db, permService)
-	permissionHandler := handlers.NewPermissionHandlerWithCache(db, permService)
-	apiTokenHandler := handlers.NewApiTokenHandler(db, tokenManager, permService)
-
-	// SCIM handlers for user/group provisioning
-	scimTokenManager := auth.NewSCIMTokenManager(db)
-	scimAuthMiddleware := middleware.NewSCIMAuthMiddleware(scimTokenManager)
-	scimBaseURL := os.Getenv("BASE_URL")
-	if scimBaseURL == "" {
-		scimBaseURL = os.Getenv("PUBLIC_URL")
-	}
-	if scimBaseURL == "" {
-		scimBaseURL = fmt.Sprintf("http://localhost:%s", port)
-	}
-	scimHandler := handlers.NewSCIMHandler(db, scimBaseURL)
-	scimTokenHandler := handlers.NewSCIMTokenHandler(scimTokenManager)
-
-	permissionSetHandler := handlers.NewPermissionSetHandlerWithPool(db, permService)
-	workspaceRoleHandler := handlers.NewWorkspaceRoleHandlerWithPool(db, permService)
-
-	// Time tracking handlers
-	timeCustomerHandler := handlers.NewTimeCustomerHandler(db)
-	timeProjectHandler := handlers.NewTimeProjectHandler(db)
-	timeProjectCategoryHandler := handlers.NewTimeProjectCategoryHandler(db)
-	timeWorklogHandler := handlers.NewTimeWorklogHandler(db, permService)
-	activeTimerHandler := handlers.NewActiveTimerHandler(db)
-
-	// Test management handlers
-	testFolderHandler := handlers.NewTestFolderHandlerWithPool(db, permService)
-	testCaseHandler := handlers.NewTestCaseHandlerWithPool(db, permService)
-	testSetHandler := handlers.NewTestSetHandlerWithPool(db, permService)
-	testRunTemplateHandler := handlers.NewTestRunTemplateHandlerWithPool(db, permService)
-	testRunHandler := handlers.NewTestRunHandlerWithPool(db, permService)
-	testSummaryHandler := handlers.NewTestSummaryHandlerWithPool(db, permService)
-	// defectHandler removed - defects are now created as regular items and linked via test_result_items
-
-	// Link management handlers
-	// Note: link_types has include_inactive query param filtering that EnumHandler doesn't support
-	linkTypeHandler := handlers.NewLinkTypeHandler(db)
-	itemLinkHandler := handlers.NewItemLinkHandler(db, notificationService)
-
-	// Recurrence handler for recurring tasks
-	recurrenceHandler := handlers.NewRecurrenceHandler(db, recurrenceScheduler)
-
-	// Actions handler for automation workflows
-	actionsHandler := handlers.NewActionsHandler(db, actionService)
-
-	milestoneCategoryHandler := handlers.NewEnumHandler(
-		services.NewEnumService(db, services.NewMilestoneCategoryConfig()),
-		func() interface{} { return &models.MilestoneCategory{} })
-	milestoneHandler := handlers.NewMilestoneHandler(db, permService)
-	channelCategoryHandler := handlers.NewEnumHandler(
-		services.NewEnumService(db, services.NewChannelCategoryConfig()),
-		func() interface{} { return &models.ChannelCategory{} })
-	collectionCategoryHandler := handlers.NewEnumHandler(
-		services.NewEnumService(db, services.NewCollectionCategoryConfig()),
-		func() interface{} { return &models.CollectionCategory{} })
-	iterationTypeHandler := handlers.NewEnumHandler(
-		services.NewEnumService(db, services.NewIterationTypeConfig()),
-		func() interface{} { return &models.IterationType{} })
-	iterationHandler := handlers.NewIterationHandler(db, permService)
-	personalLabelHandler := handlers.NewPersonalLabelHandler(db)
-	commentHandler := handlers.NewCommentHandler(db, permService, activityTracker, notificationService)
-	reviewHandler := handlers.NewReviewHandler(db)
-	calendarFeedHandler := handlers.NewCalendarFeedHandler(db, permService)
-	securitySettingsHandler := handlers.NewSecuritySettingsHandler(db, disablePlugins)
-
-	// Only create admin rate limiter if fallback is enabled
-	var adminRateLimiter *middleware.AdminFallbackRateLimiter
-	if enableAdminFallback {
-		adminRateLimiter = middleware.NewAdminFallbackRateLimiter(db)
-		slog.Info("Admin password fallback enabled (use only for emergency recovery)", slog.String("component", "auth"))
-	} else {
-		slog.Info("Admin password fallback disabled (admins must comply with auth policy)", slog.String("component", "auth"))
-	}
-
-	authPolicyHandler := handlers.NewAuthPolicyHandlerWithFallback(db, enableAdminFallback)
-
-	// Initialize auth handler with email verification service and auth policy support
-	authHandler = handlers.NewAuthHandler(db, sessionManager, loginRateLimiter, permService, emailVerificationService, ipExtractor, authPolicyHandler, adminRateLimiter)
-
-	themeHandler := handlers.NewThemeHandler(db)
-	userPreferencesHandler := handlers.NewUserPreferencesHandler(db)
-	homepageHandler := handlers.NewHomepageHandler(db, activityTracker)
-
-	// Notification HTTP handlers
-	notificationHandler := handlers.NewNotificationHandler(notificationManager, notificationService)
-	notificationTemplateHandler := handlers.NewNotificationTemplateHandlerWithPool(db)
-
-	permissionMiddleware := middleware.NewPermissionMiddleware(db)
-
-	// CSRF middleware
-	csrfMiddleware := middleware.NewCSRFMiddleware()
-
-	// Setup handler for initial configuration (needs sessionManager and authMiddleware)
-	setupHandler := handlers.NewSetupHandler(db, sessionManager, authMiddleware)
-
-	// SSO handler for Single Sign-On
-	// Pass allowedHosts, emailVerificationService, and disableCSRF (dev mode) for secure redirect URI handling
-	// Also pass useProxy and additionalProxyList for trusted proxy validation
-	ssoHandler := handlers.NewSSOHandler(db, sessionManager, permService, emailVerificationService, allowedHosts, disableCSRF, ipExtractor, useProxy, additionalProxyList)
-
-	// SCM provider handler for GitHub, GitLab, Gitea, Bitbucket integration
-	scmProviderHandler := handlers.NewSCMProviderHandler(db)
-	scmWorkspaceHandler := handlers.NewSCMWorkspaceHandler(db, scmProviderHandler.GetEncryption(), scmProviderHandler)
-	scmItemLinksHandler := handlers.NewSCMItemLinksHandler(db, scmProviderHandler.GetEncryption())
-	userSCMTokenHandler := handlers.NewUserSCMTokenHandler(db, scmProviderHandler.GetEncryption())
-
-	// Asset management handlers
-	assetHandler := handlers.NewAssetHandler(db, permService)
-	assetTypeHandler := handlers.NewAssetTypeHandler(db, permService)
-	assetCategoryHandler := handlers.NewAssetCategoryHandler(db, permService)
-	assetStatusHandler := handlers.NewAssetStatusHandler(db, permService)
-
-	// Jira import handler
-	jiraImportHandler := handlers.NewJiraImportHandler(db)
-
-	// Email provider handler for inbound email channels (OAuth + basic auth)
-	// Use scimBaseURL which contains BASE_URL/PUBLIC_URL or localhost fallback
-	emailProviderHandler := handlers.NewEmailProviderHandler(db, scmProviderHandler.GetEncryption(), scimBaseURL)
-
-	// Start email scheduler now that we have the encryption from SCM provider handler
-	emailCredManager := email.NewCredentialManager(db, scmProviderHandler.GetEncryption())
-	emailScheduler = scheduler.NewEmailScheduler(db, emailCredManager, attachmentPath)
-	emailScheduler.Start()
-	slog.Info("email scheduler started (IMAP polling)")
-
-	// SCM sync service for periodic repository synchronization
-	scmSyncService := scm.NewSyncService(db, scmProviderHandler.GetEncryption())
-
-	// Start SCM sync scheduler (every 5 minutes)
-	scmSyncStopChan := make(chan struct{})
-	go func() {
-		ticker := time.NewTicker(5 * time.Minute)
-		defer ticker.Stop()
-		slog.Info("SCM sync scheduler started (5-minute interval)")
-		for {
-			select {
-			case <-ticker.C:
-				ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
-				if err := scmSyncService.SyncAllRepositories(ctx); err != nil {
-					slog.Error("SCM sync error", "error", err)
-				}
-				if err := scmSyncService.RefreshAllPRLinkStates(ctx); err != nil {
-					slog.Error("PR state refresh error", "error", err)
-				}
-				cancel()
-			case <-scmSyncStopChan:
-				slog.Info("SCM sync scheduler stopped")
-				return
-			}
-		}
-	}()
-
-	// Webhook sender
-	webhookSender := webhook.NewWebhookSender(db)
-
-	// Wire up webhook sender to item and comment handlers for auto-trigger events
-	itemHandler.SetWebhookSender(webhookSender)
-	commentHandler.SetWebhookSender(webhookSender)
-
-	// Mention service for @mentions in comments and descriptions
-	mentionService := services.NewMentionService(db, notificationService)
-	itemHandler.SetMentionService(mentionService)
-	commentHandler.SetMentionService(mentionService)
-
-	// Comment service for unified comment creation (used by both HTTP handlers and action automation)
-	commentService := services.NewCommentService(db)
-	commentService.SetActivityTracker(activityTracker)
-	commentService.SetNotificationService(notificationService)
-	commentService.SetMentionService(mentionService)
-	commentService.SetWebhookSender(webhookSender)
-	commentHandler.SetCommentService(commentService)
-	actionService.SetCommentService(commentService)
-	slog.Info("comment service initialized")
-
-	// Wire up action service for automation workflows
-	itemHandler.SetActionService(actionService)
-	itemLinkHandler.SetActionService(actionService)
-
-	// Channels management
-	channelHandler := handlers.NewChannelHandler(db, permService, webhookSender)
-	channelHandler.SetEmailScheduler(emailScheduler)
-	channelHandler.SetEncryption(scmProviderHandler.GetEncryption())
-	channelHandler.SetBaseURL(scimBaseURL)
-
-	// Webhook handler for manual triggers
-	webhookHandler := handlers.NewWebhookHandler(db, webhookSender, permService)
-	portalHandler := handlers.NewPortalHandler(db, sessionManager, portalSessionManager, ipExtractor)
-	portalAuthHandler := handlers.NewPortalAuthHandler(db, portalSessionManager, magicLinkService, ipExtractor)
-	portalCustomersHandler := handlers.NewPortalCustomersHandler(db)
-	contactRolesHandler := handlers.NewEnumHandler(
-		services.NewEnumService(db, services.NewContactRoleConfig()),
-		func() interface{} { return &models.ContactRole{} })
-
-	// Notification settings management
-	notificationSettingsHandler := handlers.NewNotificationSettingsHandler(db)
-	configSetNotificationHandler := handlers.NewConfigurationSetNotificationHandler(db)
-
-	// We'll stop notification manager during shutdown, not in defer
-
-	// Initialize attachment handlers if attachment path is provided
-	var attachmentHandler *handlers.AttachmentHandler
-	var attachmentSettingsHandler *handlers.AttachmentSettingsHandler
-	if attachmentPath != "" {
-		slog.Info("attachments enabled", "path", attachmentPath)
-		attachmentHandler = handlers.NewAttachmentHandler(db, attachmentPath, permService)
-
-		// Create attachment settings service and initialize
-		attachmentSettingsService := services.NewAttachmentSettingsService(db)
-		if err := attachmentSettingsService.Initialize(attachmentPath); err != nil {
-			slog.Warn("failed to initialize attachment settings", "error", err)
-		}
-		attachmentSettingsHandler = handlers.NewAttachmentSettingsHandler(attachmentSettingsService)
-	} else {
-		slog.Info("attachments disabled (no --attachment-path specified)")
-	}
-
-	// Initialize diagram handler
-	diagramHandler := handlers.NewDiagramHandler(db)
-
-	// Initialize plugin system
-	var pluginManager *plugins.Manager
-	var pluginRouter *plugins.Router
-
-	if !disablePlugins {
-		// PLUGIN_DIRS env var allows loading plugins from additional directories (opt-in)
-		var pluginOpts []plugins.Option
-		pluginOpts = append(pluginOpts, plugins.WithDatabase(db), plugins.WithSCMService(scmSyncService))
-
-		if pluginDirsEnv := os.Getenv("PLUGIN_DIRS"); pluginDirsEnv != "" {
-			var additionalDirs []string
-			for _, dir := range strings.Split(pluginDirsEnv, ",") {
-				dir = strings.TrimSpace(dir)
-				if dir != "" && dir != "plugins" {
-					additionalDirs = append(additionalDirs, dir)
-				}
-			}
-			if len(additionalDirs) > 0 {
-				slog.Info("loading plugins from additional directories", "dirs", additionalDirs)
-				pluginOpts = append(pluginOpts, plugins.WithAdditionalPluginDirs(additionalDirs...))
-			}
-		}
-
-		pluginManager = plugins.NewManager("plugins", pluginOpts...)
-		slog.Info("initializing plugin system")
-		if err := pluginManager.LoadPlugins(); err != nil {
-			slog.Warn("failed to load plugins", "error", err)
-		}
-
-		// Create webhook dispatcher and wire to webhook sender
-		webhookDispatcher := plugins.NewWebhookDispatcher(pluginManager, db)
-		webhookSender.SetPluginDispatcher(webhookDispatcher)
-
-		// Register webhooks for loaded plugins
-		ctx := context.Background()
-		for _, plugin := range pluginManager.ListPlugins() {
-			if err := pluginManager.RegisterPluginWebhooks(ctx, db, plugin); err != nil {
-				slog.Warn("failed to register plugin webhooks", "plugin", plugin.Manifest.Name, "error", err)
-			}
-		}
-
-		pluginRouter = plugins.NewRouter(pluginManager)
-	} else {
-		slog.Info("plugin system disabled via startup flag")
-	}
-
-	pluginHandler := handlers.NewPluginHandler(db, pluginManager, disablePlugins)
-
-	// System handler for shutdown endpoint (created early but will use shutdown channel later)
+	// Setup signal handling for graceful shutdown
 	shutdownChan := make(chan os.Signal, 1)
-	systemHandler := handlers.NewSystemHandler(shutdownChan)
+	signal.Notify(shutdownChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
-	// Build API middleware chain
-	corsMiddleware := createCORSMiddleware(allowedHosts, effectivePort, disableCSRF)
-	apiMiddleware := router.MiddlewareChain{corsMiddleware, authMiddleware.OptionalAuth}
-
-	// Apply CSRF protection to API routes (after OptionalAuth so csrf_exempt is set)
-	if !disableCSRF {
-		slog.Info("CSRF protection enabled with bearer token bypass")
-		apiMiddleware = append(apiMiddleware, csrfMiddleware.AddCSRFTokenToContext, csrfMiddleware.CSRFProtection)
-	} else {
-		slog.Warn("CSRF protection disabled (development mode)")
+	// Build server configuration
+	cfg := server.Config{
+		Port:                port,
+		DBPath:              dbPath,
+		PostgresConn:        postgresConn,
+		DisableCSRF:         disableCSRF,
+		AttachmentPath:      attachmentPath,
+		AllowedHosts:        allowedHosts,
+		AllowedPort:         allowedPort,
+		UseProxy:            useProxy,
+		AdditionalProxies:   additionalProxies,
+		MaxReadConns:        maxReadConns,
+		MaxWriteConns:       maxWriteConns,
+		TLSCertPath:         tlsCertPath,
+		TLSKeyPath:          tlsKeyPath,
+		DisablePlugins:      disablePlugins,
+		EnableAdminFallback: enableAdminFallback,
+		BaseURL:             baseURL,
+		FrontendFiles:       frontendFiles,
+		ShutdownChan:        shutdownChan,
 	}
 
-	// Create API route group with middleware chain
-	api := router.NewRouteGroup(mux, "/api", apiMiddleware...)
-
-	// SCIM 2.0 routes (separate from /api, uses SCIM token authentication)
-	scimMiddleware := router.MiddlewareChain{corsMiddleware, scimRateLimiter.Limit}
-	scim := router.NewRouteGroup(mux, "/scim/v2", scimMiddleware...)
-
-	// Build route dependencies and register all routes
-	routeDeps := &routes.Deps{
-		API:       api,
-		SCIMGroup: scim,
-		Mux:       mux,
-
-		AuthMiddleware:       authMiddleware,
-		PermissionMiddleware: permissionMiddleware,
-		SCIMAuthMiddleware:   scimAuthMiddleware,
-		CSRFMiddleware:       csrfMiddleware,
-		DisableCSRF:          disableCSRF,
-
-		LoginRateLimiter:    loginRateLimiter,
-		AuthRateLimiter:     authRateLimiter,
-		FIDORateLimiter:     fidoRateLimiter,
-		SSORateLimiter:      ssoRateLimiter,
-		SCIMRateLimiter:     scimRateLimiter,
-		PortalSubmitLimiter: portalSubmitLimiter,
-		PortalSearchLimiter: portalSearchLimiter,
-		PortalAuthLimiter:   portalAuthLimiter,
-		EmailVerifyLimiter:  emailVerifyLimiter,
-		SetupLimiter:        setupLimiter,
-
-		Auth: routes.AuthHandlers{
-			Auth:     authHandler,
-			SSO:      ssoHandler,
-			WebAuthn: webAuthnHandler,
-		},
-		SCIM: routes.SCIMHandlers{
-			SCIM:      scimHandler,
-			SCIMToken: scimTokenHandler,
-		},
-		SCM: routes.SCMHandlers{
-			Provider:      scmProviderHandler,
-			Workspace:     scmWorkspaceHandler,
-			ItemLinks:     scmItemLinksHandler,
-			UserToken:     userSCMTokenHandler,
-			EmailProvider: emailProviderHandler,
-		},
-		Items: routes.ItemHandlers{
-			Item:               itemHandler,
-			Recurrence:         recurrenceHandler,
-			Comment:            commentHandler,
-			Attachment:         attachmentHandler,
-			AttachmentSettings: attachmentSettingsHandler,
-			Diagram:            diagramHandler,
-			ItemLink:           itemLinkHandler,
-			LinkType:           linkTypeHandler,
-		},
-		Workspaces: routes.WorkspaceHandlers{
-			Workspace:             workspaceHandler,
-			FieldRequirement:      workspaceFieldReqHandler,
-			Screen:                screenHandler,
-			ConfigSet:             configSetHandler,
-			ConfigSetNotification: configSetNotificationHandler,
-			NotificationSettings:  notificationSettingsHandler,
-			ItemType:              itemTypeHandler,
-			Priority:              priorityHandler,
-			HierarchyLevel:        hierarchyLevelHandler,
-			RequestType:           requestTypeHandler,
-			StatusCategory:        statusCategoryHandler,
-			Status:                statusHandler,
-			StatusLegacy:          statusHandlerLegacy,
-			Workflow:              workflowHandler,
-			Actions:               actionsHandler,
-		},
-		Users: routes.UserHandlers{
-			User:          userHandler,
-			Group:         groupHandler,
-			Permission:    permissionHandler,
-			PermissionSet: permissionSetHandler,
-			WorkspaceRole: workspaceRoleHandler,
-			Credential:    credentialHandler,
-			AppToken:      appTokenHandler,
-			APIToken:      apiTokenHandler,
-		},
-		Admin: routes.AdminHandlers{
-			SecuritySettings: securitySettingsHandler,
-			AuthPolicy:       authPolicyHandler,
-			Theme:            themeHandler,
-			UserPreferences:  userPreferencesHandler,
-			JiraImport:       jiraImportHandler,
-			Plugin:           pluginHandler,
-			Setup:            setupHandler,
-			System:           systemHandler,
-		},
-		Planning: routes.PlanningHandlers{
-			MilestoneCategory: milestoneCategoryHandler,
-			Milestone:         milestoneHandler,
-			IterationType:     iterationTypeHandler,
-			Iteration:         iterationHandler,
-			PersonalLabel:     personalLabelHandler,
-		},
-		TimeTracking: routes.TimeTrackingHandlers{
-			Customer:        timeCustomerHandler,
-			ProjectCategory: timeProjectCategoryHandler,
-			Project:         timeProjectHandler,
-			Worklog:         timeWorklogHandler,
-			ActiveTimer:     activeTimerHandler,
-		},
-		TestMgmt: routes.TestManagementHandlers{
-			Folder:      testFolderHandler,
-			Case:        testCaseHandler,
-			Set:         testSetHandler,
-			RunTemplate: testRunTemplateHandler,
-			Run:         testRunHandler,
-			Summary:     testSummaryHandler,
-		},
-		Channels: routes.ChannelHandlers{
-			ChannelCategory:      channelCategoryHandler,
-			Channel:              channelHandler,
-			Notification:         notificationHandler,
-			NotificationTemplate: notificationTemplateHandler,
-			Webhook:              webhookHandler,
-		},
-		Portal: routes.PortalHandlers{
-			Portal:         portalHandler,
-			PortalAuth:     portalAuthHandler,
-			PortalCustomer: portalCustomersHandler,
-			ContactRole:    contactRolesHandler,
-		},
-		Assets: routes.AssetHandlers{
-			Asset:    assetHandler,
-			Type:     assetTypeHandler,
-			Category: assetCategoryHandler,
-			Status:   assetStatusHandler,
-		},
-		Collections: routes.CollectionHandlers{
-			Category:     collectionCategoryHandler,
-			Collection:   collectionHandler,
-			BoardConfig:  boardConfigHandler,
-			TestCoverage: testCoverageHandler,
-		},
-		Misc: routes.MiscHandlers{
-			Homepage:     homepageHandler,
-			Review:       reviewHandler,
-			CalendarFeed: calendarFeedHandler,
-			CustomField:  customFieldHandler,
-		},
-	}
-	routes.RegisterAll(routeDeps)
-
-	// Register dynamic plugin routes (uses /api/plugins/{plugin}/{path...} pattern)
-	if pluginRouter != nil {
-		pluginRouter.RegisterRoutes(mux)
-	}
-
-	// ============================================
-	// Public REST API v1
-	// ============================================
-	restapi.SetupRoutes(mux, db, tokenManager, permService, v1.RegisterRoutes)
-
-	distFS, err := fs.Sub(frontendFiles, "frontend/dist")
+	// Create and start the server
+	srv, err := server.New(cfg)
 	if err != nil {
-		slog.Warn("frontend files not found, serving API only")
-	} else {
-		fileServer := http.FileServer(http.FS(distFS))
+		slog.Error("failed to create server", "error", err)
+		os.Exit(1)
+	}
 
-		// Serve Module Federation remote entry
-		mux.Handle("GET /remoteEntry.js", fileServer)
-
-		// Serve static assets directly
-		mux.Handle("GET /assets/", fileServer)
-		mux.Handle("GET /vite.svg", fileServer)
-		mux.Handle("GET /cmicon-2.svg", fileServer)
-
-		// Handle SPA routing - serve index.html for all other routes
-		mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-			// If it's an API request that wasn't matched, return 404
-			if len(r.URL.Path) >= 4 && r.URL.Path[:4] == "/api" {
-				http.NotFound(w, r)
-				return
-			}
-			// If it's a REST API request that wasn't matched, return 404
-			if len(r.URL.Path) >= 5 && r.URL.Path[:5] == "/rest" {
-				http.NotFound(w, r)
-				return
-			}
-
-			// For all other routes, serve the SPA
-			indexFile, err := distFS.Open("index.html")
-			if err != nil {
-				http.NotFound(w, r)
-				return
-			}
-			defer indexFile.Close()
-
-			w.Header().Set("Content-Type", "text/html")
-			http.ServeContent(w, r, "index.html", time.Time{}, indexFile.(io.ReadSeeker))
-		})
+	if err := srv.Start(); err != nil {
+		slog.Error("failed to start server", "error", err)
+		os.Exit(1)
 	}
 
 	// Setup SSH server if enabled
 	var sshServer *ssh.Server
 	if enableSSH {
-		apiURL := "http://localhost:" + port
+		apiURL := fmt.Sprintf("http://localhost:%d", srv.Port())
 
-		// Create server options
-		var serverOptions []ssh.Option
-		serverOptions = append(serverOptions,
-			wish.WithAddress(net.JoinHostPort(sshHost, sshPort)),
-			wish.WithHostKeyPath(sshKeyPath),
-		)
+		// We need to create a separate database connection for SSH
+		// since the server's DB is internal
+		var additionalProxyList []string
+		if additionalProxies != "" {
+			additionalProxyList = strings.Split(additionalProxies, ",")
+		}
+		enableHTTPS := tlsCertPath != "" && tlsKeyPath != ""
 
-		// Add public key authentication
-		slog.Info("SSH server starting with public key authentication enabled")
-		sshAuthMiddleware := middleware.NewSSHAuthMiddleware(db)
-		serverOptions = append(serverOptions, wish.WithPublicKeyAuth(sshAuthMiddleware.PublicKeyHandler()))
-
-		// Add middleware
-		serverOptions = append(serverOptions, wish.WithMiddleware(
-			wishbubbletea.Middleware(tui.NewTUIHandler(apiURL, sessionManager)),
-			logging.Middleware(),
-		))
-
-		s, err := wish.NewServer(serverOptions...)
-		if err != nil {
-			slog.Error("failed to create SSH server", "error", err)
+		// Create a separate DB connection for SSH auth
+		var sshDB database.Database
+		if postgresConn != "" {
+			sshDB, err = database.NewDatabase("postgres", postgresConn, maxReadConns, maxWriteConns)
 		} else {
-			sshServer = s
-			slog.Info("SSH TUI server starting", "host", sshHost, "port", sshPort)
-			go func() {
-				if err := sshServer.ListenAndServe(); err != nil && !errors.Is(err, ssh.ErrServerClosed) {
-					slog.Error("SSH server error", "error", err)
-				}
-			}()
+			sshDB, err = database.NewDatabase("sqlite3", dbPath, maxReadConns, maxWriteConns)
+		}
+		if err != nil {
+			slog.Error("failed to create SSH database connection", "error", err)
+		} else {
+			defer sshDB.Close()
+
+			sessionManager := auth.NewSessionManager(sshDB, enableHTTPS, useProxy, additionalProxyList)
+
+			var serverOptions []ssh.Option
+			serverOptions = append(serverOptions,
+				wish.WithAddress(net.JoinHostPort(sshHost, sshPort)),
+				wish.WithHostKeyPath(sshKeyPath),
+			)
+
+			slog.Info("SSH server starting with public key authentication enabled")
+			sshAuthMiddleware := middleware.NewSSHAuthMiddleware(sshDB)
+			serverOptions = append(serverOptions, wish.WithPublicKeyAuth(sshAuthMiddleware.PublicKeyHandler()))
+
+			serverOptions = append(serverOptions, wish.WithMiddleware(
+				wishbubbletea.Middleware(tui.NewTUIHandler(apiURL, sessionManager)),
+				logging.Middleware(),
+			))
+
+			s, err := wish.NewServer(serverOptions...)
+			if err != nil {
+				slog.Error("failed to create SSH server", "error", err)
+			} else {
+				sshServer = s
+				slog.Info("SSH TUI server starting", "host", sshHost, "port", sshPort)
+				go func() {
+					if err := sshServer.ListenAndServe(); err != nil && !errors.Is(err, ssh.ErrServerClosed) {
+						slog.Error("SSH server error", "error", err)
+					}
+				}()
+			}
 		}
 	}
 
-	// Setup signal handling for graceful shutdown
-	// Added SIGHUP for macOS .app bundle quit support (Cmd+Q)
-	signal.Notify(shutdownChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
-
-	// Apply security headers to all routes as final wrapper
-	securityMiddleware := createSecurityHeaders(enableHTTPS, useProxy, additionalProxyIPs)
-
-	// Add compression middleware (only if not behind proxy - proxies handle compression)
-	compressionMiddleware := middleware.CreateCompressionMiddleware(useProxy)
-
-	// Apply in order: compression wraps security wraps mux
-	handler := compressionMiddleware(securityMiddleware(mux))
-
-	// Start HTTP or HTTPS server
-	httpServer := &http.Server{
-		Addr:           ":" + port,
-		Handler:        handler,
-		ReadTimeout:    15 * time.Second, // Max time to read request from client
-		WriteTimeout:   30 * time.Second, // Max time to write response to client
-		IdleTimeout:    60 * time.Second, // Max time for keep-alive connections
-		MaxHeaderBytes: 1 << 20,          // 1 MB max header size
-	}
-
+	// Log startup info
+	enableHTTPS := tlsCertPath != "" && tlsKeyPath != ""
 	if enableHTTPS {
-		slog.Info("HTTPS server starting", "port", port, "cert", tlsCertPath, "key", tlsKeyPath)
 		if enableSSH {
 			slog.Info("SSH TUI available", "command", "ssh "+sshHost+" -p "+sshPort)
 		}
-
-		go func() {
-			if err := httpServer.ListenAndServeTLS(tlsCertPath, tlsKeyPath); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				slog.Error("HTTPS server error", "error", err)
-			}
-		}()
 	} else {
-		slog.Info("HTTP server starting (no TLS)", "port", port)
 		slog.Warn("⚠️  Running without HTTPS - credentials will be transmitted in plaintext. Use --tls-cert and --tls-key for production.")
 		if enableSSH {
 			slog.Info("SSH TUI available", "command", "ssh "+sshHost+" -p "+sshPort)
 		}
-
-		go func() {
-			if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				slog.Error("HTTP server error", "error", err)
-			}
-		}()
 	}
 
 	// Wait for shutdown signal
 	<-shutdownChan
 	slog.Info("shutdown signal received, starting graceful shutdown")
 
-	// Stop SCM sync scheduler
-	slog.Info("stopping SCM sync scheduler")
-	close(scmSyncStopChan)
-
-	// Stop notification scheduler and service
-	slog.Info("stopping notification scheduler")
-	notificationScheduler.Stop()
-	slog.Info("notification scheduler stopped")
-
-	// Stop recurrence scheduler
-	slog.Info("stopping recurrence scheduler")
-	recurrenceScheduler.Stop()
-	slog.Info("recurrence scheduler stopped")
-
-	// Stop action service
-	slog.Info("stopping action service")
-	actionService.Stop()
-	slog.Info("action service stopped")
-
-	// Stop email scheduler
-	if emailScheduler != nil {
-		slog.Info("stopping email scheduler")
-		emailScheduler.Stop()
-		slog.Info("email scheduler stopped")
-	}
-
-	slog.Info("stopping notification service")
-	notificationService.Close()
-	slog.Info("notification service stopped")
-
-	// Stop notification manager to prevent database connections from being held
-	slog.Info("stopping notification manager")
-	notificationManager.Stop()
-	slog.Info("notification manager stopped")
-
-	// Close idle connections to allow faster shutdown
-	httpServer.SetKeepAlivesEnabled(false)
-
-	// Shutdown servers gracefully with shorter timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Shutdown HTTP server
-	slog.Info("shutting down HTTP server")
-	if err := httpServer.Shutdown(ctx); err != nil {
-		slog.Warn("HTTP server graceful shutdown timed out, forcing close", "error", err)
-		httpServer.Close()
-	}
-	slog.Info("HTTP server shutdown complete")
-
-	// Shutdown SSH server
+	// Shutdown SSH server first
 	if sshServer != nil {
 		slog.Info("shutting down SSH server")
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		if err := sshServer.Shutdown(ctx); err != nil && !errors.Is(err, ssh.ErrServerClosed) {
 			slog.Error("SSH server shutdown error", "error", err)
 		} else {
 			slog.Info("SSH server shutdown complete")
 		}
+		cancel()
+	}
+
+	// Shutdown the main server
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		slog.Error("server shutdown error", "error", err)
+		os.Exit(1)
 	}
 
 	slog.Info("all servers stopped successfully")

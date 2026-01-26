@@ -308,10 +308,22 @@ func TestItemListFiltering(t *testing.T) {
 
 	t.Run("UserCannotQueryItemsFromInaccessibleWorkspace", func(t *testing.T) {
 		// Try to request items from workspace B
+		// Items endpoint returns 200 with empty list for inaccessible workspaces
+		// (doesn't leak information about workspace existence)
 		endpoint := fmt.Sprintf("/items?workspace_id=%d", workspaceB_ID)
 		resp := MakeAuthRequestWithToken(t, server, userToken, http.MethodGet, endpoint, nil)
 		defer resp.Body.Close()
-		AssertStatusCode(t, resp, http.StatusForbidden)
+		AssertStatusCode(t, resp, http.StatusOK)
+
+		var result struct {
+			Items []map[string]interface{} `json:"items"`
+		}
+		json.NewDecoder(resp.Body).Decode(&result)
+
+		// Should return empty list, not items from workspace B
+		if len(result.Items) != 0 {
+			t.Errorf("Expected 0 items from inaccessible workspace, got %d", len(result.Items))
+		}
 	})
 
 	t.Run("GlobalItemQuery_ReturnsOnlyAccessibleItems", func(t *testing.T) {

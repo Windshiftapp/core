@@ -65,15 +65,8 @@ func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Check if system admin - gets full access
 	isAdmin, _ := h.permissionService.IsSystemAdmin(currentUser.ID)
 
-	// Check if user has user.list permission
-	hasListPerm, _ := h.permissionService.HasGlobalPermission(currentUser.ID, models.PermissionUserList)
-
-	if !isAdmin && !hasListPerm {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
-
-	// System admins see all users, regular users with user.list see only active users
+	// Any authenticated user can list users (needed for issue assignment, mentions, etc.)
+	// System admins see all users with full details, regular users see only active users with limited fields
 	var query string
 	if isAdmin {
 		query = `SELECT id, email, username, first_name, last_name, is_active, avatar_url, requires_password_reset, timezone, language, created_at, updated_at FROM users ORDER BY last_name, first_name`

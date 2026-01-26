@@ -2,18 +2,25 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"windshift/internal/server"
 )
+
+// testHTTPClient is a shared HTTP client with timeout for all test requests
+var testHTTPClient = &http.Client{
+	Timeout: 30 * time.Second,
+}
 
 // TestServer represents a running test server instance
 type TestServer struct {
@@ -22,55 +29,21 @@ type TestServer struct {
 	APIBase     string
 	DBPath      string
 	DBType      string
-	Cmd         *exec.Cmd
 	BearerToken string
-	StdoutBuf   *bytes.Buffer
-	StderrBuf   *bytes.Buffer
-}
-
-// buildTestBinary builds the windshift binary for testing if it doesn't exist
-// Returns the path to the binary
-func buildTestBinary(t *testing.T) string {
-	t.Helper()
-
-	// Get absolute path to project root (parent of tests directory)
-	testDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get working directory: %v", err)
-	}
-	projectRoot := filepath.Dir(testDir)
-	binaryPath := filepath.Join(projectRoot, "windshift")
-
-	// Check if binary already exists and is recent (less than 1 hour old)
-	if info, err := os.Stat(binaryPath); err == nil {
-		if time.Since(info.ModTime()) < time.Hour {
-			return binaryPath
-		}
-	}
-
-	// Build the binary
-	t.Log("Building test binary...")
-	buildCmd := exec.Command("go", "build", "-o", binaryPath)
-	buildCmd.Dir = projectRoot
-	if output, err := buildCmd.CombinedOutput(); err != nil {
-		t.Fatalf("Failed to build test binary: %v\n%s", err, output)
-	}
-
-	return binaryPath
+	server      *server.Server // in-process server reference
 }
 
 // StartTestServer starts a windshift server with an isolated database
-// and returns a TestServer instance with cleanup function
+// and returns a TestServer instance with cleanup function.
+// This uses an in-process server for faster, more reliable tests.
 func StartTestServer(t *testing.T, dbType string) (*TestServer, func()) {
 	t.Helper()
 
-	// Generate unique database name and random port
-	timestamp := time.Now().Unix()
+	// Generate unique database name
+	timestamp := time.Now().UnixNano()
 	pid := os.Getpid()
-	port := 8000 + rand.Intn(1000)
 
 	var dbPath string
-	var cmd *exec.Cmd
 
 	if dbType == "sqlite" {
 		// Use temp directory to avoid polluting project root
@@ -79,70 +52,49 @@ func StartTestServer(t *testing.T, dbType string) (*TestServer, func()) {
 			t.Fatalf("Failed to create test temp dir: %v", err)
 		}
 		dbPath = filepath.Join(tempDir, fmt.Sprintf("test_%d_%d.db", timestamp, pid))
-
-		// Build test binary (cached if recent)
-		binaryPath := buildTestBinary(t)
-
-		// Run the binary directly for better process control
-		cmd = exec.Command(binaryPath,
-			"-db", dbPath,
-			"-p", fmt.Sprintf("%d", port),
-			"-no-csrf", // Enable development mode to bypass CSRF and WebAuthn config requirements
-		)
-		// Set required environment variables for test mode
-		cmd.Env = append(os.Environ(), "SESSION_SECRET=test-session-secret-for-integration-tests")
 	} else if dbType == "postgres" {
 		// PostgreSQL setup would go here
-		// For now, we'll focus on SQLite
 		t.Skip("PostgreSQL testing not yet implemented")
 	} else {
 		t.Fatalf("Unknown database type: %s", dbType)
 	}
 
-	// Set up command and capture output for debugging
-	cmd.Dir = filepath.Dir(dbPath)
+	// Set required environment variables for testing
+	os.Setenv("SESSION_SECRET", "test-session-secret-for-integration-tests")
 
-	// Capture stdout/stderr to buffers for debugging when tests fail
-	var stdoutBuf, stderrBuf bytes.Buffer
-	cmd.Stdout = &stdoutBuf
-	cmd.Stderr = &stderrBuf
+	// Create server configuration for testing
+	cfg := server.Config{
+		Port:          "0", // Use port 0 for OS-assigned free port
+		DBPath:        dbPath,
+		DisableCSRF:   true,                              // Disable CSRF for testing
+		SilentMode:    os.Getenv("TEST_VERBOSE") == "",   // Suppress logs unless TEST_VERBOSE is set
+		MaxReadConns:  10,
+		MaxWriteConns: 1,
+	}
+
+	// Create the in-process server
+	srv, err := server.New(cfg)
+	if err != nil {
+		t.Fatalf("Failed to create test server: %v", err)
+	}
 
 	// Start the server
-	if err := cmd.Start(); err != nil {
+	if err := srv.Start(); err != nil {
+		srv.Shutdown(context.Background())
 		t.Fatalf("Failed to start test server: %v", err)
 	}
 
+	port := srv.Port()
 	baseURL := fmt.Sprintf("http://localhost:%d", port)
 	apiBase := baseURL + "/api"
 
-	// Wait for server to be ready
-	if !waitForServer(t, apiBase+"/setup/status", 30*time.Second) {
-		// Server failed to start - log output for debugging
-		cmd.Process.Kill()
-		cmd.Wait() // Wait for process to fully exit
-
-		t.Logf("Test server failed to start within 30 seconds on port %d", port)
-		if stdoutBuf.Len() > 0 {
-			t.Logf("Server stdout:\n%s", stdoutBuf.String())
-		}
-		if stderrBuf.Len() > 0 {
-			t.Logf("Server stderr:\n%s", stderrBuf.String())
-		}
-		t.Fatalf("Test server failed to start within 30 seconds (see logs above)")
-	}
-
-	// Wait a bit for migrations
-	time.Sleep(2 * time.Second)
-
-	server := &TestServer{
-		Port:      port,
-		BaseURL:   baseURL,
-		APIBase:   apiBase,
-		DBPath:    dbPath,
-		DBType:    dbType,
-		Cmd:       cmd,
-		StdoutBuf: &stdoutBuf,
-		StderrBuf: &stderrBuf,
+	ts := &TestServer{
+		Port:    port,
+		BaseURL: baseURL,
+		APIBase: apiBase,
+		DBPath:  dbPath,
+		DBType:  dbType,
+		server:  srv,
 	}
 
 	// Cleanup function with graceful shutdown
@@ -161,61 +113,19 @@ func StartTestServer(t *testing.T, dbType string) (*TestServer, func()) {
 			}
 		}()
 
-		if cmd.Process != nil {
-			// Send SIGTERM for graceful shutdown
-			if err := cmd.Process.Signal(os.Interrupt); err != nil {
-				t.Logf("Warning: Failed to send interrupt signal: %v", err)
-			}
+		// Graceful shutdown with timeout
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-			// Wait up to 5 seconds for graceful shutdown
-			done := make(chan error, 1)
-			go func() {
-				done <- cmd.Wait()
-			}()
-
-			select {
-			case <-done:
-				// Process exited gracefully
-				t.Logf("Test server shutdown gracefully")
-			case <-time.After(5 * time.Second):
-				// Timeout - force kill
-				t.Logf("Test server did not shutdown gracefully, forcing kill")
-				cmd.Process.Kill()
-				cmd.Wait()
-			}
+		if err := srv.Shutdown(ctx); err != nil {
+			t.Logf("Warning: Server shutdown error: %v", err)
 		}
 	}
 
 	// Register cleanup with testing framework
 	t.Cleanup(cleanup)
 
-	return server, cleanup
-}
-
-// waitForServer polls an endpoint until it responds or timeout occurs
-func waitForServer(t *testing.T, url string, timeout time.Duration) bool {
-	t.Helper()
-
-	deadline := time.Now().Add(timeout)
-	attempts := 0
-	for time.Now().Before(deadline) {
-		attempts++
-		resp, err := http.Get(url)
-		if err == nil {
-			resp.Body.Close()
-			if resp.StatusCode < 500 {
-				t.Logf("Server ready after %d attempts", attempts)
-				return true
-			}
-			t.Logf("Attempt %d: Server responded with status %d, waiting...", attempts, resp.StatusCode)
-		} else if attempts%10 == 0 {
-			// Log every 10th attempt to avoid spam
-			t.Logf("Attempt %d: Server not yet responding (%v), waiting...", attempts, err)
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
-	t.Logf("Server failed to respond after %d attempts over %v", attempts, timeout)
-	return false
+	return ts, cleanup
 }
 
 // CreateBearerToken completes the full authentication flow and returns a bearer token
@@ -321,7 +231,7 @@ func CreateBearerToken(t *testing.T, server *TestServer) string {
 func getCSRFToken(t *testing.T, apiBase string) string {
 	t.Helper()
 
-	resp, err := http.Get(apiBase + "/csrf-token")
+	resp, err := testHTTPClient.Get(apiBase + "/csrf-token")
 	if err != nil {
 		t.Fatalf("Failed to get CSRF token: %v", err)
 	}
@@ -349,7 +259,7 @@ func getCSRFTokenWithCookie(t *testing.T, apiBase, cookie string) string {
 
 	req.Header.Set("Cookie", cookie)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := testHTTPClient.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to get CSRF token: %v", err)
 	}
@@ -396,7 +306,7 @@ func makeRequest(t *testing.T, method, url, bearerToken string, body interface{}
 		req.Header.Set(key, value)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := testHTTPClient.Do(req)
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
@@ -426,7 +336,7 @@ func MakeAuthRequestRaw(t *testing.T, server *TestServer, method, endpoint strin
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+server.BearerToken)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := testHTTPClient.Do(req)
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
@@ -1097,7 +1007,7 @@ func MakeSCIMRequestNoAuth(t *testing.T, server *TestServer, method, endpoint st
 		t.Fatalf("Failed to create request: %v", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := testHTTPClient.Do(req)
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}

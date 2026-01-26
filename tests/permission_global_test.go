@@ -189,10 +189,9 @@ func TestGlobalPermissions_UserManage(t *testing.T) {
 	})
 }
 
-// TestGlobalPermissions_IterationManage tests iteration creation.
-// Note: The iteration.manage permission exists but is not enforced by middleware.
-// Currently any authenticated user can create iterations (workspace or global).
-// This test documents the current behavior.
+// TestGlobalPermissions_IterationManage tests iteration creation permissions.
+// Global iterations require iteration.manage permission.
+// Workspace iterations require item.edit permission on the workspace.
 func TestGlobalPermissions_IterationManage(t *testing.T) {
 	server, _ := StartTestServer(t, "sqlite")
 	adminToken := CreateBearerToken(t, server)
@@ -202,11 +201,27 @@ func TestGlobalPermissions_IterationManage(t *testing.T) {
 	workspaceID, _ := CreateTestWorkspace(t, server, "Iteration Test WS", shortKey("ITW"))
 
 	// Create a regular user
-	_, username, password := CreateTestUserWithCredentials(t, server, "iteration_tester", "iteration@test.com")
+	userID, username, password := CreateTestUserWithCredentials(t, server, "iteration_tester", "iteration@test.com")
 	userToken := CreateBearerTokenForUser(t, server, username, password)
 
-	t.Run("AnyAuthenticatedUser_CanCreateGlobalIterations", func(t *testing.T) {
-		// Currently any authenticated user can create global iterations
+	t.Run("UserWithoutPermission_CannotCreateGlobalIterations", func(t *testing.T) {
+		// User without iteration.manage permission cannot create global iterations
+		iterationData := map[string]interface{}{
+			"name":        "Global Iteration Fail",
+			"description": "Should fail - no permission",
+			"start_date":  time.Now().Format("2006-01-02"),
+			"end_date":    time.Now().AddDate(0, 0, 14).Format("2006-01-02"),
+			"is_global":   true,
+		}
+		resp := MakeAuthRequestWithToken(t, server, userToken, http.MethodPost, "/iterations", iterationData)
+		defer resp.Body.Close()
+		AssertStatusCode(t, resp, http.StatusForbidden)
+	})
+
+	t.Run("UserWithPermission_CanCreateGlobalIterations", func(t *testing.T) {
+		// Grant iteration.manage permission to the user
+		GrantGlobalPermission(t, server, userID, "iteration.manage")
+
 		iterationData := map[string]interface{}{
 			"name":        "Global Iteration",
 			"description": "Test global iteration",
@@ -219,8 +234,10 @@ func TestGlobalPermissions_IterationManage(t *testing.T) {
 		AssertStatusCode(t, resp, http.StatusCreated)
 	})
 
-	t.Run("AnyAuthenticatedUser_CanCreateWorkspaceIterations", func(t *testing.T) {
-		// Currently any authenticated user can create workspace iterations
+	t.Run("UserWithWorkspaceRole_CanCreateWorkspaceIterations", func(t *testing.T) {
+		// Assign Editor role to the user in the workspace (Editor has item.edit permission)
+		AssignWorkspaceRole(t, server, userID, workspaceID, "Editor")
+
 		iterationData := map[string]interface{}{
 			"name":         "Workspace Iteration",
 			"description":  "Test workspace iteration",

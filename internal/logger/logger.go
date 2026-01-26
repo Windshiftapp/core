@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -9,9 +10,24 @@ import (
 )
 
 var defaultLogger *slog.Logger
+var silent bool
+
+// SetSilent disables all logging (for testing)
+func SetSilent(s bool) {
+	silent = s
+	if s {
+		defaultLogger = slog.New(slog.NewTextHandler(io.Discard, nil))
+		slog.SetDefault(defaultLogger)
+	}
+}
 
 // Init initializes the global logger with the specified level and format
 func Init(levelStr, format string) {
+	// Skip if in silent mode
+	if silent {
+		return
+	}
+
 	// Create charmbracelet log handler
 	handler := charmlog.NewWithOptions(os.Stderr, charmlog.Options{
 		ReportTimestamp: true,
@@ -57,8 +73,14 @@ func Init(levelStr, format string) {
 // Get returns the global logger instance
 func Get() *slog.Logger {
 	if defaultLogger == nil {
-		// Fallback: initialize with defaults if not yet initialized
-		Init("info", "text")
+		if silent {
+			// Return discard logger in silent mode
+			defaultLogger = slog.New(slog.NewTextHandler(io.Discard, nil))
+			slog.SetDefault(defaultLogger)
+		} else {
+			// Fallback: initialize with defaults if not yet initialized
+			Init("info", "text")
+		}
 	}
 	return defaultLogger
 }

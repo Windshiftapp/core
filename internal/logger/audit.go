@@ -31,7 +31,7 @@ type AuditEvent struct {
 // auditLogEntry is the internal representation ready for database insert
 type auditLogEntry struct {
 	Timestamp    time.Time
-	UserID       int
+	UserID       *int // nil for SCIM/system operations (maps to SQL NULL)
 	Username     string
 	IPAddress    string
 	UserAgent    string
@@ -158,16 +158,37 @@ func LogAudit(db database.Database, event AuditEvent) error {
 		timestamp = time.Now()
 	}
 
+	// Convert UserID 0 to nil for SQL NULL (SCIM/system operations have no user)
+	var userIDPtr *int
+	if event.UserID != 0 {
+		userIDPtr = &event.UserID
+	}
+
+	// Determine if this is a SCIM operation (UserID 0 or action type starts with "scim.")
+	isSCIMOperation := event.UserID == 0 || strings.HasPrefix(event.ActionType, "scim.")
+
 	// Also log to structured logger for real-time monitoring (always immediate)
-	slog.Info("audit_event",
-		"user_id", event.UserID,
-		"username", event.Username,
-		"action_type", event.ActionType,
-		"resource_type", event.ResourceType,
-		"resource_id", event.ResourceID,
-		"resource_name", event.ResourceName,
-		"success", event.Success,
-	)
+	if isSCIMOperation {
+		slog.Info("audit_event",
+			"source", "SCIM",
+			"username", event.Username,
+			"action_type", event.ActionType,
+			"resource_type", event.ResourceType,
+			"resource_id", event.ResourceID,
+			"resource_name", event.ResourceName,
+			"success", event.Success,
+		)
+	} else {
+		slog.Info("audit_event",
+			"user_id", event.UserID,
+			"username", event.Username,
+			"action_type", event.ActionType,
+			"resource_type", event.ResourceType,
+			"resource_id", event.ResourceID,
+			"resource_name", event.ResourceName,
+			"success", event.Success,
+		)
+	}
 
 	// Check if batcher is available (SQLite mode)
 	auditBatcherMu.RLock()
@@ -178,7 +199,7 @@ func LogAudit(db database.Database, event AuditEvent) error {
 		// Use batcher for efficient batched writes
 		entry := auditLogEntry{
 			Timestamp:    timestamp,
-			UserID:       event.UserID,
+			UserID:       userIDPtr, // nil for SCIM/system operations
 			Username:     event.Username,
 			IPAddress:    event.IPAddress,
 			UserAgent:    event.UserAgent,
@@ -195,7 +216,7 @@ func LogAudit(db database.Database, event AuditEvent) error {
 		slog.Debug("audit event queued for batch write",
 			"action_type", event.ActionType,
 			"resource_type", event.ResourceType,
-			"user_id", event.UserID,
+			"is_scim", isSCIMOperation,
 		)
 		return nil
 	}
@@ -212,7 +233,7 @@ func LogAudit(db database.Database, event AuditEvent) error {
 	_, err := db.ExecWrite(
 		query,
 		timestamp,
-		event.UserID,
+		userIDPtr, // nil for SCIM/system operations (becomes SQL NULL)
 		event.Username,
 		event.IPAddress,
 		event.UserAgent,
@@ -230,7 +251,7 @@ func LogAudit(db database.Database, event AuditEvent) error {
 			"error", err,
 			"action_type", event.ActionType,
 			"resource_type", event.ResourceType,
-			"user_id", event.UserID,
+			"is_scim", isSCIMOperation,
 			"resource_id", event.ResourceID,
 		)
 		return fmt.Errorf("failed to log audit event: %w", err)
@@ -239,7 +260,7 @@ func LogAudit(db database.Database, event AuditEvent) error {
 	slog.Debug("audit event logged successfully",
 		"action_type", event.ActionType,
 		"resource_type", event.ResourceType,
-		"user_id", event.UserID,
+		"is_scim", isSCIMOperation,
 	)
 
 	return nil
