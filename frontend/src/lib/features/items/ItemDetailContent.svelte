@@ -79,7 +79,6 @@
   export let iterations = [];
   export let priorities = [];
   export let attachments = [];
-  export let attachmentSettings = null;
   export let diagrams = [];
   export let manualActions = [];
 
@@ -347,7 +346,6 @@
             {availableSubIssueTypes}
             {attachments}
             {diagrams}
-            {attachmentSettings}
             {manualActions}
             on:save-field={handleSaveField}
             on:cancel-edit={handleCancelEdit}

@@ -1,6 +1,7 @@
 <script>
   import { onMount, createEventDispatcher } from 'svelte';
   import { api } from '../../api.js';
+  import { attachmentStatus } from '../../stores';
   import Modal from '../../dialogs/Modal.svelte';
   import Comments from '../items/Comments.svelte';
   import ItemDetailDescription from '../items/ItemDetailDescription.svelte';
@@ -43,7 +44,6 @@
 
   // Attachment state
   let attachments = $state([]);
-  let attachmentSettings = $state(null);
 
   // Comment count for badge
   let commentCount = $state(0);
@@ -72,8 +72,7 @@
     }
     await loadItemTypeData();
 
-    await loadAttachmentSettings();
-    if (attachmentsEnabled()) {
+    if (attachmentStatus.enabled) {
       await loadAttachments();
     }
     loading = false;
@@ -99,15 +98,6 @@
     }
   }
 
-  async function loadAttachmentSettings() {
-    try {
-      attachmentSettings = await api.attachmentSettings.get();
-    } catch (err) {
-      console.error('Failed to load attachment settings:', err);
-      attachmentSettings = { enabled: false };
-    }
-  }
-
   async function loadAttachments() {
     try {
       const response = await api.attachments.getByItem(itemId);
@@ -116,10 +106,6 @@
       console.error('Failed to load attachments:', err);
       attachments = [];
     }
-  }
-
-  function attachmentsEnabled() {
-    return attachmentSettings?.enabled && attachmentSettings?.attachment_path;
   }
 
   // Breadcrumbs data loading functions
@@ -462,7 +448,6 @@
           showLinkButton={false}
           {attachments}
           diagrams={[]}
-          {attachmentSettings}
           on:save-field={handleSaveField}
           on:cancel-edit={handleCancelEdit}
           on:attachment-upload-files={handleAttachmentUploadFiles}

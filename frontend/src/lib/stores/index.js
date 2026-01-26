@@ -56,3 +56,9 @@ export { backlogStore } from './backlogStore.svelte.js';
 // Methods: i18n.init(), i18n.setLocale(code), t(key, params), translateError(error)
 // Provides internationalization with support for multiple locales including RTL languages
 export { i18n, t, translateError, SUPPORTED_LOCALES } from './i18n.svelte.js';
+
+// Attachment status store
+// Access via: attachmentStatus.enabled, attachmentStatus.loaded, attachmentStatus.loading
+// Methods: attachmentStatus.load(), attachmentStatus.reload()
+// Provides attachment system availability status for UI components
+export { attachmentStatus } from './attachmentStatus.svelte.js';

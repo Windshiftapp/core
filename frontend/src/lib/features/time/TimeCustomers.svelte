@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../../api.js';
+  import { attachmentStatus } from '../../stores';
   import Button from '../../components/Button.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import TimeCustomerModal from '../../dialogs/TimeCustomerModal.svelte';
@@ -25,21 +26,9 @@
     custom_field_values: {}
   });
 
-  // Check if attachments are enabled
-  let attachmentsEnabled = $state(false);
-
   onMount(async () => {
-    await Promise.all([loadCustomers(), loadCustomFields(), checkAttachmentsEnabled()]);
+    await Promise.all([loadCustomers(), loadCustomFields()]);
   });
-
-  async function checkAttachmentsEnabled() {
-    try {
-      const settings = await api.attachmentSettings.get();
-      attachmentsEnabled = settings?.enabled || false;
-    } catch (err) {
-      console.error('Failed to check attachments settings:', err);
-    }
-  }
 
   async function loadCustomFields() {
     try {
@@ -192,7 +181,7 @@
   isOpen={showModal}
   bind:formData
   {customerOrgFields}
-  {attachmentsEnabled}
+  attachmentsEnabled={attachmentStatus.enabled}
   isEditing={!!editingCustomer}
   onsave={saveCustomer}
   oncancel={cancelForm}

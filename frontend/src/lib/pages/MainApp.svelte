@@ -4,6 +4,7 @@
   import { testingStore, authStore, permissionStore, uiStore, currentWorkspace, workspacesStore, workspacePermissions, ssoStore } from '../stores';
   import EmailVerificationBanner from '../features/notifications/EmailVerificationBanner.svelte';
   import { moduleSettings } from '../stores/moduleSettings.js';
+  import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import NotFound from './NotFound.svelte';
   import Workspaces from '../workspaces/Workspaces.svelte';
@@ -376,6 +377,7 @@
     // Also load personal workspace so it's available immediately
     workspacesStore.loadPersonalWorkspace();
     moduleSettings.load();
+    attachmentStatus.load();
     // Load all permissions for permission checking (admin only)
     await permissionStore.loadAllPermissions(authStore.currentUser);
     // Load workspace permissions for current user

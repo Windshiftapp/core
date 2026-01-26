@@ -1665,7 +1665,6 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     {priorities}
     attachments={attachmentManager.attachments || []}
     attachmentPagination={attachmentManager.pagination}
-    attachmentSettings={attachmentManager.settings}
     {diagrams}
     {loadingDiagrams}
     {manualActions}

@@ -1,9 +1,7 @@
 <script>
-  import { authStore, workspacesStore } from '../stores';
+  import { authStore, workspacesStore, attachmentStatus } from '../stores';
   import { navigate } from '../router.js';
-  import { onMount } from 'svelte';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
-  import { api } from '../api.js';
   import { User, Home, Shield, Camera, Sun, Moon, Monitor } from 'lucide-svelte';
   import { themeStore } from '../stores/theme.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -15,8 +13,6 @@
 
   // Local state
   let loadingPersonalWorkspace = $state(false);
-  let attachmentSettings = $state(null);
-  let loadingAttachments = $state(false);
 
   // Subscribe to personal workspace from store
   const personalWorkspace = $derived($workspacesStore.personalWorkspace);
@@ -28,22 +24,8 @@
       : ''
   );
 
-  // Check if attachments are enabled
-  const attachmentsEnabled = $derived(attachmentSettings?.enabled && attachmentSettings?.attachment_path);
-
   // Only show avatar if attachments are enabled and user has an avatar
-  const showAvatar = $derived(attachmentsEnabled && authStore.currentUser?.avatar_url);
-
-  onMount(async () => {
-    try {
-      loadingAttachments = true;
-      attachmentSettings = await api.attachmentSettings.get();
-    } catch (error) {
-      console.warn('Failed to load attachment settings:', error);
-    } finally {
-      loadingAttachments = false;
-    }
-  });
+  const showAvatar = $derived(attachmentStatus.enabled && authStore.currentUser?.avatar_url);
 
   async function handleLogout() {
     await authStore.logout();

@@ -1,4 +1,5 @@
 import { api } from '../api.js';
+import { attachmentStatus } from '../stores';
 
 /**
  * Composable for managing item attachments
@@ -18,7 +19,7 @@ export function useItemAttachments(getItemId, showError = console.error) {
   let pageSize = $state(50);
 
   /**
-   * Load attachment settings from the server
+   * Load attachment settings from the server (for file size limits, allowed types, etc.)
    */
   async function loadSettings() {
     try {
@@ -46,11 +47,11 @@ export function useItemAttachments(getItemId, showError = console.error) {
   }
 
   /**
-   * Check if attachments are enabled
+   * Check if attachments are enabled (uses shared store)
    * @returns {boolean}
    */
   function isEnabled() {
-    return settings?.enabled && settings?.attachment_path;
+    return attachmentStatus.enabled;
   }
 
   /**

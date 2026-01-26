@@ -7,6 +7,7 @@
   import { createEventDispatcher } from 'svelte';
   import { getShortcut, matchesShortcut, getDisplayString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { attachmentStatus } from '../../stores';
 
   const dispatch = createEventDispatcher();
 
@@ -23,7 +24,6 @@
   // Attachments and diagrams
   export let attachments = [];
   export let diagrams = [];
-  export let attachmentSettings = null;
   export let showLinkButton = true;
 
   // Manual actions
@@ -201,7 +201,7 @@
         <span class="action-label">{t('items.child')}</span>
       </button>
     {/if}
-    {#if attachmentSettings?.enabled}
+    {#if attachmentStatus.enabled}
       <label
         class="action-btn inline-flex items-center gap-1.5 px-2 py-1.5 rounded text-xs transition-all cursor-pointer"
         style="color: var(--ds-text-subtle);"

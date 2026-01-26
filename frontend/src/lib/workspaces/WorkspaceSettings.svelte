@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
-  import { workspacePermissions } from '../stores';
+  import { workspacePermissions, attachmentStatus } from '../stores';
   import { Trash2, AlertTriangle, Palette, Camera, Package, Settings, Clock, Shield } from 'lucide-svelte';
   import { workspaceIconMap } from '../utils/icons.js';
   import { moduleSettings } from '../stores/moduleSettings.js';
@@ -66,10 +66,6 @@
   // Avatar upload state
   let uploadingAvatar = false;
   let showAvatarUpload = false;
-  let attachmentSettings = null;
-
-  // Check if attachments are enabled
-  $: attachmentsEnabled = attachmentSettings?.enabled && attachmentSettings?.attachment_path;
 
   // Permission check for workspace admin
   $: canAdmin = workspacePermissions.canAdminWorkspace(workspaceId);
@@ -90,13 +86,6 @@
     const loadPromises = [loadWorkspace(), loadTimeProjectCategories()];
     if ($moduleSettings.time_tracking_enabled) {
       loadPromises.push(loadTimeProjects());
-    }
-
-    // Load attachment settings
-    try {
-      attachmentSettings = await api.attachmentSettings.get();
-    } catch (error) {
-      console.error('Failed to load attachment settings:', error);
     }
 
     await Promise.all(loadPromises);
@@ -244,7 +233,7 @@
   async function handleAvatarUpload(files) {
     if (!files || files.length === 0) return;
 
-    if (!attachmentsEnabled) {
+    if (!attachmentStatus.enabled) {
       showToastError(t('workspaceSettings.attachmentsRequired'));
       return;
     }
@@ -520,11 +509,11 @@
                   size="sm"
                   onclick={() => showAvatarUpload = !showAvatarUpload}
                   icon={Camera}
-                  disabled={!attachmentsEnabled}
+                  disabled={!attachmentStatus.enabled}
                 >
                   {formData.avatar_url ? t('workspaceSettings.changeAvatar') : t('workspaceSettings.uploadAvatar')}
                 </Button>
-                {#if !attachmentsEnabled}
+                {#if !attachmentStatus.enabled}
                   <p class="text-xs mt-1" style="color: var(--ds-text-warning);">
                     {t('workspaceSettings.attachmentsRequired')}
                   </p>
@@ -532,7 +521,7 @@
               </div>
 
               <!-- Upload Input (shown when toggled) -->
-              {#if showAvatarUpload && attachmentsEnabled}
+              {#if showAvatarUpload && attachmentStatus.enabled}
                 <div class="p-4 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
                   <input
                     type="file"

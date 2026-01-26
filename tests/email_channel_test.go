@@ -7,7 +7,6 @@ import (
 
 // TestEmailChannelItemCreation tests that emails received via IMAP create work items
 func TestEmailChannelItemCreation(t *testing.T) {
-	t.Skip("Skipping: Email channel feature not yet implemented - email_providers table doesn't exist")
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -114,7 +113,6 @@ func TestEmailChannelItemCreation(t *testing.T) {
 
 // TestReplyCreatesComment tests that reply emails create comments on existing items
 func TestReplyCreatesComment(t *testing.T) {
-	t.Skip("Skipping: Email channel feature not yet implemented - email_providers table doesn't exist")
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -219,7 +217,6 @@ func TestReplyCreatesComment(t *testing.T) {
 
 // TestEmailChannelValidation tests that channels without item type configured fail properly
 func TestEmailChannelValidation(t *testing.T) {
-	t.Skip("Skipping: Email channel feature not yet implemented - email_providers table doesn't exist")
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -301,7 +298,6 @@ func TestEmailChannelValidation(t *testing.T) {
 
 // TestEmailDeduplication tests that duplicate emails are not processed twice
 func TestEmailDeduplication(t *testing.T) {
-	t.Skip("Skipping: Email channel feature not yet implemented - email_providers table doesn't exist")
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}

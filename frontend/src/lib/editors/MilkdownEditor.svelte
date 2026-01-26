@@ -15,6 +15,7 @@
   import MentionPicker from '../pickers/MentionPicker.svelte';
   import { mentionDecorationPlugin } from './milkdown-mention-mark.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
 
   export let content = '';
   export let placeholder = '';
@@ -27,6 +28,9 @@
   export let onImageInsert = null; // Callback when image is inserted
   export let isPersonalWorkspace = false; // Flag to show warning in mention picker
   export let compact = false; // Use smaller height for compact layouts
+
+  // Derive attachments enabled from store (falls back to true if not yet loaded to avoid flash)
+  $: attachmentsEnabled = attachmentStatus.loaded ? attachmentStatus.enabled : true;
 
   // Compute effective entity info (supports both old itemId and new entityType/entityId)
   $: effectiveEntityType = entityType || (itemId ? 'item' : null);
@@ -247,6 +251,10 @@
 
   // Shared uploader logic for drag/drop/paste and the toolbar button
   async function uploadImages(files, schema, shouldInsertMarkdown = false) {
+    if (!attachmentsEnabled) {
+      console.log('[MilkdownEditor] Attachments disabled, skipping upload');
+      return { nodes: [], attachments: [] };
+    }
     console.log('[MilkdownEditor] uploader called with', files.length, 'files');
 
     const images = [];
@@ -363,8 +371,8 @@
             }
           }));
 
-          // Configure upload plugin following official docs pattern
-          if (!readonly) {
+          // Configure upload plugin following official docs pattern (only if attachments enabled)
+          if (!readonly && attachmentsEnabled) {
             console.log('[MilkdownEditor] Configuring uploadConfig with uploader');
             ctx.update(uploadConfig.key, (prev) => ({
               ...prev,
@@ -538,9 +546,11 @@
       <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleOrderedList} title={t('editors.numberedList')}>
         <ListOrdered size={14} />
       </button>
-      <button type="button" class="toolbar-btn" tabindex="-1" onclick={openFilePicker} title={t('editors.insertImage')}>
-        <ImageIcon size={14} />
-      </button>
+      {#if attachmentsEnabled}
+        <button type="button" class="toolbar-btn" tabindex="-1" onclick={openFilePicker} title={t('editors.insertImage')}>
+          <ImageIcon size={14} />
+        </button>
+      {/if}
     </div>
   {/if}
   <div bind:this={editorElement} class="milkdown-editor" class:readonly class:compact class:has-toolbar={showToolbar && !readonly} onclick={handleClick}></div>

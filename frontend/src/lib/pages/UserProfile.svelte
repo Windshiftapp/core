@@ -1,7 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { api, getCalendarFeedToken, createCalendarFeedToken, revokeCalendarFeedToken } from '../api.js';
-	import { authStore } from '../stores';
+	import { authStore, attachmentStatus } from '../stores';
 	import { User, Shield, Key, Smartphone, Plus, Trash2, Calendar, CheckCircle, PlayCircle, Code, Copy, Eye, EyeOff, Camera, Upload, Globe, CalendarDays, RefreshCw, Link2, ExternalLink, GitBranch } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
 	import PageHeader from '../layout/PageHeader.svelte';
@@ -39,7 +39,6 @@
 	let newTokenValue = '';
 
 	// Avatar management state
-	let attachmentSettings = null;
 	let showAvatarUpload = false;
 	let uploadingAvatar = false;
 
@@ -64,12 +63,9 @@
 	// Use current user ID from auth store
 	$: currentUserId = authStore.currentUser?.id;
 
-	// Check if attachments are enabled for avatars
-	$: attachmentsEnabled = attachmentSettings?.enabled && attachmentSettings?.attachment_path;
-
 	// Configure tabs based on whether attachments are enabled
 	$: tabs = [
-		...(attachmentsEnabled ? [{
+		...(attachmentStatus.enabled ? [{
 			id: 'avatar',
 			label: t('users.avatar'),
 			icon: Camera
@@ -102,7 +98,6 @@
 			loadCredentials();
 			loadAppTokens();
 		}
-		loadAttachmentSettings();
 	});
 
 	// Watch for currentUserId changes and load data when available
@@ -132,14 +127,6 @@
 			credentials = await api.getUserCredentials(currentUserId);
 		} catch (err) {
 			error = t('dialogs.alerts.failedToLoad', { error: 'credentials' });
-		}
-	}
-
-	async function loadAttachmentSettings() {
-		try {
-			attachmentSettings = await api.attachmentSettings.get();
-		} catch (err) {
-			console.warn('Attachments not available:', err);
 		}
 	}
 
@@ -621,7 +608,7 @@
 	<!-- Tabbed Settings -->
 	<Tabs {tabs} bind:activeTab>
 		<!-- Avatar Management Tab -->
-		{#if activeTab === 'avatar' && attachmentsEnabled}
+		{#if activeTab === 'avatar' && attachmentStatus.enabled}
 			<div class="flex items-center justify-between mb-6">
 				<div>
 					<h2 class="text-lg font-medium flex items-center gap-2" style="color: var(--ds-text);">
