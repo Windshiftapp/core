@@ -84,6 +84,7 @@ type ItemCreationParams struct {
 	InheritProject          bool
 	TimeProjectID           *int
 	AssigneeID              *int
+	ReporterID              *int   // Reporter/submitter of the item
 	CreatorID               *int
 	CreatorPortalCustomerID *int
 	ChannelID               *int       // Portal-specific: track portal/channel
@@ -164,11 +165,11 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 	insertQuery := `
 		INSERT INTO items (
 			workspace_id, workspace_item_number, item_type_id, title, description, status_id, priority_id, is_task,
-			milestone_id, iteration_id, project_id, inherit_project, time_project_id, assignee_id, creator_id, creator_portal_customer_id,
+			milestone_id, iteration_id, project_id, inherit_project, time_project_id, assignee_id, reporter_id, creator_id, creator_portal_customer_id,
 			channel_id, request_type_id, due_date, related_work_item_id,
 			custom_field_values, parent_id,
 			frac_index, created_at, updated_at, path
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING id
 	`
 
@@ -188,6 +189,7 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 		params.InheritProject,
 		params.TimeProjectID,
 		params.AssigneeID,
+		params.ReporterID,
 		params.CreatorID,
 		params.CreatorPortalCustomerID,
 		params.ChannelID,

@@ -1,8 +1,20 @@
-// Package jira provides a client for the Jira Cloud REST API
+// Package jira provides a client for the Jira Cloud and Data Center REST APIs
 // for importing projects, issues, workflows, and assets into Windshift.
 package jira
 
-import "time"
+import (
+	"encoding/json"
+	"strings"
+	"time"
+)
+
+// DeploymentType represents the Jira deployment type
+type DeploymentType string
+
+const (
+	DeploymentCloud      DeploymentType = "cloud"
+	DeploymentDataCenter DeploymentType = "datacenter"
+)
 
 // JiraInstanceInfo contains information about the connected Jira instance
 type JiraInstanceInfo struct {
@@ -34,6 +46,14 @@ type JiraIssueType struct {
 	IconURL     string `json:"iconUrl"`
 	Subtask     bool   `json:"subtask"`
 	HierarchyLevel int `json:"hierarchyLevel"` // -1=subtask, 0=base, 1=epic
+}
+
+// JiraIssueTypeWithStatuses represents a Jira issue type with its available statuses
+type JiraIssueTypeWithStatuses struct {
+	ID       string       `json:"id"`
+	Name     string       `json:"name"`
+	Subtask  bool         `json:"subtask"`
+	Statuses []JiraStatus `json:"statuses"`
 }
 
 // JiraCustomField represents a Jira custom field definition
@@ -131,6 +151,41 @@ type JiraIssueFields struct {
 	CustomFields  map[string]interface{} `json:"-"`       // Populated separately
 }
 
+// UnmarshalJSON implements custom unmarshalling for JiraIssueFields.
+// Standard fields are decoded normally. Any key starting with "customfield_"
+// is captured into the CustomFields map, which the default json:"-" tag
+// would otherwise leave empty.
+func (f *JiraIssueFields) UnmarshalJSON(data []byte) error {
+	// Use an alias to avoid infinite recursion
+	type Alias JiraIssueFields
+	aux := &struct {
+		*Alias
+	}{
+		Alias: (*Alias)(f),
+	}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+
+	// Now decode the raw JSON again to pick up custom fields
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	f.CustomFields = make(map[string]interface{})
+	for key, val := range raw {
+		if strings.HasPrefix(key, "customfield_") {
+			var v interface{}
+			if err := json.Unmarshal(val, &v); err == nil {
+				f.CustomFields[key] = v
+			}
+		}
+	}
+
+	return nil
+}
+
 // JiraPriority represents a Jira priority
 type JiraPriority struct {
 	ID      string `json:"id"`
@@ -139,13 +194,29 @@ type JiraPriority struct {
 }
 
 // JiraUser represents a Jira user
+// Cloud uses AccountID as the unique identifier
+// Data Center uses Name or Key as the unique identifier
 type JiraUser struct {
-	AccountID    string            `json:"accountId"`
+	AccountID    string            `json:"accountId"`    // Cloud identifier
+	Name         string            `json:"name"`         // Data Center identifier (username)
+	Key          string            `json:"key"`          // Data Center identifier (user key)
 	EmailAddress string            `json:"emailAddress"`
 	DisplayName  string            `json:"displayName"`
 	Active       bool              `json:"active"`
 	TimeZone     string            `json:"timeZone"`
 	AvatarURLs   map[string]string `json:"avatarUrls"`
+}
+
+// GetIdentifier returns the appropriate unique identifier for the user
+// based on what's available (Cloud uses AccountID, Data Center uses Name or Key)
+func (u *JiraUser) GetIdentifier() string {
+	if u.AccountID != "" {
+		return u.AccountID
+	}
+	if u.Name != "" {
+		return u.Name
+	}
+	return u.Key
 }
 
 // JiraComponent represents a Jira project component
@@ -488,6 +559,13 @@ type JQLSearchResponse struct {
 	Issues        []JiraIssue `json:"issues"`
 	NextPageToken string      `json:"nextPageToken,omitempty"`
 	Total         int         `json:"total,omitempty"` // May not be returned in new API
+}
+
+// UserEmailResponse is the response from GET /rest/api/3/user/email
+// Used to fetch user emails separately since Cloud omits them from issue responses
+type UserEmailResponse struct {
+	AccountID string `json:"accountId"`
+	Email     string `json:"email"`
 }
 
 // ================================================================

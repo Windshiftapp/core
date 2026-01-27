@@ -606,7 +606,7 @@ func TestIterationHandler_GetProgress_Success(t *testing.T) {
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
 
-	var response IterationProgressReport
+	var response services.IterationProgressReport
 	rr.AssertJSONResponse(&response)
 
 	if response.IterationID != created.ID {

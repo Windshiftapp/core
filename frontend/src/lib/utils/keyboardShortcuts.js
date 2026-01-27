@@ -285,11 +285,16 @@ export function getShortcutDisplay(context, action) {
  */
 export function isTypingInField(event) {
   const target = event.target;
+  const active = document.activeElement;
   return (
     target.tagName === 'INPUT' ||
     target.tagName === 'TEXTAREA' ||
     target.tagName === 'SELECT' ||
-    target.isContentEditable
+    target.isContentEditable ||
+    active?.tagName === 'INPUT' ||
+    active?.tagName === 'TEXTAREA' ||
+    active?.tagName === 'SELECT' ||
+    active?.isContentEditable
   );
 }
 

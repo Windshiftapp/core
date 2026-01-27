@@ -11,9 +11,10 @@ import (
 
 // JiraConnectRequest represents a request to connect to Jira
 type JiraConnectRequest struct {
-	InstanceURL string `json:"instance_url"`
-	Email       string `json:"email"`
-	APIToken    string `json:"api_token"`
+	InstanceURL    string `json:"instance_url"`
+	Email          string `json:"email"`          // Email (Cloud) or username (Data Center)
+	APIToken       string `json:"api_token"`      // API token (Cloud) or password/token (Data Center)
+	DeploymentType string `json:"deployment_type"` // "cloud" or "datacenter" (default: "cloud")
 }
 
 // JiraConnectResponse represents a successful connection response
@@ -41,6 +42,17 @@ type JiraAnalyzeRequest struct {
 	OpenIssuesOnly bool     `json:"open_issues_only"`
 }
 
+// JiraVersionInfo contains version/release information from Jira
+type JiraVersionInfo struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Archived    bool   `json:"archived"`
+	Released    bool   `json:"released"`
+	ReleaseDate string `json:"release_date,omitempty"`
+	ProjectKey  string `json:"project_key"`
+}
+
 // JiraAnalysisResult contains the full analysis of selected projects
 type JiraAnalysisResult struct {
 	Projects       []JiraProjectAnalysis         `json:"projects"`
@@ -48,6 +60,7 @@ type JiraAnalysisResult struct {
 	Statuses       []JiraStatusInfo              `json:"statuses"`
 	CustomFields   []jira.FieldMappingSuggestion `json:"custom_fields"`
 	Users          []JiraUserSummary             `json:"users"`
+	Versions       []JiraVersionInfo             `json:"versions"`
 	AssetSchemas   []JiraAssetSchemaInfo         `json:"asset_schemas,omitempty"`
 	TotalIssues    int                           `json:"total_issues"`
 	TotalAssets    int                           `json:"total_assets"`
@@ -56,12 +69,13 @@ type JiraAnalysisResult struct {
 
 // JiraProjectAnalysis contains analysis for a single project
 type JiraProjectAnalysis struct {
-	Key         string   `json:"key"`
-	Name        string   `json:"name"`
-	IssueCount  int      `json:"issue_count"`
-	IssueTypes  []string `json:"issue_types"`
-	HasVersions bool     `json:"has_versions"`
-	HasSprints  bool     `json:"has_sprints"`
+	Key          string   `json:"key"`
+	Name         string   `json:"name"`
+	IssueCount   int      `json:"issue_count"`
+	IssueTypes   []string `json:"issue_types"`
+	HasVersions  bool     `json:"has_versions"`
+	VersionCount int      `json:"version_count"`
+	HasSprints   bool     `json:"has_sprints"`
 }
 
 // JiraIssueTypeInfo contains issue type information
@@ -121,12 +135,23 @@ type StartImportRequest struct {
 	Mappings       ImportMappings `json:"mappings"`
 }
 
+// VersionMapping maps a Jira version to a Windshift milestone
+type VersionMapping struct {
+	JiraID      string `json:"jiraId"`
+	JiraName    string `json:"jiraName"`
+	ProjectKey  string `json:"projectKey"`
+	Released    bool   `json:"released"`
+	ReleaseDate string `json:"releaseDate,omitempty"`
+	CreateNew   bool   `json:"createNew"`
+}
+
 // ImportMappings contains all the mapping configurations
 type ImportMappings struct {
 	Workspaces   []WorkspaceMapping   `json:"workspaces"`
 	IssueTypes   []IssueTypeMapping   `json:"issueTypes"`
 	Statuses     []StatusMapping      `json:"statuses"`
 	CustomFields []CustomFieldMapping `json:"customFields"`
+	Versions     []VersionMapping     `json:"versions"`
 }
 
 // WorkspaceMapping maps a Jira project to a Windshift workspace
@@ -142,23 +167,23 @@ type WorkspaceMapping struct {
 
 // IssueTypeMapping maps a Jira issue type to a Windshift item type
 type IssueTypeMapping struct {
-	JiraID         string `json:"jiraId"`
-	JiraName       string `json:"jiraName"`
-	IsSubtask      bool   `json:"isSubtask"`
-	HierarchyLevel int    `json:"hierarchyLevel"`
-	WindshiftID    *int   `json:"windshiftId,omitempty"`
-	CreateNew      bool   `json:"createNew"`
+	JiraIDs        []string `json:"jiraIds"`
+	JiraName       string   `json:"jiraName"`
+	IsSubtask      bool     `json:"isSubtask"`
+	HierarchyLevel int      `json:"hierarchyLevel"`
+	WindshiftID    *int     `json:"windshiftId,omitempty"`
+	CreateNew      bool     `json:"createNew"`
 }
 
 // StatusMapping maps a Jira status to a Windshift status
 type StatusMapping struct {
-	JiraID       string `json:"jiraId"`
-	JiraName     string `json:"jiraName"`
-	CategoryKey  string `json:"categoryKey"`
-	CategoryName string `json:"categoryName"`
-	Color        string `json:"color"`
-	WindshiftID  *int   `json:"windshiftId,omitempty"`
-	CreateNew    bool   `json:"createNew"`
+	JiraIDs      []string `json:"jiraIds"`
+	JiraName     string   `json:"jiraName"`
+	CategoryKey  string   `json:"categoryKey"`
+	CategoryName string   `json:"categoryName"`
+	Color        string   `json:"color"`
+	WindshiftID  *int     `json:"windshiftId,omitempty"`
+	CreateNew    bool     `json:"createNew"`
 }
 
 // CustomFieldMapping maps a Jira custom field to a Windshift custom field
@@ -196,12 +221,13 @@ type StartImportResponse struct {
 
 // ConnectionInfo represents a saved connection for the UI
 type ConnectionInfo struct {
-	ID           string     `json:"id"`
-	InstanceURL  string     `json:"instance_url"`
-	Email        string     `json:"email"`
-	InstanceName string     `json:"instance_name"`
-	CreatedAt    time.Time  `json:"created_at"`
-	LastUsedAt   *time.Time `json:"last_used_at,omitempty"`
+	ID             string     `json:"id"`
+	InstanceURL    string     `json:"instance_url"`
+	Email          string     `json:"email"`
+	InstanceName   string     `json:"instance_name"`
+	DeploymentType string     `json:"deployment_type"` // "cloud" or "datacenter"
+	CreatedAt      time.Time  `json:"created_at"`
+	LastUsedAt     *time.Time `json:"last_used_at,omitempty"`
 }
 
 // ImportJobInfo represents an import job for the UI

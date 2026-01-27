@@ -54,6 +54,7 @@ export default {
     workflowName: 'Nombre del flujo de trabajo',
     transitions: 'Transiciones',
     addTransition: 'Agregar transicion',
+    searchWorkflows: 'Buscar flujos de trabajo...',
     noWorkflows: 'No se encontraron flujos de trabajo',
     workflowCreated: 'Flujo de trabajo creado correctamente',
     workflowUpdated: 'Flujo de trabajo actualizado correctamente',

@@ -55,3 +55,7 @@ func (c *ChannelCategory) GetName() string { return c.Name }
 // EnumEntity interface methods for CollectionCategory
 func (c *CollectionCategory) GetID() int   { return c.ID }
 func (c *CollectionCategory) GetName() string { return c.Name }
+
+// EnumEntity interface methods for ItemType
+func (i *ItemType) GetID() int    { return i.ID }
+func (i *ItemType) GetName() string { return i.Name }

@@ -22,6 +22,7 @@ let connectionState = $state({
   jiraUrl: '',
   email: '',
   apiToken: '',
+  deploymentType: 'cloud', // 'cloud' or 'datacenter'
   connectionId: null,
   instanceInfo: null,
   isConnecting: false,
@@ -50,7 +51,8 @@ let mappingsState = $state({
   workspaces: [],  // { jiraKey, jiraName, windshiftId, createNew, newWorkspaceName, newWorkspaceKey }
   issueTypes: [],  // { jiraIds[], jiraName, isSubtask, hierarchyLevel, windshiftId, createNew } - deduplicated by name
   statuses: [],    // { jiraIds[], jiraName, categoryKey, categoryName, color, windshiftId, createNew } - deduplicated by name
-  customFields: [] // { jiraId, jiraName, windshiftType, action, windshiftId }
+  customFields: [], // { jiraId, jiraName, windshiftType, action, windshiftId }
+  versions: []     // { jiraId, jiraName, projectKey, released, releaseDate, createNew }
 });
 
 // Import state
@@ -133,13 +135,14 @@ export const jiraImport = {
     connectionState.connectionId = connection.id;
     connectionState.jiraUrl = connection.instance_url;
     connectionState.email = connection.email;
+    connectionState.deploymentType = connection.deployment_type || 'cloud';
     connectionState.instanceInfo = { display_name: connection.instance_name };
     connectionState.isConnected = true;
     wizardState.steps[0].completed = true;
   },
 
   // Connection methods
-  async testConnection(url, email, token) {
+  async testConnection(url, email, token, deploymentType = 'cloud') {
     connectionState.isConnecting = true;
     connectionState.error = null;
 
@@ -147,7 +150,8 @@ export const jiraImport = {
       const response = await api.jiraImport.testConnection({
         instance_url: url,
         email: email,
-        api_token: token
+        api_token: token,
+        deployment_type: deploymentType
       });
 
       connectionState.connectionId = response.connection_id;
@@ -155,6 +159,7 @@ export const jiraImport = {
       connectionState.jiraUrl = url;
       connectionState.email = email;
       connectionState.apiToken = token;
+      connectionState.deploymentType = deploymentType;
       connectionState.isConnected = true;
       wizardState.steps[0].completed = true;
 
@@ -165,6 +170,11 @@ export const jiraImport = {
     } finally {
       connectionState.isConnecting = false;
     }
+  },
+
+  // Set deployment type
+  setDeploymentType(type) {
+    connectionState.deploymentType = type;
   },
 
   // Project methods
@@ -216,7 +226,9 @@ export const jiraImport = {
 
   // Analysis methods
   async analyzeProjects() {
-    if (!connectionState.connectionId || projectsState.selected.length === 0) return;
+    if (!connectionState.connectionId || projectsState.selected.length === 0) {
+      return { success: false, error: 'No projects selected' };
+    }
 
     analysisState.isAnalyzing = true;
     analysisState.error = null;
@@ -294,6 +306,16 @@ export const jiraImport = {
       }
     }
     mappingsState.statuses = Array.from(statusesByName.values());
+
+    // Initialize version mappings
+    mappingsState.versions = (analysis.versions || []).map(v => ({
+      jiraId: v.id,
+      jiraName: v.name,
+      projectKey: v.project_key,
+      released: v.released,
+      releaseDate: v.release_date,
+      createNew: true
+    }));
 
     // Initialize field mappings
     mappingsState.customFields = analysis.custom_fields.map(f => ({
@@ -487,6 +509,7 @@ export const jiraImport = {
       jiraUrl: '',
       email: '',
       apiToken: '',
+      deploymentType: 'cloud',
       connectionId: null,
       instanceInfo: null,
       isConnecting: false,
@@ -512,7 +535,8 @@ export const jiraImport = {
       workspaces: [],
       issueTypes: [],
       statuses: [],
-      customFields: []
+      customFields: [],
+      versions: []
     };
 
     importState = {

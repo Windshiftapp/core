@@ -312,9 +312,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Debug("saving attachment record to database", slog.String("component", "attachments"))
-	
-	var attachmentID int64
-	
+
 	// Add entity_type column if it doesn't exist (for polymorphic attachment support)
 	_, err = h.db.ExecWrite("ALTER TABLE attachments ADD COLUMN entity_type TEXT DEFAULT 'item'")
 	if err != nil && !strings.Contains(err.Error(), "duplicate column name") && !strings.Contains(err.Error(), "already exists") {
@@ -327,25 +325,34 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("failed to add category column (may already exist)", slog.String("component", "attachments"), slog.Any("error", err))
 	}
 
-	// For avatars and workspace avatars, use NULL for item_id since they're not associated with entities
-	var attachmentEntityID interface{}
-	if isAvatar || isWorkspaceAvatar || isCustomerAvatar {
-		attachmentEntityID = nil // NULL for avatars
-	} else {
-		attachmentEntityID = entityID // Entity ID for regular attachments
-	}
-
-	// Insert attachment record with entity_type
-	err = h.db.QueryRow(`
-		INSERT INTO attachments (item_id, entity_type, filename, original_filename, file_path, mime_type, file_size, uploaded_by, has_thumbnail, thumbnail_path, category)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-	`, attachmentEntityID, entityType, uniqueFilename, fileHeader.Filename, filePath, mimeType, fileSize, uploaderID, hasThumbnail, thumbnailPath, category).Scan(&attachmentID)
-
+	// Insert attachment record via service
+	attachmentSvc := services.NewAttachmentService(h.db)
+	attachmentID, err := attachmentSvc.CreateRecord(services.CreateAttachmentParams{
+		ItemID:           entityID,
+		EntityType:       entityType,
+		Filename:         uniqueFilename,
+		OriginalFilename: fileHeader.Filename,
+		FilePath:         filePath,
+		MimeType:         mimeType,
+		FileSize:         fileSize,
+		UploadedBy:       uploaderID,
+		HasThumbnail:     hasThumbnail,
+		ThumbnailPath:    thumbnailPath,
+		Category:         category,
+	})
 	if err != nil {
 		slog.Error("failed to save attachment record", slog.String("component", "attachments"), slog.Any("error", err))
 		os.Remove(filePath) // Clean up on error
 		http.Error(w, "Failed to save attachment record", http.StatusInternalServerError)
 		return
+	}
+
+	// For avatar type checks below
+	var attachmentEntityID interface{}
+	if isAvatar || isWorkspaceAvatar || isCustomerAvatar {
+		attachmentEntityID = nil
+	} else {
+		attachmentEntityID = entityID
 	}
 	slog.Debug("attachment saved", slog.String("component", "attachments"), slog.Int64("attachment_id", attachmentID))
 

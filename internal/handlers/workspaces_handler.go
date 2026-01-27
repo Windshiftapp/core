@@ -93,7 +93,8 @@ func (h *WorkspaceHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			LEFT JOIN time_projects tp ON w.time_project_id = tp.id
 			WHERE w.is_personal = ? AND w.owner_id = ?
 			GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.created_at, w.updated_at, tp.name
-			ORDER BY w.name`
+			ORDER BY w.name
+			LIMIT 200`
 		rows, err = h.db.Query(query, true, currentUser.ID)
 	} else {
 		// Get all workspaces excluding other users' personal workspaces
@@ -107,7 +108,8 @@ func (h *WorkspaceHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			LEFT JOIN time_projects tp ON w.time_project_id = tp.id
 			WHERE w.is_personal = 0 OR w.is_personal IS NULL OR w.owner_id = ?
 			GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.created_at, w.updated_at, tp.name
-			ORDER BY w.is_personal ASC, w.name`
+			ORDER BY w.is_personal ASC, w.name
+			LIMIT 200`
 		rows, err = h.db.Query(query, currentUser.ID)
 	}
 	if err != nil {

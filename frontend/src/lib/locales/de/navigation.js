@@ -24,6 +24,7 @@ export default {
     searchWorkspaces: 'Arbeitsbereiche suchen...',
     noWorkspacesMatch: 'Keine Arbeitsbereiche entsprechen Ihrer Suche',
     noWorkspacesFound: 'Keine Arbeitsbereiche gefunden',
+    searchToFindMore: 'Suchen Sie nach weiteren Arbeitsbereichen...',
     loadingSearch: 'Suche wird geladen...',
     loadingCreateForm: 'Formular wird geladen...',
     loading: 'Wird geladen...',

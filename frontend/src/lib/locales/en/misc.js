@@ -6,6 +6,116 @@
  */
 
 export default {
+  jiraImport: {
+    title: {
+      cloud: 'Jira Cloud Import',
+      datacenter: 'Jira Data Center Import'
+    },
+    subtitle: {
+      cloud: 'Import work items from Jira Cloud',
+      datacenter: 'Import work items from Jira Data Center'
+    },
+    steps: {
+      connect: 'Connect',
+      projects: 'Projects',
+      mapping: 'Mapping',
+      preview: 'Preview',
+      import: 'Import'
+    },
+    deploymentType: {
+      cloud: 'Jira Cloud',
+      cloudDesc: '*.atlassian.net',
+      datacenter: 'Data Center',
+      datacenterDesc: 'Self-hosted'
+    },
+    form: {
+      urlCloud: 'Jira Cloud URL',
+      urlDatacenter: 'Jira Data Center URL',
+      email: 'Email Address',
+      username: 'Username',
+      apiToken: 'API Token',
+      password: 'Password or Personal Access Token',
+      generateToken: 'Generate a token',
+      tokenHelpCloud: 'from your Atlassian account settings',
+      tokenHelpDatacenter: 'Use your password or a Personal Access Token from your Jira profile settings'
+    },
+    buttons: {
+      connect: 'Connect',
+      continue: 'Continue',
+      analyzeAndConfigure: 'Analyze & Configure',
+      startImport: 'Start Import',
+      done: 'Done',
+      back: 'Back',
+      cancel: 'Cancel',
+      selectAll: 'Select All',
+      deselectAll: 'Deselect All',
+      addNewConnection: 'Add New Connection',
+      useExisting: 'Use Existing',
+      retryImport: 'Retry Import'
+    },
+    messages: {
+      connected: 'Connected to {name}',
+      selectConnection: 'Select an existing connection or create a new one',
+      credentialsHelpCloud: 'Enter your Jira Cloud credentials. You can generate an API token from your Atlassian account settings.',
+      credentialsHelpDatacenter: 'Enter your Jira Data Center credentials. Use your username and password or a Personal Access Token.',
+      reviewSummary: 'Review the import summary before proceeding. This operation may take several minutes for large projects.',
+      noAttachments: 'Attachments will not be imported',
+      noAttachmentsDesc: 'No attachment storage is configured. Set the --attachment-path parameter when starting the server to enable attachment imports.'
+    },
+    projects: {
+      selected: 'Select projects to import ({selected} of {total} selected)',
+      openIssuesOnly: 'Import open issues only',
+      openIssuesOnlyDesc: 'Excludes issues with status category "Done"',
+      teamManaged: 'Team-managed',
+      issues: '{count} issues'
+    },
+    mapping: {
+      workspaces: 'Workspaces',
+      workspacesDesc: 'Each Jira project will become a Windshift workspace',
+      issueTypes: 'Issue Types',
+      issueTypesDesc: 'Issue types will be created as item types in Windshift',
+      statuses: 'Statuses',
+      statusesDesc: 'Statuses will be created and grouped by category',
+      customFields: 'Custom Fields',
+      customFieldsDesc: 'Custom fields that can be mapped will be created in Windshift',
+      versions: 'Versions / Milestones',
+      versionsDesc: 'Jira versions will be imported as workspace milestones.',
+      subtask: 'Sub-task',
+      create: 'Create',
+      skip: 'Skip'
+    },
+    preview: {
+      workspaces: 'Workspaces',
+      workItems: 'Work Items',
+      statuses: 'Statuses',
+      itemTypes: 'Item Types',
+      customFields: 'Custom Fields',
+      milestones: 'Milestones',
+      users: 'Users',
+      usersNew: '({count} new)',
+      assets: 'Assets',
+      projectsToImport: 'Projects to Import'
+    },
+    import: {
+      importing: 'Importing...',
+      starting: 'Starting import...',
+      complete: 'Import Complete!',
+      success: 'Successfully imported {count} items.',
+      failed: '{count} items failed to import.',
+      ready: 'Ready to Import',
+      readyDesc: 'Click "Start Import" to begin importing {count} items.',
+      progress: 'Progress'
+    },
+    errors: {
+      connectionFailed: 'Failed to connect to Jira',
+      loadProjectsFailed: 'Failed to load projects',
+      analyzeFailed: 'Failed to analyze projects',
+      importFailed: 'Failed to start import',
+      loadConnectionsFailed: 'Failed to load connections',
+      deleteConnectionFailed: 'Failed to delete connection'
+    }
+  },
+
   itemTypes: {
     title: 'Item Types',
     subtitle: 'Configure item types and their properties',

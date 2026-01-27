@@ -5,12 +5,21 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"sort"
+	"strconv"
+
 	"windshift/internal/jira"
+	"windshift/internal/models"
+	"windshift/internal/repository"
+	"windshift/internal/services"
 
 	"github.com/google/uuid"
 )
@@ -190,6 +199,39 @@ func (h *JiraImportHandler) executeImport(jobID string, req StartImportRequest) 
 		return
 	}
 
+	// When JIRA_CAPTURE_PAYLOADS is set, save the request and wrap the client
+	captureDir := os.Getenv("JIRA_CAPTURE_PAYLOADS")
+	if captureDir != "" {
+		if err := os.MkdirAll(captureDir, 0755); err != nil {
+			slog.Error("Failed to create capture directory", slog.String("component", "jira"), slog.Any("error", err))
+		} else {
+			// Save import_request.json
+			reqData, _ := json.MarshalIndent(req, "", "  ")
+			if err := os.WriteFile(captureDir+"/import_request.json", reqData, 0644); err != nil {
+				slog.Error("Failed to save import request", slog.String("component", "jira"), slog.Any("error", err))
+			}
+
+			// Wrap client in recording client
+			rc := newRecordingClient(client)
+			client = rc
+
+			// Save responses when import completes (deferred)
+			defer func() {
+				if err := rc.saveToFile(captureDir); err != nil {
+					slog.Error("Failed to save captured payloads", slog.String("component", "jira"), slog.Any("error", err))
+				}
+			}()
+		}
+	}
+
+	h.executeImportWithClient(jobID, req, client)
+}
+
+// executeImportWithClient runs the import using the provided Jira client.
+// Extracted from executeImport to allow testing with a mock client.
+func (h *JiraImportHandler) executeImportWithClient(jobID string, req StartImportRequest, client jira.Client) {
+	ctx := context.Background()
+
 	progress := &ImportProgress{
 		Phase:         "initializing",
 		TotalProjects: len(req.ProjectKeys),
@@ -203,6 +245,17 @@ func (h *JiraImportHandler) executeImport(jobID string, req StartImportRequest) 
 				break
 			}
 		}
+	}
+
+	// Create statuses and item types once (global model - shared across all workspaces)
+	statusMap, err := h.ensureStatuses(ctx, jobID, req.Mappings.Statuses)
+	if err != nil {
+		slog.Error("Failed to ensure statuses", slog.String("component", "jira"), slog.Any("error", err))
+	}
+
+	itemTypeMap, err := h.ensureItemTypes(ctx, jobID, req.Mappings.IssueTypes)
+	if err != nil {
+		slog.Error("Failed to ensure item types", slog.String("component", "jira"), slog.Any("error", err))
 	}
 
 	// Process each project
@@ -231,15 +284,22 @@ func (h *JiraImportHandler) executeImport(jobID string, req StartImportRequest) 
 			continue
 		}
 
-		// Create statuses, item types, and custom fields for this workspace
-		statusMap, err := h.ensureStatuses(ctx, jobID, workspaceID, req.Mappings.Statuses)
-		if err != nil {
-			slog.Error("Failed to ensure statuses", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
+		// Create workflows and configuration set for this project
+		if err := h.ensureWorkflowsAndConfigSet(ctx, jobID, projectKey, workspaceID, statusMap, itemTypeMap, client); err != nil {
+			slog.Error("Failed to create workflows/config set", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
+			// Non-fatal: continue importing
 		}
 
-		itemTypeMap, err := h.ensureItemTypes(ctx, jobID, workspaceID, req.Mappings.IssueTypes)
+		// Create milestones from version mappings for this project
+		var projectVersionMappings []VersionMapping
+		for _, vm := range req.Mappings.Versions {
+			if vm.ProjectKey == projectKey {
+				projectVersionMappings = append(projectVersionMappings, vm)
+			}
+		}
+		versionMap, err := h.ensureMilestones(ctx, jobID, workspaceID, projectVersionMappings)
 		if err != nil {
-			slog.Error("Failed to ensure item types", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
+			slog.Error("Failed to ensure milestones", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
 		}
 
 		// Import issues for this project
@@ -283,35 +343,37 @@ func (h *JiraImportHandler) executeImport(jobID string, req StartImportRequest) 
 			usersSeen := make(map[string]bool)
 			for _, issue := range fetchResult.Issues {
 				// Collect assignee
-				if issue.Fields.Assignee != nil && issue.Fields.Assignee.AccountID != "" {
-					if _, exists := userMap[issue.Fields.Assignee.AccountID]; !exists && !usersSeen[issue.Fields.Assignee.AccountID] {
+				if issue.Fields.Assignee != nil && issue.Fields.Assignee.GetIdentifier() != "" {
+					userID := issue.Fields.Assignee.GetIdentifier()
+					if _, exists := userMap[userID]; !exists && !usersSeen[userID] {
 						avatarURL := ""
 						if issue.Fields.Assignee.AvatarURLs != nil {
 							avatarURL = issue.Fields.Assignee.AvatarURLs["48x48"]
 						}
 						usersToProcess = append(usersToProcess, JiraUserSummary{
-							AccountID:   issue.Fields.Assignee.AccountID,
+							AccountID:   userID, // Using GetIdentifier() result (AccountID for Cloud, Name/Key for DC)
 							Email:       issue.Fields.Assignee.EmailAddress,
 							DisplayName: issue.Fields.Assignee.DisplayName,
 							AvatarURL:   avatarURL,
 						})
-						usersSeen[issue.Fields.Assignee.AccountID] = true
+						usersSeen[userID] = true
 					}
 				}
 				// Collect reporter
-				if issue.Fields.Reporter != nil && issue.Fields.Reporter.AccountID != "" {
-					if _, exists := userMap[issue.Fields.Reporter.AccountID]; !exists && !usersSeen[issue.Fields.Reporter.AccountID] {
+				if issue.Fields.Reporter != nil && issue.Fields.Reporter.GetIdentifier() != "" {
+					userID := issue.Fields.Reporter.GetIdentifier()
+					if _, exists := userMap[userID]; !exists && !usersSeen[userID] {
 						avatarURL := ""
 						if issue.Fields.Reporter.AvatarURLs != nil {
 							avatarURL = issue.Fields.Reporter.AvatarURLs["48x48"]
 						}
 						usersToProcess = append(usersToProcess, JiraUserSummary{
-							AccountID:   issue.Fields.Reporter.AccountID,
+							AccountID:   userID, // Using GetIdentifier() result (AccountID for Cloud, Name/Key for DC)
 							Email:       issue.Fields.Reporter.EmailAddress,
 							DisplayName: issue.Fields.Reporter.DisplayName,
 							AvatarURL:   avatarURL,
 						})
-						usersSeen[issue.Fields.Reporter.AccountID] = true
+						usersSeen[userID] = true
 					}
 				}
 
@@ -335,7 +397,7 @@ func (h *JiraImportHandler) executeImport(jobID string, req StartImportRequest) 
 
 			// Ensure users are created/matched
 			if len(usersToProcess) > 0 {
-				newUserMappings, err := h.ensureUsers(ctx, jobID, usersToProcess)
+				newUserMappings, err := h.ensureUsers(ctx, jobID, usersToProcess, client)
 				if err != nil {
 					slog.Error("Failed to ensure users", slog.String("component", "jira"), slog.Any("error", err))
 				}
@@ -347,7 +409,7 @@ func (h *JiraImportHandler) executeImport(jobID string, req StartImportRequest) 
 
 			// Import each issue
 			for _, issue := range fetchResult.Issues {
-				err := h.importIssue(ctx, jobID, workspaceID, &issue, statusMap, itemTypeMap, userMap, req.Mappings.CustomFields)
+				err := h.importIssue(ctx, jobID, workspaceID, &issue, statusMap, itemTypeMap, userMap, versionMap, req.Mappings.CustomFields, client, progress)
 				if err != nil {
 					slog.Error("Failed to import issue", slog.String("component", "jira"), slog.String("issue", issue.Key), slog.Any("error", err))
 					progress.FailedIssues++
@@ -359,6 +421,12 @@ func (h *JiraImportHandler) executeImport(jobID string, req StartImportRequest) 
 			h.updateJobProgress(jobID, progress)
 		}
 
+		// After all issues imported for this project, link parents
+		h.linkParents(jobID)
+
+		// After all issues imported for this project, import issue links
+		h.importIssueLinks(jobID)
+
 		progress.CompletedProjects = i + 1
 	}
 
@@ -367,41 +435,346 @@ func (h *JiraImportHandler) executeImport(jobID string, req StartImportRequest) 
 	h.updateJobStatus(jobID, "completed", "completed", progress, "")
 }
 
+// ensureWorkflowsAndConfigSet fetches per-issue-type statuses from Jira,
+// creates Windshift workflow(s) with transitions, and assigns a configuration set to the workspace.
+func (h *JiraImportHandler) ensureWorkflowsAndConfigSet(
+	ctx context.Context, jobID string, projectKey string, workspaceID int,
+	statusMap map[string]int, itemTypeMap map[string]int, client jira.Client,
+) error {
+	// Check if workspace already has a configuration set
+	csRepo := repository.NewConfigurationSetRepository(h.db)
+	existingCSID, err := csRepo.GetWorkspaceConfigSetID(workspaceID)
+	if err != nil {
+		return fmt.Errorf("failed to check existing config set: %w", err)
+	}
+	if existingCSID != nil {
+		slog.Info("Workspace already has a configuration set, skipping",
+			slog.String("component", "jira"), slog.Int("workspaceID", workspaceID), slog.Int("configSetID", *existingCSID))
+		return nil
+	}
+
+	// Fetch per-issue-type statuses from Jira
+	issueTypeStatuses, err := client.GetProjectIssueTypeStatuses(ctx, projectKey)
+	if err != nil {
+		return fmt.Errorf("failed to get project issue type statuses: %w", err)
+	}
+
+	// Map Jira issue types and statuses to Windshift IDs
+	// Group item types by their set of statuses
+	type issueTypeInfo struct {
+		windshiftItemTypeID int
+		windshiftStatusIDs  []int
+		jiraName            string
+	}
+	var issueTypeInfos []issueTypeInfo
+
+	for _, its := range issueTypeStatuses {
+		wsItemTypeID, ok := itemTypeMap[its.ID]
+		if !ok {
+			continue
+		}
+
+		// Map statuses to Windshift IDs
+		statusIDSet := make(map[int]bool)
+		for _, s := range its.Statuses {
+			if wsStatusID, ok := statusMap[s.ID]; ok {
+				statusIDSet[wsStatusID] = true
+			}
+		}
+		if len(statusIDSet) == 0 {
+			continue
+		}
+
+		var statusIDs []int
+		for id := range statusIDSet {
+			statusIDs = append(statusIDs, id)
+		}
+		sort.Ints(statusIDs)
+
+		issueTypeInfos = append(issueTypeInfos, issueTypeInfo{
+			windshiftItemTypeID: wsItemTypeID,
+			windshiftStatusIDs:  statusIDs,
+			jiraName:            its.Name,
+		})
+	}
+
+	if len(issueTypeInfos) == 0 {
+		slog.Warn("No issue types with mapped statuses found, skipping workflow creation",
+			slog.String("component", "jira"), slog.String("project", projectKey))
+		return nil
+	}
+
+	// Group item types by status set (sorted comma-joined IDs as key)
+	type workflowGroup struct {
+		statusIDs    []int
+		itemTypeIDs  []int
+		typeNames    []string
+	}
+	groups := make(map[string]*workflowGroup)
+
+	for _, info := range issueTypeInfos {
+		// Build key from sorted status IDs
+		parts := make([]string, len(info.windshiftStatusIDs))
+		for i, id := range info.windshiftStatusIDs {
+			parts[i] = strconv.Itoa(id)
+		}
+		key := strings.Join(parts, ",")
+
+		if g, ok := groups[key]; ok {
+			g.itemTypeIDs = append(g.itemTypeIDs, info.windshiftItemTypeID)
+			g.typeNames = append(g.typeNames, info.jiraName)
+		} else {
+			groups[key] = &workflowGroup{
+				statusIDs:   info.windshiftStatusIDs,
+				itemTypeIDs: []int{info.windshiftItemTypeID},
+				typeNames:   []string{info.jiraName},
+			}
+		}
+	}
+
+	// Determine which status IDs have category_id = 1 (To Do/New) for initial transitions
+	newStatusIDs := make(map[int]bool)
+	for _, statusIDs := range groups {
+		for _, sid := range statusIDs.statusIDs {
+			var catID int
+			err := h.db.QueryRow("SELECT category_id FROM statuses WHERE id = ?", sid).Scan(&catID)
+			if err == nil && catID == 1 {
+				newStatusIDs[sid] = true
+			}
+		}
+	}
+
+	// Create workflow(s)
+	multipleWorkflows := len(groups) > 1
+	type createdWorkflow struct {
+		workflowID  int
+		itemTypeIDs []int
+	}
+	var workflows []createdWorkflow
+
+	for _, group := range groups {
+		// Build workflow name
+		var wfName string
+		if multipleWorkflows {
+			wfName = projectKey + " - " + strings.Join(group.typeNames, ", ") + " Workflow"
+		} else {
+			wfName = projectKey + " Workflow"
+		}
+
+		// Insert workflow
+		var workflowID int
+		err := h.db.QueryRow(`
+			INSERT INTO workflows (name, description, is_default, created_at, updated_at)
+			VALUES (?, '', false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+		`, wfName).Scan(&workflowID)
+		if err != nil {
+			// Try ExecWrite fallback for databases that don't support RETURNING
+			res, err2 := h.db.ExecWrite(`
+				INSERT INTO workflows (name, description, is_default, created_at, updated_at)
+				VALUES (?, '', false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+			`, wfName)
+			if err2 != nil {
+				return fmt.Errorf("failed to create workflow: %w", err2)
+			}
+			id, _ := res.LastInsertId()
+			workflowID = int(id)
+		}
+
+		// Create transitions
+		order := 0
+
+		// Initial transitions: NULL -> status where category_id = 1
+		for _, sid := range group.statusIDs {
+			if newStatusIDs[sid] {
+				order++
+				h.db.ExecWrite(`
+					INSERT INTO workflow_transitions (workflow_id, from_status_id, to_status_id, display_order, source_handle, target_handle, created_at)
+					VALUES (?, NULL, ?, ?, '', '', CURRENT_TIMESTAMP)
+				`, workflowID, sid, order)
+			}
+		}
+
+		// All-to-all transitions
+		for _, fromID := range group.statusIDs {
+			for _, toID := range group.statusIDs {
+				if fromID != toID {
+					order++
+					h.db.ExecWrite(`
+						INSERT INTO workflow_transitions (workflow_id, from_status_id, to_status_id, display_order, source_handle, target_handle, created_at)
+						VALUES (?, ?, ?, ?, '', '', CURRENT_TIMESTAMP)
+					`, workflowID, fromID, toID, order)
+				}
+			}
+		}
+
+		h.recordMapping(jobID, "workflow", fmt.Sprintf("wf-%s-%d", projectKey, workflowID), wfName, workflowID, nil)
+		workflows = append(workflows, createdWorkflow{workflowID: workflowID, itemTypeIDs: group.itemTypeIDs})
+	}
+
+	// Pick default workflow (the one used by the most item types)
+	defaultWfIdx := 0
+	maxTypes := 0
+	for i, wf := range workflows {
+		if len(wf.itemTypeIDs) > maxTypes {
+			maxTypes = len(wf.itemTypeIDs)
+			defaultWfIdx = i
+		}
+	}
+	defaultWfID := workflows[defaultWfIdx].workflowID
+
+	// Create configuration set in a transaction
+	tx, err := h.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	csName := projectKey + " Configuration"
+	cs := &models.ConfigurationSet{
+		Name:                    csName,
+		WorkflowID:              &defaultWfID,
+		DifferentiateByItemType: multipleWorkflows,
+	}
+	csID, err := csRepo.Create(tx, cs)
+	if err != nil {
+		return fmt.Errorf("failed to create configuration set: %w", err)
+	}
+	configSetID := int(csID)
+
+	// Save item type configs with per-type workflow overrides
+	var itemTypeConfigs []models.ItemTypeConfig
+	for _, wf := range workflows {
+		for _, itemTypeID := range wf.itemTypeIDs {
+			config := models.ItemTypeConfig{
+				ItemTypeID: itemTypeID,
+			}
+			// Only set workflow override if it differs from default
+			if wf.workflowID != defaultWfID {
+				wfID := wf.workflowID
+				config.WorkflowID = &wfID
+			}
+			itemTypeConfigs = append(itemTypeConfigs, config)
+		}
+	}
+	if err := csRepo.SaveItemTypeConfigs(tx, configSetID, itemTypeConfigs); err != nil {
+		return fmt.Errorf("failed to save item type configs: %w", err)
+	}
+
+	// Assign workspace
+	if err := csRepo.SaveWorkspaceAssignments(tx, configSetID, []int{workspaceID}); err != nil {
+		return fmt.Errorf("failed to save workspace assignment: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit configuration set: %w", err)
+	}
+
+	h.recordMapping(jobID, "configuration_set", fmt.Sprintf("cs-%s", projectKey), csName, configSetID, nil)
+
+	slog.Info("Created workflows and configuration set for import",
+		slog.String("component", "jira"),
+		slog.String("project", projectKey),
+		slog.Int("workflows", len(workflows)),
+		slog.Int("configSetID", configSetID))
+
+	return nil
+}
+
 // ensureWorkspace creates or finds a workspace for import
 func (h *JiraImportHandler) ensureWorkspace(ctx context.Context, jobID string, mapping *WorkspaceMapping) (int, error) {
 	if !mapping.CreateNew && mapping.WindshiftID != nil {
 		return *mapping.WindshiftID, nil
 	}
 
-	// Create new workspace
-	result, err := h.db.ExecWrite(`
-		INSERT INTO workspaces (key, name, description)
-		VALUES (?, ?, ?)
-	`, mapping.NewWorkspaceKey, mapping.NewWorkspaceName, "Imported from Jira")
-	if err != nil {
-		return 0, err
+	workspaceSvc := services.NewWorkspaceService(h.db)
+
+	// Check if workspace already exists by key
+	var existingID int
+	err := h.db.QueryRow(`SELECT id FROM workspaces WHERE key = ?`, mapping.NewWorkspaceKey).Scan(&existingID)
+	if err == nil {
+		// Workspace exists, return existing ID
+		h.recordMapping(jobID, "workspace", mapping.JiraKey, mapping.JiraKey, existingID, nil)
+		return existingID, nil
 	}
 
-	workspaceID, _ := result.LastInsertId()
+	// Create new workspace using service
+	result, err := workspaceSvc.Create(services.CreateWorkspaceParams{
+		Name:        mapping.NewWorkspaceName,
+		Key:         mapping.NewWorkspaceKey,
+		Description: "Imported from Jira",
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to create workspace: %w", err)
+	}
 
 	// Record the mapping
-	h.recordMapping(jobID, "workspace", mapping.JiraKey, mapping.JiraKey, int(workspaceID), nil)
+	h.recordMapping(jobID, "workspace", mapping.JiraKey, mapping.JiraKey, result.Workspace.ID, nil)
 
-	return int(workspaceID), nil
+	return result.Workspace.ID, nil
 }
 
-// ensureStatuses creates or maps statuses for a workspace
-func (h *JiraImportHandler) ensureStatuses(ctx context.Context, jobID string, workspaceID int, mappings []StatusMapping) (map[string]int, error) {
+// ensureMilestones creates milestones for Jira versions in a workspace
+// Returns a map from Jira version ID to Windshift milestone ID
+func (h *JiraImportHandler) ensureMilestones(ctx context.Context, jobID string, workspaceID int, mappings []VersionMapping) (map[string]int, error) {
 	result := make(map[string]int)
+	planningSvc := services.NewPlanningService(h.db)
 
 	for _, m := range mappings {
-		if !m.CreateNew && m.WindshiftID != nil {
-			result[m.JiraID] = *m.WindshiftID
+		if !m.CreateNew {
 			continue
 		}
 
-		// Get or create status category
-		categoryID := 1 // Default to "To Do"
+		// Check if milestone already exists by name in this workspace
+		var existingID int
+		err := h.db.QueryRow(`SELECT id FROM milestones WHERE name = ? AND workspace_id = ?`, m.JiraName, workspaceID).Scan(&existingID)
+		if err == nil {
+			result[m.JiraID] = existingID
+			h.recordMapping(jobID, "milestone", m.JiraID, m.JiraName, existingID, nil)
+			continue
+		}
+
+		// Determine status based on released flag
+		status := "planning"
+		if m.Released {
+			status = "completed"
+		}
+
+		// Create milestone
+		milestone, err := planningSvc.CreateMilestone(services.CreateMilestoneParams{
+			Name:        m.JiraName,
+			TargetDate:  m.ReleaseDate,
+			Status:      status,
+			IsGlobal:    false,
+			WorkspaceID: &workspaceID,
+		})
+		if err != nil {
+			slog.Error("Failed to create milestone", slog.String("component", "jira"), slog.String("version", m.JiraName), slog.Any("error", err))
+			continue
+		}
+
+		result[m.JiraID] = milestone.ID
+		h.recordMapping(jobID, "milestone", m.JiraID, m.JiraName, milestone.ID, nil)
+	}
+
+	return result, nil
+}
+
+// ensureStatuses creates or maps statuses (global model - shared across workspaces)
+func (h *JiraImportHandler) ensureStatuses(ctx context.Context, jobID string, mappings []StatusMapping) (map[string]int, error) {
+	result := make(map[string]int)
+	statusSvc := services.NewEnumService(h.db, services.NewStatusConfig())
+
+	for _, m := range mappings {
+		if !m.CreateNew && m.WindshiftID != nil {
+			for _, jiraID := range m.JiraIDs {
+				result[jiraID] = *m.WindshiftID
+			}
+			continue
+		}
+
+		// Map Jira category to Windshift category ID
+		// Default category IDs: 1="To Do", 2="In Progress", 3="Done"
+		categoryID := 1
 		switch m.CategoryKey {
 		case "new":
 			categoryID = 1
@@ -411,51 +784,94 @@ func (h *JiraImportHandler) ensureStatuses(ctx context.Context, jobID string, wo
 			categoryID = 3
 		}
 
-		// Create status
-		res, err := h.db.ExecWrite(`
-			INSERT INTO statuses (workspace_id, name, description, category_id, color)
-			VALUES (?, ?, ?, ?, ?)
-		`, workspaceID, m.JiraName, "", categoryID, m.Color)
+		// Check if status already exists by name
+		var existingID int
+		err := h.db.QueryRow(`SELECT id FROM statuses WHERE name = ?`, m.JiraName).Scan(&existingID)
+		if err == nil {
+			// Status exists, use existing ID
+			for _, jiraID := range m.JiraIDs {
+				result[jiraID] = existingID
+			}
+			if len(m.JiraIDs) > 0 {
+				h.recordMapping(jobID, "status", m.JiraIDs[0], m.JiraName, existingID, nil)
+			}
+			continue
+		}
+
+		// Create new status using service
+		status := &models.Status{
+			Name:       m.JiraName,
+			CategoryID: categoryID,
+		}
+		entity, err := statusSvc.Create(status, nil)
 		if err != nil {
 			slog.Error("Failed to create status", slog.String("component", "jira"), slog.String("status", m.JiraName), slog.Any("error", err))
 			continue
 		}
 
-		statusID, _ := res.LastInsertId()
-		result[m.JiraID] = int(statusID)
+		statusID := entity.GetID()
+		for _, jiraID := range m.JiraIDs {
+			result[jiraID] = statusID
+		}
 
 		// Record the mapping
-		h.recordMapping(jobID, "status", m.JiraID, m.JiraName, int(statusID), nil)
+		if len(m.JiraIDs) > 0 {
+			h.recordMapping(jobID, "status", m.JiraIDs[0], m.JiraName, statusID, nil)
+		}
 	}
 
 	return result, nil
 }
 
-// ensureItemTypes creates or maps item types for a workspace
-func (h *JiraImportHandler) ensureItemTypes(ctx context.Context, jobID string, workspaceID int, mappings []IssueTypeMapping) (map[string]int, error) {
+// ensureItemTypes creates or maps item types (global model - shared across workspaces)
+func (h *JiraImportHandler) ensureItemTypes(ctx context.Context, jobID string, mappings []IssueTypeMapping) (map[string]int, error) {
 	result := make(map[string]int)
+	itemTypeSvc := services.NewEnumService(h.db, services.NewItemTypeConfig())
 
 	for _, m := range mappings {
 		if !m.CreateNew && m.WindshiftID != nil {
-			result[m.JiraID] = *m.WindshiftID
+			for _, jiraID := range m.JiraIDs {
+				result[jiraID] = *m.WindshiftID
+			}
 			continue
 		}
 
-		// Create item type
-		res, err := h.db.ExecWrite(`
-			INSERT INTO item_types (workspace_id, name, icon, color, hierarchy_level)
-			VALUES (?, ?, ?, ?, ?)
-		`, workspaceID, m.JiraName, "circle", "#3B82F6", m.HierarchyLevel)
+		// Check if item type already exists by name
+		var existingID int
+		err := h.db.QueryRow(`SELECT id FROM item_types WHERE name = ?`, m.JiraName).Scan(&existingID)
+		if err == nil {
+			// Item type exists, use existing ID
+			for _, jiraID := range m.JiraIDs {
+				result[jiraID] = existingID
+			}
+			if len(m.JiraIDs) > 0 {
+				h.recordMapping(jobID, "item_type", m.JiraIDs[0], m.JiraName, existingID, nil)
+			}
+			continue
+		}
+
+		// Create new item type using service
+		itemType := &models.ItemType{
+			Name:           m.JiraName,
+			Icon:           "Circle",
+			Color:          "#3B82F6",
+			HierarchyLevel: m.HierarchyLevel,
+		}
+		entity, err := itemTypeSvc.Create(itemType, nil)
 		if err != nil {
 			slog.Error("Failed to create item type", slog.String("component", "jira"), slog.String("itemType", m.JiraName), slog.Any("error", err))
 			continue
 		}
 
-		itemTypeID, _ := res.LastInsertId()
-		result[m.JiraID] = int(itemTypeID)
+		itemTypeID := entity.GetID()
+		for _, jiraID := range m.JiraIDs {
+			result[jiraID] = itemTypeID
+		}
 
 		// Record the mapping
-		h.recordMapping(jobID, "item_type", m.JiraID, m.JiraName, int(itemTypeID), nil)
+		if len(m.JiraIDs) > 0 {
+			h.recordMapping(jobID, "item_type", m.JiraIDs[0], m.JiraName, itemTypeID, nil)
+		}
 	}
 
 	return result, nil
@@ -463,12 +879,42 @@ func (h *JiraImportHandler) ensureItemTypes(ctx context.Context, jobID string, w
 
 // ensureUsers matches or creates users for import
 // Returns a map from Jira account ID to Windshift user ID
-func (h *JiraImportHandler) ensureUsers(ctx context.Context, jobID string, users []JiraUserSummary) (map[string]int, error) {
+// Fetches missing emails via the Jira API when needed
+func (h *JiraImportHandler) ensureUsers(ctx context.Context, jobID string, users []JiraUserSummary, client jira.Client) (map[string]int, error) {
 	result := make(map[string]int)
 
+	// First pass: fetch missing emails via API
+	for i := range users {
+		if users[i].AccountID == "" {
+			continue
+		}
+		if users[i].Email != "" {
+			continue // Already have email
+		}
+
+		// Try to fetch email via API
+		email, err := client.GetUserEmail(ctx, users[i].AccountID)
+		if err != nil {
+			slog.Debug("Failed to fetch email for user", slog.String("component", "jira"),
+				slog.String("accountID", users[i].AccountID), slog.Any("error", err))
+		} else if email != "" {
+			users[i].Email = email
+			slog.Debug("Fetched email for user", slog.String("component", "jira"),
+				slog.String("accountID", users[i].AccountID), slog.String("email", email))
+		}
+	}
+
+	// Second pass: create/match users
 	for _, u := range users {
 		// Skip users without account ID
 		if u.AccountID == "" {
+			continue
+		}
+
+		// Skip users without email - they can't be matched later anyway
+		// and empty emails cause UNIQUE constraint violations
+		if u.Email == "" {
+			slog.Debug("Skipping user without email", slog.String("component", "jira"), slog.String("displayName", u.DisplayName), slog.String("accountID", u.AccountID))
 			continue
 		}
 
@@ -614,34 +1060,56 @@ func addUserFromObject(userObj map[string]interface{}, existingMap map[string]in
 }
 
 // importIssue imports a single Jira issue as a Windshift work item
-func (h *JiraImportHandler) importIssue(ctx context.Context, jobID string, workspaceID int, issue *jira.JiraIssue, statusMap map[string]int, itemTypeMap map[string]int, userMap map[string]int, customFieldMappings []CustomFieldMapping) error {
-	// Get mapped status and item type
-	statusID := 0
+func (h *JiraImportHandler) importIssue(ctx context.Context, jobID string, workspaceID int, issue *jira.JiraIssue, statusMap map[string]int, itemTypeMap map[string]int, userMap map[string]int, versionMap map[string]int, customFieldMappings []CustomFieldMapping, client jira.Client, progress *ImportProgress) error {
+	// Get mapped status and item type (use nil instead of 0 for missing mappings)
+	var statusID *int
 	if issue.Fields.Status != nil {
 		if sid, ok := statusMap[issue.Fields.Status.ID]; ok {
-			statusID = sid
+			statusID = &sid
 		}
 	}
 
-	itemTypeID := 0
+	var itemTypeID *int
 	if issue.Fields.IssueType != nil {
 		if tid, ok := itemTypeMap[issue.Fields.IssueType.ID]; ok {
-			itemTypeID = tid
+			itemTypeID = &tid
 		}
 	}
 
 	// Map assignee and reporter
 	var assigneeID *int
-	if issue.Fields.Assignee != nil && issue.Fields.Assignee.AccountID != "" {
-		if uid, ok := userMap[issue.Fields.Assignee.AccountID]; ok {
+	if issue.Fields.Assignee != nil && issue.Fields.Assignee.GetIdentifier() != "" {
+		if uid, ok := userMap[issue.Fields.Assignee.GetIdentifier()]; ok {
 			assigneeID = &uid
 		}
 	}
 
 	var reporterID *int
-	if issue.Fields.Reporter != nil && issue.Fields.Reporter.AccountID != "" {
-		if uid, ok := userMap[issue.Fields.Reporter.AccountID]; ok {
+	if issue.Fields.Reporter != nil && issue.Fields.Reporter.GetIdentifier() != "" {
+		if uid, ok := userMap[issue.Fields.Reporter.GetIdentifier()]; ok {
 			reporterID = &uid
+		}
+	}
+
+	// Map fixVersion to milestone (use first version)
+	var milestoneID *int
+	if len(issue.Fields.FixVersions) > 0 {
+		if mid, ok := versionMap[issue.Fields.FixVersions[0].ID]; ok {
+			milestoneID = &mid
+		}
+	}
+
+	// Map priority
+	var priorityName string
+	if issue.Fields.Priority != nil && issue.Fields.Priority.Name != "" {
+		priorityName = issue.Fields.Priority.Name
+	}
+
+	// Parse due date
+	var dueDate *time.Time
+	if issue.Fields.DueDate != "" {
+		if parsed, err := time.Parse("2006-01-02", issue.Fields.DueDate); err == nil {
+			dueDate = &parsed
 		}
 	}
 
@@ -699,30 +1167,66 @@ func (h *JiraImportHandler) importIssue(ctx context.Context, jobID string, works
 	}
 
 	// Serialize custom field values to JSON
-	var customFieldJSON *string
+	customFieldValuesJSON := ""
 	if len(customFieldValues) > 0 {
-		jsonBytes, err := json.Marshal(customFieldValues)
-		if err == nil {
-			jsonStr := string(jsonBytes)
-			customFieldJSON = &jsonStr
+		if jsonBytes, err := json.Marshal(customFieldValues); err == nil {
+			customFieldValuesJSON = string(jsonBytes)
 		}
 	}
 
-	// Create the work item with assignee, reporter, and custom fields
-	result, err := h.db.ExecWrite(`
-		INSERT INTO items (workspace_id, title, description, status_id, item_type_id, assignee_id, reporter_id, custom_field_values)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, workspaceID, issue.Fields.Summary, description, statusID, itemTypeID, assigneeID, reporterID, customFieldJSON)
+	// Create the work item using centralized service (handles workspace_item_number, frac_index, etc.)
+	itemID, err := services.CreateItem(h.db, services.ItemCreationParams{
+		WorkspaceID:           workspaceID,
+		Title:                 issue.Fields.Summary,
+		Description:           description,
+		StatusID:              statusID,
+		ItemTypeID:            itemTypeID,
+		Priority:              priorityName,
+		DueDate:               dueDate,
+		AssigneeID:            assigneeID,
+		ReporterID:            reporterID,
+		MilestoneID:           milestoneID,
+		CustomFieldValuesJSON: customFieldValuesJSON,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to create item: %w", err)
 	}
 
-	itemID, _ := result.LastInsertId()
+	// Build metadata for the mapping (includes parent key for later linking)
+	meta := map[string]interface{}{
+		"summary": issue.Fields.Summary,
+	}
+	if issue.Fields.Parent != nil && issue.Fields.Parent.Key != "" {
+		meta["parent_key"] = issue.Fields.Parent.Key
+	}
+	if len(issue.Fields.IssueLinks) > 0 {
+		var links []map[string]interface{}
+		for _, link := range issue.Fields.IssueLinks {
+			entry := map[string]interface{}{}
+			if link.Type != nil {
+				entry["type_name"] = link.Type.Name
+				entry["inward"] = link.Type.Inward
+				entry["outward"] = link.Type.Outward
+			}
+			if link.InwardIssue != nil {
+				entry["inward_key"] = link.InwardIssue.Key
+			}
+			if link.OutwardIssue != nil {
+				entry["outward_key"] = link.OutwardIssue.Key
+			}
+			links = append(links, entry)
+		}
+		meta["issue_links"] = links
+	}
 
 	// Record the mapping
-	h.recordMapping(jobID, "item", issue.ID, issue.Key, int(itemID), map[string]interface{}{
-		"summary": issue.Fields.Summary,
-	})
+	h.recordMapping(jobID, "item", issue.ID, issue.Key, int(itemID), meta)
+
+	// Import comments for this issue
+	h.importComments(jobID, int(itemID), issue, userMap)
+
+	// Import attachments for this issue
+	h.importAttachments(ctx, jobID, int(itemID), issue, userMap, client, progress)
 
 	return nil
 }
@@ -739,6 +1243,9 @@ func (h *JiraImportHandler) recordMapping(jobID, entityType, jiraID, jiraKey str
 	_, err := h.db.ExecWrite(`
 		INSERT INTO jira_import_id_mappings (job_id, entity_type, jira_id, jira_key, windshift_id, metadata_json)
 		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT (job_id, entity_type, jira_id) DO UPDATE SET
+			windshift_id = excluded.windshift_id,
+			metadata_json = excluded.metadata_json
 	`, jobID, entityType, jiraID, jiraKey, windshiftID, metadataJSON)
 	if err != nil {
 		slog.Error("Failed to record mapping", slog.String("component", "jira"), slog.Any("error", err))
@@ -812,11 +1319,14 @@ func (h *JiraImportHandler) DeleteImportedData(w http.ResponseWriter, r *http.Re
 				WHEN 'comment' THEN 2
 				WHEN 'attachment' THEN 3
 				WHEN 'item' THEN 4
-				WHEN 'custom_field' THEN 5
-				WHEN 'status' THEN 6
-				WHEN 'item_type' THEN 7
-				WHEN 'workspace' THEN 8
-				ELSE 9
+				WHEN 'milestone' THEN 5
+				WHEN 'configuration_set' THEN 6
+				WHEN 'workflow' THEN 7
+				WHEN 'custom_field' THEN 8
+				WHEN 'status' THEN 9
+				WHEN 'item_type' THEN 10
+				WHEN 'workspace' THEN 11
+				ELSE 12
 			END
 	`, jobID)
 	if err != nil {
@@ -852,6 +1362,8 @@ func (h *JiraImportHandler) DeleteImportedData(w http.ResponseWriter, r *http.Re
 			tableName = "statuses"
 		case "item_type":
 			tableName = "item_types"
+		case "milestone":
+			tableName = "milestones"
 		case "custom_field":
 			tableName = "custom_fields"
 		case "attachment":
@@ -860,6 +1372,16 @@ func (h *JiraImportHandler) DeleteImportedData(w http.ResponseWriter, r *http.Re
 			tableName = "comments"
 		case "link":
 			tableName = "item_links"
+		case "configuration_set":
+			// Delete dependent rows first
+			h.db.ExecWrite("DELETE FROM workspace_configuration_sets WHERE configuration_set_id = ?", m.windshiftID)
+			h.db.ExecWrite("DELETE FROM configuration_set_item_types WHERE configuration_set_id = ?", m.windshiftID)
+			h.db.ExecWrite("DELETE FROM configuration_set_screens WHERE configuration_set_id = ?", m.windshiftID)
+			h.db.ExecWrite("DELETE FROM configuration_set_priorities WHERE configuration_set_id = ?", m.windshiftID)
+			tableName = "configuration_sets"
+		case "workflow":
+			h.db.ExecWrite("DELETE FROM workflow_transitions WHERE workflow_id = ?", m.windshiftID)
+			tableName = "workflows"
 		default:
 			slog.Warn("Unknown entity type", slog.String("component", "jira"), slog.String("entityType", m.entityType))
 			continue
@@ -973,4 +1495,401 @@ func (h *JiraImportHandler) GetPreviousImports(w http.ResponseWriter, r *http.Re
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(imports)
+}
+
+// ================================================================
+// Phase 3: Parent/Hierarchy Linking
+// ================================================================
+
+// linkParents sets parent_id on imported items whose Jira issue had a parent field.
+// Must be called after all issues for a project are imported so that both
+// parent and child exist in jira_import_id_mappings.
+func (h *JiraImportHandler) linkParents(jobID string) {
+	// Find all item mappings that have a parent_key in metadata
+	rows, err := h.db.Query(`
+		SELECT windshift_id, metadata_json
+		FROM jira_import_id_mappings
+		WHERE job_id = ? AND entity_type = 'item'
+	`, jobID)
+	if err != nil {
+		slog.Error("Failed to query item mappings for parent linking", slog.String("component", "jira"), slog.Any("error", err))
+		return
+	}
+	defer rows.Close()
+
+	type parentLink struct {
+		childID   int
+		parentKey string
+	}
+	var links []parentLink
+
+	for rows.Next() {
+		var windshiftID int
+		var metadataJSON sql.NullString
+		if err := rows.Scan(&windshiftID, &metadataJSON); err != nil {
+			continue
+		}
+		if !metadataJSON.Valid {
+			continue
+		}
+		var meta map[string]interface{}
+		if err := json.Unmarshal([]byte(metadataJSON.String), &meta); err != nil {
+			continue
+		}
+		if parentKey, ok := meta["parent_key"].(string); ok && parentKey != "" {
+			links = append(links, parentLink{childID: windshiftID, parentKey: parentKey})
+		}
+	}
+
+	for _, link := range links {
+		// Look up parent's Windshift ID from mappings
+		var parentID int
+		err := h.db.QueryRow(`
+			SELECT windshift_id FROM jira_import_id_mappings
+			WHERE job_id = ? AND entity_type = 'item' AND jira_key = ?
+		`, jobID, link.parentKey).Scan(&parentID)
+		if err != nil {
+			slog.Debug("Parent not found in import mappings",
+				slog.String("component", "jira"),
+				slog.String("parentKey", link.parentKey),
+				slog.Int("childID", link.childID))
+			continue
+		}
+
+		// Update the child item's parent_id directly.
+		// We cannot use ItemUpdateService here because it requires a valid user ID
+		// for history tracking, and the import runs without a user context.
+		_, err = h.db.ExecWrite(`UPDATE items SET parent_id = ? WHERE id = ?`, parentID, link.childID)
+		if err != nil {
+			slog.Error("Failed to set parent_id",
+				slog.String("component", "jira"),
+				slog.Int("childID", link.childID),
+				slog.Int("parentID", parentID),
+				slog.Any("error", err))
+		}
+	}
+}
+
+// ================================================================
+// Phase 4: Comment Import
+// ================================================================
+
+// importComments imports comments from a Jira issue into Windshift
+func (h *JiraImportHandler) importComments(jobID string, itemID int, issue *jira.JiraIssue, userMap map[string]int) {
+	if issue.Fields.Comment == nil || len(issue.Fields.Comment.Comments) == 0 {
+		return
+	}
+
+	// Create a CommentService without notification/webhook/mention services
+	// so bulk import doesn't generate notifications
+	commentSvc := services.NewCommentService(h.db)
+
+	for _, comment := range issue.Fields.Comment.Comments {
+		content := jira.ConvertADFToMarkdown(comment.Body)
+		if content == "" {
+			continue
+		}
+
+		authorID := 0
+		if comment.Author != nil && comment.Author.GetIdentifier() != "" {
+			if uid, ok := userMap[comment.Author.GetIdentifier()]; ok {
+				authorID = uid
+			}
+		}
+
+		// Parse created timestamp
+		var createdAt *time.Time
+		if comment.Created != "" {
+			if parsed, err := time.Parse("2006-01-02T15:04:05.000-0700", comment.Created); err == nil {
+				createdAt = &parsed
+			} else if parsed, err := time.Parse("2006-01-02T15:04:05.000Z0700", comment.Created); err == nil {
+				createdAt = &parsed
+			}
+		}
+
+		result, err := commentSvc.Create(services.CreateCommentParams{
+			ItemID:      itemID,
+			AuthorID:    authorID,
+			Content:     content,
+			ActorUserID: authorID,
+			CreatedAt:   createdAt,
+		})
+		if err != nil {
+			slog.Error("Failed to import comment",
+				slog.String("component", "jira"),
+				slog.String("issue", issue.Key),
+				slog.String("commentID", comment.ID),
+				slog.Any("error", err))
+			continue
+		}
+
+		h.recordMapping(jobID, "comment", comment.ID, issue.Key, int(result.CommentID), nil)
+	}
+}
+
+// ================================================================
+// Phase 5: Issue Link Import
+// ================================================================
+
+// importIssueLinks creates item_links from Jira issue links stored in mapping metadata.
+// Must be called after all issues for a project are imported.
+func (h *JiraImportHandler) importIssueLinks(jobID string) {
+	// Query all item mappings with issue_links metadata
+	rows, err := h.db.Query(`
+		SELECT windshift_id, jira_key, metadata_json
+		FROM jira_import_id_mappings
+		WHERE job_id = ? AND entity_type = 'item'
+	`, jobID)
+	if err != nil {
+		slog.Error("Failed to query item mappings for link import", slog.String("component", "jira"), slog.Any("error", err))
+		return
+	}
+	defer rows.Close()
+
+	type issueLinkInfo struct {
+		sourceID  int
+		sourceKey string
+		links     []map[string]interface{}
+	}
+	var allLinks []issueLinkInfo
+
+	for rows.Next() {
+		var windshiftID int
+		var jiraKey string
+		var metadataJSON sql.NullString
+		if err := rows.Scan(&windshiftID, &jiraKey, &metadataJSON); err != nil {
+			continue
+		}
+		if !metadataJSON.Valid {
+			continue
+		}
+		var meta map[string]interface{}
+		if err := json.Unmarshal([]byte(metadataJSON.String), &meta); err != nil {
+			continue
+		}
+		linksRaw, ok := meta["issue_links"].([]interface{})
+		if !ok || len(linksRaw) == 0 {
+			continue
+		}
+		var links []map[string]interface{}
+		for _, l := range linksRaw {
+			if m, ok := l.(map[string]interface{}); ok {
+				links = append(links, m)
+			}
+		}
+		if len(links) > 0 {
+			allLinks = append(allLinks, issueLinkInfo{sourceID: windshiftID, sourceKey: jiraKey, links: links})
+		}
+	}
+
+	// Cache link type lookups
+	linkTypeCache := make(map[string]int) // link type name -> ID
+	linkSvc := services.NewItemLinkService(h.db)
+
+	for _, info := range allLinks {
+		for _, link := range info.links {
+			typeName, _ := link["type_name"].(string)
+			if typeName == "" {
+				continue
+			}
+
+			// Determine source and target
+			// For outward links: this issue is the source, outward_key is target
+			// For inward links: inward_key is the source, this issue is target
+			// We only process outward links to avoid duplicates
+			outwardKey, _ := link["outward_key"].(string)
+			if outwardKey == "" {
+				continue
+			}
+
+			// Look up target Windshift ID
+			var targetID int
+			err := h.db.QueryRow(`
+				SELECT windshift_id FROM jira_import_id_mappings
+				WHERE job_id = ? AND entity_type = 'item' AND jira_key = ?
+			`, jobID, outwardKey).Scan(&targetID)
+			if err != nil {
+				// Target issue not imported (different project or not selected)
+				continue
+			}
+
+			// Ensure link type exists
+			linkTypeID, ok := linkTypeCache[typeName]
+			if !ok {
+				linkTypeID, err = h.ensureLinkType(typeName, link)
+				if err != nil {
+					slog.Error("Failed to ensure link type",
+						slog.String("component", "jira"),
+						slog.String("typeName", typeName),
+						slog.Any("error", err))
+					continue
+				}
+				linkTypeCache[typeName] = linkTypeID
+			}
+
+			// Create item link via service (handles duplicate check)
+			linkID, err := linkSvc.CreateLink(services.CreateItemLinkParams{
+				LinkTypeID: linkTypeID,
+				SourceType: "item",
+				SourceID:   info.sourceID,
+				TargetType: "item",
+				TargetID:   targetID,
+			})
+			if err != nil {
+				slog.Error("Failed to create item link",
+					slog.String("component", "jira"),
+					slog.String("source", info.sourceKey),
+					slog.String("target", outwardKey),
+					slog.Any("error", err))
+				continue
+			}
+
+			if linkID > 0 {
+				h.recordMapping(jobID, "link", fmt.Sprintf("%s-%s-%s", info.sourceKey, typeName, outwardKey), "", int(linkID), nil)
+			}
+		}
+	}
+}
+
+// ensureLinkType finds or creates a link type matching the Jira link type
+func (h *JiraImportHandler) ensureLinkType(typeName string, linkData map[string]interface{}) (int, error) {
+	// Try to find existing by name
+	var existingID int
+	err := h.db.QueryRow(`SELECT id FROM link_types WHERE name = ?`, typeName).Scan(&existingID)
+	if err == nil {
+		return existingID, nil
+	}
+
+	// Create new link type
+	forwardLabel, _ := linkData["outward"].(string)
+	reverseLabel, _ := linkData["inward"].(string)
+	if forwardLabel == "" {
+		forwardLabel = typeName
+	}
+	if reverseLabel == "" {
+		reverseLabel = typeName
+	}
+
+	linkTypeSvc := services.NewEnumService(h.db, services.NewLinkTypeConfig())
+	linkType := &models.LinkType{
+		Name:         typeName,
+		ForwardLabel: forwardLabel,
+		ReverseLabel: reverseLabel,
+		Color:        "#6B7280",
+		Active:       true,
+	}
+	entity, err := linkTypeSvc.Create(linkType, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create link type: %w", err)
+	}
+	return entity.GetID(), nil
+}
+
+// ================================================================
+// Phase 6: Attachment Import
+// ================================================================
+
+// importAttachments downloads and stores attachments from a Jira issue
+func (h *JiraImportHandler) importAttachments(ctx context.Context, jobID string, itemID int, issue *jira.JiraIssue, userMap map[string]int, client jira.Client, progress *ImportProgress) {
+	if len(issue.Fields.Attachment) == 0 {
+		return
+	}
+
+	// Get attachment storage path from settings
+	var attachmentPath string
+	err := h.db.QueryRow(`SELECT attachment_path FROM attachment_settings WHERE enabled = true LIMIT 1`).Scan(&attachmentPath)
+	if err != nil || attachmentPath == "" {
+		slog.Warn("Attachment settings not configured, skipping attachment import",
+			slog.String("component", "jira"), slog.String("issue", issue.Key))
+		return
+	}
+
+	for _, attachment := range issue.Fields.Attachment {
+		if attachment.Content == "" {
+			continue
+		}
+
+		progress.TotalAttachments++
+
+		// Download the attachment
+		reader, _, err := client.DownloadAttachment(ctx, attachment.Content)
+		if err != nil {
+			slog.Error("Failed to download attachment",
+				slog.String("component", "jira"),
+				slog.String("issue", issue.Key),
+				slog.String("filename", attachment.Filename),
+				slog.Any("error", err))
+			continue
+		}
+
+		// Generate a unique filename to avoid collisions
+		storedFilename := fmt.Sprintf("%s_%s", uuid.New().String(), attachment.Filename)
+		filePath := filepath.Join(attachmentPath, storedFilename)
+
+		// Save to disk
+		file, err := os.Create(filePath)
+		if err != nil {
+			_ = reader.Close()
+			slog.Error("Failed to create attachment file",
+				slog.String("component", "jira"),
+				slog.String("path", filePath),
+				slog.Any("error", err))
+			continue
+		}
+
+		written, err := io.Copy(file, reader)
+		_ = file.Close()
+		_ = reader.Close()
+		if err != nil {
+			_ = os.Remove(filePath)
+			slog.Error("Failed to write attachment file",
+				slog.String("component", "jira"),
+				slog.String("path", filePath),
+				slog.Any("error", err))
+			continue
+		}
+
+		// Use actual written size if Jira didn't report one
+		fileSize := attachment.Size
+		if fileSize == 0 {
+			fileSize = written
+		}
+
+		// Map uploader
+		var uploadedBy *int
+		if attachment.Author != nil && attachment.Author.GetIdentifier() != "" {
+			if uid, ok := userMap[attachment.Author.GetIdentifier()]; ok {
+				uploadedBy = &uid
+			}
+		}
+
+		mimeType := attachment.MimeType
+		if mimeType == "" {
+			mimeType = "application/octet-stream"
+		}
+
+		// Insert attachment record via service
+		attachmentSvc := services.NewAttachmentService(h.db)
+		attachmentID, err := attachmentSvc.CreateRecord(services.CreateAttachmentParams{
+			ItemID:           itemID,
+			EntityType:       "item",
+			Filename:         storedFilename,
+			OriginalFilename: attachment.Filename,
+			FilePath:         filePath,
+			MimeType:         mimeType,
+			FileSize:         fileSize,
+			UploadedBy:       uploadedBy,
+		})
+		if err != nil {
+			slog.Error("Failed to insert attachment record",
+				slog.String("component", "jira"),
+				slog.String("issue", issue.Key),
+				slog.String("filename", attachment.Filename),
+				slog.Any("error", err))
+			continue
+		}
+
+		h.recordMapping(jobID, "attachment", attachment.ID, issue.Key, int(attachmentID), nil)
+		progress.ImportedAttachments++
+	}
 }

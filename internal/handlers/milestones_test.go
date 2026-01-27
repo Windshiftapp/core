@@ -577,7 +577,7 @@ func TestMilestoneHandler_GetProgress_Success(t *testing.T) {
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")
 
-	var response MilestoneProgressReport
+	var response services.MilestoneProgressReport
 	rr.AssertJSONResponse(&response)
 
 	if response.MilestoneID != created.ID {

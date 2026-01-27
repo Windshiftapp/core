@@ -32,9 +32,10 @@ type CommentService struct {
 type CreateCommentParams struct {
 	ItemID      int
 	AuthorID    int
-	Content     string    // Raw content (will be sanitized)
-	IsPrivate   bool      // For action automation private notes
-	ActorUserID int       // User performing the action (for notifications)
+	Content     string     // Raw content (will be sanitized)
+	IsPrivate   bool       // For action automation private notes
+	ActorUserID int        // User performing the action (for notifications)
+	CreatedAt   *time.Time // Optional: override created_at (e.g. for imports preserving original timestamps)
 }
 
 // CreateCommentResult contains the result of creating a comment.
@@ -97,11 +98,19 @@ func (s *CommentService) Create(params CreateCommentParams) (*CreateCommentResul
 
 	// 3. Insert into DB
 	now := time.Now()
+	if params.CreatedAt != nil {
+		now = *params.CreatedAt
+	}
+	// AuthorID 0 means no author (e.g. import without user mapping) — store as NULL
+	var authorID interface{}
+	if params.AuthorID != 0 {
+		authorID = params.AuthorID
+	}
 	var commentID int64
 	err = s.db.QueryRow(`
 		INSERT INTO comments (item_id, author_id, content, is_private, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
-	`, params.ItemID, params.AuthorID, sanitizedContent, params.IsPrivate, now, now).Scan(&commentID)
+	`, params.ItemID, authorID, sanitizedContent, params.IsPrivate, now, now).Scan(&commentID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create comment: %w", err)
 	}

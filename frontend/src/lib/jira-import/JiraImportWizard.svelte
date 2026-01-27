@@ -9,11 +9,13 @@
   import Input from '../components/Input.svelte';
   import FormField from '../components/FormField.svelte';
   import {
-    Cloud, Check, ChevronRight, ChevronLeft, ArrowRight,
+    Cloud, Server, Check, ChevronRight, ChevronLeft, ArrowRight,
     Briefcase, FileText, Activity, Hash, Box, AlertCircle,
-    ExternalLink, Eye, EyeOff, Plus, Users
+    ExternalLink, Eye, EyeOff, Plus, Users, Paperclip, Flag
   } from 'lucide-svelte';
   import { addToast } from '../stores/toasts.svelte.js';
+  import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     isOpen = $bindable(false),
@@ -25,8 +27,25 @@
   let jiraUrl = $state('');
   let email = $state('');
   let apiToken = $state('');
+  let deploymentType = $state('cloud'); // 'cloud' or 'datacenter'
   let showToken = $state(false);
   let showNewConnectionForm = $state(false);
+
+  // Computed labels based on deployment type
+  let emailLabel = $derived(deploymentType === 'datacenter' ? t('jiraImport.form.username') : t('jiraImport.form.email'));
+  let emailPlaceholder = $derived(deploymentType === 'datacenter' ? 'your.username' : 'your.email@company.com');
+  let tokenLabel = $derived(deploymentType === 'datacenter' ? t('jiraImport.form.password') : t('jiraImport.form.apiToken'));
+  let tokenHelpText = $derived(deploymentType === 'datacenter'
+    ? t('jiraImport.form.tokenHelpDatacenter')
+    : t('jiraImport.form.tokenHelpCloud'));
+  let tokenHelpLink = $derived(deploymentType === 'datacenter'
+    ? null  // No standard link for DC as it varies by instance
+    : 'https://id.atlassian.com/manage-profile/security/api-tokens');
+  let urlPlaceholder = $derived(deploymentType === 'datacenter'
+    ? 'https://jira.your-company.com'
+    : 'https://your-domain.atlassian.net');
+  let modalTitle = $derived(deploymentType === 'datacenter' ? t('jiraImport.title.datacenter') : t('jiraImport.title.cloud'));
+  let modalSubtitle = $derived(connection.instanceInfo?.display_name || (deploymentType === 'datacenter' ? t('jiraImport.subtitle.datacenter') : t('jiraImport.subtitle.cloud')));
 
   // Derived state from store
   let savedConnections = $derived(jiraImport.savedConnections);
@@ -41,10 +60,11 @@
   let steps = $derived(wizard.steps);
   let currentStepId = $derived(steps[currentStep]?.id || 'connect');
 
-  // Load saved connections when modal opens
+  // Load saved connections and attachment status when modal opens
   $effect(() => {
     if (isOpen) {
       jiraImport.loadSavedConnections();
+      attachmentStatus.load();
     }
   });
 
@@ -59,12 +79,13 @@
 
   // Handle connection test (new connection)
   async function handleConnect() {
-    const result = await jiraImport.testConnection(jiraUrl, email, apiToken);
+    const result = await jiraImport.testConnection(jiraUrl, email, apiToken, deploymentType);
     if (result.success) {
-      addToast({ message: 'Connected to Jira successfully!', variant: 'success' });
+      const instanceType = deploymentType === 'datacenter' ? 'Jira Data Center' : 'Jira Cloud';
+      addToast({ message: `Connected to ${instanceType} successfully!`, variant: 'success' });
       // Load projects after connecting
       await jiraImport.loadProjects();
-      jiraImport.nextStep();
+      safeNextStep();
     } else {
       addToast({ message: result.error, variant: 'error', title: 'Connection Failed' });
     }
@@ -74,10 +95,11 @@
   async function selectSavedConnection(conn) {
     isLoadingSavedConnection = true;
     jiraImport.useSavedConnection(conn);
-    addToast({ message: `Connected to ${conn.instance_name || 'Jira Cloud'}`, variant: 'success' });
+    const instanceType = conn.deployment_type === 'datacenter' ? 'Jira Data Center' : 'Jira Cloud';
+    addToast({ message: `Connected to ${conn.instance_name || instanceType}`, variant: 'success' });
     await jiraImport.loadProjects();
     isLoadingSavedConnection = false;
-    jiraImport.nextStep();
+    safeNextStep();
   }
 
   // State for loading saved connection
@@ -89,13 +111,26 @@
   // State for loading projects when clicking Continue
   let isContinueLoading = $state(false);
 
+  // Navigation lock to prevent double navigation
+  let isNavigating = $state(false);
+
+  // Safe navigation that prevents multiple nextStep() calls in the same tick
+  async function safeNextStep() {
+    if (isNavigating) return;
+    isNavigating = true;
+    jiraImport.nextStep();
+    // Reset after microtask to allow subsequent navigation
+    await Promise.resolve();
+    isNavigating = false;
+  }
+
   // Handle project selection confirmation
   async function handleAnalyze() {
     isAnalyzing = true;
     const result = await jiraImport.analyzeProjects();
     isAnalyzing = false;
-    if (result.success) {
-      jiraImport.nextStep();
+    if (result?.success) {
+      safeNextStep();
     }
   }
 
@@ -116,7 +151,7 @@
           await jiraImport.loadProjects();
           isContinueLoading = false;
         }
-        jiraImport.nextStep();
+        safeNextStep();
       } else {
         handleConnect();
       }
@@ -127,7 +162,7 @@
     } else if (currentStepId === 'import') {
       handleClose();
     } else {
-      jiraImport.nextStep();
+      safeNextStep();
     }
   }
 
@@ -141,17 +176,17 @@
   // Get confirm button label based on current step
   function getConfirmLabel() {
     if (currentStepId === 'connect') {
-      return connection.isConnected ? 'Continue' : 'Connect';
+      return connection.isConnected ? t('jiraImport.buttons.continue') : t('jiraImport.buttons.connect');
     } else if (currentStepId === 'projects') {
-      return 'Analyze & Configure';
+      return t('jiraImport.buttons.analyzeAndConfigure');
     } else if (currentStepId === 'mapping') {
-      return 'Continue';
+      return t('jiraImport.buttons.continue');
     } else if (currentStepId === 'preview') {
-      return 'Start Import';
+      return t('jiraImport.buttons.startImport');
     } else if (currentStepId === 'import') {
-      return 'Done';
+      return t('jiraImport.buttons.done');
     }
-    return 'Next';
+    return t('jiraImport.buttons.continue');
   }
 
   // Check if confirm button should be shown
@@ -168,14 +203,14 @@
   <div class="flex flex-col max-h-[90vh]">
     <!-- Header -->
     <ModalHeader
-      title="Jira Cloud Import"
-      subtitle={connection.instanceInfo?.display_name || 'Import work items from Jira Cloud'}
-      icon={Cloud}
+      title={modalTitle}
+      subtitle={modalSubtitle}
+      icon={deploymentType === 'datacenter' ? Server : Cloud}
       onClose={handleClose}
     />
 
     <!-- Step indicator -->
-    <div class="px-6 py-3 border-b flex items-center overflow-x-auto" style="border-color: var(--ds-border);">
+    <div class="px-6 w-full py-3 border-b flex items-center overflow-x-auto" style="border-color: var(--ds-border);">
       {#each steps as step, index}
         {@const status = getStepStatus(index)}
         <div class="flex items-center flex-shrink-0">
@@ -190,7 +225,7 @@
             </div>
             <span class="text-xs font-medium whitespace-nowrap"
                   style="color: {status === 'current' ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};">
-              {step.label}
+              {t(`jiraImport.steps.${step.id}`)}
             </span>
           </div>
           {#if index < steps.length - 1}
@@ -207,17 +242,40 @@
       {#if currentStepId === 'connect'}
         <!-- Connect Step -->
         <div class="space-y-6">
+          {#if attachmentStatus.loaded && !attachmentStatus.enabled}
+            <div class="flex items-start gap-3 p-4 rounded-lg border" style="border-color: var(--ds-border-warning); background: var(--ds-background-warning-subtle);">
+              <Paperclip size={20} class="flex-shrink-0 mt-0.5" style="color: var(--ds-text-warning);" />
+              <div>
+                <p class="font-medium" style="color: var(--ds-text-warning);">{t('jiraImport.messages.noAttachments')}</p>
+                <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
+                  {t('jiraImport.messages.noAttachmentsDesc')}
+                </p>
+              </div>
+            </div>
+          {/if}
+
           {#if connection.isConnected}
             <!-- Already connected -->
-            <AlertBox variant="success" message="Connected to {connection.instanceInfo?.display_name || 'Jira Cloud'}" />
+            {@const isDataCenter = connection.deploymentType === 'datacenter'}
+            <AlertBox variant="success" message={t('jiraImport.messages.connected', { name: connection.instanceInfo?.display_name || (isDataCenter ? t('jiraImport.deploymentType.datacenter') : t('jiraImport.deploymentType.cloud')) })} />
             <div class="p-4 rounded-lg border" style="border-color: var(--ds-border); background: var(--ds-surface);">
               <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-lg flex items-center justify-center"
-                     style="background: var(--ds-background-accent-blue-subtler);">
-                  <Cloud class="w-5 h-5" style="color: var(--ds-text-accent-blue);" />
+                     style="background: {isDataCenter ? 'var(--ds-background-accent-purple-subtler)' : 'var(--ds-background-accent-blue-subtler)'};">
+                  {#if isDataCenter}
+                    <Server class="w-5 h-5" style="color: var(--ds-text-accent-purple);" />
+                  {:else}
+                    <Cloud class="w-5 h-5" style="color: var(--ds-text-accent-blue);" />
+                  {/if}
                 </div>
                 <div>
-                  <p class="font-medium" style="color: var(--ds-text);">{connection.instanceInfo?.display_name || 'Jira Cloud'}</p>
+                  <div class="flex items-center gap-2">
+                    <p class="font-medium" style="color: var(--ds-text);">{connection.instanceInfo?.display_name || (isDataCenter ? t('jiraImport.deploymentType.datacenter') : t('jiraImport.deploymentType.cloud'))}</p>
+                    <span class="text-xs px-1.5 py-0.5 rounded"
+                          style="background: {isDataCenter ? 'var(--ds-background-accent-purple-subtler)' : 'var(--ds-background-accent-blue-subtler)'}; color: {isDataCenter ? 'var(--ds-text-accent-purple)' : 'var(--ds-text-accent-blue)'};">
+                      {isDataCenter ? t('jiraImport.deploymentType.datacenter') : t('jiraImport.deploymentType.cloud')}
+                    </span>
+                  </div>
                   <p class="text-sm" style="color: var(--ds-text-subtle);">{connection.email}</p>
                 </div>
               </div>
@@ -227,13 +285,14 @@
             {#if isLoadingSavedConnection}
               <div class="flex flex-col items-center justify-center py-12">
                 <Spinner size="lg" />
-                <p class="mt-4 text-sm" style="color: var(--ds-text-subtle);">Loading projects...</p>
+                <p class="mt-4 text-sm" style="color: var(--ds-text-subtle);">{t('projects.loadingProjects')}</p>
               </div>
             {:else}
-              <AlertBox variant="info" message="Select an existing connection or create a new one" />
+              <AlertBox variant="info" message={t('jiraImport.messages.selectConnection')} />
 
               <div class="space-y-3">
                 {#each savedConnections.items as conn}
+                  {@const isDataCenter = conn.deployment_type === 'datacenter'}
                   <button
                     type="button"
                     class="w-full p-4 rounded-lg border text-left transition-all hover:border-blue-400"
@@ -242,13 +301,23 @@
                   >
                     <div class="flex items-center gap-3">
                       <div class="w-10 h-10 rounded-lg flex items-center justify-center"
-                           style="background: var(--ds-background-accent-blue-subtler);">
-                        <Cloud class="w-5 h-5" style="color: var(--ds-text-accent-blue);" />
+                           style="background: {isDataCenter ? 'var(--ds-background-accent-purple-subtler)' : 'var(--ds-background-accent-blue-subtler)'};">
+                        {#if isDataCenter}
+                          <Server class="w-5 h-5" style="color: var(--ds-text-accent-purple);" />
+                        {:else}
+                          <Cloud class="w-5 h-5" style="color: var(--ds-text-accent-blue);" />
+                        {/if}
                       </div>
                       <div class="flex-1">
-                        <p class="font-medium" style="color: var(--ds-text);">
-                          {conn.instance_name || 'Jira Cloud'}
-                        </p>
+                        <div class="flex items-center gap-2">
+                          <p class="font-medium" style="color: var(--ds-text);">
+                            {conn.instance_name || (isDataCenter ? t('jiraImport.deploymentType.datacenter') : t('jiraImport.deploymentType.cloud'))}
+                          </p>
+                          <span class="text-xs px-1.5 py-0.5 rounded"
+                                style="background: {isDataCenter ? 'var(--ds-background-accent-purple-subtler)' : 'var(--ds-background-accent-blue-subtler)'}; color: {isDataCenter ? 'var(--ds-text-accent-purple)' : 'var(--ds-text-accent-blue)'};">
+                            {isDataCenter ? t('jiraImport.deploymentType.datacenter') : t('jiraImport.deploymentType.cloud')}
+                          </span>
+                        </div>
                         <p class="text-sm" style="color: var(--ds-text-subtle);">{conn.email}</p>
                       </div>
                       <ChevronRight size={16} style="color: var(--ds-text-subtle);" />
@@ -260,7 +329,7 @@
               <div class="pt-2">
                 <Button variant="ghost" onclick={() => showNewConnectionForm = true}>
                   <Plus size={16} class="mr-2" />
-                  Add New Connection
+                  {t('jiraImport.buttons.addNewConnection')}
                 </Button>
               </div>
             {/if}
@@ -268,38 +337,80 @@
             <!-- New connection form -->
             {#if savedConnections.items.length > 0}
               <div class="flex items-center justify-between mb-4">
-                <span class="text-sm font-medium" style="color: var(--ds-text);">New Connection</span>
+                <span class="text-sm font-medium" style="color: var(--ds-text);">{t('connections.createConnection')}</span>
                 <Button variant="ghost" size="small" onclick={() => showNewConnectionForm = false}>
-                  Use Existing
+                  {t('jiraImport.buttons.useExisting')}
                 </Button>
               </div>
             {/if}
 
-            <AlertBox variant="info" message="Enter your Jira Cloud credentials to connect. You can generate an API token from your Atlassian account settings." />
+            <!-- Deployment Type Selector -->
+            <div class="flex gap-2 mb-4">
+              <button
+                type="button"
+                class="flex-1 p-3 rounded-lg border text-left transition-all flex items-center gap-3"
+                style="border-color: {deploymentType === 'cloud' ? 'var(--ds-border-focused)' : 'var(--ds-border)'}; background: {deploymentType === 'cloud' ? 'var(--ds-background-selected)' : 'transparent'};"
+                onclick={() => deploymentType = 'cloud'}
+              >
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center"
+                     style="background: var(--ds-background-accent-blue-subtler);">
+                  <Cloud class="w-5 h-5" style="color: var(--ds-text-accent-blue);" />
+                </div>
+                <div>
+                  <p class="font-medium" style="color: var(--ds-text);">{t('jiraImport.deploymentType.cloud')}</p>
+                  <p class="text-xs" style="color: var(--ds-text-subtle);">{t('jiraImport.deploymentType.cloudDesc')}</p>
+                </div>
+                {#if deploymentType === 'cloud'}
+                  <Check size={16} class="ml-auto" style="color: var(--ds-text-accent-blue);" />
+                {/if}
+              </button>
+              <button
+                type="button"
+                class="flex-1 p-3 rounded-lg border text-left transition-all flex items-center gap-3"
+                style="border-color: {deploymentType === 'datacenter' ? 'var(--ds-border-focused)' : 'var(--ds-border)'}; background: {deploymentType === 'datacenter' ? 'var(--ds-background-selected)' : 'transparent'};"
+                onclick={() => deploymentType = 'datacenter'}
+              >
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center"
+                     style="background: var(--ds-background-accent-purple-subtler);">
+                  <Server class="w-5 h-5" style="color: var(--ds-text-accent-purple);" />
+                </div>
+                <div>
+                  <p class="font-medium" style="color: var(--ds-text);">{t('jiraImport.deploymentType.datacenter')}</p>
+                  <p class="text-xs" style="color: var(--ds-text-subtle);">{t('jiraImport.deploymentType.datacenterDesc')}</p>
+                </div>
+                {#if deploymentType === 'datacenter'}
+                  <Check size={16} class="ml-auto" style="color: var(--ds-text-accent-purple);" />
+                {/if}
+              </button>
+            </div>
 
-            <FormField label="Jira Cloud URL" required>
+            <AlertBox variant="info" message={deploymentType === 'datacenter'
+              ? t('jiraImport.messages.credentialsHelpDatacenter')
+              : t('jiraImport.messages.credentialsHelpCloud')} />
+
+            <FormField label={deploymentType === 'datacenter' ? t('jiraImport.form.urlDatacenter') : t('jiraImport.form.urlCloud')} required>
               <Input
                 bind:value={jiraUrl}
-                placeholder="https://your-domain.atlassian.net"
+                placeholder={urlPlaceholder}
                 disabled={connection.isConnecting}
               />
             </FormField>
 
-            <FormField label="Email Address" required>
+            <FormField label={emailLabel} required>
               <Input
                 bind:value={email}
-                type="email"
-                placeholder="your.email@company.com"
+                type={deploymentType === 'datacenter' ? 'text' : 'email'}
+                placeholder={emailPlaceholder}
                 disabled={connection.isConnecting}
               />
             </FormField>
 
-            <FormField label="API Token" required>
+            <FormField label={tokenLabel} required>
               <div class="relative">
                 <Input
                   bind:value={apiToken}
                   type={showToken ? 'text' : 'password'}
-                  placeholder="Your Jira API token"
+                  placeholder={deploymentType === 'datacenter' ? 'Your password or token' : 'Your Jira API token'}
                   disabled={connection.isConnecting}
                 />
                 <button
@@ -315,11 +426,15 @@
                 </button>
               </div>
               <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-                <a href="https://id.atlassian.com/manage-profile/security/api-tokens"
-                   target="_blank" rel="noopener noreferrer"
-                   class="underline hover:no-underline" style="color: var(--ds-link);">
-                  Generate a token
-                </a> from your Atlassian account settings
+                {#if tokenHelpLink}
+                  <a href={tokenHelpLink}
+                     target="_blank" rel="noopener noreferrer"
+                     class="underline hover:no-underline" style="color: var(--ds-link);">
+                    {t('jiraImport.form.generateToken')}
+                  </a> {t('jiraImport.form.tokenHelpCloud')}
+                {:else}
+                  {tokenHelpText}
+                {/if}
               </p>
             </FormField>
 
@@ -334,14 +449,14 @@
         <div class="space-y-4">
           <div class="flex items-center justify-between">
             <p class="text-sm" style="color: var(--ds-text-subtle);">
-              Select projects to import ({projects.selected.length} of {projects.available.length} selected)
+              {t('jiraImport.projects.selected', { selected: projects.selected.length, total: projects.available.length })}
             </p>
             <div class="flex gap-2">
               <Button variant="ghost" size="small" onclick={() => jiraImport.selectAllProjects()}>
-                Select All
+                {t('jiraImport.buttons.selectAll')}
               </Button>
               <Button variant="ghost" size="small" onclick={() => jiraImport.deselectAllProjects()}>
-                Deselect All
+                {t('jiraImport.buttons.deselectAll')}
               </Button>
             </div>
           </div>
@@ -361,10 +476,10 @@
             />
             <div class="flex-1">
               <label for="openIssuesOnly" class="text-sm font-medium cursor-pointer" style="color: var(--ds-text);">
-                Import open issues only
+                {t('jiraImport.projects.openIssuesOnly')}
               </label>
               <p class="text-xs" style="color: var(--ds-text-subtle);">
-                Excludes issues with status category "Done"
+                {t('jiraImport.projects.openIssuesOnlyDesc')}
               </p>
             </div>
           </div>
@@ -409,7 +524,7 @@
                         </span>
                         {#if isDisabled}
                           <span class="text-xs px-1.5 py-0.5 rounded" style="background: var(--ds-background-warning-subtle); color: var(--ds-text-warning);">
-                            Team-managed
+                            {t('jiraImport.projects.teamManaged')}
                           </span>
                         {/if}
                       </div>
@@ -419,7 +534,7 @@
                           {project.key}
                         </span>
                         <span class="text-xs" style="color: var(--ds-text-subtle);">
-                          {project.issue_count.toLocaleString()} issues
+                          {t('jiraImport.projects.issues', { count: project.issue_count.toLocaleString() })}
                         </span>
                       </div>
                     </div>
@@ -437,13 +552,13 @@
           <div class="space-y-3">
             <div class="flex items-center gap-2 pb-2 border-b" style="border-color: var(--ds-border);">
               <Briefcase size={18} style="color: var(--ds-text-accent-blue);" />
-              <h3 class="font-medium" style="color: var(--ds-text);">Workspaces</h3>
+              <h3 class="font-medium" style="color: var(--ds-text);">{t('jiraImport.mapping.workspaces')}</h3>
               <span class="text-xs px-1.5 py-0.5 rounded ml-auto" style="background: var(--ds-background-neutral); color: var(--ds-text-subtle);">
                 {mappings.workspaces.length}
               </span>
             </div>
             <p class="text-xs" style="color: var(--ds-text-subtle);">
-              Each Jira project will become a Windshift workspace
+              {t('jiraImport.mapping.workspacesDesc')}
             </p>
             <div class="space-y-2">
               {#each mappings.workspaces as mapping}
@@ -479,13 +594,13 @@
           <div class="space-y-3">
             <div class="flex items-center gap-2 pb-2 border-b" style="border-color: var(--ds-border);">
               <FileText size={18} style="color: var(--ds-text-accent-purple);" />
-              <h3 class="font-medium" style="color: var(--ds-text);">Issue Types</h3>
+              <h3 class="font-medium" style="color: var(--ds-text);">{t('jiraImport.mapping.issueTypes')}</h3>
               <span class="text-xs px-1.5 py-0.5 rounded ml-auto" style="background: var(--ds-background-neutral); color: var(--ds-text-subtle);">
                 {mappings.issueTypes.length}
               </span>
             </div>
             <p class="text-xs" style="color: var(--ds-text-subtle);">
-              Issue types will be created as item types in Windshift
+              {t('jiraImport.mapping.issueTypesDesc')}
             </p>
             <div class="flex flex-wrap gap-2">
               {#each mappings.issueTypes as mapping}
@@ -495,7 +610,7 @@
                   {#if mapping.isSubtask}
                     <span class="text-xs px-1 py-0.5 rounded"
                           style="background: var(--ds-background-neutral); color: var(--ds-text-subtle);">
-                      Sub-task
+                      {t('jiraImport.mapping.subtask')}
                     </span>
                   {/if}
                 </div>
@@ -507,13 +622,13 @@
           <div class="space-y-3">
             <div class="flex items-center gap-2 pb-2 border-b" style="border-color: var(--ds-border);">
               <Activity size={18} style="color: var(--ds-text-accent-green);" />
-              <h3 class="font-medium" style="color: var(--ds-text);">Statuses</h3>
+              <h3 class="font-medium" style="color: var(--ds-text);">{t('jiraImport.mapping.statuses')}</h3>
               <span class="text-xs px-1.5 py-0.5 rounded ml-auto" style="background: var(--ds-background-neutral); color: var(--ds-text-subtle);">
                 {mappings.statuses.length}
               </span>
             </div>
             <p class="text-xs" style="color: var(--ds-text-subtle);">
-              Statuses will be created and grouped by category
+              {t('jiraImport.mapping.statusesDesc')}
             </p>
             <div class="flex flex-wrap gap-2">
               {#each mappings.statuses as mapping}
@@ -532,18 +647,52 @@
             </div>
           </div>
 
+          <!-- Versions / Milestones Section -->
+          {#if mappings.versions.length > 0}
+            <div class="space-y-3">
+              <div class="flex items-center gap-2 pb-2 border-b" style="border-color: var(--ds-border);">
+                <Flag size={18} style="color: var(--ds-text-accent-teal);" />
+                <h3 class="font-medium" style="color: var(--ds-text);">{t('jiraImport.mapping.versions')}</h3>
+                <span class="text-xs px-1.5 py-0.5 rounded ml-auto" style="background: var(--ds-background-neutral); color: var(--ds-text-subtle);">
+                  {mappings.versions.length}
+                </span>
+              </div>
+              <p class="text-xs" style="color: var(--ds-text-subtle);">
+                {t('jiraImport.mapping.versionsDesc')}
+              </p>
+              <div class="flex flex-wrap gap-2">
+                {#each mappings.versions as version}
+                  <div class="px-3 py-1.5 rounded-lg border inline-flex items-center gap-2"
+                       style="border-color: var(--ds-border); background: var(--ds-surface);">
+                    <span class="text-sm" style="color: var(--ds-text);">{version.jiraName}</span>
+                    {#if version.released}
+                      <span class="text-xs px-1 py-0.5 rounded"
+                            style="background: var(--ds-background-success-bold); color: white;">
+                        Released
+                      </span>
+                    {/if}
+                    <span class="text-xs px-1 py-0.5 rounded"
+                          style="background: var(--ds-background-neutral); color: var(--ds-text-subtle);">
+                      {version.projectKey}
+                    </span>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {/if}
+
           <!-- Custom Fields Section -->
           {#if mappings.customFields.length > 0}
             <div class="space-y-3">
               <div class="flex items-center gap-2 pb-2 border-b" style="border-color: var(--ds-border);">
                 <Hash size={18} style="color: var(--ds-text-accent-orange);" />
-                <h3 class="font-medium" style="color: var(--ds-text);">Custom Fields</h3>
+                <h3 class="font-medium" style="color: var(--ds-text);">{t('jiraImport.mapping.customFields')}</h3>
                 <span class="text-xs px-1.5 py-0.5 rounded ml-auto" style="background: var(--ds-background-neutral); color: var(--ds-text-subtle);">
                   {mappings.customFields.filter(f => f.canMap).length} / {mappings.customFields.length}
                 </span>
               </div>
               <p class="text-xs" style="color: var(--ds-text-subtle);">
-                Custom fields that can be mapped will be created in Windshift
+                {t('jiraImport.mapping.customFieldsDesc')}
               </p>
               <div class="space-y-2 max-h-48 overflow-y-auto">
                 {#each mappings.customFields as mapping}
@@ -567,12 +716,12 @@
                       {#if mapping.canMap}
                         <span class="text-xs px-2 py-1 rounded"
                               style="background: var(--ds-background-success-bold); color: white;">
-                          Create
+                          {t('jiraImport.mapping.create')}
                         </span>
                       {:else}
                         <span class="text-xs px-2 py-1 rounded"
                               style="background: var(--ds-background-neutral); color: var(--ds-text-subtle);">
-                          Skip
+                          {t('jiraImport.mapping.skip')}
                         </span>
                       {/if}
                     </div>
@@ -586,7 +735,7 @@
       {:else if currentStepId === 'preview'}
         <!-- Preview Step -->
         <div class="space-y-6">
-          <AlertBox variant="warning" message="Review the import summary before proceeding. This operation may take several minutes for large projects." />
+          <AlertBox variant="warning" message={t('jiraImport.messages.reviewSummary')} />
 
           <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div class="p-4 rounded-lg border" style="border-color: var(--ds-border); background: var(--ds-surface-raised);">
@@ -599,7 +748,7 @@
                   <p class="text-2xl font-semibold" style="color: var(--ds-text);">
                     {projects.selected.length}
                   </p>
-                  <p class="text-sm" style="color: var(--ds-text-subtle);">Workspaces</p>
+                  <p class="text-sm" style="color: var(--ds-text-subtle);">{t('jiraImport.preview.workspaces')}</p>
                 </div>
               </div>
             </div>
@@ -614,7 +763,7 @@
                   <p class="text-2xl font-semibold" style="color: var(--ds-text);">
                     {analysis.result?.total_issues?.toLocaleString() || 0}
                   </p>
-                  <p class="text-sm" style="color: var(--ds-text-subtle);">Work Items</p>
+                  <p class="text-sm" style="color: var(--ds-text-subtle);">{t('jiraImport.preview.workItems')}</p>
                 </div>
               </div>
             </div>
@@ -629,7 +778,7 @@
                   <p class="text-2xl font-semibold" style="color: var(--ds-text);">
                     {mappings.statuses.length}
                   </p>
-                  <p class="text-sm" style="color: var(--ds-text-subtle);">Statuses</p>
+                  <p class="text-sm" style="color: var(--ds-text-subtle);">{t('jiraImport.preview.statuses')}</p>
                 </div>
               </div>
             </div>
@@ -644,7 +793,7 @@
                   <p class="text-2xl font-semibold" style="color: var(--ds-text);">
                     {mappings.issueTypes.length}
                   </p>
-                  <p class="text-sm" style="color: var(--ds-text-subtle);">Item Types</p>
+                  <p class="text-sm" style="color: var(--ds-text-subtle);">{t('jiraImport.preview.itemTypes')}</p>
                 </div>
               </div>
             </div>
@@ -659,10 +808,27 @@
                   <p class="text-2xl font-semibold" style="color: var(--ds-text);">
                     {mappings.customFields.filter(f => f.canMap).length}
                   </p>
-                  <p class="text-sm" style="color: var(--ds-text-subtle);">Custom Fields</p>
+                  <p class="text-sm" style="color: var(--ds-text-subtle);">{t('jiraImport.preview.customFields')}</p>
                 </div>
               </div>
             </div>
+
+            {#if mappings.versions.length > 0}
+              <div class="p-4 rounded-lg border" style="border-color: var(--ds-border); background: var(--ds-surface-raised);">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-lg flex items-center justify-center"
+                       style="background: var(--ds-background-accent-teal-subtler);">
+                    <Flag class="w-5 h-5" style="color: var(--ds-text-accent-teal);" />
+                  </div>
+                  <div>
+                    <p class="text-2xl font-semibold" style="color: var(--ds-text);">
+                      {mappings.versions.length}
+                    </p>
+                    <p class="text-sm" style="color: var(--ds-text-subtle);">{t('jiraImport.preview.milestones')}</p>
+                  </div>
+                </div>
+              </div>
+            {/if}
 
             {#if analysis.result?.users?.length > 0}
               <div class="p-4 rounded-lg border" style="border-color: var(--ds-border); background: var(--ds-surface-raised);">
@@ -676,10 +842,10 @@
                       {analysis.result.users.length}
                     </p>
                     <p class="text-sm" style="color: var(--ds-text-subtle);">
-                      Users
+                      {t('jiraImport.preview.users')}
                       {#if analysis.result.users.filter(u => !u.matched_user_id).length > 0}
                         <span class="text-xs ml-1" style="color: var(--ds-text-accent-orange);">
-                          ({analysis.result.users.filter(u => !u.matched_user_id).length} new)
+                          {t('jiraImport.preview.usersNew', { count: analysis.result.users.filter(u => !u.matched_user_id).length })}
                         </span>
                       {/if}
                     </p>
@@ -699,7 +865,7 @@
                     <p class="text-2xl font-semibold" style="color: var(--ds-text);">
                       {analysis.result?.total_assets?.toLocaleString() || 0}
                     </p>
-                    <p class="text-sm" style="color: var(--ds-text-subtle);">Assets</p>
+                    <p class="text-sm" style="color: var(--ds-text-subtle);">{t('jiraImport.preview.assets')}</p>
                   </div>
                 </div>
               </div>
@@ -708,7 +874,7 @@
 
           <!-- Project breakdown -->
           <div class="space-y-2">
-            <h3 class="font-medium" style="color: var(--ds-text);">Projects to Import</h3>
+            <h3 class="font-medium" style="color: var(--ds-text);">{t('jiraImport.preview.projectsToImport')}</h3>
             {#each analysis.result?.projects || [] as project}
               <div class="p-3 rounded-lg border flex items-center justify-between"
                    style="border-color: var(--ds-border); background: var(--ds-surface);">
@@ -721,7 +887,7 @@
                   </span>
                 </div>
                 <span class="text-sm" style="color: var(--ds-text-subtle);">
-                  {project.issue_count.toLocaleString()} issues
+                  {t('jiraImport.projects.issues', { count: project.issue_count.toLocaleString() })}
                 </span>
               </div>
             {/each}
@@ -735,21 +901,21 @@
             <AlertBox variant="error" message={importData.error} />
             <div class="mt-4">
               <Button variant="secondary" onclick={() => jiraImport.startImport()}>
-                Retry Import
+                {t('jiraImport.buttons.retryImport')}
               </Button>
             </div>
           {:else if importData.result}
             <div class="text-center">
               <Check class="w-16 h-16 mx-auto" style="color: var(--ds-text-success);" />
               <p class="text-lg font-medium mt-4" style="color: var(--ds-text);">
-                Import Complete!
+                {t('jiraImport.import.complete')}
               </p>
               <p class="text-sm mt-2" style="color: var(--ds-text-subtle);">
-                Successfully imported {importData.progress?.imported_issues || 0} items.
+                {t('jiraImport.import.success', { count: importData.progress?.imported_issues || 0 })}
               </p>
               {#if importData.progress?.failed_issues > 0}
                 <p class="text-sm mt-1 text-amber-600">
-                  {importData.progress.failed_issues} items failed to import.
+                  {t('jiraImport.import.failed', { count: importData.progress.failed_issues })}
                 </p>
               {/if}
             </div>
@@ -757,15 +923,15 @@
             <div class="text-center">
               <Spinner size="lg" class="mx-auto" />
               <p class="text-lg font-medium mt-4" style="color: var(--ds-text);">
-                Importing...
+                {t('jiraImport.import.importing')}
               </p>
               <p class="text-sm mt-2" style="color: var(--ds-text-subtle);">
-                {importData.phase || 'Starting import...'}
+                {importData.phase || t('jiraImport.import.starting')}
               </p>
               {#if importData.progress}
                 <div class="mt-4 w-64 mx-auto">
                   <div class="flex justify-between text-xs mb-1" style="color: var(--ds-text-subtle);">
-                    <span>Progress</span>
+                    <span>{t('jiraImport.import.progress')}</span>
                     <span>{importData.progress.imported_issues || 0} / {importData.progress.total_issues || 0}</span>
                   </div>
                   <div class="w-full h-2 rounded-full" style="background: var(--ds-background-neutral);">
@@ -781,14 +947,14 @@
             <div class="text-center">
               <FileText class="w-16 h-16 mx-auto" style="color: var(--ds-text-subtle);" />
               <p class="text-lg font-medium mt-4" style="color: var(--ds-text);">
-                Ready to Import
+                {t('jiraImport.import.ready')}
               </p>
               <p class="text-sm mt-2" style="color: var(--ds-text-subtle);">
-                Click "Start Import" to begin importing {analysis.result?.total_issues || 0} items.
+                {t('jiraImport.import.readyDesc', { count: analysis.result?.total_issues || 0 })}
               </p>
               <div class="mt-6">
                 <Button variant="primary" onclick={() => jiraImport.startImport()}>
-                  Start Import
+                  {t('jiraImport.buttons.startImport')}
                 </Button>
               </div>
             </div>
@@ -801,11 +967,13 @@
     <DialogFooter
       showCancel={false}
       confirmLabel={getConfirmLabel()}
-      loading={connection.isConnecting || isAnalyzing || isContinueLoading}
+      loading={connection.isConnecting || isAnalyzing || isContinueLoading || isLoadingSavedConnection}
       disabled={
         connection.isConnecting ||
         isAnalyzing ||
         isContinueLoading ||
+        isLoadingSavedConnection ||
+        isNavigating ||
         (currentStepId === 'connect' && !connection.isConnected && (!jiraUrl || !email || !apiToken)) ||
         (currentStepId === 'projects' && projects.selected.length === 0)
       }
@@ -818,10 +986,10 @@
           disabled={connection.isConnecting || isAnalyzing}
         >
           {#if currentStep === 0}
-            Cancel
+            {t('jiraImport.buttons.cancel')}
           {:else}
             <ChevronLeft size={16} class="mr-1" />
-            Back
+            {t('jiraImport.buttons.back')}
           {/if}
         </Button>
       {/snippet}

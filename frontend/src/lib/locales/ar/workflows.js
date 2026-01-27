@@ -55,6 +55,7 @@ export default {
     workflowName: 'اسم سير العمل',
     transitions: 'الانتقالات',
     addTransition: 'إضافة انتقال',
+    searchWorkflows: 'البحث في سير العمل...',
     noWorkflows: 'لم يتم العثور على سير عمل',
     workflowCreated: 'تم إنشاء سير العمل بنجاح',
     workflowUpdated: 'تم تحديث سير العمل بنجاح',

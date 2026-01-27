@@ -54,11 +54,18 @@ func (h *JiraImportHandler) Connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Determine deployment type (default to cloud)
+	deploymentType := jira.DeploymentCloud
+	if req.DeploymentType == "datacenter" {
+		deploymentType = jira.DeploymentDataCenter
+	}
+
 	// Create Jira client and test connection
 	client, err := jira.NewClient(jira.Config{
-		InstanceURL: req.InstanceURL,
-		Email:       req.Email,
-		APIToken:    req.APIToken,
+		InstanceURL:    req.InstanceURL,
+		Email:          req.Email,
+		APIToken:       req.APIToken,
+		DeploymentType: deploymentType,
 	})
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to create Jira client: %v", err), http.StatusBadRequest)
@@ -86,9 +93,9 @@ func (h *JiraImportHandler) Connect(w http.ResponseWriter, r *http.Request) {
 	userID := getUserIDFromContext(r)
 
 	_, err = h.db.ExecWrite(`
-		INSERT INTO jira_import_connections (id, instance_url, email, encrypted_credentials, instance_name, created_by, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-	`, connectionID, req.InstanceURL, req.Email, encryptedToken, instanceInfo.DisplayName, userID)
+		INSERT INTO jira_import_connections (id, instance_url, email, encrypted_credentials, instance_name, deployment_type, created_by, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+	`, connectionID, req.InstanceURL, req.Email, encryptedToken, instanceInfo.DisplayName, string(deploymentType), userID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to store connection: %v", err), http.StatusInternalServerError)
 		return
@@ -104,7 +111,7 @@ func (h *JiraImportHandler) Connect(w http.ResponseWriter, r *http.Request) {
 // GetConnections handles GET /api/jira-import/connections
 func (h *JiraImportHandler) GetConnections(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(`
-		SELECT id, instance_url, email, instance_name, created_at, last_used_at
+		SELECT id, instance_url, email, instance_name, deployment_type, created_at, last_used_at
 		FROM jira_import_connections
 		ORDER BY created_at DESC
 	`)
@@ -118,14 +125,20 @@ func (h *JiraImportHandler) GetConnections(w http.ResponseWriter, r *http.Reques
 	for rows.Next() {
 		var conn ConnectionInfo
 		var instanceName sql.NullString
+		var deploymentType sql.NullString
 		var lastUsedAt sql.NullTime
 
-		if err := rows.Scan(&conn.ID, &conn.InstanceURL, &conn.Email, &instanceName, &conn.CreatedAt, &lastUsedAt); err != nil {
+		if err := rows.Scan(&conn.ID, &conn.InstanceURL, &conn.Email, &instanceName, &deploymentType, &conn.CreatedAt, &lastUsedAt); err != nil {
 			slog.Warn("Failed to scan connection", slog.String("component", "jira"), slog.Any("error", err))
 			continue
 		}
 		if instanceName.Valid {
 			conn.InstanceName = instanceName.String
+		}
+		if deploymentType.Valid {
+			conn.DeploymentType = deploymentType.String
+		} else {
+			conn.DeploymentType = "cloud" // Default for existing connections
 		}
 		if lastUsedAt.Valid {
 			conn.LastUsedAt = &lastUsedAt.Time
@@ -161,12 +174,13 @@ func (h *JiraImportHandler) DeleteConnection(w http.ResponseWriter, r *http.Requ
 // getClientForConnection retrieves stored credentials and creates a Jira client
 func (h *JiraImportHandler) getClientForConnection(ctx context.Context, connectionID string) (jira.Client, error) {
 	var instanceURL, email, encryptedCredentials string
+	var deploymentTypeStr sql.NullString
 
 	err := h.db.QueryRow(`
-		SELECT instance_url, email, encrypted_credentials
+		SELECT instance_url, email, encrypted_credentials, deployment_type
 		FROM jira_import_connections
 		WHERE id = ?
-	`, connectionID).Scan(&instanceURL, &email, &encryptedCredentials)
+	`, connectionID).Scan(&instanceURL, &email, &encryptedCredentials, &deploymentTypeStr)
 	if err != nil {
 		return nil, fmt.Errorf("connection not found: %w", err)
 	}
@@ -184,10 +198,17 @@ func (h *JiraImportHandler) getClientForConnection(ctx context.Context, connecti
 		return nil, fmt.Errorf("failed to decrypt credentials: %w", err)
 	}
 
+	// Determine deployment type (default to cloud for existing connections)
+	deploymentType := jira.DeploymentCloud
+	if deploymentTypeStr.Valid && deploymentTypeStr.String == "datacenter" {
+		deploymentType = jira.DeploymentDataCenter
+	}
+
 	return jira.NewClient(jira.Config{
-		InstanceURL: instanceURL,
-		Email:       email,
-		APIToken:    apiToken,
+		InstanceURL:    instanceURL,
+		Email:          email,
+		APIToken:       apiToken,
+		DeploymentType: deploymentType,
 	})
 }
 

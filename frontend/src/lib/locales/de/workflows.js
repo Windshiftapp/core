@@ -56,6 +56,7 @@ export default {
     workflowName: 'Workflow-Name',
     transitions: 'Übergänge',
     addTransition: 'Übergang hinzufügen',
+    searchWorkflows: 'Workflows suchen...',
     noWorkflows: 'Keine Workflows gefunden',
     noWorkflowsFound: 'Keine Workflows gefunden. Erstellen Sie Ihren ersten Workflow.',
     workflowCreated: 'Workflow erfolgreich erstellt',

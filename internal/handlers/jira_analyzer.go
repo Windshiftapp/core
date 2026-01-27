@@ -166,10 +166,22 @@ func (h *JiraImportHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Check for versions
+		// Check for versions and collect them
 		versions, err := client.GetProjectVersions(ctx, projectKey)
 		if err == nil && len(versions) > 0 {
 			projectAnalysis.HasVersions = true
+			projectAnalysis.VersionCount = len(versions)
+			for _, v := range versions {
+				result.Versions = append(result.Versions, JiraVersionInfo{
+					ID:          v.ID,
+					Name:        v.Name,
+					Description: v.Description,
+					Archived:    v.Archived,
+					Released:    v.Released,
+					ReleaseDate: v.ReleaseDate,
+					ProjectKey:  projectKey,
+				})
+			}
 		}
 
 		// Check for sprints (via boards)

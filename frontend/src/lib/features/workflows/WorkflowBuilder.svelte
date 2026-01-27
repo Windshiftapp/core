@@ -12,28 +12,30 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import Label from '../../components/Label.svelte';
+  import SearchInput from '../../components/SearchInput.svelte';
   import { matchesShortcut } from '../../utils/keyboardShortcuts.js';
 
-  let workflows = [];
-  let statuses = [];
-  let loading = true;
-  let loadingStatuses = true;
-  let creating = false;
-  let editingId = null;
+  let workflows = $state([]);
+  let searchQuery = $state('');
+  let statuses = $state([]);
+  let loading = $state(true);
+  let loadingStatuses = $state(true);
+  let creating = $state(false);
+  let editingId = $state(null);
   let nameInput;
 
   // Form state
-  let newWorkflow = {
+  let newWorkflow = $state({
     name: '',
     description: '',
     is_default: false
-  };
+  });
 
-  let editWorkflow = {
+  let editWorkflow = $state({
     name: '',
     description: '',
     is_default: false
-  };
+  });
 
   onMount(async () => {
     await loadStatuses();
@@ -189,6 +191,16 @@
     ];
   }
 
+  // Search filtering
+  const filteredWorkflows = $derived(workflows.filter(wf => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      wf.name?.toLowerCase().includes(query) ||
+      wf.description?.toLowerCase().includes(query)
+    );
+  }));
+
   // Table column definitions (use $derived to make it reactive to language changes)
   let workflowColumns = $derived([
     {
@@ -215,18 +227,25 @@
     icon={Workflow}
     title={t('workflows.title')}
     subtitle={t('workflows.subtitle')}
-    count={t('workflows.count', { count: workflows.length })}
+    count={t('workflows.count', { count: filteredWorkflows.length })}
   >
     {#snippet actions()}
-      <Button
-        variant="primary"
-        icon={Plus}
-        onclick={startCreate}
-        disabled={statuses.length === 0}
-        keyboardHint="A"
-      >
-        {t('workflows.createWorkflow')}
-      </Button>
+      <div class="flex items-center gap-3">
+        <SearchInput
+          bind:value={searchQuery}
+          placeholder={t('workflows.searchWorkflows')}
+          class="w-64"
+        />
+        <Button
+          variant="primary"
+          icon={Plus}
+          onclick={startCreate}
+          disabled={statuses.length === 0}
+          keyboardHint="A"
+        >
+          {t('workflows.createWorkflow')}
+        </Button>
+      </div>
     {/snippet}
   </PageHeader>
 
@@ -248,12 +267,14 @@
     <!-- Workflows Table -->
     <DataTable
       columns={workflowColumns}
-      data={workflows}
+      data={filteredWorkflows}
       keyField="id"
       emptyMessage={t('workflows.noWorkflowsFound')}
       emptyIcon={Workflow}
       actionItems={buildWorkflowDropdownItems}
       loading={loading}
+      pagination={true}
+      pageSize={15}
     >
       <div slot="workflow" let:item={workflow} class="flex items-center gap-3">
         <h3 class="font-medium" style="color: var(--ds-text);">{workflow.name}</h3>

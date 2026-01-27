@@ -5,6 +5,116 @@
  * categories, members, configuration, audit, auditLog, projects
  */
 export default {
+  jiraImport: {
+    title: {
+      cloud: 'Jira Cloud Import',
+      datacenter: 'Jira Data Center Import'
+    },
+    subtitle: {
+      cloud: 'Vorgänge aus Jira Cloud importieren',
+      datacenter: 'Vorgänge aus Jira Data Center importieren'
+    },
+    steps: {
+      connect: 'Verbinden',
+      projects: 'Projekte',
+      mapping: 'Zuordnung',
+      preview: 'Vorschau',
+      import: 'Import'
+    },
+    deploymentType: {
+      cloud: 'Jira Cloud',
+      cloudDesc: '*.atlassian.net',
+      datacenter: 'Data Center',
+      datacenterDesc: 'Selbst gehostet'
+    },
+    form: {
+      urlCloud: 'Jira Cloud URL',
+      urlDatacenter: 'Jira Data Center URL',
+      email: 'E-Mail-Adresse',
+      username: 'Benutzername',
+      apiToken: 'API-Token',
+      password: 'Passwort oder persönliches Zugriffstoken',
+      generateToken: 'Token generieren',
+      tokenHelpCloud: 'aus Ihren Atlassian-Kontoeinstellungen',
+      tokenHelpDatacenter: 'Verwenden Sie Ihr Passwort oder ein persönliches Zugriffstoken aus Ihren Jira-Profileinstellungen'
+    },
+    buttons: {
+      connect: 'Verbinden',
+      continue: 'Weiter',
+      analyzeAndConfigure: 'Analysieren & Konfigurieren',
+      startImport: 'Import starten',
+      done: 'Fertig',
+      back: 'Zurück',
+      cancel: 'Abbrechen',
+      selectAll: 'Alle auswählen',
+      deselectAll: 'Alle abwählen',
+      addNewConnection: 'Neue Verbindung hinzufügen',
+      useExisting: 'Vorhandene verwenden',
+      retryImport: 'Import wiederholen'
+    },
+    messages: {
+      connected: 'Verbunden mit {name}',
+      selectConnection: 'Wählen Sie eine bestehende Verbindung aus oder erstellen Sie eine neue',
+      credentialsHelpCloud: 'Geben Sie Ihre Jira Cloud Anmeldedaten ein. Sie können ein API-Token in Ihren Atlassian-Kontoeinstellungen generieren.',
+      credentialsHelpDatacenter: 'Geben Sie Ihre Jira Data Center Anmeldedaten ein. Verwenden Sie Ihren Benutzernamen und Ihr Passwort oder ein persönliches Zugriffstoken.',
+      reviewSummary: 'Überprüfen Sie die Import-Zusammenfassung vor dem Fortfahren. Dieser Vorgang kann bei großen Projekten mehrere Minuten dauern.',
+      noAttachments: 'Anhänge werden nicht importiert',
+      noAttachmentsDesc: 'Kein Anhangsspeicher ist konfiguriert. Setzen Sie den --attachment-path Parameter beim Starten des Servers, um Anhänge zu importieren.'
+    },
+    projects: {
+      selected: 'Projekte zum Importieren auswählen ({selected} von {total} ausgewählt)',
+      openIssuesOnly: 'Nur offene Vorgänge importieren',
+      openIssuesOnlyDesc: 'Schließt Vorgänge mit Statuskategorie "Erledigt" aus',
+      teamManaged: 'Team-verwaltet',
+      issues: '{count} Vorgänge'
+    },
+    mapping: {
+      workspaces: 'Arbeitsbereiche',
+      workspacesDesc: 'Jedes Jira-Projekt wird zu einem Windshift-Arbeitsbereich',
+      issueTypes: 'Vorgangstypen',
+      issueTypesDesc: 'Vorgangstypen werden als Eintragstypen in Windshift erstellt',
+      statuses: 'Status',
+      statusesDesc: 'Status werden erstellt und nach Kategorie gruppiert',
+      customFields: 'Benutzerdefinierte Felder',
+      customFieldsDesc: 'Benutzerdefinierte Felder, die zugeordnet werden können, werden in Windshift erstellt',
+      versions: 'Versionen / Meilensteine',
+      versionsDesc: 'Jira-Versionen werden als Workspace-Meilensteine importiert.',
+      subtask: 'Unteraufgabe',
+      create: 'Erstellen',
+      skip: 'Überspringen'
+    },
+    preview: {
+      workspaces: 'Arbeitsbereiche',
+      workItems: 'Vorgänge',
+      statuses: 'Status',
+      itemTypes: 'Eintragstypen',
+      customFields: 'Benutzerdefinierte Felder',
+      milestones: 'Meilensteine',
+      users: 'Benutzer',
+      usersNew: '({count} neu)',
+      assets: 'Assets',
+      projectsToImport: 'Zu importierende Projekte'
+    },
+    import: {
+      importing: 'Importiere...',
+      starting: 'Import wird gestartet...',
+      complete: 'Import abgeschlossen!',
+      success: '{count} Vorgänge erfolgreich importiert.',
+      failed: '{count} Vorgänge konnten nicht importiert werden.',
+      ready: 'Bereit zum Import',
+      readyDesc: 'Klicken Sie auf "Import starten", um {count} Vorgänge zu importieren.',
+      progress: 'Fortschritt'
+    },
+    errors: {
+      connectionFailed: 'Verbindung zu Jira fehlgeschlagen',
+      loadProjectsFailed: 'Projekte konnten nicht geladen werden',
+      analyzeFailed: 'Projektanalyse fehlgeschlagen',
+      importFailed: 'Import konnte nicht gestartet werden',
+      loadConnectionsFailed: 'Verbindungen konnten nicht geladen werden',
+      deleteConnectionFailed: 'Verbindung konnte nicht gelöscht werden'
+    }
+  },
+
   sprints: {
     title: 'Sprints',
     subtitle: 'Sprint-Iterationen verwalten',

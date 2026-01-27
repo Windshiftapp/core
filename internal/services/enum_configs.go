@@ -1048,6 +1048,95 @@ func NewLinkTypeConfig() EnumConfig {
 	}
 }
 
+// NewItemTypeConfig returns the configuration for ItemType CRUD
+// Used primarily by the Jira import to create item types
+func NewItemTypeConfig() EnumConfig {
+	return EnumConfig{
+		TableName:      "item_types",
+		EntityName:     "Item type",
+		SelectColumns:  "id, name, description, is_default, icon, color, hierarchy_level, sort_order, created_at, updated_at",
+		DefaultOrderBy: "hierarchy_level ASC, sort_order ASC, name ASC",
+
+		ScanRow: func(rows *sql.Rows) (EnumEntity, error) {
+			var it models.ItemType
+			var description sql.NullString
+			err := rows.Scan(&it.ID, &it.Name, &description, &it.IsDefault,
+				&it.Icon, &it.Color, &it.HierarchyLevel, &it.SortOrder,
+				&it.CreatedAt, &it.UpdatedAt)
+			if description.Valid {
+				it.Description = description.String
+			}
+			return &it, err
+		},
+
+		ScanSingleRow: func(row *sql.Row) (EnumEntity, error) {
+			var it models.ItemType
+			var description sql.NullString
+			err := row.Scan(&it.ID, &it.Name, &description, &it.IsDefault,
+				&it.Icon, &it.Color, &it.HierarchyLevel, &it.SortOrder,
+				&it.CreatedAt, &it.UpdatedAt)
+			if description.Valid {
+				it.Description = description.String
+			}
+			return &it, err
+		},
+
+		ApplyDefaults: func(entity interface{}) {
+			it := entity.(*models.ItemType)
+			if it.Icon == "" {
+				it.Icon = "Circle"
+			}
+			if it.Color == "" {
+				it.Color = "#3B82F6"
+			}
+		},
+
+		Validate: func(entity interface{}, isUpdate bool) string {
+			it := entity.(*models.ItemType)
+			if strings.TrimSpace(it.Name) == "" {
+				return "Name is required"
+			}
+			return ""
+		},
+
+		CheckUnique: func(db database.Database, entity interface{}, excludeID int) (bool, error) {
+			it := entity.(*models.ItemType)
+			var exists bool
+			var err error
+			if excludeID == 0 {
+				err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM item_types WHERE name = ?)",
+					it.Name).Scan(&exists)
+			} else {
+				err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM item_types WHERE name = ? AND id != ?)",
+					it.Name, excludeID).Scan(&exists)
+			}
+			return exists, err
+		},
+
+		CheckDependencies: func(db database.Database, id int) string {
+			var count int
+			db.QueryRow("SELECT COUNT(*) FROM items WHERE item_type_id = ?", id).Scan(&count)
+			if count > 0 {
+				return fmt.Sprintf("Cannot delete item type that is in use by %d work item(s)", count)
+			}
+			return ""
+		},
+
+		InsertArgs: func(entity interface{}, now time.Time) (string, string, []interface{}) {
+			it := entity.(*models.ItemType)
+			return "name, description, is_default, icon, color, hierarchy_level, sort_order, created_at, updated_at",
+				"?, ?, ?, ?, ?, ?, ?, ?, ?",
+				[]interface{}{it.Name, it.Description, it.IsDefault, it.Icon, it.Color, it.HierarchyLevel, it.SortOrder, now, now}
+		},
+
+		UpdateArgs: func(entity interface{}, now time.Time) (string, []interface{}) {
+			it := entity.(*models.ItemType)
+			return "name = ?, description = ?, is_default = ?, icon = ?, color = ?, hierarchy_level = ?, sort_order = ?, updated_at = ?",
+				[]interface{}{it.Name, it.Description, it.IsDefault, it.Icon, it.Color, it.HierarchyLevel, it.SortOrder, now}
+		},
+	}
+}
+
 // NewRequestTypeConfig returns the configuration for RequestType CRUD
 func NewRequestTypeConfig() EnumConfig {
 	return EnumConfig{

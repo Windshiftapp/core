@@ -35,6 +35,7 @@ type Client interface {
 	ListStatuses(ctx context.Context) ([]JiraStatus, error)
 	GetStatusCategories(ctx context.Context) ([]JiraStatusCategory, error)
 	GetProjectWorkflowScheme(ctx context.Context, projectKey string) (*JiraWorkflow, error)
+	GetProjectIssueTypeStatuses(ctx context.Context, projectKey string) ([]JiraIssueTypeWithStatuses, error)
 
 	// Issues (Legacy - uses deprecated GET /rest/api/3/search)
 	SearchIssues(ctx context.Context, opts SearchOptions) (*SearchResult, error)
@@ -54,6 +55,9 @@ type Client interface {
 	// Attachments
 	DownloadAttachment(ctx context.Context, attachmentURL string) (io.ReadCloser, string, error)
 
+	// Users
+	GetUserEmail(ctx context.Context, accountID string) (string, error)
+
 	// Jira Assets (Insight) API
 	ListObjectSchemas(ctx context.Context) ([]AssetObjectSchema, error)
 	GetObjectSchema(ctx context.Context, schemaID string) (*AssetObjectSchema, error)
@@ -65,15 +69,16 @@ type Client interface {
 
 // Config contains configuration for the Jira client
 type Config struct {
-	InstanceURL     string        // e.g., https://company.atlassian.net
-	Email           string        // User email for Basic auth
-	APIToken        string        // API token
-	RateLimitPerSec int           // Rate limit (default: 10 requests/second)
-	Timeout         time.Duration // HTTP timeout (default: 30 seconds)
+	InstanceURL     string         // e.g., https://company.atlassian.net or https://jira.company.com
+	Email           string         // User email (Cloud) or username (Data Center) for Basic auth
+	APIToken        string         // API token or password
+	DeploymentType  DeploymentType // cloud or datacenter (default: cloud)
+	RateLimitPerSec int            // Rate limit (default: 10 requests/second)
+	Timeout         time.Duration  // HTTP timeout (default: 30 seconds)
 }
 
-// client implements the Client interface
-type client struct {
+// cloudClient implements the Client interface for Jira Cloud
+type cloudClient struct {
 	baseURL     string
 	assetsURL   string
 	agileURL    string
@@ -83,6 +88,7 @@ type client struct {
 }
 
 // NewClient creates a new Jira API client
+// Returns a Cloud or Data Center client based on cfg.DeploymentType
 func NewClient(cfg Config) (Client, error) {
 	// Validate and normalize the instance URL
 	baseURL := strings.TrimSuffix(cfg.InstanceURL, "/")
@@ -116,20 +122,35 @@ func NewClient(cfg Config) (Client, error) {
 		rateLimit = 10
 	}
 
-	return &client{
+	httpClient := &http.Client{
+		Timeout: timeout,
+	}
+	limiter := rate.NewLimiter(rate.Limit(rateLimit), rateLimit)
+
+	// Return appropriate client based on deployment type
+	if cfg.DeploymentType == DeploymentDataCenter {
+		return &dataCenterClient{
+			baseURL:    baseURL + "/rest/api/2", // Data Center uses API v2
+			agileURL:   baseURL + "/rest/agile/1.0",
+			authHeader: authHeader,
+			httpClient: httpClient,
+			limiter:    limiter,
+		}, nil
+	}
+
+	// Default to Cloud client
+	return &cloudClient{
 		baseURL:    baseURL + "/rest/api/3",
 		assetsURL:  baseURL + "/rest/assets/1.0",
 		agileURL:   baseURL + "/rest/agile/1.0",
 		authHeader: authHeader,
-		httpClient: &http.Client{
-			Timeout: timeout,
-		},
-		limiter: rate.NewLimiter(rate.Limit(rateLimit), rateLimit),
+		httpClient: httpClient,
+		limiter:    limiter,
 	}, nil
 }
 
 // do performs an HTTP request with rate limiting
-func (c *client) do(ctx context.Context, method, url string, body interface{}) (*http.Response, error) {
+func (c *cloudClient) do(ctx context.Context, method, url string, body interface{}) (*http.Response, error) {
 	// Wait for rate limiter
 	if err := c.limiter.Wait(ctx); err != nil {
 		return nil, err
@@ -158,13 +179,13 @@ func (c *client) do(ctx context.Context, method, url string, body interface{}) (
 }
 
 // setHeaders sets common headers for Jira API requests
-func (c *client) setHeaders(req *http.Request) {
+func (c *cloudClient) setHeaders(req *http.Request) {
 	req.Header.Set("Authorization", c.authHeader)
 	req.Header.Set("Accept", "application/json")
 }
 
 // handleErrorResponse handles non-2xx responses
-func (c *client) handleErrorResponse(resp *http.Response) error {
+func (c *cloudClient) handleErrorResponse(resp *http.Response) error {
 	body, _ := io.ReadAll(resp.Body)
 
 	switch resp.StatusCode {
@@ -190,7 +211,7 @@ func (c *client) handleErrorResponse(resp *http.Response) error {
 // ================================================================
 
 // TestConnection tests if the credentials are valid
-func (c *client) TestConnection(ctx context.Context) (*JiraInstanceInfo, error) {
+func (c *cloudClient) TestConnection(ctx context.Context) (*JiraInstanceInfo, error) {
 	// Use /myself endpoint to verify credentials
 	resp, err := c.do(ctx, "GET", c.baseURL+"/myself", nil)
 	if err != nil {
@@ -242,7 +263,7 @@ func (c *client) TestConnection(ctx context.Context) (*JiraInstanceInfo, error) 
 // ================================================================
 
 // ListProjects lists all projects accessible to the user
-func (c *client) ListProjects(ctx context.Context) ([]JiraProject, error) {
+func (c *cloudClient) ListProjects(ctx context.Context) ([]JiraProject, error) {
 	resp, err := c.do(ctx, "GET", c.baseURL+"/project?expand=description", nil)
 	if err != nil {
 		return nil, err
@@ -261,7 +282,7 @@ func (c *client) ListProjects(ctx context.Context) ([]JiraProject, error) {
 }
 
 // GetProject gets details about a specific project
-func (c *client) GetProject(ctx context.Context, projectKey string) (*JiraProject, error) {
+func (c *cloudClient) GetProject(ctx context.Context, projectKey string) (*JiraProject, error) {
 	resp, err := c.do(ctx, "GET", c.baseURL+"/project/"+url.PathEscape(projectKey), nil)
 	if err != nil {
 		return nil, err
@@ -284,7 +305,7 @@ func (c *client) GetProject(ctx context.Context, projectKey string) (*JiraProjec
 // ================================================================
 
 // ListIssueTypes lists all issue types in the instance
-func (c *client) ListIssueTypes(ctx context.Context) ([]JiraIssueType, error) {
+func (c *cloudClient) ListIssueTypes(ctx context.Context) ([]JiraIssueType, error) {
 	resp, err := c.do(ctx, "GET", c.baseURL+"/issuetype", nil)
 	if err != nil {
 		return nil, err
@@ -303,7 +324,7 @@ func (c *client) ListIssueTypes(ctx context.Context) ([]JiraIssueType, error) {
 }
 
 // GetProjectIssueTypes gets issue types available in a project
-func (c *client) GetProjectIssueTypes(ctx context.Context, projectKey string) ([]JiraIssueType, error) {
+func (c *cloudClient) GetProjectIssueTypes(ctx context.Context, projectKey string) ([]JiraIssueType, error) {
 	resp, err := c.do(ctx, "GET", c.baseURL+"/project/"+url.PathEscape(projectKey)+"/statuses", nil)
 	if err != nil {
 		return nil, err
@@ -341,7 +362,7 @@ func (c *client) GetProjectIssueTypes(ctx context.Context, projectKey string) ([
 // ================================================================
 
 // ListCustomFields lists all custom field definitions
-func (c *client) ListCustomFields(ctx context.Context) ([]JiraCustomField, error) {
+func (c *cloudClient) ListCustomFields(ctx context.Context) ([]JiraCustomField, error) {
 	resp, err := c.do(ctx, "GET", c.baseURL+"/field", nil)
 	if err != nil {
 		return nil, err
@@ -369,7 +390,7 @@ func (c *client) ListCustomFields(ctx context.Context) ([]JiraCustomField, error
 
 // GetProjectFields returns only custom fields used by specific projects
 // Uses the stable GET /rest/api/3/field/search endpoint with projectIds filter
-func (c *client) GetProjectFields(ctx context.Context, projectIDs []string) ([]JiraCustomField, error) {
+func (c *cloudClient) GetProjectFields(ctx context.Context, projectIDs []string) ([]JiraCustomField, error) {
 	if len(projectIDs) == 0 {
 		return nil, fmt.Errorf("at least one project ID is required")
 	}
@@ -437,7 +458,7 @@ func (c *client) GetProjectFields(ctx context.Context, projectIDs []string) ([]J
 // ================================================================
 
 // ListStatuses lists all statuses in the instance
-func (c *client) ListStatuses(ctx context.Context) ([]JiraStatus, error) {
+func (c *cloudClient) ListStatuses(ctx context.Context) ([]JiraStatus, error) {
 	resp, err := c.do(ctx, "GET", c.baseURL+"/status", nil)
 	if err != nil {
 		return nil, err
@@ -456,7 +477,7 @@ func (c *client) ListStatuses(ctx context.Context) ([]JiraStatus, error) {
 }
 
 // GetStatusCategories gets all status categories
-func (c *client) GetStatusCategories(ctx context.Context) ([]JiraStatusCategory, error) {
+func (c *cloudClient) GetStatusCategories(ctx context.Context) ([]JiraStatusCategory, error) {
 	resp, err := c.do(ctx, "GET", c.baseURL+"/statuscategory", nil)
 	if err != nil {
 		return nil, err
@@ -475,7 +496,7 @@ func (c *client) GetStatusCategories(ctx context.Context) ([]JiraStatusCategory,
 }
 
 // GetProjectWorkflowScheme gets the workflow scheme for a project
-func (c *client) GetProjectWorkflowScheme(ctx context.Context, projectKey string) (*JiraWorkflow, error) {
+func (c *cloudClient) GetProjectWorkflowScheme(ctx context.Context, projectKey string) (*JiraWorkflow, error) {
 	// Get project statuses which includes workflow information
 	resp, err := c.do(ctx, "GET", c.baseURL+"/project/"+url.PathEscape(projectKey)+"/statuses", nil)
 	if err != nil {
@@ -515,12 +536,31 @@ func (c *client) GetProjectWorkflowScheme(ctx context.Context, projectKey string
 	}, nil
 }
 
+// GetProjectIssueTypeStatuses gets issue types with their available statuses for a project
+func (c *cloudClient) GetProjectIssueTypeStatuses(ctx context.Context, projectKey string) ([]JiraIssueTypeWithStatuses, error) {
+	resp, err := c.do(ctx, "GET", c.baseURL+"/project/"+url.PathEscape(projectKey)+"/statuses", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.handleErrorResponse(resp)
+	}
+
+	var result []JiraIssueTypeWithStatuses
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 // ================================================================
 // Issue Methods
 // ================================================================
 
 // SearchIssues searches for issues using JQL
-func (c *client) SearchIssues(ctx context.Context, opts SearchOptions) (*SearchResult, error) {
+func (c *cloudClient) SearchIssues(ctx context.Context, opts SearchOptions) (*SearchResult, error) {
 	// Build URL with query parameters
 	params := url.Values{}
 	if opts.JQL != "" {
@@ -557,7 +597,7 @@ func (c *client) SearchIssues(ctx context.Context, opts SearchOptions) (*SearchR
 }
 
 // GetIssue gets a single issue by key
-func (c *client) GetIssue(ctx context.Context, issueKey string, expand []string) (*JiraIssue, error) {
+func (c *cloudClient) GetIssue(ctx context.Context, issueKey string, expand []string) (*JiraIssue, error) {
 	params := url.Values{}
 	if len(expand) > 0 {
 		params.Set("expand", strings.Join(expand, ","))
@@ -586,7 +626,7 @@ func (c *client) GetIssue(ctx context.Context, issueKey string, expand []string)
 }
 
 // GetIssueCount gets the total number of issues in a project using the new JQL search endpoint
-func (c *client) GetIssueCount(ctx context.Context, projectKey string, openOnly bool) (int, error) {
+func (c *cloudClient) GetIssueCount(ctx context.Context, projectKey string, openOnly bool) (int, error) {
 	jql := fmt.Sprintf("project = %s", projectKey)
 	if openOnly {
 		jql += " AND statusCategory != Done"
@@ -615,7 +655,7 @@ func (c *client) GetIssueCount(ctx context.Context, projectKey string, openOnly 
 
 // countAllIssues counts issues by paginating through all results
 // This is a fallback when the total field is not available
-func (c *client) countAllIssues(ctx context.Context, jql string) (int, error) {
+func (c *cloudClient) countAllIssues(ctx context.Context, jql string) (int, error) {
 	count := 0
 	nextPageToken := ""
 
@@ -642,7 +682,7 @@ func (c *client) countAllIssues(ctx context.Context, jql string) (int, error) {
 }
 
 // SearchIssuesJQL searches for issues using the new POST /rest/api/3/search/jql endpoint
-func (c *client) SearchIssuesJQL(ctx context.Context, req JQLSearchRequest) (*JQLSearchResponse, error) {
+func (c *cloudClient) SearchIssuesJQL(ctx context.Context, req JQLSearchRequest) (*JQLSearchResponse, error) {
 	resp, err := c.do(ctx, "POST", c.baseURL+"/search/jql", req)
 	if err != nil {
 		return nil, err
@@ -662,7 +702,7 @@ func (c *client) SearchIssuesJQL(ctx context.Context, req JQLSearchRequest) (*JQ
 
 // BulkFetchIssues fetches multiple issues by their IDs or keys
 // Uses POST /rest/api/3/issue/bulkfetch
-func (c *client) BulkFetchIssues(ctx context.Context, req BulkFetchRequest) (*BulkFetchResponse, error) {
+func (c *cloudClient) BulkFetchIssues(ctx context.Context, req BulkFetchRequest) (*BulkFetchResponse, error) {
 	resp, err := c.do(ctx, "POST", c.baseURL+"/issue/bulkfetch", req)
 	if err != nil {
 		return nil, err
@@ -682,7 +722,7 @@ func (c *client) BulkFetchIssues(ctx context.Context, req BulkFetchRequest) (*Bu
 
 // GetAllIssueKeys retrieves all issue keys matching a JQL query
 // Paginates through all results using nextPageToken
-func (c *client) GetAllIssueKeys(ctx context.Context, jql string) ([]string, error) {
+func (c *cloudClient) GetAllIssueKeys(ctx context.Context, jql string) ([]string, error) {
 	var keys []string
 	nextPageToken := ""
 
@@ -715,7 +755,7 @@ func (c *client) GetAllIssueKeys(ctx context.Context, jql string) ([]string, err
 // ================================================================
 
 // GetProjectVersions gets all versions for a project
-func (c *client) GetProjectVersions(ctx context.Context, projectKey string) ([]JiraVersion, error) {
+func (c *cloudClient) GetProjectVersions(ctx context.Context, projectKey string) ([]JiraVersion, error) {
 	resp, err := c.do(ctx, "GET", c.baseURL+"/project/"+url.PathEscape(projectKey)+"/versions", nil)
 	if err != nil {
 		return nil, err
@@ -734,7 +774,7 @@ func (c *client) GetProjectVersions(ctx context.Context, projectKey string) ([]J
 }
 
 // ListBoards lists all Agile boards for a project
-func (c *client) ListBoards(ctx context.Context, projectKey string) (*BoardListResult, error) {
+func (c *cloudClient) ListBoards(ctx context.Context, projectKey string) (*BoardListResult, error) {
 	params := url.Values{}
 	if projectKey != "" {
 		params.Set("projectKeyOrId", projectKey)
@@ -758,7 +798,7 @@ func (c *client) ListBoards(ctx context.Context, projectKey string) (*BoardListR
 }
 
 // GetBoardSprints gets all sprints for a board
-func (c *client) GetBoardSprints(ctx context.Context, boardID int) (*SprintListResult, error) {
+func (c *cloudClient) GetBoardSprints(ctx context.Context, boardID int) (*SprintListResult, error) {
 	resp, err := c.do(ctx, "GET", fmt.Sprintf("%s/board/%d/sprint", c.agileURL, boardID), nil)
 	if err != nil {
 		return nil, err
@@ -781,7 +821,7 @@ func (c *client) GetBoardSprints(ctx context.Context, boardID int) (*SprintListR
 // ================================================================
 
 // DownloadAttachment downloads an attachment and returns the reader and content type
-func (c *client) DownloadAttachment(ctx context.Context, attachmentURL string) (io.ReadCloser, string, error) {
+func (c *cloudClient) DownloadAttachment(ctx context.Context, attachmentURL string) (io.ReadCloser, string, error) {
 	if err := c.limiter.Wait(ctx); err != nil {
 		return nil, "", err
 	}
@@ -807,11 +847,48 @@ func (c *client) DownloadAttachment(ctx context.Context, attachmentURL string) (
 }
 
 // ================================================================
+// User Methods
+// ================================================================
+
+// GetUserEmail fetches a user's email address by account ID
+// This is needed because Jira Cloud omits email addresses from standard API responses
+// Reference: https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-users/#api-rest-api-3-user-email-get
+func (c *cloudClient) GetUserEmail(ctx context.Context, accountID string) (string, error) {
+	if accountID == "" {
+		return "", nil
+	}
+
+	resp, err := c.do(ctx, "GET", c.baseURL+"/user/email?accountId="+url.QueryEscape(accountID), nil)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	// 404 means user not found or email not available - return empty string, not error
+	if resp.StatusCode == http.StatusNotFound {
+		return "", nil
+	}
+	// 403 means the user doesn't have permission to view emails
+	if resp.StatusCode == http.StatusForbidden {
+		return "", nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", c.handleErrorResponse(resp)
+	}
+
+	var result UserEmailResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+	return result.Email, nil
+}
+
+// ================================================================
 // Jira Assets (Insight) Methods
 // ================================================================
 
 // ListObjectSchemas lists all object schemas in Assets
-func (c *client) ListObjectSchemas(ctx context.Context) ([]AssetObjectSchema, error) {
+func (c *cloudClient) ListObjectSchemas(ctx context.Context) ([]AssetObjectSchema, error) {
 	resp, err := c.do(ctx, "GET", c.assetsURL+"/objectschema/list", nil)
 	if err != nil {
 		return nil, err
@@ -835,7 +912,7 @@ func (c *client) ListObjectSchemas(ctx context.Context) ([]AssetObjectSchema, er
 }
 
 // GetObjectSchema gets a single object schema by ID
-func (c *client) GetObjectSchema(ctx context.Context, schemaID string) (*AssetObjectSchema, error) {
+func (c *cloudClient) GetObjectSchema(ctx context.Context, schemaID string) (*AssetObjectSchema, error) {
 	resp, err := c.do(ctx, "GET", c.assetsURL+"/objectschema/"+url.PathEscape(schemaID), nil)
 	if err != nil {
 		return nil, err
@@ -854,7 +931,7 @@ func (c *client) GetObjectSchema(ctx context.Context, schemaID string) (*AssetOb
 }
 
 // ListObjectTypes lists all object types in a schema
-func (c *client) ListObjectTypes(ctx context.Context, schemaID string) ([]AssetObjectType, error) {
+func (c *cloudClient) ListObjectTypes(ctx context.Context, schemaID string) ([]AssetObjectType, error) {
 	resp, err := c.do(ctx, "GET", c.assetsURL+"/objectschema/"+url.PathEscape(schemaID)+"/objecttypes/flat", nil)
 	if err != nil {
 		return nil, err
@@ -873,7 +950,7 @@ func (c *client) ListObjectTypes(ctx context.Context, schemaID string) ([]AssetO
 }
 
 // GetObjectTypeAttributes gets all attributes for an object type
-func (c *client) GetObjectTypeAttributes(ctx context.Context, objectTypeID string) ([]AssetObjectAttribute, error) {
+func (c *cloudClient) GetObjectTypeAttributes(ctx context.Context, objectTypeID string) ([]AssetObjectAttribute, error) {
 	resp, err := c.do(ctx, "GET", c.assetsURL+"/objecttype/"+url.PathEscape(objectTypeID)+"/attributes", nil)
 	if err != nil {
 		return nil, err
@@ -892,7 +969,7 @@ func (c *client) GetObjectTypeAttributes(ctx context.Context, objectTypeID strin
 }
 
 // SearchObjects searches for objects in a schema
-func (c *client) SearchObjects(ctx context.Context, opts ObjectSearchOptions) (*ObjectSearchResult, error) {
+func (c *cloudClient) SearchObjects(ctx context.Context, opts ObjectSearchOptions) (*ObjectSearchResult, error) {
 	// Build the request body for object search
 	reqBody := map[string]interface{}{
 		"objectSchemaId": opts.ObjectSchemaID,
@@ -925,7 +1002,7 @@ func (c *client) SearchObjects(ctx context.Context, opts ObjectSearchOptions) (*
 }
 
 // GetObjectCount gets the total number of objects in a schema
-func (c *client) GetObjectCount(ctx context.Context, schemaID string) (int, error) {
+func (c *cloudClient) GetObjectCount(ctx context.Context, schemaID string) (int, error) {
 	schema, err := c.GetObjectSchema(ctx, schemaID)
 	if err != nil {
 		return 0, err

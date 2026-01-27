@@ -104,22 +104,6 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify the link type exists and is active
-	var linkTypeActive bool
-	err := h.db.QueryRow("SELECT active FROM link_types WHERE id = ?", link.LinkTypeID).Scan(&linkTypeActive)
-	if err == sql.ErrNoRows {
-		http.Error(w, "Link type not found", http.StatusBadRequest)
-		return
-	}
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if !linkTypeActive {
-		http.Error(w, "Link type is not active", http.StatusBadRequest)
-		return
-	}
-
 	// Special validation for "Tests" link type (ID = 1)
 	// This link type can only link between items and test cases, not between same entity types
 	if link.LinkTypeID == 1 {
@@ -137,7 +121,7 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 
 	// Check if link already exists (in either direction)
 	var existingID int
-	err = h.db.QueryRow(`
+	err := h.db.QueryRow(`
 		SELECT id FROM item_links
 		WHERE (source_type = ? AND source_id = ? AND target_type = ? AND target_id = ?)
 		   OR (source_type = ? AND source_id = ? AND target_type = ? AND target_id = ?)
@@ -161,26 +145,27 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 	}
 	createdBy := currentUser.ID
 
-	now := time.Now()
-
-	var id int64
-	err = h.db.QueryRow(`
-		INSERT INTO item_links (link_type_id, source_type, source_id, target_type, target_id, created_by, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
-	`, link.LinkTypeID, link.SourceType, link.SourceID, link.TargetType, link.TargetID, createdBy, now).Scan(&id)
-
+	// Create link via service (handles link type validation + insert)
+	linkSvc := services.NewItemLinkService(h.db)
+	id, err := linkSvc.CreateLink(services.CreateItemLinkParams{
+		LinkTypeID: link.LinkTypeID,
+		SourceType: link.SourceType,
+		SourceID:   link.SourceID,
+		TargetType: link.TargetType,
+		TargetID:   link.TargetID,
+		CreatedBy:  &createdBy,
+	})
 	if err != nil {
-		// Check for unique constraint violation
-		if err.Error() == "UNIQUE constraint failed: item_links.link_type_id, item_links.source_type, item_links.source_id, item_links.target_type, item_links.target_id" {
-			http.Error(w, "Link already exists", http.StatusConflict)
-		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if id == 0 {
+		http.Error(w, "Link already exists", http.StatusConflict)
 		return
 	}
 
 	link.ID = int(id)
-	link.CreatedAt = now
+	link.CreatedAt = time.Now()
 
 	// Get the created link with full details
 	createdLink, err := h.getLinkByID(int(id))

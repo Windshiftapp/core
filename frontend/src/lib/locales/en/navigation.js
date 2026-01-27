@@ -25,6 +25,7 @@ export default {
     searchWorkspaces: 'Search workspaces...',
     noWorkspacesMatch: 'No workspaces match your search',
     noWorkspacesFound: 'No workspaces found',
+    searchToFindMore: 'Search to find more workspaces...',
     loadingSearch: 'Loading Search...',
     loadingCreateForm: 'Loading Create Form...',
     loading: 'Loading...',
