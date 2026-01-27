@@ -413,19 +413,16 @@
           const data = source.data;
           if (data.type === 'work-item') {
             if (isValidTransition(data.item.id, data.item.status_id, statusId)) {
-              // Valid drop - use border and shadow for highlight
-              element.style.borderColor = 'var(--ds-border-focused)';
+              // Valid drop - use inset shadow for highlight (preserve column border colors)
               element.style.boxShadow = 'inset 0 0 0 2px var(--ds-border-focused)';
             } else {
-              // Invalid drop - use border and shadow for highlight
-              element.style.borderColor = 'var(--ds-border-danger)';
+              // Invalid drop - use inset shadow for highlight (preserve column border colors)
               element.style.boxShadow = 'inset 0 0 0 2px var(--ds-border-danger)';
             }
           }
         },
         onDragLeave: () => {
           // Reset styles
-          element.style.borderColor = styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
           element.style.boxShadow = '';
         },
         onDrop: async ({ source }) => {
@@ -461,7 +458,6 @@
     // Reset all status column styles to their default state
     const statusColumns = document.querySelectorAll('[data-status-column]');
     statusColumns.forEach(element => {
-      element.style.borderColor = styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
       element.style.boxShadow = '';
     });
   }
@@ -727,7 +723,7 @@
               data-status-column
               data-status-id={column.status_ids[0]}
             >
-              <div class="p-4 border-b border-l-4" style="border-bottom-color: {styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'}; border-left-color: {column.color};">
+              <div class="p-4 border-b border-t-4" style="border-bottom-color: {styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'}; border-top-color: {column.color};">
                 <h3 class="font-semibold" style={styles.glassTextStyle}>{column.name}</h3>
                 <div class="flex items-center justify-between">
                   <span class="text-sm" style={styles.glassSubtleTextStyle}>{columnItems.length} {t('items.item')}</span>

@@ -143,7 +143,7 @@ export function useGradientStyles() {
         columnStyle(blur = 12) {
             return hasGradient
                 ? `backdrop-filter: blur(${blur}px); background-color: var(--ds-glass-bg); border-color: var(--ds-glass-border);`
-                : 'background-color: var(--ds-surface-raised); border-color: var(--ds-border);';
+                : 'background-color: var(--ds-surface); border-color: var(--ds-border);';
         },
 
         /**
