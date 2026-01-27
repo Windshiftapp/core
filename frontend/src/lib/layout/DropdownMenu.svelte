@@ -1,8 +1,9 @@
 <script>
-  import { createDropdownMenu, melt } from '@melt-ui/svelte';
+  import { createPopover, melt } from '@melt-ui/svelte';
   import { ChevronDown } from 'lucide-svelte';
   import { getTextColorForBackground } from '../utils/statusColors.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { tick } from 'svelte';
 
   export let triggerText = '';
   export let triggerIcon = null;
@@ -20,39 +21,43 @@
   export let iconOnly = false; // New prop for icon-only buttons
   export let onOpen = null; // Callback when dropdown opens
   export let triggerAlignment = 'center'; // 'center', 'start', 'between'
-  
-  // Create dropdown menu
+
+  // Create popover (replaces createDropdownMenu to avoid typeahead focus-stealing)
   const {
-    elements: { trigger, menu, item },
+    elements: { trigger, content },
     states: { open }
-  } = createDropdownMenu({
+  } = createPopover({
     forceVisible: true,
     positioning: {
       placement: placement || 'bottom'
-    }
+    },
+    portal: 'body'
   });
-  
-  // Watch for open state changes and call onOpen callback
-  $: if ($open && onOpen) {
-    onOpen();
-  }
 
-  $: alignmentClass = triggerAlignment === 'between'
-    ? 'justify-between'
-    : triggerAlignment === 'start'
-      ? 'justify-start'
-      : 'justify-center';
-  
-  // Track if we have a search input in the dropdown
-  $: hasSearchInput = items.some(item => item.type === 'search');
-  
-  // Watch for dropdown close and blur the trigger
+  // Watch for open state changes
   let previousOpen = false;
   let triggerElement;
   let searchInputElement;
-  let hasSearchInput = false;
+
+  $: hasSearchInput = items.some(i => i.type === 'search');
+
   $: {
-    if (previousOpen && !$open) {
+    if ($open && !previousOpen) {
+      // Dropdown just opened
+      if (onOpen) onOpen();
+      tick().then(() => {
+        if (searchInputElement) {
+          searchInputElement.focus();
+        } else {
+          // Focus first menu item for non-search dropdowns
+          const container = document.querySelector('[data-menu-container]');
+          if (container) {
+            const firstItem = container.querySelector('button[data-menu-item]');
+            if (firstItem) firstItem.focus();
+          }
+        }
+      });
+    } else if (previousOpen && !$open) {
       // Dropdown just closed, blur the trigger element
       if (triggerElement) {
         triggerElement.blur();
@@ -60,9 +65,48 @@
     }
     previousOpen = $open;
   }
-  
+
+  $: alignmentClass = triggerAlignment === 'between'
+    ? 'justify-between'
+    : triggerAlignment === 'start'
+      ? 'justify-start'
+      : 'justify-center';
+
   function closeMenu() {
     if ($open) {
+      open.set(false);
+    }
+  }
+
+  function handleMenuKeydown(e) {
+    const focusableItems = [...e.currentTarget.querySelectorAll('button[data-menu-item]')];
+    const currentIndex = focusableItems.indexOf(document.activeElement);
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const next = currentIndex + 1;
+      if (next < focusableItems.length) {
+        focusableItems[next].focus();
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (currentIndex <= 0 && searchInputElement) {
+        searchInputElement.focus();
+      } else if (currentIndex > 0) {
+        focusableItems[currentIndex - 1].focus();
+      }
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      if (focusableItems.length > 0) {
+        focusableItems[0].focus();
+      }
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      if (focusableItems.length > 0) {
+        focusableItems[focusableItems.length - 1].focus();
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
       open.set(false);
     }
   }
@@ -129,7 +173,10 @@
 <!-- Dropdown Menu -->
 {#if $open}
   <div
-    use:melt={$menu}
+    use:melt={$content}
+    data-menu-container
+    role="menu"
+    onkeydown={handleMenuKeydown}
     class="{maxWidth} rounded shadow-xl border focus:outline-none z-[60]"
     style="background-color: var(--ds-surface-raised); border-color: var(--ds-border); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 10px 10px -5px rgba(0, 0, 0, 0.15);"
   >
@@ -150,7 +197,12 @@
               onkeydown={(e) => {
                 // Allow arrow down and tab to navigate to menu items
                 if (e.key === 'ArrowDown' || (e.key === 'Tab' && !e.shiftKey)) {
-                  // Don't preventDefault, let Melt UI handle the navigation
+                  e.preventDefault();
+                  const container = e.target.closest('[data-menu-container]');
+                  if (container) {
+                    const firstItem = container.querySelector('button[data-menu-item]');
+                    if (firstItem) firstItem.focus();
+                  }
                   return;
                 }
                 // Stop propagation for other keys to prevent closing dropdown while typing
@@ -166,15 +218,9 @@
         {:else if itemData.type === 'group'}
           {#each itemData.items as groupItem (groupItem.id)}
             <button
-              use:melt={$item}
+              data-menu-item
+              role="menuitem"
               onclick={(e) => handleItemClick(groupItem, e)}
-              onkeydown={(e) => {
-                if (e.key === 'ArrowUp' && hasSearchInput && searchInputElement) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  searchInputElement.focus();
-                }
-              }}
               class="flex items-center w-full px-4 py-3 text-sm transition-all duration-200 cursor-pointer {groupItem.class || 'group'}"
               style="color: {groupItem.color || 'var(--ds-text)'};"
               onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-pressed)'}
@@ -201,7 +247,7 @@
                   <svelte:component this={groupItem.icon} class="w-4 h-4 mr-3 {groupItem.iconClass || 'transition-colors'}" style="color: var(--ds-icon-subtle);" />
                 {/if}
               {/if}
-              
+
               {#if groupItem.content}
                 <!-- Custom content slot -->
                 <div class="flex-1 text-left">
@@ -225,15 +271,9 @@
         {:else}
           <!-- Regular item -->
           <button
-            use:melt={$item}
+            data-menu-item
+            role="menuitem"
             onclick={(e) => handleItemClick(itemData, e)}
-            onkeydown={(e) => {
-              if (e.key === 'ArrowUp' && hasSearchInput && searchInputElement) {
-                e.preventDefault();
-                e.stopPropagation();
-                searchInputElement.focus();
-              }
-            }}
             class="flex items-center w-full px-4 py-3 text-sm transition-all duration-200 cursor-pointer {itemData.class || ''}"
             style="color: {itemData.color || 'var(--ds-text)'}; {itemData.style || ''}"
             onmouseenter={(e) => { if (!itemData.style) e.currentTarget.style.backgroundColor = 'var(--ds-surface-pressed)'; }}
@@ -257,7 +297,7 @@
                 <svelte:component this={itemData.icon} class="w-4 h-4 mr-3 {itemData.iconClass || ''}" />
               {/if}
             {/if}
-            
+
             <div class="flex-1 text-left">
               {#if itemData.content}
                 <!-- Custom content slot -->
@@ -270,7 +310,7 @@
                 {/if}
               {/if}
             </div>
-            
+
             {#if itemData.badge}
               <span class="ml-auto text-xs {itemData.badgeClass || ''}" style="{itemData.badgeStyle || (itemData.badgeClass ? '' : 'color: var(--ds-text-subtlest);')}">{itemData.badge}</span>
             {/if}

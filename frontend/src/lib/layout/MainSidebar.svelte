@@ -49,7 +49,10 @@
 
     // Add workspace items
     if (filteredWorkspaces.length > 0) {
-      const workspaceItems = filteredWorkspaces.map(workspace => {
+      const maxVisible = 10;
+      const hasMore = filteredWorkspaces.length > maxVisible;
+      const visibleWorkspaces = filteredWorkspaces.slice(0, maxVisible);
+      const workspaceItems = visibleWorkspaces.map(workspace => {
         const hasAvatar = workspace.avatar_url;
         const workspaceIcon = workspaceIconMap[workspace.icon] || workspaceIconMap.Package;
 
@@ -65,10 +68,11 @@
         };
       });
 
-      items.push(
-        { type: 'group', items: workspaceItems },
-        { type: 'divider' }
-      );
+      items.push({ type: 'group', items: workspaceItems });
+      if (hasMore) {
+        items.push({ type: 'text', text: t('nav.searchToFindMore') });
+      }
+      items.push({ type: 'divider' });
     } else if ($workspacesStore.regularWorkspaces.length > 0 && workspaceSearchQuery) {
       // Show "no results" only if there are workspaces but search didn't match
       items.push(
