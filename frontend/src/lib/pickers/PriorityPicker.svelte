@@ -9,6 +9,7 @@
   // Props
   let {
     workspaceId,
+    items = null,  // Pre-loaded priority items, skips API fetch when provided
     selectedPriorityId = $bindable(null),
     onChange = () => {},
     disabled = false,
@@ -40,9 +41,12 @@
     getLabel: (item) => item.name
   };
 
-  // Reactive: Load priorities when workspaceId changes
+  // Reactive: Use provided items or fetch when workspaceId changes
   $effect(() => {
-    if (workspaceId) {
+    if (items) {
+      priorities = [...items].sort((a, b) => a.sort_order - b.sort_order);
+      loading = false;
+    } else if (workspaceId) {
       loadPriorities();
     }
   });
@@ -89,7 +93,9 @@
   }
 
   onMount(() => {
-    loadPriorities();
+    if (!items) {
+      loadPriorities();
+    }
   });
 </script>
 

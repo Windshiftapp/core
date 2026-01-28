@@ -9,7 +9,7 @@
   import TimeTrackingOnboarding from './TimeTrackingOnboarding.svelte';
   import TimeLogModal from '../../dialogs/TimeLogModal.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
-  import { createShortcutHandler } from '../../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
 
   let worklogs = $state([]);
@@ -39,15 +39,6 @@
     filters.date_from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     filters.date_to = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
     await loadWorklogs();
-
-    function handleKeydown(event) {
-      createShortcutHandler({
-        openLog: openLogTimeModal
-      }, 'timeEntry', { guard: () => !showTimeLogModal })(event);
-    }
-
-    window.addEventListener('keydown', handleKeydown);
-    return () => window.removeEventListener('keydown', handleKeydown);
   });
 
   async function loadWorklogs() {
@@ -231,6 +222,7 @@
     icon={Plus}
     onclick={openLogTimeModal}
     keyboardHint="A"
+    hotkeyConfig={{ key: toHotkeyString('timeEntry', 'openLog'), guard: () => !showTimeLogModal }}
     title={t('time.entry.addTimeEntry')}
   >
     {t('time.logTime')}

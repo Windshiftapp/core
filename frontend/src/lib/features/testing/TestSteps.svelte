@@ -8,7 +8,7 @@
   import Label from '../../components/Label.svelte';
   import Spinner from '../../components/Spinner.svelte';
   import DataTable from '../../components/DataTable.svelte';
-  import { createShortcutHandler } from '../../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
 
   let { workspaceId = null } = $props();
@@ -50,16 +50,6 @@
       loadData(currentTestCaseId);
     }
   });
-
-  // Global keyboard shortcut handler using centralized system
-  // Note: handler is created as a function that returns a new handler each render
-  // to ensure it captures the current showStepForm state
-  function handleGlobalKeydown(event) {
-    createShortcutHandler({
-      addStep: showAddStepForm
-    }, 'testSteps', { guard: () => !showStepForm })(event);
-  }
-
 
   async function loadData(id) {
     if (!id) return;
@@ -217,8 +207,6 @@
   }
 </script>
 
-<svelte:window onkeydown={handleGlobalKeydown} />
-
 <!-- Header -->
 <div class="p-6 pb-0">
   {#if loading}
@@ -257,6 +245,7 @@
             icon={Plus}
             size="medium"
             keyboardHint="A"
+            hotkeyConfig={{ key: toHotkeyString('testSteps', 'addStep'), guard: () => !showStepForm }}
           >
             {t('testing.addTestStep')}
           </Button>

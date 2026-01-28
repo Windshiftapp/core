@@ -12,7 +12,7 @@
   import Toggle from '../components/Toggle.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
-  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
 
   // System-protected status IDs (cannot be deleted)
@@ -38,13 +38,6 @@
     await loadStatusCategories();
     await loadStatuses();
   });
-
-  // Global keyboard shortcut handler
-  function handleGlobalKeydown(event) {
-    createShortcutHandler({
-      add: startCreate
-    }, 'statuses', { guard: () => !showCreateForm })(event);
-  }
 
   async function loadStatusCategories() {
     try {
@@ -258,8 +251,6 @@
   ]);
 </script>
 
-<svelte:window onkeydown={handleGlobalKeydown} />
-
 <div style="background-color: var(--ds-surface); min-height: 100vh;">
   <PageHeader
     icon={GitBranch}
@@ -274,6 +265,7 @@
         onclick={startCreate}
         disabled={statusCategories.length === 0}
         keyboardHint="A"
+        hotkeyConfig={{ key: toHotkeyString('statuses', 'add'), guard: () => !showCreateForm }}
       >
         {t('statuses.createStatus')}
       </Button>

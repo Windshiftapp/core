@@ -13,7 +13,7 @@
   import Modal from '../../dialogs/Modal.svelte';
   import Label from '../../components/Label.svelte';
   import SearchInput from '../../components/SearchInput.svelte';
-  import { matchesShortcut } from '../../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
 
   let workflows = $state([]);
   let searchQuery = $state('');
@@ -40,14 +40,6 @@
   onMount(async () => {
     await loadStatuses();
     await loadWorkflows();
-    
-    // Add global keydown listener for 'a' shortcut
-    document.addEventListener('keydown', handleGlobalKeydown);
-    
-    // Cleanup on unmount
-    return () => {
-      document.removeEventListener('keydown', handleGlobalKeydown);
-    };
   });
 
   async function loadStatuses() {
@@ -150,17 +142,6 @@
     }
   }
 
-  function handleGlobalKeydown(event) {
-    // Check for 'a' key to add new workflow
-    if (matchesShortcut(event, { key: 'a' }) && !creating && !editingId) {
-      const target = event.target;
-      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.contentEditable.includes('true')) {
-        event.preventDefault();
-        startCreate();
-      }
-    }
-  }
-
   function buildWorkflowDropdownItems(workflow) {
     return [
       {
@@ -242,6 +223,7 @@
           onclick={startCreate}
           disabled={statuses.length === 0}
           keyboardHint="A"
+          hotkeyConfig={{ key: toHotkeyString('workflow', 'add'), guard: () => !creating && !editingId }}
         >
           {t('workflows.createWorkflow')}
         </Button>

@@ -15,7 +15,7 @@
   import Input from '../components/Input.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import ColorPicker from '../editors/ColorPicker.svelte';
-  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 
   const dispatch = createEventDispatcher();
 
@@ -42,12 +42,6 @@
       loadHierarchyLevels()
     ]);
   });
-
-  function handleGlobalKeydown(event) {
-    createShortcutHandler({
-      add: startCreate
-    }, 'itemTypes', { guard: () => !showCreateForm })(event);
-  }
 
   async function loadItemTypes() {
     try {
@@ -221,8 +215,6 @@
   }
 </script>
 
-<svelte:window onkeydown={handleGlobalKeydown} />
-
 <PageHeader
   icon={FileText}
   title={t('settings.itemTypes.title')}
@@ -235,6 +227,7 @@
       onclick={startCreate}
       disabled={isLoading}
       keyboardHint="A"
+      hotkeyConfig={{ key: toHotkeyString('itemTypes', 'add'), guard: () => !showCreateForm }}
     >
       {t('settings.itemTypes.addItemType')}
     </Button>

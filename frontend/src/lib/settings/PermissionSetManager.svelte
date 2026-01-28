@@ -10,7 +10,7 @@
   import Textarea from '../components/Textarea.svelte';
   import Label from '../components/Label.svelte';
   import { confirm } from '../composables/useConfirm.js';
-  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 
   let permissionSets = $state([]);
   let loading = $state(true);
@@ -25,12 +25,6 @@
   onMount(async () => {
     await loadPermissionSets();
   });
-
-  function handleGlobalKeydown(event) {
-    createShortcutHandler({
-      add: startCreate
-    }, 'permissionSets', { guard: () => !showCreateModal })(event);
-  }
 
   function handleModalKeydown(event) {
     // Enter to submit (only if not in textarea)
@@ -160,8 +154,6 @@
   ]);
 </script>
 
-<svelte:window onkeydown={handleGlobalKeydown} />
-
 <div class="space-y-6">
   <PageHeader
     title={t('settings.permissionSets.title')}
@@ -169,7 +161,7 @@
     icon={Shield}
   >
     {#snippet actions()}
-      <Button onclick={startCreate} size="sm" variant="primary" keyboardHint="A">
+      <Button onclick={startCreate} size="sm" variant="primary" keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('permissionSets', 'add'), guard: () => !showCreateModal }}>
         <Plus class="w-4 h-4 mr-2" />
         {t('settings.permissionSets.createPermissionSet')}
       </Button>

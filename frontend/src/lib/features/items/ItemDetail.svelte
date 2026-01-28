@@ -1,9 +1,12 @@
 <script>
   import { onMount, onDestroy, untrack } from 'svelte';
+  import { useEventListener } from 'runed';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { workspacePermissions } from '../../stores';
   import { t } from '../../stores/i18n.svelte.js';
+  import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
+  import { install, uninstall } from '@github/hotkey';
   import { Trash2, FileText, AlertCircle, X, Maximize2, Minimize2, Copy } from 'lucide-svelte';
   import { scale, fly } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
@@ -227,60 +230,55 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     isFullscreen = !isFullscreen;
   }
 
-  function handleKeydown(event) {
-    if (event.key === 'Escape') {
-      // Only handle ESC in modal mode
-      if (!isModal) return;
+  // Handle Escape key manually (needs complex modal/editing state checks)
+  useEventListener(() => document, 'keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    if (!isModal) return;
 
-      // Don't close if we're editing any field
-      const isEditing = editingTitle || editingDescription || editingStatus ||
-                       editingPriority || editingMilestone || editingIteration || editingProject || editingAssignee ||
-                       Object.keys(editingCustomFields).length > 0;
+    const isEditing = editingTitle || editingDescription || editingStatus ||
+                     editingPriority || editingMilestone || editingIteration || editingProject || editingAssignee ||
+                     Object.keys(editingCustomFields).length > 0;
+    const createModalOpen = document.querySelector('.create-work-item-modal, [role="dialog"]');
 
-      // Don't close if the create modal is open
-      const createModalOpen = document.querySelector('.create-work-item-modal, [role="dialog"]');
+    if (!isEditing && !createModalOpen) {
+      closeModal();
+    }
+  });
 
-      if (!isEditing && !createModalOpen) {
-        closeModal();
-      }
-    } else if ((event.key === 'f' || event.key === 'F') && !event.ctrlKey && !event.metaKey) {
-      // Don't trigger if user is typing in an input field
-      const activeElement = document.activeElement;
-      const isInputField = activeElement && (
-        activeElement.tagName === 'INPUT' ||
-        activeElement.tagName === 'TEXTAREA' ||
-        activeElement.contentEditable === 'true' ||
-        activeElement.classList.contains('ProseMirror')
-      );
+  // Install @github/hotkey bindings for F and W shortcuts on the container element
+  $effect(() => {
+    if (!modalElement) return;
+    const keys = [
+      toHotkeyString('itemDetail', 'fullscreen'),
+      toHotkeyString('itemDetail', 'createChild')
+    ].join(',');
+    install(modalElement, keys);
+    return () => uninstall(modalElement);
+  });
 
-      if (!isInputField) {
-        event.preventDefault();
-        if (isModal) {
-          // In modal mode: open full details
-          openFullDetails();
-        } else {
-          // In full details mode: focus status field
-          editingCustomFields = {};
-          editingStatus = true;
-        }
-      }
-    } else if ((event.key === 'w' || event.key === 'W') && !event.ctrlKey && !event.metaKey) {
-      // Don't trigger if user is typing in an input field
-      const activeElement = document.activeElement;
-      const isInputField = activeElement && (
-        activeElement.tagName === 'INPUT' || 
-        activeElement.tagName === 'TEXTAREA' || 
-        activeElement.contentEditable === 'true' ||
-        activeElement.classList.contains('ProseMirror')
-      );
-      
-      if (!isInputField) {
-        event.preventDefault();
-        // Check if Create Child Work Item is available
-        if (availableSubIssueTypes && availableSubIssueTypes.length > 0) {
-          handleCreateSubIssue();
-        }
-      }
+  // Handle hotkey-fire events from @github/hotkey
+  useEventListener(() => modalElement, 'hotkey-fire', (e) => {
+    e.preventDefault(); // Don't click() the container div
+    const path = e.detail?.path;
+    if (path === toHotkeyString('itemDetail', 'fullscreen')) {
+      handleHotkeyF();
+    } else if (path === toHotkeyString('itemDetail', 'createChild')) {
+      if (availableSubIssueTypes?.length) handleHotkeyW();
+    }
+  });
+
+  function handleHotkeyF() {
+    if (isModal) {
+      openFullDetails();
+    } else {
+      editingCustomFields = {};
+      editingStatus = true;
+    }
+  }
+
+  function handleHotkeyW() {
+    if (availableSubIssueTypes && availableSubIssueTypes.length > 0) {
+      handleCreateSubIssue();
     }
   }
 
@@ -1090,7 +1088,6 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     await initializeTimer();
 
     await loadData();
-    document.addEventListener('keydown', handleKeydown);
 
     // Register context-sensitive commands for this item
     // Pass current timer status to avoid creating reactive dependency
@@ -1246,7 +1243,6 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   });
 
   onDestroy(() => {
-    document.removeEventListener('keydown', handleKeydown);
     // Unregister context commands when component is destroyed
     unregisterContextCommands('item-detail');
     // Cleanup timer intervals

@@ -10,6 +10,7 @@
   import CollectionsNavigation from '../collections/CollectionsNavigation.svelte';
   import { collectionCategoriesStore } from '../../stores/collectionCategories.js';
   import { formatDate } from '../../utils/dateFormatter.js';
+  import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { workspacesStore } from '../../stores';
   import WorkspaceSelector from '../../workspaces/WorkspaceSelector.svelte';
   import ColorDot from '../../components/ColorDot.svelte';
@@ -219,6 +220,7 @@
             variant="primary"
             icon={Plus}
             keyboardHint="A"
+            hotkeyConfig={{ key: toHotkeyString('collections', 'add'), guard: () => true }}
           >
             {t('collections.newCollection')}
           </Button>

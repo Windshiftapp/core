@@ -15,7 +15,7 @@
   import Toggle from '../components/Toggle.svelte';
   import Label from '../components/Label.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
-  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
 
   let customFields = $state([]);
@@ -66,13 +66,6 @@
       assetSets = [];
     }
   });
-
-  // Global keyboard shortcut handler
-  function handleGlobalKeydown(event) {
-    createShortcutHandler({
-      add: startCreate
-    }, 'customFields', { guard: () => !showCreateForm })(event);
-  }
 
   async function loadCustomFields() {
     try {
@@ -441,8 +434,6 @@
   ]);
 </script>
 
-<svelte:window onkeydown={handleGlobalKeydown} />
-
 <PageHeader
   icon={Database}
   title={t('fields.title')}
@@ -460,6 +451,7 @@
         icon={Plus}
         onclick={startCreate}
         keyboardHint="A"
+        hotkeyConfig={{ key: toHotkeyString('customFields', 'add'), guard: () => !showCreateForm }}
       >
         {t('fields.createField')}
       </Button>

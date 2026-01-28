@@ -13,7 +13,7 @@
   import { Plus, Link, Edit, Trash2, Power, PowerOff } from 'lucide-svelte';
   import ColorPicker from '../editors/ColorPicker.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
-  import { matchesShortcut } from '../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 
   const linkTypes = writable([]);
 
@@ -30,20 +30,6 @@
 
   onMount(() => {
     loadLinkTypes();
-    
-    // Add keyboard shortcut for new link type
-    function handleKeydown(event) {
-      if (matchesShortcut(event, { key: 'a' })) {
-        // Don't trigger if we're in an input/textarea
-        if (event.target.tagName !== 'INPUT' && event.target.tagName !== 'TEXTAREA') {
-          event.preventDefault();
-          showAddForm();
-        }
-      }
-    }
-    
-    document.addEventListener('keydown', handleKeydown);
-    return () => document.removeEventListener('keydown', handleKeydown);
   });
 
   async function loadLinkTypes() {
@@ -211,6 +197,7 @@
       icon={Plus}
       size="medium"
       keyboardHint="A"
+      hotkeyConfig={{ key: toHotkeyString('linkTypes', 'add'), guard: () => !showForm }}
     >
       {t('settings.linkTypes.addLinkType')}
     </Button>

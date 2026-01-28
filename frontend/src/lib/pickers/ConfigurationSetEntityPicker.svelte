@@ -1,22 +1,22 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { Search, Plus, X, AlertCircle } from 'lucide-svelte';
   import { itemTypeIconMap, priorityIconMap } from '../utils/icons.js';
   import { t } from '../stores/i18n.svelte.js';
 
   // Entity type determines rendering behavior
-  export let entityType = 'priorities'; // 'priorities' | 'item-types' | 'workspaces'
-  export let allEntities = [];
-  export let selectedIds = [];
-  export let configurationSetId = null; // For conflict detection
-  export let entityAssignments = {}; // Maps entity ID to other config sets (for workspaces)
+  let {
+    entityType = 'priorities', // 'priorities' | 'item-types' | 'workspaces'
+    allEntities = [],
+    selectedIds = [],
+    configurationSetId = null, // For conflict detection
+    entityAssignments = {}, // Maps entity ID to other config sets (for workspaces)
+    onchange
+  } = $props();
 
-  const dispatch = createEventDispatcher();
-
-  let searchQuery = '';
+  let searchQuery = $state('');
 
   // Filter entities by search query
-  $: filteredEntities = allEntities.filter(entity => {
+  const filteredEntities = $derived(allEntities.filter(entity => {
     const name = entity.name || '';
     const key = entity.key || '';
     const description = entity.description || '';
@@ -24,11 +24,11 @@
     return name.toLowerCase().includes(query) ||
            key.toLowerCase().includes(query) ||
            description.toLowerCase().includes(query);
-  });
+  }));
 
   // Split into assigned and available
-  $: assignedEntities = filteredEntities.filter(e => selectedIds.includes(e.id));
-  $: availableEntities = filteredEntities.filter(e => !selectedIds.includes(e.id));
+  const assignedEntities = $derived(filteredEntities.filter(e => selectedIds.includes(e.id)));
+  const availableEntities = $derived(filteredEntities.filter(e => !selectedIds.includes(e.id)));
 
   function addEntity(entityId) {
     // Check for conflicts (workspaces assigned elsewhere)
@@ -38,11 +38,11 @@
         return;
       }
     }
-    dispatch('change', [...selectedIds, entityId]);
+    onchange?.([...selectedIds, entityId]);
   }
 
   function removeEntity(entityId) {
-    dispatch('change', selectedIds.filter(id => id !== entityId));
+    onchange?.(selectedIds.filter(id => id !== entityId));
   }
 
   function getEntityLabel() {
@@ -208,4 +208,3 @@
     {/if}
   </div>
 </div>
-

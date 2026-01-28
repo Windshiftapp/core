@@ -11,7 +11,7 @@
   import { errorToast } from '../stores/toasts.svelte.js';
   import Textarea from '../components/Textarea.svelte';
   import { confirm } from '../composables/useConfirm.js';
-  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 
   let hierarchyLevels = $state([]);
   let isLoading = $state(true);
@@ -30,12 +30,6 @@
   onMount(() => {
     loadHierarchyLevels();
   });
-
-  function handleGlobalKeydown(event) {
-    createShortcutHandler({
-      add: startCreate
-    }, 'hierarchyLevels', { guard: () => !showCreateForm })(event);
-  }
 
   async function loadHierarchyLevels() {
     try {
@@ -220,8 +214,6 @@
   }
 </script>
 
-<svelte:window onkeydown={handleGlobalKeydown} />
-
 <PageHeader
   icon={Network}
   title={t('settings.hierarchyLevels.title')}
@@ -234,6 +226,7 @@
       onclick={startCreate}
       disabled={isLoading}
       keyboardHint="A"
+      hotkeyConfig={{ key: toHotkeyString('hierarchyLevels', 'add'), guard: () => !showCreateForm }}
     >
       {t('settings.hierarchyLevels.addHierarchyLevel')}
     </Button>

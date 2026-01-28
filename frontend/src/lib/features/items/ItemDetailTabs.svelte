@@ -8,7 +8,7 @@
   import { createEventDispatcher } from 'svelte';
   import { formatDateTimeLocale, formatDateShort } from '../../utils/dateFormatter.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { createShortcutHandler, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
+  import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
 
   const dispatch = createEventDispatcher();
 
@@ -65,24 +65,6 @@
     commentCount = event.detail.count;
   }
 
-  function handleGlobalKeydown(event) {
-    // Only handle shortcuts when on time tab and time tracking is enabled
-    if (tab !== 'time' || !moduleSettings?.time_tracking_enabled) return;
-
-    createShortcutHandler({
-      startTimer: () => {
-        if (!activeTimer && getDefaultProjectForTimeLogging()) {
-          handleStartTimer();
-        }
-      },
-      logTime: () => {
-        if (getDefaultProjectForTimeLogging()) {
-          handleLogTime();
-        }
-      }
-    }, 'itemDetail')(event);
-  }
-
   function handleEditWorklog(worklog) {
     dispatch('edit-worklog', worklog);
   }
@@ -125,8 +107,6 @@
     worklogToDelete = null;
   }
 </script>
-
-<svelte:window onkeydown={handleGlobalKeydown} />
 
 <div class="mt-6">
   <div>
@@ -239,6 +219,7 @@
                       size="small"
                       title={t('items.startTimerTitle')}
                       keyboardHint={getShortcutDisplay('itemDetail', 'startTimer')}
+                      hotkeyConfig={{ key: toHotkeyString('itemDetail', 'startTimer'), guard: () => tab === 'time' && moduleSettings?.time_tracking_enabled && !!getDefaultProjectForTimeLogging() }}
                     >
                       {t('items.startTimer')}
                     </Button>
@@ -250,6 +231,7 @@
                     disabled={!getDefaultProjectForTimeLogging()}
                     title={t('items.logTimeTitle')}
                     keyboardHint={getShortcutDisplay('itemDetail', 'logTime')}
+                    hotkeyConfig={{ key: toHotkeyString('itemDetail', 'logTime'), guard: () => tab === 'time' && moduleSettings?.time_tracking_enabled && !!getDefaultProjectForTimeLogging() }}
                   >
                     {t('items.logTime')}
                   </Button>
@@ -294,6 +276,7 @@
                     size="small"
                     title={t('items.startTimerTitle')}
                     keyboardHint={getShortcutDisplay('itemDetail', 'startTimer')}
+                    hotkeyConfig={{ key: toHotkeyString('itemDetail', 'startTimer'), guard: () => tab === 'time' && moduleSettings?.time_tracking_enabled && !!getDefaultProjectForTimeLogging() }}
                   >
                     {t('items.startTimer')}
                   </Button>
@@ -305,6 +288,7 @@
                   disabled={!getDefaultProjectForTimeLogging()}
                   title={t('items.logTimeTitle')}
                   keyboardHint={getShortcutDisplay('itemDetail', 'logTime')}
+                  hotkeyConfig={{ key: toHotkeyString('itemDetail', 'logTime'), guard: () => tab === 'time' && moduleSettings?.time_tracking_enabled && !!getDefaultProjectForTimeLogging() }}
                 >
                   {t('items.logTime')}
                 </Button>

@@ -1,4 +1,6 @@
 <script>
+    import { install, uninstall } from '@github/hotkey';
+    import { useEventListener } from 'runed';
     import Tooltip from "./Tooltip.svelte";
 
   let {
@@ -15,10 +17,25 @@
     keyboardHint = null, // Keyboard shortcut hint (e.g., "C", "⌃L")
     title = null,
     onclick = null, // Svelte 5 style click handler
+    hotkeyConfig = null, // { key: 'a', guard?: () => boolean }
     class: className = '',
     children
   } = $props();
   export { className as class };
+
+  let buttonEl = $state(null);
+
+  // Install/uninstall @github/hotkey on the button element
+  $effect(() => {
+    if (!buttonEl || !hotkeyConfig?.key) return;
+    install(buttonEl, hotkeyConfig.key);
+    return () => uninstall(buttonEl);
+  });
+
+  // Guard: cancel hotkey-fire when guard returns false
+  useEventListener(() => buttonEl, 'hotkey-fire', (e) => {
+    if (hotkeyConfig?.guard && !hotkeyConfig.guard()) e.preventDefault();
+  });
 
   // Base styles
   const baseClasses = $derived([
@@ -119,11 +136,11 @@
 <!-- Snippet for the button/link element -->
 {#snippet buttonElement()}
   {#if href}
-    <a {href} {target} class={allClasses} onclick={(e) => onclick?.(e)}>
+    <a bind:this={buttonEl} {href} {target} class={allClasses} onclick={(e) => onclick?.(e)}>
       {@render linkContent()}
     </a>
   {:else}
-    <button {type} {disabled} class={allClasses} onclick={(e) => onclick?.(e)}>
+    <button bind:this={buttonEl} {type} {disabled} class={allClasses} onclick={(e) => onclick?.(e)}>
       {@render buttonContent()}
     </button>
   {/if}

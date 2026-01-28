@@ -8,7 +8,7 @@
   import PageHeader from '../layout/PageHeader.svelte';
   import StatusCategoryModal from '../dialogs/StatusCategoryModal.svelte';
   import Lozenge from '../components/Lozenge.svelte';
-  import { createShortcutHandler, getShortcutDisplay } from '../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 
   let statusCategories = $state([]);
   let loading = $state(true);
@@ -84,15 +84,6 @@
       is_completed: false
     };
   }
-
-  // Keyboard shortcuts
-  const handleKeydown = createShortcutHandler({
-    addCategory: () => {
-      if (!showModal) {
-        startCreate();
-      }
-    }
-  }, 'statusCategories');
 
   async function saveCategory() {
     try {
@@ -197,9 +188,6 @@
   ]);
 </script>
 
-<!-- Keyboard shortcuts -->
-<svelte:window onkeydown={handleKeydown} />
-
 <div style="background-color: var(--ds-surface); min-height: 100vh;">
   <PageHeader
     icon={Folder}
@@ -208,7 +196,7 @@
     count="{statusCategories.length} categories"
   >
     {#snippet actions()}
-      <Button variant="primary" icon={Plus} onclick={startCreate} keyboardHint={getShortcutDisplay('statusCategories', 'addCategory')}>
+      <Button variant="primary" icon={Plus} onclick={startCreate} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('statusCategories', 'addCategory'), guard: () => !showModal }}>
         {t('settings.statusCategories.addStatusCategory')}
       </Button>
     {/snippet}

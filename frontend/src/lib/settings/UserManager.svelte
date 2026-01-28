@@ -15,7 +15,7 @@
 	import AlertBox from '../components/AlertBox.svelte';
 	import Lozenge from '../components/Lozenge.svelte';
 	import Label from '../components/Label.svelte';
-	import { matchesShortcut } from '../utils/keyboardShortcuts.js';
+	import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 	import { t } from '../stores/i18n.svelte.js';
 
 	let users = $state([]);
@@ -337,38 +337,6 @@
 
 	onMount(() => {
 		loadUsers();
-
-		// Add keyboard shortcuts
-		function handleKeydown(event) {
-			// 'a' key to open create user dialog
-			if (matchesShortcut(event, { key: 'a' })) {
-				// Don't trigger if we're in an input/textarea
-				if (event.target.tagName !== 'INPUT' && event.target.tagName !== 'TEXTAREA') {
-					event.preventDefault();
-					resetForm();
-					showCreateForm = true;
-				}
-			}
-
-			// ESC key to close create user dialog
-			if (event.key === 'Escape' && showCreateForm) {
-				event.preventDefault();
-				resetForm();
-				showCreateForm = false;
-			}
-
-			// Enter key to save user when in create dialog
-			if (event.key === 'Enter' && showCreateForm) {
-				// Don't trigger if we're in a textarea (allow multi-line input)
-				if (event.target.tagName !== 'TEXTAREA') {
-					event.preventDefault();
-					saveUser();
-				}
-			}
-		}
-
-		document.addEventListener('keydown', handleKeydown);
-		return () => document.removeEventListener('keydown', handleKeydown);
 	});
 </script>
 
@@ -393,6 +361,7 @@
 						showCreateForm = true;
 					}}
 					keyboardHint="A"
+					hotkeyConfig={{ key: toHotkeyString('users', 'add'), guard: () => !showCreateForm }}
 				>
 					{t('users.addUser')}
 				</Button>

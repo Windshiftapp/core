@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { ssoStore } from '../stores';
   import { api } from '../api.js';
-  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import {
     KeyRound, Plus, Edit, Trash2, Save, X, Check, RefreshCw,
     AlertCircle, Settings, Power, PowerOff, Link, ExternalLink,
@@ -51,25 +51,9 @@
 
   let formErrors = $state({});
 
-  // Keyboard shortcut handler
-  const handleGlobalKeydown = createShortcutHandler({
-    addProvider: () => {
-      if (!showCreateModal && !showEditModal && !showDeleteModal) {
-        openCreateModal();
-      }
-    }
-  }, 'sso');
-
   // Load providers on mount
   onMount(async () => {
     await loadProviders();
-
-    // Add global keyboard shortcut
-    window.addEventListener('keydown', handleGlobalKeydown);
-
-    return () => {
-      window.removeEventListener('keydown', handleGlobalKeydown);
-    };
   });
 
   async function loadProviders() {
@@ -275,7 +259,7 @@
       </Text>
     </div>
     {#if providers.length === 0}
-      <Button variant="primary" onclick={openCreateModal} keyboardHint="A">
+      <Button variant="primary" onclick={openCreateModal} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('sso', 'addProvider'), guard: () => !showCreateModal && !showEditModal && !showDeleteModal }}>
         <Plus class="w-4 h-4 mr-2" />
         {t('settings.sso.addProvider')}
       </Button>
@@ -300,7 +284,7 @@
       <Text as="p" size="sm" variant="subtle" class="mb-4 max-w-md mx-auto">
         {t('settings.sso.noProviderDescription')}
       </Text>
-      <Button variant="primary" onclick={openCreateModal} keyboardHint="A">
+      <Button variant="primary" onclick={openCreateModal} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('sso', 'addProvider'), guard: () => !showCreateModal && !showEditModal && !showDeleteModal }}>
         <Plus class="w-4 h-4 mr-2" />
         {t('settings.sso.addProvider')}
       </Button>

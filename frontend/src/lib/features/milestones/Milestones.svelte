@@ -23,7 +23,7 @@
   import Label from '../../components/Label.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
-  import { createShortcutHandler } from '../../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import EmptyState from '../../components/EmptyState.svelte';
 
   // Props for workspace-scoped view (optional)
@@ -74,12 +74,6 @@
     });
 
   });
-
-  function handleGlobalKeydown(event) {
-    createShortcutHandler({
-      add: startCreate
-    }, 'milestones', { guard: () => !showCreateForm })(event);
-  }
 
   async function loadData() {
     try {
@@ -304,8 +298,6 @@
   ]);
 </script>
 
-<svelte:window onkeydown={handleGlobalKeydown} />
-
 <!-- Main container with two-panel layout -->
 <div class="flex min-h-screen" style="background-color: var(--ds-surface);">
   <!-- Left Sidebar - Navigation (only in global view) -->
@@ -342,6 +334,7 @@
           icon={Plus}
           onclick={startCreate}
           keyboardHint="A"
+          hotkeyConfig={{ key: toHotkeyString('milestones', 'add'), guard: () => !showCreateForm }}
         >
           {t('common.add')}
         </Button>

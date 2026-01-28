@@ -13,7 +13,7 @@
 	import DialogFooter from '../dialogs/DialogFooter.svelte';
 	import AlertBox from '../components/AlertBox.svelte';
 	import Lozenge from '../components/Lozenge.svelte';
-	import { matchesShortcut } from '../utils/keyboardShortcuts.js';
+	import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 	import { t } from '../stores/i18n.svelte.js';
 
 	let groups = $state([]);
@@ -260,21 +260,6 @@
 	onMount(() => {
 		loadGroups();
 		loadUsers();
-
-		// Add keyboard shortcut for new group
-		function handleKeydown(event) {
-			if (matchesShortcut(event, { key: 'a' })) {
-				// Don't trigger if we're in an input/textarea
-				if (event.target.tagName !== 'INPUT' && event.target.tagName !== 'TEXTAREA') {
-					event.preventDefault();
-					resetForm();
-					showCreateForm = true;
-				}
-			}
-		}
-
-		document.addEventListener('keydown', handleKeydown);
-		return () => document.removeEventListener('keydown', handleKeydown);
 	});
 </script>
 
@@ -293,6 +278,7 @@
 					showCreateForm = true;
 				}}
 				keyboardHint="A"
+				hotkeyConfig={{ key: toHotkeyString('groups', 'add'), guard: () => !showCreateForm }}
 			>
 				{t('settings.groups.addGroup')}
 			</Button>

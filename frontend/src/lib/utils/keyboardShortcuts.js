@@ -23,7 +23,8 @@ const currentPlatform = getPlatform();
 // Keyboard shortcuts configuration by context
 const shortcuts = {
   global: {
-    commandPalette: { key: 'k', modifierKey: true }
+    commandPalette: { key: 'k', modifierKey: true },
+    create: { key: 'c' }
   },
   modal: {
     submit: { key: 'Enter', modifierKey: true },
@@ -38,7 +39,8 @@ const shortcuts = {
   },
   workflow: {
     save: { key: 'Enter', modifierKey: true },
-    new: { key: 'n' }
+    new: { key: 'n' },
+    add: { key: 'a' }
   },
   workspaces: {
     addWorkspace: { key: 'a' },
@@ -61,6 +63,9 @@ const shortcuts = {
     addCustomer: { key: 'a' },
     submitForm: { key: 'Enter' },
     cancelForm: { key: 'Escape' }
+  },
+  timeProjectCategories: {
+    add: { key: 'a' }
   },
   statusCategories: {
     addCategory: { key: 'a' },
@@ -135,6 +140,21 @@ const shortcuts = {
   systemImport: {
     add: { key: 'a' }
   },
+  linkTypes: {
+    add: { key: 'a' }
+  },
+  collections: {
+    add: { key: 'a' }
+  },
+  groups: {
+    add: { key: 'a' }
+  },
+  users: {
+    add: { key: 'a' }
+  },
+  notifications: {
+    add: { key: 'a' }
+  },
   // Pages
   screens: {
     add: { key: 'a' }
@@ -145,10 +165,12 @@ const shortcuts = {
     save: { key: 'Enter', modifierKey: true },
     cancel: { key: 'Escape' }
   },
-  // Item detail time tracking
+  // Item detail
   itemDetail: {
     startTimer: { key: 'a', modifierKey: true },
-    logTime: { key: 'a' }
+    logTime: { key: 'a' },
+    fullscreen: { key: 'f' },
+    createChild: { key: 'w' }
   }
 };
 
@@ -299,41 +321,30 @@ export function isTypingInField(event) {
 }
 
 /**
- * Create a keyboard event handler that matches shortcuts and calls actions
- * @param {Object} shortcuts - Map of shortcut names to handler functions
- * @param {string} context - The context for shortcuts
- * @param {Object} options - Optional settings
- * @param {Function} options.guard - Guard function, shortcuts disabled if returns false
- * @returns {Function} Event handler function
+ * Convert a shortcut context+action into the string format expected by @github/hotkey.
+ * Examples: { key: 'a' } → 'a', { key: 'k', modifierKey: true } → 'Mod+k'
+ * @param {string} context - The context (e.g., 'statuses')
+ * @param {string} action - The action (e.g., 'add')
+ * @returns {string} Hotkey string for @github/hotkey install()
  */
-export function createShortcutHandler(shortcuts, context, options = {}) {
-  return (event) => {
-    // Check guard first - skip if guard returns false
-    if (options.guard && !options.guard()) {
-      return;
-    }
+export function toHotkeyString(context, action) {
+  const shortcut = getShortcut(context, action);
+  if (!shortcut) return '';
 
-    // Don't handle shortcuts when typing in inputs, except for special keys
-    const isSpecialKey = event.key === 'Enter' || event.key === 'Escape';
+  const parts = [];
 
-    // Allow Enter in INPUT fields (for form submission), but not in TEXTAREA (for new lines)
-    // Allow Escape in all input fields (to cancel/close)
-    if (isTypingInField(event) && !isSpecialKey) {
-      return;
-    }
-    if (event.target.tagName === 'TEXTAREA' && event.key === 'Enter') {
-      return;
-    }
+  if (shortcut.modifierKey) {
+    parts.push('Mod');
+  } else {
+    if (shortcut.ctrlKey) parts.push('Control');
+    if (shortcut.metaKey) parts.push('Meta');
+  }
+  if (shortcut.altKey) parts.push('Alt');
+  if (shortcut.shiftKey) parts.push('Shift');
 
-    for (const [actionName, handler] of Object.entries(shortcuts)) {
-      const shortcut = getShortcut(context, actionName);
-      if (matchesShortcut(event, shortcut)) {
-        event.preventDefault();
-        handler();
-        break;
-      }
-    }
-  };
+  parts.push(shortcut.key);
+
+  return parts.join('+');
 }
 
 export { currentPlatform };

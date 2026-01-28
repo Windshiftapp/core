@@ -14,7 +14,7 @@
   import DataTable from '../../components/DataTable.svelte';
   import { Plus, Package, Edit, Trash2, Box, ChevronRight, ChevronDown, Folder, FolderOpen, Search, ExternalLink, Code } from 'lucide-svelte';
   import CustomFieldRenderer from '../items/CustomFieldRenderer.svelte';
-  import { createShortcutHandler } from '../../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
 
   // Props for detail view
   let { assetId = null } = $props();
@@ -90,12 +90,6 @@
     await loadAssetSets();
     loading = false;
   });
-
-  function handleGlobalKeydown(event) {
-    createShortcutHandler({
-      add: showAddAssetForm
-    }, 'assets', { guard: () => selectedSetId && !showAssetForm })(event);
-  }
 
   async function loadAssetSets() {
     try {
@@ -393,8 +387,6 @@
   }
 </script>
 
-<svelte:window onkeydown={handleGlobalKeydown} />
-
 <div class="flex h-full min-h-screen" style="background: var(--ds-surface);">
   <!-- Left sidebar: Category tree -->
   <div class="w-64 flex flex-col" style="border-right: 1px solid var(--ds-border); background: var(--ds-surface-raised);">
@@ -509,7 +501,7 @@
       </div>
       <div class="flex-1"></div>
       {#if selectedSetId}
-        <Button onclick={showAddAssetForm} class="whitespace-nowrap" keyboardHint="A">
+        <Button onclick={showAddAssetForm} class="whitespace-nowrap" keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('assets', 'upload'), guard: () => !!(selectedSetId && !showAssetForm) }}>
           <Plus class="w-4 h-4 mr-1" />
           {t('common.create')}
         </Button>

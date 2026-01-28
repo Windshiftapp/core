@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { UserPlus, Trash2, Shield } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
@@ -13,7 +13,7 @@
   import Text from '../components/Text.svelte';
   import Label from '../components/Label.svelte';
   import { confirm } from '../composables/useConfirm.js';
-  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 
   export let workspaceId;
 
@@ -37,22 +37,8 @@ const defaultRoleOrder = ['Viewer', 'Editor', 'Administrator', 'Tester'];
   let currentPage = 1;
   let itemsPerPage = 20;
 
-  // Keyboard shortcut handler
-  const handleKeydown = createShortcutHandler({
-    addMember: () => {
-      if (!showModal) {
-        showModal = true;
-      }
-    }
-  }, 'workspaceMembers');
-
   onMount(async () => {
     await loadData();
-    window.addEventListener('keydown', handleKeydown);
-  });
-
-  onDestroy(() => {
-    window.removeEventListener('keydown', handleKeydown);
   });
 
   async function loadData() {
@@ -338,7 +324,7 @@ const defaultRoleOrder = ['Viewer', 'Editor', 'Administrator', 'Tester'];
       placeholder="Search members by name or email..."
       class="flex-1"
     />
-    <Button variant="primary" size="medium" onclick={() => showModal = true} keyboardHint="A">
+    <Button variant="primary" size="medium" onclick={() => showModal = true} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('workspaceMembers', 'addMember'), guard: () => !showModal }}>
       <UserPlus class="w-4 h-4 mr-2" />
       Add Member
     </Button>

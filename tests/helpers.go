@@ -3,10 +3,11 @@ package tests
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
+	mathrand "math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"windshift/internal/database"
 	"windshift/internal/server"
 )
 
@@ -640,7 +642,7 @@ func shortKey(prefix string) string {
 	if len(prefix) > maxPrefixLen {
 		prefix = prefix[:maxPrefixLen]
 	}
-	return fmt.Sprintf("%s%d", prefix, rand.Intn(10000))
+	return fmt.Sprintf("%s%d", prefix, mathrand.Intn(10000))
 }
 
 // ============================================================================
@@ -1233,6 +1235,172 @@ func AssociateWorkspaceWithConfigSet(t *testing.T, server *TestServer, workspace
 	} else {
 		t.Logf("Associated workspace %d with configuration set %d", workspaceID, configSetID)
 	}
+}
+
+// DB returns the underlying database for direct DB operations in tests
+func (ts *TestServer) DB() database.Database {
+	return ts.server.DB()
+}
+
+// CreatePortalCustomerWithSession creates a portal customer via the admin API
+// and inserts a session directly into the database. Returns customerID and raw session token.
+func CreatePortalCustomerWithSession(t *testing.T, server *TestServer, name, email string) (int, string) {
+	t.Helper()
+
+	// Create portal customer via admin API
+	customerData := map[string]interface{}{
+		"name":  name,
+		"email": email,
+	}
+
+	resp := MakeAuthRequest(t, server, http.MethodPost, "/portal-customers", customerData)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("Failed to create portal customer %s: %d - %s", name, resp.StatusCode, string(body))
+	}
+
+	var result map[string]interface{}
+	DecodeJSON(t, resp, &result)
+	customerID := ExtractIDFromResponse(t, result)
+
+	// Generate a random session token
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		t.Fatalf("Failed to generate session token: %v", err)
+	}
+	sessionToken := fmt.Sprintf("%x", tokenBytes)
+
+	// Insert session directly into the database
+	db := server.DB()
+	_, err := db.ExecWrite(
+		`INSERT INTO portal_customer_sessions (portal_customer_id, session_token, expires_at, ip_address, user_agent, is_active, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		customerID, sessionToken, time.Now().Add(7*24*time.Hour), "127.0.0.1", "test-agent", true, time.Now(),
+	)
+	if err != nil {
+		t.Fatalf("Failed to insert portal session: %v", err)
+	}
+
+	return customerID, sessionToken
+}
+
+// MakeUnauthenticatedRequest makes a request with no authentication
+func MakeUnauthenticatedRequest(t *testing.T, server *TestServer, method, endpoint string, body interface{}) *http.Response {
+	t.Helper()
+
+	url := server.APIBase + endpoint
+	return makeRequest(t, method, url, "", body, nil)
+}
+
+// MakePortalRequest makes a request using a portal session token as Bearer auth
+func MakePortalRequest(t *testing.T, server *TestServer, portalToken, method, endpoint string, body interface{}) *http.Response {
+	t.Helper()
+
+	url := server.APIBase + endpoint
+	return makeRequest(t, method, url, portalToken, body, nil)
+}
+
+// SetupPortalChannel creates a portal channel with a slug and a request type.
+// Returns the portal slug.
+func SetupPortalChannel(t *testing.T, server *TestServer, workspaceID int) string {
+	t.Helper()
+
+	timestamp := time.Now().UnixNano()
+	portalSlug := fmt.Sprintf("test-portal-%d", timestamp)
+
+	// Create the channel
+	channelData := map[string]interface{}{
+		"name":        fmt.Sprintf("Test Portal %d", timestamp),
+		"type":        "portal",
+		"direction":   "inbound",
+		"description": "Portal for boundary testing",
+		"status":      "active",
+	}
+
+	resp := MakeAuthRequest(t, server, http.MethodPost, "/channels", channelData)
+	defer resp.Body.Close()
+	AssertStatusCode(t, resp, http.StatusCreated)
+
+	var result map[string]interface{}
+	DecodeJSON(t, resp, &result)
+	channelID := ExtractIDFromResponse(t, result)
+
+	// Configure the portal with slug and workspace
+	configJSON, _ := json.Marshal(map[string]interface{}{
+		"portal_slug":          portalSlug,
+		"portal_enabled":       true,
+		"portal_title":         "Test Portal",
+		"portal_description":   "Test portal for boundary tests",
+		"portal_workspace_ids": []int{workspaceID},
+	})
+
+	updateData := map[string]interface{}{
+		"name":   fmt.Sprintf("Test Portal %d", timestamp),
+		"type":   "portal",
+		"status": "active",
+		"config": string(configJSON),
+	}
+
+	resp2 := MakeAuthRequest(t, server, http.MethodPut, fmt.Sprintf("/channels/%d", channelID), updateData)
+	defer resp2.Body.Close()
+	AssertStatusCode(t, resp2, http.StatusOK)
+
+	// Create a request type for submissions
+	configSetID := GetDefaultConfigurationSet(t, server)
+	itemTypes := GetItemTypes(t, server, configSetID)
+	var itemTypeID int
+	for _, id := range itemTypes {
+		itemTypeID = id
+		break
+	}
+
+	requestTypeData := map[string]interface{}{
+		"name":         "General Request",
+		"description":  "General request type",
+		"item_type_id": itemTypeID,
+		"icon":         "Circle",
+		"color":        "#666666",
+		"is_active":    true,
+	}
+
+	resp3 := MakeAuthRequest(t, server, http.MethodPost, fmt.Sprintf("/channels/%d/request-types", channelID), requestTypeData)
+	defer resp3.Body.Close()
+	AssertStatusCode(t, resp3, http.StatusCreated)
+
+	return portalSlug
+}
+
+// SubmitPortalRequest submits a request through the portal for a specific portal customer.
+// The customerEmail must match the email used when creating the portal customer, so that
+// the submission is linked to the correct portal_customer record.
+// Returns the created item ID.
+func SubmitPortalRequest(t *testing.T, server *TestServer, portalSlug, customerEmail, title string) int {
+	t.Helper()
+
+	submissionData := map[string]interface{}{
+		"title":       title,
+		"description": "Test portal submission",
+		"name":        "Test Customer",
+		"email":       customerEmail,
+	}
+
+	endpoint := fmt.Sprintf("/portal/%s/submit", portalSlug)
+	// Submit without auth (portal submit is public, uses email to find/create customer)
+	submitResp := MakeUnauthenticatedRequest(t, server, http.MethodPost, endpoint, submissionData)
+	defer submitResp.Body.Close()
+
+	AssertStatusCode(t, submitResp, http.StatusCreated)
+
+	var result map[string]interface{}
+	DecodeJSON(t, submitResp, &result)
+
+	if itemID, ok := result["item_id"].(float64); ok {
+		return int(itemID)
+	}
+	t.Fatal("No item_id in portal submission response")
+	return 0
 }
 
 // GetItemComments returns comments for an item

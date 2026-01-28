@@ -51,10 +51,11 @@
 
   let {
     isOpen = $bindable(false),
-    compactMode = false
+    compactMode = false,
+    initialType = 'work-item'
   } = $props();
 
-  let selectedType = $state('work-item');
+  let selectedType = $state(initialType);
   let selectedWorkspace = $state(null);
   let parentItem = $state(null);
   let restrictedItemTypes = $state(null);
@@ -134,7 +135,7 @@
 
   function close() {
     isOpen = false;
-    selectedType = 'work-item';
+    selectedType = initialType;
     selectedWorkspace = null;
     parentItem = null;
     restrictedItemTypes = null;
@@ -297,6 +298,11 @@
     if (isOpen && !$workspacesStore.loaded && $workspacesStore.regularWorkspaces.length === 0) {
       loadWorkspaces();
     }
+  });
+
+  // Sync selectedType when initialType prop changes (e.g. before modal opens)
+  $effect(() => {
+    selectedType = initialType;
   });
 
   // Force work-item type when compact mode is enabled

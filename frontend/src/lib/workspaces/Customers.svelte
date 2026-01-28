@@ -5,7 +5,7 @@
   import { Users, Mail, Search, GripVertical, Plus, Edit2, Trash2, MoreHorizontal } from 'lucide-svelte';
   import { api } from '../api.js';
   import { confirm } from '../composables/useConfirm.js';
-  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import Button from '../components/Button.svelte';
   import Avatar from '../components/Avatar.svelte';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
@@ -258,12 +258,6 @@
     });
   }
 
-  function handleGlobalKeydown(event) {
-    createShortcutHandler({
-      add: startCreate
-    }, 'customers', { guard: () => !showCreateModal })(event);
-  }
-
   function startCreate() {
     showCreateModal = true;
     resetForm();
@@ -377,8 +371,6 @@
 
   </script>
 
-<svelte:window onkeydown={handleGlobalKeydown} />
-
 <div class="flex min-h-screen" style="background-color: var(--ds-surface);">
   <!-- Sidebar Navigation -->
   <CustomerOrganisationNavigation
@@ -436,6 +428,7 @@
           icon={Plus}
           onclick={startCreate}
           keyboardHint="A"
+          hotkeyConfig={{ key: toHotkeyString('customers', 'add'), guard: () => !showCreateModal }}
         >
           {t('workspaces.customers.addCustomer')}
         </Button>

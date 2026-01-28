@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
   import { Edit, Trash2, Plus, Circle, Camera, Grip } from 'lucide-svelte';
@@ -12,7 +12,7 @@
   import PageHeader from '../layout/PageHeader.svelte';
   import IconSelector from '../pickers/IconSelector.svelte';
   import Lozenge from '../components/Lozenge.svelte';
-  import { createShortcutHandler, getShortcutDisplay } from '../utils/keyboardShortcuts.js';
+  import { toHotkeyString, getShortcutDisplay } from '../utils/keyboardShortcuts.js';
   import { workspacesStore } from '../stores';
 
   // Props
@@ -41,14 +41,6 @@
   onMount(async () => {
     // Load workspaces from store
     await workspacesStore.load();
-
-    // Add global keyboard shortcut for "A" key
-    window.addEventListener('keydown', handleGlobalKeydown);
-
-    // Cleanup event listener
-    return () => {
-      window.removeEventListener('keydown', handleGlobalKeydown);
-    };
   });
 
   function startCreate() {
@@ -100,14 +92,6 @@
     }
     // ESC key handling is done by the Modal component itself
   }
-
-  const handleGlobalKeydown = createShortcutHandler({
-    addWorkspace: () => {
-      if (!showCreateForm) {
-        startCreate();
-      }
-    }
-  }, 'workspaces');
 
   // Avatar upload functionality
   async function handleAvatarUpload(files) {
@@ -236,10 +220,6 @@
     }
   ];
 
-  onDestroy(() => {
-    // Additional cleanup in case component is destroyed outside of onMount cleanup
-    window.removeEventListener('keydown', handleGlobalKeydown);
-  });
 
 </script>
 
@@ -256,6 +236,7 @@
             icon={Plus}
             onclick={startCreate}
             keyboardHint={getShortcutDisplay('workspaces', 'addWorkspace')}
+            hotkeyConfig={{ key: toHotkeyString('workspaces', 'addWorkspace'), guard: () => !showCreateForm }}
           >
             Add Workspace
           </Button>

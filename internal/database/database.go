@@ -606,6 +606,27 @@ func (db *DB) initializeDefaultData() error {
 		}
 	}
 
+	// 13b. Link all priorities to the default configuration set
+	priorityRows, err := tx.Query("SELECT id FROM priorities")
+	if err != nil {
+		return fmt.Errorf("failed to query priorities: %w", err)
+	}
+	defer priorityRows.Close()
+
+	for priorityRows.Next() {
+		var priorityID int64
+		if err := priorityRows.Scan(&priorityID); err != nil {
+			return fmt.Errorf("failed to scan priority: %w", err)
+		}
+		_, err = tx.Exec(
+			"INSERT OR IGNORE INTO configuration_set_priorities (configuration_set_id, priority_id) VALUES (?, ?)",
+			configSetID, priorityID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to link priority to default config set: %w", err)
+		}
+	}
+
 	// 14. Create default notification settings
 	notificationSettingResult, err := tx.Exec(
 		"INSERT INTO notification_settings (name, description, is_active, created_by) VALUES (?, ?, ?, ?)",

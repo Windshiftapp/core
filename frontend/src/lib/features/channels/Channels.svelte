@@ -5,7 +5,7 @@
   import { api } from '../../api.js';
   import { currentRoute, navigate } from '../../router.js';
   import { channelCategoriesStore } from '../../stores/channelCategories.js';
-  import { createShortcutHandler, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
+  import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import Button from '../../components/Button.svelte';
   import Input from '../../components/Input.svelte';
   import Select from '../../components/Select.svelte';
@@ -92,23 +92,12 @@
     return items;
   }
 
-  // Keyboard shortcut handler
-  const shortcutHandler = createShortcutHandler({
-    addChannel: () => {
-      if (!showAddForm && !showConfigModal && !showCategoryModal) {
-        showAddChannelForm();
-      }
-    }
-  }, 'channels');
-
   onMount(async () => {
     await loadChannels();
     await channelCategoriesStore.init();
 
     // Listen for manage-channel-categories event
     document.addEventListener('manage-channel-categories', handleManageCategories);
-    // Listen for keyboard shortcuts
-    document.addEventListener('keydown', shortcutHandler);
 
     // Handle OAuth callback parameters (after channels are loaded)
     handleOAuthCallback();
@@ -148,7 +137,6 @@
 
   onDestroy(() => {
     document.removeEventListener('manage-channel-categories', handleManageCategories);
-    document.removeEventListener('keydown', shortcutHandler);
   });
 
   function handleManageCategories() {
@@ -328,6 +316,7 @@
         icon={Plus}
         size="medium"
         keyboardHint={getShortcutDisplay('channels', 'addChannel')}
+        hotkeyConfig={{ key: toHotkeyString('channels', 'addChannel'), guard: () => !showAddForm && !showConfigModal && !showCategoryModal }}
       >
         {t('channels.createChannel')}
       </Button>

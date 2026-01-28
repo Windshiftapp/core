@@ -226,16 +226,16 @@
     navigate('/admin/configuration-sets');
   }
 
-  function handleWorkspacesChange(event) {
-    formData.workspace_ids = event.detail;
+  function handleWorkspacesChange(newIds) {
+    formData.workspace_ids = newIds;
   }
 
-  function handleItemTypeConfigsChange(event) {
-    formData.item_type_configs = event.detail;
+  function handleItemTypeConfigsChange(newConfigs) {
+    formData.item_type_configs = newConfigs;
   }
 
-  function handlePrioritiesChange(event) {
-    formData.priority_ids = event.detail;
+  function handlePrioritiesChange(newIds) {
+    formData.priority_ids = newIds;
   }
 </script>
 

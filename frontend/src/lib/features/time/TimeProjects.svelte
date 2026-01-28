@@ -11,7 +11,7 @@
   import { Plus, X, Briefcase, Edit, Trash2 } from 'lucide-svelte';
   import SearchInput from '../../components/SearchInput.svelte';
   import ColorDot from '../../components/ColorDot.svelte';
-  import { createShortcutHandler, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
 
   let activeTab = $state('projects');
@@ -232,15 +232,6 @@
     return true;
   }));
 
-  // Keyboard shortcut handler
-  const handleGlobalKeydown = createShortcutHandler({
-    addProject: () => {
-      if (!showCreateForm && activeTab === 'projects') {
-        startCreate();
-      }
-    }
-  }, 'timeProjects');
-
   // DataTable columns configuration - use $derived for reactivity
   const projectColumns = $derived([
     { key: 'name', label: t('time.projects.project'), slot: 'project' },
@@ -274,8 +265,6 @@
   }
 </script>
 
-<svelte:window onkeydown={handleGlobalKeydown} />
-
 <!-- Header -->
 <div class="mb-6">
   <PageHeader
@@ -290,7 +279,8 @@
           onclick={startCreate}
           icon={Plus}
           size="medium"
-          keyboardHint={getShortcutDisplay('timeProjects', 'addProject')}
+          keyboardHint="A"
+          hotkeyConfig={{ key: toHotkeyString('timeProjects', 'addProject'), guard: () => !showCreateForm && activeTab === 'projects' }}
         >
           {t('time.projects.addProject')}
         </Button>

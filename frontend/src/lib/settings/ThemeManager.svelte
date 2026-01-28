@@ -11,7 +11,7 @@
   import Spinner from '../components/Spinner.svelte';
   import ColorPicker from '../editors/ColorPicker.svelte';
   import Label from '../components/Label.svelte';
-  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
 
   // State management
@@ -37,13 +37,6 @@
     await loadThemes();
     await loadActiveTheme();
   });
-
-  // Global keyboard shortcut handler
-  function handleGlobalKeydown(event) {
-    createShortcutHandler({
-      add: () => { showCreateForm = true; }
-    }, 'themes', { guard: () => !showCreateForm })(event);
-  }
 
   async function loadThemes() {
     try {
@@ -180,8 +173,6 @@
   }
 </script>
 
-<svelte:window onkeydown={handleGlobalKeydown} />
-
 <div class="theme-manager">
   <PageHeader
     icon={Palette}
@@ -194,6 +185,7 @@
         icon={Plus}
         onclick={() => showCreateForm = !showCreateForm}
         keyboardHint="A"
+        hotkeyConfig={{ key: toHotkeyString('themes', 'add'), guard: () => !showCreateForm }}
       >
         {t('common.create')}
       </Button>

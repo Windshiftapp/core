@@ -16,7 +16,7 @@
   import PageHeader from '../../layout/PageHeader.svelte';
   import Tooltip from '../../components/Tooltip.svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-  import { createShortcutHandler, getShortcutDisplay, matchesShortcut, isTypingInField } from '../../utils/keyboardShortcuts.js';
+  import { toHotkeyString, getShortcutDisplay, matchesShortcut, isTypingInField } from '../../utils/keyboardShortcuts.js';
   import { currentRoute, navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
 
@@ -134,13 +134,6 @@
     await loadTestCases(selectedFolder);
     await loadLabels();
 
-    // Add keyboard shortcuts using centralized system
-    const handleKeyDown = createShortcutHandler({
-      addTestCase: showAddCaseForm,
-      addFolder: showAddFolderForm
-    }, 'testCases');
-
-    document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keydown', handleStepsKeyboard);
 
     // Add command palette trigger listener
@@ -154,7 +147,6 @@
 
     // Cleanup
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('keydown', handleStepsKeyboard);
       window.removeEventListener('trigger-test-case-form', handleCommandPaletteTrigger);
       clearTimeout(stepsShortcutTimeout);
@@ -804,6 +796,7 @@
           icon={Plus}
           size="medium"
           keyboardHint={getShortcutDisplay('testCases', 'addTestCase')}
+          hotkeyConfig={{ key: toHotkeyString('testCases', 'addTestCase'), guard: () => !showCaseForm && !showFolderForm }}
         >
           {t('testing.addTestCase')}
         </Button>
@@ -910,17 +903,17 @@
         
         <!-- Add Folder Button -->
         <div class="pt-2">
-          <button
+          <Button
             onclick={showAddFolderForm}
-            class="w-full flex items-center px-3 py-2 text-sm font-medium transition cursor-pointer rounded hover:bg-[var(--ds-surface-hovered)]"
-            style="color: var(--ds-text-subtle);"
+            variant="ghost"
+            icon={Plus}
+            size="small"
+            keyboardHint={getShortcutDisplay('testCases', 'addFolder')}
+            hotkeyConfig={{ key: toHotkeyString('testCases', 'addFolder'), guard: () => !showCaseForm && !showFolderForm }}
+            class="w-full justify-start"
           >
-            <Plus size="16" class="mr-2 flex-shrink-0" />
-            <span class="flex-1 text-left">{t('testing.addFolder')}</span>
-            <kbd class="ml-auto px-1.5 py-0.5 text-xs rounded border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border-bold); color: var(--ds-text-subtle);">
-              {getShortcutDisplay('testCases', 'addFolder')}
-            </kbd>
-          </button>
+            {t('testing.addFolder')}
+          </Button>
         </div>
       </div>
     </div>

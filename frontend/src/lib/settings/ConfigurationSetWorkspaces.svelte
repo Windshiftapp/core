@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { api } from '../api.js';
   import ConfigurationSetEntityPicker from '../pickers/ConfigurationSetEntityPicker.svelte';
@@ -7,10 +7,9 @@
   let {
     allWorkspaces = [],
     selectedWorkspaceIds = [],
-    configurationSetId = null
+    configurationSetId = null,
+    onchange
   } = $props();
-
-  const dispatch = createEventDispatcher();
 
   let workspaceAssignments = $state({}); // Maps workspace_id to config_set info for conflict detection
 
@@ -40,10 +39,6 @@
       console.error('Failed to load workspace assignments:', error);
     }
   }
-
-  function handleChange(event) {
-    dispatch('change', event.detail);
-  }
 </script>
 
 <div>
@@ -57,6 +52,6 @@
     selectedIds={selectedWorkspaceIds}
     {configurationSetId}
     entityAssignments={workspaceAssignments}
-    on:change={handleChange}
+    onchange={onchange}
   />
 </div>

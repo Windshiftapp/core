@@ -30,14 +30,13 @@
   import PermissionGuard from '../layout/PermissionGuard.svelte';
   import UnauthorizedAccess from './UnauthorizedAccess.svelte';
   import WorkspaceNavigation from '../workspaces/WorkspaceNavigation.svelte';
-  import { getShortcut, matchesShortcut } from '../utils/keyboardShortcuts.js';
+  import { useEventListener } from 'runed';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import MainSidebar from '../layout/MainSidebar.svelte';
-
-  // Get shortcut configurations
-  const commandPaletteShortcut = getShortcut('global', 'commandPalette');
 
   let showCommandPalette = $state(false);
   let showCreateModal = $state(false);
+  let createModalInitialType = $state('work-item');
   let showEmailVerificationBanner = $state(false);
 
   // Lazy loaded components registry
@@ -405,59 +404,38 @@
     preloadChunks();
   });
 
-  // Global keydown listener for command palette and shortcuts
-  onMount(() => {
-    function handleGlobalKeydown(e) {
-      // Check if we're in an input, textarea, or content-editable element
-      const isInInputField = e.target.tagName === 'INPUT' ||
-                            e.target.tagName === 'TEXTAREA' ||
-                            e.target.contentEditable === 'true' ||
-                            e.target.closest('[contenteditable="true"]');
+  // Double-space handler for command palette (manual — not a simple hotkey)
+  useEventListener(() => document, 'keydown', (e) => {
+    if (e.code !== 'Space') return;
 
-      // Command palette shortcut (Ctrl/Cmd+K)
-      if (matchesShortcut(e, commandPaletteShortcut)) {
-        e.preventDefault();
-        showCommandPalette = true;
-        return;
-      }
+    const isInInputField = e.target.tagName === 'INPUT' ||
+                          e.target.tagName === 'TEXTAREA' ||
+                          e.target.contentEditable === 'true' ||
+                          e.target.closest('[contenteditable="true"]');
+    if (isInInputField) return;
 
-      if (e.code === 'Space') {
-        const now = Date.now();
-
-        // Only trigger command palette if not in an input field
-        if (!isInInputField) {
-          if (now - lastSpaceTime < DOUBLE_SPACE_THRESHOLD) {
-            e.preventDefault();
-            showCommandPalette = true;
-          } else {
-            // Prevent the first space from being inserted anywhere
-            e.preventDefault();
-          }
-          lastSpaceTime = now;
-        }
-      } else if (e.key === 'c' && !e.ctrlKey && !e.metaKey && !e.altKey && !isInInputField) {
-        // "C" key for create (only when not in input fields and no modifiers)
-        e.preventDefault();
-        showCreateDropdown();
-      }
+    const now = Date.now();
+    if (now - lastSpaceTime < DOUBLE_SPACE_THRESHOLD) {
+      e.preventDefault();
+      showCommandPalette = true;
+    } else {
+      e.preventDefault();
     }
-    
-    document.addEventListener('keydown', handleGlobalKeydown);
-    
-    // Listen for create modal events from other components
+    lastSpaceTime = now;
+  });
+
+  // Listen for create modal events and workspace refresh from other components
+  onMount(() => {
     function handleShowCreateModal(event) {
-      showCreateModal = true;
       const detail = event.detail || {};
 
       if (detail.type) {
-        // Increased delay to allow CreateModal to lazy load and mount before dispatching type
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('set-create-type', { detail: { type: detail.type } }));
-        }, 200);
+        createModalInitialType = detail.type;
       }
 
+      showCreateModal = true;
+
       if (detail.workspaceId) {
-        // Dispatch workspace selection after type so resetForm doesn't clear it
         const workspaceId = typeof detail.workspaceId === 'string'
           ? parseInt(detail.workspaceId, 10)
           : detail.workspaceId;
@@ -469,18 +447,16 @@
         }, detail.type ? 250 : 200);
       }
     }
-    
+
     window.addEventListener('show-create-modal', handleShowCreateModal);
-    
-    // Listen for workspace refresh events from other components
+
     function handleRefreshWorkspaces() {
       workspacesStore.reload();
     }
 
     window.addEventListener('refresh-workspaces', handleRefreshWorkspaces);
-    
+
     return () => {
-      document.removeEventListener('keydown', handleGlobalKeydown);
       window.removeEventListener('show-create-modal', handleShowCreateModal);
       window.removeEventListener('refresh-workspaces', handleRefreshWorkspaces);
     };
@@ -686,6 +662,10 @@
     />
   {/if}
 
+  <!-- Hidden hotkey buttons for global shortcuts -->
+  <Button class="sr-only" onclick={() => showCommandPalette = true} hotkeyConfig={{ key: toHotkeyString('global', 'commandPalette') }}>Command Palette</Button>
+  <Button class="sr-only" onclick={showCreateDropdown} hotkeyConfig={{ key: toHotkeyString('global', 'create') }}>Create</Button>
+
     <!-- Main Content Area with Sidebar Layout -->
     <div class="flex flex-1 {!$uiStore.reviewFullscreen ? ($uiStore.navExpanded ? 'ml-[200px]' : 'ml-16') : ''} transition-all duration-200">
       <!-- Left Sidebar for Workspace/Admin Navigation -->
@@ -814,13 +794,10 @@
       bind:isOpen={showCommandPalette}
       onclose={() => showCommandPalette = false}
       onshow-create-modal={(event) => {
-        showCreateModal = true;
         if (event.detail?.type) {
-          // Increased delay to allow CreateModal to lazy load and mount before dispatching type
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('set-create-type', { detail: { type: event.detail.type } }));
-          }, 200);
+          createModalInitialType = event.detail.type;
         }
+        showCreateModal = true;
       }}
     />
   {/if}
@@ -842,7 +819,11 @@
     <svelte:component
       this={createModalComponent}
       bind:isOpen={showCreateModal}
-      onclose={() => showCreateModal = false}
+      initialType={createModalInitialType}
+      onclose={() => {
+        showCreateModal = false;
+        createModalInitialType = 'work-item';
+      }}
     />
   {/if}
 {/if}

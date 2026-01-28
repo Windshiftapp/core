@@ -90,6 +90,13 @@
     return screenField?.is_required === true;
   }));
 
+  // Priorities from the already-loaded config set (avoids redundant API calls in PriorityPicker)
+  let configSetPriorities = $derived(
+    currentConfigSet?.priorities_detailed?.length > 0
+      ? currentConfigSet.priorities_detailed
+      : null
+  );
+
   // Derived state
   let selectedItemType = $derived(availableItemTypes.find(t => t.id === formData.item_type_id));
   let selectedItemTypeIcon = $derived(selectedItemType?.icon ? itemTypeIconMap[selectedItemType.icon] : Layers);
@@ -634,6 +641,7 @@
       {#if selectedWorkspace}
         <PriorityPicker
           workspaceId={selectedWorkspace.id}
+          items={configSetPriorities}
           selectedPriorityId={formData.priority_id}
           onChange={(priorityId, priority) => {
             formData.priority_id = priorityId;
@@ -798,6 +806,7 @@
             {#if selectedWorkspace}
               <PriorityPicker
                 workspaceId={selectedWorkspace.id}
+                items={configSetPriorities}
                 selectedPriorityId={formData.priority_id}
                 onChange={(priorityId) => formData.priority_id = priorityId}
                 placeholder={t('createModal.noPriority')}

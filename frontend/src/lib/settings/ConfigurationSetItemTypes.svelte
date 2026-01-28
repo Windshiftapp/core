@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { FileText } from 'lucide-svelte';
   import { itemTypeIconMap } from '../utils/icons.js';
@@ -16,10 +15,9 @@
     defaultCreateScreenId = null,
     defaultEditScreenId = null,
     defaultViewScreenId = null,
-    showOverrides = false
+    showOverrides = false,
+    onchange
   } = $props();
-
-  const dispatch = createEventDispatcher();
 
   // Get currently selected item type IDs from configs
   const selectedItemTypeIds = $derived(itemTypeConfigs.map(c => c.item_type_id));
@@ -28,9 +26,7 @@
   const assignedItemTypes = $derived(itemTypes.filter(it => selectedItemTypeIds.includes(it.id)));
 
   // Handle picker changes (add/remove item types)
-  function handlePickerChange(event) {
-    const newSelectedIds = event.detail;
-
+  function handlePickerChange(newSelectedIds) {
     // Build new configs array
     const newConfigs = [];
 
@@ -51,7 +47,7 @@
       }
     }
 
-    dispatch('change', newConfigs);
+    onchange?.(newConfigs);
   }
 
   // Get config for an item type
@@ -85,7 +81,7 @@
       });
     }
 
-    dispatch('change', newConfigs);
+    onchange?.(newConfigs);
   }
 </script>
 
@@ -100,7 +96,7 @@
       entityType="item-types"
       allEntities={itemTypes}
       selectedIds={selectedItemTypeIds}
-      on:change={handlePickerChange}
+      onchange={handlePickerChange}
     />
   </div>
 

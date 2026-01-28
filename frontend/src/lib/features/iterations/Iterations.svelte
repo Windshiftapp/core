@@ -15,7 +15,7 @@
   import { currentRoute, navigate } from '../../router.js';
   import ColorDot from '../../components/ColorDot.svelte';
   import SectionHeader from '../../layout/SectionHeader.svelte';
-  import { createShortcutHandler } from '../../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import EmptyState from '../../components/EmptyState.svelte';
 
   // Props for workspace-scoped view (backward compatibility)
@@ -68,12 +68,6 @@
   function handleManageTypes() {
     // Navigate to admin panel iteration types tab
     navigate('/admin/iteration-types');
-  }
-
-  function handleGlobalKeydown(event) {
-    createShortcutHandler({
-      add: startCreate
-    }, 'iterations', { guard: () => !showModal })(event);
   }
 
   async function loadData() {
@@ -251,8 +245,6 @@
   // No need for tableData wrapper - pass props directly
 </script>
 
-<svelte:window onkeydown={handleGlobalKeydown} />
-
 <!-- Main container with conditional two-panel layout for global view -->
 <div class="flex min-h-screen" style="background-color: var(--ds-surface);">
   <!-- Left Sidebar - Navigation (only in global view) -->
@@ -279,6 +271,7 @@
             size="medium"
             icon={Plus}
             keyboardHint="A"
+            hotkeyConfig={{ key: toHotkeyString('iterations', 'add'), guard: () => !showModal }}
             onclick={startCreate}
           >
             {t('iterations.createIteration')}

@@ -17,9 +17,7 @@
   import BasePicker from '../pickers/BasePicker.svelte';
   import Label from '../components/Label.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
-  import { getShortcut, matchesShortcut } from '../utils/keyboardShortcuts.js';
-
-  const submitShortcut = getShortcut('modal', 'submit');
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 
   const dispatch = createEventDispatcher();
 
@@ -43,12 +41,6 @@
   onMount(async () => {
     await loadNotificationSettings();
     await loadAvailableEvents();
-    
-    // Add keyboard event listener
-    document.addEventListener('keydown', handleKeydown);
-    return () => {
-      document.removeEventListener('keydown', handleKeydown);
-    };
   });
 
   async function loadNotificationSettings() {
@@ -245,23 +237,6 @@
     }
   ]);
 
-  // Handle keyboard shortcuts
-  function handleKeydown(event) {
-    if (matchesShortcut(event, { key: 'a' }) && !showCreateModal && !showEditModal) {
-      const target = event.target;
-      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.contentEditable.includes('true')) {
-        event.preventDefault();
-        openCreateModal();
-      }
-    } else if (event.key === 'Escape' && (showCreateModal || showEditModal)) {
-      event.preventDefault();
-      closeModals();
-    } else if (matchesShortcut(event, submitShortcut) && (showCreateModal || showEditModal)) {
-      event.preventDefault();
-      handleSubmit();
-    }
-  }
-
 </script>
 
 <div class="space-y-6">
@@ -276,6 +251,7 @@
         icon={Plus}
         onclick={openCreateModal}
         keyboardHint="A"
+        hotkeyConfig={{ key: toHotkeyString('notifications', 'add'), guard: () => !showCreateModal && !showEditModal }}
       >
         {t('settings.notifications.createSetting')}
       </Button>

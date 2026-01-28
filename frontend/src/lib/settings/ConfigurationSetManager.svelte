@@ -24,7 +24,7 @@
   import BasePicker from '../pickers/BasePicker.svelte';
   import Label from '../components/Label.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
-  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 
   // Icon mapping for item types
   const iconMap = {
@@ -86,12 +86,6 @@
   onMount(async () => {
     await loadData(currentPage, itemsPerPage, searchQuery);
   });
-
-  function handleGlobalKeydown(event) {
-    createShortcutHandler({
-      add: startCreating
-    }, 'configurationSets', { guard: () => !creating })(event);
-  }
 
   async function loadData(page = 1, limit = 10, search = '') {
     try {
@@ -385,10 +379,8 @@
   }
 </script>
 
-<svelte:window onkeydown={handleGlobalKeydown} />
-
 {#snippet headerActions()}
-  <Button variant="primary" icon={Plus} onclick={startCreating} keyboardHint="A">
+  <Button variant="primary" icon={Plus} onclick={startCreating} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('configurationSets', 'add'), guard: () => !creating }}>
     {t('settings.configSets.addConfigSet')}
   </Button>
 {/snippet}

@@ -1,19 +1,13 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
   import ConfigurationSetEntityPicker from '../pickers/ConfigurationSetEntityPicker.svelte';
 
   let {
     priorities = [],
     selectedPriorityIds = [],
-    configurationSetId = null
+    configurationSetId = null,
+    onchange
   } = $props();
-
-  const dispatch = createEventDispatcher();
-
-  function handleChange(event) {
-    dispatch('change', event.detail);
-  }
 </script>
 
 <div>
@@ -26,6 +20,6 @@
     allEntities={priorities}
     selectedIds={selectedPriorityIds}
     {configurationSetId}
-    on:change={handleChange}
+    onchange={onchange}
   />
 </div>

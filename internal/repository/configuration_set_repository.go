@@ -285,13 +285,6 @@ func (r *ConfigurationSetRepository) loadRelations(cs *models.ConfigurationSet) 
 	cs.PriorityIDs = priorityIDs
 	cs.PrioritiesDetailed = priorities
 
-	// Populate backward-compatible priority names
-	var priorityNames []string
-	for _, p := range priorities {
-		priorityNames = append(priorityNames, p.Name)
-	}
-	cs.Priorities = priorityNames
-
 	return nil
 }
 

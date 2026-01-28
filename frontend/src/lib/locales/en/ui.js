@@ -65,12 +65,12 @@ export default {
     itemTypes: 'Item Types',
     level: 'Level {level}',
     assigned: 'Assigned',
-    noEntitiesAssigned: 'No {label} assigned',
+    noEntitiesAssigned: 'No {entities} assigned',
     available: 'Available',
-    noEntitiesMatchSearch: 'No {label} match your search',
-    allEntitiesAssigned: 'All {label} are assigned',
+    noEntitiesMatchSearch: 'No {entities} match your search',
+    allEntitiesAssigned: 'All {entities} are assigned',
     inConfigSet: 'In config set',
-    searchEntities: 'Search {label}...',
+    searchEntities: 'Search {entities}...',
 
     // Field Selector
     selectField: 'Select field',

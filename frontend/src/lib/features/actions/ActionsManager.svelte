@@ -1,7 +1,7 @@
 <script>
-  import { createEventDispatcher, onMount, onDestroy } from 'svelte';
+  import { createEventDispatcher } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
-  import { createShortcutHandler, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
+  import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import Button from '../../components/Button.svelte';
   import TestActionModal from './TestActionModal.svelte';
   import { Plus, Play } from 'lucide-svelte';
@@ -25,19 +25,6 @@
     showTestModal = false;
     testAction = null;
   }
-
-  // Keyboard shortcuts
-  const shortcutHandler = createShortcutHandler({
-    add: () => handleCreate()
-  }, 'actions');
-
-  onMount(() => {
-    window.addEventListener('keydown', shortcutHandler);
-  });
-
-  onDestroy(() => {
-    window.removeEventListener('keydown', shortcutHandler);
-  });
 
   function getTriggerTypeLabel(triggerType) {
     const labels = {
@@ -82,6 +69,7 @@
       variant="primary"
       icon={Plus}
       keyboardHint={getShortcutDisplay('actions', 'add')}
+      hotkeyConfig={{ key: toHotkeyString('actions', 'add') }}
       onclick={handleCreate}
     >
       {t('actions.create')}

@@ -8,7 +8,7 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import Avatar from '../../components/Avatar.svelte';
   import Text from '../../components/Text.svelte';
-  import { createShortcutHandler, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { Plus, Trash2, Edit, Users } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
@@ -113,15 +113,6 @@
     }
   }
 
-  // Keyboard shortcuts
-  const handleKeydown = createShortcutHandler({
-    addCustomer: () => {
-      if (!showModal) {
-        startCreate();
-      }
-    }
-  }, 'timeCustomers');
-
   // DataTable columns configuration - use $derived for reactivity
   const customerColumns = $derived([
     { key: 'name', label: t('common.name'), slot: 'name' },
@@ -154,9 +145,6 @@
   }
 </script>
 
-<!-- Keyboard shortcuts -->
-<svelte:window onkeydown={handleKeydown} />
-
 <!-- Header -->
 <div class="mb-6 flex justify-between items-start">
   <div>
@@ -170,7 +158,8 @@
       onclick={startCreate}
       icon={Plus}
       size="medium"
-      keyboardHint={getShortcutDisplay('timeCustomers', 'addCustomer')}
+      keyboardHint="A"
+      hotkeyConfig={{ key: toHotkeyString('timeCustomers', 'addCustomer'), guard: () => !showModal }}
     >
       {t('time.organizations.addOrganization')}
     </Button>

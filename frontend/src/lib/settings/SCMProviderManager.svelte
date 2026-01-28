@@ -19,7 +19,7 @@
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import WorkspacePicker from '../pickers/WorkspacePicker.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
-  import { createShortcutHandler, getShortcutDisplay } from '../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import SectionHeader from '../layout/SectionHeader.svelte';
 
   // Workspace access options
@@ -435,24 +435,13 @@
     }
   }
 
-  // Keyboard shortcuts
-  const handleKeydown = createShortcutHandler({
-    addProvider: () => {
-      if (!showCreateModal && !showEditModal && !showDeleteModal) {
-        openCreateModal();
-      }
-    }
-  }, 'scmProviders');
 </script>
-
-<!-- Keyboard shortcuts -->
-<svelte:window onkeydown={handleKeydown} />
 
 <div class="space-y-6">
   <!-- Header -->
   <SectionHeader title={t('settings.scmProviders.title')} subtitle={t('settings.scmProviders.subtitle')}>
     {#snippet actions()}
-      <Button variant="primary" onclick={openCreateModal} keyboardHint={getShortcutDisplay('scmProviders', 'addProvider')}>
+      <Button variant="primary" onclick={openCreateModal} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('scmProviders', 'addProvider'), guard: () => !showCreateModal && !showEditModal && !showDeleteModal }}>
         <Plus class="w-4 h-4 mr-2" />
         {t('settings.scmProviders.addProvider')}
       </Button>
@@ -491,7 +480,7 @@
         {t('settings.scmProviders.getStarted')}
       </p>
       <div class="mt-4">
-        <Button variant="primary" onclick={openCreateModal} keyboardHint={getShortcutDisplay('scmProviders', 'addProvider')}>
+        <Button variant="primary" onclick={openCreateModal} keyboardHint="A">
           <Plus class="w-4 h-4 mr-2" />
           {t('settings.scmProviders.addProvider')}
         </Button>

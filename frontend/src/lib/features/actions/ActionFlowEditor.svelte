@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy, untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import {
     SvelteFlow,
     Controls,
@@ -10,7 +10,7 @@
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
   import { Pencil, RefreshCw, MessageSquare, Bell, HelpCircle, Zap, Database, PlusSquare } from 'lucide-svelte';
-  import { createShortcutHandler, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
+  import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import Button from '../../components/Button.svelte';
   import FieldSelector from '../../pickers/FieldSelector.svelte';
   import TriggerNode from './nodes/TriggerNode.svelte';
@@ -142,19 +142,8 @@
     { value: 'manual', label: t('actions.trigger.manual') }
   ];
 
-  // Keyboard shortcuts
-  const shortcutHandler = createShortcutHandler({
-    save: () => !saving && handleSave(),
-    cancel: () => !saving && onCancel()
-  }, 'actions');
-
   onMount(() => {
     actionFlowStore.init(action, statuses);
-    window.addEventListener('keydown', shortcutHandler);
-  });
-
-  onDestroy(() => {
-    window.removeEventListener('keydown', shortcutHandler);
   });
 
   function handleConnect(params) {
@@ -424,6 +413,7 @@
         onclick={onCancel}
         disabled={saving}
         keyboardHint={getShortcutDisplay('actions', 'cancel')}
+        hotkeyConfig={{ key: toHotkeyString('actions', 'cancel'), guard: () => !saving }}
       >
         {t('common.cancel')}
       </Button>
@@ -433,6 +423,7 @@
         disabled={saving}
         loading={saving}
         keyboardHint={getShortcutDisplay('actions', 'save')}
+        hotkeyConfig={{ key: toHotkeyString('actions', 'save'), guard: () => !saving }}
       >
         {t('common.save')}
       </Button>

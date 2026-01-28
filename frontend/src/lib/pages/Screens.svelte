@@ -15,7 +15,7 @@
   import Modal from '../dialogs/Modal.svelte';
   import DropIndicator from '../layout/DropIndicator.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
-  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 
   let screens = $state([]);
   let customFields = $state([]);
@@ -41,12 +41,6 @@
   onMount(async () => {
     await loadScreens();
   });
-
-  function handleGlobalKeydown(event) {
-    createShortcutHandler({
-      add: startCreate
-    }, 'screens', { guard: () => !showCreateForm })(event);
-  }
 
   async function loadScreens() {
     try {
@@ -517,8 +511,6 @@
   ];
 </script>
 
-<svelte:window onkeydown={handleGlobalKeydown} />
-
 {#if !showFieldEditor}
   <PageHeader
     icon={Layout}
@@ -531,6 +523,7 @@
         icon={Plus}
         onclick={startCreate}
         keyboardHint="A"
+        hotkeyConfig={{ key: toHotkeyString('screens', 'add'), guard: () => !showCreateForm }}
       >
         {t('screensPage.addScreen')}
       </Button>

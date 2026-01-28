@@ -45,6 +45,7 @@
     "@atlaskit/pragmatic-drag-and-drop-hitbox": "^1.1.0",
     "@excalidraw/excalidraw": "^0.18.0",
     "@fontsource/geist-sans": "^5.2.5",
+    "@github/hotkey": "^3.1.1",
     "@melt-ui/pp": "^0.3.2",
     "@melt-ui/svelte": "^0.86.6",
     "@milkdown/components": "^7.17.2",

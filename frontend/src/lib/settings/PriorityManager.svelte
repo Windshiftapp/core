@@ -15,7 +15,7 @@
   import Input from '../components/Input.svelte';
   import ColorPicker from '../editors/ColorPicker.svelte';
   import Toggle from '../components/Toggle.svelte';
-  import { createShortcutHandler } from '../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
@@ -39,12 +39,6 @@
   onMount(async () => {
     await loadPriorities();
   });
-
-  function handleGlobalKeydown(event) {
-    createShortcutHandler({
-      add: startCreate
-    }, 'priorities', { guard: () => !showCreateForm })(event);
-  }
 
   async function loadPriorities() {
     try {
@@ -194,8 +188,6 @@
   }
 </script>
 
-<svelte:window onkeydown={handleGlobalKeydown} />
-
 <PageHeader
   icon={AlertCircle}
   title={t('priorities.title')}
@@ -208,6 +200,7 @@
       onclick={startCreate}
       disabled={isLoading}
       keyboardHint="A"
+      hotkeyConfig={{ key: toHotkeyString('priorities', 'add'), guard: () => !showCreateForm }}
     >
       {t('priorities.createPriority')}
     </Button>

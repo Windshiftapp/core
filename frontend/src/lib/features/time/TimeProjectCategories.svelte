@@ -4,7 +4,7 @@
   import Button from '../../components/Button.svelte';
   import TimeProjectCategoryModal from '../../dialogs/TimeProjectCategoryModal.svelte';
   import { Plus, GripVertical, Edit, Trash2 } from 'lucide-svelte';
-  import { createShortcutHandler, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
+  import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
 
   let categories = $state([]);
@@ -140,17 +140,8 @@
     draggedItem = null;
   }
 
-  // Keyboard shortcut handler
-  const handleGlobalKeydown = createShortcutHandler({
-    addCategory: () => {
-      if (!showCreateForm) {
-        startCreate();
-      }
-    }
-  }, 'timeProjects');
-</script>
 
-<svelte:window onkeydown={handleGlobalKeydown} />
+</script>
 
 <!-- Header -->
 <div class="mb-6 flex justify-between items-start">
@@ -165,7 +156,8 @@
     onclick={startCreate}
     icon={Plus}
     size="medium"
-    keyboardHint={getShortcutDisplay('timeProjects', 'addCategory')}
+    keyboardHint="A"
+    hotkeyConfig={{ key: toHotkeyString('timeProjects', 'addCategory'), guard: () => !showCreateForm }}
   >
     {t('time.categories.newCategory')}
   </Button>
