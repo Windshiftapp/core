@@ -1,107 +1,33 @@
 <script>
-  import { onMount } from 'svelte';
   import { X, MoreHorizontal, Calendar, Flag, User, Layers, ChevronDown } from 'lucide-svelte';
   import { itemTypeIconMap } from '../utils/icons.js';
-  import { api } from '../api.js';
+  import { workItemFormStore } from '../stores/workItemFormStore.svelte.js';
   import { workspacesStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
   import MilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
-  import CompactWorkspaceSelector from '../pickers/CompactWorkspaceSelector.svelte';
   import FieldChip from '../components/FieldChip.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import PriorityPicker from '../pickers/PriorityPicker.svelte';
   import MilestoneCombobox from '../pickers/MilestoneCombobox.svelte';
   import UserPicker from '../pickers/UserPicker.svelte';
   import Label from '../components/Label.svelte';
-  import { getSystemFieldName } from '../stores/fieldConfig.js';
   import { createPopover, melt } from '@melt-ui/svelte';
   import { Milestone as MilestoneIcon } from 'lucide-svelte';
 
-  const STORAGE_KEYS = {
-    workspace: 'vertex_create_modal_workspace',
-    itemType: 'vertex_create_modal_item_type'
-  };
-
   let {
-    formData = $bindable({
-      name: '',
-      description: '',
-      due_date: '',
-      workspace_id: null,
-      priority_id: null,
-      milestone_id: null,
-      assignee_id: null,
-      item_type_id: null
-    }),
-    customFieldValues = $bindable({}),
-    validationErrorMessages = $bindable([]),
-    parentItem = null,
-    restrictedItemTypes = null,
-    onWorkspaceChange = () => {},
     nameInputRef = $bindable(null)
   } = $props();
 
-  // State management
-  let selectedWorkspace = $state(null);
-  let allMilestones = $state([]);
-  let milestones = $state([]);
-  let milestonesLoading = $state(false);
-  let milestonesLoaded = $state(false);
-  let workspaceDetails = $state(null);
-  let customFields = $state([]);
-  let allCustomFields = $state([]);
-  let screenFields = $state([]);
-  let screenSystemFields = $state([]);
-  let loadingScreenFields = $state(false);
-  let currentConfigSet = $state(null);
-  let configSetLoadedForWorkspace = $state(null);
-  let screenFieldsLoadedForKey = $state(null);
-  let itemTypes = $state([]);
-  let hierarchyLevels = $state([]);
-  let availableItemTypes = $state([]);
-  let itemTypesLoaded = $state(false);
-  let users = $state([]);
-  let usersLoaded = $state(false);
-  let customFieldsLoaded = $state(false);
+  // Use the store
+  const store = workItemFormStore;
+
+  // Track priority object for display (not persisted)
   let selectedPriorityObj = $state(null);
-  let storedWorkspaceId = $state(null);
-  let storedItemTypeId = $state(null);
-  let lastPersistedWorkspaceId = $state(null);
-  let lastPersistedItemTypeId = $state(null);
-  let storedItemTypeApplied = $state(false);
-  let configSetDefaultApplied = $state(false);
 
-  // Computed required/non-required field lists
-  let nonRequiredCustomFields = $derived(customFields.filter(cf => {
-    const screenField = screenFields.find(f => f.field_type === 'custom' && parseInt(f.field_identifier) === cf.id);
-    return !screenField?.is_required;
-  }));
-
-  // System fields that are auto-managed and should not be shown in create form
-  const excludedSystemFields = ['status'];
-  let requiredSystemFields = $derived(screenFields.filter(f =>
-    f.is_required &&
-    f.field_type === 'system' &&
-    !excludedSystemFields.includes(f.field_identifier)
-  ));
-
-  let requiredCustomFields = $derived(customFields.filter(cf => {
-    const screenField = screenFields.find(f => f.field_type === 'custom' && parseInt(f.field_identifier) === cf.id);
-    return screenField?.is_required === true;
-  }));
-
-  // Priorities from the already-loaded config set (avoids redundant API calls in PriorityPicker)
-  let configSetPriorities = $derived(
-    currentConfigSet?.priorities_detailed?.length > 0
-      ? currentConfigSet.priorities_detailed
-      : null
+  // Derived state for UI
+  let selectedItemTypeIcon = $derived(
+    store.selectedItemType?.icon ? itemTypeIconMap[store.selectedItemType.icon] : Layers
   );
-
-  // Derived state
-  let selectedItemType = $derived(availableItemTypes.find(t => t.id === formData.item_type_id));
-  let selectedItemTypeIcon = $derived(selectedItemType?.icon ? itemTypeIconMap[selectedItemType.icon] : Layers);
-  let selectedAssignee = $derived(users.find(u => u.id === formData.assignee_id));
-  let selectedMilestone = $derived(milestones.find(m => m.id === formData.milestone_id));
 
   // Overflow menu popover
   const {
@@ -124,15 +50,6 @@
   });
 
   // Helper functions
-  function isFieldRequired(fieldIdentifier) {
-    const screenField = screenFields.find(f => f.field_identifier === fieldIdentifier);
-    return screenField?.is_required === true;
-  }
-
-  function isFieldConfigured(fieldIdentifier) {
-    return screenSystemFields.includes(fieldIdentifier);
-  }
-
   function formatDueDate(dateStr) {
     if (!dateStr) return null;
     const date = new Date(dateStr);
@@ -145,427 +62,93 @@
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
-  function loadStoredSelections() {
-    if (typeof window === 'undefined') return;
-    try {
-      const workspaceValue = window.localStorage.getItem(STORAGE_KEYS.workspace);
-      if (workspaceValue) {
-        const parsedWorkspace = parseInt(workspaceValue, 10);
-        storedWorkspaceId = Number.isNaN(parsedWorkspace) ? null : parsedWorkspace;
-      }
-    } catch (error) {
-      storedWorkspaceId = null;
-    }
-    try {
-      const itemTypeValue = window.localStorage.getItem(STORAGE_KEYS.itemType);
-      if (itemTypeValue) {
-        const parsedItemType = parseInt(itemTypeValue, 10);
-        storedItemTypeId = Number.isNaN(parsedItemType) ? null : parsedItemType;
-      }
-    } catch (error) {
-      storedItemTypeId = null;
-    }
-  }
+  // Reactive effects for data loading based on form state
 
-  function persistWorkspaceSelection(workspaceId) {
-    if (typeof window === 'undefined' || !workspaceId) return;
-    try {
-      window.localStorage.setItem(STORAGE_KEYS.workspace, String(workspaceId));
-      storedWorkspaceId = workspaceId;
-    } catch (error) {}
-  }
-
-  function persistItemTypeSelection(itemTypeId) {
-    if (typeof window === 'undefined' || !itemTypeId) return;
-    try {
-      window.localStorage.setItem(STORAGE_KEYS.itemType, String(itemTypeId));
-      storedItemTypeId = itemTypeId;
-    } catch (error) {}
-  }
-
-  // Data loading functions
-  async function loadUsers() {
-    if (usersLoaded) return;
-    try {
-      const result = await api.getUsers();
-      users = result || [];
-      usersLoaded = true;
-    } catch (error) {
-      users = [];
-      usersLoaded = true;
-    }
-  }
-
-  async function loadCustomFields() {
-    try {
-      const result = await api.customFields.getAll();
-      allCustomFields = result || [];
-      customFieldsLoaded = true;
-    } catch (error) {
-      allCustomFields = [];
-      customFields = [];
-      customFieldsLoaded = true;
-    }
-  }
-
-  async function loadMilestones() {
-    if (milestonesLoading || milestonesLoaded) return;
-    try {
-      milestonesLoading = true;
-      const result = await api.milestones.getAll();
-      allMilestones = result || [];
-      filterMilestones();
-      milestonesLoaded = true;
-    } catch (error) {
-      allMilestones = [];
-      milestones = [];
-      milestonesLoaded = true;
-    } finally {
-      milestonesLoading = false;
-    }
-  }
-
-  function filterMilestones() {
-    if (!workspaceDetails || !workspaceDetails.milestone_categories || workspaceDetails.milestone_categories.length === 0) {
-      milestones = allMilestones;
-    } else {
-      const allowedCategoryIds = workspaceDetails.milestone_categories;
-      milestones = allMilestones.filter(m => allowedCategoryIds.includes(m.category_id));
-    }
-  }
-
-  async function loadWorkspaceDetails(workspaceId) {
-    if (!workspaceId) {
-      workspaceDetails = null;
-      filterMilestones();
-      return;
-    }
-    try {
-      workspaceDetails = await api.workspaces.get(workspaceId);
-      filterMilestones();
-    } catch (error) {
-      workspaceDetails = null;
-      filterMilestones();
-    }
-  }
-
-  async function loadItemTypes(forceReload = false) {
-    if (itemTypesLoaded && !forceReload) return;
-    try {
-      const [itemTypesResult, hierarchyLevelsResult] = await Promise.all([
-        api.itemTypes.getAll(),
-        api.hierarchyLevels.getAll()
-      ]);
-      itemTypes = itemTypesResult || [];
-      hierarchyLevels = hierarchyLevelsResult || [];
-
-      if (restrictedItemTypes && restrictedItemTypes.length > 0) {
-        availableItemTypes = restrictedItemTypes.sort((a, b) => a.hierarchy_level - b.hierarchy_level || a.sort_order - b.sort_order);
-        const currentTypeValid = formData.item_type_id && availableItemTypes.some(t => t.id === formData.item_type_id);
-        if (!currentTypeValid && availableItemTypes.length > 0) {
-          formData.item_type_id = availableItemTypes[0].id;
-        }
-      } else {
-        availableItemTypes = itemTypes.sort((a, b) => a.hierarchy_level - b.hierarchy_level || a.sort_order - b.sort_order);
-        if (availableItemTypes.length > 0 && !formData.item_type_id) {
-          formData.item_type_id = availableItemTypes[0].id;
-        }
-      }
-      itemTypesLoaded = true;
-    } catch (error) {
-      itemTypes = [];
-      hierarchyLevels = [];
-      availableItemTypes = [];
-      itemTypesLoaded = true;
-    }
-  }
-
-  function resolveCreateScreenId(itemTypeId) {
-    if (currentConfigSet) {
-      const itemTypeConfig = currentConfigSet.item_type_configs?.find(c => c.item_type_id === itemTypeId);
-      if (itemTypeConfig?.create_screen_id) return itemTypeConfig.create_screen_id;
-      if (currentConfigSet.create_screen_id) return currentConfigSet.create_screen_id;
-    }
-    return 1;
-  }
-
-  async function loadConfigSetForWorkspace(workspaceId) {
-    if (configSetLoadedForWorkspace === workspaceId) return;
-    try {
-      const response = await api.configurationSets.getAll();
-      const configSets = response?.configuration_sets || [];
-      currentConfigSet = null;
-      let defaultConfigSet = null;
-
-      for (const configSet of configSets) {
-        if (configSet.is_default) defaultConfigSet = configSet;
-        if (configSet.workspace_ids && configSet.workspace_ids.includes(workspaceId)) {
-          currentConfigSet = await api.configurationSets.get(configSet.id);
-          break;
-        }
-      }
-
-      if (!currentConfigSet && defaultConfigSet) {
-        currentConfigSet = await api.configurationSets.get(defaultConfigSet.id);
-      }
-
-      configSetLoadedForWorkspace = workspaceId;
-
-      if (currentConfigSet?.item_type_configs?.length > 0) {
-        const allowedItemTypeIds = currentConfigSet.item_type_configs.map(c => c.item_type_id);
-        const baseTypes = restrictedItemTypes && restrictedItemTypes.length > 0 ? restrictedItemTypes : itemTypes;
-        availableItemTypes = baseTypes
-          .filter(t => allowedItemTypeIds.includes(t.id))
-          .sort((a, b) => a.hierarchy_level - b.hierarchy_level || a.sort_order - b.sort_order);
-      } else if (restrictedItemTypes && restrictedItemTypes.length > 0) {
-        availableItemTypes = restrictedItemTypes.sort((a, b) => a.hierarchy_level - b.hierarchy_level || a.sort_order - b.sort_order);
-      } else {
-        availableItemTypes = itemTypes.sort((a, b) => a.hierarchy_level - b.hierarchy_level || a.sort_order - b.sort_order);
-      }
-
-      if (availableItemTypes.length > 0 && !availableItemTypes.find(t => t.id === formData.item_type_id)) {
-        formData.item_type_id = availableItemTypes[0].id;
-      }
-    } catch (error) {
-      currentConfigSet = null;
-      configSetLoadedForWorkspace = workspaceId;
-      const baseTypes = restrictedItemTypes && restrictedItemTypes.length > 0 ? restrictedItemTypes : itemTypes;
-      availableItemTypes = baseTypes.sort((a, b) => a.hierarchy_level - b.hierarchy_level || a.sort_order - b.sort_order);
-    }
-  }
-
-  async function loadScreenFieldsForItemType(workspaceId, itemTypeId) {
-    const key = `${workspaceId}-${itemTypeId}`;
-    if (loadingScreenFields || screenFieldsLoadedForKey === key) return;
-    try {
-      loadingScreenFields = true;
-      const createScreenId = resolveCreateScreenId(itemTypeId);
-      const fields = await api.screens.getFields(createScreenId);
-      screenFields = fields || [];
-
-      screenSystemFields = screenFields
-        .filter(field => field.field_type === 'system')
-        .map(field => field.field_identifier);
-
-      const customFieldIds = screenFields
-        .filter(field => field.field_type === 'custom')
-        .map(field => parseInt(field.field_identifier));
-
-      const filteredCustomFields = allCustomFields.filter(field => customFieldIds.includes(field.id));
-
-      customFieldValues = {};
-      filteredCustomFields.forEach(field => {
-        customFieldValues[field.id] = '';
-      });
-
-      customFields = filteredCustomFields;
-      screenFieldsLoadedForKey = key;
-    } catch (error) {
-      screenSystemFields = ['priority', 'milestone'];
-      screenFields = [];
-      customFields = [];
-      customFieldValues = {};
-      screenFieldsLoadedForKey = key;
-    } finally {
-      loadingScreenFields = false;
-    }
-  }
-
-  // Validation
-  export function validate() {
-    const errors = [];
-
-    for (const field of screenFields) {
-      if (field.is_required) {
-        if (field.field_type === 'system') {
-          const identifier = field.field_identifier;
-          // Skip system-managed fields that are auto-assigned
-          if (excludedSystemFields.includes(identifier)) {
-            continue;
-          }
-          const fieldKeyMap = { 'title': 'name' };
-          const formKey = fieldKeyMap[identifier] || identifier;
-          const value = formData[formKey] ?? formData[`${formKey}_id`];
-          if (!value) {
-            errors.push(`${getSystemFieldName(identifier)} is required`);
-          }
-        } else if (field.field_type === 'custom') {
-          const fieldId = parseInt(field.field_identifier);
-          const value = customFieldValues[fieldId];
-          if (value === undefined || value === null || value === '') {
-            const fieldDef = allCustomFields.find(f => f.id === fieldId);
-            errors.push(`${fieldDef?.name || 'Custom field'} is required`);
-          }
-        }
-      }
-    }
-
-    validationErrorMessages = errors;
-    return errors.length === 0;
-  }
-
-  // Export functions for parent component
-  export function getFormData() {
-    return {
-      workspace_id: selectedWorkspace?.id,
-      title: formData.name,
-      description: formData.description || '',
-      priority_id: formData.priority_id || null,
-      milestone_id: formData.milestone_id || null,
-      assignee_id: formData.assignee_id || null,
-      due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null,
-      status: 'open',
-      item_type_id: formData.item_type_id,
-      parent_id: parentItem ? parentItem.id : null,
-      custom_field_values: customFieldValues
-    };
-  }
-
-  export function getSelectedWorkspace() {
-    return selectedWorkspace;
-  }
-
-  export function reset() {
-    selectedWorkspace = null;
-    milestonesLoaded = false;
-    milestonesLoading = false;
-    allMilestones = [];
-    milestones = [];
-    workspaceDetails = null;
-    itemTypesLoaded = false;
-    customFieldsLoaded = false;
-    itemTypes = [];
-    hierarchyLevels = [];
-    availableItemTypes = [];
-    currentConfigSet = null;
-    configSetLoadedForWorkspace = null;
-    screenFieldsLoadedForKey = null;
-    loadingScreenFields = false;
-    screenFields = [];
-    screenSystemFields = [];
-    customFields = [];
-    customFieldValues = {};
-    validationErrorMessages = [];
-    storedItemTypeApplied = false;
-    configSetDefaultApplied = false;
-
-    formData = {
-      name: '',
-      description: '',
-      due_date: '',
-      workspace_id: null,
-      priority_id: null,
-      milestone_id: null,
-      assignee_id: null,
-      item_type_id: availableItemTypes.length > 0 ? availableItemTypes[0].id : null
-    };
-  }
-
-  // Effects
+  // Load workspace details when workspace changes
   $effect(() => {
-    if (selectedWorkspace) {
-      loadWorkspaceDetails(selectedWorkspace.id);
-    } else {
-      workspaceDetails = null;
-      filterMilestones();
+    if (store.selectedWorkspace) {
+      store.loadWorkspaceDetails(store.selectedWorkspace.id);
     }
   });
 
+  // Load config set when workspace_id changes
   $effect(() => {
-    if (allCustomFields.length === 0) loadCustomFields();
-  });
-
-  $effect(() => {
-    if (!milestonesLoaded) loadMilestones();
-  });
-
-  $effect(() => {
-    if (!itemTypesLoaded) loadItemTypes();
-  });
-
-  $effect(() => {
-    if (!usersLoaded) loadUsers();
-  });
-
-  $effect(() => {
-    if (formData.workspace_id && configSetLoadedForWorkspace !== formData.workspace_id) {
-      loadConfigSetForWorkspace(formData.workspace_id);
+    if (store.formData.workspace_id && store.configSetLoadedForWorkspace !== store.formData.workspace_id) {
+      store.loadConfigSetForWorkspace(store.formData.workspace_id);
     }
   });
 
+  // Load screen fields when workspace and item type are ready
   $effect(() => {
-    if (formData.workspace_id && formData.item_type_id && customFieldsLoaded && configSetLoadedForWorkspace === formData.workspace_id) {
-      const key = `${formData.workspace_id}-${formData.item_type_id}`;
-      if (screenFieldsLoadedForKey !== key) {
-        loadScreenFieldsForItemType(formData.workspace_id, formData.item_type_id);
+    if (
+      store.formData.workspace_id &&
+      store.formData.item_type_id &&
+      store.customFieldsLoaded &&
+      store.configSetLoadedForWorkspace === store.formData.workspace_id
+    ) {
+      const key = `${store.formData.workspace_id}-${store.formData.item_type_id}`;
+      if (store.screenFieldsLoadedForKey !== key) {
+        store.loadScreenFieldsForItemType(store.formData.workspace_id, store.formData.item_type_id);
       }
     }
   });
 
+  // Apply stored workspace when workspaces are available
   $effect(() => {
-    if (!formData.workspace_id && storedWorkspaceId && $workspacesStore.regularWorkspaces.length > 0) {
-      const storedWorkspace = $workspacesStore.regularWorkspaces.find(w => w.id === storedWorkspaceId);
-      if (storedWorkspace) {
-        selectedWorkspace = storedWorkspace;
-        formData.workspace_id = storedWorkspace.id;
-      }
+    if (!store.formData.workspace_id && store.storedWorkspaceId && $workspacesStore.regularWorkspaces.length > 0) {
+      store.applyStoredWorkspace($workspacesStore.regularWorkspaces);
     }
   });
 
+  // Apply stored item type when available types are loaded
   $effect(() => {
-    // Don't apply stored item type when creating child items (restrictedItemTypes is set)
-    if (storedItemTypeId && availableItemTypes.length > 0 && !storedItemTypeApplied && !restrictedItemTypes) {
-      const storedItemType = availableItemTypes.find(type => type.id === storedItemTypeId);
-      if (storedItemType) formData.item_type_id = storedItemType.id;
-      storedItemTypeApplied = true;
+    store.applyStoredItemType();
+  });
+
+  // Apply config set default item type
+  $effect(() => {
+    store.applyConfigSetDefault();
+  });
+
+  // Persist workspace selection
+  $effect(() => {
+    if (store.selectedWorkspace?.id) {
+      // Persistence is handled in setWorkspace method
     }
   });
 
+  // Persist item type selection
   $effect(() => {
-    if (availableItemTypes.length > 0 && currentConfigSet?.default_item_type_id && !configSetDefaultApplied) {
-      const hasValidStoredType = storedItemTypeId && availableItemTypes.find(type => type.id === storedItemTypeId);
-      if (!hasValidStoredType) {
-        const configDefault = availableItemTypes.find(type => type.id === currentConfigSet.default_item_type_id);
-        if (configDefault) formData.item_type_id = configDefault.id;
-      }
-      configSetDefaultApplied = true;
-    }
-  });
-
-  $effect(() => {
-    if (selectedWorkspace?.id && selectedWorkspace.id !== lastPersistedWorkspaceId) {
-      lastPersistedWorkspaceId = selectedWorkspace.id;
-      persistWorkspaceSelection(selectedWorkspace.id);
-    }
-  });
-
-  $effect(() => {
-    if (formData.item_type_id && formData.item_type_id !== lastPersistedItemTypeId) {
-      lastPersistedItemTypeId = formData.item_type_id;
-      persistItemTypeSelection(formData.item_type_id);
+    if (store.formData.item_type_id && store.formData.item_type_id !== store.lastPersistedItemTypeId) {
+      store.setItemType(store.formData.item_type_id);
     }
   });
 
   // Auto-select first workspace if only one exists
   $effect(() => {
-    if ($workspacesStore.regularWorkspaces.length === 1 && !formData.workspace_id) {
-      selectedWorkspace = $workspacesStore.regularWorkspaces[0];
-      formData.workspace_id = $workspacesStore.regularWorkspaces[0].id;
+    if ($workspacesStore.regularWorkspaces.length === 1 && !store.formData.workspace_id) {
+      store.setWorkspace($workspacesStore.regularWorkspaces[0]);
     }
   });
 
-  onMount(() => {
-    loadStoredSelections();
+  // Sync selectedWorkspace when formData.workspace_id changes externally
+  $effect(() => {
+    if (store.formData.workspace_id && $workspacesStore.regularWorkspaces.length > 0) {
+      const workspace = $workspacesStore.regularWorkspaces.find(w => w.id === store.formData.workspace_id);
+      if (workspace && (!store.selectedWorkspace || store.selectedWorkspace.id !== workspace.id)) {
+        store.selectedWorkspace = workspace;
+      }
+    }
   });
 </script>
 
 <div class="space-y-3">
   <!-- Validation Errors -->
-  {#if validationErrorMessages.length > 0}
+  {#if store.validationErrors.length > 0}
     <div class="p-3 rounded text-sm" style="background-color: var(--ds-background-danger-subtle, #fef2f2); border: 1px solid var(--ds-border-danger, #fecaca); color: var(--ds-text-danger, #dc2626);">
       <p class="font-medium mb-1">{t('createModal.fillRequiredFields')}</p>
       <ul class="list-disc list-inside">
-        {#each validationErrorMessages as error}
+        {#each store.validationErrors as error}
           <li>{error}</li>
         {/each}
       </ul>
@@ -573,16 +156,16 @@
   {/if}
 
   <!-- Parent Item Info -->
-  {#if parentItem}
+  {#if store.parentItem}
     <div class="text-xs px-2 py-1.5 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
-      {t('createModal.parent')}: {parentItem.title}
+      {t('createModal.parent')}: {store.parentItem.title}
     </div>
   {/if}
 
   <!-- Title Input -->
   <input
     bind:this={nameInputRef}
-    bind:value={formData.name}
+    bind:value={store.formData.name}
     type="text"
     class="w-full text-lg font-medium border-0 outline-none bg-transparent"
     style="color: var(--ds-text);"
@@ -592,7 +175,7 @@
   <!-- Description -->
   <div class="min-h-[60px]">
     <MilkdownEditor
-      bind:content={formData.description}
+      bind:content={store.formData.description}
       placeholder={t('createModal.addDescription')}
       compact={true}
       showToolbar={false}
@@ -604,26 +187,26 @@
   <!-- Field Chips Row -->
   <div class="flex flex-wrap items-center gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
     <!-- Item Type Chip -->
-    {#if availableItemTypes.length >= 1}
+    {#if store.availableItemTypes.length >= 1}
       <FieldChip
         label={t('createModal.type')}
-        value={formData.item_type_id}
-        displayValue={selectedItemType?.name || ''}
+        value={store.formData.item_type_id}
+        displayValue={store.selectedItemType?.name || ''}
         icon={selectedItemTypeIcon}
         placeholder={t('createModal.type')}
       >
         {#snippet children({ close: closePopover })}
           <div class="p-2 max-h-48 overflow-y-auto">
-            {#each availableItemTypes as itemType}
+            {#each store.availableItemTypes as itemType}
               {@const TypeIcon = itemType.icon ? itemTypeIconMap[itemType.icon] : Layers}
               <button
                 type="button"
                 class="w-full flex items-center gap-2 px-3 py-2 text-left text-sm rounded transition-colors"
-                style="color: var(--ds-text); background-color: {formData.item_type_id === itemType.id ? 'var(--ds-background-selected)' : 'transparent'};"
+                style="color: var(--ds-text); background-color: {store.formData.item_type_id === itemType.id ? 'var(--ds-background-selected)' : 'transparent'};"
                 onmouseover={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)'}
-                onmouseout={(e) => e.currentTarget.style.backgroundColor = formData.item_type_id === itemType.id ? 'var(--ds-background-selected)' : 'transparent'}
+                onmouseout={(e) => e.currentTarget.style.backgroundColor = store.formData.item_type_id === itemType.id ? 'var(--ds-background-selected)' : 'transparent'}
                 onclick={() => {
-                  formData.item_type_id = itemType.id;
+                  store.setItemType(itemType.id);
                   closePopover();
                 }}
               >
@@ -637,14 +220,14 @@
     {/if}
 
     <!-- Priority Chip -->
-    {#if isFieldConfigured('priority') && !isFieldRequired('priority')}
-      {#if selectedWorkspace}
+    {#if store.isFieldConfigured('priority') && !store.isFieldRequired('priority')}
+      {#if store.selectedWorkspace}
         <PriorityPicker
-          workspaceId={selectedWorkspace.id}
-          items={configSetPriorities}
-          selectedPriorityId={formData.priority_id}
+          workspaceId={store.selectedWorkspace.id}
+          items={store.configSetPriorities}
+          selectedPriorityId={store.formData.priority_id}
           onChange={(priorityId, priority) => {
-            formData.priority_id = priorityId;
+            store.formData.priority_id = priorityId;
             selectedPriorityObj = priority;
           }}
           showUnassigned={true}
@@ -653,7 +236,7 @@
           {#snippet children()}
             <div
               class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
-              style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {formData.priority_id ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
+              style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {store.formData.priority_id ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
               onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, var(--ds-background-neutral-hovered))'}
               onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
             >
@@ -676,21 +259,21 @@
     {/if}
 
     <!-- Assignee Chip -->
-    {#if isFieldConfigured('assignee') && !isFieldRequired('assignee')}
+    {#if store.isFieldConfigured('assignee') && !store.isFieldRequired('assignee')}
       <UserPicker
-        bind:value={formData.assignee_id}
+        bind:value={store.formData.assignee_id}
         showUnassigned={true}
         unassignedLabel={t('createModal.unassigned')}
       >
         {#snippet children()}
           <div
             class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
-            style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {formData.assignee_id ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
+            style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {store.formData.assignee_id ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
             onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, var(--ds-background-neutral-hovered))'}
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
           >
             <User size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
-            <span class="truncate max-w-[120px]">{selectedAssignee?.name || selectedAssignee?.email || t('createModal.assignee')}</span>
+            <span class="truncate max-w-[120px]">{store.selectedAssignee?.name || store.selectedAssignee?.email || t('createModal.assignee')}</span>
             <ChevronDown size={12} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
           </div>
         {/snippet}
@@ -698,16 +281,16 @@
     {/if}
 
     <!-- Due Date Chip -->
-    {#if isFieldConfigured('due_date') && !isFieldRequired('due_date')}
+    {#if store.isFieldConfigured('due_date') && !store.isFieldRequired('due_date')}
       <button
         use:melt={$dueDateTrigger}
         class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
-        style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {formData.due_date ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
+        style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {store.formData.due_date ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
         onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, var(--ds-background-neutral-hovered))'}
         onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
       >
         <Calendar size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
-        <span class="truncate max-w-[120px]">{formData.due_date ? formatDueDate(formData.due_date) : t('createModal.dueDate')}</span>
+        <span class="truncate max-w-[120px]">{store.formData.due_date ? formatDueDate(store.formData.due_date) : t('createModal.dueDate')}</span>
         <ChevronDown size={12} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
       </button>
 
@@ -719,7 +302,7 @@
         >
           <input
             type="date"
-            bind:value={formData.due_date}
+            bind:value={store.formData.due_date}
             class="w-full px-3 py-2 rounded border text-sm"
             style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
             onchange={() => $dueDateOpen = false}
@@ -729,26 +312,26 @@
     {/if}
 
     <!-- Milestone Chip -->
-    {#if isFieldConfigured('milestone') && !isFieldRequired('milestone')}
+    {#if store.isFieldConfigured('milestone') && !store.isFieldRequired('milestone')}
       <MilestoneCombobox
-        bind:value={formData.milestone_id}
-        workspaceId={selectedWorkspace?.id}
+        bind:value={store.formData.milestone_id}
+        workspaceId={store.selectedWorkspace?.id}
         showUnassigned={true}
         unassignedLabel={t('createModal.noMilestone')}
       >
         {#snippet children()}
           <div
             class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
-            style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {formData.milestone_id ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
+            style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {store.formData.milestone_id ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
             onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, var(--ds-background-neutral-hovered))'}
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
           >
-            {#if selectedMilestone?.category_color}
-              <div class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {selectedMilestone.category_color};"></div>
+            {#if store.selectedMilestone?.category_color}
+              <div class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {store.selectedMilestone.category_color};"></div>
             {:else}
               <MilestoneIcon size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
             {/if}
-            <span class="truncate max-w-[120px]">{selectedMilestone?.name || t('createModal.milestoneField')}</span>
+            <span class="truncate max-w-[120px]">{store.selectedMilestone?.name || t('createModal.milestoneField')}</span>
             <ChevronDown size={12} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
           </div>
         {/snippet}
@@ -756,7 +339,7 @@
     {/if}
 
     <!-- Overflow Menu for Non-Required Custom Fields -->
-    {#if nonRequiredCustomFields.length > 0}
+    {#if store.nonRequiredCustomFields.length > 0}
       <button
         use:melt={$overflowTrigger}
         class="inline-flex items-center px-2 py-1 rounded-full text-sm transition-colors"
@@ -776,14 +359,14 @@
           <div class="text-xs font-medium px-2 py-1 mb-1" style="color: var(--ds-text-subtle);">
             {t('createModal.additionalFields')}
           </div>
-          {#each nonRequiredCustomFields as field}
+          {#each store.nonRequiredCustomFields as field}
             <div class="px-2 py-2">
               <CustomFieldRenderer
                 {field}
-                bind:value={customFieldValues[field.id]}
+                bind:value={store.customFieldValues[field.id]}
                 readonly={false}
-                onChange={(val) => customFieldValues[field.id] = val}
-                {milestones}
+                onChange={(val) => store.customFieldValues[field.id] = val}
+                milestones={store.milestones}
                 isDarkMode={false}
                 autoOpenPickers={false}
               />
@@ -795,20 +378,20 @@
   </div>
 
   <!-- Required System Fields Section -->
-  {#if requiredSystemFields.length > 0}
+  {#if store.requiredSystemFields.length > 0}
     <div class="space-y-3 pt-3 border-t" style="border-color: var(--ds-border);">
-      {#each requiredSystemFields as field}
+      {#each store.requiredSystemFields as field}
         {#if field.field_identifier === 'priority'}
           <div class="space-y-1">
             <Label color="default">
               {t('createModal.priority')} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
             </Label>
-            {#if selectedWorkspace}
+            {#if store.selectedWorkspace}
               <PriorityPicker
-                workspaceId={selectedWorkspace.id}
-                items={configSetPriorities}
-                selectedPriorityId={formData.priority_id}
-                onChange={(priorityId) => formData.priority_id = priorityId}
+                workspaceId={store.selectedWorkspace.id}
+                items={store.configSetPriorities}
+                selectedPriorityId={store.formData.priority_id}
+                onChange={(priorityId) => store.formData.priority_id = priorityId}
                 placeholder={t('createModal.noPriority')}
               />
             {:else}
@@ -824,7 +407,7 @@
             </Label>
             <input
               type="date"
-              bind:value={formData.due_date}
+              bind:value={store.formData.due_date}
               class="w-full px-3 py-2 rounded border text-sm"
               style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
             />
@@ -835,8 +418,8 @@
               {t('createModal.milestoneField')} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
             </Label>
             <MilestoneCombobox
-              bind:value={formData.milestone_id}
-              workspaceId={selectedWorkspace?.id}
+              bind:value={store.formData.milestone_id}
+              workspaceId={store.selectedWorkspace?.id}
               placeholder={t('createModal.noMilestone')}
             />
           </div>
@@ -846,7 +429,7 @@
               {t('createModal.assignee')} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
             </Label>
             <UserPicker
-              bind:value={formData.assignee_id}
+              bind:value={store.formData.assignee_id}
               placeholder={t('createModal.unassigned')}
             />
           </div>
@@ -856,19 +439,19 @@
   {/if}
 
   <!-- Required Custom Fields Section -->
-  {#if requiredCustomFields.length > 0}
+  {#if store.requiredCustomFields.length > 0}
     <div class="space-y-3 pt-3 border-t" style="border-color: var(--ds-border);">
-      {#each requiredCustomFields as field}
+      {#each store.requiredCustomFields as field}
         <div class="space-y-1">
           <Label color="default">
             {field.name} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
           </Label>
           <CustomFieldRenderer
             {field}
-            bind:value={customFieldValues[field.id]}
+            bind:value={store.customFieldValues[field.id]}
             readonly={false}
-            onChange={(val) => customFieldValues[field.id] = val}
-            {milestones}
+            onChange={(val) => store.customFieldValues[field.id] = val}
+            milestones={store.milestones}
             isDarkMode={false}
           />
         </div>

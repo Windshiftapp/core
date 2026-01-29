@@ -92,6 +92,8 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 			entityType = "workspace_avatar"
 		case "customer_avatar":
 			entityType = "customer_avatar"
+		case "workspace_background":
+			entityType = "workspace_background"
 		default:
 			entityType = "item" // Default to item for backwards compatibility
 		}
@@ -103,9 +105,10 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	isAvatar := entityType == "avatar"
 	isWorkspaceAvatar := entityType == "workspace_avatar"
 	isCustomerAvatar := entityType == "customer_avatar"
+	isWorkspaceBackground := entityType == "workspace_background"
 
-	// Validate entity_id is provided (except for avatars)
-	if entityIDStr == "" && !isAvatar && !isWorkspaceAvatar && !isCustomerAvatar {
+	// Validate entity_id is provided (except for avatars and backgrounds)
+	if entityIDStr == "" && !isAvatar && !isWorkspaceAvatar && !isCustomerAvatar && !isWorkspaceBackground {
 		slog.Debug("missing entity_id in form", slog.String("component", "attachments"))
 		http.Error(w, "entity_id is required", http.StatusBadRequest)
 		return
@@ -123,7 +126,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("uploading to entity", slog.String("component", "attachments"), slog.String("entity_type", entityType), slog.Int("entity_id", entityID))
 
 	// Verify entity exists based on type
-	if !isAvatar && !isWorkspaceAvatar && !isCustomerAvatar {
+	if !isAvatar && !isWorkspaceAvatar && !isCustomerAvatar && !isWorkspaceBackground {
 		var exists bool
 		var checkQuery string
 
@@ -256,6 +259,8 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		itemDir = filepath.Join(h.attachmentPath, "workspace_avatars")
 	case "customer_avatar":
 		itemDir = filepath.Join(h.attachmentPath, "customer_avatars")
+	case "workspace_background":
+		itemDir = filepath.Join(h.attachmentPath, "workspace_backgrounds")
 	case "test_case":
 		itemDir = filepath.Join(h.attachmentPath, "test_cases", strconv.Itoa(entityID))
 	default: // "item"
@@ -349,7 +354,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// For avatar type checks below
 	var attachmentEntityID interface{}
-	if isAvatar || isWorkspaceAvatar || isCustomerAvatar {
+	if isAvatar || isWorkspaceAvatar || isCustomerAvatar || isWorkspaceBackground {
 		attachmentEntityID = nil
 	} else {
 		attachmentEntityID = entityID
@@ -381,19 +386,23 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return success response
-	if isAvatar || isWorkspaceAvatar || isCustomerAvatar {
-		// For avatars, return the attachment download URL
-		avatarURL := fmt.Sprintf("/api/attachments/%d/download", attachmentID)
+	if isAvatar || isWorkspaceAvatar || isCustomerAvatar || isWorkspaceBackground {
+		// For avatars and backgrounds, return the attachment download URL
+		downloadURL := fmt.Sprintf("/api/attachments/%d/download", attachmentID)
 		message := "Avatar uploaded successfully"
+		urlKey := "avatar_url"
 		if isWorkspaceAvatar {
 			message = "Workspace avatar uploaded successfully"
 		} else if isCustomerAvatar {
 			message = "Customer avatar uploaded successfully"
+		} else if isWorkspaceBackground {
+			message = "Workspace background uploaded successfully"
+			urlKey = "background_url"
 		}
 		response := map[string]interface{}{
 			"success":       true,
 			"message":       message,
-			"avatar_url":    avatarURL,
+			urlKey:          downloadURL,
 			"attachment_id": attachmentID,
 			"filename":      uniqueFilename,
 		}

@@ -23,6 +23,9 @@ var (
 
 	// All HTML tags regex - matches opening, closing, and self-closing tags
 	htmlTagRegex = regexp.MustCompile(`<[^>]*>`)
+
+	// Safe br tag variations (used by Milkdown to preserve blank lines)
+	brTagRegex = regexp.MustCompile(`<br\s*/?>`)
 )
 
 // SanitizeText removes potentially dangerous HTML/script content and limits length
@@ -68,13 +71,22 @@ func StripHTMLTags(input string) string {
 
 // SanitizeDescription sanitizes descriptions by stripping HTML tags and limiting size.
 // Content is stored as Markdown, so any HTML tags are injection attempts.
+// Exception: <br /> tags are preserved as they're used by Milkdown to preserve blank lines.
 func SanitizeDescription(description string) string {
 	if description == "" || description == "null" {
 		return ""
 	}
 
-	// Strip any HTML tags - Markdown content shouldn't have any
+	// Preserve <br> tags by replacing with placeholder before stripping HTML
+	// These are used by Milkdown's remarkPreserveEmptyLinePlugin for blank lines
+	const brPlaceholder = "\x00BR_PLACEHOLDER\x00"
+	description = brTagRegex.ReplaceAllString(description, brPlaceholder)
+
+	// Strip any other HTML tags - Markdown content shouldn't have any
 	description = StripHTMLTags(description)
+
+	// Restore <br /> tags
+	description = strings.ReplaceAll(description, brPlaceholder, "<br />")
 
 	// Limit size to prevent excessive data (10KB should be enough for rich text)
 	maxLength := 10000

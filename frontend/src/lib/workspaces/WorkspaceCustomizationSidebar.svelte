@@ -1,16 +1,11 @@
 <script>
-  import { onMount, onDestroy, createEventDispatcher } from 'svelte';
-  import { X, BarChart3, Package, GripVertical, Palette } from 'lucide-svelte';
+  import { onMount, onDestroy } from 'svelte';
+  import { X, BarChart3, Package, GripVertical } from 'lucide-svelte';
   import { widgetRegistry, widgetCategories, getWidgetsByCategory } from '../services/widgetRegistry.js';
-  import { gradients } from '../utils/gradients.js';
   import { workspaceIconMap } from '../utils/icons.js';
 
   export let isOpen = false;
   export let activeCategory = 'built-in';
-  export let selectedGradient = 0;
-  export let applyToAllViews = false;
-
-  const dispatch = createEventDispatcher();
 
   // Get widgets by category
   $: builtInWidgets = getWidgetsByCategory(widgetCategories.BUILT_IN);
@@ -30,25 +25,8 @@
       name: 'Additional Widgets',
       icon: Package,
       description: 'Extended functionality widgets'
-    },
-    {
-      id: 'appearance',
-      name: 'Appearance',
-      icon: Palette,
-      description: 'Customize colors and gradients'
     }
   ];
-
-  // Handle gradient selection
-  function selectGradient(index) {
-    selectedGradient = index;
-    dispatch('selectGradient', { gradient: index });
-  }
-
-  // Handle apply to all views toggle
-  function handleApplyToAllViewsChange() {
-    dispatch('applyToAllViewsChange', { applyToAllViews });
-  }
 
   // Handle ESC key to close sidebar
   function handleKeydown(event) {
@@ -121,70 +99,8 @@
       </button>
     </div>
 
-    <!-- Widget cards / Appearance -->
+    <!-- Widget cards -->
     <div class="flex-1 overflow-y-auto p-6">
-      {#if activeCategory === 'appearance'}
-        <!-- Gradient Picker -->
-        <div class="mb-6">
-          <h3 class="text-sm font-medium mb-3" style="color: var(--ds-text);">Gradient Style</h3>
-          <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">Choose a color scheme for your workspace homepage</p>
-        </div>
-
-        <!-- Gradient Grid (7 columns to fit 19 gradients) -->
-        <div class="grid grid-cols-7 gap-3">
-          {#each gradients as gradient, index}
-            <button
-              onclick={() => selectGradient(index)}
-              class="group relative w-[25px] h-[25px] rounded overflow-hidden transition-all hover:scale-110"
-              class:ring-offset-2={selectedGradient === index}
-              style={selectedGradient === index ? 'box-shadow: 0 0 0 2px var(--ds-border-focused); outline-offset: 2px;' : ''}
-              title={gradient.name}
-            >
-              {#if index === 0}
-                <!-- "None" option with X icon -->
-                <div class="w-full h-full flex items-center justify-center" style="background-color: var(--ds-background-neutral);">
-                  <X class="w-3 h-3" style="color: var(--ds-text-subtle);" />
-                </div>
-              {:else}
-                <!-- Gradient Preview -->
-                <div
-                  class="w-full h-full"
-                  style="background: {gradient.value};"
-                ></div>
-              {/if}
-
-              <!-- Selected Indicator -->
-              {#if selectedGradient === index}
-                <div class="absolute inset-0 flex items-center justify-center bg-black/20">
-                  <div class="w-3 h-3 bg-white rounded-full flex items-center justify-center">
-                    <svg class="w-2 h-2" style="color: var(--ds-icon-accent-blue);" fill="currentColor" viewBox="0 0 20 20">
-                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                    </svg>
-                  </div>
-                </div>
-              {/if}
-            </button>
-          {/each}
-        </div>
-
-        <!-- Apply to All Views Toggle -->
-        <div class="mt-6 p-4 rounded" style="background-color: var(--ds-background-neutral); border: 1px solid var(--ds-border);">
-          <label class="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              bind:checked={applyToAllViews}
-              onchange={handleApplyToAllViewsChange}
-              class="mt-0.5"
-            />
-            <div>
-              <span class="text-sm font-medium block" style="color: var(--ds-text);">Apply gradient to all workspace views</span>
-              <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-                Board, List, Backlog, Map, and Tree
-              </p>
-            </div>
-          </label>
-        </div>
-      {:else}
         <!-- Widget Cards -->
         <div class="space-y-3">
           {#each currentWidgets as widget}
@@ -234,7 +150,6 @@
             <strong>Tip:</strong> Drag widgets from here to any section on your workspace homepage to add them.
           </p>
         </div>
-      {/if}
     </div>
   </div>
 </div>

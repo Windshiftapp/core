@@ -1,10 +1,10 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../api.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
   import { Plus, Edit, Trash2, Settings, MoreHorizontal, Circle, Layout } from 'lucide-svelte';
   import { SYSTEM_FIELDS, getSystemFieldName } from '../stores/fieldConfig.js';
+  import { screenEditorStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
@@ -17,192 +17,26 @@
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 
-  let screens = $state([]);
-  let customFields = $state([]);
-  let showCreateForm = $state(false);
-  let editingScreen = $state(null);
-  let showFieldEditor = $state(false);
-  let editingScreenFields = $state(null);
-  let formData = $state({
-    name: '',
-    description: ''
-  });
+  // Bind to store values
+  let screens = $derived(screenEditorStore.screens);
+  let showCreateForm = $derived(screenEditorStore.showCreateForm);
+  let editingScreen = $derived(screenEditorStore.editingScreen);
+  let showFieldEditor = $derived(screenEditorStore.showFieldEditor);
+  let editingScreenFields = $derived(screenEditorStore.editingScreenFields);
+  let formData = $derived(screenEditorStore.formData);
+  let screenFields = $derived(screenEditorStore.screenFields);
+  let fieldSearchQuery = $derived(screenEditorStore.fieldSearchQuery);
+  let searchFilteredFields = $derived(screenEditorStore.searchFilteredFields);
+  let draggedField = $derived(screenEditorStore.draggedField);
+  let fieldDragState = $derived(screenEditorStore.fieldDragState);
+  let fieldWidths = $derived(screenEditorStore.fieldWidths);
 
-  let screenFields = $state([]);
-
-
-  const fieldWidths = [
-    { value: 'full', label: t('screensPage.fieldWidths.full') },
-    { value: 'half', label: t('screensPage.fieldWidths.half') },
-    { value: 'third', label: t('screensPage.fieldWidths.third') },
-    { value: 'quarter', label: t('screensPage.fieldWidths.quarter') }
-  ];
-
-  onMount(async () => {
-    await loadScreens();
-  });
-
-  async function loadScreens() {
-    try {
-      const result = await api.screens.getAll();
-      screens = result || [];
-    } catch (error) {
-      console.error('Failed to load screens:', error);
-      screens = [];
-    }
-  }
-
-  async function loadCustomFields() {
-    try {
-      const result = await api.customFields.getAll();
-      customFields = result || [];
-    } catch (error) {
-      console.error('Failed to load custom fields:', error);
-      customFields = [];
-    }
-  }
-
-  function startCreate() {
-    showCreateForm = true;
-    editingScreen = null;
-    resetForm();
-  }
-
-  function startEdit(screen) {
-    editingScreen = screen;
-    formData = {
-      name: screen.name,
-      description: screen.description || ''
-    };
-    showCreateForm = true;
-  }
-
-  async function startEditFields(screen) {
-    editingScreenFields = screen;
-    showFieldEditor = true;
-    
-    try {
-      const fields = await api.screens.getFields(screen.id);
-      screenFields = fields || [];
-      
-      // Ensure Title field is always present and first
-      const titleField = screenFields.find(f => f.field_type === 'system' && f.field_identifier === 'title');
-      if (!titleField) {
-        const newTitleField = {
-          screen_id: screen.id,
-          field_type: 'system',
-          field_identifier: 'title',
-          display_order: 0,
-          is_required: true,
-          field_width: 'full',
-          field_name: 'Title',
-          field_label: 'Title'
-        };
-        screenFields = [newTitleField, ...screenFields.map(f => ({ ...f, display_order: f.display_order + 1 }))];
-      }
-
-      // Ensure Status field is always present (after title)
-      const statusField = screenFields.find(f => f.field_type === 'system' && f.field_identifier === 'status');
-      if (!statusField) {
-        const newStatusField = {
-          screen_id: screen.id,
-          field_type: 'system',
-          field_identifier: 'status',
-          display_order: 1,
-          is_required: false,
-          field_width: 'half',
-          field_name: 'Status',
-          field_label: 'Status'
-        };
-        // Insert after title
-        const titleIndex = screenFields.findIndex(f => f.field_type === 'system' && f.field_identifier === 'title');
-        const insertIndex = titleIndex >= 0 ? titleIndex + 1 : 0;
-        screenFields = [
-          ...screenFields.slice(0, insertIndex),
-          newStatusField,
-          ...screenFields.slice(insertIndex).map(f => ({ ...f, display_order: f.display_order + 1 }))
-        ];
-      }
-      
-      await loadCustomFields();
-    } catch (error) {
-      console.error('Failed to load screen fields:', error);
-      screenFields = [];
-    }
-  }
-
-  function resetForm() {
-    formData = {
-      name: '',
-      description: ''
-    };
-  }
-
-  function cancelForm() {
-    showCreateForm = false;
-    editingScreen = null;
-    resetForm();
-  }
-
-  function cancelFieldEditor() {
-    showFieldEditor = false;
-    editingScreenFields = null;
-    screenFields = [];
-    customFields = [];
-    fieldSearchQuery = '';
-    cleanupDragAndDrop();
-  }
-
-  async function saveScreen() {
-    try {
-      if (editingScreen) {
-        await api.screens.update(editingScreen.id, formData);
-      } else {
-        await api.screens.create(formData);
-      }
-      
-      await loadScreens();
-      cancelForm();
-    } catch (error) {
-      console.error('Failed to save screen:', error);
-      alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
-    }
-  }
-
-  async function saveScreenFields() {
-    try {
-      await api.screens.updateFields(editingScreenFields.id, screenFields);
-      cancelFieldEditor();
-    } catch (error) {
-      console.error('Failed to save screen fields:', error);
-      alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
-    }
-  }
-
-  async function deleteScreen(screen) {
-    // Prevent deletion of default screen (ID 1)
-    if (screen.id === 1) {
-      alert(t('dialogs.alerts.cannotDeleteDefaultScreen'));
-      return;
-    }
-
-    if (confirm(t('dialogs.confirmations.deleteScreen', { name: screen.name }))) {
-      try {
-        await api.screens.delete(screen.id);
-        await loadScreens();
-      } catch (error) {
-        console.error('Failed to delete screen:', error);
-        alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
-      }
-    }
-  }
-
-
-  // Drag and drop state
-  let draggedField = $state(null);
-  let fieldDragState = $state(new Map()); // Track { closestEdge: 'top'|'bottom'|null } for each field
   let setupCleanups = [];
   let setupTimeout;
+
+  onMount(async () => {
+    await screenEditorStore.loadScreens();
+  });
 
   $effect(() => {
     return () => {
@@ -214,7 +48,7 @@
     if (setupTimeout) clearTimeout(setupTimeout);
     setupCleanups.forEach(fn => fn());
     setupCleanups = [];
-    fieldDragState = new Map();
+    screenEditorStore.clearDragState();
   }
 
   function setupDragAndDrop() {
@@ -239,7 +73,7 @@
       const fieldIndex = parseInt(element.dataset.fieldIndex);
       const fieldId = element.dataset.fieldId;
 
-      fieldDragState.set(fieldId, { closestEdge: null });
+      screenEditorStore.setDragState(fieldId, { closestEdge: null });
 
       // Make draggable
       const dragHandle = element.querySelector('.cursor-grab');
@@ -250,10 +84,7 @@
         onDragStart: () => { element.style.opacity = '0.5'; },
         onDrop: () => {
           element.style.opacity = '';
-          fieldDragState.forEach((state, id) => {
-            fieldDragState.set(id, { closestEdge: null });
-          });
-          fieldDragState = new Map(fieldDragState);
+          screenEditorStore.clearDragState();
         }
       });
 
@@ -270,25 +101,22 @@
         },
         onDragEnter: ({ self }) => {
           const closestEdge = extractClosestEdge(self.data);
-          fieldDragState.set(fieldId, { closestEdge });
-          fieldDragState = new Map(fieldDragState);
+          screenEditorStore.setDragState(fieldId, { closestEdge });
         },
         onDragLeave: () => {
-          fieldDragState.set(fieldId, { closestEdge: null });
-          fieldDragState = new Map(fieldDragState);
+          screenEditorStore.setDragState(fieldId, { closestEdge: null });
         },
         onDrop: ({ self, source }) => {
           const closestEdge = extractClosestEdge(self.data);
           const data = source.data;
 
           if (data.type === 'available-field') {
-            addFieldAtPosition(data.field, fieldIndex, closestEdge);
+            screenEditorStore.addFieldAtPosition(data.field, fieldIndex, closestEdge);
           } else if (data.type === 'screen-field') {
-            reorderFieldWithEdge(data.fieldIndex, fieldIndex, closestEdge);
+            screenEditorStore.reorderFieldWithEdge(data.fieldIndex, fieldIndex, closestEdge);
           }
 
-          fieldDragState.set(fieldId, { closestEdge: null });
-          fieldDragState = new Map(fieldDragState);
+          screenEditorStore.setDragState(fieldId, { closestEdge: null });
         }
       });
 
@@ -304,13 +132,13 @@
       const cleanup = dropTargetForElements({
         element: dropZone,
         canDrop: ({ source }) => source.data.type === 'available-field',
-        onDragEnter: () => { draggedField = true; },
-        onDragLeave: () => { draggedField = null; },
+        onDragEnter: () => { screenEditorStore.setDraggedField(true); },
+        onDragLeave: () => { screenEditorStore.clearDraggedField(); },
         onDrop: ({ source }) => {
           if (source.data.type === 'available-field') {
-            addFieldToScreen(source.data.field);
+            screenEditorStore.addFieldToScreen(source.data.field);
           }
-          draggedField = null;
+          screenEditorStore.clearDraggedField();
         }
       });
       setupCleanups.push(cleanup);
@@ -325,134 +153,76 @@
     }
   });
 
-  function addFieldToScreen(fieldData) {
-    // Check if field already exists
-    if (screenFields.some(f => f.field_type === fieldData.type && f.field_identifier === fieldData.identifier)) {
+  function startCreate() {
+    screenEditorStore.startCreate();
+  }
+
+  function startEdit(screen) {
+    screenEditorStore.startEdit(screen);
+  }
+
+  async function startEditFields(screen) {
+    await screenEditorStore.startEditFields(screen);
+  }
+
+  function cancelForm() {
+    screenEditorStore.cancelForm();
+  }
+
+  function cancelFieldEditor() {
+    screenEditorStore.cancelFieldEditor();
+    cleanupDragAndDrop();
+  }
+
+  async function saveScreen() {
+    try {
+      await screenEditorStore.saveScreen();
+    } catch (error) {
+      alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
+    }
+  }
+
+  async function saveScreenFields() {
+    try {
+      await screenEditorStore.saveScreenFields();
+    } catch (error) {
+      alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
+    }
+  }
+
+  async function deleteScreen(screen) {
+    if (screen.id === 1) {
+      alert(t('dialogs.alerts.cannotDeleteDefaultScreen'));
       return;
     }
 
-    const newField = {
-      screen_id: editingScreenFields.id,
-      field_type: fieldData.type,
-      field_identifier: fieldData.identifier,
-      display_order: screenFields.length,
-      is_required: fieldData.identifier === 'title',
-      field_width: 'full',
-      field_name: fieldData.name,
-      field_label: fieldData.name
-    };
-
-    if (fieldData.type === 'custom') {
-      newField.field_config = fieldData.config;
+    if (confirm(t('dialogs.confirmations.deleteScreen', { name: screen.name }))) {
+      try {
+        await screenEditorStore.deleteScreen(screen);
+      } catch (error) {
+        alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
+      }
     }
-
-    screenFields = [...screenFields, newField];
-  }
-
-  function addFieldAtPosition(fieldData, targetIndex, closestEdge) {
-    // Check if field already exists
-    if (screenFields.some(f => f.field_type === fieldData.type && f.field_identifier === fieldData.identifier)) {
-      return;
-    }
-
-    const insertIndex = closestEdge === 'bottom' ? targetIndex + 1 : targetIndex;
-
-    const newField = {
-      screen_id: editingScreenFields.id,
-      field_type: fieldData.type,
-      field_identifier: fieldData.identifier,
-      display_order: insertIndex,
-      is_required: fieldData.identifier === 'title',
-      field_width: 'full',
-      field_name: fieldData.name,
-      field_label: fieldData.name
-    };
-
-    if (fieldData.type === 'custom') {
-      newField.field_config = fieldData.config;
-    }
-
-    const newFields = [...screenFields];
-    newFields.splice(insertIndex, 0, newField);
-    screenFields = newFields.map((f, i) => ({ ...f, display_order: i }));
-  }
-
-  function reorderFieldWithEdge(fromIndex, toIndex, closestEdge) {
-    if (fromIndex === toIndex) return;
-
-    const insertIndex = closestEdge === 'bottom' ? toIndex + 1 : toIndex;
-    const adjustedInsertIndex = fromIndex < insertIndex ? insertIndex - 1 : insertIndex;
-
-    const newFields = [...screenFields];
-    const [movedField] = newFields.splice(fromIndex, 1);
-    newFields.splice(adjustedInsertIndex, 0, movedField);
-
-    screenFields = newFields.map((f, i) => ({ ...f, display_order: i }));
   }
 
   function removeField(index) {
-    const field = screenFields[index];
-
-    // Prevent removing the Title and Status fields
-    if (field.field_type === 'system' && (field.field_identifier === 'title' || field.field_identifier === 'status')) {
-      return;
-    }
-
-    screenFields = screenFields.filter((_, i) => i !== index);
-    screenFields = screenFields.map((field, i) => ({ ...field, display_order: i }));
+    screenEditorStore.removeField(index);
   }
 
-  // Create combined available fields list
-  let allAvailableFields = $derived.by(() => [
-    // System fields from shared config
-    ...SYSTEM_FIELDS.map(field => ({
-      ...field,
-      type: 'system',
-      category: 'System Fields'
-    })),
-    // Custom fields
-    ...customFields.map(field => ({
-      identifier: field.id.toString(),
-      name: field.field_name || field.name,
-      type: 'custom',
-      category: 'Custom Fields',
-      fieldType: field.field_type,
-      config: field.field_config
-    }))
-  ]);
-
-  let availableFieldsFiltered = $derived.by(() =>
-    allAvailableFields.filter(field =>
-      !screenFields.some(sf => sf.field_type === field.type && sf.field_identifier === field.identifier)
-    ).filter(field =>
-      // Filter out Title and Status fields since they're always auto-added
-      !(field.type === 'system' && (field.identifier === 'title' || field.identifier === 'status'))
-    )
-  );
-
-  // Search filter for available fields
-  let fieldSearchQuery = $state('');
-
-  let searchFilteredFields = $derived.by(() =>
-    availableFieldsFiltered.filter(field => {
-      if (!fieldSearchQuery.trim()) return true;
-      const query = fieldSearchQuery.toLowerCase();
-      return field.name.toLowerCase().includes(query) ||
-             field.identifier.toLowerCase().includes(query);
-    })
-  );
-
   function getFieldWidthLabel(width) {
-    return fieldWidths.find(w => w.value === width)?.label || width;
+    return screenEditorStore.getFieldWidthLabel(width);
   }
 
   function getFieldDisplayName(field) {
-    // For system fields, use the shared config
-    if (field.field_type === 'system') {
-      return getSystemFieldName(field.field_identifier);
-    }
-    // For custom fields, use the field_name from the API
-    return field.field_name || field.field_identifier;
+    return screenEditorStore.getFieldDisplayName(field);
+  }
+
+  function setFormData(key, value) {
+    screenEditorStore.formData[key] = value;
+  }
+
+  function setFieldSearchQuery(value) {
+    screenEditorStore.fieldSearchQuery = value;
   }
 
   function buildScreenDropdownItems(screen) {
@@ -547,7 +317,8 @@
               <Label for="screen-name" required class="mb-2">{t('screensPage.screenName')}</Label>
               <Input
                 id="screen-name"
-                bind:value={formData.name}
+                value={formData.name}
+                oninput={(e) => setFormData('name', e.target.value)}
                 placeholder={t('screensPage.screenNamePlaceholder')}
                 required
               />
@@ -557,7 +328,8 @@
               <Label for="screen-description" class="mb-2">{t('screensPage.description')}</Label>
               <Textarea
                 id="screen-description"
-                bind:value={formData.description}
+                value={formData.description}
+                oninput={(e) => setFormData('description', e.target.value)}
                 rows={3}
                 placeholder={t('screensPage.optionalDescription')}
               />
@@ -622,7 +394,8 @@
 
         <Input
           placeholder={t('screensPage.searchFields')}
-          bind:value={fieldSearchQuery}
+          value={fieldSearchQuery}
+          oninput={(e) => setFieldSearchQuery(e.target.value)}
           class="mb-4"
         />
 
@@ -633,7 +406,7 @@
                 {field.category === 'System Fields' ? t('screensPage.systemFields') : field.category === 'Custom Fields' ? t('screensPage.customFields') : field.category}
               </div>
             {/if}
-            
+
             <div
               data-available-field={JSON.stringify(field)}
               class="group flex items-center gap-3 px-4 py-3 rounded border transition-all duration-200 cursor-grab hover:bg-blue-50 hover:border-blue-300 active:cursor-grabbing"
@@ -650,7 +423,7 @@
                   <circle cx="15" cy="18" r="1.5"/>
                 </svg>
               </div>
-              
+
               <div class="flex-1">
                 <div class="font-medium" style="color: var(--ds-text);">{field.name}</div>
                 <div class="text-sm" style="color: var(--ds-text-subtle);">
@@ -665,7 +438,7 @@
               </div>
             </div>
           {/each}
-          
+
           {#if searchFilteredFields.length === 0}
             <div class="text-center py-8">
               <p class="text-sm" style="color: var(--ds-text-subtle);">
@@ -684,7 +457,7 @@
       <div class="rounded-xl p-6 border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
         <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">{t('screensPage.screenFields')} ({screenFields.length})</h3>
         <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">{t('screensPage.dragToReorder')}</p>
-        
+
         <div
           data-drop-zone
           class="min-h-96 max-h-[70vh] overflow-y-auto border-2 border-dashed border-gray-200 rounded p-4 space-y-2"
@@ -712,7 +485,7 @@
                   <DropIndicator edge={fieldDragState.get(field.field_identifier)?.closestEdge} gap={8} />
                 {/if}
                 <!-- Drag Handle -->
-                <div 
+                <div
                   class="cursor-grab active:cursor-grabbing flex-shrink-0 p-1 rounded hover-bg transition-colors"
                   style="touch-action: none;"
                 >
@@ -725,7 +498,7 @@
                     <circle cx="15" cy="18" r="1.5"/>
                   </svg>
                 </div>
-                
+
                 <div class="flex-1">
                   <div class="font-medium flex items-center gap-2" style="color: var(--ds-text);">
                     {getFieldDisplayName(field)}
@@ -739,12 +512,13 @@
                   <label class="flex items-center gap-1">
                     <input
                       type="checkbox"
-                      bind:checked={field.is_required}
+                      checked={field.is_required}
+                      onchange={() => screenEditorStore.toggleFieldRequired(index)}
                       class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
                     <span class="text-xs text-gray-600">{t('screensPage.required')}</span>
                   </label>
-                  
+
                   {#if field.field_type === 'system' && (field.field_identifier === 'title' || field.field_identifier === 'status')}
                     <div class="w-9 h-9 flex items-center justify-center flex-shrink-0">
                       <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">

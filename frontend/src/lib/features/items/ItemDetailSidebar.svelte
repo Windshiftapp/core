@@ -13,6 +13,7 @@
   import CreatePRFromBranchModal from '../../dialogs/CreatePRFromBranchModal.svelte';
   import { createEventDispatcher } from 'svelte';
   import { isGrayColor, lightenColor } from '../../utils/colorUtils.js';
+  import { getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import { workspacePermissions } from '../../stores';
   import { themeStore } from '../../stores/theme.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -142,6 +143,7 @@
     item,
     workspace = null,
     statusOptions = [],
+    editingStatus = false,
     editingDueDate = false,
     editingCustomFields = {},
     editCustomFieldValues = {},
@@ -382,6 +384,7 @@
         config={statusConfig}
         placeholder="Select status..."
         showUnassigned={false}
+        autoOpen={editingStatus}
         class="w-full"
         on:select={(e) => {
           const selectedStatus = e.detail;
@@ -389,6 +392,9 @@
             field: 'status_id',
             value: selectedStatus?.id || null
           });
+        }}
+        on:cancel={() => {
+          dispatch('cancel-edit', { field: 'status_id' });
         }}
       >
         {#snippet children()}
@@ -401,7 +407,7 @@
               <Text variant="subtle" size="sm">{t('common.status')}</Text>
               <kbd class="px-1.5 py-0.5 text-xs font-medium rounded border opacity-0 group-hover:opacity-70 transition-opacity"
                    style="background-color: var(--ds-background-neutral-subtle); border-color: var(--ds-border); color: var(--ds-text-subtle);">
-                F
+                {getShortcutDisplay('itemDetail', 'focusStatus')}
               </kbd>
             </div>
             {#if selectedStatus}

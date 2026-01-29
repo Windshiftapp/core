@@ -169,8 +169,9 @@ const shortcuts = {
   itemDetail: {
     startTimer: { key: 'a', modifierKey: true },
     logTime: { key: 'a' },
-    fullscreen: { key: 'f' },
-    createChild: { key: 'w' }
+    fullscreen: { key: 'f', shiftKey: true },
+    createChild: { key: 'w', shiftKey: true },
+    focusStatus: { key: 'f' }
   }
 };
 

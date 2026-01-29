@@ -46,14 +46,12 @@
   }
 
   .item-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lift, 0 8px 30px rgba(0, 0, 0, 0.12));
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
     border-color: var(--ds-border-bold);
   }
 
   .item-card:active {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   }
 
   /* Subtle gradient overlay on hover */

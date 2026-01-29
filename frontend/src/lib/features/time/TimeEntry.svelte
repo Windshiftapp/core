@@ -1,8 +1,9 @@
 <script>
   import { onMount } from 'svelte';
-  import { Filter, Plus, Edit, Trash2, MoreHorizontal, AlertTriangle } from 'lucide-svelte';
-  import { api } from '../../api.js';
+  import { Filter, Plus, Edit, Trash2, MoreHorizontal } from 'lucide-svelte';
+  import AlertBox from '../../components/AlertBox.svelte';
   import { navigate } from '../../router.js';
+  import { timeEntryStore } from '../../stores';
   import Button from '../../components/Button.svelte';
   import Input from '../../components/Input.svelte';
   import Select from '../../components/Select.svelte';
@@ -12,80 +13,22 @@
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
 
-  let worklogs = $state([]);
-  let customers = $state([]);
-  let projects = $state([]);
-  let workItems = $state([]);
-  let workspaces = $state([]);
-  let editingWorklog = $state(null);
-  let showOnboarding = $state(false);
-  let showTimeLogModal = $state(false);
-
-  let filters = $state({
-    customer_id: '',
-    project_id: '',
-    date_from: '',
-    date_to: ''
-  });
+  // Bind to store values
+  let worklogs = $derived(timeEntryStore.worklogs);
+  let customers = $derived(timeEntryStore.customers);
+  let projects = $derived(timeEntryStore.projects);
+  let workItems = $derived(timeEntryStore.workItems);
+  let workspaces = $derived(timeEntryStore.workspaces);
+  let editingWorklog = $derived(timeEntryStore.editingWorklog);
+  let showOnboarding = $derived(timeEntryStore.showOnboarding);
+  let showTimeLogModal = $derived(timeEntryStore.showTimeLogModal);
+  let filters = $derived(timeEntryStore.filters);
+  let activeProjects = $derived(timeEntryStore.activeProjects);
+  let filteredProjects = $derived(timeEntryStore.filteredProjects);
 
   onMount(async () => {
-    await Promise.all([loadWorklogs(), loadCustomers(), loadProjects(), loadWorkItems(), loadWorkspaces()]);
-
-    if (customers.length === 0 && projects.length === 0) {
-      showOnboarding = true;
-    }
-
-    const now = new Date();
-    filters.date_from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    filters.date_to = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-    await loadWorklogs();
+    await timeEntryStore.init();
   });
-
-  async function loadWorklogs() {
-    try {
-      worklogs = await api.time.worklogs.getAll(filters) || [];
-    } catch (error) {
-      console.error('Failed to load worklogs:', error);
-      worklogs = [];
-    }
-  }
-
-  async function loadCustomers() {
-    try {
-      customers = await api.time.customers.getAll() || [];
-    } catch (error) {
-      console.error('Failed to load customers:', error);
-      customers = [];
-    }
-  }
-
-  async function loadProjects() {
-    try {
-      projects = await api.time.projects.getAll() || [];
-    } catch (error) {
-      console.error('Failed to load projects:', error);
-      projects = [];
-    }
-  }
-
-  async function loadWorkItems() {
-    try {
-      const result = await api.items.getAll({ limit: 100 });
-      workItems = result.items || [];
-    } catch (error) {
-      console.error('Failed to load work items:', error);
-      workItems = [];
-    }
-  }
-
-  async function loadWorkspaces() {
-    try {
-      workspaces = await api.workspaces.getAll() || [];
-    } catch (error) {
-      console.error('Failed to load workspaces:', error);
-      workspaces = [];
-    }
-  }
 
   function buildWorklogDropdownItems(worklog) {
     return [
@@ -95,7 +38,7 @@
         icon: Edit,
         title: t('common.edit'),
         hoverClass: 'hover-bg',
-        onClick: () => editWorklog(worklog)
+        onClick: () => timeEntryStore.editWorklog(worklog)
       },
       {
         id: 'delete',
@@ -111,14 +54,7 @@
   async function handleModalSave(event) {
     try {
       const data = event.detail;
-      if (editingWorklog) {
-        await api.time.worklogs.update(editingWorklog.id, data);
-      } else {
-        await api.time.worklogs.create(data);
-      }
-      await loadWorklogs();
-      showTimeLogModal = false;
-      editingWorklog = null;
+      await timeEntryStore.saveWorklog(data);
     } catch (error) {
       console.error('Failed to save worklog:', error);
       alert(t('time.entry.failedToSave'));
@@ -126,25 +62,17 @@
   }
 
   function handleModalCancel() {
-    showTimeLogModal = false;
-    editingWorklog = null;
+    timeEntryStore.closeTimeLogModal();
   }
 
   function openLogTimeModal() {
-    editingWorklog = null;
-    showTimeLogModal = true;
-  }
-
-  function editWorklog(worklog) {
-    editingWorklog = worklog;
-    showTimeLogModal = true;
+    timeEntryStore.openTimeLogModal();
   }
 
   async function deleteWorklog(worklog) {
     if (confirm(t('time.entry.confirmDelete'))) {
       try {
-        await api.time.worklogs.delete(worklog.id);
-        await loadWorklogs();
+        await timeEntryStore.deleteWorklog(worklog);
       } catch (error) {
         console.error('Failed to delete worklog:', error);
       }
@@ -152,39 +80,23 @@
   }
 
   function formatTime(unixTimestamp) {
-    const date = new Date(unixTimestamp * 1000);
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
+    return timeEntryStore.formatTime(unixTimestamp);
   }
 
   function formatDuration(minutes) {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours === 0) return `${mins}m`;
-    if (mins === 0) return `${hours}h`;
-    return `${hours}h ${mins}m`;
+    return timeEntryStore.formatDuration(minutes);
   }
 
   function isProjectOverBudget(worklog) {
-    if (!worklog.project_max_hours || worklog.project_max_hours <= 0) return false;
-    return (worklog.project_total_hours || 0) > worklog.project_max_hours;
+    return timeEntryStore.isProjectOverBudget(worklog);
   }
 
   async function applyFilters() {
-    await loadWorklogs();
+    await timeEntryStore.applyFilters();
   }
 
   function clearFilters() {
-    filters = {
-      customer_id: '',
-      project_id: '',
-      date_from: '',
-      date_to: ''
-    };
-    loadWorklogs();
+    timeEntryStore.clearFilters();
   }
 
   function navigateToItem(workspaceId, itemId) {
@@ -194,18 +106,16 @@
   }
 
   function handleOnboardingCancel() {
-    showOnboarding = false;
+    timeEntryStore.closeOnboarding();
   }
 
   async function handleOnboardingCompleted(event) {
-    await Promise.all([loadCustomers(), loadProjects()]);
-    showOnboarding = false;
+    await timeEntryStore.handleOnboardingCompleted();
   }
 
-  const activeProjects = $derived(projects.filter(p => p.active));
-  const filteredProjects = $derived(filters.customer_id
-    ? activeProjects.filter(p => p.customer_id === parseInt(filters.customer_id))
-    : activeProjects);
+  function setFilter(key, value) {
+    timeEntryStore.setFilter(key, value);
+  }
 </script>
 
 <!-- Header -->
@@ -230,15 +140,15 @@
 </div>
 
 {#if activeProjects.length === 0 && !showOnboarding}
-  <div class="rounded-xl p-6 mb-6 border" style="background-color: var(--ds-background-warning); border-color: var(--ds-border-warning);">
-    <p style="color: var(--ds-text-warning);">
-      {t('time.entry.needProjects')}
+  <AlertBox variant="warning" class="mb-6">
+    <p class="font-medium" style="color: var(--ds-text-warning);">{t('time.entry.needProjects')}</p>
+    <p class="mt-1" style="color: var(--ds-text-subtle);">
       <a href="/time/projects" class="font-medium underline hover:opacity-80 transition-opacity" style="color: var(--ds-link);">{t('time.entry.goToProjects')}</a>
       {#if customers.length === 0}
-        {t('common.or')} <button onclick={() => showOnboarding = true} class="font-medium underline hover:opacity-80 transition-opacity" style="color: var(--ds-link);">{t('time.entry.startSetupWizard')}</button>
+        {t('common.or')} <button onclick={() => timeEntryStore.openOnboarding()} class="font-medium underline hover:opacity-80 transition-opacity" style="color: var(--ds-link);">{t('time.entry.startSetupWizard')}</button>
       {/if}
     </p>
-  </div>
+  </AlertBox>
 {/if}
 
 <!-- Filters -->
@@ -247,7 +157,7 @@
   <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
     <div>
       <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.customer')}</label>
-      <Select bind:value={filters.customer_id} size="small">
+      <Select value={filters.customer_id} onchange={(e) => setFilter('customer_id', e.target.value)} size="small">
         <option value="">{t('time.reports.allCustomers')}</option>
         {#each customers as customer}
           <option value={customer.id}>{customer.name}</option>
@@ -256,7 +166,7 @@
     </div>
     <div>
       <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.project')}</label>
-      <Select bind:value={filters.project_id} size="small">
+      <Select value={filters.project_id} onchange={(e) => setFilter('project_id', e.target.value)} size="small">
         <option value="">{t('time.reports.allProjects')}</option>
         {#each filteredProjects as project}
           <option value={project.id}>{project.name}</option>
@@ -265,11 +175,11 @@
     </div>
     <div>
       <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.fromDate')}</label>
-      <Input type="date" bind:value={filters.date_from} size="small" />
+      <Input type="date" value={filters.date_from} oninput={(e) => setFilter('date_from', e.target.value)} size="small" />
     </div>
     <div>
       <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.toDate')}</label>
-      <Input type="date" bind:value={filters.date_to} size="small" />
+      <Input type="date" value={filters.date_to} oninput={(e) => setFilter('date_to', e.target.value)} size="small" />
     </div>
   </div>
   <div class="mt-5 flex gap-3">
@@ -372,7 +282,7 @@
     <!-- Summary -->
     <div class="px-6 py-4 border-t" style="background-color: var(--ds-background-neutral); border-color: var(--ds-border);">
       <div class="text-sm font-semibold" style="color: var(--ds-text);">
-        {t('time.reports.totalTime')}: {formatDuration(worklogs.reduce((sum, w) => sum + w.duration_minutes, 0))}
+        {t('time.reports.totalTime')}: {formatDuration(timeEntryStore.totalDuration)}
         <span class="ml-2 font-normal" style="color: var(--ds-text-subtle);">({t('time.reports.entriesShown', { count: worklogs.length })})</span>
       </div>
     </div>
@@ -387,7 +297,7 @@
 <!-- Time Log Modal -->
 {#if showTimeLogModal}
   <TimeLogModal
-    {projects}
+    projects={projects}
     {customers}
     {workItems}
     {workspaces}
@@ -396,4 +306,3 @@
     oncancel={handleModalCancel}
   />
 {/if}
-

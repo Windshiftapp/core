@@ -203,6 +203,26 @@ func (db *DB) Initialize() error {
 			slog.Warn("PRAGMA optimize failed (may be using older SQLite)", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Run migrations for existing databases
+		migrations := []struct {
+			check string
+			alter string
+		}{
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('workspaces') WHERE name='display_mode'",
+				alter: "ALTER TABLE workspaces ADD COLUMN display_mode TEXT DEFAULT 'default'",
+			},
+		}
+
+		for _, m := range migrations {
+			var count int
+			if err := db.QueryRow(m.check).Scan(&count); err == nil && count == 0 {
+				if _, err := db.Exec(m.alter); err != nil {
+					slog.Warn("migration failed", slog.String("component", "database"), slog.String("sql", m.alter), slog.Any("error", err))
+				}
+			}
+		}
+
 		return nil
 	}
 

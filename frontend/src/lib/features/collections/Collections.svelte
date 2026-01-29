@@ -3,7 +3,7 @@
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { Filter, Search, MoreHorizontal, Calendar, User, AlertCircle, Edit, Trash2, Eye, Save, SquareKanban } from 'lucide-svelte';
+  import { Filter, Search, MoreHorizontal, Calendar, User, AlertCircle, Trash2, Eye, Save, SquareKanban } from 'lucide-svelte';
   import Button from '../../components/Button.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import Pagination from '../../components/Pagination.svelte';
@@ -571,10 +571,6 @@
     navigate(`/workspaces/${item.workspace_id}/items/${item.id}`);
   }
 
-  function editItem(item) {
-    navigate(`/workspaces/${item.workspace_id}/items/${item.id}`);
-  }
-
   async function deleteItem(item) {
     if (!confirm(t('collections.confirmDeleteItem', { title: item.title }))) {
       return;
@@ -598,13 +594,6 @@
         icon: Eye,
         title: t('items.viewItem'),
         onClick: () => viewItem(item)
-      },
-      {
-        id: 'edit',
-        type: 'regular',
-        icon: Edit,
-        title: t('common.edit'),
-        onClick: () => editItem(item)
       },
       { type: 'divider' },
       {

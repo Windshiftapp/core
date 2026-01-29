@@ -252,6 +252,26 @@ func (p *PostgresDB) Initialize() error {
 
 	// If all core tables exist, database is already initialized
 	if tableCount >= 4 {
+		// Run migrations for existing databases
+		pgMigrations := []struct {
+			check string
+			alter string
+		}{
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='workspaces' AND column_name='display_mode'",
+				alter: "ALTER TABLE workspaces ADD COLUMN display_mode TEXT DEFAULT 'default'",
+			},
+		}
+
+		for _, m := range pgMigrations {
+			var count int
+			if err := p.db.QueryRow(m.check).Scan(&count); err == nil && count == 0 {
+				if _, err := p.db.Exec(m.alter); err != nil {
+					slog.Warn("postgres migration failed", slog.String("component", "database"), slog.String("sql", m.alter), slog.Any("error", err))
+				}
+			}
+		}
+
 		return nil
 	}
 

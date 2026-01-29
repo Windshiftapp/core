@@ -107,7 +107,7 @@
     { id: 'time', icon: Clock, labelKey: 'nav.timeAndProjects', href: '/time', activeViews: ['time'] },
     { id: 'milestones', icon: Milestone, labelKey: 'nav.milestones', href: '/milestones', activeViews: ['milestones', 'milestone-detail'] },
     { id: 'iterations', icon: Calendar, labelKey: 'nav.iterations', href: '/iterations', activeViews: ['iterations', 'iteration-detail'] },
-    { id: 'assets', icon: Package, labelKey: 'nav.assets', href: '/assets', activeViews: ['assets', 'asset-detail'] },
+    { id: 'assets', icon: Package, labelKey: 'nav.assets', href: '/assets', activeViews: ['assets', 'asset-detail'], permission: 'canAccessAssets' },
     { id: 'channels', icon: LifeBuoy, labelKey: 'nav.channels', href: '/channels', activeViews: ['channels'] },
     { id: 'customers', icon: Users, labelKey: 'nav.customers', href: '/customers', activeViews: ['customers'], permission: 'canAccessCustomers' }
   ];

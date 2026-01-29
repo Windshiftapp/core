@@ -1,20 +1,18 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
-
-  const dispatch = createEventDispatcher();
-
-  // Props
-  export let tabs = []; // Array of { id, label, icon?, badge?, className? }
-  export let activeTab = ''; // Current active tab ID (bindable)
+  let { tabs = [], activeTab = $bindable(''), onTabChange = null, children } = $props();
 
   // Initialize activeTab to first tab if not set
-  $: if (!activeTab && tabs.length > 0) {
-    activeTab = tabs[0].id;
-  }
+  $effect(() => {
+    if (!activeTab && tabs.length > 0) {
+      activeTab = tabs[0].id;
+    }
+  });
 
   function switchTab(tabId) {
     activeTab = tabId;
-    dispatch('tab-change', { tab: tabId });
+    if (onTabChange) {
+      onTabChange({ tab: tabId });
+    }
   }
 </script>
 
@@ -42,6 +40,6 @@
 
   <!-- Tab Content -->
   <div class="p-6">
-    <slot />
+    {@render children?.()}
   </div>
 </div>

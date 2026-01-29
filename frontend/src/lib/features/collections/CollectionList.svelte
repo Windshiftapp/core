@@ -6,7 +6,7 @@
   import { getCollection } from '../collections/collectionService.js';
   import { getStatusCategory as getStatusCategoryUtil, getStatusColor as getStatusColorUtil, getStatusInlineStyle, getTextColorForBackground } from '../../utils/statusColors.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
-  import { Plus, Filter, MoreHorizontal, Calendar, User, AlertCircle, Edit, Trash2, Eye } from 'lucide-svelte';
+  import { Plus, Filter, MoreHorizontal, Calendar, User, AlertCircle, Trash2, Eye } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import SearchInput from '../../components/SearchInput.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
@@ -231,13 +231,6 @@
     navigate(url);
   }
 
-  function editItem(item) {
-    const url = collectionId 
-      ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
-      : `/workspaces/${workspaceId}/items/${item.id}`;
-    navigate(url);
-  }
-
   async function deleteItem(item) {
     if (!confirm(t('collections.confirmDeleteItem', { title: item.title }))) {
       return;
@@ -303,13 +296,6 @@
         icon: Eye,
         title: t('items.viewItem'),
         onClick: () => viewItem(item)
-      },
-      {
-        id: 'edit',
-        type: 'regular',
-        icon: Edit,
-        title: t('common.edit'),
-        onClick: () => editItem(item)
       },
       { type: 'divider' },
       {
@@ -443,7 +429,7 @@
           collection={currentCollectionName}
           viewName="List"
           itemCount={itemsPagination?.total || workItems.length}
-          hasGradient={styles.hasGradient}
+          hasGradient={styles.hasCustomBackground}
           textStyle={styles.textStyle}
           subtleTextStyle={styles.subtleTextStyle}
         />
@@ -456,7 +442,7 @@
           <SearchInput
             bind:value={searchQuery}
             placeholder={t('common.search')}
-            hasGradient={styles.hasGradient}
+            hasGradient={styles.hasCustomBackground}
           />
 
         </div>
@@ -473,11 +459,13 @@
           <EmptyState
             title={t('items.noItems')}
             description={t('items.createToStart')}
+            hasGradient={styles.hasCustomBackground}
           />
         {:else}
           <EmptyState
             title={t('items.noItemsInFilter')}
             description={t('items.noItemsInFilter')}
+            hasGradient={styles.hasCustomBackground}
           />
         {/if}
       {:else}
@@ -695,7 +683,7 @@
               totalItems={itemsPagination.total}
               itemsPerPage={itemsPagination.limit}
               maxItems={100}
-              hasGradient={styles.hasGradient}
+              hasGradient={styles.hasCustomBackground}
               on:pageChange={handlePageChange}
               on:pageSizeChange={handlePageSizeChange}
             />

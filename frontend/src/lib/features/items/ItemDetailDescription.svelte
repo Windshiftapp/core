@@ -15,23 +15,24 @@
   const saveShortcut = getShortcut('description', 'save');
   const cancelShortcut = getShortcut('description', 'cancel');
 
-  export let item;
-  export let editingDescription = false;
-  export let editDescription = '';
-  export let saving = false;
-  export let availableSubIssueTypes = [];
+  let {
+    item,
+    editingDescription = false,
+    editDescription = '',
+    saving = false,
+    availableSubIssueTypes = [],
+    attachments = [],
+    diagrams = [],
+    showLinkButton = true,
+    manualActions = []
+  } = $props();
 
-  // Attachments and diagrams
-  export let attachments = [];
-  export let diagrams = [];
-  export let showLinkButton = true;
+  let milkdownEditor = $state(null);
+  let showActionsMenu = $state(false);
+  let actionsMenuRef = $state(null);
 
-  // Manual actions
-  export let manualActions = [];
-
-  let milkdownEditor;
-  let showActionsMenu = false;
-  let actionsMenuRef;
+  // Local state for editor content (initialized from prop when editing starts)
+  let editorContent = $state('');
 
   // Handle image insertions from attachments or uploads
   export function insertImage(imageData) {
@@ -58,18 +59,29 @@
     dispatch('image-uploaded', { attachment });
   }
 
-  async function startEditingDescription() {
-    editDescription = item.description || '';
-    editingDescription = true;
-    // Wait for the editor to be rendered, then focus it
-    await tick();
-    if (milkdownEditor) {
-      milkdownEditor.focus();
-    }
+  function startEditingDescription() {
+    dispatch('start-editing-description');
   }
 
+  // Initialize editor content when editing starts
+  $effect(() => {
+    if (editingDescription) {
+      editorContent = editDescription;
+    }
+  });
+
+  // Focus editor when it becomes available during editing
+  // Both dependencies must be at the top level to be tracked properly
+  $effect(() => {
+    const isEditing = editingDescription;
+    const editor = milkdownEditor;
+    if (isEditing && editor) {
+      tick().then(() => editor.focusEnd());
+    }
+  });
+
   function saveDescription() {
-    dispatch('save-field', { field: 'description', value: editDescription });
+    dispatch('save-field', { field: 'description', value: editorContent });
   }
 
   function cancelEdit() {
@@ -133,7 +145,7 @@
     <div class="space-y-3" onkeydown={handleKeydown}>
       <MilkdownEditor
         bind:this={milkdownEditor}
-        bind:content={editDescription}
+        bind:content={editorContent}
         placeholder={t('items.enterDescription')}
         showToolbar={true}
         itemId={item.id}

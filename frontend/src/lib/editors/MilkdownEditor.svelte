@@ -740,6 +740,13 @@
     margin: 0.25rem 0;
   }
 
+  /* Preserve blank lines from remarkPreserveEmptyLinePlugin */
+  :global(.milkdown-editor .ProseMirror br) {
+    display: block;
+    content: "";
+    margin-top: 0.5rem;
+  }
+
   :global(.milkdown-editor .ProseMirror ul),
   :global(.milkdown-editor .ProseMirror ol) {
     padding-left: 1.5rem;

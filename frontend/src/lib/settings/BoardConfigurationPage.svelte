@@ -5,6 +5,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { getCollection } from '../features/collections/collectionService.js';
   import { Plus, GripVertical, Trash2, X } from 'lucide-svelte';
+  import { useGradientStyles, loadWorkspaceGradient } from '../stores/workspaceGradient.svelte.js';
   import ViewHeader from '../layout/ViewHeader.svelte';
   import Button from '../components/Button.svelte';
   import CollectionViewSwitcher from '../features/collections/CollectionViewSwitcher.svelte';
@@ -23,7 +24,12 @@
   let activeTab = $state('columns'); // 'columns' or 'backlog'
   let backlogStatusIDs = $state([]); // Status IDs to show in backlog
 
+  const styles = useGradientStyles();
+
   onMount(async () => {
+    if (workspaceId) {
+      await loadWorkspaceGradient(workspaceId);
+    }
     await loadData();
     loading = false;
   });
@@ -272,27 +278,30 @@
     <div class="animate-pulse">{t('common.loading')}</div>
   </div>
 {:else if workspace}
-  <div style="background-color: var(--ds-surface);">
+  <div class="min-h-screen" style="{styles.backgroundStyle}">
     <div class="p-6">
-      <!-- Header with view tabs -->
-      <div class="mb-8">
+      <div class="space-y-6">
+        <!-- Header with view tabs -->
         <ViewHeader
           workspaceName={workspace.name}
           collection={currentCollectionName}
           viewName="Configure Board"
           itemCount={columns.length}
+          hasGradient={styles.hasCustomBackground}
+          textStyle={styles.textStyle}
+          subtleTextStyle={styles.subtleTextStyle}
         >
           <CollectionViewSwitcher
             slot="actions"
             {workspaceId}
             {collectionId}
             activeView="configure"
+            hasGradient={styles.hasCustomBackground}
           />
         </ViewHeader>
-      </div>
 
-      <!-- Configuration content -->
-      <div>
+        <!-- Configuration content in raised box -->
+        <div class="w-full rounded-xl p-6 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: {styles.hasCustomBackground ? 'transparent' : 'var(--ds-border)'};">
         <!-- Tab Navigation -->
         <div class="border-b" style="border-color: var(--ds-border);">
           <div class="flex gap-4">
@@ -503,6 +512,7 @@
               {saving ? t('common.saving') : t('common.saveChanges')}
             </Button>
           </div>
+        </div>
         </div>
       </div>
     </div>

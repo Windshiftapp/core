@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Plus, CheckSquare, Calendar, Home, Inbox, SquareKanban, List, GitBranch, MapPin, Settings, BookOpen, Package, ChevronDown, FileCheck, FileStack, Play, BarChart3, ListTree, Milestone, Grip, Zap } from 'lucide-svelte';
+  import { Plus, CheckSquare, Calendar, Home, Inbox, SquareKanban, List, GitBranch, MapPin, Settings, BookOpen, Package, ChevronDown, FileCheck, FileStack, Play, BarChart3, ListTree, Milestone, Grip, Zap, Palette } from 'lucide-svelte';
   import { workspaceIconMap } from '../utils/icons.js';
   import { navigate, currentRoute } from '../router.js';
   import { currentWorkspace, workspacePermissions } from '../stores';
@@ -60,6 +60,7 @@
   // Permission-based visibility
   const canViewTests = $derived.by(() => workspacePermissions.canViewTests(workspaceId));
   const canManageActions = $derived.by(() => workspacePermissions.canManageActions(workspaceId));
+  const canAdmin = $derived.by(() => workspacePermissions.canAdminWorkspace(workspaceId));
 
   // Filter workspace-only views based on permissions
   const filteredWorkspaceOnlyViews = $derived.by(() => {
@@ -309,7 +310,7 @@
 
 {#if $currentWorkspace?.is_personal}
   <!-- Simplified Personal Workspace Sidebar -->
-  <div class="w-48 min-w-48 flex-shrink-0 {sidebarBgClass} border-r flex flex-col py-4" style={sidebarBgStyle}>
+  <div class="w-48 min-w-48 h-full flex-shrink-0 {sidebarBgClass} border-r flex flex-col py-4" style={sidebarBgStyle}>
     <!-- Workspace Header -->
     <div class="px-4 mb-4 pb-4 border-b" style="border-color: var(--ds-border);">
       <div class="flex items-center gap-3">
@@ -366,7 +367,7 @@
   </div>
 {:else}
   <!-- Regular Workspace Navigation Sidebar -->
-  <div class="w-48 min-w-48 flex-shrink-0 {sidebarBgClass} border-r flex flex-col py-4" style={sidebarBgStyle}>
+  <div class="w-48 min-w-48 h-full flex-shrink-0 {sidebarBgClass} border-r flex flex-col py-4" style={sidebarBgStyle}>
 
   <!-- Workspace Header -->
   <div class="px-4 mb-4 pb-4 border-b" style="border-color: var(--ds-border);">
@@ -511,13 +512,28 @@
             </Tooltip>
           {/each}
 
+          {#if canAdmin}
+            <Tooltip content="Customize appearance and layout" placement="right">
+              <button
+                onclick={() => navigate(`/workspaces/${workspaceId}/look-and-feel`)}
+                class="w-full text-left px-3 py-2 cursor-pointer rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item"
+                style={$currentRoute.view === 'workspace-look-and-feel' ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
+                onmouseenter={(e) => { if ($currentRoute.view !== 'workspace-look-and-feel') e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
+                onmouseleave={(e) => { if ($currentRoute.view !== 'workspace-look-and-feel') e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
+              >
+                <Palette class="w-4 h-4" />
+                Look and Feel
+              </button>
+            </Tooltip>
+          {/if}
+
           <Tooltip content="Configure workspace settings and preferences" placement="right">
             <button
               onclick={() => navigate(`/workspaces/${workspaceId}/settings/general`)}
               class="w-full text-left px-3 py-2 cursor-pointer rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item"
-              style={['workspace-settings', 'workspace-settings-general', 'workspace-settings-appearance', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger'].includes($currentRoute.view) ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
-              onmouseenter={(e) => { if (!['workspace-settings', 'workspace-settings-general', 'workspace-settings-appearance', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger'].includes($currentRoute.view)) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
-              onmouseleave={(e) => { if (!['workspace-settings', 'workspace-settings-general', 'workspace-settings-appearance', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger'].includes($currentRoute.view)) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
+              style={['workspace-settings', 'workspace-settings-general', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger'].includes($currentRoute.view) ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
+              onmouseenter={(e) => { if (!['workspace-settings', 'workspace-settings-general', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger'].includes($currentRoute.view)) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
+              onmouseleave={(e) => { if (!['workspace-settings', 'workspace-settings-general', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger'].includes($currentRoute.view)) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
             >
               <Settings class="w-4 h-4" />
               Settings

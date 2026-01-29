@@ -308,6 +308,10 @@ export default {
     title: 'Milestones',
     milestone: 'Milestone',
     subtitle: 'Track releases and deadlines',
+    addMilestone: 'Add Milestone',
+    noMilestones: 'No milestones yet',
+    noMilestonesDescription: 'Create your first milestone to track releases and deadlines.',
+    noMilestonesInCategory: 'No milestones in this category',
     allCategories: 'All Categories',
     manageCategories: 'Manage Categories',
     allMilestones: 'All Milestones',
@@ -464,7 +468,8 @@ export default {
     // Reflection placeholders
     placeholderAccomplishments: 'Describe your key accomplishments...',
     placeholderWentWell: 'What went well and why...',
-    placeholderImprovements: 'Areas for improvement and next steps...'
+    placeholderImprovements: 'Areas for improvement and next steps...',
+    startWriting: 'Start writing your reflection...'
   },
 
   audit: {

@@ -257,7 +257,7 @@
     </div>
     <div class="flex items-center gap-1">
       <button
-        class="p-1 rounded transition-colors opacity-0 group-hover:opacity-100"
+        class="p-1 rounded transition-colors opacity-40 group-hover:opacity-100"
         class:invisible={showAddForm || !expanded || !personalWorkspace}
         onclick={(e) => { e.stopPropagation(); showAddForm = true; }}
         title={t('personal.addPersonalTask')}

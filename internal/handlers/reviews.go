@@ -401,6 +401,7 @@ func (h *ReviewHandler) GetCompletedItems(w http.ResponseWriter, r *http.Request
 		SELECT i.id, i.workspace_id, i.title, i.description,
 		       i.created_at, i.updated_at,
 		       w.name as workspace_name, w.key as workspace_key,
+		       i.workspace_item_number, i.item_type_id,
 		       ce.completed_at
 		FROM completion_events ce
 		JOIN items i ON i.id = ce.item_id
@@ -423,7 +424,9 @@ func (h *ReviewHandler) GetCompletedItems(w http.ResponseWriter, r *http.Request
 		var completedAtStr sql.NullString
 		err := rows.Scan(&item.ID, &item.WorkspaceID, &item.Title, &item.Description,
 			&item.CreatedAt, &item.UpdatedAt,
-			&item.WorkspaceName, &item.WorkspaceKey, &completedAtStr)
+			&item.WorkspaceName, &item.WorkspaceKey,
+			&item.WorkspaceItemNumber, &item.ItemTypeID,
+			&completedAtStr)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Row scan error: %v", err), http.StatusInternalServerError)
 			return

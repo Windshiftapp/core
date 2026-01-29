@@ -21,11 +21,11 @@ func NewWorkspaceRepository(db database.Database) *WorkspaceRepository {
 // FindByID retrieves a workspace by ID with project count and time project name
 func (r *WorkspaceRepository) FindByID(id int) (*models.Workspace, error) {
 	var workspace models.Workspace
-	var timeProjectName, icon, color, defaultView sql.NullString
+	var timeProjectName, icon, color, defaultView, displayMode sql.NullString
 	var configSetID sql.NullInt64
 
 	err := r.db.QueryRow(`
-		SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.created_at, w.updated_at,
+		SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
 		       COUNT(p.id) as project_count,
 		       tp.name as time_project_name,
 		       wcs.configuration_set_id
@@ -34,10 +34,10 @@ func (r *WorkspaceRepository) FindByID(id int) (*models.Workspace, error) {
 		LEFT JOIN time_projects tp ON w.time_project_id = tp.id
 		LEFT JOIN workspace_configuration_sets wcs ON w.id = wcs.workspace_id
 		WHERE w.id = ?
-		GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.created_at, w.updated_at, tp.name, wcs.configuration_set_id
+		GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name, wcs.configuration_set_id
 	`, id).Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
 		&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID,
-		&icon, &color, &workspace.AvatarURL, &defaultView, &workspace.CreatedAt, &workspace.UpdatedAt,
+		&icon, &color, &workspace.AvatarURL, &defaultView, &displayMode, &workspace.CreatedAt, &workspace.UpdatedAt,
 		&workspace.ProjectCount, &timeProjectName, &configSetID)
 
 	if err == sql.ErrNoRows {
@@ -50,6 +50,7 @@ func (r *WorkspaceRepository) FindByID(id int) (*models.Workspace, error) {
 	workspace.Icon = icon.String
 	workspace.Color = color.String
 	workspace.DefaultView = defaultView.String
+	workspace.DisplayMode = displayMode.String
 	workspace.TimeProjectName = timeProjectName.String
 	if configSetID.Valid {
 		workspace.ConfigurationSetID = &configSetID.Int64
@@ -91,26 +92,26 @@ func (r *WorkspaceRepository) FindAll(userID int, isPersonalOnly bool) ([]models
 
 	if isPersonalOnly {
 		query = `
-			SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.created_at, w.updated_at,
+			SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
 			       COUNT(p.id) as project_count,
 			       tp.name as time_project_name
 			FROM workspaces w
 			LEFT JOIN projects p ON w.id = p.workspace_id
 			LEFT JOIN time_projects tp ON w.time_project_id = tp.id
 			WHERE w.is_personal = ? AND w.owner_id = ?
-			GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.created_at, w.updated_at, tp.name
+			GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name
 			ORDER BY w.name`
 		rows, err = r.db.Query(query, true, userID)
 	} else {
 		query = `
-			SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.created_at, w.updated_at,
+			SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
 			       COUNT(p.id) as project_count,
 			       tp.name as time_project_name
 			FROM workspaces w
 			LEFT JOIN projects p ON w.id = p.workspace_id
 			LEFT JOIN time_projects tp ON w.time_project_id = tp.id
 			WHERE w.is_personal = 0 OR w.is_personal IS NULL OR w.owner_id = ?
-			GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.created_at, w.updated_at, tp.name
+			GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name
 			ORDER BY w.is_personal ASC, w.name`
 		rows, err = r.db.Query(query, userID)
 	}
@@ -122,10 +123,10 @@ func (r *WorkspaceRepository) FindAll(userID int, isPersonalOnly bool) ([]models
 	var workspaces []models.Workspace
 	for rows.Next() {
 		var workspace models.Workspace
-		var timeProjectName, icon, color, defaultView sql.NullString
+		var timeProjectName, icon, color, defaultView, displayMode sql.NullString
 		err := rows.Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
 			&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID,
-			&icon, &color, &workspace.AvatarURL, &defaultView,
+			&icon, &color, &workspace.AvatarURL, &defaultView, &displayMode,
 			&workspace.CreatedAt, &workspace.UpdatedAt,
 			&workspace.ProjectCount, &timeProjectName)
 		if err != nil {
@@ -135,6 +136,7 @@ func (r *WorkspaceRepository) FindAll(userID int, isPersonalOnly bool) ([]models
 		workspace.Icon = icon.String
 		workspace.Color = color.String
 		workspace.DefaultView = defaultView.String
+		workspace.DisplayMode = displayMode.String
 		workspace.TimeProjectName = timeProjectName.String
 		workspaces = append(workspaces, workspace)
 	}
@@ -148,12 +150,12 @@ func (r *WorkspaceRepository) Create(workspace *models.Workspace) (int64, error)
 	var id int64
 
 	err := r.db.QueryRow(`
-		INSERT INTO workspaces (name, key, description, active, time_project_id, is_personal, owner_id, icon, color, avatar_url, default_view, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO workspaces (name, key, description, active, time_project_id, is_personal, owner_id, icon, color, avatar_url, default_view, display_mode, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING id
 	`, workspace.Name, workspace.Key, workspace.Description, workspace.Active,
 		workspace.TimeProjectID, workspace.IsPersonal, workspace.OwnerID,
-		workspace.Icon, workspace.Color, workspace.AvatarURL, workspace.DefaultView,
+		workspace.Icon, workspace.Color, workspace.AvatarURL, workspace.DefaultView, workspace.DisplayMode,
 		now, now).Scan(&id)
 
 	return id, err
@@ -164,11 +166,11 @@ func (r *WorkspaceRepository) Update(workspace *models.Workspace) error {
 	now := time.Now()
 	_, err := r.db.ExecWrite(`
 		UPDATE workspaces
-		SET name = ?, key = ?, description = ?, active = ?, time_project_id = ?, is_personal = ?, owner_id = ?, icon = ?, color = ?, avatar_url = ?, default_view = ?, updated_at = ?
+		SET name = ?, key = ?, description = ?, active = ?, time_project_id = ?, is_personal = ?, owner_id = ?, icon = ?, color = ?, avatar_url = ?, default_view = ?, display_mode = ?, updated_at = ?
 		WHERE id = ?
 	`, workspace.Name, workspace.Key, workspace.Description, workspace.Active,
 		workspace.TimeProjectID, workspace.IsPersonal, workspace.OwnerID,
-		workspace.Icon, workspace.Color, workspace.AvatarURL, workspace.DefaultView,
+		workspace.Icon, workspace.Color, workspace.AvatarURL, workspace.DefaultView, workspace.DisplayMode,
 		now, workspace.ID)
 
 	return err

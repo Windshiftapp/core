@@ -18,6 +18,7 @@
     title = '',
     description = '',
     action = null,
+    hasGradient = false,
     class: className = ''
   } = $props();
 </script>
@@ -28,5 +29,6 @@
   {title}
   {description}
   {action}
+  {hasGradient}
   class={className}
 />

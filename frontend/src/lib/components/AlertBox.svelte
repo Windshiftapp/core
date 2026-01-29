@@ -2,10 +2,11 @@
   import { AlertCircle, CircleCheck, Info, AlertTriangle } from 'lucide-svelte';
 
   let {
-    variant = 'error', // 'error', 'warning', 'info', 'success'
+    variant = 'error', // 'error', 'warning', 'info', 'success', 'neutral'
     message = '',
     showIcon = true,
-    class: className = ''
+    class: className = '',
+    children
   } = $props();
 
   const styles = $derived({
@@ -39,7 +40,7 @@
   const IconComponent = $derived(styles?.icon || AlertCircle);
 </script>
 
-{#if message}
+{#if message || children}
   <div
     class="px-4 py-3 rounded flex items-start gap-3 {className}"
     style="background: var(--ds-surface-raised); border: 1px solid var(--ds-border); border-left: 4px solid {styles?.borderColor}; color: var(--ds-text);"
@@ -47,6 +48,12 @@
     {#if showIcon}
       <IconComponent class="w-5 h-5 flex-shrink-0 mt-0.5" style="color: {styles?.iconColor};" />
     {/if}
-    <span class="text-sm">{message}</span>
+    {#if children}
+      <div class="text-sm flex-1">
+        {@render children()}
+      </div>
+    {:else}
+      <span class="text-sm">{message}</span>
+    {/if}
   </div>
 {/if}

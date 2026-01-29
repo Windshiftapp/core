@@ -1,146 +1,59 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { api } from '../api.js';
-  import { authStore } from '../stores';
+  import { authStore, homepageStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
   import DashboardOnboarding from './DashboardOnboarding.svelte';
   import ColorDot from '../components/ColorDot.svelte';
   import ItemCard from '../features/items/ItemCard.svelte';
+  import WorkItemRow from '../features/items/WorkItemRow.svelte';
   import Text from '../components/Text.svelte';
   import { Clock, Eye, Edit, MessageSquare, Bookmark, Bell, Briefcase, Calendar, Target, Search, Grip, Info, CheckCircle, AlertCircle, XCircle } from 'lucide-svelte';
   import { workspaceIconMap } from '../utils/icons.js';
 
-  let greeting = $state('');
-  let currentDate = $state('');
-
-  // Homepage data from API
-  let recentWorkspaces = $state([]);
-  let totalWorkspaceCount = $state(0);
-  let totalItemCount = $state(0);
-  let watchedItems = $state([]);
-  let loading = $state(true);
-
-  // Activity data from API
-  let recentlyViewed = $state([]);
-  let recentlyEdited = $state([]);
-  let recentlyCommented = $state([]);
-
-  // Upcoming milestones from API
-  let upcomingMilestones = $state([]);
-
-  // Notifications from API
-  let notifications = $state([]);
-
-  let activeTab = $state('viewed'); // viewed, edited, commented
-
-  // Track if onboarding was dismissed
-  let onboardingDismissed = $state(false);
-  const ONBOARDING_STORAGE_KEY = 'windshift-dashboard-onboarding-dismissed';
-
-  // Derived state: show onboarding mode when no workspaces or items AND not dismissed
-  let isOnboarding = $derived((totalWorkspaceCount === 0 || totalItemCount === 0) && !onboardingDismissed);
+  // Use store values with aliases for easier template access
+  let greeting = $derived(homepageStore.greeting);
+  let currentDate = $derived(homepageStore.currentDate);
+  let recentWorkspaces = $derived(homepageStore.recentWorkspaces);
+  let totalWorkspaceCount = $derived(homepageStore.totalWorkspaceCount);
+  let totalItemCount = $derived(homepageStore.totalItemCount);
+  let watchedItems = $derived(homepageStore.watchedItems);
+  let loading = $derived(homepageStore.loading);
+  let recentlyViewed = $derived(homepageStore.recentlyViewed);
+  let recentlyEdited = $derived(homepageStore.recentlyEdited);
+  let recentlyCommented = $derived(homepageStore.recentlyCommented);
+  let upcomingMilestones = $derived(homepageStore.upcomingMilestones);
+  let notifications = $derived(homepageStore.notifications);
+  let activeTab = $derived(homepageStore.activeTab);
+  let isOnboarding = $derived(homepageStore.isOnboarding);
 
   function handleOnboardingDismiss() {
-    onboardingDismissed = true;
+    homepageStore.dismissOnboarding();
+  }
+
+  function setActiveTab(tab) {
+    homepageStore.setActiveTab(tab);
   }
 
   onMount(async () => {
-    // Check if onboarding was previously dismissed
-    onboardingDismissed = localStorage.getItem(ONBOARDING_STORAGE_KEY) === 'true';
+    const userTimeZone = authStore.currentUser?.timezone || 'UTC';
+    await homepageStore.init(userTimeZone);
 
-    calculateGreeting();
-    await loadHomepageData();
-
-    // Listen for workspace refresh events (e.g., when workspace is created from onboarding)
+    // Listen for workspace refresh events
     window.addEventListener('refresh-workspaces', handleRefreshWorkspaces);
-    // Listen for work item refresh events (e.g., when work item is created from onboarding)
     window.addEventListener('refresh-work-items', handleRefreshWorkItems);
   });
 
   onDestroy(() => {
-    // Clean up event listeners
     window.removeEventListener('refresh-workspaces', handleRefreshWorkspaces);
     window.removeEventListener('refresh-work-items', handleRefreshWorkItems);
   });
 
   function handleRefreshWorkspaces() {
-    // Reload homepage data to update workspace count
-    loadHomepageData();
+    homepageStore.refresh();
   }
 
   function handleRefreshWorkItems() {
-    // Reload homepage data to update item count
-    loadHomepageData();
-  }
-
-  async function loadHomepageData() {
-    try {
-      loading = true;
-      const data = await api.homepage.get();
-
-      // Load recent workspaces with icon and color
-      recentWorkspaces = (data.recent_workspaces || []).slice(0, 5); // Limit to 5 most recent
-
-      // Load total workspace count
-      totalWorkspaceCount = data.total_workspace_count || 0;
-
-      // Load total item count
-      totalItemCount = data.total_item_count || 0;
-
-      // Load watched items
-      watchedItems = data.watched_items || [];
-
-      // Load upcoming milestones
-      upcomingMilestones = data.upcoming_milestones || [];
-      console.log('Upcoming milestones loaded:', upcomingMilestones);
-
-      // Load activity data
-      recentlyViewed = data.recently_viewed || [];
-      recentlyEdited = data.recently_edited || [];
-      recentlyCommented = data.recently_commented || [];
-
-      // Load notifications
-      const notificationsData = await api.notifications.getAll({ limit: 5 });
-      notifications = notificationsData || [];
-
-    } catch (error) {
-      console.error('Failed to load homepage data:', error);
-    } finally {
-      loading = false;
-    }
-  }
-
-  function calculateGreeting() {
-    const now = new Date();
-    const userTimeZone = authStore.currentUser?.timezone || 'UTC';
-
-    // Get hour in user's timezone
-    const hourString = now.toLocaleString('en-US', {
-      timeZone: userTimeZone,
-      hour: 'numeric',
-      hour12: false
-    });
-    const hour = parseInt(hourString);
-
-    // Determine greeting based on time of day
-    if (hour >= 5 && hour < 12) {
-      greeting = t('dashboard.goodMorning');
-    } else if (hour >= 12 && hour < 18) {
-      greeting = t('dashboard.goodAfternoon');
-    } else if (hour >= 18 && hour < 22) {
-      greeting = t('dashboard.goodEvening');
-    } else {
-      greeting = t('dashboard.goodNight');
-    }
-
-    // Format current date
-    currentDate = now.toLocaleDateString('en-US', {
-      timeZone: userTimeZone,
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    homepageStore.refresh();
   }
 
   function getNotificationIcon(type) {
@@ -159,32 +72,11 @@
   }
 
   function formatRelativeTime(timestamp) {
-    if (!timestamp) return 'Unknown';
-
-    const now = new Date();
-    const then = new Date(timestamp);
-    const diffMs = now - then;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
-
-    return then.toLocaleDateString();
+    return homepageStore.formatRelativeTime(timestamp);
   }
 
   function calculateDaysUntil(targetDate) {
-    if (!targetDate) return null;
-
-    const now = new Date();
-    const target = new Date(targetDate);
-    const diffTime = target - now;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    return diffDays;
+    return homepageStore.calculateDaysUntil(targetDate);
   }
 </script>
 
@@ -283,7 +175,7 @@
         <!-- Tabs -->
         <div class="px-4 py-2 flex gap-2" style="border-bottom: 1px solid var(--ds-border);">
           <button
-            onclick={() => activeTab = 'viewed'}
+            onclick={() => setActiveTab('viewed')}
             class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
             style={activeTab === 'viewed'
               ? 'background-color: var(--ds-background-selected); color: var(--ds-text);'
@@ -292,7 +184,7 @@
             {t('dashboard.viewed')}
           </button>
           <button
-            onclick={() => activeTab = 'edited'}
+            onclick={() => setActiveTab('edited')}
             class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
             style={activeTab === 'edited'
               ? 'background-color: var(--ds-background-selected); color: var(--ds-text);'
@@ -301,7 +193,7 @@
             {t('dashboard.edited')}
           </button>
           <button
-            onclick={() => activeTab = 'commented'}
+            onclick={() => setActiveTab('commented')}
             class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
             style={activeTab === 'commented'
               ? 'background-color: var(--ds-background-selected); color: var(--ds-text);'
@@ -322,33 +214,16 @@
             {:else}
               <div class="space-y-2">
                 {#each recentlyViewed as item}
-                  <ItemCard href="/workspaces/{item.workspace_id}/items/{item.item_id}">
-                    {#snippet children()}
-                      <div class="flex items-start justify-between">
-                        <div class="flex-1">
-                          <div class="flex items-center mb-1">
-                            <span class="font-mono text-xs px-2 py-0.5 rounded mr-2" style="background-color: rgba(59, 130, 246, 0.1); color: var(--ds-text);">
-                              {item.workspace_key}-{item.workspace_item_number}
-                            </span>
-                            {#if item.priority_id && item.priority_name}
-                              <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-md"
-                                    style="background-color: {item.priority_color}20; color: {item.priority_color};">
-                                {item.priority_name}
-                              </span>
-                            {/if}
-                          </div>
-                          <h4 class="font-medium mb-1" style="color: var(--ds-text);">{item.title}</h4>
-                          <div class="flex items-center text-xs" style="color: var(--ds-text-subtle);">
-                            <Clock class="w-3 h-3 mr-1" />
-                            {formatRelativeTime(item.last_activity)}
-                          </div>
-                        </div>
-                        <span class="text-xs px-2 py-1 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text);">
-                          {item.status}
-                        </span>
-                      </div>
-                    {/snippet}
-                  </ItemCard>
+                  <WorkItemRow
+                    {item}
+                    href="/workspaces/{item.workspace_id}/items/{item.item_id}"
+                    showIcon={false}
+                    showPriority={true}
+                    showStatus={true}
+                    showTimestamp={true}
+                    timestamp={item.last_activity}
+                    formatTimestamp={formatRelativeTime}
+                  />
                 {/each}
               </div>
             {/if}
@@ -361,33 +236,16 @@
             {:else}
               <div class="space-y-2">
                 {#each recentlyEdited as item}
-                  <ItemCard href="/workspaces/{item.workspace_id}/items/{item.item_id}">
-                    {#snippet children()}
-                      <div class="flex items-start justify-between">
-                        <div class="flex-1">
-                          <div class="flex items-center mb-1">
-                            <span class="font-mono text-xs px-2 py-0.5 rounded mr-2" style="background-color: rgba(59, 130, 246, 0.1); color: var(--ds-text);">
-                              {item.workspace_key}-{item.workspace_item_number}
-                            </span>
-                            {#if item.priority_id && item.priority_name}
-                              <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-md"
-                                    style="background-color: {item.priority_color}20; color: {item.priority_color};">
-                                {item.priority_name}
-                              </span>
-                            {/if}
-                          </div>
-                          <h4 class="font-medium mb-1" style="color: var(--ds-text);">{item.title}</h4>
-                          <div class="flex items-center text-xs" style="color: var(--ds-text-subtle);">
-                            <Clock class="w-3 h-3 mr-1" />
-                            {formatRelativeTime(item.last_activity)}
-                          </div>
-                        </div>
-                        <span class="text-xs px-2 py-1 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text);">
-                          {item.status}
-                        </span>
-                      </div>
-                    {/snippet}
-                  </ItemCard>
+                  <WorkItemRow
+                    {item}
+                    href="/workspaces/{item.workspace_id}/items/{item.item_id}"
+                    showIcon={false}
+                    showPriority={true}
+                    showStatus={true}
+                    showTimestamp={true}
+                    timestamp={item.last_activity}
+                    formatTimestamp={formatRelativeTime}
+                  />
                 {/each}
               </div>
             {/if}
@@ -400,33 +258,16 @@
             {:else}
               <div class="space-y-2">
                 {#each recentlyCommented as item}
-                  <ItemCard href="/workspaces/{item.workspace_id}/items/{item.item_id}">
-                    {#snippet children()}
-                      <div class="flex items-start justify-between">
-                        <div class="flex-1">
-                          <div class="flex items-center mb-1">
-                            <span class="font-mono text-xs px-2 py-0.5 rounded mr-2" style="background-color: rgba(59, 130, 246, 0.1); color: var(--ds-text);">
-                              {item.workspace_key}-{item.workspace_item_number}
-                            </span>
-                            {#if item.priority_id && item.priority_name}
-                              <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-md"
-                                    style="background-color: {item.priority_color}20; color: {item.priority_color};">
-                                {item.priority_name}
-                              </span>
-                            {/if}
-                          </div>
-                          <h4 class="font-medium mb-1" style="color: var(--ds-text);">{item.title}</h4>
-                          <div class="flex items-center text-xs" style="color: var(--ds-text-subtle);">
-                            <Clock class="w-3 h-3 mr-1" />
-                            {formatRelativeTime(item.last_activity)}
-                          </div>
-                        </div>
-                        <span class="text-xs px-2 py-1 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text);">
-                          {item.status}
-                        </span>
-                      </div>
-                    {/snippet}
-                  </ItemCard>
+                  <WorkItemRow
+                    {item}
+                    href="/workspaces/{item.workspace_id}/items/{item.item_id}"
+                    showIcon={false}
+                    showPriority={true}
+                    showStatus={true}
+                    showTimestamp={true}
+                    timestamp={item.last_activity}
+                    formatTimestamp={formatRelativeTime}
+                  />
                 {/each}
               </div>
             {/if}

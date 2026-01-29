@@ -116,6 +116,7 @@ export default {
       noProjects: 'Keine Projekte gefunden. Erstellen Sie Ihr erstes Projekt, um mit der Zeiterfassung zu beginnen.',
       noProjectsInCategory: 'Keine Projekte in dieser Kategorie.',
       failedToSave: 'Projekt konnte nicht gespeichert werden',
+      deleteProject: 'Projekt löschen',
       confirmDelete: 'Sind Sie sicher, dass Sie "{name}" löschen möchten?',
       unknownCustomer: 'Unbekannter Kunde',
       project: 'Projekt',
@@ -170,6 +171,7 @@ export default {
       emailOptional: 'E-Mail (Optional)',
       contactPersonOptional: 'Kontaktperson (Optional)',
       failedToSave: 'Organisation konnte nicht gespeichert werden',
+      deleteOrganization: 'Organisation löschen',
       confirmDelete: 'Sind Sie sicher, dass Sie "{name}" löschen möchten?'
     }
   },

@@ -11,6 +11,7 @@
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { Plus, Trash2, Edit, Users } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { confirm } from '../../composables/useConfirm.js';
 
   let customers = $state([]);
   let customFields = $state([]);
@@ -103,7 +104,15 @@
   }
 
   async function deleteCustomer(customer) {
-    if (confirm(t('time.organizations.confirmDelete', { name: customer.name }))) {
+    const confirmed = await confirm({
+      title: t('time.organizations.deleteOrganization'),
+      message: t('time.organizations.confirmDelete', { name: customer.name }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+
+    if (confirmed) {
       try {
         await api.time.customers.delete(customer.id);
         await loadCustomers();

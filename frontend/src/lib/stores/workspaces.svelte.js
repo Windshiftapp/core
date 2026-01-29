@@ -3,11 +3,16 @@ import { api } from '../api.js';
 
 // Current workspace store - automatically syncs with route
 function createCurrentWorkspaceStore() {
-  const { subscribe, set } = writable(null);
+  const { subscribe, set, update } = writable(null);
   let lastWorkspaceId = null;
 
   return {
     subscribe,
+
+    // Patch workspace with partial updates (no API call)
+    patch(updates) {
+      update(ws => ws ? { ...ws, ...updates } : null);
+    },
 
     // Load workspace by ID
     async load(workspaceId) {

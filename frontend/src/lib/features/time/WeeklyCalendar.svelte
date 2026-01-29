@@ -64,15 +64,15 @@
   };
 
   // Transform availableStatuses for ItemPicker
-  $: statusOptions = availableStatuses.map(status => ({
+  let statusOptions = $derived(availableStatuses.map(status => ({
     id: status.id,
     label: status.name,
     value: status.name,
     categoryColor: status.category_color
-  }));
+  })));
 
   // Generate time slots for the grid
-  $: timeSlots = Array.from({ length: TOTAL_HOURS }, (_, i) => {
+  const timeSlots = Array.from({ length: TOTAL_HOURS }, (_, i) => {
     const hour = DAY_START_HOUR + i;
     return {
       hour,
@@ -253,7 +253,7 @@
   }
 
   // Get all tasks for the current week (work items only)
-  $: allWeekTasks = (() => {
+  let allWeekTasks = $derived((() => {
     const tasks = [];
     weekDays.forEach(day => {
       if (workItems[day.dateKey]?.length) {
@@ -269,7 +269,7 @@
       }
     });
     return tasks.sort((a, b) => a.date - b.date);
-  })();
+  })());
 
   // Calculate week start (Monday)
   function getWeekStart(date) {
@@ -700,7 +700,7 @@
   }
 
   // Menu items for calendar actions
-  $: calendarMenuItems = [
+  let calendarMenuItems = $derived([
     {
       id: 'export-ics',
       type: 'regular',
@@ -708,7 +708,7 @@
       title: t('time.calendar.exportWeekToICS'),
       onClick: handleExportICS
     }
-  ];
+  ]);
 
   function handleExportICS() {
     // Get only items scheduled for the current week

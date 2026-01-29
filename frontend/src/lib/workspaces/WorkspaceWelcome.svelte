@@ -51,7 +51,7 @@
   let sections = [];
   let widgets = [];
   let selectedGradient = 0;
-  let applyToAllViews = false;
+  let applyToAllViews = true;
   let isEditMode = false;
   let isCustomizeMode = false;
   let customizationCategory = 'built-in';
@@ -321,20 +321,20 @@
         sections = layout.sections.sort((a, b) => a.display_order - b.display_order);
         widgets = layout.widgets || [];
         selectedGradient = layout.gradient ?? 0;
-        applyToAllViews = layout.applyToAllViews ?? false;
+        applyToAllViews = layout.applyToAllViews ?? true;
       } else {
         // No layout exists, use defaults
         sections = getDefaultSections();
         widgets = getDefaultWidgets();
         selectedGradient = 0;
-        applyToAllViews = false;
+        applyToAllViews = true;
       }
     } catch (error) {
       console.error('Failed to load homepage layout:', error);
       sections = getDefaultSections();
       widgets = getDefaultWidgets();
       selectedGradient = 0;
-      applyToAllViews = false;
+      applyToAllViews = true;
     }
   }
 
@@ -507,16 +507,6 @@
     }
   }
 
-  function handleGradientSelection(event) {
-    selectedGradient = event.detail.gradient;
-    debouncedSave();
-  }
-
-  function handleApplyToAllViewsChange(event) {
-    applyToAllViews = event.detail.applyToAllViews;
-    debouncedSave();
-  }
-
   function updateWidgetWidth(widgetId, newWidth) {
     widgets = widgets.map(w =>
       w.id === widgetId ? { ...w, width: newWidth } : w
@@ -624,10 +614,6 @@
 <WorkspaceCustomizationSidebar
   bind:isOpen={isCustomizeMode}
   bind:activeCategory={customizationCategory}
-  bind:selectedGradient
-  bind:applyToAllViews
-  on:selectGradient={handleGradientSelection}
-  on:applyToAllViewsChange={handleApplyToAllViewsChange}
 />
 
 <div class="workspace-welcome-wrapper" style="{backgroundStyle}">

@@ -7,14 +7,7 @@
   import { api } from '../api.js';
   import { contextCommands } from '../utils/contextCommands.js';
   import { isSystemAdmin } from '../stores';
-  import {
-    activeTimer,
-    canStartTimer,
-    canStopTimer,
-    timerSyncing,
-    stop as stopTimerAction,
-    initialize as initializeTimer
-  } from '../stores/timerStore.js';
+  import { timerStore } from '../stores/timerStore.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
@@ -402,24 +395,24 @@
         }, 100);
       } else if (command.action === 'start-timer') {
         // Start a timer directly using the timer composable
-        if ($canStartTimer) {
+        if (timerStore.canStart) {
           // Show error - need a workspace and project context
           alert(t('dialogs.alerts.startTimerFromItem'));
-        } else if ($activeTimer) {
+        } else if (timerStore.activeTimer) {
           alert(t('dialogs.alerts.timerAlreadyRunning'));
         }
       } else if (command.action === 'stop-timer') {
         // Stop the timer directly using the timer store
-        if ($canStopTimer) {
+        if (timerStore.canStop) {
           try {
-            await stopTimerAction();
+            await timerStore.stop();
           } catch (error) {
             console.error('Failed to stop timer:', error);
             alert(t('dialogs.alerts.stopTimerFailed', { error: error.message }));
           }
-        } else if (!$activeTimer) {
+        } else if (!timerStore.activeTimer) {
           alert(t('dialogs.alerts.noTimerRunning'));
-        } else if ($timerSyncing) {
+        } else if (timerStore.syncing) {
           alert(t('dialogs.alerts.timerSyncing'));
         }
       }
@@ -488,7 +481,7 @@
   $: if (isOpen) {
     loadData();
     // Initialize timer to get latest state
-    initializeTimer();
+    timerStore.initialize();
   }
   
   // Focus the search input when opened

@@ -25,6 +25,7 @@
 		avatar_url TEXT,
 		homepage_layout TEXT, -- JSON array of gadget configurations
 		default_view TEXT DEFAULT 'board', -- Default view when entering workspace (board, backlog, list, tree, map)
+		display_mode TEXT DEFAULT 'default', -- Display mode for workspace layout (default, board)
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);

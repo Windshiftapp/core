@@ -1,8 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { currentRoute, navigate } from '../router.js';
-	import { api } from '../api.js';
-	import { authStore } from '../stores';
+	import { authStore, securityStore } from '../stores';
 	import { t } from '../stores/i18n.svelte.js';
 	import { User, Shield, Key, Smartphone, Plus, Trash2, Calendar, CheckCircle, PlayCircle, Code, Copy, Eye, EyeOff, Terminal, AlertTriangle, X } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
@@ -22,322 +21,119 @@
 		processCredentialCreationResponse
 	} from '../utils/webauthn-utils.js';
 
-	// State variables
-	let user = $state(null);
-	let credentials = $state([]);
-	let apiTokens = $state([]);
-	let loading = $state(false);
-	let showAddCredential = $state(false);
-	let credentialType = $state('fido'); // 'fido' or 'ssh'
-	let enrollingFIDO = $state(false);
-	let newCredentialName = $state('');
-	let newSSHPublicKey = $state('');
-	let testingLogin = $state(false);
-	let loginTestResult = $state('');
-	let showAddToken = $state(false);
-	let creatingToken = $state(false);
-	let newTokenName = $state('');
-	let newTokenScopes = $state([]);
-	let newTokenExpiry = $state('');
-	let showNewToken = $state(false);
-	let newTokenValue = $state('');
-	let showConfirmDialog = $state(false);
-	let confirmDialogConfig = $state({
-		title: '',
-		message: '',
-		action: null
-	});
+	// Bind to store values
+	let user = $derived(securityStore.user);
+	let credentials = $derived(securityStore.credentials);
+	let apiTokens = $derived(securityStore.apiTokens);
+	let loading = $derived(securityStore.loading);
+	let showAddCredential = $derived(securityStore.showAddCredential);
+	let credentialType = $derived(securityStore.credentialType);
+	let enrollingFIDO = $derived(securityStore.enrollingFIDO);
+	let newCredentialName = $derived(securityStore.newCredentialName);
+	let newSSHPublicKey = $derived(securityStore.newSSHPublicKey);
+	let showAddToken = $derived(securityStore.showAddToken);
+	let creatingToken = $derived(securityStore.creatingToken);
+	let newTokenName = $derived(securityStore.newTokenName);
+	let newTokenExpiry = $derived(securityStore.newTokenExpiry);
+	let showNewToken = $derived(securityStore.showNewToken);
+	let newTokenValue = $derived(securityStore.newTokenValue);
+	let showConfirmDialog = $derived(securityStore.showConfirmDialog);
+	let confirmDialogConfig = $derived(securityStore.confirmDialogConfig);
+	let showEnrollmentBanner = $derived(securityStore.showEnrollmentBanner);
+	let enrollmentType = $derived(securityStore.enrollmentType);
+	let showChangePassword = $derived(securityStore.showChangePassword);
+	let changePasswordData = $derived(securityStore.changePasswordData);
+	let changePasswordLoading = $derived(securityStore.changePasswordLoading);
+	let changePasswordError = $derived(securityStore.changePasswordError);
+	let changePasswordSuccess = $derived(securityStore.changePasswordSuccess);
 
-	// Enrollment banner state
-	let showEnrollmentBanner = $state(false);
-	let enrollmentType = $state('');
+	// Derived from auth store
+	let currentUserId = $derived(authStore.currentUser?.id);
 
 	// Check for enrollment query parameter
 	onMount(() => {
 		const unsubscribe = currentRoute.subscribe(route => {
 			if (route.query?.enroll === 'passkey') {
-				showEnrollmentBanner = true;
-				enrollmentType = 'passkey';
-				// Auto-open the add credential modal
-				setTimeout(() => {
-					credentialType = 'fido';
-					showAddCredential = true;
-				}, 500);
+				securityStore.checkEnrollmentRequired('passkey');
 			}
 		});
 		return unsubscribe;
 	});
 
-	function dismissEnrollmentBanner() {
-		showEnrollmentBanner = false;
-		// Remove the query parameter from URL
-		navigate('/security');
-	}
-
-	// Change password state
-	let showChangePassword = $state(false);
-	let changePasswordData = $state({
-		current_password: '',
-		new_password: '',
-		confirm_password: '',
-		logout_all: false
-	});
-	let changePasswordLoading = $state(false);
-	let changePasswordError = $state('');
-	let changePasswordSuccess = $state(false);
-
-	// Use current user ID from auth store
-	let currentUserId = $derived(authStore.currentUser?.id);
-
-	// Initialize data when currentUserId becomes available
-	let initialized = $state(false);
-
+	// Initialize when user ID becomes available
 	$effect(() => {
-		if (currentUserId && !initialized) {
-			initialized = true;
-			loadUserProfile();
-			loadCredentials();
-			loadApiTokens();
+		if (currentUserId) {
+			securityStore.setCurrentUserId(currentUserId);
 		}
 	});
 
-	async function loadUserProfile() {
-		if (!currentUserId) return;
-		try {
-			loading = true;
-			user = await api.getUser(currentUserId);
-		} catch (err) {
-			errorToast(err.message || 'Failed to load user profile');
-		} finally {
-			loading = false;
-		}
-	}
-
-	async function loadCredentials() {
-		if (!currentUserId) return;
-		try {
-			credentials = await api.getUserCredentials(currentUserId);
-		} catch (err) {
-			console.warn('Failed to load credentials:', err);
-			credentials = [];
-		}
-	}
-
-	async function loadApiTokens() {
-		try {
-			apiTokens = await api.getApiTokens();
-		} catch (err) {
-			console.warn('Failed to load API tokens:', err);
-			apiTokens = [];
-		}
+	function dismissEnrollmentBanner() {
+		securityStore.dismissEnrollmentBanner();
+		navigate('/security');
 	}
 
 	// Security credential functions
 	async function startFIDORegistration() {
-		if (!currentUserId || !newCredentialName.trim()) return;
-
-		// Check WebAuthn support
 		if (!isWebAuthnSupported()) {
 			errorToast('WebAuthn is not supported by this browser');
 			return;
 		}
 
 		try {
-			enrollingFIDO = true;
+			const result = await securityStore.startFIDORegistration(
+				prepareCredentialCreationOptions,
+				processCredentialCreationResponse
+			);
 
-			// Start registration with server
-			const registrationData = await api.startFIDORegistration(currentUserId, newCredentialName.trim());
-
-			// Extract session ID and options
-			const sessionId = registrationData.sessionId;
-			const publicKeyOptions = registrationData.publicKey || registrationData.options || registrationData;
-
-			if (!publicKeyOptions || !publicKeyOptions.challenge) {
-				throw new Error('Invalid registration response from server');
-			}
-
-			// Prepare options for browser API
-			const credentialCreationOptions = prepareCredentialCreationOptions(publicKeyOptions);
-
-			// Create credential using browser API
-			const credential = await navigator.credentials.create(credentialCreationOptions);
-
-			// Process credential for server
-			const credentialResponse = processCredentialCreationResponse(credential);
-
-			// Complete registration with server
-			const completionData = {
-				sessionId: sessionId,
-				credentialName: newCredentialName.trim(),
-				response: credentialResponse
-			};
-
-			await api.completeFIDORegistration(currentUserId, completionData);
-			await loadCredentials();
-
-			// If this was an enrollment requirement, show success and clear banner
-			if (showEnrollmentBanner) {
+			if (result.wasEnrollmentRequired) {
 				successToast('Passkey registered successfully! Your account is now secured.');
-				dismissEnrollmentBanner();
 			}
-
-			newCredentialName = '';
-			showAddCredential = false;
 		} catch (err) {
-			console.error('FIDO registration error:', err);
 			errorToast(err.message || 'Failed to register security key');
-		} finally {
-			enrollingFIDO = false;
 		}
 	}
 
 	async function createSSHKey() {
-		if (!currentUserId || !newCredentialName.trim() || !newSSHPublicKey.trim()) return;
-		
 		try {
-			loading = true;
-			await api.createSSHKey(currentUserId, newCredentialName.trim(), newSSHPublicKey.trim());
-			await loadCredentials();
-			
-			newCredentialName = '';
-			newSSHPublicKey = '';
-			showAddCredential = false;
+			await securityStore.createSSHKey();
 		} catch (err) {
 			errorToast(err.message || 'Failed to add SSH key');
-		} finally {
-			loading = false;
 		}
 	}
 
 	function confirmRemoveCredential(credentialId, credentialName) {
-		confirmDialogConfig = {
-			title: 'Remove Security Credential',
-			message: `Are you sure you want to remove the security credential "${credentialName}"? This action cannot be undone.`,
-			action: () => removeCredential(credentialId)
-		};
-		showConfirmDialog = true;
-	}
-
-	async function removeCredential(credentialId) {
-		if (!currentUserId) return;
-		
-		try {
-			await api.removeUserCredential(currentUserId, credentialId);
-			await loadCredentials();
-		} catch (err) {
-			errorToast(err.message || 'Failed to remove credential');
-		}
-	}
-
-	// API token functions
-	async function createApiToken() {
-		if (!newTokenName.trim()) return;
-		
-		try {
-			creatingToken = true;
-			const tokenData = {
-				name: newTokenName.trim(),
-				permissions: newTokenScopes.length > 0 ? newTokenScopes : ['read'],
-				expires_at: newTokenExpiry || null
-			};
-			
-			const result = await api.createApiToken(tokenData);
-			newTokenValue = result.token;
-			showNewToken = true;
-			
-			await loadApiTokens();
-			resetTokenForm();
-		} catch (err) {
-			errorToast(err.message || 'Failed to create token');
-		} finally {
-			creatingToken = false;
-		}
+		securityStore.confirmRemoveCredential(credentialId, credentialName);
 	}
 
 	function confirmRevokeApiToken(tokenId, tokenName) {
-		confirmDialogConfig = {
-			title: 'Revoke API Token',
-			message: `Are you sure you want to revoke the token "${tokenName}"? This action cannot be undone and will immediately invalidate the token.`,
-			action: () => revokeApiToken(tokenId)
-		};
-		showConfirmDialog = true;
+		securityStore.confirmRevokeApiToken(tokenId, tokenName);
 	}
 
-	async function revokeApiToken(tokenId) {
+	async function createApiToken() {
 		try {
-			await api.revokeApiToken(tokenId);
-			await loadApiTokens();
+			await securityStore.createApiToken();
 		} catch (err) {
-			errorToast(err.message || 'Failed to revoke token');
+			errorToast(err.message || 'Failed to create token');
 		}
 	}
 
-	function resetTokenForm() {
-		newTokenName = '';
-		newTokenScopes = [];
-		newTokenExpiry = '';
-		showAddToken = false;
-	}
-
-	function resetCredentialForm() {
-		newCredentialName = '';
-		newSSHPublicKey = '';
-		credentialType = 'fido';
-		showAddCredential = false;
-	}
-
-	// Confirm dialog handlers
 	function handleConfirm() {
-		if (confirmDialogConfig.action) {
-			confirmDialogConfig.action();
-		}
-		showConfirmDialog = false;
+		securityStore.handleConfirmDialogConfirm();
 	}
 
 	function handleCancel() {
-		showConfirmDialog = false;
+		securityStore.handleConfirmDialogCancel();
 	}
 
 	async function handleChangePassword() {
-		changePasswordError = '';
-
-		// Validate passwords match
-		if (changePasswordData.new_password !== changePasswordData.confirm_password) {
-			changePasswordError = 'New passwords do not match';
-			return;
-		}
-
-		// Validate minimum length
-		if (changePasswordData.new_password.length < 8) {
-			changePasswordError = 'Password must be at least 8 characters';
-			return;
-		}
-
-		changePasswordLoading = true;
-		try {
-			await api.auth.changePassword({
-				current_password: changePasswordData.current_password,
-				new_password: changePasswordData.new_password,
-				logout_all: changePasswordData.logout_all
-			});
-			changePasswordSuccess = true;
-			// Reset form after brief delay
-			setTimeout(() => {
-				showChangePassword = false;
-				changePasswordSuccess = false;
-				changePasswordData = { current_password: '', new_password: '', confirm_password: '', logout_all: false };
-			}, 2000);
-		} catch (err) {
-			changePasswordError = err.message || 'Failed to change password';
-		} finally {
-			changePasswordLoading = false;
+		const result = await securityStore.changePassword();
+		if (!result.success && result.error) {
+			// Error is already stored in securityStore.changePasswordError
 		}
 	}
 
 	function cancelChangePassword() {
-		showChangePassword = false;
-		changePasswordError = '';
-		changePasswordData = { current_password: '', new_password: '', confirm_password: '', logout_all: false };
+		securityStore.closeChangePasswordModal();
 	}
 
 	function copyToClipboard(text) {
@@ -380,6 +176,30 @@
 		}
 	}
 
+	// Form value setters
+	function setCredentialType(value) {
+		securityStore.credentialType = value;
+	}
+
+	function setNewCredentialName(value) {
+		securityStore.newCredentialName = value;
+	}
+
+	function setNewSSHPublicKey(value) {
+		securityStore.newSSHPublicKey = value;
+	}
+
+	function setNewTokenName(value) {
+		securityStore.newTokenName = value;
+	}
+
+	function setNewTokenExpiry(value) {
+		securityStore.newTokenExpiry = value;
+	}
+
+	function setChangePasswordData(field, value) {
+		securityStore.changePasswordData[field] = value;
+	}
 </script>
 
 <div class="max-w-4xl mx-auto space-y-6">
@@ -414,7 +234,7 @@
 								variant="default"
 								size="small"
 								icon={Key}
-								onclick={() => { credentialType = 'fido'; showAddCredential = true; }}
+								onclick={() => { securityStore.credentialType = 'fido'; securityStore.showAddCredential = true; }}
 							>
 								Register Passkey Now
 							</Button>
@@ -439,7 +259,7 @@
 			{#snippet actions()}
 				<Button
 					variant="primary"
-					onclick={() => showAddCredential = true}
+					onclick={() => securityStore.showAddCredential = true}
 					icon={Plus}
 					size="medium"
 					keyboardHint="A"
@@ -490,7 +310,7 @@
 					<div class="font-medium" style="color: var(--ds-text);">Password</div>
 					<div class="text-sm" style="color: var(--ds-text-subtle);">Last updated: Unknown</div>
 				</div>
-				<Button variant="link" onclick={() => showChangePassword = true}>
+				<Button variant="link" onclick={() => securityStore.showChangePassword = true}>
 					Change Password
 				</Button>
 			</div>
@@ -503,7 +323,7 @@
 			{#snippet actions()}
 				<Button
 					variant="primary"
-					onclick={() => showAddToken = true}
+					onclick={() => securityStore.showAddToken = true}
 					icon={Plus}
 					size="medium"
 					keyboardHint="A"
@@ -541,7 +361,7 @@
 					<Button
 						variant="default"
 						size="small"
-						onclick={() => { showNewToken = false; newTokenValue = ''; }}
+						onclick={() => securityStore.closeNewTokenDisplay()}
 					>
 						{t('common.done')}
 					</Button>
@@ -584,7 +404,7 @@
 
 <!-- Confirm Dialog -->
 <ConfirmDialog
-	bind:show={showConfirmDialog}
+	show={showConfirmDialog}
 	title={confirmDialogConfig.title}
 	message={confirmDialogConfig.message}
 	variant="danger"
@@ -614,7 +434,8 @@
 					<input
 						id="current-password"
 						type="password"
-						bind:value={changePasswordData.current_password}
+						value={changePasswordData.current_password}
+						oninput={(e) => setChangePasswordData('current_password', e.target.value)}
 						class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 						style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
 						placeholder={t('placeholders.enterPassword')}
@@ -626,7 +447,8 @@
 					<input
 						id="new-password"
 						type="password"
-						bind:value={changePasswordData.new_password}
+						value={changePasswordData.new_password}
+						oninput={(e) => setChangePasswordData('new_password', e.target.value)}
 						class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 						style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
 						placeholder={t('placeholders.enterNewPassword')}
@@ -638,7 +460,8 @@
 					<input
 						id="confirm-password"
 						type="password"
-						bind:value={changePasswordData.confirm_password}
+						value={changePasswordData.confirm_password}
+						oninput={(e) => setChangePasswordData('confirm_password', e.target.value)}
 						class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 						style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
 						placeholder={t('placeholders.confirmNewPassword')}
@@ -649,7 +472,8 @@
 					<input
 						id="logout-all"
 						type="checkbox"
-						bind:checked={changePasswordData.logout_all}
+						checked={changePasswordData.logout_all}
+						onchange={(e) => setChangePasswordData('logout_all', e.target.checked)}
 						class="h-4 w-4 rounded"
 						style="accent-color: var(--ds-interactive);"
 					/>
@@ -674,7 +498,7 @@
 </Modal>
 
 <!-- Add Credential Modal -->
-<Modal isOpen={showAddCredential} onclose={resetCredentialForm} maxWidth="max-w-lg">
+<Modal isOpen={showAddCredential} onclose={() => securityStore.resetCredentialForm()} maxWidth="max-w-lg">
 	<div class="p-6">
 		<h3 class="text-xl font-semibold mb-6" style="color: var(--ds-text);">
 			Add Security Credential
@@ -688,8 +512,8 @@
 					<label class="flex items-center cursor-pointer">
 						<input
 							type="radio"
-							bind:group={credentialType}
-							value="fido"
+							checked={credentialType === 'fido'}
+							onchange={() => setCredentialType('fido')}
 							class="mr-2"
 						/>
 						<Key class="h-4 w-4 mr-2" />
@@ -698,8 +522,8 @@
 					<label class="flex items-center cursor-pointer">
 						<input
 							type="radio"
-							bind:group={credentialType}
-							value="ssh"
+							checked={credentialType === 'ssh'}
+							onchange={() => setCredentialType('ssh')}
 							class="mr-2"
 						/>
 						<Terminal class="h-4 w-4 mr-2" />
@@ -725,7 +549,8 @@
 				<input
 					id="credential-name"
 					type="text"
-					bind:value={newCredentialName}
+					value={newCredentialName}
+					oninput={(e) => setNewCredentialName(e.target.value)}
 					placeholder={credentialType === 'fido' ? 'e.g., YubiKey, iPhone Touch ID' : 'e.g., MacBook Pro, CI Server'}
 					class="w-full px-3 py-2 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
 					style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
@@ -737,7 +562,8 @@
 					<Label for="ssh-public-key" color="default" class="mb-1">Public Key</Label>
 					<Textarea
 						id="ssh-public-key"
-						bind:value={newSSHPublicKey}
+						value={newSSHPublicKey}
+						oninput={(e) => setNewSSHPublicKey(e.target.value)}
 						placeholder="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAA... or ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAA..."
 						rows={4}
 						class="font-mono text-sm"
@@ -762,7 +588,7 @@
 			</Button>
 			<Button
 				variant="default"
-				onclick={resetCredentialForm}
+				onclick={() => securityStore.resetCredentialForm()}
 				keyboardHint="Esc"
 			>
 				{t('common.cancel')}
@@ -772,7 +598,7 @@
 </Modal>
 
 <!-- Create Token Modal -->
-<Modal isOpen={showAddToken} onclose={resetTokenForm} maxWidth="max-w-md">
+<Modal isOpen={showAddToken} onclose={() => securityStore.resetTokenForm()} maxWidth="max-w-md">
 	<div class="p-6">
 		<h3 class="text-xl font-semibold mb-6" style="color: var(--ds-text);">
 			{t('security.createToken')}
@@ -784,7 +610,8 @@
 				<input
 					id="token-name"
 					type="text"
-					bind:value={newTokenName}
+					value={newTokenName}
+					oninput={(e) => setNewTokenName(e.target.value)}
 					placeholder="e.g., Mobile App, CI/CD Pipeline"
 					class="w-full px-3 py-2 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
 					style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
@@ -796,7 +623,8 @@
 				<input
 					id="token-expiry"
 					type="date"
-					bind:value={newTokenExpiry}
+					value={newTokenExpiry}
+					oninput={(e) => setNewTokenExpiry(e.target.value)}
 					min={new Date().toISOString().split('T')[0]}
 					class="w-full px-3 py-2 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
 					style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
@@ -816,7 +644,7 @@
 			</Button>
 			<Button
 				variant="default"
-				onclick={resetTokenForm}
+				onclick={() => securityStore.resetTokenForm()}
 				keyboardHint="Esc"
 			>
 				{t('common.cancel')}

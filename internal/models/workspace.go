@@ -20,6 +20,7 @@ type Workspace struct {
 	AvatarURL      *string   `json:"avatar_url,omitempty"`      // Custom avatar image URL
 	HomepageLayout *string   `json:"homepage_layout,omitempty"` // JSON object with sections and widgets
 	DefaultView    string    `json:"default_view,omitempty"`    // Default view when entering workspace (board, backlog, list, tree, map)
+	DisplayMode    string    `json:"display_mode,omitempty"`    // Display mode for workspace layout (default, board)
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 	// Joined fields for API responses
@@ -51,10 +52,11 @@ type WorkspaceWidget struct {
 
 // WorkspaceHomepageLayout represents the complete homepage layout structure
 type WorkspaceHomepageLayout struct {
-	Sections        []WorkspaceHomepageSection `json:"sections"`        // Sections on the homepage
-	Widgets         []WorkspaceWidget          `json:"widgets"`         // All widgets across all sections
-	Gradient        int                        `json:"gradient"`        // Selected gradient index (-1 = none, 0-17 = gradient index)
-	ApplyToAllViews bool                       `json:"applyToAllViews"` // If true, apply gradient to all workspace views
+	Sections           []WorkspaceHomepageSection `json:"sections"`                     // Sections on the homepage
+	Widgets            []WorkspaceWidget          `json:"widgets"`                      // All widgets across all sections
+	Gradient           int                        `json:"gradient"`                     // Selected gradient index (-1 = none, 0-17 = gradient index)
+	ApplyToAllViews    bool                       `json:"applyToAllViews"`              // If true, apply gradient to all workspace views
+	BackgroundImageURL string                     `json:"backgroundImageUrl,omitempty"` // Custom background image URL (takes priority over gradient)
 }
 
 // WorkspaceScreen represents a screen assignment for a workspace

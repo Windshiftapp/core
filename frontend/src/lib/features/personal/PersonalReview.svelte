@@ -2,43 +2,47 @@
   import { onMount } from 'svelte';
   import { api } from '../../api.js';
   import { authStore, uiStore } from '../../stores';
-  import { ChevronLeft, ChevronRight, Calendar, BookOpen, CheckSquare, Clock, Lightbulb, Maximize, Minimize, BookOpenCheck, FileEdit } from 'lucide-svelte';
+  import { ChevronLeft, ChevronRight, Calendar, BookOpen, Clock, Lightbulb, Maximize, Minimize, BookOpenCheck, FileEdit } from 'lucide-svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import Card from '../../components/Card.svelte';
+  import WorkItemRow from '../items/WorkItemRow.svelte';
   import { scale } from 'svelte/transition';
   import PageHeader from '../../layout/PageHeader.svelte';
-  import Textarea from '../../components/Textarea.svelte';
+  import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
+  import Button from '../../components/Button.svelte';
+  import { getShortcut, matchesShortcut, toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
 
-  // Props
-  export let currentUser = null;
+  // Props (Svelte 5)
+  let { currentUser = null } = $props();
 
-  // State
-  let currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-  let reviewType = localStorage.getItem('reviewType') || 'daily';
-  let reviewData = {
-    accomplishments: '',
-    went_well: '',
-    improvements: '',
-    mood: '',
-    tags: []
-  };
-  let completedItems = [];
-  let existingReview = null;
-  let loading = false;
-  let saving = false;
-  let autoSaveTimeout = null;
-  let reviewHistory = [];
-  let showHistory = false;
+  // State (Svelte 5)
+  let currentDate = $state(new Date().toISOString().split('T')[0]);
+  let reviewType = $state(localStorage.getItem('reviewType') || 'daily');
+  let reviewContent = $state('');
+  let completedItems = $state([]);
+  let itemTypes = $state([]);
+  let existingReview = $state(null);
+  let loading = $state(false);
+  let saving = $state(false);
+  let autoSaveTimeout = $state(null);
+  let reviewHistory = $state([]);
+  let showHistory = $state(false);
+  let previousContent = $state('');
+  let initialLoadDone = $state(false);
+
+  // Keyboard shortcut for save
+  const saveShortcut = getShortcut('description', 'save');
 
   // Calendar week calculation
   function getWeekDates(date) {
     const d = new Date(date);
     const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
     const monday = new Date(d.setDate(diff));
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
-    
+
     return {
       start: monday.toISOString().split('T')[0],
       end: sunday.toISOString().split('T')[0],
@@ -46,20 +50,32 @@
     };
   }
 
-  // Get prompts based on review type
-  function getPrompts() {
+  // Template for new reviews
+  function getDefaultTemplate() {
     if (reviewType === 'daily') {
-      return {
-        accomplishments: t('personal.whatAccomplished'),
-        went_well: t('personal.whatWentWell'),
-        improvements: t('personal.whatImprove')
-      };
+      return `## ${t('personal.whatAccomplished')}
+
+${t('personal.placeholderAccomplishments')}
+
+## ${t('personal.whatWentWell')}
+
+${t('personal.placeholderWentWell')}
+
+## ${t('personal.whatImprove')}
+
+${t('personal.placeholderImprovements')}`;
     } else {
-      return {
-        accomplishments: t('personal.weeklyAccomplishments'),
-        went_well: t('personal.weeklyChallenges'),
-        improvements: t('personal.weeklyPriorities')
-      };
+      return `## ${t('personal.weeklyAccomplishments')}
+
+...
+
+## ${t('personal.weeklyChallenges')}
+
+...
+
+## ${t('personal.weeklyPriorities')}
+
+...`;
     }
   }
 
@@ -72,19 +88,17 @@
       date.setDate(date.getDate() + (direction * 7));
     }
     currentDate = date.toISOString().split('T')[0];
-    loadReview();
   }
 
   function goToToday() {
     currentDate = new Date().toISOString().split('T')[0];
-    loadReview();
   }
 
   // Load completed items for the date range
   async function loadCompletedItems() {
     try {
       let startDate, endDate;
-      
+
       if (reviewType === 'daily') {
         startDate = endDate = currentDate;
       } else {
@@ -93,8 +107,12 @@
         endDate = week.end;
       }
 
-      const items = await api.reviews.getCompletedItems(startDate, endDate);
+      const [items, types] = await Promise.all([
+        api.reviews.getCompletedItems(startDate, endDate),
+        api.itemTypes.getAll()
+      ]);
       completedItems = items || [];
+      itemTypes = types || [];
     } catch (error) {
       console.error('Failed to load completed items:', error);
       completedItems = [];
@@ -105,10 +123,8 @@
   async function loadReview() {
     loading = true;
     try {
-      // Load completed items first
       await loadCompletedItems();
 
-      // Check for existing review
       const reviews = await api.reviews.getAll({
         type: reviewType,
         start_date: currentDate,
@@ -120,21 +136,22 @@
         existingReview = reviews[0];
         try {
           const data = JSON.parse(existingReview.review_data);
-          reviewData = {
-            accomplishments: data.accomplishments || '',
-            went_well: data.went_well || '',
-            improvements: data.improvements || '',
-            mood: data.mood || '',
-            tags: data.tags || []
-          };
+          // Support both old format (separate fields) and new format (single content)
+          if (data.content) {
+            reviewContent = data.content;
+          } else {
+            // Migrate old format to new
+            reviewContent = `## ${t('personal.whatAccomplished')}\n\n${data.accomplishments || ''}\n\n## ${t('personal.whatWentWell')}\n\n${data.went_well || ''}\n\n## ${t('personal.whatImprove')}\n\n${data.improvements || ''}`;
+          }
         } catch (e) {
           console.error('Failed to parse review data:', e);
-          resetReviewData();
+          reviewContent = getDefaultTemplate();
         }
       } else {
         existingReview = null;
-        resetReviewData();
+        reviewContent = getDefaultTemplate();
       }
+      previousContent = reviewContent;
     } catch (error) {
       console.error('Failed to load review:', error);
     } finally {
@@ -156,16 +173,6 @@
     }
   }
 
-  function resetReviewData() {
-    reviewData = {
-      accomplishments: '',
-      went_well: '',
-      improvements: '',
-      mood: '',
-      tags: []
-    };
-  }
-
   // Auto-save functionality
   function scheduleAutoSave() {
     if (autoSaveTimeout) {
@@ -173,20 +180,20 @@
     }
     autoSaveTimeout = setTimeout(() => {
       saveReview(true);
-    }, 2000); // Auto-save after 2 seconds of inactivity
+    }, 2000);
   }
 
   // Save review
   async function saveReview(isAutoSave = false) {
     if (saving) return;
-    
+
     saving = true;
     try {
       const payload = {
         review_date: currentDate,
         review_type: reviewType,
         review_data: JSON.stringify({
-          ...reviewData,
+          content: reviewContent,
           completed_items: completedItems.map(item => item.id),
           date: currentDate,
           week_start: reviewType === 'weekly' ? getWeekDates(currentDate).start : null
@@ -194,18 +201,12 @@
       };
 
       if (existingReview) {
-        // Update existing review
         const updated = await api.reviews.update(existingReview.id, {
           review_data: payload.review_data
         });
         existingReview = updated;
       } else {
-        // Create new review
         existingReview = await api.reviews.create(payload);
-      }
-
-      if (!isAutoSave) {
-        // Show success feedback for manual saves
       }
     } catch (error) {
       console.error('Failed to save review:', error);
@@ -217,19 +218,18 @@
   // Handle review type change
   function handleTypeChange() {
     localStorage.setItem('reviewType', reviewType);
-    loadReview();
     loadReviewHistory();
   }
 
   // Format date for display
-  function formatDisplayDate(dateStr = currentDate, type = reviewType) {
+  function formatDisplayDate(dateStr, type) {
     const date = new Date(dateStr);
     if (type === 'daily') {
-      return date.toLocaleDateString('en-US', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
+      return date.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
       });
     } else {
       return getWeekDates(dateStr).week;
@@ -240,7 +240,6 @@
   function goToHistoryDate(historyItem) {
     currentDate = historyItem.review_date;
     reviewType = historyItem.review_type;
-    loadReview();
     showHistory = false;
   }
 
@@ -256,23 +255,43 @@
     }
   }
 
+  // Keyboard shortcut handler
+  function handleKeydown(event) {
+    if (matchesShortcut(event, saveShortcut)) {
+      event.preventDefault();
+      saveReview(false);
+    }
+  }
+
+  // Derived values (Svelte 5)
+  const displayDate = $derived(formatDisplayDate(currentDate, reviewType));
+
+  // Effects (Svelte 5)
+  $effect(() => {
+    // Track dependencies and reload when they change
+    const type = reviewType;
+    const date = currentDate;
+    loadReview();
+  });
+
+  // Track content changes for auto-save
+  $effect(() => {
+    const content = reviewContent;
+    if (initialLoadDone && content !== previousContent && !loading) {
+      previousContent = content;
+      scheduleAutoSave();
+    }
+  });
+
   // Initialize
   onMount(() => {
     authStore.subscribe(auth => {
       currentUser = auth.user;
     });
-    
-    loadReview();
-    loadReviewHistory();
-  });
 
-  // Reactive statements
-  $: if (reviewType || currentDate) {
-    loadReview();
-  }
-  
-  // Reactive date display update
-  $: displayDate = formatDisplayDate(currentDate, reviewType);
+    loadReviewHistory();
+    initialLoadDone = true;
+  });
 </script>
 
 <div class="p-6" style="background-color: var(--ds-surface); min-height: 100vh;" onclick={handleClickOutside}>
@@ -295,7 +314,6 @@
           <input
             type="date"
             bind:value={currentDate}
-            onchange={loadReview}
             class="text-sm border-none bg-transparent cursor-pointer rounded px-2 py-1 transition-colors"
             style="color: var(--ds-text-subtle); hover:background-color: var(--ds-background-neutral-hovered);"
           />
@@ -405,7 +423,9 @@
       <!-- Completed Items -->
       <div>
         <div class="flex items-center space-x-3 mb-8">
-          <BookOpenCheck class="w-5 h-5" style="color: var(--ds-text-success);" />
+          <div class="w-7 h-7 rounded-md flex items-center justify-center" style="background-color: var(--ds-accent-purple);">
+            <BookOpenCheck class="w-4 h-4" style="color: white;" />
+          </div>
           <h2 class="text-xl font-light" style="color: var(--ds-text);">
             {reviewType === 'daily' ? t('personal.completedToday') : t('personal.completedThisWeek')}
           </h2>
@@ -413,7 +433,7 @@
             {completedItems.length}
           </span>
         </div>
-          
+
         {#if loading}
           <div class="text-center py-8">
             <div class="animate-spin w-6 h-6 border-2 border-t-transparent rounded-full mx-auto" style="border-color: var(--ds-background-brand); border-top-color: transparent;"></div>
@@ -425,88 +445,54 @@
             title={reviewType === 'daily' ? t('personal.noCompletedItemsDay') : t('personal.noCompletedItemsWeek')}
           />
         {:else}
-          <div class="space-y-4">
+          <div class="space-y-2">
             {#each completedItems as item (item.id)}
-              <div class="flex items-start space-x-4 py-3" transition:scale>
-                <CheckSquare class="w-4 h-4 mt-1 flex-shrink-0" style="color: var(--ds-text-success);" />
-                <div class="flex-1 min-w-0">
-                  <p class="font-medium" style="color: var(--ds-text);">{item.title}</p>
-                  <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-                    {item.workspace_name} • {new Date(item.completed_at || item.updated_at).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
+              <WorkItemRow {item} {itemTypes} showWorkspace={true} />
             {/each}
           </div>
         {/if}
       </div>
 
-        <!-- Reflection Questions -->
-        <div>
-          <div class="flex items-center space-x-3 mb-8">
-            <Lightbulb class="w-5 h-5" style="color: var(--ds-text-warning);" />
-            <h2 class="text-xl font-light" style="color: var(--ds-text);">{t('personal.reflection')}</h2>
-            {#if saving}
-              <div class="flex items-center space-x-2 text-sm" style="color: var(--ds-text-subtle);">
-                <div class="animate-spin w-4 h-4 border-2 border-t-transparent rounded-full" style="border-color: var(--ds-text-subtle); border-top-color: transparent;"></div>
-                <span>{t('common.saving')}</span>
-              </div>
-            {/if}
+      <!-- Reflection Section with Single Editor -->
+      <Card variant="raised" padding="spacious" shadow={true}>
+        <div class="flex items-center space-x-3 mb-6">
+          <div class="w-7 h-7 rounded-md flex items-center justify-center" style="background-color: var(--ds-accent-teal);">
+            <Lightbulb class="w-4 h-4" style="color: white;" />
           </div>
-
-          <div class="space-y-12">
-            <!-- Accomplishments -->
-            <div>
-              <label class="block text-sm font-light mb-4" style="color: var(--ds-text-subtle);">
-                {getPrompts().accomplishments}
-              </label>
-              <Textarea
-                bind:value={reviewData.accomplishments}
-                oninput={scheduleAutoSave}
-                class="h-32 border-0"
-                placeholder={t('personal.placeholderAccomplishments')}
-              />
+          <h2 class="text-xl font-light" style="color: var(--ds-text);">{t('personal.reflection')}</h2>
+          {#if saving}
+            <div class="flex items-center space-x-2 text-sm" style="color: var(--ds-text-subtle);">
+              <div class="animate-spin w-4 h-4 border-2 border-t-transparent rounded-full" style="border-color: var(--ds-text-subtle); border-top-color: transparent;"></div>
+              <span>{t('common.saving')}</span>
             </div>
-
-            <!-- What Went Well -->
-            <div>
-              <label class="block text-sm font-light mb-4" style="color: var(--ds-text-subtle);">
-                {getPrompts().went_well}
-              </label>
-              <Textarea
-                bind:value={reviewData.went_well}
-                oninput={scheduleAutoSave}
-                class="h-32 border-0"
-                placeholder={t('personal.placeholderWentWell')}
-              />
-            </div>
-
-            <!-- Improvements -->
-            <div>
-              <label class="block text-sm font-light mb-4" style="color: var(--ds-text-subtle);">
-                {getPrompts().improvements}
-              </label>
-              <Textarea
-                bind:value={reviewData.improvements}
-                oninput={scheduleAutoSave}
-                class="h-32 border-0"
-                placeholder={t('personal.placeholderImprovements')}
-              />
-            </div>
-
-            <!-- Save Button -->
-            <div class="flex justify-end pt-8">
-              <button
-                onclick={() => saveReview(false)}
-                disabled={saving}
-                class="px-8 py-3 rounded font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                style="background-color: var(--ds-background-brand); color: var(--ds-text-on-brand);"
-              >
-                {saving ? t('common.saving') : t('personal.saveReview')}
-              </button>
-            </div>
-          </div>
+          {/if}
         </div>
-      </div>
+
+        <div onkeydown={handleKeydown} class="review-editor-container">
+          <MilkdownEditor
+            bind:content={reviewContent}
+            placeholder={t('personal.startWriting')}
+            showToolbar={true}
+          />
+        </div>
+
+        <div class="flex justify-end pt-6">
+          <Button
+            onclick={() => saveReview(false)}
+            disabled={saving}
+            variant="primary"
+            hotkeyConfig={{ key: toHotkeyString('description', 'save') }}
+          >
+            {saving ? t('common.saving') : t('personal.saveReview')}
+          </Button>
+        </div>
+      </Card>
     </div>
   </div>
+</div>
+
+<style>
+  :global(.review-editor-container .milkdown-editor .milkdown) {
+    min-height: 300px;
+  }
+</style>

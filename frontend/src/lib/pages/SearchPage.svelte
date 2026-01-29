@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import { Search, Calendar, User, Eye, Edit, Trash2, MoreHorizontal, Building, AlertCircle } from 'lucide-svelte';
+  import { Search, Calendar, User, Eye, Trash2, MoreHorizontal, Building, AlertCircle } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import WorkItemFilter from '../features/items/WorkItemFilter.svelte';
@@ -53,11 +53,6 @@
     window.location.href = `/workspaces/${item.workspace_id}/items/${item.id}`;
   }
 
-  function editItem(item) {
-    // Navigate to item edit page
-    window.location.href = `/workspaces/${item.workspace_id}/items/${item.id}`;
-  }
-
   async function deleteItem(item) {
     if (!confirm(t('dialogs.confirmations.deleteItem', { name: item.title }))) {
       return;
@@ -81,13 +76,6 @@
         icon: Eye,
         title: t('common.viewDetails'),
         onClick: () => viewItem(item)
-      },
-      {
-        id: 'edit',
-        type: 'regular',
-        icon: Edit,
-        title: t('common.edit'),
-        onClick: () => editItem(item)
       },
       { type: 'divider' },
       {

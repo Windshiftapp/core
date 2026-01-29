@@ -3,10 +3,9 @@
   import { useEventListener } from 'runed';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
-  import { workspacePermissions } from '../../stores';
+  import { workspacePermissions, itemDetailStore } from '../../stores';
   import { t } from '../../stores/i18n.svelte.js';
-  import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
-  import { install, uninstall } from '@github/hotkey';
+  import { toHotkeyString, getShortcut, matchesShortcut, isTypingInField } from '../../utils/keyboardShortcuts.js';
   import { Trash2, FileText, AlertCircle, X, Maximize2, Minimize2, Copy } from 'lucide-svelte';
   import { scale, fly } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
@@ -14,38 +13,29 @@
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { addToast, successToast, errorToast } from '../../stores/toasts.svelte.js';
-  import {
-    activeTimer,
-    canStartTimer,
-    canStopTimer,
-    timerSyncing,
-    start as startTimerAction,
-    initialize as initializeTimer,
-    cleanup as cleanupTimer,
-    getCurrentTimer
-  } from '../../stores/timerStore.js';
+  import { timerStore } from '../../stores/timerStore.svelte.js';
   import { useItemAttachments } from '../../composables/useItemAttachments.svelte.js';
   import { createEventDispatcher } from 'svelte';
-import { 
-    registerContextCommands, 
-    unregisterContextCommands, 
+import {
+    registerContextCommands,
+    unregisterContextCommands,
     createContextCommand,
-    COMMAND_PRIORITIES 
+    COMMAND_PRIORITIES
   } from '../../utils/contextCommands.js';
 import Modal from '../../dialogs/Modal.svelte';
 import DeleteItemDialog from '../../dialogs/DeleteItemDialog.svelte';
 import LinkItemModal from '../../dialogs/LinkItemModal.svelte';
-  
+
   const dispatch = createEventDispatcher();
-  
+
   // Import the shared content component
   import ItemDetailContent from '../items/ItemDetailContent.svelte';
 import TimeLogModal from '../../dialogs/TimeLogModal.svelte';
 import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
-  
+
   // Use centralized icon map for work item types
   const iconMap = itemTypeIconMap;
-  
+
   let {
     workspaceId,
     itemId,
@@ -64,89 +54,89 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     (title, message) => errorToast(message, title)
   );
 
-  // All component state variables...
-  let item = $state(null);
-  let workspace = $state(null);
-  let parentHierarchy = $state([]);
-  let milestones = $state([]);
-  let iterations = $state([]);
-  let priorities = $state([]);
-  let customFieldDefinitions = $state([]);
-  let workspaceScreenFields = $state([]);
-  let workspaceScreenSystemFields = $state([]);
-  let loading = $state(true);
-  let error = $state(null);
-  let saving = $state(false);
+  // Bind to store values using $derived
+  let item = $derived(itemDetailStore.item);
+  let workspace = $derived(itemDetailStore.workspace);
+  let parentHierarchy = $derived(itemDetailStore.parentHierarchy);
+  let milestones = $derived(itemDetailStore.milestones);
+  let iterations = $derived(itemDetailStore.iterations);
+  let priorities = $derived(itemDetailStore.priorities);
+  let customFieldDefinitions = $derived(itemDetailStore.customFieldDefinitions);
+  let workspaceScreenFields = $derived(itemDetailStore.workspaceScreenFields);
+  let workspaceScreenSystemFields = $derived(itemDetailStore.workspaceScreenSystemFields);
+  let loading = $derived(itemDetailStore.loading);
+  let error = $derived(itemDetailStore.error);
+  let saving = $derived(itemDetailStore.saving);
 
   // Modal state
-  let isFullscreen = $state(false);
+  let isFullscreen = $derived(itemDetailStore.isFullscreen);
   let modalElement = $state(null);
 
-  // All other state variables...
-  let editingTitle = $state(false);
-  let editTitle = $state('');
-  let dropdownItems = $state([]);
-  let editingDescription = $state(false);
-  let editDescription = $state('');
-  let editingStatus = $state(false);
+  // Editing state - derive from store's unified editing object
+  let editingTitle = $derived(itemDetailStore.editing.title.active);
+  let editTitle = $derived(itemDetailStore.editing.title.value);
+  let dropdownItems = $derived(itemDetailStore.dropdownItems);
+  let editingDescription = $derived(itemDetailStore.editing.description.active);
+  let editDescription = $derived(itemDetailStore.editing.description.value);
+  let editingStatus = $derived(itemDetailStore.editing.status.active);
   let editStatus = $state('');
-  let editingPriority = $state(false);
-  let editingDueDate = $state(false);
+  let editingPriority = $derived(itemDetailStore.editing.priority.active);
+  let editingDueDate = $derived(itemDetailStore.editing.dueDate.active);
   let editPriority = $state('');
-  let editingMilestone = $state(false);
-  let editMilestone = $state(null);
-  let editingIteration = $state(false);
-  let editIteration = $state(null);
-  let editingProject = $state(false);
-  let editProject = $state(null);
-  let editingAssignee = $state(false);
-  let editAssignee = $state(null);
-  let editingCustomFields = $state({});
-  let editCustomFieldValues = $state({});
-  let itemLinks = $state([]);
-  let linkTypes = $state([]);
-  let loadingLinks = $state(false);
-  let showLinkModal = $state(false);
+  let editingMilestone = $derived(itemDetailStore.editing.milestone.active);
+  let editMilestone = $derived(itemDetailStore.editing.milestone.value);
+  let editingIteration = $derived(itemDetailStore.editing.iteration.active);
+  let editIteration = $derived(itemDetailStore.editing.iteration.value);
+  let editingProject = $derived(itemDetailStore.editing.project.active);
+  let editProject = $derived(itemDetailStore.editing.project.value);
+  let editingAssignee = $derived(itemDetailStore.editing.assignee.active);
+  let editAssignee = $derived(itemDetailStore.editing.assignee.value);
+  let editingCustomFields = $derived(itemDetailStore.editing.customFields.active);
+  let editCustomFieldValues = $derived(itemDetailStore.editing.customFields.values);
+  let itemLinks = $derived(itemDetailStore.itemLinks);
+  let linkTypes = $derived(itemDetailStore.linkTypes);
+  let loadingLinks = $derived(itemDetailStore.loadingLinks);
+  let showLinkModal = $derived(itemDetailStore.showLinkModal);
   const TEST_LINK_TYPE_ID = 1;
-  let showTestCaseModal = $state(false);
-  let selectedTestCaseId = $state(null);
+  let showTestCaseModal = $derived(itemDetailStore.showTestCaseModal);
+  let selectedTestCaseId = $derived(itemDetailStore.selectedTestCaseId);
 
   // Delete dialog state
-  let showDeleteDialog = $state(false);
+  let showDeleteDialog = $derived(itemDetailStore.showDeleteDialog);
 
   // Filter link types for item → item linking
   // The "Tests" link type (ID=1) can only link between items and test cases
-  let filteredLinkTypes = $derived(linkTypes);
+  let filteredLinkTypes = $derived(itemDetailStore.filteredLinkTypes);
 
-  let currentItemType = $state(null);
-  let currentHierarchyLevel = $state(null);
-  let availableSubIssueTypes = $state([]);
-  let isWatching = $state(false);
-  let loadingWatchStatus = $state(false);
-  let childItems = $state([]);
-  let loadingChildItems = $state(false);
-  let itemTypes = $state([]);
-  let timeProjects = $state([]);
-  let timeWorklogs = $state([]);
-  let showTimeLogModal = $state(false);
-  let editingWorklog = $state(null);
-  let workItems = $state([]);
-  let customers = $state([]);
-  let workspaces = $state([]);
+  let currentItemType = $derived(itemDetailStore.currentItemType);
+  let currentHierarchyLevel = $derived(itemDetailStore.currentHierarchyLevel);
+  let availableSubIssueTypes = $derived(itemDetailStore.availableSubIssueTypes);
+  let isWatching = $derived(itemDetailStore.isWatching);
+  let loadingWatchStatus = $derived(itemDetailStore.loadingWatchStatus);
+  let childItems = $derived(itemDetailStore.childItems);
+  let loadingChildItems = $derived(itemDetailStore.loadingChildItems);
+  let itemTypes = $derived(itemDetailStore.itemTypes);
+  let timeProjects = $derived(itemDetailStore.timeProjects);
+  let timeWorklogs = $derived(itemDetailStore.timeWorklogs);
+  let showTimeLogModal = $derived(itemDetailStore.showTimeLogModal);
+  let editingWorklog = $derived(itemDetailStore.editingWorklog);
+  let workItems = $derived(itemDetailStore.workItems);
+  let customers = $derived(itemDetailStore.customers);
+  let workspaces = $derived(itemDetailStore.workspaces);
 
   // Diagrams
-  let diagrams = $state([]);
-  let loadingDiagrams = $state(false);
+  let diagrams = $derived(itemDetailStore.diagrams);
+  let loadingDiagrams = $derived(itemDetailStore.loadingDiagrams);
 
   // Manual actions
-  let manualActions = $state([]);
+  let manualActions = $derived(itemDetailStore.manualActions);
 
   // Status transition lazy loading
-  let availableStatusTransitions = $state([]);
-  let loadingStatusTransitions = $state(false);
+  let availableStatusTransitions = $derived(itemDetailStore.availableStatusTransitions);
+  let loadingStatusTransitions = $derived(itemDetailStore.loadingStatusTransitions);
 
   // Track if any changes were made
-  let hasChanges = $state(false);
+  let hasChanges = $derived(itemDetailStore.hasChanges);
 
   // Track itemId changes for reactivity
   let previousItemId = $state(itemId);
@@ -155,79 +145,26 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   let isStartingTimer = $state(false);
 
   // Animation state for smooth transitions
-  let transitioning = $state(false);
+  let transitioning = $derived(itemDetailStore.transitioning);
   
   // Status options are loaded dynamically from the API
   // No hardcoded defaults - backend returns all statuses with category colors
   // Priority options are now loaded dynamically via PriorityPicker component
 
-  // All functions for data loading and management...
-  // Lazy load status transitions for the current item
-  async function loadAvailableStatusTransitions() {
-    if (!item?.id || loadingStatusTransitions) {
-      return;
-    }
-
-    try {
-      loadingStatusTransitions = true;
-      const result = await api.items.getAvailableStatusTransitions(item.id);
-      availableStatusTransitions = result.available_transitions || [];
-    } catch (error) {
-      console.error('Failed to load status transitions:', error);
-      availableStatusTransitions = [];
-    } finally {
-      loadingStatusTransitions = false;
-    }
-  }
-
-  async function loadPriorities() {
-    if (!workspace) return;
-
-    try {
-      if (workspace.configuration_set_id) {
-        // Load priorities from configuration set
-        const configSet = await api.configurationSets.get(workspace.configuration_set_id);
-        priorities = configSet.priorities_detailed || [];
-      } else {
-        // No configuration set - load all priorities
-        priorities = await api.priorities.getAll();
-      }
-
-      // Sort by sort_order
-      priorities = priorities.sort((a, b) => a.sort_order - b.sort_order);
-    } catch (err) {
-      console.error('Failed to load priorities:', err);
-      priorities = [];
-    }
-  }
-
-  // Reactive status options based on loaded transitions
-  let statusOptions = $derived.by(() => {
-    // If transitions are loaded, use them
-    if (availableStatusTransitions.length > 0) {
-      return availableStatusTransitions.map(transition => ({
-        id: transition.id,
-        value: transition.value,
-        label: transition.name,
-        categoryColor: transition.category_color || null
-      }));
-    }
-
-    // Return loading state or empty array
-    return loadingStatusTransitions ? [{ value: '', label: t('common.loading') }] : [];
-  });
+  // Status options derived from store
+  let statusOptions = $derived(itemDetailStore.statusOptions);
 
   // Modal control functions
   function closeModal() {
     if (isModal && onclose) {
-      onclose({ hasChanges });
+      onclose({ hasChanges: itemDetailStore.hasChanges });
     } else if (!isModal) {
       navigate(`/workspaces/${workspaceId}`);
     }
   }
 
   function toggleFullscreen() {
-    isFullscreen = !isFullscreen;
+    itemDetailStore.toggleFullscreen();
   }
 
   // Handle Escape key manually (needs complex modal/editing state checks)
@@ -245,35 +182,47 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     }
   });
 
-  // Install @github/hotkey bindings for F and W shortcuts on the container element
-  $effect(() => {
-    if (!modalElement) return;
-    const keys = [
-      toHotkeyString('itemDetail', 'fullscreen'),
-      toHotkeyString('itemDetail', 'createChild')
-    ].join(',');
-    install(modalElement, keys);
-    return () => uninstall(modalElement);
-  });
+  // Handle global keyboard shortcuts for item detail
+  useEventListener(() => document, 'keydown', (e) => {
+    // Only handle if item is loaded
+    if (!item) return;
 
-  // Handle hotkey-fire events from @github/hotkey
-  useEventListener(() => modalElement, 'hotkey-fire', (e) => {
-    e.preventDefault(); // Don't click() the container div
-    const path = e.detail?.path;
-    if (path === toHotkeyString('itemDetail', 'fullscreen')) {
-      handleHotkeyF();
-    } else if (path === toHotkeyString('itemDetail', 'createChild')) {
+    // Don't trigger when typing in input fields
+    if (isTypingInField(e)) return;
+
+    // F - Focus status field
+    if (matchesShortcut(e, getShortcut('itemDetail', 'focusStatus'))) {
+      e.preventDefault();
+      handleFocusStatus();
+      return;
+    }
+
+    // Shift+F - Fullscreen toggle / open full details
+    if (matchesShortcut(e, getShortcut('itemDetail', 'fullscreen'))) {
+      e.preventDefault();
+      handleHotkeyFullscreen();
+      return;
+    }
+
+    // Shift+W - Create child work item
+    if (matchesShortcut(e, getShortcut('itemDetail', 'createChild'))) {
+      e.preventDefault();
       if (availableSubIssueTypes?.length) handleHotkeyW();
+      return;
     }
   });
 
-  function handleHotkeyF() {
+  function handleHotkeyFullscreen() {
     if (isModal) {
       openFullDetails();
     } else {
-      editingCustomFields = {};
-      editingStatus = true;
+      toggleFullscreen();
     }
+  }
+
+  function handleFocusStatus() {
+    // Focus the status field by starting edit mode
+    itemDetailStore.startEditing('status');
   }
 
   function handleHotkeyW() {
@@ -398,249 +347,29 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   }
 
   async function saveField(field, directValue = null, assigneeName = null, iterationName = null) {
-    if (saving) return;
-    
     try {
-      saving = true;
-      let updateData = {};
-      
-      if (field === 'title') {
-        const newTitle = directValue || editTitle.trim();
-        if (newTitle === item.title) {
-          cancelEdit('title');
-          return;
-        }
-        updateData.title = newTitle;
-      } else if (field === 'description') {
-        const newDescription = directValue !== null ? directValue : editDescription;
-        if (newDescription === (item.description || '')) {
-          cancelEdit('description');
-          return;
-        }
-        updateData.description = newDescription;
-      } else if (field === 'status') {
-        const newStatus = directValue || editStatus;
-        if (newStatus === item.status) {
-          cancelEdit('status');
-          return;
-        }
-        updateData.status = newStatus;
-      } else if (field === 'status_id') {
-        const newStatusId = directValue !== null ? directValue : null;
-        if (newStatusId === item.status_id) {
-          cancelEdit('status_id');
-          return;
-        }
-        updateData.status_id = newStatusId;
-
-        // Optimistic update - update UI immediately
-        item = {
-          ...item,
-          status_id: newStatusId
-        };
-      } else if (field === 'priority') {
-        const newPriority = directValue || editPriority;
-        if (newPriority === item.priority) {
-          cancelEdit('priority');
-          return;
-        }
-        updateData.priority = newPriority;
-      } else if (field === 'priority_id') {
-        const newPriorityId = directValue !== null ? directValue : null;
-        if (newPriorityId === item.priority_id) {
-          cancelEdit('priority_id');
-          return;
-        }
-        updateData.priority_id = newPriorityId;
-
-        // Optimistic update - update UI immediately
-        item = {
-          ...item,
-          priority_id: newPriorityId
-        };
-      } else if (field === 'due_date') {
-        const newDueDate = directValue !== null ? directValue : null;
-        if (newDueDate === item.due_date) {
-          cancelEdit('due_date');
-          return;
-        }
-        updateData.due_date = newDueDate;
-
-        // Optimistic update - update UI immediately
-        item = {
-          ...item,
-          due_date: newDueDate
-        };
-      } else if (field === 'milestone') {
-        const newMilestone = directValue !== null ? directValue : editMilestone;
-        if (newMilestone === item.milestone_id) {
-          cancelEdit('milestone');
-          return;
-        }
-        updateData.milestone_id = newMilestone;
-
-        // Optimistic update - update UI immediately
-        item = {
-          ...item,
-          milestone_id: newMilestone
-        };
-      } else if (field === 'iteration') {
-        const newIteration = directValue !== null ? directValue : null;
-        if (newIteration === item.iteration_id) {
-          return;
-        }
-        updateData.iteration_id = newIteration;
-
-        // Optimistic update - update UI immediately
-        item = {
-          ...item,
-          iteration_id: newIteration,
-          iteration_name: iterationName !== undefined ? iterationName : item.iteration_name
-        };
-      } else if (field === 'project') {
-        const newProject = directValue !== null ? directValue : editProject;
-        // Handle object value with project_id and inherit_project
-        if (typeof newProject === 'object' && newProject !== null) {
-          updateData.project_id = newProject.project_id;
-          updateData.inherit_project = newProject.inherit_project;
-
-          // Optimistic update - update UI immediately
-          item = {
-            ...item,
-            project_id: newProject.project_id,
-            inherit_project: newProject.inherit_project
-          };
-        } else {
-          // Fallback for old format
-          if (newProject === item.project_id) {
-            cancelEdit('project');
-            return;
-          }
-          updateData.project_id = newProject;
-
-          // Optimistic update - update UI immediately
-          item = {
-            ...item,
-            project_id: newProject
-          };
-        }
-      } else if (field === 'assignee') {
-        const newAssignee = directValue !== undefined ? directValue : editAssignee;
-        if (newAssignee === item.assignee_id) {
-          cancelEdit('assignee');
-          return;
-        }
-        updateData.assignee_id = newAssignee;
-
-        // Optimistic update - update UI immediately
-        item = {
-          ...item,
-          assignee_id: newAssignee,
-          assignee_name: assigneeName !== undefined ? assigneeName : item.assignee_name
-        };
-      } else if (field.startsWith('custom_field_')) {
-        const fieldId = field.replace('custom_field_', '');
-        let newValue = directValue !== null ? directValue : editCustomFieldValues[fieldId];
-        const currentValue = item.custom_field_values?.[fieldId] || '';
-        
-        // Convert number fields to actual numbers
-        const fieldDef = customFieldDefinitions.find(field => field.id === parseInt(fieldId));
-        if (fieldDef && fieldDef.field_type === 'number' && newValue !== null && newValue !== undefined && newValue !== '') {
-          newValue = parseFloat(newValue);
-          // If parsing failed, keep as string or handle as needed
-          if (isNaN(newValue)) {
-            newValue = directValue !== null ? directValue : editCustomFieldValues[fieldId];
-          }
-        }
-        
-        if (newValue === currentValue) {
-          cancelEdit(field);
-          return;
-        }
-        
-        // Update custom field values
-        updateData.custom_field_values = {
-          ...(item.custom_field_values || {}),
-          [fieldId]: newValue
-        };
-      }
-
-      // Update item via API
-      const updatedItem = await api.items.update(item.id, updateData);
-      
-      // Update local item data
-      item = { ...item, ...updatedItem };
-      
-      // For assignee field, also update the assignee name if provided
-      if (field === 'assignee' && assigneeName !== null) {
-        item = { ...item, assignee_name: assigneeName };
-      }
-
-      // For iteration field, also update the iteration name if provided
-      if (field === 'iteration' && iterationName !== undefined) {
-        item = { ...item, iteration_name: iterationName };
-      }
-
-      // Mark that changes were made
-      hasChanges = true;
-      
-      // Exit editing mode
-      cancelEdit(field);
-      
+      await itemDetailStore.saveField(field, directValue, assigneeName, iterationName);
     } catch (err) {
       console.error('Failed to update item:', err);
       showError('Failed to update item', err.message || String(err));
-    } finally {
-      saving = false;
     }
   }
 
   function cancelEdit(field) {
-    
-    if (field === 'title') {
-      editingTitle = false;
-      editTitle = item?.title || ''; // Reset to original item title
-    } else if (field === 'description') {
-      editingDescription = false;
-      // Force reactivity by creating a new reference
-      editDescription = String(item?.description || '');
-    } else if (field === 'status' || field === 'status_id') {
-      editingStatus = false;
-      editStatus = '';
-    } else if (field === 'priority' || field === 'priority_id') {
-      editingPriority = false;
-      editPriority = '';
-    } else if (field === 'due_date') {
-      editingDueDate = false;
-    } else if (field === 'milestone') {
-      editingMilestone = false;
-      editMilestone = null;
-    } else if (field === 'iteration') {
-      editingIteration = false;
-      editIteration = null;
-    } else if (field === 'project') {
-      editingProject = false;
-      editProject = null;
-    } else if (field === 'assignee') {
-      editingAssignee = false;
-      editAssignee = null;
-    } else if (field.startsWith('custom_field_')) {
-      const fieldId = field.replace('custom_field_', '');
-      delete editingCustomFields[fieldId];
-      delete editCustomFieldValues[fieldId];
-      editingCustomFields = { ...editingCustomFields }; // Trigger reactivity
-    }
+    // Map legacy field names to store field names
+    let storeField = field;
+    if (field === 'status_id') storeField = 'status';
+    if (field === 'priority_id') storeField = 'priority';
+    if (field === 'due_date') storeField = 'dueDate';
+
+    itemDetailStore.cancelEditing(storeField);
   }
   
   function handleStartEditingCustomField(event) {
     const fieldId = event.detail.fieldId;
     // Cancel assignee editing when starting to edit a custom field
-    editingAssignee = false;
-    editingCustomFields[fieldId] = true;
-    // Use nullish coalescing to preserve 0 values for number fields
-    const currentValue = item.custom_field_values?.[fieldId];
-    editCustomFieldValues[fieldId] = currentValue !== null && currentValue !== undefined ? currentValue : '';
-    editingCustomFields = { ...editingCustomFields }; // Trigger reactivity
+    itemDetailStore.cancelEditing('assignee');
+    itemDetailStore.startEditing(`custom_field_${fieldId}`);
   }
   
   function handleSwitchTab(event) {
@@ -654,27 +383,18 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   }
 
   function handleShowLinkModal() {
-    showLinkModal = true;
+    itemDetailStore.openLinkModal();
   }
 
   function handleLinkModalCancel() {
-    showLinkModal = false;
+    itemDetailStore.closeLinkModal();
   }
 
   async function handleLinkCreated(event) {
     const { link_type_id, target_id, target_type } = event.detail;
 
     try {
-      await api.links.create({
-        source_type: "item",
-        source_id: parseInt(itemId),
-        target_type: target_type || "item",
-        target_id: parseInt(target_id),
-        link_type_id: parseInt(link_type_id)
-      });
-
-      // Reload links
-      await loadData();
+      await itemDetailStore.createLink(link_type_id, target_id, target_type);
     } catch (error) {
       console.error('Error creating link:', error);
       showError('Failed to create link', error.message || 'Unknown error');
@@ -689,21 +409,18 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
       console.warn('Received invalid test case ID from link:', testCaseId);
       return;
     }
-    selectedTestCaseId = normalizedId;
-    showTestCaseModal = true;
+    itemDetailStore.openTestCaseModal(normalizedId);
   }
 
   function handleCloseTestCaseModal() {
-    showTestCaseModal = false;
-    selectedTestCaseId = null;
+    itemDetailStore.closeTestCaseModal();
   }
 
   async function handleRemoveLink(event) {
     const { linkId } = event.detail;
-    
+
     try {
-      await api.links.delete(linkId);
-      await loadData(); // Reload to refresh links
+      await itemDetailStore.removeLink(linkId);
     } catch (error) {
       console.error('Error removing link:', error);
     }
@@ -711,44 +428,50 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 
   function handleStartEditingAssignee() {
     // Cancel all custom field editing when starting to edit assignee
-    editingCustomFields = {};
-    editingAssignee = true;
+    itemDetailStore.editing.customFields.active = {};
+    itemDetailStore.startEditing('assignee');
   }
 
   function handleStartEditingMilestone() {
     // Cancel all custom field editing when starting to edit milestone
-    editingCustomFields = {};
-    editingMilestone = true;
+    itemDetailStore.editing.customFields.active = {};
+    itemDetailStore.startEditing('milestone');
   }
 
   function handleStartEditingIteration() {
     // Cancel all custom field editing when starting to edit iteration
-    editingCustomFields = {};
-    editingIteration = true;
+    itemDetailStore.editing.customFields.active = {};
+    itemDetailStore.startEditing('iteration');
   }
 
   function handleStartEditingPriority() {
     // Cancel all custom field editing when starting to edit priority
-    editingCustomFields = {};
-    editingPriority = true;
+    itemDetailStore.editing.customFields.active = {};
+    itemDetailStore.startEditing('priority');
   }
 
   function handleStartEditingDueDate() {
     // Cancel all custom field editing when starting to edit due date
-    editingCustomFields = {};
-    editingDueDate = true;
+    itemDetailStore.editing.customFields.active = {};
+    itemDetailStore.startEditing('dueDate');
   }
 
   function handleStartEditingStatus() {
     // Cancel all custom field editing when starting to edit status
-    editingCustomFields = {};
-    editingStatus = true;
+    itemDetailStore.editing.customFields.active = {};
+    itemDetailStore.startEditing('status');
   }
 
   function handleStartEditingProject() {
     // Cancel all custom field editing when starting to edit project
-    editingCustomFields = {};
-    editingProject = true;
+    itemDetailStore.editing.customFields.active = {};
+    itemDetailStore.startEditing('project');
+  }
+
+  function handleStartEditingDescription() {
+    // Cancel all custom field editing when starting to edit description
+    itemDetailStore.editing.customFields.active = {};
+    itemDetailStore.startEditing('description');
   }
 
   async function handleStartTimer() {
@@ -759,10 +482,10 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     }
 
     // Guard: Use reactive store values
-    if (!$canStartTimer) {
-      if ($timerSyncing) {
+    if (!timerStore.canStart) {
+      if (timerStore.syncing) {
         showError(t('items.timerBusy'), t('items.timerSyncingMessage'));
-      } else if ($activeTimer) {
+      } else if (timerStore.activeTimer) {
         showError(t('items.timerAlreadyRunning'), t('items.stopTimerFirst'));
       }
       return;
@@ -795,7 +518,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
         description: t('items.workingOn', { title: item.title })
       };
 
-      await startTimerAction(timerData);
+      await timerStore.start(timerData);
     } catch (error) {
       console.error('Failed to start timer:', error);
       // Only show error if it's not a 409 conflict (already running)
@@ -809,13 +532,11 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   }
 
   function handleLogTime() {
-    editingWorklog = null;
-    showTimeLogModal = true;
+    itemDetailStore.openTimeLogModal();
   }
 
   function handleEditWorklog(event) {
-    editingWorklog = event.detail;
-    showTimeLogModal = true;
+    itemDetailStore.openTimeLogModal(event.detail);
   }
 
   async function handleDeleteWorklog(event) {
@@ -823,8 +544,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     try {
       await api.time.worklogs.delete(worklog.id);
       // Reload worklogs
-      const worklogsData = await api.time.worklogs.getByItem(itemId);
-      timeWorklogs = worklogsData || [];
+      await itemDetailStore.reloadWorklogs();
     } catch (error) {
       console.error('Failed to delete worklog:', error);
       showError(t('items.failedToDeleteTimeEntry'), error.message || t('errors.UNKNOWN'));
@@ -834,18 +554,15 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   async function handleModalSave(event) {
     try {
       const data = event.detail;
-      if (editingWorklog) {
-        await api.time.worklogs.update(editingWorklog.id, data);
+      if (itemDetailStore.editingWorklog) {
+        await api.time.worklogs.update(itemDetailStore.editingWorklog.id, data);
       } else {
         await api.time.worklogs.create(data);
       }
 
       // Reload worklogs
-      const worklogsData = await api.time.worklogs.getByItem(itemId);
-      timeWorklogs = worklogsData || [];
-
-      showTimeLogModal = false;
-      editingWorklog = null;
+      await itemDetailStore.reloadWorklogs();
+      itemDetailStore.closeTimeLogModal();
     } catch (error) {
       console.error('Failed to save worklog:', error);
       showError(t('items.failedToSaveTimeEntry'), error.message || t('errors.UNKNOWN'));
@@ -853,27 +570,17 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   }
 
   function handleModalCancel() {
-    showTimeLogModal = false;
-    editingWorklog = null;
+    itemDetailStore.closeTimeLogModal();
   }
 
   // Get default project for time logging
   function getDefaultProjectForTimeLogging() {
-    if (item?.time_project_id) {
-      return item.time_project_id;
-    }
-    if (item?.effective_project_id) {
-      return item.effective_project_id;
-    }
-    if (workspace?.time_project_id) {
-      return workspace.time_project_id;
-    }
-    return null;
+    return itemDetailStore.getDefaultProjectForTimeLogging();
   }
 
   async function handleCopyItem() {
     try {
-      const copiedItem = await api.items.copy(item.id);
+      const copiedItem = await itemDetailStore.copyItem();
 
       // Show clickable success toast that navigates to the copied item
       const itemKey = workspace?.key ? `${workspace.key}-${copiedItem.workspace_item_number}` : `ITEM-${copiedItem.workspace_item_number}`;
@@ -904,7 +611,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   }
 
   function handleDeleteItem() {
-    showDeleteDialog = true;
+    itemDetailStore.openDeleteDialog();
   }
 
   function handleDeleteComplete(result) {
@@ -923,36 +630,9 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     showError(t('items.failedToDelete'), err.message || String(err));
   }
 
-  async function loadWatchStatus() {
-    if (!item?.id || loadingWatchStatus) return;
-
-    try {
-      loadingWatchStatus = true;
-      const result = await api.items.getWatchStatus(item.id);
-      isWatching = result.watching || false;
-    } catch (err) {
-      console.error('Failed to load watch status:', err);
-      isWatching = false;
-    } finally {
-      loadingWatchStatus = false;
-    }
-  }
-
   async function toggleWatch() {
-    if (!item?.id) return;
-
     try {
-      if (isWatching) {
-        await api.items.removeWatch(item.id);
-        isWatching = false;
-      } else {
-        await api.items.addWatch(item.id);
-        isWatching = true;
-      }
-
-      // Trigger update for homepage watched items
-      hasChanges = true;
-
+      await itemDetailStore.toggleWatch();
     } catch (err) {
       console.error('Failed to toggle watch:', err);
       showError(t('items.failedToUpdateWatchStatus'), err.message || String(err));
@@ -960,7 +640,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   }
 
   function populateDropdownItems() {
-    if (!item) return;
+    if (!itemDetailStore.item) return;
 
     const items = [
       {
@@ -973,8 +653,8 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
       {
         id: 'watch',
         type: 'regular',
-        icon: isWatching ? BookmarkCheck : Bookmark,
-        title: isWatching ? t('items.unwatchWorkItem') : t('items.watchWorkItem'),
+        icon: itemDetailStore.isWatching ? BookmarkCheck : Bookmark,
+        title: itemDetailStore.isWatching ? t('items.unwatchWorkItem') : t('items.watchWorkItem'),
         onClick: toggleWatch
       }
     ];
@@ -1000,77 +680,41 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
       );
     }
 
-    dropdownItems = items;
+    itemDetailStore.dropdownItems = items;
   }
 
   // Reactive statement to handle itemId changes for navigation between items
   $effect(() => {
-    if (itemId !== previousItemId && !loading) {
+    if (itemId !== previousItemId && !itemDetailStore.loading) {
       previousItemId = itemId;
-      transitioning = true;
+      itemDetailStore.transitioning = true;
 
 
       // Small delay to allow fade out animation
       setTimeout(() => {
-        loading = true;
+        itemDetailStore.loading = true;
 
         // Clear all state before loading new data to prevent stale data during navigation
-        item = null;
-        parentHierarchy = [];
-        childItems = [];
-        availableStatusTransitions = [];
-        customFieldDefinitions = [];
-        workspaceScreenFields = [];
-        itemLinks = [];
+        itemDetailStore.clearForNavigation();
 
         loadData().then(() => {
           populateDropdownItems();
-          loading = false;
-          transitioning = false;
+          itemDetailStore.loading = false;
+          itemDetailStore.transitioning = false;
         }).catch((error) => {
           console.error('Failed to load item data after navigation:', error);
-          loading = false;
-          transitioning = false;
+          itemDetailStore.loading = false;
+          itemDetailStore.transitioning = false;
         });
       }, 150);
     }
   });
 
-  // Load diagrams for the item
-  async function loadDiagrams() {
-    if (!item?.id) return;
-
-    try {
-      loadingDiagrams = true;
-      diagrams = await api.getDiagrams(item.id) || [];
-    } catch (err) {
-      console.error('Failed to load diagrams:', err);
-      diagrams = [];
-    } finally {
-      loadingDiagrams = false;
-    }
-  }
-
-  // Load manual actions for the workspace
-  async function loadManualActions() {
-    if (!workspaceId) return;
-
-    try {
-      const allActions = await api.actions.getAll(workspaceId);
-      manualActions = (allActions || []).filter(a =>
-        a.trigger_type === 'manual' && a.is_enabled
-      );
-    } catch (err) {
-      console.error('Failed to load manual actions:', err);
-      manualActions = [];
-    }
-  }
-
   // Handler for executing a manual action
   async function handleExecuteAction(event) {
     const action = event.detail;
     try {
-      await api.actions.execute(workspaceId, action.id, item.id);
+      await itemDetailStore.executeAction(action.id);
       successToast(t('actions.test.executionQueued'));
     } catch (err) {
       console.error('Failed to execute action:', err);
@@ -1080,18 +724,18 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 
   // Handle diagram saved event - reload diagrams
   async function handleDiagramSaved() {
-    await loadDiagrams();
+    await itemDetailStore.loadDiagrams();
   }
 
   onMount(async () => {
     // Initialize timer state from server
-    await initializeTimer();
+    await timerStore.initialize();
 
     await loadData();
 
     // Register context-sensitive commands for this item
     // Pass current timer status to avoid creating reactive dependency
-    registerItemContextCommands(!!getCurrentTimer());
+    registerItemContextCommands(!!timerStore.getCurrent());
   });
   
   // Register context commands for this work item
@@ -1200,7 +844,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     if (item && item.id !== previousCommandItemId) {
       previousCommandItemId = item.id;
       // Pass current timer status to avoid creating reactive dependency
-      registerItemContextCommands(!!getCurrentTimer());
+      registerItemContextCommands(!!timerStore.getCurrent());
       populateDropdownItems();
     }
   });
@@ -1209,7 +853,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   // This allows us to show/hide the "Start Timer" command based on timer status
   let previousTimerStatus; // Plain variable, not reactive - prevents self-invalidation
   $effect(() => {
-    const currentTimerStatus = !!$activeTimer;
+    const currentTimerStatus = !!timerStore.activeTimer;
     if (item && previousTimerStatus !== undefined && previousTimerStatus !== currentTimerStatus) {
       // Timer status changed, re-register commands with new status
       registerItemContextCommands(currentTimerStatus);
@@ -1219,21 +863,19 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 
   // Rebuild dropdown when watch status changes
   $effect(() => {
-    isWatching;
-    item && populateDropdownItems();
+    itemDetailStore.isWatching;
+    itemDetailStore.item && populateDropdownItems();
   });
 
   // Reload worklogs when timer stops (activeTimer becomes null from non-null)
   let previousActiveTimer; // Plain variable, not reactive - prevents self-invalidation
   $effect(() => {
-    const currentTimer = $activeTimer;
+    const currentTimer = timerStore.activeTimer;
 
     // If we had an active timer and now it's null, and it was for this item, reload worklogs
     if (previousActiveTimer && !currentTimer && previousActiveTimer.item_id === parseInt(itemId)) {
       // Timer was stopped, reload worklogs for this item
-      api.time.worklogs.getByItem(itemId).then(worklogs => {
-        timeWorklogs = worklogs || [];
-      }).catch(err => {
+      itemDetailStore.reloadWorklogs().catch(err => {
         console.error('Failed to reload worklogs after timer stop:', err);
       });
     }
@@ -1246,300 +888,57 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     // Unregister context commands when component is destroyed
     unregisterContextCommands('item-detail');
     // Cleanup timer intervals
-    cleanupTimer();
+    timerStore.cleanup();
   });
 
+  // Load data using the store
   async function loadData() {
-    try {
-      loadingLinks = true;
-      const [itemData, workspaceData, linkTypesData, linksData, customFieldsData, milestonesData, iterationsData, projectsData, worklogsData, customersData, workItemsData, workspacesData] = await Promise.all([
-        api.items.get(itemId),
-        api.workspaces.get(workspaceId),
-        api.linkTypes.getAll(),
-        api.links.getForItem('items', itemId),
-        api.customFields.getAll(),
-        api.milestones.getAll(),
-        api.iterations.getAll({ workspace_id: workspaceId, include_global: true }),
-        api.time.projects.getByWorkspace(workspaceId),
-        api.time.worklogs.getByItem(itemId),
-        api.time.customers.getAll(),
-        api.items.getAll({ limit: 100 }),
-        api.workspaces.getAll()
-      ]);
+    await itemDetailStore.loadItem(workspaceId, itemId);
 
-      item = itemData;
-      // Ensure assignee_id is never undefined to prevent binding errors
-      if (item.assignee_id === undefined) {
-        item.assignee_id = null;
-      }
-      workspace = workspaceData;
-      customFieldDefinitions = customFieldsData || [];
-
-      // Filter milestones by workspace milestone category restrictions
-      let allMilestones = milestonesData || [];
-      if (workspace && workspace.milestone_categories && workspace.milestone_categories.length > 0) {
-        const allowedCategoryIds = workspace.milestone_categories;
-        milestones = allMilestones.filter(m => allowedCategoryIds.includes(m.category_id));
-      } else {
-        milestones = allMilestones;
-      }
-
-      iterations = iterationsData || [];
-      timeProjects = projectsData || [];
-      timeWorklogs = worklogsData || [];
-      customers = customersData || [];
-      workItems = workItemsData?.items || workItemsData || [];
-      workspaces = workspacesData || [];
-
-      // Load priorities based on workspace configuration
-      await loadPriorities();
-
-      // Load status transitions and watch status for this item
-      loadAvailableStatusTransitions();
-      loadWatchStatus();
-      linkTypes = linkTypesData;
-      
-      
-      // Process links data - combine incoming and outgoing links
-      const allLinks = [];
-      if (linksData.outgoing) {
-        allLinks.push(...linksData.outgoing);
-      }
-      if (linksData.incoming) {
-        allLinks.push(...linksData.incoming);
-      }
-      itemLinks = allLinks;
-      
-      editTitle = item.title;
-      editDescription = item.description || '';
-      
-      // Load parent hierarchy if item has parents, otherwise clear it
-      if (item.parent_id) {
-        await loadParentHierarchy();
-      } else {
-        parentHierarchy = [];
-      }
-      
-      // Load child items and hierarchy data
-      await loadChildItems();
-      await loadItemTypeData();
-      
-      // Load attachment settings and attachments
-      await attachmentManager.loadSettings();
-      if (attachmentManager.isEnabled()) {
-        await attachmentManager.load();
-      }
-
-      // Load diagrams (always load, not dependent on attachment settings)
-      await loadDiagrams();
-
-      // Load manual actions for the workspace
-      await loadManualActions();
-
-      // Load workspace screen configuration
-      await loadWorkspaceScreenFields();
-      
-      loading = false;
-      loadingLinks = false;
-    } catch (err) {
-      console.error('Failed to load item or workspace:', err);
-      error = err.message || 'Failed to load data';
-      loading = false;
-      loadingLinks = false;
+    // Load attachment settings and attachments (still using composable)
+    await attachmentManager.loadSettings();
+    if (attachmentManager.isEnabled()) {
+      await attachmentManager.load();
     }
   }
 
-  // Parent hierarchy function (from original)
-  async function loadParentHierarchy() {
-    try {
-      
-      // Get all items in workspace
-      const response = await api.items.getAll({ workspace_id: workspaceId });
-      
-      // Handle different response formats
-      let allItems = [];
-      if (Array.isArray(response)) {
-        allItems = response;
-      } else if (response && Array.isArray(response.items)) {
-        allItems = response.items;
-      } else if (response && response.data && Array.isArray(response.data)) {
-        allItems = response.data;
-      } else {
-        console.warn('Unexpected response format from api.items.getAll:', response);
-        parentHierarchy = [];
-        return;
-      }
-      
-      
-      // Build parent hierarchy using the new ancestor API
-      try {
-        const ancestors = await api.items.getAncestors(item.id);
-        
-        // Load item types for parent items to show icons
-        try {
-          const itemTypesData = await api.itemTypes.getAll();
-          parentHierarchy = ancestors.map(ancestor => {
-            if (ancestor.item_type_id) {
-              const itemType = itemTypesData.find(type => type.id === ancestor.item_type_id);
-              return { ...ancestor, itemType };
-            }
-            return ancestor;
-          });
-        } catch (err) {
-          console.warn('Failed to load item types for parent hierarchy:', err);
-          // Use ancestors without item type information
-          parentHierarchy = ancestors;
-        }
-        
-      } catch (error) {
-        console.error('Failed to load ancestors:', error);
-        parentHierarchy = [];
-      }
-      
-    } catch (err) {
-      console.error('Failed to load parent hierarchy:', err);
-      parentHierarchy = [];
-    }
-  }
-
-  // Load workspace screen fields configuration
-  async function loadWorkspaceScreenFields() {
-    try {
-      let screenId = null;
-
-      // Try to get screen from configuration set if assigned
-      if (workspace?.configuration_set_id) {
-        const configSet = await api.configurationSets.get(workspace.configuration_set_id);
-        screenId = configSet?.edit_screen_id || configSet?.create_screen_id || configSet?.view_screen_id;
-      }
-
-      // Fallback to default screen (ID 1) if no configuration set or no screens assigned
-      if (!screenId) {
-        screenId = 1;
-      }
-
-      // Get the full screen object (includes both custom and system fields)
-      const screen = await api.screens.get(screenId);
-      const screenFields = screen?.fields || [];
-
-      // Separate custom fields so we can render them in configured order
-      workspaceScreenFields = screenFields.filter(field => field.field_type === 'custom');
-
-      // Determine which system fields should be shown.
-      // Screens API currently stores system selections in the main fields payload,
-      // so derive them here and fall back to legacy system_fields if present.
-      const configuredSystemFields = screenFields
-        .filter(field => field.field_type === 'system')
-        .map(field => field.field_identifier);
-
-      if (configuredSystemFields.length > 0) {
-        workspaceScreenSystemFields = configuredSystemFields;
-      } else {
-        workspaceScreenSystemFields = screen?.system_fields || [];
-      }
-
-    } catch (err) {
-      console.error('Failed to load workspace screen fields:', err);
-      workspaceScreenFields = [];
-      workspaceScreenSystemFields = [];
-    }
-  }
-
-  // Child items and hierarchy functions (from original)
-  async function loadChildItems() {
-    try {
-      loadingChildItems = true;
-      const response = await api.items.getChildren(itemId);
-      
-      // Handle different response formats
-      if (Array.isArray(response)) {
-        childItems = response;
-      } else if (response && Array.isArray(response.items)) {
-        childItems = response.items;
-      } else if (response && response.data && Array.isArray(response.data)) {
-        childItems = response.data;
-      } else {
-        childItems = [];
-      }
-    } catch (err) {
-      console.error('[loadChildItems] Failed to load child items:', err);
-      childItems = [];
-    } finally {
-      loadingChildItems = false;
-    }
-  }
-
-  async function loadItemTypeData() {
-    try {
-      // Load current item's type and hierarchy levels
-      const [itemTypesData, hierarchyLevels] = await Promise.all([
-        api.itemTypes.getAll(),
-        api.hierarchyLevels.getAll()
-      ]);
-      
-      itemTypes = itemTypesData || [];
-      
-      if (item.item_type_id) {
-        currentItemType = itemTypes.find(type => type.id === item.item_type_id);
-        if (currentItemType) {
-          currentHierarchyLevel = hierarchyLevels.find(level => level.level === currentItemType.hierarchy_level);
-        }
-      }
-      
-      // Find available sub-issue types (next level down)
-      if (currentItemType && currentHierarchyLevel) {
-        const nextLevel = currentHierarchyLevel.level + 1;
-        availableSubIssueTypes = itemTypes.filter(type => type.hierarchy_level === nextLevel);
-      } else {
-        availableSubIssueTypes = [];
-      }
-      
-    } catch (err) {
-      console.error('Failed to load item type data:', err);
-      currentItemType = null;
-      currentHierarchyLevel = null;
-      availableSubIssueTypes = [];
-    }
-  }
-
-  // Sub-issue creation function (from original)
+  // Sub-issue creation function
   function startCreateSubIssue() {
-
-    if (availableSubIssueTypes.length === 0) {
+    if (itemDetailStore.availableSubIssueTypes.length === 0) {
       showError(t('items.noSubIssueTypes'), t('items.cannotCreateChildItems'));
       return;
     }
-    
+
     // Set up for sub-issue creation and open the global create modal
-    
+
     // First, trigger loading the CreateModal component
     window.dispatchEvent(new CustomEvent('show-create-modal'));
-    
+
     // Small delay to let the modal load, then configure it
     setTimeout(() => {
       // Set the type first
-      window.dispatchEvent(new CustomEvent('set-create-type', { 
-        detail: { type: 'work-item' } 
+      window.dispatchEvent(new CustomEvent('set-create-type', {
+        detail: { type: 'work-item' }
       }));
-      
+
       // Set the parent
-      window.dispatchEvent(new CustomEvent('set-create-parent', { 
-        detail: { 
-          parentId: item.id, 
-          parentTitle: item.title,
-          availableItemTypes: availableSubIssueTypes
-        } 
+      window.dispatchEvent(new CustomEvent('set-create-parent', {
+        detail: {
+          parentId: itemDetailStore.item.id,
+          parentTitle: itemDetailStore.item.title,
+          availableItemTypes: itemDetailStore.availableSubIssueTypes
+        }
       }));
-      
+
       // Open the modal (this will load workspaces)
       window.dispatchEvent(new CustomEvent('open-create-modal'));
-      
+
       // After modal is open and workspaces are loaded, set the workspace
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('set-create-workspace', {
           detail: {
             workspaceId: workspaceId,
-            workspaceName: workspace?.name
+            workspaceName: itemDetailStore.workspace?.name
           }
         }));
       }, 200);
@@ -1549,54 +948,54 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 
 {#snippet contentSnippet()}
   <ItemDetailContent
-    {loading}
-    {error}
-    {item}
-    {workspace}
+    loading={itemDetailStore.loading}
+    error={itemDetailStore.error}
+    item={itemDetailStore.item}
+    workspace={itemDetailStore.workspace}
     {isModal}
-    {parentHierarchy}
-    {currentItemType}
-    {currentHierarchyLevel}
+    parentHierarchy={itemDetailStore.parentHierarchy}
+    currentItemType={itemDetailStore.currentItemType}
+    currentHierarchyLevel={itemDetailStore.currentHierarchyLevel}
     {iconMap}
     {workspaceId}
-    bind:editingTitle
-    bind:editTitle
-    {saving}
-    {dropdownItems}
-    statusOptions={statusOptions}
-    bind:editingDescription
-    bind:editDescription
-    {itemLinks}
-    {loadingLinks}
-    {availableSubIssueTypes}
-    {childItems}
-    {loadingChildItems}
-    {itemTypes}
+    editingTitle={itemDetailStore.editing.title.active}
+    editTitle={itemDetailStore.editing.title.value}
+    saving={itemDetailStore.saving}
+    dropdownItems={itemDetailStore.dropdownItems}
+    statusOptions={itemDetailStore.statusOptions}
+    editingDescription={itemDetailStore.editing.description.active}
+    editDescription={itemDetailStore.editing.description.value}
+    itemLinks={itemDetailStore.itemLinks}
+    loadingLinks={itemDetailStore.loadingLinks}
+    availableSubIssueTypes={itemDetailStore.availableSubIssueTypes}
+    childItems={itemDetailStore.childItems}
+    loadingChildItems={itemDetailStore.loadingChildItems}
+    itemTypes={itemDetailStore.itemTypes}
     {tab}
     {moduleSettings}
-    {timeWorklogs}
-    {timeProjects}
-    activeTimer={$activeTimer}
-    {editingStatus}
-    {editingPriority}
-    {editingDueDate}
-    {editingProject}
-    {editingAssignee}
-    {editingMilestone}
-    {editingIteration}
-    {editingCustomFields}
-    {editCustomFieldValues}
-    {workspaceScreenFields}
-    {workspaceScreenSystemFields}
-    {customFieldDefinitions}
-    {milestones}
-    {iterations}
-    {priorities}
+    timeWorklogs={itemDetailStore.timeWorklogs}
+    timeProjects={itemDetailStore.timeProjects}
+    activeTimer={timerStore.activeTimer}
+    editingStatus={itemDetailStore.editing.status.active}
+    editingPriority={itemDetailStore.editing.priority.active}
+    editingDueDate={itemDetailStore.editing.dueDate.active}
+    editingProject={itemDetailStore.editing.project.active}
+    editingAssignee={itemDetailStore.editing.assignee.active}
+    editingMilestone={itemDetailStore.editing.milestone.active}
+    editingIteration={itemDetailStore.editing.iteration.active}
+    editingCustomFields={itemDetailStore.editing.customFields.active}
+    editCustomFieldValues={itemDetailStore.editing.customFields.values}
+    workspaceScreenFields={itemDetailStore.workspaceScreenFields}
+    workspaceScreenSystemFields={itemDetailStore.workspaceScreenSystemFields}
+    customFieldDefinitions={itemDetailStore.customFieldDefinitions}
+    milestones={itemDetailStore.milestones}
+    iterations={itemDetailStore.iterations}
+    priorities={itemDetailStore.priorities}
     attachments={attachmentManager.attachments || []}
     attachmentPagination={attachmentManager.pagination}
-    {diagrams}
-    {loadingDiagrams}
-    {manualActions}
+    diagrams={itemDetailStore.diagrams}
+    loadingDiagrams={itemDetailStore.loadingDiagrams}
+    manualActions={itemDetailStore.manualActions}
     on:navigate={handleNavigate}
     on:go-back={handleGoBack}
     on:copy-key={handleCopyKey}
@@ -1614,6 +1013,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     on:start-editing-due-date={handleStartEditingDueDate}
     on:start-editing-status={handleStartEditingStatus}
     on:start-editing-project={handleStartEditingProject}
+    on:start-editing-description={handleStartEditingDescription}
     on:start-editing-custom-field={handleStartEditingCustomField}
     on:start-timer={handleStartTimer}
     on:log-time={handleLogTime}
@@ -1634,39 +1034,39 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 {#if isModal}
   <Modal
     isOpen={true}
-    maxWidth={isFullscreen ? 'max-w-[95vw]' : 'max-w-[80vw]'}
+    maxWidth={itemDetailStore.isFullscreen ? 'max-w-[95vw]' : 'max-w-[80vw]'}
     onclose={closeModal}
   >
     <div
       bind:this={modalElement}
-      class="flex flex-col relative w-full {isFullscreen ? 'h-[95vh]' : 'max-h-[90vh]'}"
+      class="flex flex-col relative w-full {itemDetailStore.isFullscreen ? 'h-[95vh]' : 'max-h-[90vh]'}"
     >
-      {#if showTestCaseModal}
+      {#if itemDetailStore.showTestCaseModal}
         <TestCaseViewModal
           embedded={true}
-          bind:isOpen={showTestCaseModal}
-          testCaseId={selectedTestCaseId}
+          isOpen={itemDetailStore.showTestCaseModal}
+          testCaseId={itemDetailStore.selectedTestCaseId}
           on:close={handleCloseTestCaseModal}
         />
       {:else}
-        {#if item && workspace}
+        {#if itemDetailStore.item && itemDetailStore.workspace}
           <!-- Modal Header -->
           <div class="flex items-center justify-between p-4 border-b" style="border-color: var(--ds-border); background-color: var(--ds-surface);">
             <div class="flex items-center gap-3">
               <h1 class="text-lg font-semibold" style="color: var(--ds-text);">{t('items.workItemDetails')}</h1>
               <span class="px-2 py-1 text-sm font-mono rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
-                {workspace.key}-{item.workspace_item_number}
+                {itemDetailStore.workspace.key}-{itemDetailStore.item.workspace_item_number}
               </span>
             </div>
             <div class="flex items-center gap-2">
               <button
                 onclick={openFullDetails}
                 class="inline-flex items-center gap-2 px-3 py-1.5 bg-[var(--ds-interactive)] text-white rounded hover:bg-[var(--ds-interactive-hovered)] transition-colors text-sm font-medium"
-                title="Open full details (F)"
+                title="Open full details (⇧F)"
               >
                 <ExternalLink class="w-4 h-4" />
                 {t('items.fullDetails')}
-                <span class="ml-1 px-1.5 py-0.5 bg-[var(--ds-interactive-hovered)] bg-opacity-50 rounded text-xs font-mono">F</span>
+                <span class="ml-1 px-1.5 py-0.5 bg-[var(--ds-interactive-hovered)] bg-opacity-50 rounded text-xs font-mono">⇧F</span>
               </button>
               <button
                 onclick={toggleFullscreen}
@@ -1674,9 +1074,9 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
                 style="color: var(--ds-text-subtle);"
                 onmouseenter={(e) => { e.currentTarget.style.color = 'var(--ds-text)'; e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'; }}
                 onmouseleave={(e) => { e.currentTarget.style.color = 'var(--ds-text-subtle)'; e.currentTarget.style.backgroundColor = ''; }}
-                title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+                title={itemDetailStore.isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
               >
-                {#if isFullscreen}
+                {#if itemDetailStore.isFullscreen}
                   <Minimize2 class="w-5 h-5" />
                 {:else}
                   <Maximize2 class="w-5 h-5" />
@@ -1700,8 +1100,8 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
         {#key itemId}
           <div
             class="transition-opacity duration-300 ease-in-out overflow-y-auto flex-1"
-            class:opacity-30={transitioning}
-            class:opacity-100={!transitioning}
+            class:opacity-30={itemDetailStore.transitioning}
+            class:opacity-100={!itemDetailStore.transitioning}
           >
             {@render contentSnippet()}
           </div>
@@ -1720,8 +1120,8 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   {#key itemId}
     <div
       class="transition-opacity duration-300 ease-in-out"
-      class:opacity-30={transitioning}
-      class:opacity-100={!transitioning}
+      class:opacity-30={itemDetailStore.transitioning}
+      class:opacity-100={!itemDetailStore.transitioning}
     >
       {@render contentSnippet()}
     </div>
@@ -1730,22 +1130,22 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 
 {#if !isModal}
   <TestCaseViewModal
-    bind:isOpen={showTestCaseModal}
-    testCaseId={selectedTestCaseId}
+    isOpen={itemDetailStore.showTestCaseModal}
+    testCaseId={itemDetailStore.selectedTestCaseId}
     on:close={handleCloseTestCaseModal}
   />
 {/if}
 
 <!-- Time Log Modal -->
-{#if showTimeLogModal}
+{#if itemDetailStore.showTimeLogModal}
   <TimeLogModal
     defaultProjectId={getDefaultProjectForTimeLogging()}
     defaultItemId={parseInt(itemId)}
-    projects={timeProjects}
-    {customers}
-    {workItems}
-    {workspaces}
-    {editingWorklog}
+    projects={itemDetailStore.timeProjects}
+    customers={itemDetailStore.customers}
+    workItems={itemDetailStore.workItems}
+    workspaces={itemDetailStore.workspaces}
+    editingWorklog={itemDetailStore.editingWorklog}
     showProjectField={true}
     showWorkItemField={false}
     onsave={handleModalSave}
@@ -1756,16 +1156,16 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 
 <!-- Delete Item Dialog -->
 <DeleteItemDialog
-  bind:show={showDeleteDialog}
-  item={item}
+  show={itemDetailStore.showDeleteDialog}
+  item={itemDetailStore.item}
   ondeleted={handleDeleteComplete}
   onerror={handleDeleteError}
 />
 
 <!-- Link Item Modal -->
 <LinkItemModal
-  bind:isOpen={showLinkModal}
-  linkTypes={filteredLinkTypes}
+  isOpen={itemDetailStore.showLinkModal}
+  linkTypes={itemDetailStore.filteredLinkTypes}
   currentItemId={parseInt(itemId)}
   on:submit={handleLinkCreated}
   on:cancel={handleLinkModalCancel}

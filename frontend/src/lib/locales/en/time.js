@@ -117,6 +117,7 @@ export default {
       noProjects: 'No projects found. Create your first project to start tracking time.',
       noProjectsInCategory: 'No projects in this category.',
       failedToSave: 'Failed to save project',
+      deleteProject: 'Delete Project',
       confirmDelete: 'Are you sure you want to delete "{name}"?',
       unknownCustomer: 'Unknown Customer',
       project: 'Project',
@@ -171,6 +172,7 @@ export default {
       emailOptional: 'Email (Optional)',
       contactPersonOptional: 'Contact Person (Optional)',
       failedToSave: 'Failed to save organization',
+      deleteOrganization: 'Delete Organization',
       confirmDelete: 'Are you sure you want to delete "{name}"?'
     }
   },

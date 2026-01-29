@@ -138,7 +138,13 @@
     class="{triggerAvatar ? 'p-0' : iconOnly ? '' : triggerClass ? '' : 'px-4 py-2'} rounded text-sm font-medium transition cursor-pointer flex items-center {alignmentClass} {triggerGap} flex-shrink-0 {triggerBgColor ? getTextColorForBackground(triggerBgColor) : ''} {triggerClass}"
     style="{triggerBgColor ? `background-color: ${triggerBgColor}; ${triggerStyle}` : triggerStyle}"
   >
-    {#if triggerAvatar}
+    {#if $$slots.default}
+      <!-- Custom trigger content via slot -->
+      <slot />
+      {#if showChevron}
+        <ChevronDown class="w-3 h-3" />
+      {/if}
+    {:else if triggerAvatar}
       <img src={triggerAvatar} alt={t('common.profile')} class="w-8 h-8 rounded-full object-cover flex-shrink-0" />
       {#if triggerText}
         <span class="text-sm whitespace-nowrap">{triggerText}</span>

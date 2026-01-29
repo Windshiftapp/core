@@ -22,7 +22,7 @@ const routes = {
   '/workspaces/:id/reviews': 'workspace-reviews',
   '/workspaces/:id/settings': 'workspace-settings',
   '/workspaces/:id/settings/general': 'workspace-settings-general',
-  '/workspaces/:id/settings/appearance': 'workspace-settings-appearance',
+  '/workspaces/:id/look-and-feel': 'workspace-look-and-feel',
   '/workspaces/:id/settings/categories': 'workspace-settings-categories',
   '/workspaces/:id/settings/members': 'workspace-settings-members',
   '/workspaces/:id/settings/configuration': 'workspace-settings-configuration',

@@ -457,6 +457,7 @@ export default {
   workspaceSettings: {
     // Tab navigation
     tabs: {
+      mode: 'Mode',
       general: 'General',
       appearance: 'Appearance',
       categories: 'Categories',
@@ -478,6 +479,17 @@ export default {
     accessDenied: 'Access Denied',
     accessDeniedDescription: 'You need workspace administrator permissions to access settings.',
     backToWorkspace: 'Back to Workspace',
+
+    // Mode tab
+    displayMode: 'Display Mode',
+    displayModeDescription: 'Choose how this workspace is displayed. This affects the navigation layout and default behavior.',
+    modeDefault: 'Default',
+    modeDefaultDescription: 'Full navigation sidebar with all workspace views, collections, and tools.',
+    modeBoard: 'Board',
+    modeBoardDescription: 'Simplified layout focused on the board view. Navigation is available through a compact toolbar.',
+    modeItsm: 'ITSM',
+    modeItsmDescription: 'Service management layout optimized for ticket handling and SLA tracking.',
+    modeComingSoon: 'Coming Soon',
 
     // General tab
     basicInformation: 'Basic Information',
@@ -561,5 +573,25 @@ export default {
     pleaseConfirmDeletion: 'Please enter the workspace name exactly as shown to confirm deletion',
     pleaseSelectImage: 'Please select an image file',
     failedToUploadAvatar: 'Failed to upload avatar: {error}'
+  },
+
+  lookAndFeel: {
+    title: 'Look and Feel',
+    subtitle: 'Customize the appearance and layout of your workspace',
+    displayModeTitle: 'Display Mode',
+    displayModeDescription: 'Choose how this workspace is displayed. This affects the navigation layout and default behavior.',
+    gradientTitle: 'Background & Gradient',
+    gradientDescription: 'Choose a color scheme for your workspace',
+    gradients: 'Gradients',
+    backgroundImages: 'Background Images',
+    currentBackground: 'Current Background',
+    uploadCustomImage: 'Upload Custom Image',
+    backgroundUploadRecommendation: 'Recommended: High-resolution images (1920x1080 or larger) for best quality',
+    backgroundUploadedSuccess: 'Background image uploaded successfully',
+    failedToUploadBackground: 'Failed to upload background: {error}',
+    identityTitle: 'Workspace Identity',
+    identityDescription: 'Customize the icon, color, and avatar for your workspace',
+    savedSuccessfully: 'Look and feel settings saved successfully',
+    failedToSave: 'Failed to save look and feel settings: {error}'
   }
 };

@@ -12,6 +12,7 @@ function createPermissionStore() {
   const userPermissions = writable(new Set());
   const loading = writable(false);
   const error = writable(null);
+  const hasAssetSets = writable(false);
 
   const canAccessAdmin = derived(
     [authStore, permissions, userPermissions],
@@ -52,17 +53,27 @@ function createPermissionStore() {
     }
   );
 
+  const canAccessAssets = derived(
+    [authStore, hasAssetSets],
+    ([$authStore, $hasAssetSets]) => {
+      const user = $authStore.currentUser;
+      if (!user) return false;
+      return $hasAssetSets;
+    }
+  );
+
   // Create a combined derived store for easy subscription
   const combined = derived(
-    [permissions, userPermissions, loading, error, isSystemAdmin, canAccessAdmin, canAccessCustomers],
-    ([$permissions, $userPermissions, $loading, $error, $isSystemAdmin, $canAccessAdmin, $canAccessCustomers]) => ({
+    [permissions, userPermissions, loading, error, isSystemAdmin, canAccessAdmin, canAccessCustomers, canAccessAssets],
+    ([$permissions, $userPermissions, $loading, $error, $isSystemAdmin, $canAccessAdmin, $canAccessCustomers, $canAccessAssets]) => ({
       permissions: $permissions,
       userPermissions: $userPermissions,
       loading: $loading,
       error: $error,
       isSystemAdmin: $isSystemAdmin,
       canAccessAdmin: $canAccessAdmin,
-      canAccessCustomers: $canAccessCustomers
+      canAccessCustomers: $canAccessCustomers,
+      canAccessAssets: $canAccessAssets
     })
   );
 
@@ -87,6 +98,17 @@ function createPermissionStore() {
       let value;
       canAccessCustomers.subscribe(v => value = v)();
       return value;
+    },
+
+    get canAccessAssets() {
+      let value;
+      canAccessAssets.subscribe(v => value = v)();
+      return value;
+    },
+
+    // Set whether asset sets exist
+    setHasAssetSets(value) {
+      hasAssetSets.set(value);
     },
 
     // Load user permissions

@@ -3,13 +3,11 @@
   import { api } from '../api.js';
   import { navigate } from '../router.js';
   import { workspacePermissions, attachmentStatus } from '../stores';
-  import { Trash2, AlertTriangle, Palette, Camera, Package, Settings, Clock, Shield } from 'lucide-svelte';
-  import { workspaceIconMap } from '../utils/icons.js';
+  import { Trash2, AlertTriangle, Settings, Clock, Shield } from 'lucide-svelte';
   import { moduleSettings } from '../stores/moduleSettings.js';
   import WorkspaceConfigurationAssigner from './WorkspaceConfigurationAssigner.svelte';
   import WorkspaceConfigurationPreview from './WorkspaceConfigurationPreview.svelte';
   import WorkspaceSCMSettings from './WorkspaceSCMSettings.svelte';
-  import IconSelector from '../pickers/IconSelector.svelte';
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Input from '../components/Input.svelte';
@@ -19,60 +17,47 @@
   import WorkspaceMembers from './WorkspaceMembers.svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import Label from '../components/Label.svelte';
-  import { getHexFromColorName } from '../utils/colors.js';
   import Toggle from '../components/Toggle.svelte';
   import Tabs from '../components/Tabs.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
-  
-  export let workspaceId;
-  export let activeTab = 'general'; // 'general', 'configuration', or 'danger'
-  
-  let workspace = null;
-  let loading = true;
-  let saving = false;
-  let showDeleteConfirm = false;
-  let deleteConfirmText = '';
-  let timeProjects = [];
-  let configurationRefreshKey = 0;
-  
+
+  let { workspaceId = null, activeTab = $bindable('general') } = $props();
+
+  let workspace = $state(null);
+  let loading = $state(true);
+  let saving = $state(false);
+  let showDeleteConfirm = $state(false);
+  let deleteConfirmText = $state('');
+  let timeProjects = $state([]);
+  let configurationRefreshKey = $state(0);
+
   // Time project categories state
-  let timeProjectCategories = [];
-  let selectedTimeProjectCategories = [];
-  
-  let formData = {
+  let timeProjectCategories = $state([]);
+  let selectedTimeProjectCategories = $state([]);
+
+  let formData = $state({
     name: '',
     key: '',
     description: '',
     active: true,
     time_project_id: null,
-    default_view: 'board',
-    icon: 'Package',
-    color: '#3b82f6',
-    avatar_url: null
-  };
+    default_view: 'board'
+  });
 
   // Settings tabs configuration
-  $: settingsTabs = [
+  const settingsTabs = $derived([
     { id: 'general', label: t('workspaceSettings.tabs.general') },
-    { id: 'appearance', label: t('workspaceSettings.tabs.appearance') },
     { id: 'categories', label: t('workspaceSettings.tabs.categories') },
     { id: 'members', label: t('workspaceSettings.tabs.members') },
     { id: 'configuration', label: t('workspaceSettings.tabs.configurationSets') },
     { id: 'source-control', label: t('workspaceSettings.tabs.sourceControl') },
     { id: 'danger', label: t('workspaceSettings.tabs.removeWorkspace'), className: 'tab-danger' }
-  ];
-
-  // Avatar upload state
-  let uploadingAvatar = false;
-  let showAvatarUpload = false;
+  ]);
 
   // Permission check for workspace admin
-  $: canAdmin = workspacePermissions.canAdminWorkspace(workspaceId);
+  const canAdmin = $derived(workspacePermissions.canAdminWorkspace(workspaceId));
 
-  // Use centralized icon map for workspace icons
-  const iconMap = workspaceIconMap;
-  
   onMount(async () => {
     await moduleSettings.load();
 
@@ -91,7 +76,7 @@
     await Promise.all(loadPromises);
     loading = false;
   });
-  
+
   async function loadWorkspace() {
     try {
       workspace = await api.workspaces.get(workspaceId);
@@ -102,10 +87,7 @@
           description: workspace.description || '',
           active: workspace.active,
           time_project_id: workspace.time_project_id || null,
-          default_view: workspace.default_view || 'board',
-          icon: workspace.icon || 'Package',
-          color: workspace.color || '#3b82f6',
-          avatar_url: workspace.avatar_url || null
+          default_view: workspace.default_view || 'board'
         };
       }
     } catch (error) {
@@ -121,11 +103,10 @@
       timeProjects = [];
     }
   }
-  
+
   async function loadTimeProjectCategories() {
     try {
       timeProjectCategories = await api.time.projectCategories.getAll() || [];
-      // Load workspace's selected categories if they exist
       if (workspace?.time_project_categories) {
         selectedTimeProjectCategories = workspace.time_project_categories;
       }
@@ -134,20 +115,18 @@
       timeProjectCategories = [];
     }
   }
-  
-  
-  
+
   async function saveWorkspace() {
     if (!formData.name.trim()) {
-      showToastError(t('workspaceSettings.workspaceNameRequired'));
+      errorToast(t('workspaceSettings.workspaceNameRequired'));
       return;
     }
 
     if (!formData.key.trim()) {
-      showToastError(t('workspaceSettings.workspaceKeyRequired'));
+      errorToast(t('workspaceSettings.workspaceKeyRequired'));
       return;
     }
-    
+
     try {
       saving = true;
       await api.workspaces.update(workspaceId, {
@@ -155,52 +134,42 @@
         time_project_id: formData.time_project_id ? parseInt(formData.time_project_id, 10) : null,
         time_project_categories: selectedTimeProjectCategories
       });
-      
+
       // Update local workspace object
       workspace = { ...workspace, ...formData };
 
-      // Show success toast
-      showToastSuccess(t('workspaceSettings.savedSuccessfully'));
+      successToast(t('workspaceSettings.savedSuccessfully'));
     } catch (error) {
       console.error('Failed to save workspace:', error);
-      showToastError(t('workspaceSettings.failedToSave', { error: error.message || error }));
+      errorToast(t('workspaceSettings.failedToSave', { error: error.message || error }));
     } finally {
       saving = false;
     }
   }
-  
-  function showToastSuccess(message) {
-    successToast(message);
-  }
 
-  function showToastError(message) {
-    errorToast(message);
-  }
-  
   function cancelDeleteWorkspace() {
     showDeleteConfirm = false;
     deleteConfirmText = '';
   }
-  
+
   async function deleteWorkspace() {
     if (deleteConfirmText !== workspace.name) {
-      showToastError(t('workspaceSettings.pleaseConfirmDeletion'));
+      errorToast(t('workspaceSettings.pleaseConfirmDeletion'));
       return;
     }
 
     try {
       await api.workspaces.delete(workspaceId);
-      showToastSuccess(t('workspaceSettings.deletedSuccessfully', { name: workspace.name }));
-      // Navigate after showing the toast
+      successToast(t('workspaceSettings.deletedSuccessfully', { name: workspace.name }));
       setTimeout(() => {
         navigate('/workspaces');
       }, 1000);
     } catch (error) {
       console.error('Failed to delete workspace:', error);
-      showToastError(t('workspaceSettings.failedToDelete', { error: error.message || error }));
+      errorToast(t('workspaceSettings.failedToDelete', { error: error.message || error }));
     }
   }
-  
+
   function goBackToWorkspace() {
     navigate(`/workspaces/${workspaceId}`);
   }
@@ -212,8 +181,6 @@
   function switchTab(tab) {
     if (tab === 'general') {
       navigate(`/workspaces/${workspaceId}/settings/general`);
-    } else if (tab === 'appearance') {
-      navigate(`/workspaces/${workspaceId}/settings/appearance`);
     } else if (tab === 'categories') {
       navigate(`/workspaces/${workspaceId}/settings/categories`);
     } else if (tab === 'members') {
@@ -229,63 +196,14 @@
     }
   }
 
-  // Avatar upload functionality
-  async function handleAvatarUpload(files) {
-    if (!files || files.length === 0) return;
-
-    if (!attachmentStatus.enabled) {
-      showToastError(t('workspaceSettings.attachmentsRequired'));
-      return;
-    }
-
-    const file = files[0];
-    if (!file.type.startsWith('image/')) {
-      showToastError(t('workspaceSettings.pleaseSelectImage'));
-      return;
-    }
-
-    uploadingAvatar = true;
-    try {
-      const uploadFormData = new FormData();
-      uploadFormData.append('file', file);
-      uploadFormData.append('item_id', workspaceId.toString());
-      uploadFormData.append('category', 'workspace_avatar');
-
-      const response = await fetch('/api/attachments/upload', {
-        method: 'POST',
-        body: uploadFormData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
-
-      const uploadResult = await response.json();
-      
-      if (uploadResult && uploadResult.success && uploadResult.avatar_url) {
-        formData.avatar_url = uploadResult.avatar_url;
-        showAvatarUpload = false;
-        showToastSuccess(t('workspaceSettings.avatarUploadedSuccess'));
-      }
-    } catch (err) {
-      showToastError(t('workspaceSettings.failedToUploadAvatar', { error: err.message || err }));
-    } finally {
-      uploadingAvatar = false;
-    }
+  function handleTabChange(detail) {
+    switchTab(detail.tab);
   }
 
-  function removeAvatar() {
-    formData.avatar_url = null;
+  function handleConfigurationChanged() {
+    configurationRefreshKey++;
   }
-
-  function handleIconChange(event) {
-    formData.icon = event.detail.icon;
-    formData.color = event.detail.color;
-  }
-
 </script>
-
-
 
 {#if loading}
   <div class="rounded-xl p-6 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
@@ -312,14 +230,14 @@
       <!-- Breadcrumb Navigation -->
       <div class="flex items-center gap-2 text-sm mb-4" style="color: var(--ds-text-subtle);">
         <button
-          on:click={goBackToWorkspaceList}
+          onclick={goBackToWorkspaceList}
           class="breadcrumb-link transition-colors"
         >
           {t('workspaceSettings.breadcrumbs.workspaces')}
         </button>
         <span>/</span>
         <button
-          on:click={goBackToWorkspace}
+          onclick={goBackToWorkspace}
           class="breadcrumb-link transition-colors"
         >
           {workspace.name}
@@ -338,7 +256,7 @@
       />
     </div>
 
-    <Tabs tabs={settingsTabs} bind:activeTab on:tab-change={(e) => switchTab(e.detail.tab)}>
+    <Tabs tabs={settingsTabs} bind:activeTab onTabChange={handleTabChange}>
       {#if activeTab === 'general'}
         <!-- Basic Information -->
         <h3 class="text-lg font-medium mb-6" style="color: var(--ds-text);">{t('workspaceSettings.basicInformation')}</h3>
@@ -424,8 +342,8 @@
               {t('workspaceSettings.activeWorkspaceHelp')}
             </p>
           </div>
-<Toggle bind:checked={formData.active} />
-          </div>
+          <Toggle bind:checked={formData.active} />
+        </div>
         </div>
 
         <div class="flex items-center gap-3 mt-6">
@@ -445,124 +363,6 @@
           {t('workspaceSettings.reset')}
         </Button>
       </div>
-    {:else if activeTab === 'appearance'}
-        <!-- Visual Identity Settings -->
-        <div class="flex items-center gap-3 mb-6">
-          <Palette class="w-5 h-5" style="color: var(--ds-text-subtle);" />
-          <h3 class="text-lg font-medium" style="color: var(--ds-text);">{t('workspaceSettings.visualIdentity')}</h3>
-        </div>
-
-        <p class="text-sm mb-6" style="color: var(--ds-text-subtle);">
-          {t('workspaceSettings.visualIdentityDescription')}
-        </p>
-        
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <!-- Icon and Color Selection -->
-          <div>
-            <IconSelector
-              selectedIcon={formData.icon}
-              selectedColor={formData.color}
-              label={t('workspaceSettings.workspaceIconColor')}
-              compact={true}
-              on:change={handleIconChange}
-            />
-          </div>
-
-          <!-- Avatar Upload -->
-          <div>
-            <Label class="mb-2">{t('workspaceSettings.workspaceAvatar')}</Label>
-
-            <div class="space-y-4">
-              <!-- Current Avatar Display -->
-              {#if formData.avatar_url}
-                <div class="flex items-center gap-4 p-4 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-                  <img src={formData.avatar_url} alt="Workspace avatar" class="w-16 h-16 rounded object-cover" />
-                  <div class="flex-1">
-                    <div class="text-sm font-medium" style="color: var(--ds-text);">{t('workspaceSettings.customAvatar')}</div>
-                    <div class="text-xs" style="color: var(--ds-text-subtle);">{t('workspaceSettings.imageUploadedSuccessfully')}</div>
-                  </div>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onclick={removeAvatar}
-                    icon={Trash2}
-                  >
-                    {t('workspaceSettings.remove')}
-                  </Button>
-                </div>
-              {:else}
-                <div class="flex items-center gap-4 p-4 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-                  <div class="w-16 h-16 rounded flex items-center justify-center" style="background-color: {formData.color};">
-                    <svelte:component this={iconMap[formData.icon] || Package} size={32} color="white" />
-                  </div>
-                  <div class="flex-1">
-                    <div class="text-sm font-medium" style="color: var(--ds-text);">{t('workspaceSettings.defaultIcon')}</div>
-                    <div class="text-xs" style="color: var(--ds-text-subtle);">{t('workspaceSettings.usingSelectedIconColor')}</div>
-                  </div>
-                </div>
-              {/if}
-
-              <!-- Upload Controls -->
-              <div>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onclick={() => showAvatarUpload = !showAvatarUpload}
-                  icon={Camera}
-                  disabled={!attachmentStatus.enabled}
-                >
-                  {formData.avatar_url ? t('workspaceSettings.changeAvatar') : t('workspaceSettings.uploadAvatar')}
-                </Button>
-                {#if !attachmentStatus.enabled}
-                  <p class="text-xs mt-1" style="color: var(--ds-text-warning);">
-                    {t('workspaceSettings.attachmentsRequired')}
-                  </p>
-                {/if}
-              </div>
-
-              <!-- Upload Input (shown when toggled) -->
-              {#if showAvatarUpload && attachmentStatus.enabled}
-                <div class="p-4 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    on:change={(e) => handleAvatarUpload(e.target.files)}
-                    disabled={uploadingAvatar}
-                    class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
-                  />
-                  {#if uploadingAvatar}
-                    <div class="mt-2 text-sm text-blue-600">{t('workspaceSettings.uploading')}</div>
-                  {/if}
-                  <p class="text-xs mt-2" style="color: var(--ds-text-subtle);">
-                    {t('workspaceSettings.uploadRecommendation')}
-                  </p>
-                </div>
-              {/if}
-            </div>
-
-            <p class="text-xs mt-3" style="color: var(--ds-text-subtle);">
-              {t('workspaceSettings.avatarOrIconNote')}
-            </p>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-3 mt-6">
-          <Button
-            variant="primary"
-            size="medium"
-            onclick={saveWorkspace}
-            disabled={saving || !formData.name.trim() || !formData.key.trim()}
-          >
-            {#if saving}{t('workspaceSettings.saving')}{:else}{t('workspaceSettings.saveChanges')}{/if}
-          </Button>
-          <Button
-            variant="secondary"
-            size="medium"
-            onclick={loadWorkspace}
-          >
-            {t('workspaceSettings.reset')}
-          </Button>
-        </div>
     {:else if activeTab === 'categories'}
         <!-- Project Category Restrictions -->
         <div class="flex items-center gap-3 mb-6">
@@ -603,7 +403,7 @@
         <WorkspaceMembers {workspaceId} />
     {:else if activeTab === 'configuration'}
         <!-- Configuration Sets -->
-        <WorkspaceConfigurationAssigner workspaceId={workspaceId} on:configurationChanged={() => configurationRefreshKey++} />
+        <WorkspaceConfigurationAssigner workspaceId={workspaceId} onconfigurationChanged={handleConfigurationChanged} />
 
         <!-- Active Configuration Preview -->
         <div class="mt-6 pt-6 border-t" style="border-color: var(--ds-border);">
@@ -637,7 +437,7 @@
 
         {#if !showDeleteConfirm}
           <button
-            on:click={() => showDeleteConfirm = true}
+            onclick={() => showDeleteConfirm = true}
             class="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 transition-colors"
           >
             <Trash2 class="w-4 h-4" />
@@ -660,14 +460,14 @@
 
             <div class="flex items-center gap-3">
               <button
-                on:click={deleteWorkspace}
+                onclick={deleteWorkspace}
                 disabled={deleteConfirmText !== workspace.name}
                 class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t('workspaceSettings.yesRemoveWorkspace')}
               </button>
               <button
-                on:click={cancelDeleteWorkspace}
+                onclick={cancelDeleteWorkspace}
                 class="px-4 py-2 text-sm font-medium rounded border border-red-300 text-red-700 hover:bg-red-50 transition-colors"
               >
                 {t('workspaceSettings.cancel')}
@@ -688,10 +488,6 @@
 <style>
   .breadcrumb-link:hover {
     color: var(--ds-text) !important;
-  }
-
-  .toggle-off {
-    background-color: var(--ds-surface);
   }
 
   :global(.tab-danger) {

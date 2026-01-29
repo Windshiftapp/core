@@ -673,14 +673,14 @@ async function loadStatuses() {
 {:else if workspace}
   <div style="{styles.backgroundStyle} min-height: 100vh;">
     <!-- Header -->
-    <div class="p-6 border-b" style="border-color: {styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'};">
+    <div class="p-6 border-b" style="border-color: {styles.hasCustomBackground ? 'var(--ds-glass-border)' : 'var(--ds-border)'};">
 
       <ViewHeader
         workspaceName={workspace.name}
         collection={currentCollectionName}
         viewName="Map"
         itemCount={backboneItems.length + Object.values(childItemsByParent).flat().length}
-        hasGradient={styles.hasGradient}
+        hasGradient={styles.hasCustomBackground}
         textStyle={styles.textStyle}
         subtleTextStyle={styles.subtleTextStyle}
       />
@@ -757,7 +757,7 @@ async function loadStatuses() {
             <div class="flex-none w-64">
               <!-- Backbone Item -->
               <div class="mb-3">
-                <ItemCard hasGradient={styles.hasGradient} compact>
+                <ItemCard hasGradient={styles.hasCustomBackground} compact>
                   <!-- Title -->
                   <button
                     onclick={() => navigateToItem(backboneItem.id)}
@@ -1116,6 +1116,7 @@ async function loadStatuses() {
                 icon={MapPin}
                 title={t('collections.noTopLevelItems')}
                 description={t('collections.noTopLevelItemsDesc')}
+                hasGradient={styles.hasCustomBackground}
               />
             </div>
           {/if}
@@ -1129,6 +1130,7 @@ async function loadStatuses() {
     <EmptyState
       icon={null}
       title={t('collections.workspaceNotFound')}
+      hasGradient={styles.hasCustomBackground}
     />
   </div>
 {/if}

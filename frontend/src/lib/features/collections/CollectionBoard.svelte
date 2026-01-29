@@ -679,7 +679,7 @@
           collection={currentCollectionName}
           viewName="Board"
           itemCount={items.length}
-          hasGradient={styles.hasGradient}
+          hasGradient={styles.hasCustomBackground}
           textStyle={styles.textStyle}
           subtleTextStyle={styles.subtleTextStyle}
         >
@@ -688,7 +688,7 @@
             {workspaceId}
             {collectionId}
             activeView="board"
-            hasGradient={styles.hasGradient}
+            hasGradient={styles.hasCustomBackground}
           />
         </ViewHeader>
       </div>

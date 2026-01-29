@@ -336,7 +336,7 @@
           keyboardHint="A"
           hotkeyConfig={{ key: toHotkeyString('milestones', 'add'), guard: () => !showCreateForm }}
         >
-          {t('common.add')}
+          {t('milestones.addMilestone')}
         </Button>
       </div>
 
@@ -345,12 +345,12 @@
       {#if filteredMilestones.length === 0}
         <EmptyState
           icon={Milestone}
-          title={t('common.noItems')}
-          description={isGlobalView && activeCategoryId ? t('categories.noCategorizedWork') : t('common.noItems')}
+          title={isGlobalView && activeCategoryId ? t('milestones.noMilestonesInCategory') : t('milestones.noMilestones')}
+          description={isGlobalView && activeCategoryId ? t('categories.noCategorizedWork') : t('milestones.noMilestonesDescription')}
         >
           {#snippet action()}
             <Button variant="primary" icon={Plus} onclick={startCreate} keyboardHint="A">
-              {t('common.add')}
+              {t('milestones.addMilestone')}
             </Button>
           {/snippet}
         </EmptyState>

@@ -4,18 +4,15 @@
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { getCollection } from '../collections/collectionService.js';
-  import { getStatusCategory } from '../../utils/statusColors.js';
-  import Lozenge from '../../components/Lozenge.svelte';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
-  import { Plus, GripVertical, List } from 'lucide-svelte';
+  import { GripVertical, List } from 'lucide-svelte';
   import EmptyState from '../../components/EmptyState.svelte';
-  import { itemTypeIconMap } from '../../utils/icons.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
   import ItemDetail from '../items/ItemDetail.svelte';
+  import WorkItemRow from '../items/WorkItemRow.svelte';
   import DropIndicator from '../../layout/DropIndicator.svelte';
   import ViewHeader from '../../layout/ViewHeader.svelte';
-  import ItemKey from '../items/ItemKey.svelte';
   import CollectionViewSwitcher from './CollectionViewSwitcher.svelte';
   import { backlogStore } from '../../stores/index.js';
 
@@ -26,21 +23,7 @@
   let itemTypes = $state([]);
   let statuses = $state([]);
   let statusCategories = $state([]);
-  let statusMap = $state(new Map());
-  $effect(() => {
-    const entries = [];
-    (statuses || []).forEach((status) => {
-      if (!status || status.id === undefined || status.id === null) {
-        return;
-      }
-      const numericId = Number(status.id);
-      if (!Number.isNaN(numericId)) {
-        entries.push([numericId, status]);
-      }
-    });
-    statusMap = new Map(entries);
-  });
-  
+
   let backlogItems = $derived(items);
   let loading = $state(true);
   let currentCollectionName = $state('Default');
@@ -131,28 +114,6 @@
     } finally {
       loading = false;
     }
-  }
-
-  function getStatusName(item) {
-    if (!item) return '';
-    if (item.status_name && item.status_name.trim()) {
-      return item.status_name;
-    }
-    const candidateIds = [item.status_id, item.statusId];
-    for (const candidate of candidateIds) {
-      if (candidate === null || candidate === undefined) continue;
-      const numericId = Number(candidate);
-      if (!Number.isNaN(numericId) && statusMap.has(numericId)) {
-        const status = statusMap.get(numericId);
-        if (status?.name) {
-          return status.name;
-        }
-      }
-    }
-    if (typeof item.status === 'string' && item.status.trim()) {
-      return item.status;
-    }
-    return '';
   }
 
   function openItem(itemId, event) {
@@ -402,7 +363,7 @@
           collection={currentCollectionName}
           viewName="Backlog"
           itemCount={backlogItems.length}
-          hasGradient={styles.hasGradient}
+          hasGradient={styles.hasCustomBackground}
           textStyle={styles.textStyle}
           subtleTextStyle={styles.subtleTextStyle}
         >
@@ -411,7 +372,7 @@
             {workspaceId}
             {collectionId}
             activeView="backlog"
-            hasGradient={styles.hasGradient}
+            hasGradient={styles.hasCustomBackground}
           />
         </ViewHeader>
       </div>
@@ -421,63 +382,39 @@
           icon={List}
           title={t('collections.noItemsInBacklog')}
           description={t('collections.noItemsInBacklogDesc')}
+          hasGradient={styles.hasCustomBackground}
         />
       {:else}
         <!-- Backlog items list -->
         <div class="w-full">
           
           <div class="flex flex-col" style={`row-gap: ${backlogRowGap}px;`}>
-            {#each backlogItems as item, index (item.id)}
-              {@const statusName = getStatusName(item)}
-              {@const statusCategory = statusName ? getStatusCategory(statusName, statuses, statusCategories) : null}
+            {#each backlogItems as item (item.id)}
               <div
-                class="relative border rounded px-4 py-3 shadow-sm hover:shadow-md transition-shadow overflow-visible"
-                style="{styles.cardStyle(8)}"
+                class="relative"
                 data-item-card
                 data-item-id={item.id}
-                role="button"
-                tabindex="0"
-                onclick={event => openItem(item.id, event)}
-                onkeydown={event => (event.key === 'Enter' || event.key === ' ') && openItem(item.id, event)}
               >
                 {#if dragState.get(item.id)?.closestEdge}
                   <DropIndicator edge={dragState.get(item.id)?.closestEdge} gap={backlogRowGap} />
                 {/if}
 
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-3 flex-1">
-                    <!-- Drag handle -->
+                <WorkItemRow
+                  {item}
+                  {workspace}
+                  {itemTypes}
+                  {statuses}
+                  {statusCategories}
+                  onclick={(e) => openItem(item.id, e)}
+                  showStatus={true}
+                  hasGradient={styles.hasCustomBackground}
+                >
+                  {#snippet leading()}
                     <div class="cursor-grab active:cursor-grabbing" style={styles.dragHandleStyle}>
                       <GripVertical class="w-4 h-4" />
                     </div>
-                    <!-- Title with key and item type icon -->
-                    <div class="flex items-center gap-2">
-                      <ItemKey {item} {workspace} className="text-xs font-mono" style={styles.glassSubtleTextStyle} />
-                      {#if item.item_type_id && itemTypes.length > 0}
-                        {@const itemType = itemTypes.find(type => type.id === item.item_type_id)}
-                        {#if itemType}
-                          <div
-                            class="w-4 h-4 rounded flex items-center justify-center text-white text-xs"
-                            style="background-color: {itemType.color};"
-                            title={itemType.name}
-                          >
-                            <svelte:component this={itemTypeIconMap[itemType.icon] || itemTypeIconMap.FileText} class="w-3 h-3" />
-                          </div>
-                        {/if}
-                      {/if}
-                      <h4 class="font-medium text-sm" style="color: var(--ds-text);">
-                        {item.title}
-                      </h4>
-                    </div>
-
-                  </div>
-
-                  <!-- Status on the right -->
-                  <Lozenge
-                    text={statusName ? statusName.replace(/_/g, ' ') : 'Status'}
-                    customBg={statusCategory?.color || '#6b7280'}
-                  />
-                </div>
+                  {/snippet}
+                </WorkItemRow>
               </div>
             {/each}
           </div>

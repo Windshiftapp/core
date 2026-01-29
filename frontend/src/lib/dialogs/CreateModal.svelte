@@ -3,7 +3,7 @@
   import { fade } from 'svelte/transition';
   import { navigate, currentRoute } from '../router.js';
   import { milestonesStore } from '../stores/milestones.js';
-  import { workspacesStore, shouldNavigateAfterCreate } from '../stores';
+  import { workspacesStore, shouldNavigateAfterCreate, workItemFormStore } from '../stores';
   import { api } from '../api.js';
   import { X, Target, Building, FolderOpen, ChevronRight, FileText } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
@@ -56,31 +56,14 @@
   } = $props();
 
   let selectedType = $state(initialType);
-  let selectedWorkspace = $state(null);
-  let parentItem = $state(null);
-  let restrictedItemTypes = $state(null);
 
   // Form references
-  let workItemFormRef = $state(null);
   let milestoneFormRef = $state(null);
   let workspaceFormRef = $state(null);
   let collectionFormRef = $state(null);
   let nameInputRef = $state(null);
 
-  // Form data for each type
-  let workItemFormData = $state({
-    name: '',
-    description: '',
-    due_date: '',
-    workspace_id: null,
-    priority_id: null,
-    milestone_id: null,
-    assignee_id: null,
-    item_type_id: null
-  });
-  let workItemCustomFieldValues = $state({});
-  let workItemValidationErrors = $state([]);
-
+  // Non-work-item form data
   let milestoneFormData = $state({
     name: '',
     description: '',
@@ -105,7 +88,7 @@
   let currentTypeName = $derived(typeLabels[selectedType] || 'Item');
   let currentFormData = $derived.by(() => {
     switch (selectedType) {
-      case 'work-item': return workItemFormData;
+      case 'work-item': return workItemFormStore.formData;
       case 'milestone': return milestoneFormData;
       case 'workspace': return workspaceFormData;
       case 'collection': return collectionFormData;
@@ -117,7 +100,7 @@
   let isFormValid = $derived.by(() => {
     switch (selectedType) {
       case 'work-item':
-        return workItemFormData.name.trim() !== '' && workItemFormData.workspace_id;
+        return workItemFormStore.formData.name.trim() !== '' && workItemFormStore.formData.workspace_id;
       case 'milestone':
         return milestoneFormData.name.trim() !== '' && milestoneFormData.target_date;
       case 'workspace':
@@ -136,24 +119,11 @@
   function close() {
     isOpen = false;
     selectedType = initialType;
-    selectedWorkspace = null;
-    parentItem = null;
-    restrictedItemTypes = null;
 
-    // Reset all forms
-    workItemFormData = {
-      name: '',
-      description: '',
-      due_date: '',
-      workspace_id: null,
-      priority_id: null,
-      milestone_id: null,
-      assignee_id: null,
-      item_type_id: null
-    };
-    workItemCustomFieldValues = {};
-    workItemValidationErrors = [];
+    // Reset work item form store
+    workItemFormStore.resetForm();
 
+    // Reset other forms
     milestoneFormData = {
       name: '',
       description: '',
@@ -187,24 +157,12 @@
   async function handleSubmit() {
     try {
       if (selectedType === 'work-item') {
-        // Validate using form reference
-        if (workItemFormRef && !workItemFormRef.validate()) {
+        // Validate using store
+        if (!workItemFormStore.validate()) {
           return;
         }
 
-        const formData = workItemFormRef?.getFormData() || {
-          workspace_id: selectedWorkspace?.id,
-          title: workItemFormData.name,
-          description: workItemFormData.description || '',
-          priority_id: workItemFormData.priority_id || null,
-          milestone_id: workItemFormData.milestone_id || null,
-          assignee_id: workItemFormData.assignee_id || null,
-          due_date: workItemFormData.due_date ? new Date(workItemFormData.due_date).toISOString() : null,
-          status: 'open',
-          item_type_id: workItemFormData.item_type_id,
-          parent_id: parentItem ? parentItem.id : null,
-          custom_field_values: workItemCustomFieldValues
-        };
+        const formData = workItemFormStore.getFormData();
 
         if (!formData.workspace_id) {
           errorToast('Please select a workspace');
@@ -293,6 +251,13 @@
     }
   });
 
+  // Initialize store when modal opens for work items
+  $effect(() => {
+    if (isOpen && selectedType === 'work-item') {
+      workItemFormStore.init();
+    }
+  });
+
   // Load workspaces when modal opens
   $effect(() => {
     if (isOpen && !$workspacesStore.loaded && $workspacesStore.regularWorkspaces.length === 0) {
@@ -326,25 +291,31 @@
     if (event.detail?.workspaceId) {
       const workspaceId = event.detail.workspaceId;
       const workspaceIdNum = typeof workspaceId === 'string' ? parseInt(workspaceId, 10) : workspaceId;
-      workItemFormData.workspace_id = workspaceIdNum;
 
       if ($workspacesStore.regularWorkspaces.length === 0) {
         loadWorkspaces().then(() => {
-          selectedWorkspace = $workspacesStore.regularWorkspaces.find(w => w.id === workspaceIdNum);
+          const workspace = $workspacesStore.regularWorkspaces.find(w => w.id === workspaceIdNum);
+          if (workspace) {
+            workItemFormStore.setWorkspace(workspace);
+          }
         });
       } else {
-        selectedWorkspace = $workspacesStore.regularWorkspaces.find(w => w.id === workspaceIdNum);
+        const workspace = $workspacesStore.regularWorkspaces.find(w => w.id === workspaceIdNum);
+        if (workspace) {
+          workItemFormStore.setWorkspace(workspace);
+        }
       }
     }
   }
 
   function handleSetCreateParent(event) {
     if (event.detail?.parentId) {
-      parentItem = {
+      const parent = {
         id: event.detail.parentId,
         title: event.detail.parentTitle
       };
-      restrictedItemTypes = event.detail.availableItemTypes || null;
+      const allowedItemTypes = event.detail.availableItemTypes || null;
+      workItemFormStore.setParentItem(parent, allowedItemTypes);
     }
   }
 
@@ -387,7 +358,7 @@
       <!-- Compact Header -->
       <div class="flex items-center gap-2 px-4 py-3 border-b" style="border-color: var(--ds-border);">
         <!-- Type Selector FIRST (independent of workspace) -->
-        {#if !parentItem && !compactMode}
+        {#if !workItemFormStore.parentItem && !compactMode}
           <FieldChip
             label={t('createModal.type')}
             value={selectedType}
@@ -420,14 +391,13 @@
         {/if}
 
         <!-- Workspace Selector (only for work-items) -->
-        {#if selectedType === 'work-item' && !parentItem}
+        {#if selectedType === 'work-item' && !workItemFormStore.parentItem}
           <CompactWorkspaceSelector
-            bind:value={workItemFormData.workspace_id}
+            value={workItemFormStore.formData.workspace_id}
             workspaces={$workspacesStore.regularWorkspaces}
             onSelect={(workspace) => {
               if (workspace) {
-                selectedWorkspace = workspace;
-                workItemFormData.workspace_id = workspace.id;
+                workItemFormStore.setWorkspace(workspace);
               }
             }}
           />
@@ -435,7 +405,7 @@
         {/if}
 
         <span class="font-medium" style="color: var(--ds-text);">
-          {#if parentItem}
+          {#if workItemFormStore.parentItem}
             {t('createModal.newChildItem')}
           {:else}
             {t('createModal.new')} {currentTypeName}
@@ -458,13 +428,7 @@
       <div class="px-4 py-3">
         {#if selectedType === 'work-item'}
           <WorkItemForm
-            bind:this={workItemFormRef}
-            bind:formData={workItemFormData}
-            bind:customFieldValues={workItemCustomFieldValues}
-            bind:validationErrorMessages={workItemValidationErrors}
             bind:nameInputRef={nameInputRef}
-            {parentItem}
-            {restrictedItemTypes}
           />
         {:else if selectedType === 'milestone'}
           <MilestoneForm

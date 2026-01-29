@@ -465,7 +465,7 @@
           collection={currentCollectionName}
           viewName={t('collectionTree.tree')}
           itemCount={allItems.length}
-          hasGradient={styles.hasGradient}
+          hasGradient={styles.hasCustomBackground}
           textStyle={styles.textStyle}
           subtleTextStyle={styles.subtleTextStyle}
         />
@@ -476,6 +476,7 @@
         <EmptyState
           title={t('collectionTree.noWorkItemsYet')}
           description={t('collectionTree.createFirstWorkItem')}
+          hasGradient={styles.hasCustomBackground}
         />
       {:else}
         <!-- Tree Controls -->

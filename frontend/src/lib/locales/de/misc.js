@@ -211,6 +211,10 @@ export default {
     title: 'Meilensteine',
     milestone: 'Meilenstein',
     subtitle: 'Releases und Fristen verfolgen',
+    addMilestone: 'Meilenstein hinzufügen',
+    noMilestones: 'Noch keine Meilensteine',
+    noMilestonesDescription: 'Erstellen Sie Ihren ersten Meilenstein, um Releases und Fristen zu verfolgen.',
+    noMilestonesInCategory: 'Keine Meilensteine in dieser Kategorie',
     allCategories: 'Alle Kategorien',
     manageCategories: 'Kategorien verwalten',
     allMilestones: 'Alle Meilensteine',
@@ -367,7 +371,8 @@ export default {
     // Reflexion - Platzhalter
     placeholderAccomplishments: 'Beschreiben Sie Ihre wichtigsten Erfolge...',
     placeholderWentWell: 'Was gut lief und warum...',
-    placeholderImprovements: 'Verbesserungsbereiche und nächste Schritte...'
+    placeholderImprovements: 'Verbesserungsbereiche und nächste Schritte...',
+    startWriting: 'Beginnen Sie mit Ihrer Reflexion...'
   },
 
   connections: {

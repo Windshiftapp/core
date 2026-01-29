@@ -35,6 +35,7 @@ type CreateWorkspaceRequest struct {
 	Color         string `json:"color,omitempty"`
 	AvatarURL     string `json:"avatar_url,omitempty"`
 	DefaultView   string `json:"default_view,omitempty"` // Default view when entering workspace (board, backlog, list, tree, map)
+	DisplayMode   string `json:"display_mode,omitempty"` // Display mode for workspace layout (default, board)
 }
 
 // UpdateWorkspaceRequest represents the request payload for updating a workspace
@@ -50,6 +51,7 @@ type UpdateWorkspaceRequest struct {
 	Color                 string `json:"color,omitempty"`
 	AvatarURL             string `json:"avatar_url,omitempty"`
 	DefaultView           string `json:"default_view,omitempty"` // Default view when entering workspace (board, backlog, list, tree, map)
+	DisplayMode           string `json:"display_mode,omitempty"` // Display mode for workspace layout (default, board)
 	TimeProjectCategories []int  `json:"time_project_categories,omitempty"`
 }
 
@@ -85,14 +87,14 @@ func (h *WorkspaceHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	if isPersonalParam == "true" {
 		// Filter to only current user's personal workspace
 		query = `
-			SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.created_at, w.updated_at,
+			SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
 			       COUNT(p.id) as project_count,
 			       tp.name as time_project_name
 			FROM workspaces w
 			LEFT JOIN projects p ON w.id = p.workspace_id
 			LEFT JOIN time_projects tp ON w.time_project_id = tp.id
 			WHERE w.is_personal = ? AND w.owner_id = ?
-			GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.created_at, w.updated_at, tp.name
+			GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name
 			ORDER BY w.name
 			LIMIT 200`
 		rows, err = h.db.Query(query, true, currentUser.ID)
@@ -100,14 +102,14 @@ func (h *WorkspaceHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		// Get all workspaces excluding other users' personal workspaces
 		// Only include: 1) non-personal workspaces, 2) current user's personal workspace
 		query = `
-			SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.created_at, w.updated_at,
+			SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
 			       COUNT(p.id) as project_count,
 			       tp.name as time_project_name
 			FROM workspaces w
 			LEFT JOIN projects p ON w.id = p.workspace_id
 			LEFT JOIN time_projects tp ON w.time_project_id = tp.id
 			WHERE w.is_personal = 0 OR w.is_personal IS NULL OR w.owner_id = ?
-			GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.created_at, w.updated_at, tp.name
+			GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name
 			ORDER BY w.is_personal ASC, w.name
 			LIMIT 200`
 		rows, err = h.db.Query(query, currentUser.ID)
@@ -121,9 +123,9 @@ func (h *WorkspaceHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	var workspaces []models.Workspace
 	for rows.Next() {
 		var workspace models.Workspace
-		var timeProjectName, icon, color, defaultView sql.NullString
+		var timeProjectName, icon, color, defaultView, displayMode sql.NullString
 		err := rows.Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
-			&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID, &icon, &color, &workspace.AvatarURL, &defaultView, &workspace.CreatedAt, &workspace.UpdatedAt,
+			&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID, &icon, &color, &workspace.AvatarURL, &defaultView, &displayMode, &workspace.CreatedAt, &workspace.UpdatedAt,
 			&workspace.ProjectCount, &timeProjectName)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -133,6 +135,7 @@ func (h *WorkspaceHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		workspace.Icon = icon.String
 		workspace.Color = color.String
 		workspace.DefaultView = defaultView.String
+		workspace.DisplayMode = displayMode.String
 		workspace.TimeProjectName = timeProjectName.String
 		workspaces = append(workspaces, workspace)
 	}
@@ -188,10 +191,10 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var workspace models.Workspace
-	var timeProjectName, icon, color, defaultView sql.NullString
+	var timeProjectName, icon, color, defaultView, displayMode sql.NullString
 	var configSetID sql.NullInt64
 	err := h.db.QueryRow(`
-		SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.created_at, w.updated_at,
+		SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
 		       COUNT(p.id) as project_count,
 		       tp.name as time_project_name,
 		       wcs.configuration_set_id
@@ -200,14 +203,15 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN time_projects tp ON w.time_project_id = tp.id
 		LEFT JOIN workspace_configuration_sets wcs ON w.id = wcs.workspace_id
 		WHERE w.id = ?
-		GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.created_at, w.updated_at, tp.name, wcs.configuration_set_id
+		GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name, wcs.configuration_set_id
 	`, id).Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
-		&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID, &icon, &color, &workspace.AvatarURL, &defaultView, &workspace.CreatedAt, &workspace.UpdatedAt,
+		&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID, &icon, &color, &workspace.AvatarURL, &defaultView, &displayMode, &workspace.CreatedAt, &workspace.UpdatedAt,
 		&workspace.ProjectCount, &timeProjectName, &configSetID)
 
 	workspace.Icon = icon.String
 	workspace.Color = color.String
 	workspace.DefaultView = defaultView.String
+	workspace.DisplayMode = displayMode.String
 	workspace.TimeProjectName = timeProjectName.String
 	if configSetID.Valid {
 		workspace.ConfigurationSetID = &configSetID.Int64
@@ -327,13 +331,19 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 		defaultView = "board"
 	}
 
+	// Default display mode to 'default' if not specified or invalid
+	displayMode := req.DisplayMode
+	if displayMode != "default" && displayMode != "board" {
+		displayMode = "default"
+	}
+
 	now := time.Now()
 	var id int64
 	err = h.db.QueryRow(`
-		INSERT INTO workspaces (name, key, description, active, time_project_id, is_personal, owner_id, icon, color, avatar_url, default_view, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO workspaces (name, key, description, active, time_project_id, is_personal, owner_id, icon, color, avatar_url, default_view, display_mode, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING id
-	`, req.Name, req.Key, req.Description, isActive, req.TimeProjectID, req.IsPersonal, req.OwnerID, req.Icon, req.Color, req.AvatarURL, defaultView, now, now).Scan(&id)
+	`, req.Name, req.Key, req.Description, isActive, req.TimeProjectID, req.IsPersonal, req.OwnerID, req.Icon, req.Color, req.AvatarURL, defaultView, displayMode, now, now).Scan(&id)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -356,22 +366,23 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Return the created workspace with joined data
 	var workspace models.Workspace
-	var timeProjectName, icon, color, defaultViewStr sql.NullString
+	var timeProjectName, icon, color, defaultViewStr, displayModeStr sql.NullString
 	err = h.db.QueryRow(`
-		SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.created_at, w.updated_at,
+		SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
 		       COUNT(p.id) as project_count,
 		       tp.name as time_project_name
 		FROM workspaces w
 		LEFT JOIN projects p ON w.id = p.workspace_id
 		LEFT JOIN time_projects tp ON w.time_project_id = tp.id
 		WHERE w.id = ?
-		GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.created_at, w.updated_at, tp.name
+		GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name
 	`, id).Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
-		&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID, &icon, &color, &workspace.AvatarURL, &defaultViewStr, &workspace.CreatedAt, &workspace.UpdatedAt, &workspace.ProjectCount, &timeProjectName)
+		&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID, &icon, &color, &workspace.AvatarURL, &defaultViewStr, &displayModeStr, &workspace.CreatedAt, &workspace.UpdatedAt, &workspace.ProjectCount, &timeProjectName)
 
 	workspace.Icon = icon.String
 	workspace.Color = color.String
 	workspace.DefaultView = defaultViewStr.String
+	workspace.DisplayMode = displayModeStr.String
 	workspace.TimeProjectName = timeProjectName.String
 
 	if err != nil {
@@ -468,12 +479,18 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 		keyToUse = oldWorkspace.Key
 	}
 
+	// Validate display mode
+	displayModeToUse := req.DisplayMode
+	if displayModeToUse != "default" && displayModeToUse != "board" {
+		displayModeToUse = "default"
+	}
+
 	now := time.Now()
 	_, err = h.db.ExecWrite(`
 		UPDATE workspaces
-		SET name = ?, key = ?, description = ?, active = ?, time_project_id = ?, is_personal = ?, owner_id = ?, icon = ?, color = ?, avatar_url = ?, default_view = ?, updated_at = ?
+		SET name = ?, key = ?, description = ?, active = ?, time_project_id = ?, is_personal = ?, owner_id = ?, icon = ?, color = ?, avatar_url = ?, default_view = ?, display_mode = ?, updated_at = ?
 		WHERE id = ?
-	`, req.Name, keyToUse, req.Description, req.Active, req.TimeProjectID, req.IsPersonal, req.OwnerID, req.Icon, req.Color, req.AvatarURL, req.DefaultView, now, id)
+	`, req.Name, keyToUse, req.Description, req.Active, req.TimeProjectID, req.IsPersonal, req.OwnerID, req.Icon, req.Color, req.AvatarURL, req.DefaultView, displayModeToUse, now, id)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -490,22 +507,23 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Return the updated workspace with joined data
 	var workspace models.Workspace
-	var timeProjectName, icon, color, defaultView sql.NullString
+	var timeProjectName, icon, color, defaultView, displayModeVal sql.NullString
 	err = h.db.QueryRow(`
-		SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.created_at, w.updated_at,
+		SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
 		       COUNT(p.id) as project_count,
 		       tp.name as time_project_name
 		FROM workspaces w
 		LEFT JOIN projects p ON w.id = p.workspace_id
 		LEFT JOIN time_projects tp ON w.time_project_id = tp.id
 		WHERE w.id = ?
-		GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.created_at, w.updated_at, tp.name
+		GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name
 	`, id).Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
-		&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID, &icon, &color, &workspace.AvatarURL, &defaultView, &workspace.CreatedAt, &workspace.UpdatedAt, &workspace.ProjectCount, &timeProjectName)
+		&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID, &icon, &color, &workspace.AvatarURL, &defaultView, &displayModeVal, &workspace.CreatedAt, &workspace.UpdatedAt, &workspace.ProjectCount, &timeProjectName)
 
 	workspace.Icon = icon.String
 	workspace.Color = color.String
 	workspace.DefaultView = defaultView.String
+	workspace.DisplayMode = displayModeVal.String
 	workspace.TimeProjectName = timeProjectName.String
 
 	if err != nil {

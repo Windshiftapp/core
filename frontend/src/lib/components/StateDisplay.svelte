@@ -32,15 +32,33 @@
     action = null, // Snippet for custom action
     size = 'md', // For loading spinner: 'sm' | 'md' | 'lg'
     inline = false, // For loading: horizontal layout
+    hasGradient = false, // Whether displayed on a gradient background
     class: className = ''
   } = $props();
 
-  // Computed icon color based on type
-  const iconColor = $derived({
-    error: 'var(--ds-icon-danger)',
-    empty: 'var(--ds-icon-disabled)',
-    loading: 'var(--ds-icon-subtle)'
-  }[type] || 'var(--ds-icon-disabled)');
+  // Computed icon color based on type and gradient
+  const iconColor = $derived(
+    hasGradient && type === 'empty'
+      ? 'rgba(255, 255, 255, 0.6)'
+      : {
+          error: 'var(--ds-icon-danger)',
+          empty: 'var(--ds-icon-disabled)',
+          loading: 'var(--ds-icon-subtle)'
+        }[type] || 'var(--ds-icon-disabled)'
+  );
+
+  // Text colors based on gradient
+  const titleColor = $derived(
+    hasGradient && type === 'empty'
+      ? 'rgba(255, 255, 255, 0.8)'
+      : type === 'error' ? 'var(--ds-text)' : 'var(--ds-text-subtle)'
+  );
+
+  const messageColor = $derived(
+    hasGradient && type === 'empty'
+      ? 'rgba(255, 255, 255, 0.6)'
+      : 'var(--ds-text-subtle)'
+  );
 
   // Default icons per type
   const defaultIcon = $derived({
@@ -89,22 +107,22 @@
     {#if title}
       <h3
         class="text-lg font-medium mb-1"
-        style="color: {type === 'error' ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
+        style="color: {titleColor};"
       >
         {title}
       </h3>
     {:else if type === 'error'}
-      <h3 class="text-lg font-medium mb-1" style="color: var(--ds-text);">
+      <h3 class="text-lg font-medium mb-1" style="color: {titleColor};">
         {t('components.errorState.title')}
       </h3>
     {:else if type === 'empty'}
-      <h3 class="text-lg font-medium mb-1" style="color: var(--ds-text-subtle);">
+      <h3 class="text-lg font-medium mb-1" style="color: {titleColor};">
         {t('common.noData')}
       </h3>
     {/if}
 
     {#if displayMessage}
-      <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">{displayMessage}</p>
+      <p class="text-sm mb-4" style="color: {messageColor};">{displayMessage}</p>
     {/if}
 
     {#if action}

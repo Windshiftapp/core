@@ -41,15 +41,35 @@
 
   // Expose methods from the underlying editor
   export function focus() {
-    if (editorInstance?.focus) {
-      editorInstance.focus();
-    }
+    let attempts = 0;
+    const maxAttempts = 20; // 20 * 50ms = 1 second max wait
+
+    const attemptFocus = () => {
+      if (editorInstance?.focus) {
+        editorInstance.focus();
+      } else if (attempts < maxAttempts) {
+        attempts++;
+        setTimeout(attemptFocus, 50);
+      }
+    };
+
+    attemptFocus();
   }
 
   export function focusEnd() {
-    if (editorInstance?.focusEnd) {
-      editorInstance.focusEnd();
-    }
+    let attempts = 0;
+    const maxAttempts = 20; // 20 * 50ms = 1 second max wait
+
+    const attemptFocus = () => {
+      if (editorInstance?.focusEnd) {
+        editorInstance.focusEnd();
+      } else if (attempts < maxAttempts) {
+        attempts++;
+        setTimeout(attemptFocus, 50);
+      }
+    };
+
+    attemptFocus();
   }
 
   export function clear() {

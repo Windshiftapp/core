@@ -13,6 +13,7 @@
   import ColorDot from '../../components/ColorDot.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { confirm } from '../../composables/useConfirm.js';
 
   let activeTab = $state('projects');
   let projects = $state([]);
@@ -146,7 +147,15 @@
   }
 
   async function deleteProject(project) {
-    if (confirm(t('time.projects.confirmDelete', { name: project.name }))) {
+    const confirmed = await confirm({
+      title: t('time.projects.deleteProject'),
+      message: t('time.projects.confirmDelete', { name: project.name }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+
+    if (confirmed) {
       try {
         await api.time.projects.delete(project.id);
         await loadProjects();

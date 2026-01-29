@@ -63,6 +63,7 @@
   export let savingTimeEntry = false;
   export let timeProjects = [];
   export let activeTimer = null;
+  export let editingStatus = false;
   export let editingDueDate = false;
   export let editingCustomFields = {};
   export let editCustomFieldValues = {};
@@ -325,8 +326,8 @@
           <ItemDetailDescription
             bind:this={descriptionComponent}
             {item}
-            bind:editingDescription
-            bind:editDescription
+            {editingDescription}
+            {editDescription}
             {saving}
             {availableSubIssueTypes}
             {attachments}
@@ -334,6 +335,7 @@
             {manualActions}
             on:save-field={handleSaveField}
             on:cancel-edit={handleCancelEdit}
+            on:start-editing-description={() => dispatch('start-editing-description')}
             on:show-add-link={handleShowLinkModal}
             on:create-sub-issue={handleCreateSubIssue}
             on:image-uploaded={handleImageUploaded}
@@ -401,6 +403,7 @@
             {item}
             {workspace}
             {statusOptions}
+            {editingStatus}
             {editingDueDate}
             {editingCustomFields}
             {editCustomFieldValues}

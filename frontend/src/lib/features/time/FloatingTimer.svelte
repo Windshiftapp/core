@@ -1,13 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import {
-    activeTimer,
-    formattedDuration,
-    timerSyncing,
-    stop as stopTimerAction,
-    initialize as initializeTimer,
-    cleanup as cleanupTimer
-  } from '../../stores/timerStore.js';
+  import { timerStore } from '../../stores/timerStore.svelte.js';
   import { Clock, Square, Maximize2, Minimize2, ExternalLink } from 'lucide-svelte';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -22,7 +15,7 @@
 
   // Initialize timer on mount
   onMount(async () => {
-    await initializeTimer();
+    await timerStore.initialize();
     
     // Load saved position and collapsed state from localStorage
     const savedPosition = localStorage.getItem('windshift-timer-position');
@@ -128,7 +121,7 @@
 
   async function handleStopTimer() {
     try {
-      await stopTimerAction();
+      await timerStore.stop();
     } catch (error) {
       console.error('Failed to stop timer:', error);
       // Error is already handled in the store
@@ -141,14 +134,14 @@
   }
 
   function navigateToItem() {
-    const currentTimer = $activeTimer;
+    const currentTimer = timerStore.activeTimer;
     if (currentTimer && currentTimer.item_id && currentTimer.workspace_id) {
       navigate(`/workspaces/${currentTimer.workspace_id}/items/${currentTimer.item_id}`);
     }
   }
 
   function getWorkItemKey() {
-    const currentTimer = $activeTimer;
+    const currentTimer = timerStore.activeTimer;
     if (currentTimer && currentTimer.workspace_key && currentTimer.item_id) {
       return `${currentTimer.workspace_key}-${currentTimer.item_id}`;
     }
@@ -167,14 +160,14 @@
     }
 
     // Cleanup timer intervals
-    cleanupTimer();
+    timerStore.cleanup();
   });
 
   // Reactive position style
   const positionStyle = $derived(`left: ${position.x}px; top: ${position.y}px;`);
 </script>
 
-{#if $activeTimer}
+{#if timerStore.activeTimer}
   <div
     bind:this={timerElement}
     class="fixed z-50 select-none {dragging ? 'cursor-grabbing' : 'cursor-grab transition-all duration-200 ease-in-out'}"
@@ -199,9 +192,9 @@
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span class="font-mono text-sm font-bold text-white">
-              {$formattedDuration}
+              {timerStore.durationFormatted}
             </span>
-            {#if $timerSyncing}
+            {#if timerStore.syncing}
               <div class="w-2 h-2 bg-white rounded-full animate-pulse opacity-75"></div>
             {/if}
           </div>
@@ -210,7 +203,7 @@
             <button
               onclick={(e) => { e.stopPropagation(); navigateToItem(); }}
               class="text-xs font-mono bg-blue-400 bg-opacity-30 text-blue-100 px-1.5 py-0.5 rounded hover:bg-opacity-50 transition-colors flex items-center gap-1"
-              title={t('time.timer.goToWorkItem', { title: $activeTimer.item_title || t('items.workItem') })}
+              title={t('time.timer.goToWorkItem', { title: timerStore.activeTimer.item_title || t('items.workItem') })}
               type="button"
             >
               {getWorkItemKey()}
@@ -237,7 +230,7 @@
             onclick={(e) => { e.stopPropagation(); handleStopTimer(); }}
             class="p-1 rounded hover:bg-red-500 hover:bg-opacity-80 text-white transition-colors"
             title={t('time.stopTimer')}
-            disabled={$timerSyncing}
+            disabled={timerStore.syncing}
             type="button"
           >
             <Square class="w-3 h-3" />
@@ -249,18 +242,18 @@
       {#if !collapsed}
         <div class="px-3 py-2 border-t border-blue-400 border-opacity-30 bg-blue-600 bg-opacity-20">
           <div class="space-y-1.5 text-xs">
-            {#if $activeTimer.project_name}
+            {#if timerStore.activeTimer.project_name}
               <div class="text-blue-100">
-                <span class="font-medium">{t('time.timer.project')}:</span> {$activeTimer.project_name}
-                {#if $activeTimer.customer_name}
-                  ({$activeTimer.customer_name})
+                <span class="font-medium">{t('time.timer.project')}:</span> {timerStore.activeTimer.project_name}
+                {#if timerStore.activeTimer.customer_name}
+                  ({timerStore.activeTimer.customer_name})
                 {/if}
               </div>
             {/if}
 
-            {#if $activeTimer.workspace_name}
+            {#if timerStore.activeTimer.workspace_name}
               <div class="text-blue-100">
-                <span class="font-medium">{t('time.timer.workspace')}:</span> {$activeTimer.workspace_name}
+                <span class="font-medium">{t('time.timer.workspace')}:</span> {timerStore.activeTimer.workspace_name}
               </div>
             {/if}
 

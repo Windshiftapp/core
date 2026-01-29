@@ -62,3 +62,39 @@ export { i18n, t, translateError, SUPPORTED_LOCALES } from './i18n.svelte.js';
 // Methods: attachmentStatus.load(), attachmentStatus.reload()
 // Provides attachment system availability status for UI components
 export { attachmentStatus } from './attachmentStatus.svelte.js';
+
+// Work Item Form store
+// Access via: workItemFormStore.formData, workItemFormStore.selectedWorkspace,
+// workItemFormStore.validate(), workItemFormStore.getFormData(), etc.
+// Centralized state management for work item creation form
+export { workItemFormStore } from './workItemFormStore.svelte.js';
+
+// Item Detail store
+// Access via: itemDetailStore.item, itemDetailStore.workspace, itemDetailStore.editing,
+// itemDetailStore.loadItem(wsId, itemId), itemDetailStore.saveField(field, value), etc.
+// Centralized state management for item detail view (editing, modals, related data)
+export { itemDetailStore } from './itemDetailStore.svelte.js';
+
+// Security store
+// Access via: securityStore.credentials, securityStore.apiTokens, securityStore.user,
+// securityStore.loadCredentials(), securityStore.createApiToken(), etc.
+// Centralized state management for security settings page
+export { securityStore } from './securityStore.svelte.js';
+
+// Screen Editor store
+// Access via: screenEditorStore.screens, screenEditorStore.screenFields,
+// screenEditorStore.loadScreens(), screenEditorStore.saveScreenFields(), etc.
+// Centralized state management for screen configuration editor
+export { screenEditorStore } from './screenEditorStore.svelte.js';
+
+// Homepage store
+// Access via: homepageStore.recentWorkspaces, homepageStore.notifications,
+// homepageStore.loadDashboardData(), homepageStore.isOnboarding, etc.
+// Centralized state management for homepage/dashboard
+export { homepageStore } from './homepageStore.svelte.js';
+
+// Time Entry store
+// Access via: timeEntryStore.worklogs, timeEntryStore.filters,
+// timeEntryStore.loadWorklogs(), timeEntryStore.saveWorklog(), etc.
+// Centralized state management for time tracking entries
+export { timeEntryStore } from './timeEntryStore.svelte.js';

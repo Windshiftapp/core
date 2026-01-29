@@ -4,6 +4,7 @@
   import { AlertTriangle, X, Trash2, Check } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { getShortcut, matchesShortcut } from '../utils/keyboardShortcuts.js';
 
   const dispatch = createEventDispatcher();  // Keep for backward compatibility
 
@@ -19,20 +20,64 @@
     oncancel = null
   } = $props();
 
+  // Get shortcut configurations
+  const submitShortcut = getShortcut('modal', 'submit');
+  const cancelShortcut = getShortcut('modal', 'cancel');
+
+  // Focus management
+  let backdropRef = $state(null);
+  let previouslyFocusedElement = null;
+
+  // Store previously focused element when show becomes true
+  $effect(() => {
+    if (show && !previouslyFocusedElement) {
+      previouslyFocusedElement = document.activeElement;
+    }
+    if (!show && previouslyFocusedElement) {
+      // Restore focus when modal closes
+      previouslyFocusedElement?.focus();
+      previouslyFocusedElement = null;
+    }
+  });
+
+  // Focus backdrop after intro transition completes
+  function handleIntroEnd() {
+    backdropRef?.focus();
+  }
+
   // Use translations for defaults
   const resolvedTitle = $derived(title ?? t('common.areYouSure'));
   const resolvedMessage = $derived(message ?? t('common.confirmAction'));
   const resolvedConfirmText = $derived(confirmText ?? t('common.confirm'));
   const resolvedCancelText = $derived(cancelText ?? t('common.cancel'));
 
-  // Auto-close on escape key
+  // Handle keyboard navigation using standard shortcuts
   function handleKeydown(event) {
-    if (event.key === 'Escape' && show) {
+    // Check for cancel shortcut (Escape)
+    if (matchesShortcut(event, cancelShortcut)) {
       cancel();
+      return;
+    }
+
+    // Check for submit shortcut (Cmd/Ctrl+Enter)
+    if (matchesShortcut(event, submitShortcut)) {
+      event.preventDefault();
+      doConfirm();
+      return;
+    }
+
+    // Enter without modifier confirms (unless on cancel button)
+    if (event.key === 'Enter' && !event.ctrlKey && !event.metaKey) {
+      const activeElement = document.activeElement;
+      const isOnCancelButton = activeElement?.textContent?.trim() === resolvedCancelText;
+      if (!isOnCancelButton) {
+        event.preventDefault();
+        doConfirm();
+      }
     }
   }
 
-  function confirm() {
+  function doConfirm() {
     dispatch('confirm');  // Keep for backward compatibility
     onconfirm?.();        // New Svelte 5 style
     show = false;
@@ -80,18 +125,20 @@
   let styles = $derived(getVariantStyles(variant));
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
 {#if show}
   <!-- Modal backdrop -->
   <div
+    bind:this={backdropRef}
     transition:fade={{ duration: 150 }}
-    class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
+    onintroend={handleIntroEnd}
+    class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 focus:outline-none"
     onclick={handleBackdropClick}
+    onkeydown={handleKeydown}
     role="dialog"
     aria-modal="true"
     aria-labelledby="dialog-title"
     aria-describedby="dialog-description"
+    tabindex="-1"
   >
     <!-- Modal content -->
     <div
@@ -142,14 +189,16 @@
           variant="default"
           onclick={cancel}
           size="small"
+          keyboardHint="Esc"
         >
           {resolvedCancelText}
         </Button>
 
         <Button
           variant={styles.buttonVariant}
-          onclick={confirm}
+          onclick={doConfirm}
           size="small"
+          keyboardHint="↵"
         >
           {resolvedConfirmText}
         </Button>
