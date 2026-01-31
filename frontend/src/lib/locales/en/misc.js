@@ -162,7 +162,13 @@ export default {
     multiSelect: 'Multi-Select',
     checkbox: 'Checkbox',
     user: 'User',
-    url: 'URL'
+    url: 'URL',
+    // Field type hints
+    milestoneHint: 'Milestone fields automatically reference system milestones. Users will be able to select from existing milestones when filling out this field.',
+    dateHint: 'Date fields allow users to select dates using a date picker. Values are stored in YYYY-MM-DD format.',
+    assetHint: 'Asset fields allow users to select assets from a specified asset set. You can optionally filter available assets using a QL query.',
+    portalCustomerHint: 'Portal Customer fields reference portal customers. Use with currentCustomer() in asset reports to filter by the logged-in portal customer.',
+    customerOrganisationHint: 'Customer Organisation fields reference customer organisations. Use with currentOrganisation() in asset reports to filter by the customer\'s organisation.'
   },
 
   categories: {

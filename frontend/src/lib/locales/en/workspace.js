@@ -273,7 +273,12 @@ export default {
     posting: 'Posting...',
     comment: 'Comment',
     noComments: 'No comments yet',
-    beFirstToComment: 'Be the first to comment on this item.'
+    beFirstToComment: 'Be the first to comment on this item.',
+    internalNote: 'Internal note',
+    internalNoteHint: 'Not visible on portal',
+    internal: 'Internal',
+    oldestFirst: 'Oldest first',
+    newestFirst: 'Newest first'
   },
 
   todo: {
@@ -592,6 +597,12 @@ export default {
     identityTitle: 'Workspace Identity',
     identityDescription: 'Customize the icon, color, and avatar for your workspace',
     savedSuccessfully: 'Look and feel settings saved successfully',
-    failedToSave: 'Failed to save look and feel settings: {error}'
+    failedToSave: 'Failed to save look and feel settings: {error}',
+    // Logo
+    logo: 'Logo',
+    currentLogo: 'Current Logo',
+    noLogoSet: 'No logo set',
+    uploadLogo: 'Upload Logo',
+    logoRecommendation: 'Recommended: PNG or SVG with transparent background. Max height in header: 40-50px.'
   }
 };

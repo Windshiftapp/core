@@ -247,7 +247,12 @@ export default {
     posting: 'Wird gepostet...',
     comment: 'Kommentar',
     noComments: 'Noch keine Kommentare',
-    beFirstToComment: 'Seien Sie der Erste, der diesen Eintrag kommentiert.'
+    beFirstToComment: 'Seien Sie der Erste, der diesen Eintrag kommentiert.',
+    internalNote: 'Interne Notiz',
+    internalNoteHint: 'Nicht im Portal sichtbar',
+    internal: 'Intern',
+    oldestFirst: 'Älteste zuerst',
+    newestFirst: 'Neueste zuerst'
   },
 
   todo: {
@@ -504,5 +509,31 @@ export default {
     pleaseConfirmDeletion: 'Bitte geben Sie den Arbeitsbereichsnamen genau wie angezeigt ein, um die Löschung zu bestätigen',
     pleaseSelectImage: 'Bitte wählen Sie eine Bilddatei aus',
     failedToUploadAvatar: 'Avatar-Upload fehlgeschlagen: {error}'
+  },
+
+  lookAndFeel: {
+    title: 'Erscheinungsbild',
+    subtitle: 'Passen Sie das Aussehen und Layout Ihres Arbeitsbereichs an',
+    displayModeTitle: 'Anzeigemodus',
+    displayModeDescription: 'Wählen Sie, wie dieser Arbeitsbereich angezeigt wird. Dies beeinflusst das Navigationslayout und das Standardverhalten.',
+    gradientTitle: 'Hintergrund & Farbverlauf',
+    gradientDescription: 'Wählen Sie ein Farbschema für Ihren Arbeitsbereich',
+    gradients: 'Farbverläufe',
+    backgroundImages: 'Hintergrundbilder',
+    currentBackground: 'Aktueller Hintergrund',
+    uploadCustomImage: 'Benutzerdefiniertes Bild hochladen',
+    backgroundUploadRecommendation: 'Empfohlen: Hochauflösende Bilder (1920x1080 oder größer) für beste Qualität',
+    backgroundUploadedSuccess: 'Hintergrundbild erfolgreich hochgeladen',
+    failedToUploadBackground: 'Hintergrundbild-Upload fehlgeschlagen: {error}',
+    identityTitle: 'Arbeitsbereich-Identität',
+    identityDescription: 'Passen Sie das Symbol, die Farbe und den Avatar für Ihren Arbeitsbereich an',
+    savedSuccessfully: 'Erscheinungsbild-Einstellungen erfolgreich gespeichert',
+    failedToSave: 'Speichern der Erscheinungsbild-Einstellungen fehlgeschlagen: {error}',
+    // Logo
+    logo: 'Logo',
+    currentLogo: 'Aktuelles Logo',
+    noLogoSet: 'Kein Logo gesetzt',
+    uploadLogo: 'Logo hochladen',
+    logoRecommendation: 'Empfohlen: PNG oder SVG mit transparentem Hintergrund. Maximale Höhe im Header: 40-50px.'
   }
 };

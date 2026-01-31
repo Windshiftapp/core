@@ -12,6 +12,7 @@ export default {
     iterations: 'Iterations',
     assets: 'Assets',
     channels: 'Channels',
+    portalHub: 'Portal Hub',
     customers: 'Customers',
     create: 'Create',
     search: 'Search',

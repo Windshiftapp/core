@@ -49,6 +49,8 @@ export default {
     none: 'Keine',
     enable: 'Aktivieren',
     disable: 'Deaktivieren',
+    enabled: 'Aktiviert',
+    disabled: 'Deaktiviert',
     show: 'Anzeigen',
     hide: 'Ausblenden',
     expand: 'Erweitern',
@@ -61,6 +63,7 @@ export default {
     export: 'Exportieren',
     print: 'Drucken',
     share: 'Teilen',
+    open: 'Öffnen',
 
     // Common labels
     id: 'ID',

@@ -626,7 +626,13 @@ export default {
     multiSelect: 'Mehrfachauswahl',
     checkbox: 'Kontrollkästchen',
     user: 'Benutzer',
-    url: 'URL'
+    url: 'URL',
+    // Field type hints
+    milestoneHint: 'Meilenstein-Felder verweisen automatisch auf System-Meilensteine. Benutzer können beim Ausfüllen dieses Feldes aus vorhandenen Meilensteinen auswählen.',
+    dateHint: 'Datumsfelder ermöglichen Benutzern die Auswahl von Daten mit einer Datumsauswahl. Werte werden im Format JJJJ-MM-TT gespeichert.',
+    assetHint: 'Asset-Felder ermöglichen Benutzern die Auswahl von Assets aus einem bestimmten Asset-Set. Sie können verfügbare Assets optional mit einer QL-Abfrage filtern.',
+    portalCustomerHint: 'Portal-Kunden-Felder verweisen auf Portal-Kunden. Verwenden Sie currentCustomer() in Asset-Berichten, um nach dem angemeldeten Portal-Kunden zu filtern.',
+    customerOrganisationHint: 'Kundenorganisations-Felder verweisen auf Kundenorganisationen. Verwenden Sie currentOrganisation() in Asset-Berichten, um nach der Organisation des Kunden zu filtern.'
   },
 
   itemTypes: {

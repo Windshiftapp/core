@@ -79,8 +79,11 @@ export default {
     portal: 'Portal',
     webhook: 'Webhook',
     email: 'Email',
+    smtp: 'SMTP',
     categories: 'Categories',
+    category: 'Category',
     allChannels: 'All Channels',
+    allCategories: 'All Categories',
     manageCategories: 'Manage Categories'
   },
 
@@ -111,6 +114,8 @@ export default {
     searchWorkspaces: 'Search for workspaces...',
     portalTitle: 'Portal Title',
     enablePortal: 'Enable Portal (allow public submissions)',
+    portalIsActive: 'Portal is active and accepting submissions',
+    portalIsInactive: 'Portal is currently disabled',
 
     // Webhook Configuration
     webhookConfiguration: 'Webhook Configuration',
@@ -204,18 +209,82 @@ export default {
     commentUpdated: 'Comment Updated',
     commentDeleted: 'Comment Deleted',
     itemLinked: 'Item Linked',
-    itemUnlinked: 'Item Unlinked'
+    itemUnlinked: 'Item Unlinked',
+
+    // SMTP Configuration
+    smtpConfiguration: 'SMTP Configuration',
+    smtpHost: 'SMTP Host',
+    smtpHostRequired: 'SMTP host is required',
+    smtpPort: 'Port',
+    smtpUsername: 'Username',
+    smtpUsernamePlaceholder: 'SMTP username (if required)',
+    smtpPassword: 'Password',
+    smtpFromEmail: 'From Email',
+    smtpFromEmailRequired: 'From email address is required',
+    smtpFromName: 'From Name',
+    smtpFromNamePlaceholder: 'Display name for outgoing emails',
+    smtpEncryption: 'Encryption',
+    noEncryption: 'None (not recommended)',
+    authentication: 'Authentication',
+    senderSettings: 'Sender Settings',
+    smtpHostAndFromRequired: 'SMTP host and from email are required',
+    testSmtp: 'Test SMTP',
+    testEmailAddress: 'Test Email Address',
+    testEmailPlaceholder: 'Enter email to send test to',
+    testEmailRequired: 'Please enter a test email address',
+    sendTestEmail: 'Send Test Email',
+    sendingTestEmail: 'Sending test email...',
+    testEmailSent: 'Test email sent successfully! Configuration has been saved.',
+    testEmailFailed: 'Test email failed'
   },
 
   portal: {
     title: 'Portal',
     subtitle: 'Customer portal settings',
     portalTitle: 'Portal Title',
+
+    // Magic link authentication
+    signInTitle: 'Sign in to your account',
+    signInDescription: 'Enter your email to receive a sign-in link',
+    enterEmail: 'Enter your email address',
+    sendMagicLink: 'Send sign-in link',
+    noAccountNeeded: "You don't need to create an account. Just enter your email and we'll send you a sign-in link.",
+    checkYourEmail: 'Check your email',
+    magicLinkSent: "We've sent a sign-in link to your email. Click the link to access your portal account.",
+    linkExpiresIn: 'The link expires in 15 minutes.',
+    useAnotherEmail: 'Use a different email',
+
+    // Magic link verification
+    verifying: 'Verifying your link...',
+    pleaseWait: 'Please wait while we sign you in.',
+    signInSuccess: 'Successfully signed in!',
+    redirecting: 'Redirecting you to the portal...',
+    verificationFailed: 'Sign in failed',
+    invalidLink: 'Invalid or missing token',
+
+    // Portal customer
+    portalCustomer: 'Portal Customer',
+
+    // Loading states
+    loading: 'Loading portal...',
+    signInToAccess: 'Sign in to access the portal and submit requests',
+    checkingAuth: 'Checking authentication...',
+
+    // Additional sending state
+    sending: 'Sending...',
+
+    // Internal account login
+    internalSignIn: 'Staff sign in',
+    backToMagicLink: 'Back to email sign in',
+    password: 'Password',
+    enterPassword: 'Enter your password',
+    signingIn: 'Signing in...',
+
     // Keys used by hub and portal customize panels
     theme: 'Theme',
     gradient: 'Gradient',
     searchBox: 'Search Box',
-    customize: 'Customize',
+    customizeButton: 'Customize',
     portalDescription: 'Portal description (optional)',
     portalSlug: 'Portal Slug',
     requestTypes: 'Request Types',
@@ -259,16 +328,20 @@ export default {
 
     // Customize panel
     customize: {
-      heroGradient: 'Hero Gradient',
+      heroGradient: 'Background',
+      background: 'Background',
       navigation: 'Navigation',
       requestTypes: 'Request Types',
       knowledgeBase: 'Knowledge Base',
       gradientStyle: 'Gradient Style',
+      gradients: 'Gradients',
       gradientDescription: 'Choose a gradient for the portal hero section.',
+      backgroundDescription: 'Choose a gradient or background image for the portal hero section. Background images will override the gradient selection.',
       navigationComingSoon: 'Navigation customization coming soon.',
       requestTypesDescription: 'Drag and drop request types to reorder. Click the menu to edit, rename, or delete.',
       creates: 'Creates',
       fields: 'Fields',
+      addFields: 'Add Fields',
       rename: 'Rename',
       markAsInactive: 'Mark as Inactive',
       markAsActive: 'Mark as Active',
@@ -292,15 +365,46 @@ export default {
       docmostStep2: 'Click the Share button',
       docmostStep3: 'Enable public sharing',
       docmostStep4: 'Copy the share link',
-      docmostStep5: 'Paste it above'
+      docmostStep5: 'Paste it above',
+      // Logo section
+      logo: 'Portal Logo',
+      logoHelp: 'Upload a logo to display in the portal header. If not set, the hub logo will be used as a fallback.',
+      // Asset reports section
+      assetReports: 'Asset Reports',
+      assetReportsDescription: 'Configure asset reports that portal users can view.',
+      noAssetReports: 'No asset reports configured yet.',
+      addAssetReport: 'Add Asset Report'
+    },
+
+    // Visibility settings
+    visibility: {
+      title: 'Request Type Visibility',
+      configureAccess: 'Configure who can see this request type',
+      configureVisibility: 'Configure visibility',
+      everyone: 'Everyone',
+      everyoneDesc: 'All authenticated users can see this request type',
+      restricted: 'Specific groups and/or organizations',
+      restrictedDesc: 'Only selected groups or organizations can see this type',
+      internalGroups: 'Internal Groups',
+      organizations: 'Organizations',
+      selectGroups: 'Select groups...',
+      selectOrganizations: 'Select organizations...',
+      noRestrictions: 'No restrictions - visible to everyone',
+      hasRestrictions: 'Visibility restricted',
+      orLogicHint: 'User must belong to at least one selected group OR organization',
+      noGroupsAvailable: 'No groups available',
+      noOrganizationsAvailable: 'No organizations available'
     }
   },
 
   requestForm: {
+    title: 'Title',
+    description: 'Description',
     enterTitle: 'Enter a title for your request',
     describeRequest: 'Please describe your request',
     yourName: 'Your name',
-    yourEmail: 'your@email.com',
+    yourEmail: 'Your email',
+    emailPlaceholder: 'your@email.com',
     emailFollowUp: 'We\'ll use this to follow up on your request',
     submittingAs: 'Submitting as {name} ({email})',
     nameRequired: 'Name is required',
@@ -316,6 +420,7 @@ export default {
   requestTypeFields: {
     configureFields: 'Configure Fields',
     step: 'Step',
+    fields: 'Fields',
     addField: 'Add Field',
     addVirtualField: 'Add Virtual Field',
     addExistingField: 'Add Existing Field',
@@ -324,9 +429,13 @@ export default {
     requiredField: 'Required field',
     required: 'Required',
     noFieldsInStep: 'No fields in Step {step}. Add fields below.',
+    stepHasNoFields: 'This step has no fields. Drag fields from the available list or add a virtual field.',
     virtualField: 'Virtual',
+    virtual: 'Virtual',
     defaultField: 'Default Field',
     customField: 'Custom Field',
+    system: 'System',
+    custom: 'Custom',
     text: 'Text',
     multiLine: 'Multi-line',
     select: 'Select',
@@ -338,7 +447,7 @@ export default {
     value: 'Value',
     label: 'Label',
     addOption: 'Add option',
-    pleasSelectField: 'Please select a field',
+    pleaseSelectField: 'Please select a field',
     fieldAlreadyAdded: 'This field is already added to this step',
     pleaseEnterFieldName: 'Please enter a field name',
     addAtLeastOneOption: 'Please add at least one option for select field',
@@ -351,7 +460,17 @@ export default {
     changesSavedAuto: 'Changes are saved automatically',
     addNewStep: 'Add new step',
     removeCurrentStep: 'Remove current step',
-    removeField: 'Remove field'
+    removeField: 'Remove field',
+    // Drag and drop
+    availableFields: 'Available Fields',
+    dragFieldsHint: 'Drag fields to the right panel to add them',
+    searchFields: 'Search fields...',
+    noFieldsMatch: 'No fields match your search',
+    allFieldsAdded: 'All available fields have been added',
+    dragToReorder: 'Drag to reorder fields',
+    dropFieldsHere: 'Drop fields here',
+    failedToLoadFields: 'Failed to load fields',
+    failedToSaveFields: 'Failed to save fields'
   },
 
   // Portal Hub translations
@@ -373,6 +492,10 @@ export default {
     dropPortalsHere: 'Drag portals here or add them from the customize panel',
     manageChannels: 'Manage Channels',
     heroContent: 'Hero Content',
+    // Search
+    noSearchResults: 'No results found',
+    matchingPortals: 'Portals',
+    matchingRequestTypes: 'Request Types',
     // Inbox
     noRequests: 'No requests yet',
     noRequestsDescription: 'Requests submitted through your portals will appear here',
@@ -385,6 +508,9 @@ export default {
     allStatuses: 'All Statuses',
     anonymous: 'Anonymous',
     showingResults: 'Showing',
-    of: 'of'
+    of: 'of',
+    // Logo
+    logo: 'Hub Logo',
+    logoHelp: 'This logo will be displayed on the Hub and used as a fallback for portals without their own logo.'
   }
 };
