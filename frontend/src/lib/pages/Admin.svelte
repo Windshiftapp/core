@@ -288,7 +288,8 @@
     // If no tab in URL and not on a nested detail route, redirect to default tab
     const path = $currentRoute.path;
     const isNested = path.startsWith('/admin/permission-sets/') || path.startsWith('/admin/configuration-sets/');
-    if (!$currentRoute.params?.tab && !isNested) {
+    const isChannelsRoute = path.startsWith('/admin/channels');
+    if (!$currentRoute.params?.tab && !isNested && !isChannelsRoute) {
       navigate('/admin/custom-fields');
     }
 

@@ -4,6 +4,8 @@
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import PersonalLabelCombobox from '../../pickers/PersonalLabelCombobox.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
+  import PortalCustomerPicker from '../../pickers/PortalCustomerPicker.svelte';
+  import CustomerOrganisationPicker from '../../pickers/CustomerOrganisationPicker.svelte';
   import { Box, Globe, Building2, Calendar, User, Target } from 'lucide-svelte';
   import ColorDot from '../../components/ColorDot.svelte';
   import { api } from '../../api.js';
@@ -158,6 +160,16 @@
           return value.asset_tag ? `${value.asset_tag} - ${value.title}` : value.title;
         }
         return `Asset #${value}`;
+      case 'portalcustomer':
+        if (typeof value === 'object' && value.name) {
+          return value.name;
+        }
+        return `Customer #${value}`;
+      case 'customerorganisation':
+        if (typeof value === 'object' && value.name) {
+          return value.name;
+        }
+        return `Organisation #${value}`;
       case 'select':
       case 'multiselect':
         if (field.options) {
@@ -294,6 +306,14 @@
             <!-- Display asset with icon -->
             <Box class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
             <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
+          {:else if field.field_type === 'portalcustomer'}
+            <!-- Display portal customer with icon -->
+            <User class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+            <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
+          {:else if field.field_type === 'customerorganisation'}
+            <!-- Display customer organisation with icon -->
+            <Building2 class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+            <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
           {:else if field.field_type === 'combobox'}
             <!-- Display labels as chips/tags -->
             <div class="flex items-center gap-1 flex-wrap">
@@ -315,6 +335,10 @@
             <Target class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
           {:else if field.field_type === 'asset'}
             <Box class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+          {:else if field.field_type === 'portalcustomer'}
+            <User class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+          {:else if field.field_type === 'customerorganisation'}
+            <Building2 class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
           {/if}
           <span style="color: var(--ds-text-subtle);">{t('items.setField', { field: field.name.toLowerCase() })}</span>
         {/if}
@@ -361,6 +385,16 @@
           {:else if field.field_type === 'asset'}
             <div class="flex items-center gap-2">
               <Box class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+              <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
+            </div>
+          {:else if field.field_type === 'portalcustomer'}
+            <div class="flex items-center gap-2">
+              <User class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+              <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
+            </div>
+          {:else if field.field_type === 'customerorganisation'}
+            <div class="flex items-center gap-2">
+              <Building2 class="w-4 h-4" style="color: var(--ds-text-subtle);" />
               <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
             </div>
           {:else if field.field_type === 'combobox'}
@@ -448,6 +482,39 @@
             id: asset.id,
             title: asset.title,
             asset_tag: asset.asset_tag || ''
+          } : null);
+        }}
+        onCancel={() => onCancel?.()}
+      />
+    {:else if field.field_type === 'portalcustomer'}
+      {@const customerValue = value && typeof value === 'object' ? value.id : value}
+      <PortalCustomerPicker
+        value={customerValue}
+        placeholder="Select portal customer"
+        showUnassigned={true}
+        class="w-full"
+        {disabled}
+        onSelect={(customer) => {
+          onChange(customer ? {
+            id: customer.id,
+            name: customer.name,
+            email: customer.email
+          } : null);
+        }}
+        onCancel={() => onCancel?.()}
+      />
+    {:else if field.field_type === 'customerorganisation'}
+      {@const orgValue = value && typeof value === 'object' ? value.id : value}
+      <CustomerOrganisationPicker
+        value={orgValue}
+        placeholder="Select organisation"
+        showUnassigned={true}
+        class="w-full"
+        {disabled}
+        onSelect={(org) => {
+          onChange(org ? {
+            id: org.id,
+            name: org.name
           } : null);
         }}
         onCancel={() => onCancel?.()}

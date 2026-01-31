@@ -1,7 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import Button from '../components/Button.svelte';
-  import StatusCircle from '../components/StatusCircle.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import {
     X
@@ -83,9 +82,9 @@
   }
 
   function createWorkspace() {
-    // Dispatch create modal event with workspace type
+    // Dispatch create modal event with workspace type, skip navigation to stay on onboarding
     window.dispatchEvent(new CustomEvent('show-create-modal', {
-      detail: { type: 'workspace' }
+      detail: { type: 'workspace', skipNavigate: true }
     }));
   }
 
@@ -114,7 +113,7 @@
       <!-- Header -->
       <div class="flex items-center gap-4 mb-6">
         <div class="flex-shrink-0">
-          <img src="/cmicon-2.svg" alt="Windshift" class="w-14 h-14" />
+          <img src="/windshift-3.svg" alt="Windshift" class="w-14 h-14" />
         </div>
         <div class="flex-1">
           <h1 class="text-2xl font-semibold mb-1" style="color: var(--ds-text);">
@@ -149,76 +148,54 @@
           class:border-l-sky-600={activeStep === 1}
           style={activeStep === 1 ? 'background-color: rgba(19, 136, 231, 0.05);' : ''}
         >
-          <div class="flex items-start gap-3">
-            <!-- Step Icon -->
-            <div class="flex-shrink-0 mt-0.5">
-              <StatusCircle 
-                status={workspaceCount > 0 ? 'completed' : (activeStep === 1 ? 'active' : 'pending')} 
-              />
-            </div>
-            <!-- Step Content -->
-            <div class="flex-1">
-              {#if workspaceCount > 0}
-                <!-- Completed state: strikethrough -->
-                <h3 class="text-sm line-through" style="color: var(--ds-text-subtle);">{t('onboarding.createWorkspace')}</h3>
-              {:else}
-                <h3 class="text-sm font-semibold" style="color: var(--ds-text);">{t('onboarding.createWorkspace')}</h3>
-                {#if activeStep === 1}
-                  <p class="text-sm mt-1 mb-3" style="color: var(--ds-text-subtle);">
-                    {t('onboarding.workspacesHelp')}
-                  </p>
-                  <Button
-                    variant="primary"
-                    size="small"
-                    keyboardHint="W"
-                    onclick={createWorkspace}
-                  >
-                    {t('onboarding.createWorkspaceBtn')}
-                  </Button>
-                {/if}
-              {/if}
-            </div>
-          </div>
+          {#if workspaceCount > 0}
+            <!-- Completed state: strikethrough -->
+            <h3 class="text-sm line-through" style="color: var(--ds-text-subtle);">{t('onboarding.createWorkspace')}</h3>
+          {:else}
+            <h3 class="text-sm font-semibold" style="color: var(--ds-text);">{t('onboarding.createWorkspace')}</h3>
+            {#if activeStep === 1}
+              <p class="text-sm mt-1 mb-3" style="color: var(--ds-text-subtle);">
+                {t('onboarding.workspacesHelp')}
+              </p>
+              <Button
+                variant="primary"
+                size="small"
+                keyboardHint="W"
+                onclick={createWorkspace}
+              >
+                {t('onboarding.createWorkspaceBtn')}
+              </Button>
+            {/if}
+          {/if}
         </div>
 
         <!-- Step 2: Create Work Item -->
         <div
-          class="rounded-lg py-3 px-4 transition-all"
+          class="rounded py-3 px-4 transition-all"
           class:border-l-6={activeStep === 2}
           class:border-l-sky-600={activeStep === 2}
           style={activeStep === 2 ? 'background-color: rgba(19, 136, 231, 0.05);' : ''}
         >
-          <div class="flex items-start gap-3">
-            <!-- Step Icon -->
-            <div class="flex-shrink-0 mt-0.5">
-              <StatusCircle 
-                status={itemCount > 0 ? 'completed' : (activeStep === 2 ? 'active' : 'pending')} 
-              />
-            </div>
-            <!-- Step Content -->
-            <div class="flex-1">
-              {#if itemCount > 0}
-                <!-- Completed state: strikethrough -->
-                <h3 class="text-sm line-through" style="color: var(--ds-text-subtle);">{t('onboarding.createFirstWorkItem')}</h3>
-              {:else if activeStep === 2}
-                <h3 class="text-sm font-semibold" style="color: var(--ds-text);">{t('onboarding.createFirstWorkItem')}</h3>
-                <p class="text-sm mt-1 mb-3" style="color: var(--ds-text-subtle);">
-                  {t('onboarding.trackTasks')}
-                </p>
-                <Button
-                  variant="primary"
-                  size="small"
-                  keyboardHint="I"
-                  onclick={createWorkItem}
-                >
-                  {t('onboarding.createWorkItemBtn')}
-                </Button>
-              {:else}
-                <!-- Pending state -->
-                <h3 class="text-sm" style="color: var(--ds-text-subtle);">{t('onboarding.createFirstWorkItem')}</h3>
-              {/if}
-            </div>
-          </div>
+          {#if itemCount > 0}
+            <!-- Completed state: strikethrough -->
+            <h3 class="text-sm line-through" style="color: var(--ds-text-subtle);">{t('onboarding.createFirstWorkItem')}</h3>
+          {:else if activeStep === 2}
+            <h3 class="text-sm font-semibold" style="color: var(--ds-text);">{t('onboarding.createFirstWorkItem')}</h3>
+            <p class="text-sm mt-1 mb-3" style="color: var(--ds-text-subtle);">
+              {t('onboarding.trackTasks')}
+            </p>
+            <Button
+              variant="primary"
+              size="small"
+              keyboardHint="I"
+              onclick={createWorkItem}
+            >
+              {t('onboarding.createWorkItemBtn')}
+            </Button>
+          {:else}
+            <!-- Pending state -->
+            <h3 class="text-sm" style="color: var(--ds-text-subtle);">{t('onboarding.createFirstWorkItem')}</h3>
+          {/if}
         </div>
       </div>
 

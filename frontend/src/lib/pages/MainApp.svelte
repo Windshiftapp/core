@@ -41,6 +41,7 @@
   let showCommandPalette = $state(false);
   let showCreateModal = $state(false);
   let createModalInitialType = $state('work-item');
+  let createModalSkipNavigate = $state(false);
   let showEmailVerificationBanner = $state(false);
 
   // Track display mode changes to only animate when switching modes (not on initial load)
@@ -409,6 +410,15 @@
       permissionStore.setHasAssetSets(false);
     }
 
+    // Check active portals for hub visibility
+    try {
+      const hubData = await api.hub.get();
+      permissionStore.setHasActivePortals(hubData.portals && hubData.portals.length > 0);
+    } catch (err) {
+      console.warn('Failed to check portals:', err);
+      permissionStore.setHasActivePortals(false);
+    }
+
     // Check for email verification pending (after SSO callback redirect)
     if (ssoStore.checkForEmailVerificationPending()) {
       showEmailVerificationBanner = true;
@@ -456,6 +466,7 @@
       if (detail.type) {
         createModalInitialType = detail.type;
       }
+      createModalSkipNavigate = detail.skipNavigate || false;
 
       showCreateModal = true;
 
@@ -707,7 +718,10 @@
   <Button class="sr-only" onclick={showCreateDropdown} hotkeyConfig={{ key: toHotkeyString('global', 'create') }}>Create</Button>
 
     <!-- Main Content Area with Sidebar Layout -->
-    <div class="flex flex-1 {!$uiStore.reviewFullscreen ? ($uiStore.navExpanded ? 'ml-[200px]' : 'ml-16') : ''} transition-all duration-200">
+    <div
+      class="flex flex-1 transition-transform duration-200 ease-out {!$uiStore.reviewFullscreen ? 'ml-16' : ''}"
+      style={!$uiStore.reviewFullscreen ? `transform: translateX(${$uiStore.navExpanded ? '136px' : '0px'})` : ''}
+    >
       <!-- Left Sidebar for Workspace/Admin Navigation (hidden in board mode) -->
       {#if !$uiStore.reviewFullscreen && $currentRoute.view !== 'workspaces' && $currentWorkspace && $currentWorkspace.display_mode !== 'board' && (isWorkspaceRoute($currentRoute.view) || effectiveView === 'personal-task-detail' || testViews.has($currentRoute.view))}
         <div
@@ -831,7 +845,10 @@
     </div>
     
     <!-- Footer with proper sidebar margin -->
-    <footer class="{!$uiStore.reviewFullscreen ? ($uiStore.navExpanded ? 'ml-[200px]' : 'ml-16') : ''} transition-all duration-200">
+    <footer
+      class="transition-transform duration-200 ease-out {!$uiStore.reviewFullscreen ? 'ml-16' : ''}"
+      style={!$uiStore.reviewFullscreen ? `transform: translateX(${$uiStore.navExpanded ? '136px' : '0px'})` : ''}
+    >
       <Footer />
     </footer>
 </div>
@@ -881,9 +898,11 @@
       this={createModalComponent}
       bind:isOpen={showCreateModal}
       initialType={createModalInitialType}
+      skipNavigate={createModalSkipNavigate}
       onclose={() => {
         showCreateModal = false;
         createModalInitialType = 'work-item';
+        createModalSkipNavigate = false;
       }}
     />
   {/if}

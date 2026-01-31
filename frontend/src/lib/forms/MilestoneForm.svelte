@@ -3,6 +3,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import MilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
   import FieldChip from '../components/FieldChip.svelte';
+  import { useForm, validators } from '../composables/useForm.svelte.js';
 
   let {
     formData = $bindable({
@@ -14,6 +15,28 @@
     nameInputRef = $bindable(null)
   } = $props();
 
+  // Initialize form with useForm composable
+  const form = useForm({
+    initialValues: {
+      name: '',
+      description: '',
+      target_date: '',
+      status: 'planning'
+    },
+    schema: {
+      name: validators.required('Name is required'),
+      target_date: validators.required('Target date is required')
+    }
+  });
+
+  // Sync form values to bindable formData for parent component compatibility
+  $effect(() => {
+    formData.name = form.values.name;
+    formData.description = form.values.description;
+    formData.target_date = form.values.target_date;
+    formData.status = form.values.status;
+  });
+
   // Status options for milestones - reactive for i18n
   const milestoneStatusOptions = $derived([
     { value: 'planning', label: t('createModal.planning') },
@@ -23,30 +46,29 @@
   ]);
 
   export function validate() {
-    return formData.name.trim() !== '' && formData.target_date !== '';
+    return form.isValid;
   }
 
   export function getFormData() {
     return {
-      name: formData.name,
-      description: formData.description,
-      target_date: formData.target_date,
-      status: formData.status,
+      name: form.values.name,
+      description: form.values.description,
+      target_date: form.values.target_date,
+      status: form.values.status,
       category_id: null
     };
   }
 
   export function reset() {
-    formData = {
-      name: '',
-      description: '',
-      target_date: '',
-      status: 'planning'
-    };
+    form.reset();
   }
 
   export function isValid() {
-    return formData.name.trim() !== '' && formData.target_date !== '';
+    return form.isValid;
+  }
+
+  export function isDirty() {
+    return form.isDirty;
   }
 </script>
 
@@ -54,17 +76,21 @@
   <!-- Title Input -->
   <input
     bind:this={nameInputRef}
-    bind:value={formData.name}
+    bind:value={form.values.name}
     type="text"
     class="w-full text-lg font-medium border-0 outline-none bg-transparent"
     style="color: var(--ds-text);"
     placeholder={t('createModal.milestoneName')}
+    onblur={() => form.touchField('name')}
   />
+  {#if form.hasError('name')}
+    <span class="text-xs" style="color: var(--ds-text-danger);">{form.errors.name}</span>
+  {/if}
 
   <!-- Description -->
   <div class="min-h-[60px]">
     <MilkdownEditor
-      bind:content={formData.description}
+      bind:content={form.values.description}
       placeholder={t('createModal.addDescription')}
       compact={true}
       showToolbar={false}
@@ -78,8 +104,8 @@
     <!-- Target Date Chip -->
     <FieldChip
       label={t('createModal.targetDate')}
-      value={formData.target_date}
-      displayValue={formData.target_date ? new Date(formData.target_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+      value={form.values.target_date}
+      displayValue={form.values.target_date ? new Date(form.values.target_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
       icon={Calendar}
       placeholder={t('createModal.targetDate')}
       required={true}
@@ -88,10 +114,13 @@
         <div class="p-3">
           <input
             type="date"
-            bind:value={formData.target_date}
+            bind:value={form.values.target_date}
             class="w-full px-3 py-2 rounded border text-sm"
             style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-            onchange={() => closePopover()}
+            onchange={() => {
+              form.touchField('target_date');
+              closePopover();
+            }}
           />
         </div>
       {/snippet}
@@ -100,8 +129,8 @@
     <!-- Status Chip -->
     <FieldChip
       label={t('createModal.status')}
-      value={formData.status}
-      displayValue={milestoneStatusOptions.find(s => s.value === formData.status)?.label || t('createModal.planning')}
+      value={form.values.status}
+      displayValue={milestoneStatusOptions.find(s => s.value === form.values.status)?.label || t('createModal.planning')}
       icon={Target}
       placeholder={t('createModal.status')}
     >
@@ -115,7 +144,7 @@
               onmouseover={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)'}
               onmouseout={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               onclick={() => {
-                formData.status = status.value;
+                form.setValue('status', status.value);
                 closePopover();
               }}
             >

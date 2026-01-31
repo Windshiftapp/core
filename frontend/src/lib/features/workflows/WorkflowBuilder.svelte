@@ -12,6 +12,7 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import Label from '../../components/Label.svelte';
+  import Checkbox from '../../components/Checkbox.svelte';
   import SearchInput from '../../components/SearchInput.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
 
@@ -208,7 +209,6 @@
     icon={Workflow}
     title={t('workflows.title')}
     subtitle={t('workflows.subtitle')}
-    count={t('workflows.count', { count: filteredWorkflows.length })}
   >
     {#snippet actions()}
       <div class="flex items-center gap-3">
@@ -301,16 +301,11 @@
           />
         </div>
 
-        <div class="flex items-center gap-2">
-          <input
-            type="checkbox"
-            bind:checked={newWorkflow.is_default}
-            id="new-default"
-            class="rounded"
-            style="border-color: var(--ds-border);"
-          />
-          <label for="new-default" class="text-sm" style="color: var(--ds-text);">{t('workflows.setAsDefault')}</label>
-        </div>
+        <Checkbox
+          bind:checked={newWorkflow.is_default}
+          label={t('workflows.setAsDefault')}
+          size="small"
+        />
       </div>
 
       <div class="flex justify-end gap-3 mt-6 pt-4 border-t" style="border-color: var(--ds-border);">
@@ -355,16 +350,11 @@
           />
         </div>
 
-        <div class="flex items-center gap-2">
-          <input
-            type="checkbox"
-            bind:checked={editWorkflow.is_default}
-            id="edit-default"
-            class="rounded"
-            style="border-color: var(--ds-border);"
-          />
-          <label for="edit-default" class="text-sm" style="color: var(--ds-text);">{t('workflows.setAsDefault')}</label>
-        </div>
+        <Checkbox
+          bind:checked={editWorkflow.is_default}
+          label={t('workflows.setAsDefault')}
+          size="small"
+        />
       </div>
 
       <div class="flex justify-end gap-3 mt-6 pt-4 border-t" style="border-color: var(--ds-border);">

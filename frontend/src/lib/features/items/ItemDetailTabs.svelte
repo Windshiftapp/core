@@ -61,8 +61,8 @@
     dispatch('log-time');
   }
   
-  function handleCommentsLoaded(event) {
-    commentCount = event.detail.count;
+  function handleCommentsLoaded(data) {
+    commentCount = data.count;
   }
 
   function handleEditWorklog(worklog) {
@@ -157,7 +157,7 @@
     <!-- Tab Content -->
     <div class="pt-4">
       {#if tab === 'comments'}
-        <Comments itemId={item.id} isPersonalWorkspace={workspace?.is_personal} oncommentsLoaded={handleCommentsLoaded} />
+        <Comments itemId={item.id} isPersonalWorkspace={workspace?.is_personal} isPortalRequest={!!item.request_type_id} onCommentsLoaded={handleCommentsLoaded} />
       {:else if tab === 'details'}
         <div class="space-y-4">
           <div class="grid grid-cols-2 gap-6">

@@ -84,12 +84,6 @@
   <!-- Greeting Section with Animated Gradient Hero (only when NOT onboarding) -->
   {#if !isOnboarding}
     <div class="mb-8 relative overflow-hidden rounded-xl p-6 hero-section">
-      <!-- Animated gradient background -->
-      <div class="absolute inset-0 gradient-animated opacity-10"></div>
-
-      <!-- Floating glow orb -->
-      <div class="absolute top-0 right-0 w-64 h-64 rounded-full glow-orb"></div>
-
       <!-- Content -->
       <div class="relative z-10">
         <Text as="h1" size="2xl" weight="semibold">
@@ -444,14 +438,6 @@
     animation: fade-up var(--duration-slow, 300ms) var(--ease-smooth, ease) forwards;
   }
 
-  /* Floating glow orb */
-  .glow-orb {
-    background: radial-gradient(circle, var(--ds-gradient-start), transparent);
-    filter: blur(40px);
-    opacity: 0.2;
-    animation: glow-breathe 4s ease-in-out infinite;
-  }
-
   /* Card entrance animation - staggered */
   :global(.homepage-card) {
     animation: fade-up var(--duration-normal, 200ms) var(--ease-smooth, ease) forwards;
@@ -472,10 +458,6 @@
     .hero-section,
     :global(.homepage-card) {
       animation: none;
-    }
-    .glow-orb {
-      animation: none;
-      opacity: 0.1;
     }
   }
 </style>

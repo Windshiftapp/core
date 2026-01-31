@@ -16,7 +16,7 @@
 
   // Status ID constants (matching backend constants/statuses.go)
   const STATUS_ID_OPEN = 1;    // Default status for new tasks
-  const STATUS_ID_CLOSED = 6;  // Status for completed tasks
+  const STATUS_ID_DONE = 3;    // Status for completed tasks
 
   let personalTasks = $state([]);
   let loading = $state(false);
@@ -97,7 +97,7 @@
   // Helper function to check if task is completed
   function isTaskCompleted(task) {
     // Check status_id first (current approach)
-    if (task.status_id === STATUS_ID_CLOSED) {
+    if (task.status_id === STATUS_ID_DONE) {
       return true;
     }
     // Fallback to deprecated status fields for backward compatibility
@@ -173,7 +173,7 @@
   async function handleToggleComplete(task) {
     try {
       const isDone = isTaskCompleted(task);
-      const newStatusId = isDone ? STATUS_ID_OPEN : STATUS_ID_CLOSED;
+      const newStatusId = isDone ? STATUS_ID_OPEN : STATUS_ID_DONE;
 
       await api.items.update(task.id, { status_id: newStatusId });
 

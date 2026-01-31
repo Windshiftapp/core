@@ -52,7 +52,8 @@
   let {
     isOpen = $bindable(false),
     compactMode = false,
-    initialType = 'work-item'
+    initialType = 'work-item',
+    skipNavigate = false
   } = $props();
 
   let selectedType = $state(initialType);
@@ -198,7 +199,9 @@
         });
 
         window.dispatchEvent(new CustomEvent('refresh-workspaces'));
-        navigate(`/workspaces/${result.id}`);
+        if (!skipNavigate) {
+          navigate(`/workspaces/${result.id}`);
+        }
         close();
       } else if (selectedType === 'collection') {
         const result = await api.collections.create({

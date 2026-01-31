@@ -47,7 +47,9 @@
     { value: 'user', label: 'User' },
     { value: 'iteration', label: 'Iteration' },
     { value: 'milestone', label: 'Milestone' },
-    { value: 'asset', label: 'Asset' }
+    { value: 'asset', label: 'Asset' },
+    { value: 'portalcustomer', label: 'Portal Customer' },
+    { value: 'customerorganisation', label: 'Customer Organisation' }
   ];
 
   // Asset field configuration
@@ -295,6 +297,9 @@
   const isMilestoneField = $derived(formData.field_type === 'milestone');
   const isDateField = $derived(formData.field_type === 'date');
   const isAssetField = $derived(formData.field_type === 'asset');
+  const isPortalCustomerField = $derived(formData.field_type === 'portalcustomer');
+  const isCustomerOrganisationField = $derived(formData.field_type === 'customerorganisation');
+  const hideAppliesToSection = $derived(formData.field_type === 'portalcustomer' || formData.field_type === 'customerorganisation');
 
   // Reactive statement to trigger re-calculation when screens data changes
   const screensLoaded = $derived(screens && screens.length > 0);
@@ -495,42 +500,54 @@
             {/each}
           </Select>
           {#if isMilestoneField}
-            <p class="text-sm mt-2 text-blue-600 bg-blue-50 p-2 rounded">
-              📌 Milestone fields automatically reference system milestones. Users will be able to select from existing milestones when filling out this field.
+            <p class="text-sm mt-2 p-2 rounded" style="color: var(--ds-text); background: var(--ds-surface); border: 1px solid var(--ds-border);">
+              {t('fields.milestoneHint')}
             </p>
           {/if}
           {#if isDateField}
-            <p class="text-sm mt-2 text-green-600 bg-green-50 p-2 rounded">
-              📅 Date fields allow users to select dates using a date picker. Values are stored in YYYY-MM-DD format.
+            <p class="text-sm mt-2 p-2 rounded" style="color: var(--ds-text); background: var(--ds-surface); border: 1px solid var(--ds-border);">
+              {t('fields.dateHint')}
             </p>
           {/if}
           {#if isAssetField}
-            <p class="text-sm mt-2 text-purple-600 bg-purple-50 p-2 rounded">
-              📦 Asset fields allow users to select assets from a specified asset set. You can optionally filter available assets using a QL query.
+            <p class="text-sm mt-2 p-2 rounded" style="color: var(--ds-text); background: var(--ds-surface); border: 1px solid var(--ds-border);">
+              {t('fields.assetHint')}
+            </p>
+          {/if}
+          {#if isPortalCustomerField}
+            <p class="text-sm mt-2 p-2 rounded" style="color: var(--ds-text); background: var(--ds-surface); border: 1px solid var(--ds-border);">
+              {t('fields.portalCustomerHint')}
+            </p>
+          {/if}
+          {#if isCustomerOrganisationField}
+            <p class="text-sm mt-2 p-2 rounded" style="color: var(--ds-text); background: var(--ds-surface); border: 1px solid var(--ds-border);">
+              {t('fields.customerOrganisationHint')}
             </p>
           {/if}
         </div>
       </div>
 
-      <!-- Applies To Section -->
-      <div class="col-span-2 mt-4">
-        <Label class="mb-3">Applies To</Label>
-        <div class="flex flex-col gap-3">
-          <Toggle
-            bind:checked={formData.applies_to_portal_customers}
-            label="Portal Customers"
-            size="small"
-          />
-          <Toggle
-            bind:checked={formData.applies_to_customer_organisations}
-            label="Customer Organisations"
-            size="small"
-          />
+      {#if !hideAppliesToSection}
+        <!-- Applies To Section -->
+        <div class="col-span-2 mt-4">
+          <Label class="mb-3">Applies To</Label>
+          <div class="flex flex-col gap-3">
+            <Toggle
+              bind:checked={formData.applies_to_portal_customers}
+              label="Portal Customers"
+              size="small"
+            />
+            <Toggle
+              bind:checked={formData.applies_to_customer_organisations}
+              label="Customer Organisations"
+              size="small"
+            />
+          </div>
+          <p class="text-xs mt-2" style="color: var(--ds-text-subtle);">
+            Note: Work items use screen-based field configuration
+          </p>
         </div>
-        <p class="text-xs mt-2" style="color: var(--ds-text-subtle);">
-          Note: Work items use screen-based field configuration
-        </p>
-      </div>
+      {/if}
 
       {#if needsMaxLength}
         <div class="mt-6">
