@@ -9,6 +9,9 @@ func RegisterPortalRoutes(deps *Deps) {
 
 	// Public portal API endpoints (OptionalAuth - work both authenticated and unauthenticated)
 	api.Handle("GET /portal/{slug}", deps.Portal.Portal.GetPortal)
+	api.Handle("GET /portal/{slug}/request-types", deps.Portal.Portal.GetRequestTypes)
+	api.Handle("GET /portal/{slug}/asset-reports", deps.Portal.Portal.GetAssetReports)
+	api.Handle("GET /portal/{slug}/asset-reports/{id}/execute", deps.Portal.Portal.ExecuteAssetReport)
 	api.HandleH("POST /portal/{slug}/submit", deps.PortalSubmitLimiter.Limit(http.HandlerFunc(deps.Portal.Portal.SubmitToPortal)))
 	api.HandleH("POST /portal/{slug}/knowledge-base/search", deps.PortalSearchLimiter.Limit(http.HandlerFunc(deps.Portal.Portal.SearchKnowledgeBase)))
 

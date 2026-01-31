@@ -245,8 +245,8 @@ func (h *StatusHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Protect system-critical statuses from deletion
-	if id == constants.StatusIDOpen || id == constants.StatusIDClosed {
-		http.Error(w, "Cannot delete Open or Closed status - these are required by the system", http.StatusForbidden)
+	if id == constants.StatusIDOpen || id == constants.StatusIDDone {
+		http.Error(w, "Cannot delete Open or Done status - these are required by the system", http.StatusForbidden)
 		return
 	}
 

@@ -97,7 +97,7 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := `
-		SELECT c.id, c.item_id, c.author_id, c.portal_customer_id, c.content, c.created_at, c.updated_at,
+		SELECT c.id, c.item_id, c.author_id, c.portal_customer_id, c.content, c.is_private, c.created_at, c.updated_at,
 		       u.first_name, u.last_name, u.email, u.avatar_url,
 		       pc.name as customer_name, pc.email as customer_email
 		FROM comments c
@@ -123,7 +123,7 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 		var customerName, customerEmail sql.NullString
 
 		err := rows.Scan(
-			&comment.ID, &comment.ItemID, &authorID, &portalCustomerID, &comment.Content,
+			&comment.ID, &comment.ItemID, &authorID, &portalCustomerID, &comment.Content, &comment.IsPrivate,
 			&comment.CreatedAt, &comment.UpdatedAt,
 			&firstName, &lastName, &email, &avatarURL,
 			&customerName, &customerEmail,
@@ -187,8 +187,9 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var reqBody struct {
-		Content  string `json:"content"`
-		AuthorID int    `json:"author_id"`
+		Content   string `json:"content"`
+		AuthorID  int    `json:"author_id"`
+		IsPrivate bool   `json:"is_private"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
@@ -248,7 +249,7 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 			ItemID:      itemID,
 			AuthorID:    reqBody.AuthorID,
 			Content:     reqBody.Content,
-			IsPrivate:   false,
+			IsPrivate:   reqBody.IsPrivate,
 			ActorUserID: user.ID,
 		})
 		if err != nil {
@@ -551,7 +552,7 @@ func (h *CommentHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 // Helper function to get a comment by ID with author details
 func (h *CommentHandler) getCommentByID(commentID int) (*models.Comment, error) {
 	query := `
-		SELECT c.id, c.item_id, c.author_id, c.portal_customer_id, c.content, c.created_at, c.updated_at,
+		SELECT c.id, c.item_id, c.author_id, c.portal_customer_id, c.content, c.is_private, c.created_at, c.updated_at,
 		       u.first_name, u.last_name, u.email, u.avatar_url,
 		       pc.name as customer_name, pc.email as customer_email
 		FROM comments c
@@ -567,7 +568,7 @@ func (h *CommentHandler) getCommentByID(commentID int) (*models.Comment, error) 
 	var customerName, customerEmail sql.NullString
 
 	err := h.db.QueryRow(query, commentID).Scan(
-		&comment.ID, &comment.ItemID, &authorID, &portalCustomerID, &comment.Content,
+		&comment.ID, &comment.ItemID, &authorID, &portalCustomerID, &comment.Content, &comment.IsPrivate,
 		&comment.CreatedAt, &comment.UpdatedAt,
 		&firstName, &lastName, &email, &avatarURL,
 		&customerName, &customerEmail,

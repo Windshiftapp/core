@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
 )
@@ -33,6 +35,16 @@ func NewHubHandler(db database.Database, permissionService *services.PermissionS
 func (h *HubHandler) GetHub(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	// Get optional user context (may be nil for unauthenticated requests)
+	user, _ := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+
+	var isAdmin bool
+	var userGroupIDs []int
+	if user != nil {
+		isAdmin, _ = h.permissionService.IsSystemAdmin(user.ID)
+		userGroupIDs = h.getUserGroupIDs(ctx, user.ID)
+	}
 
 	// Get hub configuration from system_settings
 	var configJSON string
@@ -76,8 +88,8 @@ func (h *HubHandler) GetHub(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Get all enabled portal channels
-	portals, err := h.getEnabledPortals(ctx)
+	// Get all enabled portal channels (filtered by user visibility)
+	portals, err := h.getEnabledPortals(ctx, isAdmin, userGroupIDs)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to get portals: %v", err), http.StatusInternalServerError)
 		return
@@ -96,7 +108,7 @@ func (h *HubHandler) GetHub(w http.ResponseWriter, r *http.Request) {
 // PUT /api/hub/config
 func (h *HubHandler) UpdateHubConfig(w http.ResponseWriter, r *http.Request) {
 	// Get current user for permission check
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
 		return
@@ -318,8 +330,28 @@ func (h *HubHandler) GetHubInboxItem(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(item)
 }
 
+// getUserGroupIDs returns the group IDs for a user
+func (h *HubHandler) getUserGroupIDs(ctx context.Context, userID int) []int {
+	rows, err := h.db.QueryContext(ctx, `SELECT group_id FROM group_members WHERE user_id = ?`, userID)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var groupIDs []int
+	for rows.Next() {
+		var groupID int
+		if err := rows.Scan(&groupID); err == nil {
+			groupIDs = append(groupIDs, groupID)
+		}
+	}
+	return groupIDs
+}
+
 // getEnabledPortals returns all enabled portal channels with metadata
-func (h *HubHandler) getEnabledPortals(ctx context.Context) ([]models.HubPortalInfo, error) {
+// isAdmin: if true, shows all request types regardless of visibility
+// userGroupIDs: internal user group IDs for visibility filtering
+func (h *HubHandler) getEnabledPortals(ctx context.Context, isAdmin bool, userGroupIDs []int) ([]models.HubPortalInfo, error) {
 	query := `
 		SELECT
 			c.id, c.name, c.description, c.status, c.config,
@@ -336,6 +368,7 @@ func (h *HubHandler) getEnabledPortals(ctx context.Context) ([]models.HubPortalI
 	defer rows.Close()
 
 	var portals []models.HubPortalInfo
+	var portalIDs []int
 	for rows.Next() {
 		var portal models.HubPortalInfo
 		var description sql.NullString
@@ -366,11 +399,88 @@ func (h *HubHandler) getEnabledPortals(ctx context.Context) ([]models.HubPortalI
 		}
 
 		portals = append(portals, portal)
+		portalIDs = append(portalIDs, portal.ID)
 	}
 
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
 
+	// Fetch request types for all portals (filtered by visibility)
+	if len(portalIDs) > 0 {
+		requestTypes, err := h.getRequestTypesForPortals(ctx, portalIDs, isAdmin, userGroupIDs)
+		if err != nil {
+			return nil, err
+		}
+
+		// Map request types to their portals
+		for i := range portals {
+			if rts, ok := requestTypes[portals[i].ID]; ok {
+				portals[i].RequestTypes = rts
+			}
+		}
+	}
+
 	return portals, nil
+}
+
+// getRequestTypesForPortals fetches request types for multiple portal channel IDs
+// Filters by visibility based on user context:
+// - isAdmin=true: shows all request types
+// - userGroupIDs non-empty: filters by visibility_group_ids
+// - both false/empty: only shows request types with no visibility restrictions
+func (h *HubHandler) getRequestTypesForPortals(ctx context.Context, portalIDs []int, isAdmin bool, userGroupIDs []int) (map[int][]models.HubPortalRequestType, error) {
+	if len(portalIDs) == 0 {
+		return nil, nil
+	}
+
+	// Build query with IN clause
+	placeholders := make([]string, len(portalIDs))
+	args := make([]interface{}, len(portalIDs))
+	for i, id := range portalIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, channel_id, name, COALESCE(description, ''), COALESCE(icon, ''), COALESCE(color, ''),
+		       visibility_group_ids, visibility_org_ids
+		FROM request_types
+		WHERE channel_id IN (%s) AND is_active = true
+		ORDER BY display_order ASC
+	`, strings.Join(placeholders, ","))
+
+	rows, err := h.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[int][]models.HubPortalRequestType)
+	for rows.Next() {
+		var rt models.HubPortalRequestType
+		var channelID int
+		var visGroupIDs, visOrgIDs *string
+		err := rows.Scan(&rt.ID, &channelID, &rt.Name, &rt.Description, &rt.Icon, &rt.Color, &visGroupIDs, &visOrgIDs)
+		if err != nil {
+			return nil, err
+		}
+
+		// Create full RequestType to use IsVisibleTo method
+		fullRT := models.RequestType{
+			VisibilityGroupIDs: deserializeIntArray(visGroupIDs),
+			VisibilityOrgIDs:   deserializeIntArray(visOrgIDs),
+		}
+
+		// Admin sees all, others filtered by visibility
+		if isAdmin || fullRT.IsVisibleTo(userGroupIDs, nil) {
+			result[channelID] = append(result[channelID], rt)
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }

@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"net/smtp"
 	"net/url"
 	"strconv"
 	"strings"
@@ -24,6 +23,7 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/scheduler"
 	"windshift/internal/services"
+	windshiftsmtp "windshift/internal/smtp"
 	"windshift/internal/webhook"
 )
 
@@ -35,6 +35,7 @@ type ChannelHandler struct {
 	emailScheduler    *scheduler.EmailScheduler
 	encryption        email.Encryptor
 	baseURL           string
+	smtpSender        *windshiftsmtp.NotificationSMTPSender
 }
 
 // NewChannelHandler creates a new channel handler
@@ -59,6 +60,11 @@ func (h *ChannelHandler) SetBaseURL(baseURL string) {
 // SetEmailScheduler sets the email scheduler (used to avoid circular dependencies)
 func (h *ChannelHandler) SetEmailScheduler(es *scheduler.EmailScheduler) {
 	h.emailScheduler = es
+}
+
+// SetSMTPSender sets the SMTP sender for sending test emails
+func (h *ChannelHandler) SetSMTPSender(sender *windshiftsmtp.NotificationSMTPSender) {
+	h.smtpSender = sender
 }
 
 // GetChannels returns all channels (admins) or only managed channels (non-admins)
@@ -316,8 +322,9 @@ func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 	// Check if channel exists and is not a plugin-managed channel
 	var exists bool
 	var pluginName *string
-	checkQuery := "SELECT EXISTS(SELECT 1 FROM channels WHERE id = ?), (SELECT plugin_name FROM channels WHERE id = ?)"
-	err = h.db.QueryRowContext(ctx, checkQuery, id, id).Scan(&exists, &pluginName)
+	var existingConfig string
+	checkQuery := "SELECT EXISTS(SELECT 1 FROM channels WHERE id = ?), (SELECT plugin_name FROM channels WHERE id = ?), (SELECT config FROM channels WHERE id = ?)"
+	err = h.db.QueryRowContext(ctx, checkQuery, id, id, id).Scan(&exists, &pluginName, &existingConfig)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
 		return
@@ -332,6 +339,12 @@ func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	updates.UpdatedAt = time.Now()
+
+	// Preserve existing config if not provided or if it looks scrubbed
+	// Config updates should go through UpdateChannelConfig which handles merging properly
+	if updates.Config == "" {
+		updates.Config = existingConfig
+	}
 
 	query := `
 		UPDATE channels
@@ -600,8 +613,13 @@ Test Time: ` + time.Now().Format("January 2, 2006 at 3:04 PM MST") + `
 
 If you received this email, your SMTP configuration is ready to send notifications.`
 
-	// Send the test email using the SMTP sender functionality
-	err := h.sendTestEmail(&config, testEmail, subject, htmlBody, textBody)
+	// Check if SMTP sender is configured
+	if h.smtpSender == nil {
+		return false, "SMTP sender not configured"
+	}
+
+	// Send the test email using the shared SMTP sender
+	err := h.smtpSender.SendEmailWithConfig(&config, testEmail, subject, htmlBody, textBody)
 	if err != nil {
 		// Provide more specific error guidance based on common SMTP errors
 		errorMsg := err.Error()
@@ -678,143 +696,6 @@ func (h *ChannelHandler) testSMTPConfig(config models.ChannelConfig) bool {
 	}
 
 	return true // Connection test successful
-}
-
-// sendTestEmail sends a test email using the existing SMTP functionality
-func (h *ChannelHandler) sendTestEmail(config *models.ChannelConfig, toEmail, subject, htmlBody, textBody string) error {
-	// Build MIME message
-	boundary := "----=_NextPart_" + fmt.Sprintf("%d", time.Now().UnixNano())
-
-	var from string
-	if config.SMTPFromName != "" {
-		from = fmt.Sprintf("%s <%s>", config.SMTPFromName, config.SMTPFromEmail)
-	} else {
-		from = config.SMTPFromEmail
-	}
-
-	headers := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=%s\r\n\r\n",
-		from, toEmail, subject, boundary)
-
-	textPart := fmt.Sprintf("--%s\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n%s\r\n\r\n",
-		boundary, textBody)
-
-	htmlPart := fmt.Sprintf("--%s\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n%s\r\n\r\n",
-		boundary, htmlBody)
-
-	ending := fmt.Sprintf("--%s--\r\n", boundary)
-	message := headers + textPart + htmlPart + ending
-
-	// Set up authentication
-	var auth smtp.Auth
-	if config.SMTPUsername != "" && config.SMTPPassword != "" {
-		auth = smtp.PlainAuth("", config.SMTPUsername, config.SMTPPassword, config.SMTPHost)
-	}
-
-	// Determine server address
-	addr := fmt.Sprintf("%s:%d", config.SMTPHost, config.SMTPPort)
-
-	// Handle different encryption types
-	switch strings.ToLower(config.SMTPEncryption) {
-	case "tls":
-		return h.sendTestEmailWithStartTLS(addr, auth, config.SMTPFromEmail, toEmail, message)
-	case "ssl":
-		return h.sendTestEmailWithSSL(addr, auth, config.SMTPFromEmail, toEmail, message)
-	default: // "none" or empty
-		return smtp.SendMail(addr, auth, config.SMTPFromEmail, []string{toEmail}, []byte(message))
-	}
-}
-
-// sendTestEmailWithStartTLS sends test email using STARTTLS encryption
-func (h *ChannelHandler) sendTestEmailWithStartTLS(addr string, auth smtp.Auth, from, to, message string) error {
-	client, err := smtp.Dial(addr)
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	// Start TLS
-	tlsConfig := &tls.Config{
-		ServerName: strings.Split(addr, ":")[0],
-		MinVersion: tls.VersionTLS12,
-	}
-	
-	if err = client.StartTLS(tlsConfig); err != nil {
-		return err
-	}
-
-	// Authenticate
-	if auth != nil {
-		if err = client.Auth(auth); err != nil {
-			return err
-		}
-	}
-
-	// Set sender and recipient
-	if err = client.Mail(from); err != nil {
-		return err
-	}
-
-	if err = client.Rcpt(to); err != nil {
-		return err
-	}
-
-	// Send message
-	writer, err := client.Data()
-	if err != nil {
-		return err
-	}
-	defer writer.Close()
-
-	_, err = writer.Write([]byte(message))
-	return err
-}
-
-// sendTestEmailWithSSL sends test email using SSL/TLS encryption
-func (h *ChannelHandler) sendTestEmailWithSSL(addr string, auth smtp.Auth, from, to, message string) error {
-	// Create TLS connection
-	tlsConfig := &tls.Config{
-		ServerName: strings.Split(addr, ":")[0],
-		MinVersion: tls.VersionTLS12,
-	}
-
-	conn, err := tls.Dial("tcp", addr, tlsConfig)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	// Create SMTP client on TLS connection
-	client, err := smtp.NewClient(conn, strings.Split(addr, ":")[0])
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	// Authenticate
-	if auth != nil {
-		if err = client.Auth(auth); err != nil {
-			return err
-		}
-	}
-
-	// Set sender and recipient
-	if err = client.Mail(from); err != nil {
-		return err
-	}
-
-	if err = client.Rcpt(to); err != nil {
-		return err
-	}
-
-	// Send message
-	writer, err := client.Data()
-	if err != nil {
-		return err
-	}
-	defer writer.Close()
-
-	_, err = writer.Write([]byte(message))
-	return err
 }
 
 // updateChannelActivity updates the last_activity timestamp for a channel

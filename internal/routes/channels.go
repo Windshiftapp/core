@@ -44,6 +44,16 @@ func RegisterChannelRoutes(deps *Deps) {
 	api.HandleH("DELETE /request-types/{id}", auth(http.HandlerFunc(deps.Workspaces.RequestType.Delete)))
 	api.HandleH("GET /request-types/{id}/fields", auth(http.HandlerFunc(deps.Workspaces.RequestType.GetFields)))
 	api.HandleH("PUT /request-types/{id}/fields", auth(http.HandlerFunc(deps.Workspaces.RequestType.UpdateFields)))
+	api.HandleH("GET /request-types/{id}/available-fields", auth(http.HandlerFunc(deps.Workspaces.RequestType.GetAvailableFields)))
+	api.HandleH("PUT /request-types/{id}/visibility", channelMgmt(http.HandlerFunc(deps.Workspaces.RequestType.UpdateVisibility)))
+
+	// Asset Report endpoints (channel-scoped)
+	api.HandleH("GET /channels/{channel_id}/asset-reports", auth(http.HandlerFunc(deps.Channels.AssetReport.GetAllForChannel)))
+	api.HandleH("POST /channels/{channel_id}/asset-reports", auth(http.HandlerFunc(deps.Channels.AssetReport.Create)))
+	api.HandleH("GET /asset-reports/{id}", auth(http.HandlerFunc(deps.Channels.AssetReport.Get)))
+	api.HandleH("PUT /asset-reports/{id}", auth(http.HandlerFunc(deps.Channels.AssetReport.Update)))
+	api.HandleH("DELETE /asset-reports/{id}", auth(http.HandlerFunc(deps.Channels.AssetReport.Delete)))
+	api.HandleH("PUT /asset-reports/{id}/visibility", channelMgmt(http.HandlerFunc(deps.Channels.AssetReport.UpdateVisibility)))
 
 	// Notification endpoints
 	api.HandleH("GET /notifications", auth(http.HandlerFunc(deps.Channels.Notification.GetNotifications)))

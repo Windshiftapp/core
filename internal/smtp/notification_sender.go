@@ -42,9 +42,9 @@ func (s *NotificationSMTPSender) IsSMTPConfigured() bool {
 // getSMTPConfig retrieves the active SMTP configuration
 func (s *NotificationSMTPSender) getSMTPConfig() (*models.ChannelConfig, error) {
 	query := `
-		SELECT config FROM channels 
-		WHERE type = 'smtp' AND direction = 'outbound' AND status = 'active'
-		ORDER BY is_default DESC, id ASC
+		SELECT config FROM channels
+		WHERE type = 'smtp' AND direction = 'outbound' AND status = 'enabled'
+		ORDER BY updated_at DESC, is_default DESC
 		LIMIT 1
 	`
 
@@ -388,5 +388,11 @@ func (s *NotificationSMTPSender) SendCustomEmail(toEmail, subject, htmlBody, tex
 	}
 
 	// Send email
+	return s.sendEmail(config, toEmail, subject, htmlBody, textBody)
+}
+
+// SendEmailWithConfig sends an email using a provided config (for testing channels)
+// This allows channel test emails to use the same sending logic as production emails
+func (s *NotificationSMTPSender) SendEmailWithConfig(config *models.ChannelConfig, toEmail, subject, htmlBody, textBody string) error {
 	return s.sendEmail(config, toEmail, subject, htmlBody, textBody)
 }

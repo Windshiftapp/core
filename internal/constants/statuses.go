@@ -6,11 +6,8 @@ package constants
 //
 // The order of insertion determines the IDs:
 // 1. Open (default initial status)
-// 2. To Do
-// 3. In Progress
-// 4. Under Review
-// 5. Done
-// 6. Closed
+// 2. In Progress
+// 3. Done
 //
 // Note: These statuses can be renamed by users, but cannot be deleted as they are
 // required for core system functionality (particularly personal tasks).
@@ -18,6 +15,6 @@ const (
 	// StatusIDOpen is the default status for new work items and personal tasks
 	StatusIDOpen = 1
 
-	// StatusIDClosed is used to mark personal tasks as completed
-	StatusIDClosed = 6
+	// StatusIDDone is used to mark personal tasks as completed
+	StatusIDDone = 3
 )

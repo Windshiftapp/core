@@ -9,6 +9,8 @@
 					color TEXT DEFAULT '#6b7280',
 					display_order INTEGER DEFAULT 0,
 					is_active BOOLEAN DEFAULT 1,
+					visibility_group_ids TEXT DEFAULT NULL,
+					visibility_org_ids TEXT DEFAULT NULL,
 					created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 					updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 					FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,

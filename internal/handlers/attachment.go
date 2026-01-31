@@ -94,6 +94,12 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 			entityType = "customer_avatar"
 		case "workspace_background":
 			entityType = "workspace_background"
+		case "portal_background":
+			entityType = "portal_background"
+		case "portal_logo":
+			entityType = "portal_logo"
+		case "hub_logo":
+			entityType = "hub_logo"
 		default:
 			entityType = "item" // Default to item for backwards compatibility
 		}
@@ -106,9 +112,12 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	isWorkspaceAvatar := entityType == "workspace_avatar"
 	isCustomerAvatar := entityType == "customer_avatar"
 	isWorkspaceBackground := entityType == "workspace_background"
+	isPortalBackground := entityType == "portal_background"
+	isPortalLogo := entityType == "portal_logo"
+	isHubLogo := entityType == "hub_logo"
 
-	// Validate entity_id is provided (except for avatars and backgrounds)
-	if entityIDStr == "" && !isAvatar && !isWorkspaceAvatar && !isCustomerAvatar && !isWorkspaceBackground {
+	// Validate entity_id is provided (except for avatars, backgrounds, and logos)
+	if entityIDStr == "" && !isAvatar && !isWorkspaceAvatar && !isCustomerAvatar && !isWorkspaceBackground && !isPortalBackground && !isPortalLogo && !isHubLogo {
 		slog.Debug("missing entity_id in form", slog.String("component", "attachments"))
 		http.Error(w, "entity_id is required", http.StatusBadRequest)
 		return
@@ -126,7 +135,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("uploading to entity", slog.String("component", "attachments"), slog.String("entity_type", entityType), slog.Int("entity_id", entityID))
 
 	// Verify entity exists based on type
-	if !isAvatar && !isWorkspaceAvatar && !isCustomerAvatar && !isWorkspaceBackground {
+	if !isAvatar && !isWorkspaceAvatar && !isCustomerAvatar && !isWorkspaceBackground && !isPortalBackground && !isPortalLogo && !isHubLogo {
 		var exists bool
 		var checkQuery string
 
@@ -261,6 +270,12 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		itemDir = filepath.Join(h.attachmentPath, "customer_avatars")
 	case "workspace_background":
 		itemDir = filepath.Join(h.attachmentPath, "workspace_backgrounds")
+	case "portal_background":
+		itemDir = filepath.Join(h.attachmentPath, "portal_backgrounds")
+	case "portal_logo":
+		itemDir = filepath.Join(h.attachmentPath, "portal_logos")
+	case "hub_logo":
+		itemDir = filepath.Join(h.attachmentPath, "hub_logos")
 	case "test_case":
 		itemDir = filepath.Join(h.attachmentPath, "test_cases", strconv.Itoa(entityID))
 	default: // "item"
@@ -354,7 +369,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// For avatar type checks below
 	var attachmentEntityID interface{}
-	if isAvatar || isWorkspaceAvatar || isCustomerAvatar || isWorkspaceBackground {
+	if isAvatar || isWorkspaceAvatar || isCustomerAvatar || isWorkspaceBackground || isPortalBackground || isPortalLogo || isHubLogo {
 		attachmentEntityID = nil
 	} else {
 		attachmentEntityID = entityID
@@ -386,8 +401,8 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return success response
-	if isAvatar || isWorkspaceAvatar || isCustomerAvatar || isWorkspaceBackground {
-		// For avatars and backgrounds, return the attachment download URL
+	if isAvatar || isWorkspaceAvatar || isCustomerAvatar || isWorkspaceBackground || isPortalBackground || isPortalLogo || isHubLogo {
+		// For avatars, backgrounds, and logos, return the attachment download URL
 		downloadURL := fmt.Sprintf("/api/attachments/%d/download", attachmentID)
 		message := "Avatar uploaded successfully"
 		urlKey := "avatar_url"
@@ -398,6 +413,15 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		} else if isWorkspaceBackground {
 			message = "Workspace background uploaded successfully"
 			urlKey = "background_url"
+		} else if isPortalBackground {
+			message = "Portal background uploaded successfully"
+			urlKey = "background_url"
+		} else if isPortalLogo {
+			message = "Portal logo uploaded successfully"
+			urlKey = "logo_url"
+		} else if isHubLogo {
+			message = "Hub logo uploaded successfully"
+			urlKey = "logo_url"
 		}
 		response := map[string]interface{}{
 			"success":       true,

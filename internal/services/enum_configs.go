@@ -622,8 +622,8 @@ func NewStatusConfig() EnumConfig {
 
 		BeforeDelete: func(db database.Database, id int) (bool, int, string) {
 			// Protect system-critical statuses from deletion
-			if id == constants.StatusIDOpen || id == constants.StatusIDClosed {
-				return false, 403, "Cannot delete Open or Closed status - these are required by the system"
+			if id == constants.StatusIDOpen || id == constants.StatusIDDone {
+				return false, 403, "Cannot delete Open or Done status - these are required by the system"
 			}
 			return true, 0, ""
 		},

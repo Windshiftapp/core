@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"windshift/internal/constants"
 	"windshift/internal/database"
 )
 
@@ -46,9 +47,9 @@ func ValidateItemCreation(db database.Database, params ItemValidationParams) *It
 
 	// Task-specific validation
 	if params.IsTask {
-		// Tasks can only have status_id 1 (Open) or 5 (Done)
-		if params.StatusID != nil && *params.StatusID != 1 && *params.StatusID != 5 {
-			return &ItemValidationResult{Valid: false, Error: "Tasks can only have status 'Open' (1) or 'Done' (5)"}
+		// Tasks can only have status_id Open or Done
+		if params.StatusID != nil && *params.StatusID != constants.StatusIDOpen && *params.StatusID != constants.StatusIDDone {
+			return &ItemValidationResult{Valid: false, Error: "Tasks can only have status 'Open' or 'Done'"}
 		}
 	}
 

@@ -20,6 +20,7 @@ import (
 type PortalAuthHandler struct {
 	db                   database.Database
 	portalSessionManager *auth.PortalSessionManager
+	sessionManager       *auth.SessionManager // internal session manager
 	magicLinkService     *services.MagicLinkService
 	ipExtractor          *utils.IPExtractor
 }
@@ -28,12 +29,14 @@ type PortalAuthHandler struct {
 func NewPortalAuthHandler(
 	db database.Database,
 	portalSessionManager *auth.PortalSessionManager,
+	sessionManager *auth.SessionManager,
 	magicLinkService *services.MagicLinkService,
 	ipExtractor *utils.IPExtractor,
 ) *PortalAuthHandler {
 	return &PortalAuthHandler{
 		db:                   db,
 		portalSessionManager: portalSessionManager,
+		sessionManager:       sessionManager,
 		magicLinkService:     magicLinkService,
 		ipExtractor:          ipExtractor,
 	}
@@ -117,11 +120,11 @@ func (h *PortalAuthHandler) RequestMagicLink(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Find portal customer by email
-	customerID, customerName, err := h.magicLinkService.GetPortalCustomerByEmail(email)
+	// Find or create portal customer by email
+	customerID, err := h.magicLinkService.FindOrCreatePortalCustomer(email, "", channel.ID)
 	if err != nil {
-		// Always return success to prevent email enumeration
-		slog.Debug("portal customer not found", slog.String("component", "portal_auth"), slog.String("email", email))
+		slog.Error("failed to find or create portal customer", slog.String("component", "portal_auth"), slog.String("email", email), slog.Any("error", err))
+		// Still return success to prevent email enumeration
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
@@ -129,6 +132,9 @@ func (h *PortalAuthHandler) RequestMagicLink(w http.ResponseWriter, r *http.Requ
 		})
 		return
 	}
+
+	// Get customer name for email personalization (may be empty for new customers)
+	_, customerName, _ := h.magicLinkService.GetPortalCustomerByEmail(email)
 
 	// Generate magic link
 	token, err := h.magicLinkService.GenerateMagicLink(customerID, &channel.ID)
@@ -280,7 +286,7 @@ func (h *PortalAuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetCurrentCustomer handles GET /portal/{slug}/auth/me
-// Returns the current authenticated portal customer
+// Returns the current authenticated portal customer or internal user
 func (h *PortalAuthHandler) GetCurrentCustomer(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 
@@ -294,36 +300,55 @@ func (h *PortalAuthHandler) GetCurrentCustomer(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Get session token
+	// Try portal session first
 	token, err := h.portalSessionManager.GetPortalSessionFromRequest(r)
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"authenticated": false,
-		})
-		return
+	if err == nil {
+		session, err := h.portalSessionManager.ValidatePortalSession(token)
+		if err == nil {
+			// Portal customer authenticated
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"authenticated": true,
+				"is_internal":   false,
+				"customer": map[string]interface{}{
+					"id":    session.Customer.ID,
+					"email": session.Customer.Email,
+					"name":  session.Customer.Name,
+				},
+			})
+			return
+		}
 	}
 
-	// Validate session
-	session, err := h.portalSessionManager.ValidatePortalSession(token)
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"authenticated": false,
-			"error":         "Session expired or invalid",
-		})
-		return
+	// Fallback: Check for internal session
+	if h.sessionManager != nil {
+		internalToken, err := h.sessionManager.GetSessionFromRequest(r)
+		if err == nil {
+			clientIP := h.getClientIP(r)
+			session, err := h.sessionManager.ValidateSession(internalToken, clientIP)
+			if err == nil && session.User != nil {
+				// Internal user authenticated
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"authenticated": true,
+					"is_internal":   true,
+					"user": map[string]interface{}{
+						"id":         session.User.ID,
+						"email":      session.User.Email,
+						"name":       session.User.FirstName + " " + session.User.LastName,
+						"first_name": session.User.FirstName,
+						"last_name":  session.User.LastName,
+					},
+				})
+				return
+			}
+		}
 	}
 
+	// No valid session found
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusUnauthorized)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"authenticated": true,
-		"customer": map[string]interface{}{
-			"id":    session.Customer.ID,
-			"email": session.Customer.Email,
-			"name":  session.Customer.Name,
-		},
+		"authenticated": false,
 	})
 }

@@ -449,6 +449,7 @@ func (s *Server) initialize() error {
 	assetTypeHandler := handlers.NewAssetTypeHandler(s.db, permService)
 	assetCategoryHandler := handlers.NewAssetCategoryHandler(s.db, permService)
 	assetStatusHandler := handlers.NewAssetStatusHandler(s.db, permService)
+	assetReportHandler := handlers.NewAssetReportHandler(s.db)
 
 	// Jira import handler
 	jiraImportHandler := handlers.NewJiraImportHandler(s.db)
@@ -508,15 +509,17 @@ func (s *Server) initialize() error {
 	channelHandler.SetEmailScheduler(s.emailScheduler)
 	channelHandler.SetEncryption(scmProviderHandler.GetEncryption())
 	channelHandler.SetBaseURL(baseURL)
+	channelHandler.SetSMTPSender(smtpSender)
 
 	// Webhook handler
 	webhookHandler := handlers.NewWebhookHandler(s.db, webhookSender, permService)
 	portalHandler := handlers.NewPortalHandler(s.db, sessionManager, portalSessionManager, ipExtractor)
-	portalAuthHandler := handlers.NewPortalAuthHandler(s.db, portalSessionManager, magicLinkService, ipExtractor)
+	portalAuthHandler := handlers.NewPortalAuthHandler(s.db, portalSessionManager, sessionManager, magicLinkService, ipExtractor)
 	portalCustomersHandler := handlers.NewPortalCustomersHandler(s.db)
 	contactRolesHandler := handlers.NewEnumHandler(
 		services.NewEnumService(s.db, services.NewContactRoleConfig()),
 		func() interface{} { return &models.ContactRole{} })
+	hubHandler := handlers.NewHubHandler(s.db, permService)
 
 	// Notification settings
 	notificationSettingsHandler := handlers.NewNotificationSettingsHandler(s.db)
@@ -724,12 +727,14 @@ func (s *Server) initialize() error {
 			Notification:         notificationHandler,
 			NotificationTemplate: notificationTemplateHandler,
 			Webhook:              webhookHandler,
+			AssetReport:          assetReportHandler,
 		},
 		Portal: routes.PortalHandlers{
 			Portal:         portalHandler,
 			PortalAuth:     portalAuthHandler,
 			PortalCustomer: portalCustomersHandler,
 			ContactRole:    contactRolesHandler,
+			Hub:            hubHandler,
 		},
 		Assets: routes.AssetHandlers{
 			Asset:    assetHandler,
@@ -772,6 +777,7 @@ func (s *Server) initialize() error {
 			mux.Handle("GET /assets/", fileServer)
 			mux.Handle("GET /vite.svg", fileServer)
 			mux.Handle("GET /cmicon-2.svg", fileServer)
+			mux.Handle("GET /windshift-2.svg", fileServer)
 
 			mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 				if len(r.URL.Path) >= 4 && r.URL.Path[:4] == "/api" {

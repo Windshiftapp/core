@@ -170,6 +170,7 @@ type ChannelHandlers struct {
 	Notification         *handlers.NotificationHandler
 	NotificationTemplate *handlers.NotificationTemplateHandler
 	Webhook              *handlers.WebhookHandler
+	AssetReport          *handlers.AssetReportHandler
 }
 
 // PortalHandlers groups portal-related handlers.

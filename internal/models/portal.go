@@ -95,10 +95,12 @@ type ChannelConfig struct {
 	PortalDescription  string `json:"portal_description,omitempty"` // Description shown on portal page
 
 	// Portal Customization
-	PortalGradient          int    `json:"portal_gradient,omitempty"`           // Selected gradient index (0-17)
-	PortalTheme             string `json:"portal_theme,omitempty"`              // Theme mode: "light" or "dark"
-	PortalSearchPlaceholder string `json:"portal_search_placeholder,omitempty"` // Custom search placeholder text
-	PortalSearchHint        string `json:"portal_search_hint,omitempty"`        // Custom search hint text
+	PortalGradient            int    `json:"portal_gradient,omitempty"`              // Selected gradient index (0-17)
+	PortalTheme               string `json:"portal_theme,omitempty"`                 // Theme mode: "light" or "dark"
+	PortalSearchPlaceholder   string `json:"portal_search_placeholder,omitempty"`    // Custom search placeholder text
+	PortalSearchHint          string `json:"portal_search_hint,omitempty"`           // Custom search hint text
+	PortalBackgroundImageURL  string `json:"portal_background_image_url,omitempty"`  // Custom background image URL (overrides gradient)
+	PortalLogoURL             string `json:"portal_logo_url,omitempty"`              // Custom portal logo URL
 	PortalFooterColumns     []struct {
 		Title string `json:"title"`
 		Links []struct {
@@ -138,11 +140,12 @@ type ChannelManagerRequest struct {
 
 // PortalSection represents a configurable section on the portal page
 type PortalSection struct {
-	ID             string `json:"id"`               // UUID for client-side tracking
-	Title          string `json:"title"`            // Section title (e.g., "Popular Requests")
-	Subtitle       string `json:"subtitle"`         // Section subtitle (optional)
-	DisplayOrder   int    `json:"display_order"`    // Order of section on page
-	RequestTypeIDs []int  `json:"request_type_ids"` // Ordered list of request type IDs in this section
+	ID              string `json:"id"`                // UUID for client-side tracking
+	Title           string `json:"title"`             // Section title (e.g., "Popular Requests")
+	Subtitle        string `json:"subtitle"`          // Section subtitle (optional)
+	DisplayOrder    int    `json:"display_order"`     // Order of section on page
+	RequestTypeIDs  []int  `json:"request_type_ids"`  // Ordered list of request type IDs in this section
+	AssetReportIDs  []int  `json:"asset_report_ids"`  // Ordered list of asset report IDs in this section
 }
 
 // PortalCustomer represents an individual portal user
@@ -210,20 +213,106 @@ type ContactRole struct {
 
 // RequestType represents a portal request type that maps to an item type
 type RequestType struct {
-	ID           int       `json:"id"`
-	ChannelID    int       `json:"channel_id"` // Scope request type to specific portal/channel
-	Name         string    `json:"name"`
-	Description  string    `json:"description"`
-	ItemTypeID   int       `json:"item_type_id"`  // n:1 relationship - which item type submissions create
-	Icon         string    `json:"icon"`          // Lucide icon name for visual representation
-	Color        string    `json:"color"`         // Hex color for visual representation
-	DisplayOrder int       `json:"display_order"` // Ordering within channel
-	IsActive     bool      `json:"is_active"`     // Enable/disable this request type
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID                 int       `json:"id"`
+	ChannelID          int       `json:"channel_id"` // Scope request type to specific portal/channel
+	Name               string    `json:"name"`
+	Description        string    `json:"description"`
+	ItemTypeID         int       `json:"item_type_id"`  // n:1 relationship - which item type submissions create
+	Icon               string    `json:"icon"`          // Lucide icon name for visual representation
+	Color              string    `json:"color"`         // Hex color for visual representation
+	DisplayOrder       int       `json:"display_order"` // Ordering within channel
+	IsActive           bool      `json:"is_active"`     // Enable/disable this request type
+	VisibilityGroupIDs []int     `json:"visibility_group_ids,omitempty"` // Internal groups that can see this request type
+	VisibilityOrgIDs   []int     `json:"visibility_org_ids,omitempty"`   // Customer organisations that can see this request type
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 	// Joined fields for API responses
 	ChannelName  string `json:"channel_name,omitempty"`
 	ItemTypeName string `json:"item_type_name,omitempty"`
+}
+
+// IsVisibleTo checks if this request type is visible to the given user groups and/or customer organisation
+// Returns true if no restrictions are set, or if the user matches any group OR the customer org matches any org
+func (rt *RequestType) IsVisibleTo(userGroupIDs []int, customerOrgID *int) bool {
+	// No restrictions = visible to all
+	if len(rt.VisibilityGroupIDs) == 0 && len(rt.VisibilityOrgIDs) == 0 {
+		return true
+	}
+
+	// Check group match (internal users)
+	if len(rt.VisibilityGroupIDs) > 0 && len(userGroupIDs) > 0 {
+		for _, gid := range rt.VisibilityGroupIDs {
+			for _, ug := range userGroupIDs {
+				if gid == ug {
+					return true
+				}
+			}
+		}
+	}
+
+	// Check org match (portal customers)
+	if len(rt.VisibilityOrgIDs) > 0 && customerOrgID != nil {
+		for _, oid := range rt.VisibilityOrgIDs {
+			if oid == *customerOrgID {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// AssetReport represents a portal asset report that displays filtered assets
+type AssetReport struct {
+	ID                 int       `json:"id"`
+	ChannelID          int       `json:"channel_id"`
+	AssetSetID         int       `json:"asset_set_id"`
+	Name               string    `json:"name"`
+	Description        string    `json:"description"`
+	CQLQuery           string    `json:"cql_query"`
+	Icon               string    `json:"icon"`
+	Color              string    `json:"color"`
+	DisplayOrder       int       `json:"display_order"`
+	IsActive           bool      `json:"is_active"`
+	ColumnConfig       []string  `json:"column_config,omitempty"`
+	VisibilityGroupIDs []int     `json:"visibility_group_ids,omitempty"`
+	VisibilityOrgIDs   []int     `json:"visibility_org_ids,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
+	// Joined fields for API responses
+	ChannelName  string `json:"channel_name,omitempty"`
+	AssetSetName string `json:"asset_set_name,omitempty"`
+}
+
+// IsVisibleTo checks if this asset report is visible to the given user groups and/or customer organisation
+// Returns true if no restrictions are set, or if the user matches any group OR the customer org matches any org
+func (ar *AssetReport) IsVisibleTo(userGroupIDs []int, customerOrgID *int) bool {
+	// No restrictions = visible to all
+	if len(ar.VisibilityGroupIDs) == 0 && len(ar.VisibilityOrgIDs) == 0 {
+		return true
+	}
+
+	// Check group match (internal users)
+	if len(ar.VisibilityGroupIDs) > 0 && len(userGroupIDs) > 0 {
+		for _, gid := range ar.VisibilityGroupIDs {
+			for _, ug := range userGroupIDs {
+				if gid == ug {
+					return true
+				}
+			}
+		}
+	}
+
+	// Check org match (portal customers)
+	if len(ar.VisibilityOrgIDs) > 0 && customerOrgID != nil {
+		for _, oid := range ar.VisibilityOrgIDs {
+			if oid == *customerOrgID {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // RequestTypeField represents a field configuration for a request type
@@ -432,4 +521,90 @@ func GetAvailableNotificationEvents() []NotificationEvent {
 		{EventStatusChanged, "Status Changed", "When a work item's status is changed", "status"},
 		{EventMention, "User Mentioned", "When a user is @mentioned in a comment or description", "mention"},
 	}
+}
+
+// ============================================
+// Portal Hub Models
+// ============================================
+
+// PortalHubConfig represents the configuration for the Portal Hub central page
+type PortalHubConfig struct {
+	Title             string         `json:"title"`
+	Description       string         `json:"description"`
+	Gradient          int            `json:"gradient"`
+	Theme             string         `json:"theme"`
+	SearchPlaceholder string         `json:"search_placeholder"`
+	SearchHint        string         `json:"search_hint"`
+	LogoURL           string         `json:"logo_url,omitempty"`
+	Sections          []HubSection   `json:"sections"`
+	FooterColumns     []FooterColumn `json:"footer_columns"`
+}
+
+// HubSection represents a customizable section in the Portal Hub
+type HubSection struct {
+	ID      string `json:"id"`
+	Title   string `json:"title"`
+	Content string `json:"content"`
+	Visible bool   `json:"visible"`
+}
+
+// FooterColumn represents a column in the Portal Hub footer
+type FooterColumn struct {
+	Title string `json:"title"`
+	Links []struct {
+		Text string `json:"text"`
+		URL  string `json:"url"`
+	} `json:"links"`
+}
+
+// HubResponse is the API response for the Portal Hub
+type HubResponse struct {
+	Config  PortalHubConfig `json:"config"`
+	Portals []HubPortalInfo `json:"portals"`
+}
+
+// HubPortalInfo represents portal information displayed in the hub
+type HubPortalInfo struct {
+	ID               int                      `json:"id"`
+	Name             string                   `json:"name"`
+	Description      string                   `json:"description"`
+	Status           string                   `json:"status"`
+	Slug             string                   `json:"slug"`
+	Gradient         int                      `json:"gradient"`
+	RequestTypeCount int                      `json:"request_type_count"`
+	RequestTypes     []HubPortalRequestType   `json:"request_types,omitempty"`
+}
+
+// HubPortalRequestType represents a request type for hub search
+type HubPortalRequestType struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Icon        string `json:"icon"`
+	Color       string `json:"color"`
+}
+
+// HubInboxItem represents a request/ticket in the hub inbox
+type HubInboxItem struct {
+	ID                  int       `json:"id"`
+	Title               string    `json:"title"`
+	Description         string    `json:"description"`
+	CreatedAt           time.Time `json:"created_at"`
+	StatusName          string    `json:"status_name"`
+	StatusColor         string    `json:"status_color"`
+	WorkspaceKey        string    `json:"workspace_key"`
+	WorkspaceItemNumber int       `json:"workspace_item_number"`
+	PortalName          string    `json:"portal_name"`
+	PortalSlug          string    `json:"portal_slug"`
+	SubmitterName       *string   `json:"submitter_name,omitempty"`
+	SubmitterEmail      *string   `json:"submitter_email,omitempty"`
+}
+
+// HubInboxResponse is the API response for the hub inbox
+type HubInboxResponse struct {
+	Items      []HubInboxItem `json:"items"`
+	Total      int            `json:"total"`
+	Page       int            `json:"page"`
+	PerPage    int            `json:"per_page"`
+	TotalPages int            `json:"total_pages"`
 }

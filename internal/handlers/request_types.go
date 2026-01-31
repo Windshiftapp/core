@@ -1,18 +1,44 @@
 package handlers
 
 import (
-	"windshift/internal/database"
-	"windshift/internal/logger"
-	"windshift/internal/models"
-	"windshift/internal/utils"
 	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
-
+	"windshift/internal/database"
+	"windshift/internal/logger"
+	"windshift/internal/models"
+	"windshift/internal/utils"
 )
+
+// serializeIntArray converts a slice of ints to a JSON string pointer
+// Returns nil if the slice is empty or nil
+func serializeIntArray(ids []int) *string {
+	if len(ids) == 0 {
+		return nil
+	}
+	data, err := json.Marshal(ids)
+	if err != nil {
+		return nil
+	}
+	s := string(data)
+	return &s
+}
+
+// deserializeIntArray converts a JSON string pointer to a slice of ints
+// Returns nil if the string is nil or empty
+func deserializeIntArray(s *string) []int {
+	if s == nil || *s == "" {
+		return nil
+	}
+	var ids []int
+	if err := json.Unmarshal([]byte(*s), &ids); err != nil {
+		return nil
+	}
+	return ids
+}
 
 type RequestTypeHandler struct {
 	db database.Database
@@ -32,7 +58,9 @@ func (h *RequestTypeHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 
 	query := `
 		SELECT rt.id, rt.channel_id, rt.name, rt.description, rt.item_type_id,
-		       rt.icon, rt.color, rt.display_order, rt.is_active, rt.created_at, rt.updated_at,
+		       rt.icon, rt.color, rt.display_order, rt.is_active,
+		       rt.visibility_group_ids, rt.visibility_org_ids,
+		       rt.created_at, rt.updated_at,
 		       c.name as channel_name, it.name as item_type_name
 		FROM request_types rt
 		LEFT JOIN channels c ON rt.channel_id = c.id
@@ -50,13 +78,18 @@ func (h *RequestTypeHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 	var requestTypes []models.RequestType
 	for rows.Next() {
 		var rt models.RequestType
+		var visibilityGroupIDs, visibilityOrgIDs *string
 		err := rows.Scan(&rt.ID, &rt.ChannelID, &rt.Name, &rt.Description, &rt.ItemTypeID,
-			&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive, &rt.CreatedAt, &rt.UpdatedAt,
+			&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive,
+			&visibilityGroupIDs, &visibilityOrgIDs,
+			&rt.CreatedAt, &rt.UpdatedAt,
 			&rt.ChannelName, &rt.ItemTypeName)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		rt.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
+		rt.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
 		requestTypes = append(requestTypes, rt)
 	}
 
@@ -77,16 +110,21 @@ func (h *RequestTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var rt models.RequestType
+	var visibilityGroupIDs, visibilityOrgIDs *string
 	err = h.db.QueryRow(`
 		SELECT rt.id, rt.channel_id, rt.name, rt.description, rt.item_type_id,
-		       rt.icon, rt.color, rt.display_order, rt.is_active, rt.created_at, rt.updated_at,
+		       rt.icon, rt.color, rt.display_order, rt.is_active,
+		       rt.visibility_group_ids, rt.visibility_org_ids,
+		       rt.created_at, rt.updated_at,
 		       c.name as channel_name, it.name as item_type_name
 		FROM request_types rt
 		LEFT JOIN channels c ON rt.channel_id = c.id
 		LEFT JOIN item_types it ON rt.item_type_id = it.id
 		WHERE rt.id = ?
 	`, id).Scan(&rt.ID, &rt.ChannelID, &rt.Name, &rt.Description, &rt.ItemTypeID,
-		&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive, &rt.CreatedAt, &rt.UpdatedAt,
+		&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive,
+		&visibilityGroupIDs, &visibilityOrgIDs,
+		&rt.CreatedAt, &rt.UpdatedAt,
 		&rt.ChannelName, &rt.ItemTypeName)
 
 	if err == sql.ErrNoRows {
@@ -97,6 +135,9 @@ func (h *RequestTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	rt.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
+	rt.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(rt)
@@ -162,9 +203,10 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	var id int64
 	err = h.db.QueryRow(`
-		INSERT INTO request_types (channel_id, name, description, item_type_id, icon, color, display_order, is_active, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-	`, rt.ChannelID, rt.Name, rt.Description, rt.ItemTypeID, rt.Icon, rt.Color, rt.DisplayOrder, rt.IsActive, now, now).Scan(&id)
+		INSERT INTO request_types (channel_id, name, description, item_type_id, icon, color, display_order, is_active, visibility_group_ids, visibility_org_ids, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+	`, rt.ChannelID, rt.Name, rt.Description, rt.ItemTypeID, rt.Icon, rt.Color, rt.DisplayOrder, rt.IsActive,
+		serializeIntArray(rt.VisibilityGroupIDs), serializeIntArray(rt.VisibilityOrgIDs), now, now).Scan(&id)
 
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
@@ -176,17 +218,24 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return the created request type
+	var visibilityGroupIDs, visibilityOrgIDs *string
 	err = h.db.QueryRow(`
 		SELECT rt.id, rt.channel_id, rt.name, rt.description, rt.item_type_id,
-		       rt.icon, rt.color, rt.display_order, rt.is_active, rt.created_at, rt.updated_at,
+		       rt.icon, rt.color, rt.display_order, rt.is_active,
+		       rt.visibility_group_ids, rt.visibility_org_ids,
+		       rt.created_at, rt.updated_at,
 		       c.name as channel_name, it.name as item_type_name
 		FROM request_types rt
 		LEFT JOIN channels c ON rt.channel_id = c.id
 		LEFT JOIN item_types it ON rt.item_type_id = it.id
 		WHERE rt.id = ?
 	`, id).Scan(&rt.ID, &rt.ChannelID, &rt.Name, &rt.Description, &rt.ItemTypeID,
-		&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive, &rt.CreatedAt, &rt.UpdatedAt,
+		&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive,
+		&visibilityGroupIDs, &visibilityOrgIDs,
+		&rt.CreatedAt, &rt.UpdatedAt,
 		&rt.ChannelName, &rt.ItemTypeName)
+	rt.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
+	rt.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -230,17 +279,24 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Get the old request type for audit logging
 	var oldRT models.RequestType
+	var oldVisibilityGroupIDs, oldVisibilityOrgIDs *string
 	err = h.db.QueryRow(`
 		SELECT rt.id, rt.channel_id, rt.name, rt.description, rt.item_type_id,
-		       rt.icon, rt.color, rt.display_order, rt.is_active, rt.created_at, rt.updated_at,
+		       rt.icon, rt.color, rt.display_order, rt.is_active,
+		       rt.visibility_group_ids, rt.visibility_org_ids,
+		       rt.created_at, rt.updated_at,
 		       c.name as channel_name, it.name as item_type_name
 		FROM request_types rt
 		LEFT JOIN channels c ON rt.channel_id = c.id
 		LEFT JOIN item_types it ON rt.item_type_id = it.id
 		WHERE rt.id = ?
 	`, id).Scan(&oldRT.ID, &oldRT.ChannelID, &oldRT.Name, &oldRT.Description, &oldRT.ItemTypeID,
-		&oldRT.Icon, &oldRT.Color, &oldRT.DisplayOrder, &oldRT.IsActive, &oldRT.CreatedAt, &oldRT.UpdatedAt,
+		&oldRT.Icon, &oldRT.Color, &oldRT.DisplayOrder, &oldRT.IsActive,
+		&oldVisibilityGroupIDs, &oldVisibilityOrgIDs,
+		&oldRT.CreatedAt, &oldRT.UpdatedAt,
 		&oldRT.ChannelName, &oldRT.ItemTypeName)
+	oldRT.VisibilityGroupIDs = deserializeIntArray(oldVisibilityGroupIDs)
+	oldRT.VisibilityOrgIDs = deserializeIntArray(oldVisibilityOrgIDs)
 
 	if err == sql.ErrNoRows {
 		http.Error(w, "Request type not found", http.StatusNotFound)
@@ -278,9 +334,11 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	_, err = h.db.ExecWrite(`
 		UPDATE request_types
-		SET name = ?, description = ?, item_type_id = ?, icon = ?, color = ?, display_order = ?, is_active = ?, updated_at = ?
+		SET name = ?, description = ?, item_type_id = ?, icon = ?, color = ?, display_order = ?, is_active = ?,
+		    visibility_group_ids = ?, visibility_org_ids = ?, updated_at = ?
 		WHERE id = ?
-	`, rt.Name, rt.Description, rt.ItemTypeID, rt.Icon, rt.Color, rt.DisplayOrder, rt.IsActive, now, id)
+	`, rt.Name, rt.Description, rt.ItemTypeID, rt.Icon, rt.Color, rt.DisplayOrder, rt.IsActive,
+		serializeIntArray(rt.VisibilityGroupIDs), serializeIntArray(rt.VisibilityOrgIDs), now, id)
 
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
@@ -292,17 +350,24 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return the updated request type
+	var visibilityGroupIDs, visibilityOrgIDs *string
 	err = h.db.QueryRow(`
 		SELECT rt.id, rt.channel_id, rt.name, rt.description, rt.item_type_id,
-		       rt.icon, rt.color, rt.display_order, rt.is_active, rt.created_at, rt.updated_at,
+		       rt.icon, rt.color, rt.display_order, rt.is_active,
+		       rt.visibility_group_ids, rt.visibility_org_ids,
+		       rt.created_at, rt.updated_at,
 		       c.name as channel_name, it.name as item_type_name
 		FROM request_types rt
 		LEFT JOIN channels c ON rt.channel_id = c.id
 		LEFT JOIN item_types it ON rt.item_type_id = it.id
 		WHERE rt.id = ?
 	`, id).Scan(&rt.ID, &rt.ChannelID, &rt.Name, &rt.Description, &rt.ItemTypeID,
-		&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive, &rt.CreatedAt, &rt.UpdatedAt,
+		&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive,
+		&visibilityGroupIDs, &visibilityOrgIDs,
+		&rt.CreatedAt, &rt.UpdatedAt,
 		&rt.ChannelName, &rt.ItemTypeName)
+	rt.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
+	rt.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -582,4 +647,172 @@ func (h *RequestTypeHandler) UpdateFields(w http.ResponseWriter, r *http.Request
 
 	// Return the updated fields
 	h.GetFields(w, r)
+}
+
+// GetAvailableFields returns all fields available for a request type based on its item type
+// This includes default fields (title, description) and custom fields filtered by item type
+func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.Request) {
+	requestTypeID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "Invalid request type ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get the request type to find its item_type_id
+	var itemTypeID int
+	err = h.db.QueryRow("SELECT item_type_id FROM request_types WHERE id = ?", requestTypeID).Scan(&itemTypeID)
+	if err == sql.ErrNoRows {
+		http.Error(w, "Request type not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Build the result list
+	type AvailableField struct {
+		Identifier string `json:"identifier"`
+		Name       string `json:"name"`
+		Type       string `json:"type"` // "default" or "custom"
+		FieldType  string `json:"field_type,omitempty"`
+	}
+
+	var fields []AvailableField
+
+	// Add default fields
+	fields = append(fields, AvailableField{
+		Identifier: "title",
+		Name:       "Title",
+		Type:       "default",
+	})
+	fields = append(fields, AvailableField{
+		Identifier: "description",
+		Name:       "Description",
+		Type:       "default",
+	})
+
+	// Get custom fields for this item type
+	// Custom fields can be associated with specific item types via item_type_id
+	// If item_type_id is null, the field applies to all item types
+	customFieldsQuery := `
+		SELECT id, name, field_type
+		FROM custom_field_definitions
+		WHERE item_type_id IS NULL OR item_type_id = ?
+		ORDER BY name`
+
+	rows, err := h.db.Query(customFieldsQuery, itemTypeID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int
+		var name, fieldType string
+		if err := rows.Scan(&id, &name, &fieldType); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		fields = append(fields, AvailableField{
+			Identifier: strconv.Itoa(id),
+			Name:       name,
+			Type:       "custom",
+			FieldType:  fieldType,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(fields)
+}
+
+// UpdateVisibility updates only the visibility settings for a request type
+func (h *RequestTypeHandler) UpdateVisibility(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	// Verify request type exists
+	var exists bool
+	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM request_types WHERE id = ?)", id).Scan(&exists)
+	if err != nil || !exists {
+		http.Error(w, "Request type not found", http.StatusNotFound)
+		return
+	}
+
+	// Parse visibility request
+	var req struct {
+		GroupIDs []int `json:"group_ids"`
+		OrgIDs   []int `json:"org_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Update visibility columns
+	now := time.Now()
+	_, err = h.db.ExecWrite(`
+		UPDATE request_types
+		SET visibility_group_ids = ?, visibility_org_ids = ?, updated_at = ?
+		WHERE id = ?
+	`, serializeIntArray(req.GroupIDs), serializeIntArray(req.OrgIDs), now, id)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Return the updated request type
+	var rt models.RequestType
+	var visibilityGroupIDs, visibilityOrgIDs *string
+	err = h.db.QueryRow(`
+		SELECT rt.id, rt.channel_id, rt.name, rt.description, rt.item_type_id,
+		       rt.icon, rt.color, rt.display_order, rt.is_active,
+		       rt.visibility_group_ids, rt.visibility_org_ids,
+		       rt.created_at, rt.updated_at,
+		       c.name as channel_name, it.name as item_type_name
+		FROM request_types rt
+		LEFT JOIN channels c ON rt.channel_id = c.id
+		LEFT JOIN item_types it ON rt.item_type_id = it.id
+		WHERE rt.id = ?
+	`, id).Scan(&rt.ID, &rt.ChannelID, &rt.Name, &rt.Description, &rt.ItemTypeID,
+		&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive,
+		&visibilityGroupIDs, &visibilityOrgIDs,
+		&rt.CreatedAt, &rt.UpdatedAt,
+		&rt.ChannelName, &rt.ItemTypeName)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	rt.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
+	rt.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
+
+	// Log audit event
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   "request_type_visibility_update",
+			ResourceType: "request_type",
+			ResourceID:   &rt.ID,
+			ResourceName: rt.Name,
+			Details: map[string]interface{}{
+				"visibility_group_ids": req.GroupIDs,
+				"visibility_org_ids":   req.OrgIDs,
+			},
+			Success: true,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(rt)
 }
