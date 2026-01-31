@@ -74,7 +74,7 @@
               <!-- Right: Back to Hub Button -->
               <button
                 onclick={() => hubStore.toggleInbox()}
-                class="flex items-center gap-2 px-3 py-1.5 rounded text-white text-sm bg-white/10 backdrop-blur-sm hover:bg-white/20 transition-all border border-white/20"
+                class="glass-btn flex items-center gap-2 px-3 py-1.5 rounded text-white text-sm transition-all"
               >
                 <ArrowLeft class="w-4 h-4" />
                 <span class="font-medium">{t('hub.backToHub', 'Back to Hub')}</span>

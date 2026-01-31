@@ -6,6 +6,7 @@
   import { hubStore, gradients } from '../stores/hub.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { navigate } from '../router.js';
+  import LogoUploader from '../components/LogoUploader.svelte';
 
   let showCustomizePanelHover = $state(false);
 </script>
@@ -135,6 +136,18 @@
               class="w-full px-3 py-2 rounded border text-sm"
               style="background-color: var(--ds-surface-raised); border-color: var(--ds-border); color: var(--ds-text);"
               placeholder="Search hint text"
+            />
+          </div>
+
+          <!-- Logo Upload -->
+          <div class="border-t pt-6" style="border-color: var(--ds-border);">
+            <LogoUploader
+              currentLogoUrl={hubStore.logoUrl}
+              onUpload={(files) => hubStore.handleLogoUpload(files)}
+              onRemove={() => hubStore.removeLogo()}
+              uploading={hubStore.uploadingLogo}
+              label={t('hub.logo', 'Hub Logo')}
+              helpText={t('hub.logoHelp', 'This logo will be displayed on the Hub and used as a fallback for portals without their own logo.')}
             />
           </div>
         </div>

@@ -22,6 +22,11 @@ let showCustomizePanel = $state(false);
 let showInbox = $state(false);
 let selectedGradient = $state(0);
 let activeSection = $state('hero-gradient');
+let searchQuery = $state('');
+
+// Logo state
+let logoUrl = $state(null);
+let uploadingLogo = $state(false);
 
 // Editable content
 let editableTitle = $state('Portal Hub');
@@ -76,6 +81,7 @@ async function loadHub() {
     isDarkMode = data.config.theme === 'dark';
     editableSearchPlaceholder = data.config.search_placeholder || 'Search portals...';
     editableSearchHint = data.config.search_hint || '';
+    logoUrl = data.config.logo_url || null;
 
     // Load hub sections
     hubSections = data.config.sections || [];
@@ -129,6 +135,55 @@ function selectGradient(index) {
 }
 
 /**
+ * Handle logo upload
+ */
+async function handleLogoUpload(files) {
+  if (!files || files.length === 0) return;
+
+  const file = files[0];
+  if (!file.type.startsWith('image/')) {
+    console.error('Please select an image file');
+    return;
+  }
+
+  uploadingLogo = true;
+  try {
+    const uploadFormData = new FormData();
+    uploadFormData.append('file', file);
+    uploadFormData.append('category', 'hub_logo');
+
+    const response = await fetch('/api/attachments/upload', {
+      method: 'POST',
+      body: uploadFormData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`);
+    }
+
+    const uploadResult = await response.json();
+
+    if (uploadResult && uploadResult.success && uploadResult.logo_url) {
+      logoUrl = uploadResult.logo_url;
+      saveCustomizations();
+      console.log('Hub logo uploaded successfully');
+    }
+  } catch (err) {
+    console.error('Failed to upload hub logo:', err);
+  } finally {
+    uploadingLogo = false;
+  }
+}
+
+/**
+ * Remove logo
+ */
+function removeLogo() {
+  logoUrl = null;
+  saveCustomizations();
+}
+
+/**
  * Save customizations (debounced)
  */
 async function saveCustomizations() {
@@ -146,6 +201,7 @@ async function saveCustomizations() {
         theme: isDarkMode ? 'dark' : 'light',
         search_placeholder: editableSearchPlaceholder,
         search_hint: editableSearchHint,
+        logo_url: logoUrl || '',
         sections: hubSections,
         footer_columns: footerColumns,
       };
@@ -358,6 +414,9 @@ function reset() {
   showInbox = false;
   selectedGradient = 0;
   activeSection = 'hero-gradient';
+  searchQuery = '';
+  logoUrl = null;
+  uploadingLogo = false;
   editableTitle = 'Portal Hub';
   editableDescription = '';
   editableSearchPlaceholder = 'Search portals...';
@@ -395,6 +454,11 @@ export const hubStore = {
   get showInbox() { return showInbox; },
   get selectedGradient() { return selectedGradient; },
   get activeSection() { return activeSection; },
+  get searchQuery() { return searchQuery; },
+
+  // Getters for logo state
+  get logoUrl() { return logoUrl; },
+  get uploadingLogo() { return uploadingLogo; },
 
   // Getters for editable content
   get editableTitle() { return editableTitle; },
@@ -422,6 +486,7 @@ export const hubStore = {
   set showCustomizePanel(value) { showCustomizePanel = value; },
   set showInbox(value) { showInbox = value; },
   set activeSection(value) { activeSection = value; },
+  set searchQuery(value) { searchQuery = value; },
   set draggedPortal(value) { draggedPortal = value; },
 
   // Setters for editable content
@@ -436,6 +501,10 @@ export const hubStore = {
   toggleTheme,
   selectGradient,
   saveCustomizations,
+
+  // Logo actions
+  handleLogoUpload,
+  removeLogo,
 
   // Section actions
   addSection,
