@@ -199,6 +199,32 @@
   -webkit-backdrop-filter: var(--glass-blur-light);
 }
 
+/* Glass button on gradient backgrounds (portal/hub hero) */
+.glass-btn {
+  background: var(--ds-glass-btn-bg);
+  backdrop-filter: var(--glass-blur-medium) var(--glass-saturation);
+  -webkit-backdrop-filter: var(--glass-blur-medium) var(--glass-saturation);
+  border: 1px solid var(--ds-glass-btn-border);
+}
+
+.glass-btn:hover {
+  background: var(--ds-glass-btn-bg-hover);
+  border-color: var(--ds-glass-btn-border-hover);
+}
+
+/* Modal/overlay backdrop blur */
+.glass-backdrop {
+  background-color: var(--ds-glass-backdrop);
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
+}
+
+.glass-backdrop-heavy {
+  background-color: var(--ds-glass-backdrop);
+  backdrop-filter: var(--glass-blur-medium);
+  -webkit-backdrop-filter: var(--glass-blur-medium);
+}
+
 /* Animated gradient background */
 .gradient-animated {
   background: linear-gradient(

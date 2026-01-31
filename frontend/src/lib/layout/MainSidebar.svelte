@@ -108,7 +108,7 @@
     { id: 'milestones', icon: Milestone, labelKey: 'nav.milestones', href: '/milestones', activeViews: ['milestones', 'milestone-detail'] },
     { id: 'iterations', icon: Calendar, labelKey: 'nav.iterations', href: '/iterations', activeViews: ['iterations', 'iteration-detail'] },
     { id: 'assets', icon: Package, labelKey: 'nav.assets', href: '/assets', activeViews: ['assets', 'asset-detail'], permission: 'canAccessAssets' },
-    { id: 'channels', icon: LifeBuoy, labelKey: 'nav.channels', href: '/channels', activeViews: ['hub', 'hub-inbox', 'channels'] },
+    { id: 'portal-hub', icon: LifeBuoy, labelKey: 'nav.portalHub', href: '/channels', activeViews: ['hub', 'hub-inbox', 'channels'], permission: 'canAccessPortalHub' },
     { id: 'customers', icon: Users, labelKey: 'nav.customers', href: '/customers', activeViews: ['customers'], permission: 'canAccessCustomers' }
   ];
 
@@ -134,14 +134,14 @@
   }
 </script>
 
-<nav class="{$uiStore.navExpanded ? 'w-[200px]' : 'w-16'} shadow-lg border-r flex flex-col py-4 fixed h-full z-40 themed-nav transition-all duration-200" style="border-color: var(--ds-border);" aria-label="Main navigation">
+<nav class="{$uiStore.navExpanded ? 'w-[200px]' : 'w-16'} shadow-lg border-r flex flex-col py-4 fixed h-full z-40 themed-nav transition-all duration-200 overflow-x-hidden" style="border-color: var(--ds-border);" aria-label="Main navigation">
   <!-- Logo -->
   <Tooltip content="Windshift" placement="right" disabled={$uiStore.navExpanded}>
     <a
       href="/"
       class="flex items-center {$uiStore.navExpanded ? 'px-4' : 'justify-center'} w-full h-10 mb-2 hover:opacity-80 transition-opacity cursor-pointer"
     >
-      <img src="/cmicon-2.svg" alt="Windshift" class="w-8 h-8 flex-shrink-0" />
+      <img src="/windshift-3.svg" alt="Windshift" class="w-8 h-8 flex-shrink-0" />
       {#if $uiStore.navExpanded}
         <span class="ml-3 font-semibold text-sm whitespace-nowrap">Windshift</span>
       {/if}

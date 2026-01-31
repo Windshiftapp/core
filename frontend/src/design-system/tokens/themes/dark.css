@@ -181,6 +181,15 @@ html[data-color-mode="dark"] {
   --ds-glow-nav: 0 0 15px rgba(87, 157, 255, 0.25);
   --ds-glow-primary: 0 0 25px rgba(87, 157, 255, 0.3);
 
+  /* Glass button (for use on gradient backgrounds) */
+  --ds-glass-btn-bg: rgba(255, 255, 255, 0.15);
+  --ds-glass-btn-bg-hover: rgba(255, 255, 255, 0.25);
+  --ds-glass-btn-border: rgba(255, 255, 255, 0.2);
+  --ds-glass-btn-border-hover: rgba(255, 255, 255, 0.35);
+
+  /* Glass backdrop overlay */
+  --ds-glass-backdrop: rgba(0, 0, 0, 0.5);
+
   /* =================================================================
      GRADIENT ANIMATION COLORS
      ================================================================= */

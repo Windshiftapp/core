@@ -97,7 +97,7 @@
         >
           <div class="text-center">
             <div class="w-16 h-16 mx-auto mb-4">
-              <img src="/cmicon-2.svg" alt="Windshift" class="w-16 h-16 animate-pulse" />
+              <img src="/windshift-3.svg" alt="Windshift" class="w-16 h-16 animate-pulse" />
             </div>
             <p class="text-sm" style="color: var(--ds-text-subtle);">Loading...</p>
           </div>
@@ -112,7 +112,7 @@
           style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
         >
           <div class="text-center">
-            <img src="/cmicon-2.svg" alt="Windshift" class="w-16 h-16 mx-auto mb-4 opacity-50" />
+            <img src="/windshift-3.svg" alt="Windshift" class="w-16 h-16 mx-auto mb-4 opacity-50" />
             <h1 class="text-2xl font-bold mb-2" style="color: var(--ds-text-disabled);">Windshift</h1>
             <p style="color: var(--ds-text-subtle);">Work Management</p>
           </div>

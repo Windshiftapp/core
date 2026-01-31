@@ -7,7 +7,13 @@
     rows = 3,
     size = 'medium',
     id = undefined,
-    class: className = ''
+    class: className = '',
+    // Svelte 5 event handlers
+    oninput = undefined,
+    onchange = undefined,
+    onfocus = undefined,
+    onblur = undefined,
+    onkeydown = undefined
   } = $props();
   export { className as class };
 
@@ -35,9 +41,9 @@
   {rows}
   class={allClasses}
   style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-  on:input
-  on:change
-  on:focus
-  on:blur
-  on:keydown
+  {oninput}
+  {onchange}
+  {onfocus}
+  {onblur}
+  {onkeydown}
 ></textarea>
