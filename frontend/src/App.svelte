@@ -155,7 +155,7 @@
     <div class="min-h-screen flex items-center justify-center w-full">
       <div class="text-center">
         <div class="w-16 h-16 mx-auto mb-4">
-          <img src="/cmicon-2.svg" alt={APP_NAME} class="w-16 h-16 animate-pulse" />
+          <img src="/windshift-3.svg" alt={APP_NAME} class="w-16 h-16 animate-pulse" />
         </div>
         <p class="text-gray-600">Loading...</p>
       </div>
@@ -180,7 +180,7 @@
       {:else if showLoginDialog}
         <!-- Login dialog will show, but we can show a minimal background -->
         <div class="text-center">
-          <img src="/cmicon-2.svg" alt="Windshift" class="w-16 h-16 mx-auto mb-4 opacity-50" />
+          <img src="/windshift-3.svg" alt="Windshift" class="w-16 h-16 mx-auto mb-4 opacity-50" />
           <h1 class="text-2xl font-bold text-gray-400 mb-2">Windshift</h1>
           <p class="text-gray-500">Work Management</p>
         </div>

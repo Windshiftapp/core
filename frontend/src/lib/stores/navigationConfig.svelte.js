@@ -16,7 +16,7 @@
 const viewNavigationConfig = {
   'workspace-board': false,    // Stay on board after creating items
   'workspace-backlog': false,  // Stay on backlog after creating items
-  // Add more view configurations as needed:
+    // Add more view configurations as needed:
   // 'workspace-list': false,
   // 'collection-board': false,
   // 'personal-tasks': false,

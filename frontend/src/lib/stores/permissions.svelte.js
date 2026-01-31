@@ -13,6 +13,7 @@ function createPermissionStore() {
   const loading = writable(false);
   const error = writable(null);
   const hasAssetSets = writable(false);
+  const hasActivePortals = writable(false);
 
   const canAccessAdmin = derived(
     [authStore, permissions, userPermissions],
@@ -36,10 +37,13 @@ function createPermissionStore() {
   );
 
   const canAccessCustomers = derived(
-    [authStore, permissions, userPermissions],
-    ([$authStore, $permissions, $userPermissions]) => {
+    [authStore, permissions, userPermissions, hasActivePortals],
+    ([$authStore, $permissions, $userPermissions, $hasActivePortals]) => {
       const user = $authStore.currentUser;
       if (!user) return false;
+
+      // Hide if no active portals
+      if (!$hasActivePortals) return false;
 
       // System admins can always access
       if (user.is_system_admin) return true;
@@ -62,10 +66,19 @@ function createPermissionStore() {
     }
   );
 
+  const canAccessPortalHub = derived(
+    [authStore, hasActivePortals],
+    ([$authStore, $hasActivePortals]) => {
+      const user = $authStore.currentUser;
+      if (!user) return false;
+      return $hasActivePortals;
+    }
+  );
+
   // Create a combined derived store for easy subscription
   const combined = derived(
-    [permissions, userPermissions, loading, error, isSystemAdmin, canAccessAdmin, canAccessCustomers, canAccessAssets],
-    ([$permissions, $userPermissions, $loading, $error, $isSystemAdmin, $canAccessAdmin, $canAccessCustomers, $canAccessAssets]) => ({
+    [permissions, userPermissions, loading, error, isSystemAdmin, canAccessAdmin, canAccessCustomers, canAccessAssets, canAccessPortalHub],
+    ([$permissions, $userPermissions, $loading, $error, $isSystemAdmin, $canAccessAdmin, $canAccessCustomers, $canAccessAssets, $canAccessPortalHub]) => ({
       permissions: $permissions,
       userPermissions: $userPermissions,
       loading: $loading,
@@ -73,7 +86,8 @@ function createPermissionStore() {
       isSystemAdmin: $isSystemAdmin,
       canAccessAdmin: $canAccessAdmin,
       canAccessCustomers: $canAccessCustomers,
-      canAccessAssets: $canAccessAssets
+      canAccessAssets: $canAccessAssets,
+      canAccessPortalHub: $canAccessPortalHub
     })
   );
 
@@ -106,9 +120,20 @@ function createPermissionStore() {
       return value;
     },
 
+    get canAccessPortalHub() {
+      let value;
+      canAccessPortalHub.subscribe(v => value = v)();
+      return value;
+    },
+
     // Set whether asset sets exist
     setHasAssetSets(value) {
       hasAssetSets.set(value);
+    },
+
+    // Set whether active portals exist
+    setHasActivePortals(value) {
+      hasActivePortals.set(value);
     },
 
     // Load user permissions

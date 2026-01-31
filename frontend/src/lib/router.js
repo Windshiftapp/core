@@ -95,6 +95,7 @@ const routes = {
   '/security': 'security',
   '/workflows/:id/design': 'workflow-designer',
   '/portal/:slug': 'portal',
+  '/portal/:slug/verify': 'portal',
   '/about': 'about',
   '/404': '404'
 };

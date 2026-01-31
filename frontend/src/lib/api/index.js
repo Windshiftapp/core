@@ -11,7 +11,7 @@ import { assetSets, assetRoles, assetTypes, assetCategories, assetStatuses, asse
 import { portal, portalAuth, portalCustomers, contactRoles, customerOrganisations } from './portal.js';
 import { hub } from './hub.js';
 import { scmProviders, workspaceSCM, itemSCMLinks, userSCM } from './scm.js';
-import { channels, channelCategories, requestTypes } from './channels.js';
+import { channels, channelCategories, requestTypes, assetReports } from './channels.js';
 import { milestoneCategories, milestones, iterationTypes, iterations } from './milestones.js';
 import { permissions, groups } from './permissions.js';
 import { notifications, notificationSettings, configurationSetNotifications } from './notifications.js';
@@ -212,6 +212,9 @@ export const api = {
 
   // Request Types (channel-scoped)
   requestTypes,
+
+  // Asset Reports (channel-scoped, for portal asset tables)
+  assetReports,
 
   // Collections
   collections,
