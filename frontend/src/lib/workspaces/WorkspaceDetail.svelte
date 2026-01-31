@@ -10,6 +10,7 @@
   import PageHeader from '../layout/PageHeader.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import Label from '../components/Label.svelte';
+  import Checkbox from '../components/Checkbox.svelte';
 
   export let workspaceId;
 
@@ -206,14 +207,12 @@
           </div>
         </div>
         
-        <div class="mt-6 flex items-center">
-          <input
-            type="checkbox"
+        <div class="mt-6">
+          <Checkbox
             bind:checked={formData.active}
-            id="active"
-            class="mr-3 w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+            label="Active Project"
+            size="small"
           />
-          <label for="active" class="text-sm font-medium" style="color: var(--ds-text);">Active Project</label>
         </div>
 
         <div class="mt-8 flex gap-3">

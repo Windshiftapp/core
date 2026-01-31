@@ -14,6 +14,7 @@
   import Lozenge from '../components/Lozenge.svelte';
   import { toHotkeyString, getShortcutDisplay } from '../utils/keyboardShortcuts.js';
   import { workspacesStore } from '../stores';
+  import Checkbox from '../components/Checkbox.svelte';
 
   // Props
   export let showPageHeader = true; // Whether to show admin header and use admin layout
@@ -423,14 +424,11 @@
       </div>
 
       <div class="mt-6">
-        <label class="flex items-center">
-          <input
-            type="checkbox"
-            bind:checked={formData.active}
-            class="mr-3 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-          />
-          <span class="text-sm" style="color: var(--ds-text);">Active workspace</span>
-        </label>
+        <Checkbox
+          bind:checked={formData.active}
+          label="Active workspace"
+          size="small"
+        />
       </div>
     </div>
 
