@@ -1,9 +1,10 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-  import { Plus, Trash2, X, Package } from 'lucide-svelte';
+  import { Plus, Trash2, X, Package, Table2 } from 'lucide-svelte';
   import { portalStore, iconMap } from '../stores/portal.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import AssetReportTable from './AssetReportTable.svelte';
 
   let {
     onOpenRequestForm = () => {}
@@ -49,8 +50,9 @@
   let lastSectionIds = '';
 
   function setupDropZones() {
-    // Only setup if in edit mode or customize panel with request-types section is open
-    const shouldSetup = portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'request-types');
+    // Only setup if in edit mode or customize panel with request-types or asset-reports section is open
+    const shouldSetup = portalStore.isEditing ||
+      (portalStore.showCustomizePanel && (portalStore.activeSection === 'request-types' || portalStore.activeSection === 'asset-reports'));
     if (!shouldSetup) return;
 
     const zones = document.querySelectorAll('[data-section-drop-zone]');
@@ -59,7 +61,7 @@
 
       const cleanup = dropTargetForElements({
         element: zone,
-        canDrop: ({ source }) => source.data.type === 'request-type',
+        canDrop: ({ source }) => source.data.type === 'request-type' || source.data.type === 'asset-report',
         onDragEnter: () => {
           dropZoneStates.set(sectionId, { isOver: true });
           dropZoneStates = new Map(dropZoneStates); // trigger reactivity
@@ -71,6 +73,8 @@
         onDrop: ({ source }) => {
           if (source.data.type === 'request-type') {
             portalStore.addRequestTypeToSection(sectionId, source.data.requestType.id);
+          } else if (source.data.type === 'asset-report') {
+            portalStore.addAssetReportToSection(sectionId, source.data.assetReport.id);
           }
           dropZoneStates.set(sectionId, { isOver: false });
           dropZoneStates = new Map(dropZoneStates);
@@ -94,7 +98,8 @@
   $effect(() => {
     // Track dependencies
     const currentIds = portalStore.portalSections.map(s => s.id).join(',');
-    const isActive = portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'request-types');
+    const isActive = portalStore.isEditing ||
+      (portalStore.showCustomizePanel && (portalStore.activeSection === 'request-types' || portalStore.activeSection === 'asset-reports'));
 
     if (currentIds !== lastSectionIds || isActive) {
       lastSectionIds = currentIds;
@@ -111,8 +116,11 @@
 <div class="space-y-12">
   {#each portalStore.portalSections as section, sectionIndex}
     {@const sectionRequestTypes = portalStore.getSectionRequestTypes(section, portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'request-types'))}
-    <!-- Only show section in public view if it has a title or request types -->
-    {#if portalStore.isEditing || section.title || sectionRequestTypes.length > 0}
+    {@const sectionAssetReports = portalStore.getSectionAssetReports(section, portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'asset-reports'))}
+    {@const isDraggingItem = portalStore.draggedRequestType || portalStore.draggedAssetReport}
+    {@const isDropTarget = portalStore.isEditing || (portalStore.showCustomizePanel && (portalStore.activeSection === 'request-types' || portalStore.activeSection === 'asset-reports'))}
+    <!-- Only show section in public view if it has a title, request types, or asset reports -->
+    {#if portalStore.isEditing || section.title || sectionRequestTypes.length > 0 || sectionAssetReports.length > 0}
       <div class="relative {portalStore.isEditing ? 'p-6 rounded border-2 border-dashed' : ''}" style="{portalStore.isEditing ? `border-color: ${portalStore.isDarkMode ? '#475569' : '#d1d5db'}; background-color: ${portalStore.isDarkMode ? 'rgba(51, 65, 85, 0.3)' : 'rgba(249, 250, 251, 0.5)'};` : ''}">
         {#if portalStore.isEditing}
           <!-- Edit Mode: Show section controls -->
@@ -215,10 +223,10 @@
 
           <!-- Request Types Grid / Drop Zone -->
           <div
-            class="mt-6 {(portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'request-types')) ? 'min-h-32' : ''} rounded transition-all"
-            class:border-2={portalStore.draggedRequestType && (portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'request-types'))}
-            class:border-dashed={portalStore.draggedRequestType && (portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'request-types'))}
-            style="{portalStore.draggedRequestType && (portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'request-types')) ? `border-color: ${dropZoneStates.get(section.id)?.isOver ? '#3b82f6' : (portalStore.isDarkMode ? '#475569' : '#d1d5db')}; background-color: ${dropZoneStates.get(section.id)?.isOver ? (portalStore.isDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#dbeafe') : 'transparent'}; padding: 0.5rem;` : ''}"
+            class="mt-6 {isDropTarget ? 'min-h-32' : ''} rounded transition-all"
+            class:border-2={isDraggingItem && isDropTarget}
+            class:border-dashed={isDraggingItem && isDropTarget}
+            style="{isDraggingItem && isDropTarget ? `border-color: ${dropZoneStates.get(section.id)?.isOver ? '#3b82f6' : (portalStore.isDarkMode ? '#475569' : '#d1d5db')}; background-color: ${dropZoneStates.get(section.id)?.isOver ? (portalStore.isDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#dbeafe') : 'transparent'}; padding: 0.5rem;` : ''}"
             data-section-drop-zone
             data-section-id={section.id}
           >
@@ -264,14 +272,14 @@
               </div>
 
               <!-- Drop zone indicator when dragging over section with items -->
-              {#if portalStore.draggedRequestType && dropZoneStates.get(section.id)?.isOver && (portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'request-types'))}
+              {#if isDraggingItem && dropZoneStates.get(section.id)?.isOver && isDropTarget}
                 <div class="mt-4 text-center py-4 border-2 border-dashed rounded" style="border-color: #3b82f6; background-color: {portalStore.isDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#dbeafe'};">
                   <p class="text-sm font-medium" style="color: {portalStore.isDarkMode ? '#60a5fa' : '#2563eb'};">
                     {t('portal.dropHereToAdd')}
                   </p>
                 </div>
               {/if}
-            {:else if portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'request-types')}
+            {:else if isDropTarget}
               <div
                 class="text-center py-8 border-2 border-dashed rounded transition-all"
                 style="border-color: {dropZoneStates.get(section.id)?.isOver ? '#3b82f6' : (portalStore.isDarkMode ? '#475569' : '#d1d5db')}; background-color: {dropZoneStates.get(section.id)?.isOver ? (portalStore.isDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#dbeafe') : 'transparent'};"
@@ -280,8 +288,33 @@
                   {dropZoneStates.get(section.id)?.isOver ? t('portal.dropHereToAdd') : t('portal.noRequestTypesInSection')}
                 </p>
               </div>
+            {:else}
+              <!-- Empty state for public view -->
+              <div
+                class="text-center py-8 border rounded"
+                style="border-color: var(--ds-border);"
+              >
+                <p class="text-sm" style="color: var(--ds-text-subtle);">
+                  {t('portal.noRequestTypesInSection')}
+                </p>
+              </div>
             {/if}
           </div>
+
+          <!-- Asset Reports (full width) -->
+          {#if sectionAssetReports.length > 0}
+            <div class="mt-6 space-y-4">
+              {#each sectionAssetReports as report}
+                <AssetReportTable
+                  {report}
+                  slug={portalStore.currentSlug}
+                  sectionId={section.id}
+                  isEditing={portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'asset-reports')}
+                  onRemove={(reportId) => portalStore.removeAssetReportFromSection(section.id, reportId)}
+                />
+              {/each}
+            </div>
+          {/if}
         </div>
       </div>
     {/if}

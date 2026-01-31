@@ -2,6 +2,7 @@
   import { X, Calendar, Tag, MessageSquare, List } from 'lucide-svelte';
   import Spinner from '../components/Spinner.svelte';
   import Textarea from '../components/Textarea.svelte';
+  import Button from '../components/Button.svelte';
   import { portalStore } from '../stores/portal.svelte.js';
 </script>
 
@@ -87,14 +88,14 @@
               rows={3}
             />
             <div class="flex justify-end mt-2">
-              <button
+              <Button
+                variant="primary"
                 onclick={() => portalStore.addComment()}
                 disabled={!portalStore.newCommentContent.trim() || portalStore.addingComment}
-                class="px-4 py-2 rounded font-medium transition-colors disabled:opacity-50"
-                style="background-color: {portalStore.isDarkMode ? '#60a5fa' : '#2563eb'}; color: white;"
+                loading={portalStore.addingComment}
               >
-                {portalStore.addingComment ? 'Adding...' : 'Add Comment'}
-              </button>
+                Add Comment
+              </Button>
             </div>
           </div>
         {/if}

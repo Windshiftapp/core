@@ -19,41 +19,25 @@
     portalStore.searchQuery = e.target.value;
     portalStore.debouncedSearch();
   }
+
+  // Compute background style - image takes priority over gradient
+  const backgroundStyle = $derived(() => {
+    if (portalStore.backgroundImageUrl) {
+      return `background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${portalStore.backgroundImageUrl}) center/cover no-repeat;`;
+    }
+    // Use selected gradient, or fall back to first gradient with a value (index 1) if "None" (index 0) is selected
+    const gradientValue = gradients[portalStore.selectedGradient]?.value;
+    if (gradientValue) {
+      return `background: ${gradientValue};`;
+    }
+    // Fall back to first gradient with a value (index 1 = "Blue to Purple")
+    return `background: ${gradients[1].value};`;
+  });
 </script>
 
-<!-- Hero Section with Gradient -->
-<div class="hero-gradient {portalStore.isDarkMode ? 'dark-mode' : ''}" style="background: {gradients[portalStore.selectedGradient].value};">
-  <div class="hero-content max-w-4xl mx-auto px-6 py-20 text-center">
-    <!-- Portal Title -->
-    {#if portalStore.isEditing}
-      <input
-        type="text"
-        value={portalStore.editableTitle}
-        oninput={(e) => portalStore.editableTitle = e.target.value}
-        class="text-6xl font-bold mb-6 text-white bg-transparent text-center w-full focus:outline-none"
-        placeholder="Portal Title"
-      />
-    {:else}
-      <h1 class="text-6xl font-bold mb-6 text-white">
-        {portalStore.editableTitle}
-      </h1>
-    {/if}
-
-    <!-- Portal Description -->
-    {#if portalStore.isEditing}
-      <textarea
-        value={portalStore.editableDescription}
-        oninput={(e) => portalStore.editableDescription = e.target.value}
-        class="text-2xl text-white/90 mb-12 max-w-3xl mx-auto bg-transparent text-center w-full focus:outline-none resize-none"
-        placeholder="Portal description (optional)"
-        rows="2"
-      ></textarea>
-    {:else if portalStore.editableDescription}
-      <p class="text-2xl text-white/90 mb-12 max-w-3xl mx-auto">
-        {portalStore.editableDescription}
-      </p>
-    {/if}
-
+<!-- Hero Section with Gradient or Background Image -->
+<div class="hero-gradient {portalStore.isDarkMode ? 'dark-mode' : ''} {portalStore.hasBackgroundImage ? 'has-image' : ''}" style="{backgroundStyle()}">
+  <div class="hero-content max-w-4xl mx-auto px-6 py-12 text-center">
     <!-- Search Box -->
     <div class="max-w-2xl mx-auto relative">
       <form onsubmit={handleSearch} class="relative">
@@ -196,8 +180,8 @@
     position: relative;
   }
 
-  /* Add subtle pattern overlay for depth */
-  .hero-gradient::before {
+  /* Add subtle pattern overlay for depth (only for gradients, not images) */
+  .hero-gradient:not(.has-image)::before {
     content: '';
     position: absolute;
     top: 0;
@@ -210,8 +194,8 @@
     pointer-events: none;
   }
 
-  /* Dark mode overlay - dims the gradient */
-  .hero-gradient.dark-mode::after {
+  /* Dark mode overlay - dims the gradient (not needed for images as they have built-in overlay) */
+  .hero-gradient.dark-mode:not(.has-image)::after {
     content: '';
     position: absolute;
     top: 0;

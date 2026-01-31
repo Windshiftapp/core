@@ -4,7 +4,13 @@
  */
 
 import { api } from '../api.js';
-import { authStore } from '../stores';
+import { authStore, attachmentStatus } from '../stores';
+import { navigate } from '../router.js';
+import { portalAuthStore } from './portalAuth.svelte.js';
+import { gradients } from '../utils/gradients.js';
+
+// Re-export gradients for backward compatibility
+export { gradients };
 
 // Icon mapping for request types
 import {
@@ -34,28 +40,6 @@ export const iconMap = {
   Wrench, Truck, Volume2, Watch, Briefcase, Cloud, BarChart
 };
 
-// Gradient presets
-export const gradients = [
-  { name: 'Blue to Purple', value: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
-  { name: 'Deep Ocean', value: 'linear-gradient(135deg, #2E3192 0%, #1BFFFF 100%)' },
-  { name: 'Sunset Warmth', value: 'linear-gradient(135deg, #FF6B6B 0%, #FFE66D 100%)' },
-  { name: 'Forest Green', value: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)' },
-  { name: 'Deep Night', value: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)' },
-  { name: 'Pink Blush', value: 'linear-gradient(135deg, #ec008c 0%, #fc6767 100%)' },
-  { name: 'Teal to Cyan', value: 'linear-gradient(135deg, #13547a 0%, #80d0c7 100%)' },
-  { name: 'Royal Purple', value: 'linear-gradient(135deg, #6a11cb 0%, #2575fc 100%)' },
-  { name: 'Fire Orange', value: 'linear-gradient(135deg, #f83600 0%, #f9d423 100%)' },
-  { name: 'Cool Blues', value: 'linear-gradient(135deg, #2b5876 0%, #4e4376 100%)' },
-  { name: 'Rose Garden', value: 'linear-gradient(135deg, #ee0979 0%, #ff6a00 100%)' },
-  { name: 'Midnight', value: 'linear-gradient(135deg, #000428 0%, #004e92 100%)' },
-  { name: 'Emerald Water', value: 'linear-gradient(135deg, #348f50 0%, #56b4d3 100%)' },
-  { name: 'Peach', value: 'linear-gradient(135deg, #ed4264 0%, #ffedbc 100%)' },
-  { name: 'Purple Dream', value: 'linear-gradient(135deg, #bf5ae0 0%, #a811da 100%)' },
-  { name: 'Cosmic', value: 'linear-gradient(135deg, #ff0844 0%, #ffb199 100%)' },
-  { name: 'Sea Breeze', value: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' },
-  { name: 'Autumn', value: 'linear-gradient(135deg, #fa8bff 0%, #2bd2ff 90%, #2bff88 100%)' },
-];
-
 // Core state
 let portalData = $state(null);
 let loading = $state(true);
@@ -69,6 +53,16 @@ let showCustomizePanel = $state(false);
 let showMyRequests = $state(false);
 let selectedGradient = $state(0);
 let activeSection = $state('hero-gradient');
+
+// Background image state
+let backgroundImageUrl = $state(null);
+let uploadingBackground = $state(false);
+let selectedBackgroundCategory = $state('abstract');
+
+// Logo state
+let logoUrl = $state(null);
+let hubLogoUrl = $state(null);
+let uploadingLogo = $state(false);
 
 // Menu states
 let showProfileMenu = $state(false);
@@ -85,11 +79,17 @@ let editableSearchHint = $state('Search for articles, guides, and answers to com
 let requestTypes = $state([]);
 let loadingRequestTypes = $state(false);
 
+// Asset reports state
+let assetReports = $state([]);
+let loadingAssetReports = $state(false);
+let hasAssetSets = $state(false);
+
 // Portal sections
 let portalSections = $state([]);
 
 // Drag-and-drop state
 let draggedRequestType = $state(null);
+let draggedAssetReport = $state(null);
 
 // Footer columns
 let footerColumns = $state([
@@ -116,6 +116,9 @@ let requestComments = $state([]);
 let loadingComments = $state(false);
 let newCommentContent = $state('');
 let addingComment = $state(false);
+
+// Pending request type (for opening form after login)
+let pendingRequestType = $state(null);
 
 // Internal state
 let isInitialLoad = true;
@@ -148,6 +151,9 @@ async function loadPortal(slug) {
     isDarkMode = portalData.theme === 'dark';
     editableSearchPlaceholder = portalData.search_placeholder || 'Search the knowledge base...';
     editableSearchHint = portalData.search_hint || 'Search for articles, guides, and answers to common questions';
+    backgroundImageUrl = portalData.background_image_url || null;
+    logoUrl = portalData.logo_url || null;
+    hubLogoUrl = portalData.hub_logo_url || null;
 
     // Load footer columns
     footerColumns = portalData.footer_columns || [
@@ -165,9 +171,12 @@ async function loadPortal(slug) {
     // Ensure workspace_ids is always an array
     portalData.workspace_ids = portalData.workspace_ids || [];
 
-    // Load request types for rendering sections
+    // Load request types and asset reports for rendering sections
     if (portalData.channel_id) {
-      await loadRequestTypes();
+      await Promise.all([
+        loadRequestTypes(),
+        loadAssetReports()
+      ]);
     }
 
     // Allow saves from user changes after initial load
@@ -208,6 +217,117 @@ function toggleTheme() {
  */
 function selectGradient(index) {
   selectedGradient = index;
+  // Clear background image when selecting a gradient (if selecting non-None)
+  if (index > 0) {
+    backgroundImageUrl = null;
+  }
+  saveCustomizations();
+}
+
+/**
+ * Select a background image
+ */
+function selectBackgroundImage(url) {
+  backgroundImageUrl = url;
+  // Clear gradient when selecting a background image
+  selectedGradient = 0;
+  saveCustomizations();
+}
+
+/**
+ * Remove background image
+ */
+function removeBackgroundImage() {
+  backgroundImageUrl = null;
+  saveCustomizations();
+}
+
+/**
+ * Handle background image upload
+ */
+async function handleBackgroundUpload(files) {
+  if (!files || files.length === 0) return;
+
+  const file = files[0];
+  if (!file.type.startsWith('image/')) {
+    console.error('Please select an image file');
+    return;
+  }
+
+  uploadingBackground = true;
+  try {
+    const uploadFormData = new FormData();
+    uploadFormData.append('file', file);
+    uploadFormData.append('category', 'portal_background');
+
+    const response = await fetch('/api/attachments/upload', {
+      method: 'POST',
+      body: uploadFormData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`);
+    }
+
+    const uploadResult = await response.json();
+
+    if (uploadResult && uploadResult.success && uploadResult.background_url) {
+      selectBackgroundImage(uploadResult.background_url);
+      console.log('Portal background uploaded successfully');
+    }
+  } catch (err) {
+    console.error('Failed to upload portal background:', err);
+  } finally {
+    uploadingBackground = false;
+  }
+}
+
+/**
+ * Handle logo upload
+ */
+async function handleLogoUpload(files) {
+  if (!files || files.length === 0) return;
+
+  const file = files[0];
+  if (!file.type.startsWith('image/')) {
+    console.error('Please select an image file');
+    return;
+  }
+
+  uploadingLogo = true;
+  try {
+    const uploadFormData = new FormData();
+    uploadFormData.append('file', file);
+    uploadFormData.append('category', 'portal_logo');
+
+    const response = await fetch('/api/attachments/upload', {
+      method: 'POST',
+      body: uploadFormData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`);
+    }
+
+    const uploadResult = await response.json();
+
+    if (uploadResult && uploadResult.success && uploadResult.logo_url) {
+      logoUrl = uploadResult.logo_url;
+      saveCustomizations();
+      console.log('Portal logo uploaded successfully');
+    }
+  } catch (err) {
+    console.error('Failed to upload portal logo:', err);
+  } finally {
+    uploadingLogo = false;
+  }
+}
+
+/**
+ * Remove logo
+ */
+function removeLogo() {
+  logoUrl = null;
   saveCustomizations();
 }
 
@@ -269,6 +389,8 @@ async function saveCustomizations() {
         knowledge_base_share_link: knowledgeBaseShareLink,
         knowledge_base_url: baseURL,
         knowledge_base_share_id: shareID,
+        portal_background_image_url: backgroundImageUrl || '',
+        portal_logo_url: logoUrl || '',
       };
 
       await api.channels.updateConfig(portalData.channel_id, config);
@@ -311,6 +433,8 @@ async function saveKnowledgeBaseConfig() {
       knowledge_base_share_link: knowledgeBaseShareLink,
       knowledge_base_url: baseURL,
       knowledge_base_share_id: shareID,
+      portal_background_image_url: backgroundImageUrl || '',
+      portal_logo_url: logoUrl || '',
     };
 
     await api.channels.updateConfig(portalData.channel_id, config);
@@ -331,13 +455,69 @@ async function loadRequestTypes() {
   try {
     isLoadingRequestTypes = true;
     loadingRequestTypes = true;
-    requestTypes = await api.requestTypes.getForChannel(portalData.channel_id);
+    const types = await api.requestTypes.getForChannel(portalData.channel_id);
+
+    // Fetch field counts in parallel
+    const typesWithFields = await Promise.all(
+      types.map(async (rt) => {
+        try {
+          const fields = await api.requestTypes.getFields(rt.id);
+          return { ...rt, field_count: fields.length };
+        } catch (err) {
+          console.error(`Failed to load fields for request type ${rt.id}:`, err);
+          return { ...rt, field_count: 0 };
+        }
+      })
+    );
+
+    requestTypes = typesWithFields;
   } catch (err) {
     console.error('Failed to load request types:', err);
   } finally {
     loadingRequestTypes = false;
     isLoadingRequestTypes = false;
   }
+}
+
+/**
+ * Load asset reports
+ */
+async function loadAssetReports() {
+  if (!portalData || !portalData.channel_id) return;
+
+  try {
+    loadingAssetReports = true;
+    const reports = await api.assetReports.getForChannel(portalData.channel_id);
+    assetReports = reports;
+    hasAssetSets = reports.length > 0 || await checkAssetSetsExist();
+  } catch (err) {
+    console.error('Failed to load asset reports:', err);
+  } finally {
+    loadingAssetReports = false;
+  }
+}
+
+/**
+ * Check if asset sets exist (to show/hide the asset reports section)
+ */
+async function checkAssetSetsExist() {
+  try {
+    const sets = await api.assetSets.getAll();
+    return sets && sets.length > 0;
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
+ * Get asset reports for a section
+ */
+function getSectionAssetReports(section, inCustomizeMode = false) {
+  const reportIds = section.asset_report_ids || [];
+  return reportIds
+    .map(id => assetReports.find(ar => ar.id === id))
+    .filter(ar => ar !== undefined)
+    .filter(ar => inCustomizeMode || ar.is_active);
 }
 
 /**
@@ -418,6 +598,35 @@ function removeRequestTypeFromSection(sectionId, requestTypeId) {
       return {
         ...s,
         request_type_ids: s.request_type_ids.filter(id => id !== requestTypeId)
+      };
+    }
+    return s;
+  });
+  saveCustomizations();
+}
+
+function addAssetReportToSection(sectionId, reportId) {
+  portalSections = portalSections.map(s => {
+    if (s.id === sectionId) {
+      const currentIds = s.asset_report_ids || [];
+      if (!currentIds.includes(reportId)) {
+        return {
+          ...s,
+          asset_report_ids: [...currentIds, reportId]
+        };
+      }
+    }
+    return s;
+  });
+  saveCustomizations();
+}
+
+function removeAssetReportFromSection(sectionId, reportId) {
+  portalSections = portalSections.map(s => {
+    if (s.id === sectionId) {
+      return {
+        ...s,
+        asset_report_ids: (s.asset_report_ids || []).filter(id => id !== reportId)
       };
     }
     return s;
@@ -539,6 +748,8 @@ async function loadMyRequests() {
 
 async function viewRequest(request) {
   selectedRequest = request;
+  // Update URL with request ID
+  navigate(`/portal/${currentSlug}?view=requests&id=${request.id}`);
   await loadRequestComments(request.id);
 }
 
@@ -575,14 +786,49 @@ function closeRequestDetail() {
   selectedRequest = null;
   requestComments = [];
   newCommentContent = '';
+  // Return to requests list URL
+  navigate(`/portal/${currentSlug}?view=requests`);
+}
+
+/**
+ * Set showMyRequests directly without navigation (for URL sync)
+ */
+function setShowMyRequests(value) {
+  showMyRequests = value;
+  if (value && (authStore.isAuthenticated || portalAuthStore.isAuthenticated)) {
+    loadMyRequests();
+  }
+  if (!value) {
+    selectedRequest = null;
+  }
+}
+
+/**
+ * Load a specific request by ID and view it (for URL sync)
+ */
+async function loadAndViewRequest(requestId) {
+  if (!currentSlug) return;
+  try {
+    const request = await api.portal.getRequestDetail(currentSlug, requestId);
+    selectedRequest = request;
+    await loadRequestComments(request.id);
+  } catch (err) {
+    console.error('Failed to load request:', err);
+  }
 }
 
 async function toggleMyRequests() {
   showMyRequests = !showMyRequests;
   showProfileMenu = false;
 
-  if (showMyRequests && authStore.isAuthenticated) {
-    await loadMyRequests();
+  // Update URL
+  if (showMyRequests) {
+    navigate(`/portal/${currentSlug}?view=requests`);
+    if (authStore.isAuthenticated || portalAuthStore.isAuthenticated) {
+      await loadMyRequests();
+    }
+  } else {
+    navigate(`/portal/${currentSlug}`);
   }
 
   if (!showMyRequests) {
@@ -609,6 +855,12 @@ function reset() {
   showMyRequests = false;
   selectedGradient = 0;
   activeSection = 'hero-gradient';
+  backgroundImageUrl = null;
+  uploadingBackground = false;
+  selectedBackgroundCategory = 'abstract';
+  logoUrl = null;
+  hubLogoUrl = null;
+  uploadingLogo = false;
   showProfileMenu = false;
   showMainMenu = false;
   showLoginDialog = false;
@@ -618,6 +870,9 @@ function reset() {
   editableSearchHint = 'Search for articles, guides, and answers to common questions';
   requestTypes = [];
   loadingRequestTypes = false;
+  assetReports = [];
+  loadingAssetReports = false;
+  hasAssetSets = false;
   portalSections = [];
   footerColumns = [
     { title: '', links: [] },
@@ -637,6 +892,7 @@ function reset() {
   loadingComments = false;
   newCommentContent = '';
   addingComment = false;
+  pendingRequestType = null;
   isInitialLoad = true;
 }
 
@@ -656,6 +912,19 @@ export const portalStore = {
   get selectedGradient() { return selectedGradient; },
   get activeSection() { return activeSection; },
 
+  // Getters for background image state
+  get backgroundImageUrl() { return backgroundImageUrl; },
+  get uploadingBackground() { return uploadingBackground; },
+  get selectedBackgroundCategory() { return selectedBackgroundCategory; },
+  get hasBackgroundImage() { return backgroundImageUrl !== null && backgroundImageUrl !== ''; },
+  get hasGradient() { return !backgroundImageUrl && selectedGradient > 0 && gradients[selectedGradient]?.value; },
+
+  // Getters for logo state
+  get logoUrl() { return logoUrl; },
+  get hubLogoUrl() { return hubLogoUrl; },
+  get uploadingLogo() { return uploadingLogo; },
+  get effectiveLogoUrl() { return logoUrl || hubLogoUrl; }, // Portal logo with hub fallback
+
   // Getters for menu states
   get showProfileMenu() { return showProfileMenu; },
   get showMainMenu() { return showMainMenu; },
@@ -671,10 +940,16 @@ export const portalStore = {
   get requestTypes() { return requestTypes; },
   get loadingRequestTypes() { return loadingRequestTypes; },
 
+  // Getters for asset reports
+  get assetReports() { return assetReports; },
+  get loadingAssetReports() { return loadingAssetReports; },
+  get hasAssetSets() { return hasAssetSets; },
+
   // Getters for sections/footer
   get portalSections() { return portalSections; },
   get footerColumns() { return footerColumns; },
   get draggedRequestType() { return draggedRequestType; },
+  get draggedAssetReport() { return draggedAssetReport; },
 
   // Getters for knowledge base
   get knowledgeBaseShareLink() { return knowledgeBaseShareLink; },
@@ -694,6 +969,7 @@ export const portalStore = {
   get loadingComments() { return loadingComments; },
   get newCommentContent() { return newCommentContent; },
   get addingComment() { return addingComment; },
+  get pendingRequestType() { return pendingRequestType; },
 
   // Setters for UI state
   set isEditing(value) { isEditing = value; },
@@ -704,6 +980,8 @@ export const portalStore = {
   set showMainMenu(value) { showMainMenu = value; },
   set showLoginDialog(value) { showLoginDialog = value; },
   set draggedRequestType(value) { draggedRequestType = value; },
+  set draggedAssetReport(value) { draggedAssetReport = value; },
+  set selectedBackgroundCategory(value) { selectedBackgroundCategory = value; },
 
   // Setters for editable content
   set editableTitle(value) { editableTitle = value; },
@@ -719,6 +997,7 @@ export const portalStore = {
 
   // Setters for my requests
   set newCommentContent(value) { newCommentContent = value; },
+  set pendingRequestType(value) { pendingRequestType = value; },
 
   // Actions
   loadPortal,
@@ -731,6 +1010,19 @@ export const portalStore = {
   getSectionRequestTypes,
   parseDocmostShareLink,
 
+  // Asset report actions
+  loadAssetReports,
+  getSectionAssetReports,
+
+  // Background image actions
+  selectBackgroundImage,
+  removeBackgroundImage,
+  handleBackgroundUpload,
+
+  // Logo actions
+  handleLogoUpload,
+  removeLogo,
+
   // Section actions
   addSection,
   deleteSection,
@@ -739,6 +1031,8 @@ export const portalStore = {
   moveSectionDown,
   addRequestTypeToSection,
   removeRequestTypeFromSection,
+  addAssetReportToSection,
+  removeAssetReportFromSection,
 
   // Footer actions
   addFooterLink,
@@ -758,6 +1052,8 @@ export const portalStore = {
   addComment,
   closeRequestDetail,
   toggleMyRequests,
+  setShowMyRequests,
+  loadAndViewRequest,
 
   // Menu actions
   closeAllMenus,
