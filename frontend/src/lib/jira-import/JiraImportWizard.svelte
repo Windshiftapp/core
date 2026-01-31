@@ -9,13 +9,15 @@
   import Input from '../components/Input.svelte';
   import FormField from '../components/FormField.svelte';
   import {
-    Cloud, Server, Check, ChevronRight, ChevronLeft, ArrowRight,
+    Cloud, Server, ChevronRight, ChevronLeft, ArrowRight,
     Briefcase, FileText, Activity, Hash, Box, AlertCircle,
-    ExternalLink, Eye, EyeOff, Plus, Users, Paperclip, Flag
+    ExternalLink, Eye, EyeOff, Plus, Users, Paperclip, Flag, Check
   } from 'lucide-svelte';
+  import Stepper from '../components/Stepper.svelte';
   import { addToast } from '../stores/toasts.svelte.js';
   import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import Checkbox from '../components/Checkbox.svelte';
 
   let {
     isOpen = $bindable(false),
@@ -210,31 +212,14 @@
     />
 
     <!-- Step indicator -->
-    <div class="px-6 w-full py-3 border-b flex items-center overflow-x-auto" style="border-color: var(--ds-border);">
-      {#each steps as step, index}
-        {@const status = getStepStatus(index)}
-        <div class="flex items-center flex-shrink-0">
-          <div class="flex items-center gap-2">
-            <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-colors"
-                 style="background: {status !== 'pending' ? 'var(--ds-interactive)' : 'var(--ds-background-neutral)'}; color: {status !== 'pending' ? 'white' : 'var(--ds-text-subtle)'};">
-              {#if status === 'completed'}
-                <Check size={14} />
-              {:else}
-                {index + 1}
-              {/if}
-            </div>
-            <span class="text-xs font-medium whitespace-nowrap"
-                  style="color: {status === 'current' ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};">
-              {t(`jiraImport.steps.${step.id}`)}
-            </span>
-          </div>
-          {#if index < steps.length - 1}
-            <div class="w-8 h-px mx-2"
-                 style="background: {status === 'completed' ? 'var(--ds-interactive)' : 'var(--ds-border)'};">
-            </div>
-          {/if}
-        </div>
-      {/each}
+    <div class="px-6 w-full py-3 border-b overflow-x-auto" style="border-color: var(--ds-border);">
+      <Stepper
+        {steps}
+        currentStep={currentStep + 1}
+        showLabels={true}
+        size="small"
+        getLabel={(step) => t(`jiraImport.steps.${step.id}`)}
+      />
     </div>
 
     <!-- Content area -->
@@ -462,26 +447,18 @@
           </div>
 
           <!-- Open Issues Only Toggle -->
-          <div class="flex items-center gap-3 p-3 rounded-lg border"
+          <div class="p-3 rounded-lg border"
                style="border-color: var(--ds-border); background: var(--ds-surface);">
-            <input
-              type="checkbox"
-              id="openIssuesOnly"
+            <Checkbox
               checked={projects.openIssuesOnly}
               onchange={async () => {
                 jiraImport.toggleOpenIssuesOnly();
                 await jiraImport.reloadProjectsWithFilter();
               }}
-              class="w-4 h-4 rounded"
+              label={t('jiraImport.projects.openIssuesOnly')}
+              hint={t('jiraImport.projects.openIssuesOnlyDesc')}
+              size="small"
             />
-            <div class="flex-1">
-              <label for="openIssuesOnly" class="text-sm font-medium cursor-pointer" style="color: var(--ds-text);">
-                {t('jiraImport.projects.openIssuesOnly')}
-              </label>
-              <p class="text-xs" style="color: var(--ds-text-subtle);">
-                {t('jiraImport.projects.openIssuesOnlyDesc')}
-              </p>
-            </div>
           </div>
 
           <Input
@@ -506,14 +483,16 @@
                   disabled={isDisabled}
                 >
                   <div class="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      disabled={isDisabled}
-                      class="mt-1 w-4 h-4 rounded"
-                      onclick={(e) => e.stopPropagation()}
-                      onchange={() => !isDisabled && jiraImport.toggleProject(project.key)}
-                    />
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                    <div onclick={(e) => e.stopPropagation()} class="mt-1">
+                      <Checkbox
+                        checked={isSelected}
+                        disabled={isDisabled}
+                        onchange={() => !isDisabled && jiraImport.toggleProject(project.key)}
+                        size="small"
+                      />
+                    </div>
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-2">
                         {#if project.avatar_url}
