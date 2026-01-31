@@ -1,12 +1,15 @@
 <script>
   import { onMount, createEventDispatcher } from 'svelte';
+  import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+  import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
   import { api } from '../api.js';
-  import { Plus, Trash2, GripVertical, Check, ChevronUp, ChevronDown, Pencil, Type, AlignLeft, ListChecks, ToggleLeft } from 'lucide-svelte';
+  import { Plus, Trash2, GripVertical, Pencil, Type, AlignLeft, ListChecks, ToggleLeft, AlertTriangle, Search } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
-  import BasePicker from '../pickers/BasePicker.svelte';
   import Spinner from '../components/Spinner.svelte';
   import PortalModal from './PortalModal.svelte';
+  import DropIndicator from '../layout/DropIndicator.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import Checkbox from '../components/Checkbox.svelte';
 
   const dispatch = createEventDispatcher();
 
@@ -15,21 +18,25 @@
   export let requestTypeName = '';
   export let isDarkMode = false;
 
+  // Field data
   let fields = [];
+  let availableFields = [];
   let loading = false;
   let error = null;
-  let availableFields = [];
   let saving = false;
 
-  // Step management
+  // Step management - steps are explicitly tracked, not derived from fields
   let steps = [1];
   let currentStep = 1;
 
-  // Field being added
-  let addingField = false;
-  let newFieldIdentifier = '';
-  let newFieldType = 'default';
-  let newIsRequired = false;
+  // Search/filter
+  let fieldSearchQuery = '';
+
+  // Drag state
+  let draggedField = false;
+  let fieldDragState = new Map();
+  let setupCleanups = [];
+  let setupTimeout;
 
   // Virtual field creation
   let addingVirtualField = false;
@@ -43,21 +50,28 @@
   let editDisplayName = '';
   let editDescription = '';
 
+  // Helper function to capitalize field labels
+  function capitalizeLabel(name) {
+    if (!name) return '';
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  }
+
   // Track the previous open state to only load when actually opening
   let wasOpen = false;
 
   // Computed: fields for current step
-  $: currentStepFields = fields.filter(f => (f.step_number || 1) === currentStep);
+  $: currentStepFields = fields
+    .filter(f => (f.step_number || 1) === currentStep)
+    .sort((a, b) => a.display_order - b.display_order);
 
-  // Update steps list when fields change
-  $: {
-    const stepNumbers = [...new Set(fields.map(f => f.step_number || 1))].sort((a, b) => a - b);
-    if (stepNumbers.length === 0) {
-      steps = [1];
-    } else {
-      steps = stepNumbers;
-    }
-  }
+  // Computed: filtered available fields (exclude already configured and apply search)
+  $: filteredAvailableFields = availableFields
+    .filter(f => !fields.some(cf => cf.field_identifier === f.identifier))
+    .filter(f => {
+      if (!fieldSearchQuery.trim()) return true;
+      const query = fieldSearchQuery.toLowerCase();
+      return f.name.toLowerCase().includes(query) || f.identifier.toLowerCase().includes(query);
+    });
 
   // Load fields when modal opens
   $: {
@@ -70,19 +84,25 @@
     }
   }
 
+  // Re-setup drag and drop when fields or step changes
+  $: if (!loading && fields && typeof document !== 'undefined') {
+    if (setupTimeout) clearTimeout(setupTimeout);
+    setupTimeout = setTimeout(() => setupDragAndDrop(), 50);
+  }
+
   async function loadFields() {
     try {
       loading = true;
       error = null;
       fields = await api.requestTypes.getFields(requestTypeId);
 
-      // Load available custom fields (for dropdown)
-      const allCustomFields = await api.customFields.getAll();
-      availableFields = [
-        { id: 'title', name: 'Title', type: 'default' },
-        { id: 'description', name: 'Description', type: 'default' },
-        ...allCustomFields.map(f => ({ id: f.id.toString(), name: f.name, type: 'custom' }))
-      ];
+      // Initialize steps from loaded fields
+      const loadedSteps = [...new Set(fields.map(f => f.step_number || 1))].sort((a, b) => a - b);
+      steps = loadedSteps.length > 0 ? loadedSteps : [1];
+      currentStep = 1;
+
+      // Load available fields for this request type's item type
+      await loadAvailableFields();
     } catch (err) {
       console.error('Failed to load request type fields:', err);
       error = err.message || t('requestTypeFields.failedToLoadFields');
@@ -91,71 +111,275 @@
     }
   }
 
+  async function loadAvailableFields() {
+    try {
+      availableFields = await api.requestTypes.getAvailableFields(requestTypeId);
+    } catch (err) {
+      console.error('Failed to load available fields:', err);
+      // Fall back to default fields
+      availableFields = [
+        { identifier: 'title', name: 'Title', type: 'default' },
+        { identifier: 'description', name: 'Description', type: 'default' }
+      ];
+    }
+  }
+
   function clearForm() {
-    addingField = false;
     addingVirtualField = false;
-    newFieldIdentifier = '';
-    newFieldType = 'default';
-    newIsRequired = false;
     virtualFieldName = '';
     virtualFieldType = 'text';
     virtualFieldRequired = false;
     virtualFieldOptions = [{ value: '', label: '' }];
     editingField = null;
     error = null;
+    fieldSearchQuery = '';
+    cleanupDragAndDrop();
   }
 
-  function startAddingField() {
-    addingField = true;
-    addingVirtualField = false;
+  // === Drag and Drop Setup ===
+
+  function cleanupDragAndDrop() {
+    if (setupTimeout) clearTimeout(setupTimeout);
+    setupCleanups.forEach(fn => fn());
+    setupCleanups = [];
+    fieldDragState = new Map();
+    draggedField = false;
   }
+
+  function setupDragAndDrop() {
+    cleanupDragAndDrop();
+
+    // Setup available fields as draggable
+    document.querySelectorAll('[data-available-field]').forEach(element => {
+      const fieldData = JSON.parse(element.dataset.availableField);
+
+      const cleanup = draggable({
+        element,
+        getInitialData: () => ({ field: fieldData, type: 'available-field' }),
+        onDragStart: () => { element.style.opacity = '0.5'; },
+        onDrop: () => { element.style.opacity = ''; }
+      });
+
+      setupCleanups.push(cleanup);
+    });
+
+    // Setup configured fields as both draggable and drop targets with edge detection
+    document.querySelectorAll('[data-configured-field]').forEach(element => {
+      const fieldIndex = parseInt(element.dataset.fieldIndex);
+      const fieldId = element.dataset.fieldId;
+
+      fieldDragState.set(fieldId, { closestEdge: null });
+
+      // Make draggable
+      const dragHandle = element.querySelector('.cursor-grab');
+      const draggableCleanup = draggable({
+        element,
+        dragHandle: dragHandle || element,
+        getInitialData: () => ({ fieldIndex, fieldId, type: 'configured-field' }),
+        onDragStart: () => { element.style.opacity = '0.5'; },
+        onDrop: () => {
+          element.style.opacity = '';
+          clearDragState();
+        }
+      });
+
+      // Make drop target with edge detection
+      const dropTargetCleanup = dropTargetForElements({
+        element,
+        canDrop: ({ source }) => {
+          const data = source.data;
+          if (data.type === 'configured-field' && data.fieldIndex === fieldIndex) return false;
+          return data.type === 'available-field' || data.type === 'configured-field';
+        },
+        getData: ({ input, element }) => {
+          return attachClosestEdge({}, { input, element, allowedEdges: ['top', 'bottom'] });
+        },
+        onDragEnter: ({ self }) => {
+          const closestEdge = extractClosestEdge(self.data);
+          setDragState(fieldId, { closestEdge });
+        },
+        onDragLeave: () => {
+          setDragState(fieldId, { closestEdge: null });
+        },
+        onDrop: ({ self, source }) => {
+          const closestEdge = extractClosestEdge(self.data);
+          const data = source.data;
+
+          if (data.type === 'available-field') {
+            addFieldAtPosition(data.field, fieldIndex, closestEdge);
+          } else if (data.type === 'configured-field') {
+            reorderFieldWithEdge(data.fieldIndex, fieldIndex, closestEdge);
+          }
+
+          setDragState(fieldId, { closestEdge: null });
+        }
+      });
+
+      setupCleanups.push(() => {
+        draggableCleanup();
+        dropTargetCleanup();
+      });
+    });
+
+    // Setup drop zone for empty area / append to end
+    const dropZone = document.querySelector('[data-drop-zone]');
+    if (dropZone) {
+      const cleanup = dropTargetForElements({
+        element: dropZone,
+        canDrop: ({ source }) => source.data.type === 'available-field',
+        onDragEnter: () => { draggedField = true; },
+        onDragLeave: () => { draggedField = false; },
+        onDrop: ({ source }) => {
+          if (source.data.type === 'available-field') {
+            addFieldToStep(source.data.field);
+          }
+          draggedField = false;
+        }
+      });
+      setupCleanups.push(cleanup);
+    }
+  }
+
+  function setDragState(fieldId, state) {
+    fieldDragState.set(fieldId, state);
+    fieldDragState = new Map(fieldDragState);
+  }
+
+  function clearDragState() {
+    fieldDragState.forEach((_, id) => {
+      fieldDragState.set(id, { closestEdge: null });
+    });
+    fieldDragState = new Map(fieldDragState);
+  }
+
+  // === Field Management ===
+
+  function addFieldToStep(fieldData) {
+    // Check if field already exists in any step
+    if (fields.some(f => f.field_identifier === fieldData.identifier)) {
+      return;
+    }
+
+    const newField = {
+      field_identifier: fieldData.identifier,
+      field_type: fieldData.type,
+      is_required: false,
+      display_order: currentStepFields.length,
+      field_name: fieldData.name,
+      step_number: currentStep
+    };
+
+    fields = [...fields, newField];
+    saveFields();
+  }
+
+  function addFieldAtPosition(fieldData, targetIndex, closestEdge) {
+    // Check if field already exists
+    if (fields.some(f => f.field_identifier === fieldData.identifier)) {
+      return;
+    }
+
+    // Find the actual field at targetIndex in current step
+    const targetField = currentStepFields[targetIndex];
+    if (!targetField) {
+      addFieldToStep(fieldData);
+      return;
+    }
+
+    const insertOrder = closestEdge === 'bottom' ? targetField.display_order + 1 : targetField.display_order;
+
+    const newField = {
+      field_identifier: fieldData.identifier,
+      field_type: fieldData.type,
+      is_required: false,
+      display_order: insertOrder,
+      field_name: fieldData.name,
+      step_number: currentStep
+    };
+
+    // Increment display_order for fields at or after insert position
+    fields = fields.map(f => {
+      if ((f.step_number || 1) === currentStep && f.display_order >= insertOrder) {
+        return { ...f, display_order: f.display_order + 1 };
+      }
+      return f;
+    });
+
+    fields = [...fields, newField];
+    recalculateDisplayOrder();
+    saveFields();
+  }
+
+  function reorderFieldWithEdge(fromIndex, toIndex, closestEdge) {
+    if (fromIndex === toIndex) return;
+
+    const sortedFields = currentStepFields;
+    const movedField = sortedFields[fromIndex];
+    const targetField = sortedFields[toIndex];
+
+    if (!movedField || !targetField) return;
+
+    // Calculate new display order
+    let newOrder;
+    if (closestEdge === 'bottom') {
+      newOrder = targetField.display_order + 0.5;
+    } else {
+      newOrder = targetField.display_order - 0.5;
+    }
+
+    // Update the moved field's order
+    movedField.display_order = newOrder;
+
+    // Re-sort and reassign sequential orders
+    recalculateDisplayOrder();
+    saveFields();
+  }
+
+  function recalculateDisplayOrder() {
+    // Group by step and recalculate display_order within each step
+    const byStep = {};
+    fields.forEach(f => {
+      const step = f.step_number || 1;
+      if (!byStep[step]) byStep[step] = [];
+      byStep[step].push(f);
+    });
+
+    Object.values(byStep).forEach(stepFields => {
+      stepFields.sort((a, b) => a.display_order - b.display_order);
+      stepFields.forEach((f, i) => f.display_order = i);
+    });
+
+    fields = [...fields];
+  }
+
+  function removeField(field) {
+    fields = fields.filter(f => f !== field);
+    recalculateDisplayOrder();
+    saveFields();
+  }
+
+  function toggleRequired(field) {
+    field.is_required = !field.is_required;
+    fields = [...fields];
+    saveFields();
+  }
+
+  // === Virtual Field Management ===
 
   function startAddingVirtualField() {
     addingVirtualField = true;
-    addingField = false;
     virtualFieldName = '';
     virtualFieldType = 'text';
     virtualFieldRequired = false;
     virtualFieldOptions = [{ value: '', label: '' }];
   }
 
-  function cancelAddingField() {
-    addingField = false;
+  function cancelAddingVirtualField() {
     addingVirtualField = false;
-    newFieldIdentifier = '';
-    newFieldType = 'default';
-    newIsRequired = false;
     virtualFieldName = '';
     virtualFieldType = 'text';
     virtualFieldRequired = false;
     virtualFieldOptions = [{ value: '', label: '' }];
-  }
-
-  function addField() {
-    if (!newFieldIdentifier) {
-      error = t('requestTypeFields.pleaseSelectField');
-      return;
-    }
-
-    if (fields.some(f => f.field_identifier === newFieldIdentifier && (f.step_number || 1) === currentStep)) {
-      error = t('requestTypeFields.fieldAlreadyAdded');
-      return;
-    }
-
-    const field = availableFields.find(f => f.id === newFieldIdentifier);
-    const fieldName = field ? field.name : newFieldIdentifier;
-
-    fields = [...fields, {
-      field_identifier: newFieldIdentifier,
-      field_type: newFieldType,
-      is_required: newIsRequired,
-      display_order: currentStepFields.length,
-      field_name: fieldName,
-      step_number: currentStep
-    }];
-
-    cancelAddingField();
-    saveFields();
   }
 
   function addVirtualField() {
@@ -189,7 +413,7 @@
       virtual_field_options: optionsJson
     }];
 
-    cancelAddingField();
+    cancelAddingVirtualField();
     saveFields();
   }
 
@@ -201,64 +425,7 @@
     virtualFieldOptions = virtualFieldOptions.filter((_, i) => i !== index);
   }
 
-  function removeField(fieldToRemove) {
-    fields = fields.filter(f => f !== fieldToRemove);
-    recalculateDisplayOrder();
-    saveFields();
-  }
-
-  function moveFieldUp(field) {
-    const stepFields = fields.filter(f => (f.step_number || 1) === (field.step_number || 1));
-    const fieldIndex = stepFields.findIndex(f => f === field);
-    if (fieldIndex <= 0) return;
-
-    // Swap display_order with previous field
-    const prevField = stepFields[fieldIndex - 1];
-    const tempOrder = field.display_order;
-    field.display_order = prevField.display_order;
-    prevField.display_order = tempOrder;
-
-    fields = [...fields];
-    saveFields();
-  }
-
-  function moveFieldDown(field) {
-    const stepFields = fields.filter(f => (f.step_number || 1) === (field.step_number || 1));
-    const fieldIndex = stepFields.findIndex(f => f === field);
-    if (fieldIndex >= stepFields.length - 1) return;
-
-    // Swap display_order with next field
-    const nextField = stepFields[fieldIndex + 1];
-    const tempOrder = field.display_order;
-    field.display_order = nextField.display_order;
-    nextField.display_order = tempOrder;
-
-    fields = [...fields];
-    saveFields();
-  }
-
-  function recalculateDisplayOrder() {
-    // Group by step and recalculate display_order within each step
-    const byStep = {};
-    fields.forEach(f => {
-      const step = f.step_number || 1;
-      if (!byStep[step]) byStep[step] = [];
-      byStep[step].push(f);
-    });
-
-    Object.values(byStep).forEach(stepFields => {
-      stepFields.sort((a, b) => a.display_order - b.display_order);
-      stepFields.forEach((f, i) => f.display_order = i);
-    });
-
-    fields = [...fields];
-  }
-
-  function toggleRequired(field) {
-    field.is_required = !field.is_required;
-    fields = [...fields];
-    saveFields();
-  }
+  // === Field Editing ===
 
   function startEditingField(field) {
     editingField = field;
@@ -282,10 +449,14 @@
     editDescription = '';
   }
 
+  // === Step Management ===
+
   function addStep() {
     const maxStep = Math.max(...steps, 0);
     steps = [...steps, maxStep + 1];
     currentStep = maxStep + 1;
+    // Save fields to persist the new step structure
+    saveFields();
   }
 
   function removeStep(stepNumber) {
@@ -311,11 +482,19 @@
     saveFields();
   }
 
+  function stepHasFields(step) {
+    return fields.some(f => (f.step_number || 1) === step);
+  }
+
+  // === Save ===
+
   async function saveFields() {
     try {
       saving = true;
       error = null;
 
+      // Ensure empty steps are preserved by including step metadata
+      // The backend will handle this based on field data
       const fieldsToSave = fields.map(f => ({
         field_identifier: f.field_identifier,
         field_type: f.field_type,
@@ -355,16 +534,26 @@
     }
     return field.field_type === 'default' ? t('requestTypeFields.defaultField') : t('requestTypeFields.customField');
   }
+
+  function getAvailableFieldTypeLabel(field) {
+    if (field.type === 'default') {
+      return t('requestTypeFields.system');
+    }
+    if (field.field_type) {
+      return field.field_type;
+    }
+    return t('requestTypeFields.custom');
+  }
 </script>
 
 {#if isOpen}
   <PortalModal
     isOpen={isOpen}
     isDarkMode={isDarkMode}
-    maxWidth="max-w-3xl"
+    maxWidth="max-w-5xl"
     title={`${t('requestTypeFields.configureFields')}: ${requestTypeName}`}
     onClose={handleClose}
-    bodyClass="px-6 py-4 max-h-[70vh] overflow-y-auto"
+    bodyClass="px-6 py-4"
   >
     {#if loading}
       <div class="flex items-center justify-center py-12">
@@ -374,29 +563,41 @@
       {#if error}
         <div
           class="mb-4 p-3 rounded border"
-          style="background-color: {isDarkMode ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2'}; border-color: {isDarkMode ? 'rgba(239, 68, 68, 0.3)' : '#fecaca'};"
+          style="background-color: var(--ds-status-error-subtle); border-color: var(--ds-status-error);"
         >
-          <p class="text-sm" style="color: {isDarkMode ? '#fca5a5' : '#dc2626'};">
+          <p class="text-sm" style="color: var(--ds-status-error);">
             {error}
           </p>
         </div>
       {/if}
 
       <!-- Step Tabs -->
-      <div class="flex items-center gap-2 mb-4 pb-3 border-b" style="border-color: {isDarkMode ? '#475569' : '#e5e7eb'};">
+      <div class="flex items-center gap-2 mb-4 pb-3 border-b" style="border-color: var(--ds-border-subtle);">
         {#each steps as step}
+          {@const hasFields = stepHasFields(step)}
           <button
             onclick={() => currentStep = step}
-            class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
-            style="background-color: {currentStep === step ? (isDarkMode ? '#3b82f6' : '#3b82f6') : (isDarkMode ? '#334155' : '#f3f4f6')}; color: {currentStep === step ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#6b7280')};"
+            class="px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5"
+            style="
+              background-color: {currentStep === step
+                ? 'var(--ds-interactive)'
+                : hasFields
+                  ? 'var(--ds-surface-raised)'
+                  : 'var(--ds-status-warning-subtle)'};
+              color: {currentStep === step ? 'white' : 'var(--ds-text-subtle)'};
+              border: {!hasFields && currentStep !== step ? '1px solid var(--ds-status-warning)' : '1px solid transparent'};
+            "
           >
             {t('requestTypeFields.step')} {step}
+            {#if !hasFields && currentStep !== step}
+              <AlertTriangle class="w-3 h-3" style="color: var(--ds-status-warning);" />
+            {/if}
           </button>
         {/each}
         <button
           onclick={addStep}
           class="px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-1"
-          style="background-color: {isDarkMode ? '#334155' : '#f3f4f6'}; color: {isDarkMode ? '#94a3b8' : '#6b7280'};"
+          style="background-color: var(--ds-surface-raised); color: var(--ds-text-subtle);"
           title={t('requestTypeFields.addNewStep')}
         >
           <Plus class="w-4 h-4" />
@@ -405,7 +606,7 @@
           <button
             onclick={() => removeStep(currentStep)}
             class="px-3 py-2 rounded-lg text-sm transition-all"
-            style="color: {isDarkMode ? '#fca5a5' : '#dc2626'};"
+            style="color: var(--ds-status-error);"
             title={t('requestTypeFields.removeCurrentStep')}
           >
             <Trash2 class="w-4 h-4" />
@@ -413,178 +614,219 @@
         {/if}
       </div>
 
-      <!-- Fields List for Current Step -->
-      <div class="space-y-2 mb-4">
-        {#each currentStepFields.sort((a, b) => a.display_order - b.display_order) as field, index}
-          <div
-            class="flex items-start gap-3 p-3 rounded border"
-            style="background-color: {isDarkMode ? '#334155' : '#f9fafb'}; border-color: {isDarkMode ? '#475569' : '#e5e7eb'};"
-          >
-            <div class="flex flex-col gap-1 pt-1">
-              <button
-                onclick={() => moveFieldUp(field)}
-                disabled={index === 0}
-                class="p-1 rounded transition-all disabled:opacity-30"
-                style="color: {isDarkMode ? '#94a3b8' : '#6b7280'};"
-              >
-                <ChevronUp class="w-4 h-4" />
-              </button>
-              <button
-                onclick={() => moveFieldDown(field)}
-                disabled={index === currentStepFields.length - 1}
-                class="p-1 rounded transition-all disabled:opacity-30"
-                style="color: {isDarkMode ? '#94a3b8' : '#6b7280'};"
-              >
-                <ChevronDown class="w-4 h-4" />
-              </button>
-            </div>
-
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2">
-                <span class="font-medium text-sm" style="color: {isDarkMode ? '#e2e8f0' : '#111827'};">
-                  {field.display_name || field.field_name || field.field_identifier}
-                </span>
-                {#if field.display_name && field.display_name !== field.field_name}
-                  <span class="text-xs" style="color: {isDarkMode ? '#64748b' : '#9ca3af'};">
-                    ({field.field_name || field.field_identifier})
-                  </span>
-                {/if}
-              </div>
-              <div class="text-xs mt-0.5" style="color: {isDarkMode ? '#94a3b8' : '#6b7280'};">
-                {getFieldTypeLabel(field)}
-              </div>
-              {#if field.description}
-                <div class="text-xs mt-1 italic" style="color: {isDarkMode ? '#64748b' : '#9ca3af'};">
-                  {field.description}
-                </div>
-              {/if}
-            </div>
-
-            <div class="flex items-center gap-2">
-              <button
-                onclick={() => startEditingField(field)}
-                class="p-2 rounded transition-all"
-                style="color: {isDarkMode ? '#94a3b8' : '#6b7280'};"
-                title={t('layout.editDisplaySettings')}
-              >
-                <Pencil class="w-4 h-4" />
-              </button>
-
-              <button
-                onclick={() => toggleRequired(field)}
-                class="flex items-center gap-1.5 px-2.5 py-1.5 rounded border transition-all text-xs"
-                style="background-color: {field.is_required ? (isDarkMode ? '#1e40af' : '#dbeafe') : 'transparent'}; border-color: {isDarkMode ? '#475569' : '#e5e7eb'}; color: {field.is_required ? (isDarkMode ? '#60a5fa' : '#2563eb') : (isDarkMode ? '#94a3b8' : '#6b7280')};"
-              >
-                {#if field.is_required}
-                  <Check class="w-3 h-3" />
-                {/if}
-                <span>{t('requestTypeFields.required')}</span>
-              </button>
-
-              <button
-                onclick={() => removeField(field)}
-                class="p-2 rounded transition-all"
-                style="color: {isDarkMode ? '#fca5a5' : '#dc2626'}; background-color: {isDarkMode ? 'rgba(220, 38, 38, 0.1)' : 'transparent'};"
-                title={t('requestTypeFields.removeField')}
-              >
-                <Trash2 class="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        {/each}
-
-        {#if currentStepFields.length === 0 && !addingField && !addingVirtualField}
-          <div class="text-center py-8">
-            <p class="text-sm" style="color: {isDarkMode ? '#94a3b8' : '#6b7280'};">
-              {t('requestTypeFields.noFieldsInStep', { step: currentStep })}
-            </p>
-          </div>
-        {/if}
-      </div>
-
-      <!-- Add Field Form -->
-      {#if addingField}
+      <!-- Empty Step Warning -->
+      {#if !stepHasFields(currentStep) && !addingVirtualField}
         <div
-          class="p-4 rounded border space-y-3"
-          style="background-color: {isDarkMode ? '#334155' : '#f9fafb'}; border-color: {isDarkMode ? '#475569' : '#e5e7eb'};"
+          class="mb-4 p-3 rounded border flex items-center gap-2"
+          style="background-color: var(--ds-status-warning-subtle); border-color: var(--ds-status-warning);"
         >
-          <div class="text-sm font-medium mb-2" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
-            {t('requestTypeFields.addExistingField')}
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
-              {t('requestTypeFields.field')}
-            </label>
-            <BasePicker
-              bind:value={newFieldIdentifier}
-              items={availableFields}
-              placeholder={t('requestTypeFields.selectField')}
-              showUnassigned={true}
-              unassignedLabel={t('requestTypeFields.selectField')}
-              getValue={(field) => field.id}
-              getLabel={(field) => `${field.name} (${field.type})`}
-              onSelect={(field) => {
-                if (field) newFieldType = field.type;
-              }}
-            />
-          </div>
+          <AlertTriangle class="w-4 h-4 flex-shrink-0" style="color: var(--ds-status-warning);" />
+          <p class="text-sm" style="color: var(--ds-text);">
+            {t('requestTypeFields.stepHasNoFields')}
+          </p>
+        </div>
+      {/if}
 
-          <div class="flex items-center gap-2">
+      <!-- Dual Panel Layout -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Available Fields Panel -->
+        <div class="rounded-xl p-4 border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+          <h3 class="text-base font-semibold mb-3" style="color: var(--ds-text);">
+            {t('requestTypeFields.availableFields')}
+          </h3>
+          <p class="text-xs mb-3" style="color: var(--ds-text-subtle);">
+            {t('requestTypeFields.dragFieldsHint')}
+          </p>
+
+          <!-- Search -->
+          <div class="relative mb-3">
+            <Search class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style="color: var(--ds-text-subtle);" />
             <input
-              type="checkbox"
-              bind:checked={newIsRequired}
-              id="newFieldRequired"
-              class="h-4 w-4 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+              type="text"
+              bind:value={fieldSearchQuery}
+              placeholder={t('requestTypeFields.searchFields')}
+              class="w-full pl-9 pr-3 py-2 rounded border text-sm focus:outline-none focus:ring-2"
+              style="background-color: var(--ds-background-input); color: var(--ds-text); border-color: var(--ds-border); --tw-ring-color: var(--ds-interactive);"
             />
-            <label for="newFieldRequired" class="text-sm" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
-              {t('requestTypeFields.requiredField')}
-            </label>
           </div>
 
-          <div class="flex gap-2">
-            <Button
-              onclick={addField}
-              variant="primary"
-              size="medium"
-              class="flex-1"
-            >
-              {t('requestTypeFields.addField')}
-            </Button>
-            <Button
-              onclick={cancelAddingField}
-              variant="default"
-              size="medium"
-            >
-              {t('common.cancel')}
-            </Button>
+          <div class="space-y-1 max-h-80 overflow-y-auto">
+            {#each filteredAvailableFields as field (field.identifier)}
+              <div
+                data-available-field={JSON.stringify(field)}
+                class="group flex items-center gap-3 px-3 py-2.5 rounded border transition-all duration-200 cursor-grab hover:border-blue-300 active:cursor-grabbing"
+                style="border-color: var(--ds-border); background-color: var(--ds-background-input); user-select: none;"
+              >
+                <!-- Drag Handle -->
+                <div class="flex-shrink-0">
+                  <svg class="w-4 h-4" style="color: var(--ds-text-subtle);" fill="currentColor" viewBox="0 0 24 24">
+                    <circle cx="9" cy="6" r="1.5"/>
+                    <circle cx="15" cy="6" r="1.5"/>
+                    <circle cx="9" cy="12" r="1.5"/>
+                    <circle cx="15" cy="12" r="1.5"/>
+                    <circle cx="9" cy="18" r="1.5"/>
+                    <circle cx="15" cy="18" r="1.5"/>
+                  </svg>
+                </div>
+
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-sm" style="color: var(--ds-text);">
+                    {field.name}
+                  </div>
+                </div>
+
+                <span
+                  class="text-xs px-1.5 py-0.5 rounded flex-shrink-0"
+                  style="background-color: var(--ds-surface-sunken); color: var(--ds-text-subtle);"
+                >
+                  {getAvailableFieldTypeLabel(field)}
+                </span>
+              </div>
+            {:else}
+              <div class="text-center py-6">
+                <p class="text-sm" style="color: var(--ds-text-subtle);">
+                  {#if fieldSearchQuery.trim()}
+                    {t('requestTypeFields.noFieldsMatch')}
+                  {:else}
+                    {t('requestTypeFields.allFieldsAdded')}
+                  {/if}
+                </p>
+              </div>
+            {/each}
           </div>
         </div>
 
-      <!-- Add Virtual Field Form -->
-      {:else if addingVirtualField}
+        <!-- Configured Fields Panel -->
+        <div class="rounded-xl p-4 border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+          <h3 class="text-base font-semibold mb-3" style="color: var(--ds-text);">
+            {t('requestTypeFields.step')} {currentStep} {t('requestTypeFields.fields')} ({currentStepFields.length})
+          </h3>
+          <p class="text-xs mb-3" style="color: var(--ds-text-subtle);">
+            {t('requestTypeFields.dragToReorder')}
+          </p>
+
+          <div
+            data-drop-zone
+            class="min-h-64 max-h-80 overflow-y-auto border-2 border-dashed rounded p-3 space-y-2"
+            class:border-blue-400={draggedField}
+            style="border-color: {draggedField ? 'var(--ds-interactive)' : 'var(--ds-border)'}; background-color: {draggedField ? 'var(--ds-interactive-subtle)' : 'transparent'};"
+          >
+            {#if currentStepFields.length === 0 && !addingVirtualField}
+              <div class="text-center py-8">
+                <svg class="w-10 h-10 mx-auto mb-3" style="color: var(--ds-text-subtle);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                <p class="text-sm" style="color: var(--ds-text-subtle);">
+                  {t('requestTypeFields.dropFieldsHere')}
+                </p>
+              </div>
+            {:else}
+              {#each currentStepFields as field, index (field.field_identifier)}
+                <div
+                  data-configured-field
+                  data-field-index={index}
+                  data-field-id={field.field_identifier}
+                  class="relative group flex items-center gap-3 px-3 py-2.5 rounded border transition-all duration-200"
+                  style="border-color: var(--ds-border); background-color: var(--ds-background); user-select: none;"
+                >
+                  <!-- Drop indicator -->
+                  {#if fieldDragState.get(field.field_identifier)?.closestEdge}
+                    <DropIndicator edge={fieldDragState.get(field.field_identifier)?.closestEdge} gap={8} />
+                  {/if}
+
+                  <!-- Drag Handle -->
+                  <div
+                    class="cursor-grab active:cursor-grabbing flex-shrink-0 p-1 rounded transition-colors"
+                    style="touch-action: none;"
+                  >
+                    <svg class="w-4 h-4" style="color: var(--ds-text-subtle);" fill="currentColor" viewBox="0 0 24 24">
+                      <circle cx="9" cy="6" r="1.5"/>
+                      <circle cx="15" cy="6" r="1.5"/>
+                      <circle cx="9" cy="12" r="1.5"/>
+                      <circle cx="15" cy="12" r="1.5"/>
+                      <circle cx="9" cy="18" r="1.5"/>
+                      <circle cx="15" cy="18" r="1.5"/>
+                    </svg>
+                  </div>
+
+                  <div class="flex-1 min-w-0">
+                    <div class="font-medium text-sm flex items-center gap-2" style="color: var(--ds-text);">
+                      {capitalizeLabel(field.display_name || field.field_name || field.field_identifier)}
+                      <span
+                        class="text-xs px-1.5 py-0.5 rounded"
+                        style="background-color: var(--ds-surface-sunken); color: var(--ds-text-subtle);"
+                      >
+                        {field.field_type === 'virtual' ? t('requestTypeFields.virtual') : field.field_type === 'default' ? t('requestTypeFields.system') : t('requestTypeFields.custom')}
+                      </span>
+                    </div>
+                    {#if field.display_name && field.display_name !== field.field_name && field.field_type !== 'virtual'}
+                      <div class="text-xs" style="color: var(--ds-text-subtle);">
+                        {field.field_name || field.field_identifier}
+                      </div>
+                    {/if}
+                  </div>
+
+                  <div class="flex items-center gap-2 flex-shrink-0">
+                    <!-- Required Checkbox -->
+                    <Checkbox
+                      checked={field.is_required}
+                      onchange={() => toggleRequired(field)}
+                      label={t('requestTypeFields.required')}
+                      size="small"
+                    />
+
+                    <!-- Edit Button -->
+                    <button
+                      onclick={() => startEditingField(field)}
+                      class="p-1.5 rounded transition-all opacity-0 group-hover:opacity-100"
+                      style="color: var(--ds-text-subtle);"
+                      title={t('layout.editDisplaySettings')}
+                    >
+                      <Pencil class="w-3.5 h-3.5" />
+                    </button>
+
+                    <!-- Remove Button -->
+                    <button
+                      onclick={() => removeField(field)}
+                      class="p-1.5 rounded transition-all opacity-0 group-hover:opacity-100"
+                      style="color: var(--ds-status-error);"
+                      title={t('requestTypeFields.removeField')}
+                    >
+                      <Trash2 class="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              {/each}
+            {/if}
+          </div>
+        </div>
+      </div>
+
+      <!-- Add Virtual Field Section -->
+      {#if addingVirtualField}
         <div
-          class="p-4 rounded border space-y-3"
-          style="background-color: {isDarkMode ? '#334155' : '#f9fafb'}; border-color: {isDarkMode ? '#475569' : '#e5e7eb'};"
+          class="mt-4 p-4 rounded border space-y-3"
+          style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
         >
-          <div class="text-sm font-medium mb-2" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
+          <div class="text-sm font-medium" style="color: var(--ds-text);">
             {t('requestTypeFields.addVirtualField')}
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
+            <label class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
               {t('requestTypeFields.fieldName')}
             </label>
             <input
               type="text"
               bind:value={virtualFieldName}
               placeholder={t('requestTypeFields.fieldNamePlaceholder')}
-              class="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500"
-              style="background-color: {isDarkMode ? '#1e293b' : '#ffffff'}; color: {isDarkMode ? '#e2e8f0' : '#111827'}; border-color: {isDarkMode ? '#475569' : '#d1d5db'};"
+              class="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2 text-sm"
+              style="background-color: var(--ds-background-input); color: var(--ds-text); border-color: var(--ds-border); --tw-ring-color: var(--ds-interactive);"
             />
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
+            <label class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
               {t('requestTypeFields.fieldType')}
             </label>
             <div class="grid grid-cols-4 gap-2">
@@ -597,7 +839,7 @@
                 <button
                   onclick={() => virtualFieldType = type.value}
                   class="flex flex-col items-center gap-1 p-3 rounded border transition-all"
-                  style="background-color: {virtualFieldType === type.value ? (isDarkMode ? '#1e40af' : '#dbeafe') : 'transparent'}; border-color: {virtualFieldType === type.value ? (isDarkMode ? '#3b82f6' : '#3b82f6') : (isDarkMode ? '#475569' : '#e5e7eb')}; color: {virtualFieldType === type.value ? (isDarkMode ? '#60a5fa' : '#2563eb') : (isDarkMode ? '#94a3b8' : '#6b7280')};"
+                  style="background-color: {virtualFieldType === type.value ? 'var(--ds-interactive-subtle)' : 'transparent'}; border-color: {virtualFieldType === type.value ? 'var(--ds-interactive)' : 'var(--ds-border)'}; color: {virtualFieldType === type.value ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'};"
                 >
                   <svelte:component this={type.icon} class="w-5 h-5" />
                   <span class="text-xs">{type.label}</span>
@@ -608,7 +850,7 @@
 
           {#if virtualFieldType === 'select'}
             <div>
-              <label class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
+              <label class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
                 {t('requestTypeFields.options')}
               </label>
               <div class="space-y-2">
@@ -618,20 +860,20 @@
                       type="text"
                       bind:value={option.value}
                       placeholder={t('requestTypeFields.value')}
-                      class="flex-1 px-3 py-2 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                      style="background-color: {isDarkMode ? '#1e293b' : '#ffffff'}; color: {isDarkMode ? '#e2e8f0' : '#111827'}; border-color: {isDarkMode ? '#475569' : '#d1d5db'};"
+                      class="flex-1 px-3 py-2 rounded border focus:outline-none focus:ring-2 text-sm"
+                      style="background-color: var(--ds-background-input); color: var(--ds-text); border-color: var(--ds-border); --tw-ring-color: var(--ds-interactive);"
                     />
                     <input
                       type="text"
                       bind:value={option.label}
                       placeholder={t('requestTypeFields.label')}
-                      class="flex-1 px-3 py-2 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                      style="background-color: {isDarkMode ? '#1e293b' : '#ffffff'}; color: {isDarkMode ? '#e2e8f0' : '#111827'}; border-color: {isDarkMode ? '#475569' : '#d1d5db'};"
+                      class="flex-1 px-3 py-2 rounded border focus:outline-none focus:ring-2 text-sm"
+                      style="background-color: var(--ds-background-input); color: var(--ds-text); border-color: var(--ds-border); --tw-ring-color: var(--ds-interactive);"
                     />
                     <button
                       onclick={() => removeVirtualFieldOption(i)}
                       class="p-2 rounded"
-                      style="color: {isDarkMode ? '#fca5a5' : '#dc2626'};"
+                      style="color: var(--ds-status-error);"
                       disabled={virtualFieldOptions.length === 1}
                     >
                       <Trash2 class="w-4 h-4" />
@@ -641,7 +883,7 @@
                 <button
                   onclick={addVirtualFieldOption}
                   class="text-sm flex items-center gap-1"
-                  style="color: {isDarkMode ? '#60a5fa' : '#2563eb'};"
+                  style="color: var(--ds-interactive);"
                 >
                   <Plus class="w-4 h-4" /> {t('requestTypeFields.addOption')}
                 </button>
@@ -649,17 +891,11 @@
             </div>
           {/if}
 
-          <div class="flex items-center gap-2">
-            <input
-              type="checkbox"
-              bind:checked={virtualFieldRequired}
-              id="virtualFieldRequired"
-              class="h-4 w-4 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-            />
-            <label for="virtualFieldRequired" class="text-sm" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
-              {t('requestTypeFields.requiredField')}
-            </label>
-          </div>
+          <Checkbox
+            bind:checked={virtualFieldRequired}
+            label={t('requestTypeFields.requiredField')}
+            size="small"
+          />
 
           <div class="flex gap-2">
             <Button
@@ -671,7 +907,7 @@
               {t('requestTypeFields.addVirtualField')}
             </Button>
             <Button
-              onclick={cancelAddingField}
+              onclick={cancelAddingVirtualField}
               variant="default"
               size="medium"
             >
@@ -679,35 +915,27 @@
             </Button>
           </div>
         </div>
-
-      <!-- Add Field Buttons -->
       {:else}
-        <div class="flex gap-2">
-          <button
-            onclick={startAddingField}
-            class="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded border-2 border-dashed transition-all"
-            style="border-color: {isDarkMode ? '#475569' : '#d1d5db'}; color: {isDarkMode ? '#94a3b8' : '#6b7280'};"
-          >
-            <Plus class="w-5 h-5" />
-            <span class="font-medium">{t('requestTypeFields.addField')}</span>
-          </button>
+        <!-- Add Virtual Field Button -->
+        <div class="mt-4">
           <button
             onclick={startAddingVirtualField}
-            class="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded border-2 border-dashed transition-all"
-            style="border-color: {isDarkMode ? '#475569' : '#d1d5db'}; color: {isDarkMode ? '#94a3b8' : '#6b7280'};"
+            class="flex items-center gap-2 px-4 py-2 rounded border-2 border-dashed transition-all text-sm"
+            style="border-color: var(--ds-border); color: var(--ds-text-subtle);"
           >
-            <Type class="w-5 h-5" />
+            <Type class="w-4 h-4" />
             <span class="font-medium">{t('requestTypeFields.addVirtualField')}</span>
           </button>
         </div>
       {/if}
     {/if}
 
+    <!-- Footer -->
     <div
       class="px-6 py-4 border-t flex items-center justify-between -mx-6 -mb-4 mt-6"
-      style="background-color: {isDarkMode ? '#334155' : '#f9fafb'}; border-color: {isDarkMode ? '#475569' : '#e5e7eb'};"
+      style="background-color: var(--ds-surface-sunken); border-color: var(--ds-border);"
     >
-      <div class="text-sm" style="color: {isDarkMode ? '#94a3b8' : '#6b7280'};">
+      <div class="text-sm" style="color: var(--ds-text-subtle);">
         {#if saving}
           <div class="flex items-center gap-2">
             <Spinner size="sm" />
@@ -740,31 +968,31 @@
   >
     <div class="space-y-4">
       <div>
-        <label class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
+        <label class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
           {t('requestTypeFields.displayName')}
         </label>
         <input
           type="text"
           bind:value={editDisplayName}
           placeholder={editingField.field_name || editingField.field_identifier}
-          class="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500"
-          style="background-color: {isDarkMode ? '#1e293b' : '#ffffff'}; color: {isDarkMode ? '#e2e8f0' : '#111827'}; border-color: {isDarkMode ? '#475569' : '#d1d5db'};"
+          class="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2"
+          style="background-color: var(--ds-background-input); color: var(--ds-text); border-color: var(--ds-border); --tw-ring-color: var(--ds-interactive);"
         />
-        <p class="text-xs mt-1" style="color: {isDarkMode ? '#64748b' : '#9ca3af'};">
+        <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
           {t('requestTypeFields.overrideLabel')}
         </p>
       </div>
 
       <div>
-        <label class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#e2e8f0' : '#374151'};">
+        <label class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
           {t('requestTypeFields.descriptionHelpText')}
         </label>
         <textarea
           bind:value={editDescription}
           placeholder={t('requestTypeFields.helpTextPlaceholder')}
           rows="3"
-          class="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500"
-          style="background-color: {isDarkMode ? '#1e293b' : '#ffffff'}; color: {isDarkMode ? '#e2e8f0' : '#111827'}; border-color: {isDarkMode ? '#475569' : '#d1d5db'};"
+          class="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2"
+          style="background-color: var(--ds-background-input); color: var(--ds-text); border-color: var(--ds-border); --tw-ring-color: var(--ds-interactive);"
         ></textarea>
       </div>
 

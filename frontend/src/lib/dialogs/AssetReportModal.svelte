@@ -9,14 +9,15 @@
   import PortalModal from './PortalModal.svelte';
   import DialogFooter from './DialogFooter.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import Checkbox from '../components/Checkbox.svelte';
 
   const dispatch = createEventDispatcher();
 
   export let isOpen = false;
   export let mode = 'create'; // 'create' or 'edit'
-  export let requestType = null;
+  export let assetReport = null;
   export let channelId = null;
-  export let availableItemTypes = [];
+  export let availableAssetSets = [];
   export let isDarkMode = false;
 
   let submitting = false;
@@ -27,9 +28,12 @@
   let formData = {
     name: '',
     description: '',
-    icon: 'FileText',
+    icon: 'Table2',
     color: '#6b7280',
-    item_type_id: null
+    asset_set_id: null,
+    cql_query: '',
+    column_config: [],
+    is_active: true
   };
 
   // Track if form has been initialized to prevent re-initialization
@@ -43,21 +47,27 @@
 
       if (isOpen) {
         if (!isFormInitialized) {
-          if (mode === 'edit' && requestType) {
+          if (mode === 'edit' && assetReport) {
             formData = {
-              name: requestType.name || '',
-              description: requestType.description || '',
-              icon: requestType.icon || 'FileText',
-              color: requestType.color || '#6b7280',
-              item_type_id: requestType.item_type_id || null
+              name: assetReport.name || '',
+              description: assetReport.description || '',
+              icon: assetReport.icon || 'Table2',
+              color: assetReport.color || '#6b7280',
+              asset_set_id: assetReport.asset_set_id || null,
+              cql_query: assetReport.cql_query || '',
+              column_config: assetReport.column_config || [],
+              is_active: assetReport.is_active !== false
             };
           } else if (mode === 'create') {
             formData = {
               name: '',
               description: '',
-              icon: 'FileText',
+              icon: 'Table2',
               color: '#6b7280',
-              item_type_id: availableItemTypes.length > 0 ? availableItemTypes[0].id : null
+              asset_set_id: availableAssetSets.length > 0 ? availableAssetSets[0].id : null,
+              cql_query: '',
+              column_config: [],
+              is_active: true
             };
           }
           isFormInitialized = true;
@@ -68,9 +78,12 @@
         formData = {
           name: '',
           description: '',
-          icon: 'FileText',
+          icon: 'Table2',
           color: '#6b7280',
-          item_type_id: null
+          asset_set_id: null,
+          cql_query: '',
+          column_config: [],
+          is_active: true
         };
         error = null;
         success = false;
@@ -86,8 +99,8 @@
         return;
       }
 
-      if (!formData.item_type_id) {
-        error = t('portal.itemTypeRequired');
+      if (!formData.asset_set_id) {
+        error = t('portal.assetSetRequired');
         return;
       }
 
@@ -95,22 +108,26 @@
       error = null;
 
       if (mode === 'create') {
-        await api.requestTypes.create(channelId, {
+        await api.assetReports.create(channelId, {
           name: formData.name.trim(),
           description: formData.description.trim(),
           icon: formData.icon,
           color: formData.color,
-          item_type_id: formData.item_type_id,
-          is_active: true
+          asset_set_id: formData.asset_set_id,
+          cql_query: formData.cql_query.trim(),
+          column_config: formData.column_config,
+          is_active: formData.is_active
         });
       } else {
-        await api.requestTypes.update(requestType.id, {
+        await api.assetReports.update(assetReport.id, {
           name: formData.name.trim(),
           description: formData.description.trim(),
           icon: formData.icon,
           color: formData.color,
-          item_type_id: formData.item_type_id,
-          is_active: true
+          asset_set_id: formData.asset_set_id,
+          cql_query: formData.cql_query.trim(),
+          column_config: formData.column_config,
+          is_active: formData.is_active
         });
       }
 
@@ -118,8 +135,8 @@
       handleClose();
       dispatch('saved');
     } catch (err) {
-      console.error('Failed to save request type:', err);
-      error = err.message || t('portal.failedToSaveRequestType');
+      console.error('Failed to save asset report:', err);
+      error = err.message || t('portal.failedToSaveAssetReport');
     } finally {
       submitting = false;
     }
@@ -135,14 +152,14 @@
     isOpen={isOpen}
     isDarkMode={isDarkMode}
     maxWidth="max-w-2xl"
-    title={mode === 'create' ? t('portal.createRequestType') : t('portal.editRequestType')}
-    subtitle={mode === 'create' ? t('portal.addRequestTypeSubtitle') : t('portal.editRequestTypeSubtitle')}
+    title={mode === 'create' ? t('portal.createAssetReport') : t('portal.editAssetReport')}
+    subtitle={mode === 'create' ? t('portal.addAssetReportSubtitle') : t('portal.editAssetReportSubtitle')}
     onClose={handleClose}
     bodyClass="px-6 py-4 max-h-[60vh] overflow-y-auto"
   >
     {#if success}
       <div class="mb-4">
-        <AlertBox variant="success" message={mode === 'create' ? t('portal.requestTypeCreated') : t('portal.requestTypeUpdated')} />
+        <AlertBox variant="success" message={mode === 'create' ? t('portal.assetReportCreated') : t('portal.assetReportUpdated')} />
       </div>
     {:else}
       {#if error}
@@ -158,29 +175,29 @@
 
       <div class="space-y-4">
         <div>
-          <label for="rt-name" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
+          <label for="ar-name" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
             {t('common.name')} <span class="text-red-500">*</span>
           </label>
           <input
-            id="rt-name"
+            id="ar-name"
             bind:value={formData.name}
             type="text"
             class="w-full px-4 py-3 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500"
             style="background-color: {isDarkMode ? '#1e293b' : '#ffffff'}; color: {isDarkMode ? '#e2e8f0' : '#111827'}; border-color: {isDarkMode ? '#475569' : '#d1d5db'};"
-            placeholder={t('portal.requestTypeNamePlaceholder')}
+            placeholder={t('portal.assetReportNamePlaceholder')}
             required
           />
         </div>
 
         <div>
-          <label for="rt-description" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
+          <label for="ar-description" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
             {t('portal.descriptionOptional')}
           </label>
           <Textarea
-            id="rt-description"
+            id="ar-description"
             bind:value={formData.description}
-            rows={3}
-            placeholder={t('portal.requestTypeDescriptionPlaceholder')}
+            rows={2}
+            placeholder={t('portal.assetReportDescriptionPlaceholder')}
           />
         </div>
 
@@ -193,26 +210,47 @@
         </div>
 
         <div>
-          <label for="rt-itemtype" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
-            {t('portal.createsItemType')} <span class="text-red-500">*</span>
+          <label for="ar-assetset" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
+            {t('portal.assetSet')} <span class="text-red-500">*</span>
           </label>
           <BasePicker
-            bind:value={formData.item_type_id}
-            items={availableItemTypes}
-            placeholder={t('portal.selectItemType')}
+            bind:value={formData.asset_set_id}
+            items={availableAssetSets}
+            placeholder={t('portal.selectAssetSet')}
             getValue={(item) => item.id}
             getLabel={(item) => item.name}
           />
           <p class="text-xs mt-1" style="color: {isDarkMode ? '#94a3b8' : '#6b7280'};">
-            {t('portal.submissionsCreateItemType')}
+            {t('portal.assetSetDescription')}
           </p>
         </div>
+
+        <div>
+          <label for="ar-cql" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
+            {t('portal.cqlQuery')}
+          </label>
+          <Textarea
+            id="ar-cql"
+            bind:value={formData.cql_query}
+            rows={3}
+            placeholder={t('portal.cqlQueryPlaceholder')}
+          />
+          <p class="text-xs mt-1" style="color: {isDarkMode ? '#94a3b8' : '#6b7280'};">
+            {t('portal.cqlQueryHint')}
+          </p>
+        </div>
+
+        <Checkbox
+          bind:checked={formData.is_active}
+          label={t('portal.activeReport')}
+          size="small"
+        />
       </div>
 
       <DialogFooter
         onCancel={handleClose}
         onConfirm={handleSubmit}
-        confirmLabel={mode === 'create' ? t('portal.createRequestType') : t('common.saveChanges')}
+        confirmLabel={mode === 'create' ? t('portal.createAssetReport') : t('common.saveChanges')}
         loading={submitting}
         loadingLabel={mode === 'create' ? t('portal.creating') : t('common.saving')}
         class="mt-6 -mx-6 -mb-4"

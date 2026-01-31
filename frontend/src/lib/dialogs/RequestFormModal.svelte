@@ -1,59 +1,73 @@
 <script>
-  import { onMount, createEventDispatcher } from 'svelte';
   import { api } from '../api.js';
   import { authStore } from '../stores';
+  import { portalAuthStore } from '../stores/portalAuth.svelte.js';
+  import { portalStore, gradients, iconMap } from '../stores/portal.svelte.js';
   import Button from '../components/Button.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import Spinner from '../components/Spinner.svelte';
   import Textarea from '../components/Textarea.svelte';
   import AlertBox from '../components/AlertBox.svelte';
+  import Label from '../components/Label.svelte';
   import PortalModal from './PortalModal.svelte';
-  import { ChevronLeft, ChevronRight } from 'lucide-svelte';
+  import { ChevronLeft, ChevronRight, Package, X, Check } from 'lucide-svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  const dispatch = createEventDispatcher();
+  let {
+    isOpen = $bindable(false),
+    requestType = null,
+    portalSlug = '',
+    isDarkMode = false,
+    onsubmitted = () => {},
+    onclose = () => {}
+  } = $props();
 
-  export let isOpen = false;
-  export let requestType = null;
-  export let portalSlug = '';
-  export let isDarkMode = false;
+  // Direct store access (Svelte 5 reactive)
 
-  let fields = [];
-  let customFieldDefinitions = [];
-  let loading = false;
-  let submitting = false;
-  let error = null;
-  let success = false;
+  let fields = $state([]);
+  let customFieldDefinitions = $state([]);
+  let loading = $state(false);
+  let submitting = $state(false);
+  let error = $state(null);
+  let success = $state(false);
 
   // Multi-step support
-  let steps = [1];
-  let currentStep = 1;
+  let steps = $state([1]);
+  let currentStep = $state(1);
 
   // Form data
-  let formData = {
+  let formData = $state({
     title: '',
-    description: '',
-    name: '',
-    email: ''
-  };
-  let customFieldValues = {};
+    description: ''
+  });
+  let customFieldValues = $state({});
 
   // Computed: fields for current step
-  $: currentStepFields = fields.filter(f => (f.step_number || 1) === currentStep);
-  $: totalSteps = steps.length;
-  $: isLastStep = currentStep === Math.max(...steps);
-  $: isFirstStep = currentStep === Math.min(...steps);
+  let currentStepFields = $derived(fields.filter(f => (f.step_number || 1) === currentStep));
+  let totalSteps = $derived(steps.length);
+  let isLastStep = $derived(currentStep === Math.max(...steps));
+  let isFirstStep = $derived(currentStep === Math.min(...steps));
+
+  // Get gradient - use portal gradient or fallback
+  let gradientValue = $derived(
+    gradients[portalStore.selectedGradient]?.value ||
+    gradients[0].value
+  );
 
   // Load fields when modal opens
-  $: if (isOpen && requestType) {
-    loadFields();
-  }
+  $effect(() => {
+    if (isOpen && requestType) {
+      loadFields();
+    }
+  });
 
   // Clear form when modal closes
-  $: if (!isOpen) {
-    clearForm();
-  }
+  $effect(() => {
+    if (!isOpen) {
+      clearForm();
+    }
+  });
 
   async function loadFields() {
     try {
@@ -96,9 +110,7 @@
   function clearForm() {
     formData = {
       title: '',
-      description: '',
-      name: '',
-      email: ''
+      description: ''
     };
     customFieldValues = {};
     error = null;
@@ -194,34 +206,16 @@
       // Reset to last step for UI consistency during submission
       currentStep = Math.max(...steps);
 
-      // Validate name and email only for anonymous users
-      if (!authStore.isAuthenticated) {
-        if (!formData.name.trim()) {
-          error = t('requestForm.nameRequired');
-          return;
-        }
-        if (!formData.email.trim()) {
-          error = t('requestForm.emailRequired');
-          return;
-        }
-      }
-
       submitting = true;
       error = null;
 
-      // Submit to portal
+      // Submit to portal (user info comes from authenticated session)
       const submissionData = {
         request_type_id: requestType.id,
         title: formData.title,
         description: formData.description,
         custom_fields: customFieldValues
       };
-
-      // Only include name and email for anonymous users
-      if (!authStore.isAuthenticated) {
-        submissionData.name = formData.name;
-        submissionData.email = formData.email;
-      }
 
       await api.portal.submit(portalSlug, submissionData);
 
@@ -230,7 +224,7 @@
       // Close modal after short delay
       setTimeout(() => {
         handleClose();
-        dispatch('submitted');
+        onsubmitted();
       }, 1500);
     } catch (err) {
       console.error('Failed to submit request:', err);
@@ -242,7 +236,7 @@
 
   function handleClose() {
     isOpen = false;
-    dispatch('close');
+    onclose();
   }
 
   function parseSelectOptions(optionsJson) {
@@ -259,62 +253,96 @@
     isOpen={isOpen}
     isDarkMode={isDarkMode}
     maxWidth="max-w-2xl"
-    title={requestType?.name}
-    subtitle={requestType?.description}
+    showHeader={false}
+    bodyClass=""
     onClose={handleClose}
-    bodyClass="px-6 py-4 max-h-[60vh] overflow-y-auto"
   >
-    {#if loading}
-      <div class="flex items-center justify-center py-12">
-        <Spinner />
-      </div>
-    {:else if success}
-      <div class="mb-4">
-        <AlertBox variant="success" message={t('requestForm.requestSubmittedSuccess')} />
-      </div>
-    {:else}
-      {#if error}
-        <div
-          class="mb-4 p-3 rounded border"
-          style="background-color: {isDarkMode ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2'}; border-color: {isDarkMode ? 'rgba(239, 68, 68, 0.3)' : '#fecaca'};"
-        >
-          <p class="text-sm" style="color: {isDarkMode ? '#fca5a5' : '#dc2626'};">
-            {error}
-          </p>
+    <!-- Gradient Header with Integrated Stepper -->
+    <div
+      class="px-8 pt-8 pb-6 text-white text-center relative"
+      style="background: {gradientValue};"
+    >
+      <!-- Close button -->
+      <button
+        onclick={handleClose}
+        class="absolute top-4 right-4 p-2 rounded-full hover:bg-white/20 transition-all"
+        aria-label="Close"
+      >
+        <X class="w-5 h-5" />
+      </button>
+
+      <!-- Icon -->
+      <div class="flex justify-center mb-3">
+        <div class="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+          <svelte:component this={iconMap[requestType?.icon] || Package} class="w-7 h-7 text-white" />
         </div>
+      </div>
+
+      <!-- Title -->
+      <h2 class="text-xl font-bold">{requestType?.name}</h2>
+      {#if requestType?.description}
+        <p class="text-white/80 mt-1 text-sm">{requestType.description}</p>
       {/if}
 
-      <!-- Step Indicator (only show if multi-step) -->
+      <!-- Integrated Stepper (white theme for gradient background) -->
       {#if totalSteps > 1}
-        <div class="flex items-center justify-center gap-2 mb-6">
+        <div class="mt-6 flex items-center justify-center gap-2">
           {#each steps as step, index}
+            {@const isCompleted = index + 1 < currentStep}
+            {@const isCurrent = index + 1 === currentStep}
             <div class="flex items-center">
               <div
                 class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all"
-                style="background-color: {currentStep === step ? '#3b82f6' : currentStep > step ? '#22c55e' : (isDarkMode ? '#475569' : '#e5e7eb')}; color: {currentStep >= step ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#6b7280')};"
+                style="background: {isCurrent || isCompleted ? 'white' : 'rgba(255,255,255,0.3)'}; color: {isCurrent || isCompleted ? '#667eea' : 'white'};"
               >
-                {step}
+                {#if isCompleted}
+                  <Check class="w-4 h-4" />
+                {:else}
+                  {index + 1}
+                {/if}
               </div>
               {#if index < steps.length - 1}
                 <div
                   class="w-8 h-0.5 mx-1"
-                  style="background-color: {currentStep > step ? '#22c55e' : (isDarkMode ? '#475569' : '#e5e7eb')};"
+                  style="background: {isCompleted ? 'white' : 'rgba(255,255,255,0.3)'};"
                 ></div>
               {/if}
             </div>
           {/each}
         </div>
       {/if}
+    </div>
 
-      <div class="space-y-4">
+    <!-- Form Body -->
+    {#if loading}
+      <div class="flex items-center justify-center py-12">
+        <Spinner />
+      </div>
+    {:else if success}
+      <div class="px-6 py-4">
+        <AlertBox variant="success" message={t('requestForm.requestSubmittedSuccess')} />
+      </div>
+    {:else}
+      <div class="px-6 py-4 max-h-[50vh] overflow-y-auto">
+        {#if error}
+          <div
+            class="mb-4 p-3 rounded border"
+            style="background-color: {isDarkMode ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2'}; border-color: {isDarkMode ? 'rgba(239, 68, 68, 0.3)' : '#fecaca'};"
+          >
+            <p class="text-sm" style="color: {isDarkMode ? '#fca5a5' : '#dc2626'};">
+              {error}
+            </p>
+          </div>
+        {/if}
+
+        <div class="space-y-4">
         <!-- Default Fields -->
         {#if hasFieldInCurrentStep('title')}
           {@const titleField = currentStepFields.find(f => f.field_identifier === 'title')}
           <div>
-            <label for="request-title" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
-              {getFieldLabel(titleField)}
-              {#if titleField.is_required}<span class="text-red-500">*</span>{/if}
-            </label>
+            <Label for="request-title" required={titleField.is_required} class="mb-2">
+              {titleField.display_name || t('requestForm.title')}
+            </Label>
             <input
               id="request-title"
               bind:value={formData.title}
@@ -335,10 +363,9 @@
         {#if hasFieldInCurrentStep('description')}
           {@const descField = currentStepFields.find(f => f.field_identifier === 'description')}
           <div>
-            <label for="request-description" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
-              {getFieldLabel(descField)}
-              {#if descField.is_required}<span class="text-red-500">*</span>{/if}
-            </label>
+            <Label for="request-description" required={descField.is_required} class="mb-2">
+              {descField.display_name || t('requestForm.description')}
+            </Label>
             <Textarea
               id="request-description"
               bind:value={formData.description}
@@ -362,10 +389,9 @@
           {#if fieldDef}
             <div>
               {#if field.display_name || field.description}
-                <label class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
+                <Label required={field.is_required} class="mb-2">
                   {field.display_name || fieldDef.name}
-                  {#if field.is_required}<span class="text-red-500">*</span>{/if}
-                </label>
+                </Label>
                 {#if field.description}
                   <p class="text-xs mb-2" style="color: {isDarkMode ? '#94a3b8' : '#6b7280'};">
                     {field.description}
@@ -396,10 +422,9 @@
         <!-- Virtual Fields -->
         {#each currentStepFields.filter(f => f.field_type === 'virtual') as field}
           <div>
-            <label class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
+            <Label required={field.is_required} class="mb-2">
               {getFieldLabel(field)}
-              {#if field.is_required}<span class="text-red-500">*</span>{/if}
-            </label>
+            </Label>
             {#if field.description}
               <p class="text-xs mb-2" style="color: {isDarkMode ? '#94a3b8' : '#6b7280'};">
                 {field.description}
@@ -447,53 +472,26 @@
           </div>
         {/each}
 
-        <!-- Name/Email for anonymous users (only on last step) -->
-        {#if isLastStep && !authStore.isAuthenticated}
-          <div>
-            <label for="request-name" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
-              {t('requestForm.yourName')}
-              <span class="text-red-500">*</span>
-            </label>
-            <input
-              id="request-name"
-              bind:value={formData.name}
-              type="text"
-              class="w-full px-4 py-3 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500"
-              style="background-color: {isDarkMode ? '#1e293b' : '#ffffff'}; color: {isDarkMode ? '#e2e8f0' : '#111827'}; border-color: {isDarkMode ? '#475569' : '#d1d5db'};"
-              placeholder={t('requestForm.yourName')}
-              required
-            />
-          </div>
-
-          <div>
-            <label for="request-email" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
-              {t('requestForm.yourEmail')}
-              <span class="text-red-500">*</span>
-            </label>
-            <input
-              id="request-email"
-              bind:value={formData.email}
-              type="email"
-              class="w-full px-4 py-3 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500"
-              style="background-color: {isDarkMode ? '#1e293b' : '#ffffff'}; color: {isDarkMode ? '#e2e8f0' : '#111827'}; border-color: {isDarkMode ? '#475569' : '#d1d5db'};"
-              placeholder="your@email.com"
-              required
-            />
-            <p class="text-xs mt-1" style="color: {isDarkMode ? '#94a3b8' : '#6b7280'};">
-              {t('requestForm.emailFollowUp')}
-            </p>
-          </div>
-        {:else if isLastStep && authStore.isAuthenticated}
-          <div class="p-3 rounded border" style="background-color: {isDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff'}; border-color: {isDarkMode ? 'rgba(59, 130, 246, 0.3)' : '#bfdbfe'};">
-            <p class="text-sm" style="color: {isDarkMode ? '#93c5fd' : '#1e40af'};">
-              {t('requestForm.submittingAs', { name: `${authStore.currentUser?.first_name} ${authStore.currentUser?.last_name}`, email: authStore.currentUser?.email })}
-            </p>
-          </div>
-        {/if}
+          <!-- Submitting as info (only on last step) -->
+          {#if isLastStep}
+            <div class="p-3 rounded border" style="background-color: {isDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff'}; border-color: {isDarkMode ? 'rgba(59, 130, 246, 0.3)' : '#bfdbfe'};">
+              <p class="text-sm" style="color: {isDarkMode ? '#93c5fd' : '#1e40af'};">
+                {#if authStore.isAuthenticated && authStore.currentUser}
+                  {t('requestForm.submittingAs', { name: `${authStore.currentUser?.first_name} ${authStore.currentUser?.last_name}`, email: authStore.currentUser?.email })}
+                {:else if portalAuthStore.isAuthenticated && portalAuthStore.customer}
+                  {t('requestForm.submittingAs', { name: portalAuthStore.customer.name || t('portal.portalCustomer'), email: portalAuthStore.customer.email })}
+                {/if}
+              </p>
+            </div>
+          {/if}
+        </div>
       </div>
 
-      <!-- Navigation / Submit Buttons -->
-      <div class="flex items-center justify-between gap-3 pt-4">
+      <!-- Footer with Navigation Buttons (fixed at bottom) -->
+      <div
+        class="px-6 py-4 border-t flex items-center justify-between"
+        style="border-color: {isDarkMode ? '#475569' : '#e5e7eb'};"
+      >
         <div>
           {#if !isFirstStep}
             <Button
