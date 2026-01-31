@@ -1,10 +1,11 @@
 <script>
-	import { onMount, createEventDispatcher, tick } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { api } from '../../api.js';
 	import { authStore } from '../../stores';
 	import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
 	import Button from '../../components/Button.svelte';
 	import Avatar from '../../components/Avatar.svelte';
+	import Checkbox from '../../components/Checkbox.svelte';
 	import { formatRelativeTime } from '../../utils/dateFormatter.js';
 	import { getShortcut, matchesShortcut, getDisplayString } from '../../utils/keyboardShortcuts.js';
 	import { t } from '../../stores/i18n.svelte.js';
@@ -12,22 +13,35 @@
 	// Get shortcut configuration (use same as description save)
 	const submitShortcut = getShortcut('description', 'save');
 
-	export let itemId;
-	export let isPersonalWorkspace = false;
+	let { itemId, isPersonalWorkspace = false, isPortalRequest = false, onCommentsLoaded } = $props();
 
-	const dispatch = createEventDispatcher();
-
-	let comments = [];
-	let newCommentContent = '';
-	let isSubmitting = false;
-	let error = '';
+	let comments = $state([]);
+	let newCommentContent = $state('');
+	let isSubmitting = $state(false);
+	let error = $state('');
 	let editorRef;
+	let isInternalComment = $state(false);
 
 	// Editing state
-	let editingCommentId = null;
+	let editingCommentId = $state(null);
 	let editingContent = '';
-	let isSavingEdit = false;
+	let isSavingEdit = $state(false);
 	let editEditorRef;
+
+	// Sort state
+	let sortOrder = $state('oldest'); // 'oldest' | 'newest'
+
+	const sortedComments = $derived.by(() => {
+		return [...comments].sort((a, b) => {
+			const dateA = new Date(a.created_at).getTime();
+			const dateB = new Date(b.created_at).getTime();
+			return sortOrder === 'oldest' ? dateA - dateB : dateB - dateA;
+		});
+	});
+
+	function toggleSortOrder() {
+		sortOrder = sortOrder === 'oldest' ? 'newest' : 'oldest';
+	}
 
 	onMount(() => {
 		loadComments();
@@ -36,13 +50,13 @@
 	async function loadComments() {
 		try {
 			comments = await api.getComments(itemId) || [];
-			// Dispatch event to update comment count in parent
-			dispatch('commentsLoaded', { count: comments.length });
+			// Notify parent of comment count
+			onCommentsLoaded?.({ count: comments.length });
 		} catch (err) {
 			console.error('Failed to load comments:', err);
 			error = t('comments.failedToLoad');
 			comments = [];
-			dispatch('commentsLoaded', { count: 0 });
+			onCommentsLoaded?.({ count: 0 });
 		}
 	}
 
@@ -55,14 +69,16 @@
 		try {
 			const newComment = await api.createComment(itemId, {
 				content: newCommentContent,
-				author_id: authStore.currentUser.id
+				author_id: authStore.currentUser.id,
+				is_private: isInternalComment
 			});
 
 			comments = [...comments, newComment];
 			newCommentContent = '';
 			editorRef?.clear();
+			isInternalComment = false; // Reset toggle after posting
 			// Update comment count
-			dispatch('commentsLoaded', { count: comments.length });
+			onCommentsLoaded?.({ count: comments.length });
 		} catch (err) {
 			console.error('Failed to create comment:', err);
 			error = t('comments.failedToCreate');
@@ -89,7 +105,7 @@
 			await api.deleteComment(commentId);
 			comments = comments.filter(c => c.id !== commentId);
 			// Update comment count
-			dispatch('commentsLoaded', { count: comments.length });
+			onCommentsLoaded?.({ count: comments.length });
 		} catch (err) {
 			console.error('Failed to delete comment:', err);
 			error = t('comments.failedToDelete');
@@ -162,9 +178,25 @@
 		</div>
 	{/if}
 
+	<!-- Sort Toggle -->
+	{#if comments.length > 1}
+		<div class="flex items-center justify-end mb-4">
+			<button
+				onclick={toggleSortOrder}
+				class="flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-colors hover:bg-[var(--ds-bg-subtle)]"
+				style="color: var(--ds-text-subtle);"
+			>
+				<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+				</svg>
+				{sortOrder === 'oldest' ? t('comments.oldestFirst') : t('comments.newestFirst')}
+			</button>
+		</div>
+	{/if}
+
 	<!-- Comments List -->
 	<div class="space-y-4">
-		{#each comments as comment (comment.id)}
+		{#each sortedComments as comment (comment.id)}
 			<div class="flex items-start space-x-3 group">
 				<div class="flex-shrink-0">
 					<Avatar
@@ -186,6 +218,9 @@
 								</span>
 								{#if isEdited(comment)}
 									<span class="text-xs" style="color: var(--ds-text-subtlest);">({t('comments.edited')})</span>
+								{/if}
+								{#if comment.is_private}
+									<span class="internal-badge">{t('comments.internal')}</span>
 								{/if}
 							</div>
 							{#if authStore.currentUser && comment.author_id === authStore.currentUser.id && editingCommentId !== comment.id}
@@ -287,8 +322,18 @@
 					{isPersonalWorkspace}
 				/>
 				<div class="flex items-center justify-between mt-3">
-					<div class="text-xs" style="color: var(--ds-text-subtle);">
-						{t('comments.markdownSupported')}
+					<div class="flex items-center gap-4">
+						<div class="text-xs" style="color: var(--ds-text-subtle);">
+							{t('comments.markdownSupported')}
+						</div>
+						{#if isPortalRequest}
+							<Checkbox
+								bind:checked={isInternalComment}
+								label={t('comments.internalNote')}
+								hint={t('comments.internalNoteHint')}
+								size="small"
+							/>
+						{/if}
 					</div>
 					<Button
 						variant="primary"
@@ -305,3 +350,17 @@
 	</div>
 </div>
 
+<style>
+	.internal-badge {
+		display: inline-flex;
+		align-items: center;
+		padding: 2px 6px;
+		font-size: 10px;
+		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.025em;
+		background-color: var(--ds-status-warning-bg);
+		color: var(--ds-status-warning-text);
+		border-radius: 4px;
+	}
+</style>

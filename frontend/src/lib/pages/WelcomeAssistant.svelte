@@ -177,7 +177,7 @@
       <!-- Header -->
       <div class="text-center mb-8">
         <div class="flex justify-center mb-4">
-          <img src="/cmicon-2.svg" alt={APP_NAME} class="w-16 h-16" />
+          <img src="/windshift-3.svg" alt={APP_NAME} class="w-16 h-16" />
         </div>
         <h1 class="text-3xl font-bold mb-2" style="color: var(--ds-text);">{t('setup.welcomeTo', { appName: APP_NAME })}</h1>
         <p class="text-lg" style="color: var(--ds-text-subtle);">{t('setup.setupMessage')}</p>

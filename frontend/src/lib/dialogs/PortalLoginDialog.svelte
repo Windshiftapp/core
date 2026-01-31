@@ -4,6 +4,7 @@
   import { api } from '../api.js';
   import { Eye, EyeOff, Lock, User, AlertCircle, X } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
+  import Checkbox from '../components/Checkbox.svelte';
   import { isWebAuthnSupported } from '../utils/webauthn-utils.js';
   import {
     deriveFidoError,
@@ -277,16 +278,12 @@
 
         <!-- Remember Me -->
         <div class="flex items-center">
-          <input
-            id="rememberMe"
-            type="checkbox"
+          <Checkbox
             bind:checked={rememberMe}
             disabled={authStore.loading}
-            class="h-4 w-4 rounded border-gray-300 focus:ring-2 focus:ring-offset-0"
+            label={t('portalLogin.keepMeSignedIn')}
+            size="small"
           />
-          <label for="rememberMe" class="ml-2 block text-sm" style="color: {isDarkMode ? '#cbd5e1' : '#4b5563'};">
-            {t('portalLogin.keepMeSignedIn')}
-          </label>
         </div>
 
         <!-- FIDO Authentication Option -->

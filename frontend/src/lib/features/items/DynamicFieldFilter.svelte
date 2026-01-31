@@ -6,6 +6,7 @@
   import BasePicker from '../../pickers/BasePicker.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import Button from '../../components/Button.svelte';
+  import Checkbox from '../../components/Checkbox.svelte';
   import { api } from '../../api.js';
 
   // Boolean options for select
@@ -337,15 +338,14 @@
         {#if valueOptions.length > 0}
           <div class="border border-gray-300 rounded p-2 bg-white max-h-32 overflow-y-auto">
             {#each valueOptions as option}
-              <label class="flex items-center gap-2 py-1 cursor-pointer hover:bg-gray-50 px-2 rounded">
-                <input
-                  type="checkbox"
+              <div class="py-1 px-2 rounded hover:bg-gray-50">
+                <Checkbox
                   checked={filter.values.includes(option.value)}
                   onchange={() => handleMultiValueToggle(option.value)}
-                  class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  label={option.label}
+                  size="small"
                 />
-                <span class="text-sm text-gray-700">{option.label}</span>
-              </label>
+              </div>
             {/each}
           </div>
         {:else}

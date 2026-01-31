@@ -15,6 +15,7 @@
   import Toggle from '../components/Toggle.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
   import Label from '../components/Label.svelte';
+  import Checkbox from '../components/Checkbox.svelte';
 
   // Tab configuration
   let activeTab = $state('general');
@@ -316,16 +317,11 @@
                       />
                     </div>
 
-                    <div>
-                      <label class="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          bind:checked={formData.is_default}
-                          class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span class="text-sm" style="color: var(--ds-text);">{t('settings.configSets.setAsDefault')}</span>
-                      </label>
-                    </div>
+                    <Checkbox
+                      bind:checked={formData.is_default}
+                      label={t('settings.configSets.setAsDefault')}
+                      size="small"
+                    />
                   </div>
                 </div>
 

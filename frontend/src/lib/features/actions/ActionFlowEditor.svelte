@@ -26,6 +26,7 @@
   import CreateAssetConfigPanel from './CreateAssetConfigPanel.svelte';
   import PlaceholderReferenceModal from './PlaceholderReferenceModal.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import Checkbox from '../../components/Checkbox.svelte';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { actionFlowStore } from '../../stores/actionFlowStore.svelte.js';
 
@@ -494,17 +495,13 @@
             </div>
           {/if}
           <div class="pt-4 border-t cascade-option">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={selectedNode.data?.config?.respond_to_cascades || false}
-                onchange={handleRespondToCascadesChange}
-              />
-              <span class="text-sm">{t('actions.trigger.respondToCascades')}</span>
-            </label>
-            <p class="text-xs cascade-hint mt-1 ml-6">
-              {t('actions.trigger.respondToCascadesHint')}
-            </p>
+            <Checkbox
+              checked={selectedNode.data?.config?.respond_to_cascades || false}
+              onchange={handleRespondToCascadesChange}
+              label={t('actions.trigger.respondToCascades')}
+              hint={t('actions.trigger.respondToCascadesHint')}
+              size="small"
+            />
           </div>
         {:else if selectedNode.type === 'set_status'}
           <div>
@@ -570,15 +567,12 @@
               placeholder={t('actions.config.commentPlaceholder')}
             ></textarea>
           </div>
-          <div class="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="is_private"
-              checked={selectedNode.data?.config?.is_private || false}
-              onchange={handlePrivateChange}
-            />
-            <label for="is_private" class="text-sm">{t('actions.config.privateComment')}</label>
-          </div>
+          <Checkbox
+            checked={selectedNode.data?.config?.is_private || false}
+            onchange={handlePrivateChange}
+            label={t('actions.config.privateComment')}
+            size="small"
+          />
         {:else if selectedNode.type === 'condition'}
           <div>
             <label class="block text-xs font-medium mb-1">{t('actions.config.fieldToCheck')}</label>
@@ -645,15 +639,12 @@
               placeholder={t('actions.config.notifyPlaceholder')}
             ></textarea>
           </div>
-          <div class="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="include_link"
-              checked={selectedNode.data?.config?.include_link ?? true}
-              onchange={handleIncludeLinkChange}
-            />
-            <label for="include_link" class="text-sm">{t('actions.config.includeLink')}</label>
-          </div>
+          <Checkbox
+            checked={selectedNode.data?.config?.include_link ?? true}
+            onchange={handleIncludeLinkChange}
+            label={t('actions.config.includeLink')}
+            size="small"
+          />
         {:else if selectedNode.type === 'update_asset'}
           <UpdateAssetConfigPanel {selectedNode} bind:showPlaceholderModal />
         {:else if selectedNode.type === 'create_asset'}

@@ -15,6 +15,7 @@
   import FieldLayoutEditor from '../../editors/FieldLayoutEditor.svelte';
   import ColorPicker from '../../editors/ColorPicker.svelte';
   import Label from '../../components/Label.svelte';
+  import Checkbox from '../../components/Checkbox.svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
   // State for asset sets
@@ -804,10 +805,7 @@
           style="background: var(--ds-background-input); border: 1px solid var(--ds-border); color: var(--ds-text);"
         ></textarea>
       </div>
-      <div class="flex items-center gap-2">
-        <input type="checkbox" id="is_default" bind:checked={setFormData.is_default} />
-        <label for="is_default" class="text-sm" style="color: var(--ds-text);">{t('assets.default')}</label>
-      </div>
+      <Checkbox bind:checked={setFormData.is_default} label={t('assets.default')} />
     </div>
     <div class="flex justify-end gap-2 mt-6">
       <Button variant="outline" type="button" onclick={() => showSetForm = false}>{t('common.cancel')}</Button>
@@ -843,10 +841,7 @@
       <div>
         <ColorPicker bind:value={typeFormData.color} label={t('common.color')} />
       </div>
-      <div class="flex items-center gap-2">
-        <input type="checkbox" id="type_active" bind:checked={typeFormData.is_active} />
-        <label for="type_active" class="text-sm" style="color: var(--ds-text);">{t('common.active')}</label>
-      </div>
+      <Checkbox bind:checked={typeFormData.is_active} label={t('common.active')} />
     </div>
     <div class="flex justify-end gap-2 mt-6">
       <Button variant="outline" type="button" onclick={() => showTypeForm = false}>{t('common.cancel')}</Button>

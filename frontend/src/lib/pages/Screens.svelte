@@ -16,6 +16,7 @@
   import DropIndicator from '../layout/DropIndicator.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
+  import Checkbox from '../components/Checkbox.svelte';
 
   // Bind to store values
   let screens = $derived(screenEditorStore.screens);
@@ -509,15 +510,12 @@
                 </div>
 
                 <div class="flex items-center gap-3 flex-shrink-0">
-                  <label class="flex items-center gap-1">
-                    <input
-                      type="checkbox"
-                      checked={field.is_required}
-                      onchange={() => screenEditorStore.toggleFieldRequired(index)}
-                      class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <span class="text-xs text-gray-600">{t('screensPage.required')}</span>
-                  </label>
+                  <Checkbox
+                    checked={field.is_required}
+                    onchange={() => screenEditorStore.toggleFieldRequired(index)}
+                    label={t('screensPage.required')}
+                    size="small"
+                  />
 
                   {#if field.field_type === 'system' && (field.field_identifier === 'title' || field.field_identifier === 'status')}
                     <div class="w-9 h-9 flex items-center justify-center flex-shrink-0">

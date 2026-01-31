@@ -4,6 +4,7 @@
   import { getTextColorForBackground } from '../utils/statusColors.js';
   import { t } from '../stores/i18n.svelte.js';
   import { tick } from 'svelte';
+  import Checkbox from '../components/Checkbox.svelte';
 
   export let triggerText = '';
   export let triggerIcon = null;
@@ -233,14 +234,8 @@
               onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
             >
               {#if groupItem.type === 'checkbox'}
-                <div class="w-4 h-4 mr-3 flex items-center justify-center">
-                  <input
-                    type="checkbox"
-                    checked={groupItem.checked || false}
-                    class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                    style="border-color: var(--ds-border);"
-                    onclick={(e) => e.stopPropagation()}
-                  />
+                <div class="mr-3 pointer-events-none">
+                  <Checkbox checked={groupItem.checked || false} size="small" />
                 </div>
               {:else if groupItem.avatarUrl}
                 <img src={groupItem.avatarUrl} alt="Avatar" class="w-6 h-6 mr-3 rounded object-cover" />
@@ -286,13 +281,8 @@
             onmouseleave={(e) => { if (!itemData.style) e.currentTarget.style.backgroundColor = ''; }}
           >
             {#if itemData.type === 'checkbox'}
-              <div class="w-4 h-4 mr-3 flex items-center justify-center">
-                <input
-                  type="checkbox"
-                  checked={itemData.checked || false}
-                  class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 pointer-events-none"
-                  style="border-color: var(--ds-border);"
-                />
+              <div class="mr-3 pointer-events-none">
+                <Checkbox checked={itemData.checked || false} size="small" />
               </div>
             {:else if itemData.icon}
               {#if itemData.iconColor}

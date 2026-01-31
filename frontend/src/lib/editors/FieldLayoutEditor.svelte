@@ -9,6 +9,7 @@
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import DropIndicator from '../layout/DropIndicator.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import Checkbox from '../components/Checkbox.svelte';
 
   let {
     isOpen = $bindable(false),
@@ -305,7 +306,7 @@
               >
                 <!-- Drag Handle -->
                 <div class="flex-shrink-0">
-                  <svg class="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-4 h-4 group-hover:text-blue-500" style="color: var(--ds-text-subtlest);" fill="currentColor" viewBox="0 0 24 24">
                     <circle cx="9" cy="6" r="1.5"/>
                     <circle cx="15" cy="6" r="1.5"/>
                     <circle cx="9" cy="12" r="1.5"/>
@@ -351,16 +352,14 @@
         <div
           data-drop-zone-editor
           class="min-h-48 max-h-[50vh] overflow-y-auto border-2 border-dashed rounded p-3 space-y-2"
-          style="border-color: var(--ds-border); overscroll-behavior: contain;"
-          class:border-blue-400={draggedField}
-          class:bg-blue-50={draggedField}
+          style="border-color: var(--ds-border); overscroll-behavior: contain; {draggedField ? 'border-color: var(--ds-interactive); background: var(--ds-surface-hovered);' : ''}"
         >
           {#if selectedFields.length === 0}
             <div class="text-center py-8">
-              <svg class="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-10 h-10 mx-auto mb-3" style="color: var(--ds-text-subtlest);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
               </svg>
-              <p class="text-sm text-gray-500">{t('editors.dropFieldsHere')}</p>
+              <p class="text-sm" style="color: var(--ds-text-subtle);">{t('editors.dropFieldsHere')}</p>
             </div>
           {:else}
             {#each selectedFields as field, index (field.field_identifier)}
@@ -368,8 +367,8 @@
                 data-selected-field-editor
                 data-field-index={index}
                 data-field-id={field.field_identifier}
-                class="relative group flex items-center gap-3 px-3 py-2 rounded border bg-white hover:shadow-sm transition-all duration-200"
-                style="border-color: var(--ds-border); user-select: none;"
+                class="relative group flex items-center gap-3 px-3 py-2 rounded border hover:shadow-sm transition-all duration-200"
+                style="background: var(--ds-background-input); border-color: var(--ds-border); user-select: none;"
               >
                 <!-- Drop indicator -->
                 {#if fieldDragState.get(field.field_identifier)?.closestEdge}
@@ -381,7 +380,7 @@
                   class="cursor-grab active:cursor-grabbing flex-shrink-0 p-1 rounded hover-bg transition-colors"
                   style="touch-action: none;"
                 >
-                  <svg class="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-4 h-4 group-hover:text-blue-500" style="color: var(--ds-text-subtlest);" fill="currentColor" viewBox="0 0 24 24">
                     <circle cx="9" cy="6" r="1.5"/>
                     <circle cx="15" cy="6" r="1.5"/>
                     <circle cx="9" cy="12" r="1.5"/>
@@ -395,7 +394,7 @@
                   <div class="font-medium text-sm flex items-center gap-2" style="color: var(--ds-text);">
                     <span class="truncate">{getFieldDisplayName(field)}</span>
                     {#if showTypeLabels && field.field_type}
-                      <span class="text-xs px-1.5 py-0.5 rounded text-gray-500 bg-gray-100 flex-shrink-0">
+                      <span class="text-xs px-1.5 py-0.5 rounded flex-shrink-0" style="color: var(--ds-text-subtle); background: var(--ds-surface);">
                         {field.field_type}
                       </span>
                     {/if}
@@ -404,26 +403,19 @@
 
                 <div class="flex items-center gap-2 flex-shrink-0">
                   {#if showRequiredToggle}
-                    <label class="flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        bind:checked={field.is_required}
-                        class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <span class="text-xs text-gray-600">{t('common.required')}</span>
-                    </label>
+                    <Checkbox bind:checked={field.is_required} label={t('common.required')} size="small" />
                   {/if}
 
                   {#if isProtected(field)}
                     <div class="w-8 h-8 flex items-center justify-center flex-shrink-0">
-                      <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-4 h-4" style="color: var(--ds-text-subtlest);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                       </svg>
                     </div>
                   {:else}
                     <button
                       onclick={() => removeField(index)}
-                      class="text-red-500 hover:text-red-700 transition-colors p-1 rounded hover:bg-red-50 flex-shrink-0"
+                      class="text-red-500 hover:text-red-700 transition-colors p-1 rounded flex-shrink-0 remove-field-btn"
                       title={t('aria.removeField')}
                     >
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -446,3 +438,9 @@
     </div>
   </div>
 </Modal>
+
+<style>
+  .remove-field-btn:hover {
+    background: color-mix(in srgb, currentColor 10%, transparent);
+  }
+</style>

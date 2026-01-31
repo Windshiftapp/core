@@ -7,6 +7,7 @@
   import { Eye, EyeOff, Lock, User, AlertCircle, LogIn, Key } from 'lucide-svelte';
   import { APP_NAME } from '../constants.js';
   import Button from '../components/Button.svelte';
+  import Checkbox from '../components/Checkbox.svelte';
   import Label from '../components/Label.svelte';
   import {
     isWebAuthnSupported
@@ -201,7 +202,7 @@
     <!-- Header -->
     <div class="text-center mb-6">
       <div class="flex justify-center mb-4">
-        <img src="/cmicon-2.svg" alt={APP_NAME} class="w-12 h-12" />
+        <img src="/windshift-3.svg" alt={APP_NAME} class="w-12 h-12" />
       </div>
       <h2 class="text-xl font-semibold text-[var(--ds-text)]">{t('auth.signIn')}</h2>
       <p class="text-sm text-[var(--ds-text-subtle)] mt-1">{t('auth.loginSubtitle')}</p>
@@ -396,18 +397,12 @@
       </div>
 
       <!-- Remember Me -->
-      <div class="flex items-center">
-        <input
-          id="rememberMe"
-          type="checkbox"
-          bind:checked={rememberMe}
-          disabled={$authStore.loading}
-          class="h-4 w-4 text-[var(--ds-interactive)] focus:ring-[var(--ds-border-focused)] border-[var(--ds-border)] rounded disabled:bg-[var(--ds-background-disabled)]"
-        />
-        <label for="rememberMe" class="ml-2 block text-sm text-[var(--ds-text)]">
-          {t('auth.staySignedIn')}
-        </label>
-      </div>
+      <Checkbox
+        bind:checked={rememberMe}
+        disabled={$authStore.loading}
+        label={t('auth.staySignedIn')}
+        size="small"
+      />
 
       <!-- FIDO Authentication Option -->
       {#if showFidoOption && fidoAvailable}

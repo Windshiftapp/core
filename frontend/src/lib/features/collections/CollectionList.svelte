@@ -17,6 +17,7 @@
   import ItemKey from '../items/ItemKey.svelte';
   import ColorDot from '../../components/ColorDot.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
+  import Checkbox from '../../components/Checkbox.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import { formatDate } from '../../utils/dateFormatter.js';
 
@@ -536,18 +537,12 @@
                   <div class="col-span-2">
                     {#if item.is_task}
                       <!-- Task checkbox -->
-                      <label class="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={item.status === 'completed'}
-                          on:change={(e) => toggleTaskStatus(item, e.target.checked)}
-                          class="w-4 h-4 rounded focus:ring-2"
-                          style="accent-color: var(--ds-background-brand-bold);"
-                        />
-                        <span class="text-sm" style="color: var(--ds-text-subtle);">
-                          {item.status === 'completed' ? 'Done' : 'Todo'}
-                        </span>
-                      </label>
+                      <Checkbox
+                        checked={item.status === 'completed'}
+                        onchange={(checked) => toggleTaskStatus(item, checked)}
+                        label={item.status === 'completed' ? 'Done' : 'Todo'}
+                        size="small"
+                      />
                     {:else}
                       <!-- Status Picker -->
                       {@const selectedStatus = statuses.find(s => s.id === item.status_id)}

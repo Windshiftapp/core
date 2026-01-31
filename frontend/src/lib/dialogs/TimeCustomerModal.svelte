@@ -6,6 +6,7 @@
   import Textarea from '../components/Textarea.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import Label from '../components/Label.svelte';
+  import Checkbox from '../components/Checkbox.svelte';
   import { Camera, Trash2 } from 'lucide-svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -216,14 +217,12 @@
         <Textarea bind:value={formData.description} rows={3} />
       </div>
 
-      <div class="mt-6 flex items-center">
-        <input
-          type="checkbox"
+      <div class="mt-6">
+        <Checkbox
           bind:checked={formData.active}
-          id="active"
-          class="mr-3 w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+          label={t('organization.activeOrganization')}
+          size="small"
         />
-        <label for="active" class="text-sm font-medium" style="color: var(--ds-text);">{t('organization.activeOrganization')}</label>
       </div>
 
       <!-- Custom Fields -->

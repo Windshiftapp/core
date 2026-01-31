@@ -7,6 +7,7 @@
   import ItemDetailDescription from '../items/ItemDetailDescription.svelte';
   import { X, Calendar, MessageSquare } from 'lucide-svelte';
   import Button from '../../components/Button.svelte';
+  import Checkbox from '../../components/Checkbox.svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { formatDate } from '../../utils/dateFormatter.js';
   import { navigate } from '../../router.js';
@@ -311,8 +312,8 @@
     }
   }
 
-  function handleCommentsLoaded(event) {
-    commentCount = event.detail.count;
+  function handleCommentsLoaded(data) {
+    commentCount = data.count;
   }
 
   function closeModal() {
@@ -356,13 +357,12 @@
     <div class="flex items-center justify-between {isModal ? 'p-4' : 'px-6 py-4'} border-b" style="border-color: var(--ds-border);">
       <div class="flex items-center gap-3 flex-1 min-w-0">
         <!-- Done Checkbox -->
-        <input
-          type="checkbox"
+        <Checkbox
           checked={isTaskCompleted()}
           onchange={toggleDone}
           disabled={saving}
-          class="h-5 w-5 rounded cursor-pointer flex-shrink-0"
-          style="accent-color: #10b981;"
+          size="medium"
+          class="task-complete-checkbox"
         />
 
         <!-- Editable Title -->
@@ -465,7 +465,7 @@
           {/if}
         </div>
       </div>
-      <Comments itemId={item.id} isPersonalWorkspace={true} oncommentsLoaded={handleCommentsLoaded} />
+      <Comments itemId={item.id} isPersonalWorkspace={true} onCommentsLoaded={handleCommentsLoaded} />
     </div>
   {/if}
 {/snippet}

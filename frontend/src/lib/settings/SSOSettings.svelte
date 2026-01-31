@@ -18,6 +18,7 @@
   import Text from '../components/Text.svelte';
   import Card from '../components/Card.svelte';
   import Label from '../components/Label.svelte';
+  import Checkbox from '../components/Checkbox.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   let providers = $state([]);
@@ -530,57 +531,33 @@
 
       <!-- Checkboxes -->
       <div class="space-y-3 pt-2">
-        <label class="flex items-center gap-3">
-          <input
-            type="checkbox"
-            bind:checked={formData.enabled}
-            class="w-4 h-4 rounded"
-            style="border-color: var(--ds-border);"
-          />
-          <span class="text-sm" style="color: var(--ds-text);">
-            <span class="font-medium">{t('settings.sso.enableThisProvider')}</span>
-            <span class="block text-xs" style="color: var(--ds-text-subtle);">{t('settings.sso.enableThisProviderDesc')}</span>
-          </span>
-        </label>
+        <Checkbox
+          bind:checked={formData.enabled}
+          label={t('settings.sso.enableThisProvider')}
+          hint={t('settings.sso.enableThisProviderDesc')}
+          size="small"
+        />
 
-        <label class="flex items-center gap-3">
-          <input
-            type="checkbox"
-            bind:checked={formData.auto_provision_users}
-            class="w-4 h-4 rounded"
-            style="border-color: var(--ds-border);"
-          />
-          <span class="text-sm" style="color: var(--ds-text);">
-            <span class="font-medium">{t('settings.sso.autoProvisionUsers')}</span>
-            <span class="block text-xs" style="color: var(--ds-text-subtle);">{t('settings.sso.autoProvisionUsersDesc')}</span>
-          </span>
-        </label>
+        <Checkbox
+          bind:checked={formData.auto_provision_users}
+          label={t('settings.sso.autoProvisionUsers')}
+          hint={t('settings.sso.autoProvisionUsersDesc')}
+          size="small"
+        />
 
-        <label class="flex items-center gap-3">
-          <input
-            type="checkbox"
-            bind:checked={formData.allow_password_login}
-            class="w-4 h-4 rounded"
-            style="border-color: var(--ds-border);"
-          />
-          <span class="text-sm" style="color: var(--ds-text);">
-            <span class="font-medium">{t('settings.sso.allowPasswordLogin')}</span>
-            <span class="block text-xs" style="color: var(--ds-text-subtle);">{t('settings.sso.allowPasswordLoginDesc')}</span>
-          </span>
-        </label>
+        <Checkbox
+          bind:checked={formData.allow_password_login}
+          label={t('settings.sso.allowPasswordLogin')}
+          hint={t('settings.sso.allowPasswordLoginDesc')}
+          size="small"
+        />
 
-        <label class="flex items-center gap-3">
-          <input
-            type="checkbox"
-            bind:checked={formData.require_verified_email}
-            class="w-4 h-4 rounded"
-            style="border-color: var(--ds-border);"
-          />
-          <span class="text-sm" style="color: var(--ds-text);">
-            <span class="font-medium">{t('settings.sso.trustIdpEmailVerification')}</span>
-            <span class="block text-xs" style="color: var(--ds-text-subtle);">{t('settings.sso.trustIdpEmailVerificationDesc')}</span>
-          </span>
-        </label>
+        <Checkbox
+          bind:checked={formData.require_verified_email}
+          label={t('settings.sso.trustIdpEmailVerification')}
+          hint={t('settings.sso.trustIdpEmailVerificationDesc')}
+          size="small"
+        />
       </div>
 
       <!-- Test Connection (only for edit) -->

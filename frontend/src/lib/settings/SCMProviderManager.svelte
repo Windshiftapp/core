@@ -16,6 +16,7 @@
   import AlertBox from '../components/AlertBox.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import Label from '../components/Label.svelte';
+  import Checkbox from '../components/Checkbox.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import WorkspacePicker from '../pickers/WorkspacePicker.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
@@ -815,24 +816,16 @@
 
       <!-- Enabled & Default -->
       <div class="flex items-center space-x-6">
-        <label class="flex items-center">
-          <input
-            type="checkbox"
-            bind:checked={formData.enabled}
-            class="h-4 w-4 text-blue-600 focus:ring-blue-500 rounded"
-            style="border-color: var(--ds-border);"
-          />
-          <span class="ml-2 text-sm" style="color: var(--ds-text);">{t('settings.scmProviders.enabled')}</span>
-        </label>
-        <label class="flex items-center">
-          <input
-            type="checkbox"
-            bind:checked={formData.is_default}
-            class="h-4 w-4 text-blue-600 focus:ring-blue-500 rounded"
-            style="border-color: var(--ds-border);"
-          />
-          <span class="ml-2 text-sm" style="color: var(--ds-text);">{t('settings.scmProviders.default')}</span>
-        </label>
+        <Checkbox
+          bind:checked={formData.enabled}
+          label={t('settings.scmProviders.enabled')}
+          size="small"
+        />
+        <Checkbox
+          bind:checked={formData.is_default}
+          label={t('settings.scmProviders.default')}
+          size="small"
+        />
       </div>
 
       <!-- Test Result -->

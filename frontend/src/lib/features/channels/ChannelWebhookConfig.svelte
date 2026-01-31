@@ -5,6 +5,7 @@
   import Input from '../../components/Input.svelte';
   import Button from '../../components/Button.svelte';
   import Label from '../../components/Label.svelte';
+  import Checkbox from '../../components/Checkbox.svelte';
   import Spinner from '../../components/Spinner.svelte';
   import WorkspacePicker from '../../pickers/WorkspacePicker.svelte';
   import CollectionPicker from '../../pickers/CollectionPicker.svelte';
@@ -216,13 +217,14 @@
       <!-- Event Triggers -->
       <div class="pt-4 border-t" style="border-color: var(--ds-border);">
         <h5 class="text-sm font-semibold mb-3" style="color: var(--ds-text);">{t('channel.automaticTriggers')}</h5>
-        <label class="flex items-center gap-3 p-3 rounded cursor-pointer" style="background-color: var(--ds-surface-raised);">
-          <input type="checkbox" bind:checked={formData.auto_trigger} class="w-4 h-4 rounded" />
-          <div>
-            <span class="text-sm font-medium" style="color: var(--ds-text);">{t('channel.enableAutoTriggers')}</span>
-            <p class="text-xs" style="color: var(--ds-text-subtle);">{t('channel.autoTriggersHelp')}</p>
-          </div>
-        </label>
+        <div class="p-3 rounded" style="background-color: var(--ds-surface-raised);">
+          <Checkbox
+            bind:checked={formData.auto_trigger}
+            label={t('channel.enableAutoTriggers')}
+            hint={t('channel.autoTriggersHelp')}
+            size="small"
+          />
+        </div>
 
         {#if formData.auto_trigger}
           <div class="mt-4 space-y-4">
@@ -231,15 +233,14 @@
                 <h6 class="text-xs font-medium uppercase tracking-wide mb-2" style="color: var(--ds-text-subtle);">{t(categoryKey)}</h6>
                 <div class="grid grid-cols-2 gap-2">
                   {#each webhookEvents.filter(e => e.categoryKey === categoryKey) as event}
-                    <label class="flex items-center gap-2 p-2 rounded cursor-pointer" style="background-color: var(--ds-surface);">
-                      <input
-                        type="checkbox"
+                    <div class="p-2 rounded" style="background-color: var(--ds-surface);">
+                      <Checkbox
                         checked={formData.subscribed_events.includes(event.id)}
                         onchange={() => toggleWebhookEvent(event.id)}
-                        class="w-4 h-4 rounded"
+                        label={t(event.labelKey)}
+                        size="small"
                       />
-                      <span class="text-sm" style="color: var(--ds-text);">{t(event.labelKey)}</span>
-                    </label>
+                    </div>
                   {/each}
                 </div>
               </div>

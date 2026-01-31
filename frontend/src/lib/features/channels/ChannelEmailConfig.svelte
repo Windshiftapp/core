@@ -6,6 +6,7 @@
   import Select from '../../components/Select.svelte';
   import Button from '../../components/Button.svelte';
   import Label from '../../components/Label.svelte';
+  import Checkbox from '../../components/Checkbox.svelte';
 
   let {
     channelId,
@@ -343,21 +344,23 @@
       </div>
 
       <div class="space-y-3">
-        <label class="flex items-center gap-3 p-3 rounded cursor-pointer" style="background-color: var(--ds-surface-raised);">
-          <input type="checkbox" bind:checked={formData.mark_as_read} class="w-4 h-4 rounded" />
-          <div>
-            <span class="text-sm font-medium" style="color: var(--ds-text);">{t('channel.markAsRead')}</span>
-            <p class="text-xs" style="color: var(--ds-text-subtle);">{t('channel.markAsReadHelp')}</p>
-          </div>
-        </label>
+        <div class="p-3 rounded" style="background-color: var(--ds-surface-raised);">
+          <Checkbox
+            bind:checked={formData.mark_as_read}
+            label={t('channel.markAsRead')}
+            hint={t('channel.markAsReadHelp')}
+            size="small"
+          />
+        </div>
 
-        <label class="flex items-center gap-3 p-3 rounded cursor-pointer" style="background-color: var(--ds-surface-raised);">
-          <input type="checkbox" bind:checked={formData.delete_after_process} class="w-4 h-4 rounded" />
-          <div>
-            <span class="text-sm font-medium" style="color: var(--ds-text);">{t('channel.deleteAfterProcess')}</span>
-            <p class="text-xs" style="color: var(--ds-text-subtle);">{t('channel.deleteAfterProcessHelp')}</p>
-          </div>
-        </label>
+        <div class="p-3 rounded" style="background-color: var(--ds-surface-raised);">
+          <Checkbox
+            bind:checked={formData.delete_after_process}
+            label={t('channel.deleteAfterProcess')}
+            hint={t('channel.deleteAfterProcessHelp')}
+            size="small"
+          />
+        </div>
       </div>
     </div>
   </div>

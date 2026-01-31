@@ -13,6 +13,7 @@
   import { authStore } from '../../stores';
   import { formatDate } from '../../utils/dateFormatter.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import Checkbox from '../../components/Checkbox.svelte';
 
   export let workspaceId;
 
@@ -410,12 +411,10 @@
                 {#each personalTodos as todo (todo.id)}
                   <div class="group flex items-center gap-3 p-3 border rounded transition-colors todo-row" style="border-color: var(--ds-border);">
                     <!-- Simple Checkbox -->
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={isPersonalTaskCompleted(todo)}
                       onchange={() => togglePersonalTask(todo)}
-                      class="h-4 w-4 text-green-600 focus:ring-green-500 rounded"
-                      style="border-color: var(--ds-border);"
+                      size="small"
                     />
 
                     <!-- Todo Content with Key -->

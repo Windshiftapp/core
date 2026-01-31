@@ -10,6 +10,7 @@
   import Textarea from '../components/Textarea.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import Label from '../components/Label.svelte';
+  import Checkbox from '../components/Checkbox.svelte';
   import { Plus, Link, Edit, Trash2, Power, PowerOff } from 'lucide-svelte';
   import ColorPicker from '../editors/ColorPicker.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
@@ -269,14 +270,11 @@
       </div>
 
       <div class="mb-4">
-        <label class="flex items-center">
-          <input
-            type="checkbox"
-            bind:checked={formData.active}
-            class="mr-2"
-          />
-          <span class="text-sm" style="color: var(--ds-text);">{t('settings.linkTypes.active')}</span>
-        </label>
+        <Checkbox
+          bind:checked={formData.active}
+          label={t('settings.linkTypes.active')}
+          size="small"
+        />
       </div>
     </form>
   </div>

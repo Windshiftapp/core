@@ -23,6 +23,7 @@
   import Lozenge from '../components/Lozenge.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
   import Label from '../components/Label.svelte';
+  import Checkbox from '../components/Checkbox.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 
@@ -440,16 +441,14 @@
               <Label color="default" class="mb-3">{t('settings.configSets.workspaces')}</Label>
               <div class="space-y-2 max-h-48 overflow-y-auto border rounded p-3" style="border-color: var(--ds-border);">
                 {#each workspaces as workspace}
-                  <label class="flex items-center gap-3 p-2 rounded cursor-pointer workspace-option">
-                    <input
-                      type="checkbox"
+                  <div class="p-2 rounded workspace-option">
+                    <Checkbox
                       checked={isWorkspaceSelected(workspace.id, false)}
                       onchange={() => toggleWorkspaceSelection(workspace.id, false)}
-                      class="rounded"
-                      style="border-color: var(--ds-border);"
+                      label={workspace.name}
+                      size="small"
                     />
-                    <span class="text-sm" style="color: var(--ds-text);">{workspace.name}</span>
-                  </label>
+                  </div>
                 {/each}
                 {#if workspaces.length === 0}
                   <p class="text-sm italic" style="color: var(--ds-text-subtle);">{t('settings.configSets.noWorkspacesAvailable')}</p>
@@ -538,16 +537,11 @@
               />
             </div>
 
-            <div class="flex items-center gap-2">
-              <input
-                type="checkbox"
-                bind:checked={newConfigSet.is_default}
-                id="new-default"
-                class="rounded"
-                style="border-color: var(--ds-border);"
-              />
-              <label for="new-default" class="text-sm" style="color: var(--ds-text);">{t('settings.configSets.setAsDefault')}</label>
-            </div>
+            <Checkbox
+              bind:checked={newConfigSet.is_default}
+              label={t('settings.configSets.setAsDefault')}
+              size="small"
+            />
           </div>
         </form>
       </div>
@@ -757,16 +751,14 @@
           <Label color="default" class="mb-3">{t('settings.configSets.workspaces')}</Label>
           <div class="space-y-2 max-h-48 overflow-y-auto border rounded p-3" style="border-color: var(--ds-border);">
             {#each workspaces as workspace}
-              <label class="flex items-center gap-3 p-2 rounded cursor-pointer workspace-option">
-                <input
-                  type="checkbox"
+              <div class="p-2 rounded workspace-option">
+                <Checkbox
                   checked={isWorkspaceSelected(workspace.id, true)}
                   onchange={() => toggleWorkspaceSelection(workspace.id, true)}
-                  class="rounded"
-                  style="border-color: var(--ds-border);"
+                  label={workspace.name}
+                  size="small"
                 />
-                <span class="text-sm" style="color: var(--ds-text);">{workspace.name}</span>
-              </label>
+              </div>
             {/each}
             {#if workspaces.length === 0}
               <p class="text-sm italic" style="color: var(--ds-text-subtle);">{t('settings.configSets.noWorkspacesAvailable')}</p>
@@ -854,16 +846,11 @@
           />
         </div>
 
-        <div class="flex items-center gap-2">
-          <input
-            type="checkbox"
-            bind:checked={editConfigSet.is_default}
-            id="edit-default"
-            class="rounded"
-            style="border-color: var(--ds-border);"
-          />
-          <label for="edit-default" class="text-sm" style="color: var(--ds-text);">{t('settings.configSets.setAsDefault')}</label>
-        </div>
+        <Checkbox
+          bind:checked={editConfigSet.is_default}
+          label={t('settings.configSets.setAsDefault')}
+          size="small"
+        />
       </div>
     </form>
   </div>

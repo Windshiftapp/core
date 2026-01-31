@@ -15,6 +15,7 @@
 	import Label from '../components/Label.svelte';
 	import { formatDate, formatDateShort } from '../utils/dateFormatter.js';
 	import { errorToast, successToast } from '../stores/toasts.svelte.js';
+	import Checkbox from '../components/Checkbox.svelte';
 	import {
 		isWebAuthnSupported,
 		prepareCredentialCreationOptions,
@@ -468,19 +469,12 @@
 					/>
 				</div>
 
-				<div class="flex items-center gap-2">
-					<input
-						id="logout-all"
-						type="checkbox"
-						checked={changePasswordData.logout_all}
-						onchange={(e) => setChangePasswordData('logout_all', e.target.checked)}
-						class="h-4 w-4 rounded"
-						style="accent-color: var(--ds-interactive);"
-					/>
-					<label for="logout-all" class="text-sm" style="color: var(--ds-text-subtle);">
-						Log out of all other sessions
-					</label>
-				</div>
+				<Checkbox
+					checked={changePasswordData.logout_all}
+					onchange={(checked) => setChangePasswordData('logout_all', checked)}
+					label="Log out of all other sessions"
+					size="small"
+				/>
 			</div>
 		{/if}
 	</div>

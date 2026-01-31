@@ -10,6 +10,7 @@
   import { authStore, workspacesStore } from '../../stores';
   import { getStatusStyleFromStatuses } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import Checkbox from '../../components/Checkbox.svelte';
 
   // Get current date and week
   let currentDate = new Date();
@@ -795,12 +796,11 @@
                 {#if isPersonalWorkspaceItem(item)}
                   <!-- Personal Task with Checkbox -->
                   <div class="flex items-start gap-3">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={isPersonalTaskCompleted(item)}
                       onchange={() => togglePersonalTask(item)}
-                      class="h-4 w-4 text-green-600 focus:ring-green-500 rounded flex-shrink-0 mt-0.5"
-                      style="border-color: var(--ds-border);"
+                      size="small"
+                      class="flex-shrink-0 mt-0.5"
                     />
                     <div class="flex-1 min-w-0">
                       <button

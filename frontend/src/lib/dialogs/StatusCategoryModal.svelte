@@ -5,6 +5,7 @@
   import Textarea from '../components/Textarea.svelte';
   import ColorPicker from '../editors/ColorPicker.svelte';
   import Label from '../components/Label.svelte';
+  import Checkbox from '../components/Checkbox.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
@@ -71,32 +72,18 @@
       </div>
 
       <div class="mt-6 flex flex-col gap-4">
-        <label class="inline-flex items-center gap-3 text-sm font-medium" style="color: var(--ds-text);">
-          <input
-            type="checkbox"
-            bind:checked={formData.is_default}
-            id="is-default"
-            class="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-          />
-          <span>{t('statusCategory.setAsDefault')}</span>
-        </label>
+        <Checkbox
+          bind:checked={formData.is_default}
+          label={t('statusCategory.setAsDefault')}
+          size="small"
+        />
 
-        <div class="flex items-start gap-3">
-          <input
-            type="checkbox"
-            bind:checked={formData.is_completed}
-            id="is-completed"
-            class="mt-1 w-4 h-4 text-emerald-600 rounded focus:ring-2 focus:ring-emerald-500"
-          />
-          <div>
-            <label for="is-completed" class="text-sm font-medium" style="color: var(--ds-text);">
-              {t('statusCategory.marksWorkCompleted')}
-            </label>
-            <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-              {t('statusCategory.marksWorkCompletedHelp')}
-            </p>
-          </div>
-        </div>
+        <Checkbox
+          bind:checked={formData.is_completed}
+          label={t('statusCategory.marksWorkCompleted')}
+          hint={t('statusCategory.marksWorkCompletedHelp')}
+          size="small"
+        />
       </div>
 
       <div class="mt-8 flex gap-3">

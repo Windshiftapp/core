@@ -16,6 +16,7 @@
   import Textarea from '../components/Textarea.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
   import Label from '../components/Label.svelte';
+  import Checkbox from '../components/Checkbox.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 
@@ -337,17 +338,11 @@
             />
           </div>
 
-          <div class="flex items-center">
-            <input
-              id="is_active"
-              type="checkbox"
-              bind:checked={formData.is_active}
-              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <label for="is_active" class="ml-2 block text-sm" style="color: var(--ds-text)">
-              {t('settings.notifications.activeCanBeAssigned')}
-            </label>
-          </div>
+          <Checkbox
+            bind:checked={formData.is_active}
+            label={t('settings.notifications.activeCanBeAssigned')}
+            size="small"
+          />
         </div>
 
         <!-- Event Rules -->
@@ -402,14 +397,11 @@
 
                     <!-- Enabled -->
                     <div class="flex items-center pt-7">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         bind:checked={rule.is_enabled}
-                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        label={t('common.enable')}
+                        size="small"
                       />
-                      <label class="ml-2 block text-sm" style="color: var(--ds-text)">
-                        {t('common.enable')}
-                      </label>
                     </div>
                   </div>
 
@@ -417,41 +409,29 @@
                   <div class="mt-4">
                     <Label color="default" class="mb-2">{t('settings.notifications.notifyRecipients')}</Label>
                     <div class="grid grid-cols-2 gap-4">
-                      <label class="flex items-center">
-                        <input
-                          type="checkbox"
-                          bind:checked={rule.notify_assignee}
-                          class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <span class="ml-2 text-sm" style="color: var(--ds-text)">{t('settings.notifications.assignee')}</span>
-                      </label>
+                      <Checkbox
+                        bind:checked={rule.notify_assignee}
+                        label={t('settings.notifications.assignee')}
+                        size="small"
+                      />
 
-                      <label class="flex items-center">
-                        <input
-                          type="checkbox"
-                          bind:checked={rule.notify_creator}
-                          class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <span class="ml-2 text-sm" style="color: var(--ds-text)">{t('settings.notifications.creator')}</span>
-                      </label>
+                      <Checkbox
+                        bind:checked={rule.notify_creator}
+                        label={t('settings.notifications.creator')}
+                        size="small"
+                      />
 
-                      <label class="flex items-center">
-                        <input
-                          type="checkbox"
-                          bind:checked={rule.notify_watchers}
-                          class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <span class="ml-2 text-sm" style="color: var(--ds-text)">{t('settings.notifications.watchers')}</span>
-                      </label>
+                      <Checkbox
+                        bind:checked={rule.notify_watchers}
+                        label={t('settings.notifications.watchers')}
+                        size="small"
+                      />
 
-                      <label class="flex items-center">
-                        <input
-                          type="checkbox"
-                          bind:checked={rule.notify_workspace_admins}
-                          class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <span class="ml-2 text-sm" style="color: var(--ds-text)">{t('settings.notifications.workspaceAdmins')}</span>
-                      </label>
+                      <Checkbox
+                        bind:checked={rule.notify_workspace_admins}
+                        label={t('settings.notifications.workspaceAdmins')}
+                        size="small"
+                      />
                     </div>
                   </div>
 

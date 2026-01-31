@@ -14,7 +14,7 @@
     <!-- Logo and Title -->
     <div class="text-center mb-12">
       <div class="flex justify-center mb-6">
-        <img src="/cmicon-2.svg" alt="Windshift" class="h-24 w-24" />
+        <img src="/windshift-3.svg" alt="Windshift" class="h-24 w-24" />
       </div>
       <h1 class="text-4xl font-bold mb-4" style="color: var(--ds-text);">
         {t('about.title')}
