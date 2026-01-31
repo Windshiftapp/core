@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="frontend/public/cmicon-2.svg" alt="Windshift" width="120" height="120">
+  <img src="frontend/public/windshift-3.svg" alt="Windshift" width="120" height="120">
 </p>
 
 <h1 align="center">Windshift</h1>

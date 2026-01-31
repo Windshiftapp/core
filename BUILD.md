@@ -6,7 +6,7 @@ This document explains how to build Windshift for multiple platforms.
 
 ### Build Everything (Recommended)
 ```bash
-# Build both server and vx client for all platforms
+# Build both server and ws client for all platforms
 ./build-all.sh
 
 # Clean and build everything
@@ -15,7 +15,7 @@ This document explains how to build Windshift for multiple platforms.
 # Build only the server
 ./build-all.sh --server-only
 
-# Build only the vx client  
+# Build only the ws client
 ./build-all.sh --client-only
 
 # Get help
@@ -33,9 +33,9 @@ cd ..
 # Build server (current platform)
 go build -o windshift main.go
 
-# Build vx client (current platform)  
-cd cmd/vx
-go build -o vx
+# Build ws client (current platform)
+cd cmd/ws
+go build -o ws
 cd ../..
 ```
 
@@ -52,20 +52,20 @@ dist/
 │   ├── windshift-darwin-amd64
 │   └── windshift-darwin-arm64
 └── client/
-    ├── vx-linux-amd64
-    ├── vx-linux-arm64
-    ├── vx-windows-amd64.exe
-    ├── vx-darwin-amd64
-    └── vx-darwin-arm64
+    ├── ws-linux-amd64
+    ├── ws-linux-arm64
+    ├── ws-windows-amd64.exe
+    ├── ws-darwin-amd64
+    └── ws-darwin-arm64
 ```
 
 ## Supported Platforms
 
-| Platform | Server | VX Client |
+| Platform | Server | WS Client |
 |----------|--------|-----------|
 | Linux (x64) | ✅ | ✅ |
 | Linux (ARM64) | ✅ | ✅ |
-| Windows (x64) | ✅ | ✅ |  
+| Windows (x64) | ✅ | ✅ |
 | macOS (Intel) | ✅ | ✅ |
 | macOS (Apple Silicon) | ✅ | ✅ |
 
@@ -77,9 +77,9 @@ Go makes cross-compilation easy. You can build for any platform from any platfor
 # Build server for Linux from macOS/Windows
 GOOS=linux GOARCH=amd64 go build -o windshift-linux main.go
 
-# Build vx client for Windows from Linux/macOS
-cd cmd/vx
-GOOS=windows GOARCH=amd64 go build -o vx-windows.exe
+# Build ws client for Windows from Linux/macOS
+cd cmd/ws
+GOOS=windows GOARCH=amd64 go build -o ws-windows.exe
 cd ../..
 
 # Build for ARM64 (Apple Silicon, ARM Linux)
@@ -94,7 +94,7 @@ GOOS=linux GOARCH=arm64 go build -o windshift-linux-arm64 main.go
 - **Node.js 18+** - Frontend build
 - **npm** - Package management
 
-### For VX Client Only
+### For WS Client Only
 - **Go 1.21+** - Client compilation only
 
 ## Usage Examples
@@ -104,21 +104,21 @@ GOOS=linux GOARCH=arm64 go build -o windshift-linux-arm64 main.go
 # Extract and run
 tar -xzf windshift-linux-amd64.tar.gz
 ./dist/server/windshift-linux-amd64 &
-./dist/client/vx-linux-amd64 workspace list
+./dist/client/ws-linux-amd64 workspace list
 ```
 
 ### Windows
 ```bash
-# Extract and run  
+# Extract and run
 dist\server\windshift-windows-amd64.exe
-dist\client\vx-windows-amd64.exe workspace list
+dist\client\ws-windows-amd64.exe workspace list
 ```
 
 ### macOS
 ```bash
 # Extract and run
 ./dist/server/windshift-darwin-arm64 &
-./dist/client/vx-darwin-arm64 workspace list
+./dist/client/ws-darwin-arm64 workspace list
 ```
 
 ## Build Optimization
