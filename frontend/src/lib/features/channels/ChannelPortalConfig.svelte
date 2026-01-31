@@ -69,16 +69,40 @@
       <Input bind:value={formData.title} placeholder="Support Portal" />
     </div>
 
-    <div>
-      <Label color="default" class="mb-2">{t('channel.description')}</Label>
-      <Textarea bind:value={formData.description} placeholder={t('channel.briefDescription')} rows={2} />
-    </div>
-
-    <div class="flex items-center gap-3 p-4 rounded" style="background-color: var(--ds-surface-raised);">
-      <input type="checkbox" id="portalEnabled" bind:checked={formData.enabled} class="w-4 h-4 rounded" />
-      <label for="portalEnabled" class="text-sm font-medium cursor-pointer" style="color: var(--ds-text);">
-        {t('channel.enablePortal')}
-      </label>
+    <!-- Enable Portal Toggle - Prominent -->
+    <div
+      class="flex items-center justify-between p-4 rounded-lg border-2 transition-colors cursor-pointer"
+      style="background-color: {formData.enabled ? 'var(--ds-background-success)' : 'var(--ds-surface-raised)'}; border-color: {formData.enabled ? 'var(--ds-border-success)' : 'var(--ds-border)'};"
+      onclick={() => formData.enabled = !formData.enabled}
+      role="button"
+      tabindex="0"
+      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); formData.enabled = !formData.enabled; }}}
+    >
+      <div class="flex items-center gap-3">
+        <div
+          class="w-10 h-6 rounded-full relative transition-colors"
+          style="background-color: {formData.enabled ? 'var(--ds-background-success-bold)' : 'var(--ds-background-neutral)'};"
+        >
+          <div
+            class="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform"
+            style="transform: translateX({formData.enabled ? '22px' : '4px'});"
+          ></div>
+        </div>
+        <div>
+          <div class="text-sm font-semibold" style="color: var(--ds-text);">
+            {t('channel.enablePortal')}
+          </div>
+          <div class="text-xs" style="color: var(--ds-text-subtle);">
+            {formData.enabled ? t('channel.portalIsActive', 'Portal is active and accepting submissions') : t('channel.portalIsInactive', 'Portal is currently disabled')}
+          </div>
+        </div>
+      </div>
+      <div
+        class="px-3 py-1 rounded-full text-xs font-semibold"
+        style="background-color: {formData.enabled ? 'var(--ds-background-success-bold)' : 'var(--ds-background-neutral)'}; color: {formData.enabled ? 'white' : 'var(--ds-text-subtle)'};"
+      >
+        {formData.enabled ? t('common.enabled', 'Enabled') : t('common.disabled', 'Disabled')}
+      </div>
     </div>
   </div>
 </div>

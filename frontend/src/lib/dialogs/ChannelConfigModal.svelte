@@ -1,6 +1,6 @@
 <script>
   import { untrack } from 'svelte';
-  import { LifeBuoy, Settings, Webhook, ExternalLink, Users, Globe, Mail } from 'lucide-svelte';
+  import { LifeBuoy, Settings, Webhook, ExternalLink, Users, Globe, Mail, Send } from 'lucide-svelte';
   import { api } from '../api.js';
   import { channelCategoriesStore } from '../stores/channelCategories.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -18,6 +18,7 @@
   import ChannelPortalConfig from '../features/channels/ChannelPortalConfig.svelte';
   import ChannelWebhookConfig from '../features/channels/ChannelWebhookConfig.svelte';
   import ChannelEmailConfig from '../features/channels/ChannelEmailConfig.svelte';
+  import ChannelSMTPConfig from '../features/channels/ChannelSMTPConfig.svelte';
 
   let {
     isOpen = false,
@@ -37,6 +38,7 @@
   let portalConfigRef = $state(null);
   let webhookConfigRef = $state(null);
   let emailConfigRef = $state(null);
+  let smtpConfigRef = $state(null);
 
   // Portal configuration form data
   let portalFormData = $state({
@@ -78,6 +80,17 @@
     mailbox: 'INBOX',
     mark_as_read: true,
     delete_after_process: false
+  });
+
+  // SMTP configuration form data
+  let smtpFormData = $state({
+    host: '',
+    port: 587,
+    username: '',
+    password: '',
+    from_email: '',
+    from_name: '',
+    encryption: 'tls'
   });
 
   // Workspaces and item types for email configuration
@@ -161,6 +174,16 @@
           delete_after_process: config.email_delete_after_process || false
         };
         loadWorkspacesAndItemTypes();
+      } else if (channel.type === 'smtp') {
+        smtpFormData = {
+          host: config.smtp_host || '',
+          port: config.smtp_port || 587,
+          username: config.smtp_username || '',
+          password: '',
+          from_email: config.smtp_from_email || '',
+          from_name: config.smtp_from_name || '',
+          encryption: config.smtp_encryption || 'tls'
+        };
       }
 
       activeTab = 'configuration';
@@ -215,7 +238,8 @@
     const icons = {
       'webhook': Webhook,
       'portal': Globe,
-      'email': Mail
+      'email': Mail,
+      'smtp': Send
     };
     return icons[type] || LifeBuoy;
   }
@@ -238,6 +262,10 @@
       return emailConfigRef.validate();
     }
 
+    if (channel.type === 'smtp' && smtpConfigRef) {
+      return smtpConfigRef.validate();
+    }
+
     return { valid: true };
   }
 
@@ -255,9 +283,13 @@
     try {
       loading = true;
 
-      // Save basic info
+      // Save basic info (excluding config to preserve sensitive fields)
       await api.channels.update(channel.id, {
-        ...channel,
+        id: channel.id,
+        type: channel.type,
+        direction: channel.direction,
+        status: channel.status,
+        is_default: channel.is_default,
         name: channelFormData.name,
         description: channelFormData.description,
         category_id: channelFormData.category_id
@@ -277,6 +309,9 @@
       } else if (channel.type === 'email' && emailConfigRef) {
         await api.channels.updateConfig(channel.id, emailConfigRef.getConfig());
         emailConfigRef.clearSecrets?.();
+      } else if (channel.type === 'smtp' && smtpConfigRef) {
+        await api.channels.updateConfig(channel.id, smtpConfigRef.getConfig());
+        smtpConfigRef.clearSecret?.();
       }
 
       toastMessage = t('channel.channelSavedSuccess');
@@ -440,6 +475,13 @@
               bind:loading
               onLoadItemTypes={loadItemTypesForWorkspace}
               onToast={handleToast}
+            />
+          {:else if channel.type === 'smtp'}
+            <ChannelSMTPConfig
+              bind:this={smtpConfigRef}
+              channelId={channel.id}
+              bind:formData={smtpFormData}
+              onSave={onSave}
             />
           {:else}
             <div class="pt-6 border-t" style="border-color: var(--ds-border);">

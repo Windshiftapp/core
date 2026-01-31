@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
-  import { LifeBuoy, Plus, Webhook, Globe, Trash2, Settings, Search, Mail, Layers, Tag } from 'lucide-svelte';
+  import { LifeBuoy, Plus, Webhook, Globe, Trash2, Settings, Search, Mail, Layers, Tag, Send } from 'lucide-svelte';
   import { api } from '../../api.js';
   import { currentRoute, navigate } from '../../router.js';
   import { channelCategoriesStore } from '../../stores/channelCategories.js';
@@ -9,6 +9,7 @@
   import Button from '../../components/Button.svelte';
   import Input from '../../components/Input.svelte';
   import Select from '../../components/Select.svelte';
+  import ItemPicker from '../../pickers/ItemPicker.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
@@ -30,7 +31,8 @@
     { id: null, label: t('channels.allTypes', 'All'), icon: Layers },
     { id: 'portal', label: t('channels.portal', 'Portal'), icon: Globe },
     { id: 'webhook', label: t('channels.webhook', 'Webhook'), icon: Webhook },
-    { id: 'email', label: t('channels.email', 'Email'), icon: Mail }
+    { id: 'email', label: t('channels.email', 'Email'), icon: Mail },
+    { id: 'smtp', label: t('channels.smtp', 'SMTP'), icon: Send }
   ];
 
   let channels = $state([]);
@@ -221,7 +223,9 @@
   function getChannelTypeIcon(type) {
     const icons = {
       'webhook': Webhook,
-      'portal': Globe
+      'portal': Globe,
+      'email': Mail,
+      'smtp': Send
     };
     return icons[type] || LifeBuoy;
   }
@@ -252,7 +256,8 @@
       const directionMap = {
         'portal': 'inbound',
         'webhook': 'outbound',
-        'email': 'inbound'
+        'email': 'inbound',
+        'smtp': 'outbound'
       };
       const direction = directionMap[channelFormData.type] || 'outbound';
 
@@ -339,46 +344,58 @@
     <!-- Embedded Tab Navigation -->
     {#if embedded}
       <div class="border-b mb-6" style="border-color: var(--ds-border);">
-        <!-- Type Tabs -->
-        <div class="flex gap-1">
-          {#each channelTypes as type (type.id)}
-            {@const isActive = activeTypeFilter === type.id}
-            <button
-              onclick={() => handleTypeClick(type.id)}
-              class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors flex items-center gap-2"
-              style={isActive
-                ? 'border-color: var(--ds-border-focused); color: var(--ds-text);'
-                : 'border-color: transparent; color: var(--ds-text-subtle);'}
-              onmouseenter={(e) => { if (!isActive) e.currentTarget.style.color = 'var(--ds-text)'; }}
-              onmouseleave={(e) => { if (!isActive) e.currentTarget.style.color = 'var(--ds-text-subtle)'; }}
-            >
-              <svelte:component this={type.icon} class="w-4 h-4" />
-              {type.label}
-            </button>
-          {/each}
-        </div>
-        <!-- Category Filter Row -->
-        <div class="flex items-center gap-3 py-3">
-          <span class="text-sm" style="color: var(--ds-text-subtle);">{t('channels.category', 'Category')}:</span>
-          <Select
-            value={activeCategoryId || ''}
-            onchange={handleCategoryChange}
-            size="small"
-            class="w-48"
-          >
-            <option value="">{t('channels.allCategories', 'All Categories')}</option>
-            {#each $channelCategoriesStore as category}
-              <option value={category.id}>{category.name}</option>
+        <!-- Type Tabs with Category filter and Manage button on right -->
+        <div class="flex items-center justify-between">
+          <div class="flex gap-1">
+            {#each channelTypes as type (type.id)}
+              {@const isActive = activeTypeFilter === type.id}
+              <button
+                onclick={() => handleTypeClick(type.id)}
+                class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors flex items-center gap-2"
+                style={isActive
+                  ? 'border-color: var(--ds-border-focused); color: var(--ds-text);'
+                  : 'border-color: transparent; color: var(--ds-text-subtle);'}
+                onmouseenter={(e) => { if (!isActive) e.currentTarget.style.color = 'var(--ds-text)'; }}
+                onmouseleave={(e) => { if (!isActive) e.currentTarget.style.color = 'var(--ds-text-subtle)'; }}
+              >
+                <svelte:component this={type.icon} class="w-4 h-4" />
+                {type.label}
+              </button>
             {/each}
-          </Select>
-          <Button
-            onclick={() => showCategoryModal = true}
-            variant="ghost"
-            size="small"
-            icon={Tag}
-          >
-            {t('channels.manageCategories', 'Manage')}
-          </Button>
+          </div>
+          <div class="flex items-center gap-3 flex-shrink-0">
+            <span class="text-sm whitespace-nowrap" style="color: var(--ds-text-subtle);">{t('channels.category', 'Category')}:</span>
+            <ItemPicker
+              value={activeCategoryId ? parseInt(activeCategoryId) : null}
+              items={$channelCategoriesStore}
+              placeholder={t('channels.allCategories', 'All Categories')}
+              showUnassigned={true}
+              unassignedLabel={t('channels.allCategories', 'All Categories')}
+              allowClear={false}
+              class="w-48"
+              onselect={(e) => {
+                const item = e.detail;
+                if (embedded) {
+                  embeddedCategoryId = item ? item.id : null;
+                } else {
+                  if (!item) {
+                    navigate('/admin/channels');
+                  } else {
+                    navigate(`/admin/channels/category/${item.id}`);
+                  }
+                }
+              }}
+            />
+            <Button
+              onclick={() => showCategoryModal = true}
+              variant="ghost"
+              size="small"
+              icon={Tag}
+              class="whitespace-nowrap flex-shrink-0"
+            >
+              {t('channels.manageCategories', 'Manage')}
+            </Button>
+          </div>
         </div>
       </div>
     {/if}
@@ -397,10 +414,22 @@
               {t('channels.title')}
             {/if}
           </h1>
+          <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">
+            {filteredChannels().length} channel{filteredChannels().length !== 1 ? 's' : ''}
+          </p>
+        {:else}
+          <!-- Search Bar (embedded) -->
+          <div class="relative w-64">
+            <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color: var(--ds-text-subtle);" />
+            <input
+              type="text"
+              bind:value={channelSearch}
+              placeholder={t('channels.searchChannels')}
+              class="w-full pl-9 pr-3 py-2 text-sm rounded-lg border"
+              style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
+            />
+          </div>
         {/if}
-        <p class="{embedded ? '' : 'mt-1'} text-sm" style="color: var(--ds-text-subtle);">
-          {filteredChannels().length} channel{filteredChannels().length !== 1 ? 's' : ''}
-        </p>
       </div>
       <Button
         onclick={showAddChannelForm}
@@ -414,19 +443,21 @@
       </Button>
     </div>
 
-    <!-- Search Bar -->
-    <div class="mb-6">
-      <div class="relative max-w-md">
-        <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color: var(--ds-text-subtle);" />
-        <input
-          type="text"
-          bind:value={channelSearch}
-          placeholder={t('channels.searchChannels')}
-          class="w-full pl-9 pr-3 py-2 text-sm rounded-lg border"
-          style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-        />
+    <!-- Search Bar (non-embedded) -->
+    {#if !embedded}
+      <div class="mb-6">
+        <div class="relative max-w-md">
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color: var(--ds-text-subtle);" />
+          <input
+            type="text"
+            bind:value={channelSearch}
+            placeholder={t('channels.searchChannels')}
+            class="w-full pl-9 pr-3 py-2 text-sm rounded-lg border"
+            style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
+          />
+        </div>
       </div>
-    </div>
+    {/if}
 
     <!-- Data Table -->
     {#if loading}
@@ -522,7 +553,8 @@
           {#each [
             { id: 'portal', label: 'Portal', icon: Globe, color: 'var(--ds-icon-accent-green)' },
             { id: 'webhook', label: 'Webhook', icon: Webhook, color: 'var(--ds-icon-accent-purple)' },
-            { id: 'email', label: 'Email', icon: Mail, color: 'var(--ds-icon-accent-blue)' }
+            { id: 'email', label: 'Email', icon: Mail, color: 'var(--ds-icon-accent-blue)' },
+            { id: 'smtp', label: 'SMTP', icon: Send, color: 'var(--ds-icon-accent-orange)' }
           ] as option}
             <button
               type="button"
