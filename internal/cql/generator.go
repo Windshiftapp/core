@@ -339,6 +339,12 @@ func (g *SQLGenerator) generateFunction(node *ASTNode) (string, []interface{}, e
 	case "currentuser":
 		// This would need to be filled in with actual user context
 		return "?", []interface{}{"current-user-id"}, nil
+	case "currentcustomer":
+		// Portal customer ID - resolved at handler level before CQL parsing
+		return "?", []interface{}{"current-customer-id"}, nil
+	case "currentorganisation":
+		// Customer organisation ID - resolved at handler level before CQL parsing
+		return "?", []interface{}{"current-organisation-id"}, nil
 	case "now":
 		return "datetime('now')", nil, nil
 	case "startofday":

@@ -127,7 +127,7 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate field type
-	if cf.FieldType != "text" && cf.FieldType != "textarea" && cf.FieldType != "select" && cf.FieldType != "multiselect" && cf.FieldType != "number" && cf.FieldType != "milestone" && cf.FieldType != "date" && cf.FieldType != "user" && cf.FieldType != "iteration" && cf.FieldType != "asset" {
+	if cf.FieldType != "text" && cf.FieldType != "textarea" && cf.FieldType != "select" && cf.FieldType != "multiselect" && cf.FieldType != "number" && cf.FieldType != "milestone" && cf.FieldType != "date" && cf.FieldType != "user" && cf.FieldType != "iteration" && cf.FieldType != "asset" && cf.FieldType != "portalcustomer" && cf.FieldType != "customerorganisation" {
 		http.Error(w, "Invalid field type", http.StatusBadRequest)
 		return
 	}
@@ -162,7 +162,7 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate options JSON if provided (for select/multiselect fields only)
-	if cf.Options != "" && cf.FieldType != "asset" {
+	if cf.Options != "" && cf.FieldType != "asset" && cf.FieldType != "portalcustomer" && cf.FieldType != "customerorganisation" {
 		var testOptions []string
 		if err := json.Unmarshal([]byte(cf.Options), &testOptions); err != nil {
 			http.Error(w, "Invalid options JSON format", http.StatusBadRequest)
@@ -282,7 +282,7 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate field type
-	if cf.FieldType != "text" && cf.FieldType != "textarea" && cf.FieldType != "select" && cf.FieldType != "multiselect" && cf.FieldType != "number" && cf.FieldType != "milestone" && cf.FieldType != "date" && cf.FieldType != "user" && cf.FieldType != "iteration" && cf.FieldType != "asset" {
+	if cf.FieldType != "text" && cf.FieldType != "textarea" && cf.FieldType != "select" && cf.FieldType != "multiselect" && cf.FieldType != "number" && cf.FieldType != "milestone" && cf.FieldType != "date" && cf.FieldType != "user" && cf.FieldType != "iteration" && cf.FieldType != "asset" && cf.FieldType != "portalcustomer" && cf.FieldType != "customerorganisation" {
 		http.Error(w, "Invalid field type", http.StatusBadRequest)
 		return
 	}
@@ -304,7 +304,7 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate options JSON if provided (for select/multiselect fields)
-	if cf.Options != "" && cf.FieldType != "asset" {
+	if cf.Options != "" && cf.FieldType != "asset" && cf.FieldType != "portalcustomer" && cf.FieldType != "customerorganisation" {
 		var testOptions []string
 		if err := json.Unmarshal([]byte(cf.Options), &testOptions); err != nil {
 			http.Error(w, "Invalid options JSON format", http.StatusBadRequest)

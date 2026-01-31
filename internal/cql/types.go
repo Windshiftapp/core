@@ -21,6 +21,8 @@
 //
 // Supported Functions:
 //   - currentUser(), now(), startOfDay(), endOfDay()
+//   - currentCustomer() - Returns the current portal customer's ID (for portal asset reports)
+//   - currentOrganisation() - Returns the current portal customer's organisation ID (for portal asset reports)
 //   - childrenOf("ql query") - Find all descendants of items matching the query
 //   - linkedOf("link_label", "ql query") - Find items linked via the specified link type
 //

@@ -94,6 +94,9 @@ var actionsSchema string
 //go:embed schema/email.sql
 var emailSchema string
 
+//go:embed schema/asset_reports.sql
+var assetReportsSchema string
+
 // DB wraps a sql.DB connection with a dedicated write connection
 type DB struct {
 	*sql.DB
@@ -227,7 +230,7 @@ func (db *DB) Initialize() error {
 	}
 
 	// Database needs full initialization
-	schema := coreSchema + itemsSchema + requestTypeSchema + usersSchema + testsSchema + workspaceSchema + configWorkflowsSchema + timeTrackingSchema + channelsSchema + portalSchema + portalAuthSchema + milestonesSchema + iterationsSchema + contentSchema + mentionsSchema + notificationsSchema + permissionsSchema + systemSchema + userPreferencesSchema + webauthnSchema + ssoSchema + scmSchema + assetsSchema + recurringTasksSchema + jiraImportSchema + actionsSchema + emailSchema
+	schema := coreSchema + itemsSchema + requestTypeSchema + usersSchema + testsSchema + workspaceSchema + configWorkflowsSchema + timeTrackingSchema + channelsSchema + portalSchema + portalAuthSchema + milestonesSchema + iterationsSchema + contentSchema + mentionsSchema + notificationsSchema + permissionsSchema + systemSchema + userPreferencesSchema + webauthnSchema + ssoSchema + scmSchema + assetsSchema + recurringTasksSchema + jiraImportSchema + actionsSchema + emailSchema + assetReportsSchema
 
 	if _, err := db.Exec(schema); err != nil {
 		return fmt.Errorf("failed to initialize database schema: %w", err)
@@ -296,11 +299,8 @@ func (db *DB) initializeDefaultData() error {
 		isDefault   bool
 	}{
 		{"Open", "New work item, not yet started", "To Do", true},
-		{"To Do", "Ready to be worked on", "To Do", false},
 		{"In Progress", "Currently being worked on", "In Progress", false},
-		{"Under Review", "Completed and waiting for review", "In Progress", false},
 		{"Done", "Work has been completed", "Done", false},
-		{"Closed", "Work item is finished and closed", "Done", false},
 	}
 
 	statusIDs := make(map[string]int64)
@@ -327,17 +327,14 @@ func (db *DB) initializeDefaultData() error {
 	}
 	workflowID, _ := result.LastInsertId()
 
-	// 4. Create workflow transitions (simplified 4-status workflow)
+	// 4. Create workflow transitions (simplified 3-status workflow)
 	transitions := []struct {
 		from string // empty string means initial status
 		to   string
 	}{
-		{"", "Open"},            // Initial transition
-		{"Open", "To Do"},
+		{"", "Open"},             // Initial transition
 		{"Open", "In Progress"},
-		{"Open", "Done"},        // Direct completion from Open
-		{"To Do", "In Progress"},
-		{"To Do", "Done"},       // Direct completion from To Do
+		{"Open", "Done"},         // Direct completion from Open
 		{"In Progress", "Done"},
 	}
 
