@@ -403,7 +403,7 @@
         <div class="space-y-1 min-h-96 max-h-[70vh] overflow-y-auto">
           {#each searchFilteredFields as field, index}
             {#if index === 0 || field.category !== searchFilteredFields[index - 1].category}
-              <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mt-4 mb-2 first:mt-0">
+              <div class="text-xs font-semibold uppercase tracking-wider mt-4 mb-2 first:mt-0" style="color: var(--ds-text-subtle);">
                 {field.category === 'System Fields' ? t('screensPage.systemFields') : field.category === 'Custom Fields' ? t('screensPage.customFields') : field.category}
               </div>
             {/if}
@@ -415,7 +415,7 @@
             >
               <!-- Drag Handle -->
               <div class="flex-shrink-0">
-                <svg class="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+                <svg class="w-4 h-4 group-hover:text-blue-500" style="color: var(--ds-text-subtle);" fill="currentColor" viewBox="0 0 24 24">
                   <circle cx="9" cy="6" r="1.5"/>
                   <circle cx="15" cy="6" r="1.5"/>
                   <circle cx="9" cy="12" r="1.5"/>
@@ -461,16 +461,16 @@
 
         <div
           data-drop-zone
-          class="min-h-96 max-h-[70vh] overflow-y-auto border-2 border-dashed border-gray-200 rounded p-4 space-y-2"
+          class="min-h-96 max-h-[70vh] overflow-y-auto border-2 border-dashed rounded p-4 space-y-2" style="border-color: var(--ds-border);"
           class:border-blue-400={draggedField}
           class:bg-blue-50={draggedField}
         >
           {#if screenFields.length === 0}
             <div class="text-center py-12">
-              <svg class="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-12 h-12 mx-auto mb-4" style="color: var(--ds-text-disabled);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
               </svg>
-              <p class="text-sm text-gray-500">{t('screensPage.dropFieldsHere')}</p>
+              <p class="text-sm" style="color: var(--ds-text-subtle);">{t('screensPage.dropFieldsHere')}</p>
             </div>
           {:else}
             {#each screenFields as field, index (field.field_identifier)}
@@ -478,8 +478,8 @@
                 data-screen-field
                 data-field-index={index}
                 data-field-id={field.field_identifier}
-                class="relative group flex items-center gap-3 px-4 py-3 rounded border bg-white hover:shadow-sm transition-all duration-200 h-16"
-                style="border-color: var(--ds-border); user-select: none;"
+                class="relative group flex items-center gap-3 px-4 py-3 rounded border hover:shadow-sm transition-all duration-200 h-16"
+                style="border-color: var(--ds-border); background-color: var(--ds-surface-raised); user-select: none;"
               >
                 <!-- Drop indicator -->
                 {#if fieldDragState.get(field.field_identifier)?.closestEdge}
@@ -490,7 +490,7 @@
                   class="cursor-grab active:cursor-grabbing flex-shrink-0 p-1 rounded hover-bg transition-colors"
                   style="touch-action: none;"
                 >
-                  <svg class="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-4 h-4 group-hover:text-blue-500" style="color: var(--ds-text-subtle);" fill="currentColor" viewBox="0 0 24 24">
                     <circle cx="9" cy="6" r="1.5"/>
                     <circle cx="15" cy="6" r="1.5"/>
                     <circle cx="9" cy="12" r="1.5"/>
@@ -503,7 +503,7 @@
                 <div class="flex-1">
                   <div class="font-medium flex items-center gap-2" style="color: var(--ds-text);">
                     {getFieldDisplayName(field)}
-                    <span class="text-xs px-1.5 py-0.5 rounded text-gray-500 bg-gray-100">
+                    <span class="text-xs px-1.5 py-0.5 rounded" style="color: var(--ds-text-subtle); background-color: var(--ds-background-neutral);">
                       {field.field_type === 'system' ? t('screensPage.system') : t('screensPage.custom')}
                     </span>
                   </div>
@@ -519,7 +519,7 @@
 
                   {#if field.field_type === 'system' && (field.field_identifier === 'title' || field.field_identifier === 'status')}
                     <div class="w-9 h-9 flex items-center justify-center flex-shrink-0">
-                      <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-4 h-4" style="color: var(--ds-text-disabled);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                       </svg>
                     </div>

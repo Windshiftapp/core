@@ -12,15 +12,15 @@
   $: displayMessage = message || t('errors.INSUFFICIENT_PERMISSION');
 </script>
 
-<div class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+<div class="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8" style="background-color: var(--ds-surface);">
   <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-    <div class="bg-white py-8 px-4 shadow-sm sm:rounded sm:px-10 border border-gray-200">
+    <div class="py-8 px-4 shadow-sm sm:rounded sm:px-10 border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
       <div class="text-center">
         <div class="mx-auto h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
           <Lock class="h-8 w-8 text-blue-600" />
         </div>
-        <h2 class="text-xl font-medium text-gray-900 mb-2">Access Restricted</h2>
-        <p class="text-gray-500 mb-6 text-sm">{displayMessage}</p>
+        <h2 class="text-xl font-medium mb-2" style="color: var(--ds-text);">Access Restricted</h2>
+        <p class="mb-6 text-sm" style="color: var(--ds-text-subtle);">{displayMessage}</p>
         
         {#if requiredPermission}
           <div class="bg-blue-50 border border-blue-200 rounded-md p-3 mb-6">
@@ -65,7 +65,7 @@
           </Button>
         </div>
         
-        <p class="text-xs text-gray-400 mt-6">
+        <p class="text-xs mt-6" style="color: var(--ds-text-subtlest);">
           If you believe you should have access to this page, please contact your administrator.
         </p>
       </div>

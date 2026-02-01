@@ -336,9 +336,9 @@
       {#if isMultiValueOperator(filter.operator)}
         <!-- Multi-value selector for IN/NOT IN -->
         {#if valueOptions.length > 0}
-          <div class="border border-gray-300 rounded p-2 bg-white max-h-32 overflow-y-auto">
+          <div class="border rounded p-2 max-h-32 overflow-y-auto" style="border-color: var(--ds-border); background-color: var(--ds-surface);">
             {#each valueOptions as option}
-              <div class="py-1 px-2 rounded hover:bg-gray-50">
+              <div class="py-1 px-2 rounded filter-option-hover">
                 <Checkbox
                   checked={filter.values.includes(option.value)}
                   onchange={() => handleMultiValueToggle(option.value)}
@@ -383,7 +383,7 @@
       {:else if filter.field.type === 'enum' || filter.field.type === 'select'}
         <!-- Dropdown for enum/select fields -->
         {#if loadingOptions}
-          <div class="px-3 py-2 text-sm text-gray-500">Loading options...</div>
+          <div class="px-3 py-2 text-sm" style="color: var(--ds-text-subtle);">Loading options...</div>
         {:else if valueOptions.length > 0}
           <BasePicker
             value={filter.value}
@@ -430,9 +430,10 @@
             value={filter.value}
             oninput={handleValueChange}
             onkeydown={handleValueKeydown}
-            class="w-full px-3 py-2 pr-10 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            class="w-full px-3 py-2 pr-10 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
           />
-          <Calendar class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <Calendar class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none" style="color: var(--ds-text-subtle);" />
         </div>
       {:else if filter.field.type === 'number'}
         <!-- Number input -->
@@ -442,7 +443,8 @@
           value={filter.value}
           oninput={handleValueChange}
           onkeydown={handleValueKeydown}
-          class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
         />
       {:else if filter.field.type === 'boolean'}
         <!-- Boolean select -->
@@ -521,3 +523,9 @@
     </div>
   </div>
 </Modal>
+
+<style>
+  .filter-option-hover:hover {
+    background-color: var(--ds-background-neutral-hovered);
+  }
+</style>

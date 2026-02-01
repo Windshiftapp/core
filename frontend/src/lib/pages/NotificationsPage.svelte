@@ -161,7 +161,7 @@
 
     <!-- Filters Section -->
     {#if showFilters}
-      <div class="mb-6 p-4 bg-gray-50 rounded border" style="border-color: var(--ds-border);" transition:slide={{ duration: 200 }}>
+      <div class="mb-6 p-4 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);" transition:slide={{ duration: 200 }}>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <!-- Search -->
           <SearchInput
@@ -191,9 +191,9 @@
 
         <!-- Active Filters & Clear -->
         {#if searchQuery || selectedType !== 'all' || selectedStatus !== 'all'}
-          <div class="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
+          <div class="mt-4 pt-4 border-t flex items-center justify-between" style="border-color: var(--ds-border);">
             <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-sm text-gray-600">Active filters:</span>
+              <span class="text-sm" style="color: var(--ds-text-subtle);">Active filters:</span>
               {#if searchQuery}
                 <span class="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-md">
                   Search: "{searchQuery}"
@@ -232,7 +232,7 @@
     {/if}
 
     <!-- Results Summary -->
-    <div class="mb-4 text-sm text-gray-600">
+    <div class="mb-4 text-sm" style="color: var(--ds-text-subtle);">
       {#if filteredNotifications.length === $notifications.length}
         Showing all {$notifications.length} notification{$notifications.length !== 1 ? 's' : ''}
       {:else}
@@ -243,11 +243,11 @@
     <!-- Notifications List -->
     {#if filteredNotifications.length === 0}
       <div class="rounded-xl border shadow-sm p-12 text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-        <Bell class="w-12 h-12 text-gray-400 mx-auto mb-4 opacity-50" />
-        <h3 class="text-lg font-medium text-gray-900 mb-2">
+        <Bell class="w-12 h-12 mx-auto mb-4 opacity-50" style="color: var(--ds-text-subtle);" />
+        <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">
           {$notifications.length === 0 ? t('notifications.noNotifications') : t('common.noResults')}
         </h3>
-        <p class="text-gray-500">
+        <p style="color: var(--ds-text-subtle);">
           {#if $notifications.length === 0}
             {t('dashboard.allCaughtUp')}
           {:else if searchQuery || selectedType !== 'all' || selectedStatus !== 'all'}
@@ -271,7 +271,7 @@
       <!-- Notifications Cards -->
       <div class="rounded-xl border shadow-sm overflow-hidden" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
         {#each filteredNotifications as notification, index (notification.id)}
-          <div class="notification-wrapper" class:border-b={index < filteredNotifications.length - 1} class:border-gray-100={index < filteredNotifications.length - 1}>
+          <div class="notification-wrapper" class:border-b={index < filteredNotifications.length - 1} style={index < filteredNotifications.length - 1 ? 'border-color: var(--ds-border);' : ''}>
             <NotificationCard {notification} />
           </div>
         {/each}
@@ -279,8 +279,8 @@
 
       <!-- Footer Actions -->
       {#if $notifications.length > 10}
-        <div class="mt-6 p-4 bg-gray-50 rounded text-center" style="border-color: var(--ds-border);">
-          <p class="text-sm text-gray-600 mb-3">
+        <div class="mt-6 p-4 rounded text-center" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
+          <p class="text-sm mb-3" style="color: var(--ds-text-subtle);">
             Showing {Math.min(filteredNotifications.length, 50)} notifications. 
             {#if $notifications.length > 50}
               Older notifications are automatically archived.

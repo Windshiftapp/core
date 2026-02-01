@@ -18,6 +18,7 @@
     BarChart3 as DashboardIcon
   } from 'lucide-svelte';
   import PageHeader from '../layout/PageHeader.svelte';
+  import StatCard from '../components/StatCard.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   let stats = {
@@ -127,12 +128,12 @@
 
   function getPriorityColor(priority) {
     const colors = {
-      low: 'bg-green-100 text-green-800',
-      medium: 'bg-yellow-100 text-yellow-800',
-      high: 'bg-orange-100 text-orange-800',
-      critical: 'bg-red-100 text-red-800'
+      low: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+      medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+      high: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+      critical: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
     };
-    return colors[priority.toLowerCase()] || 'bg-gray-100 text-gray-800';
+    return colors[priority.toLowerCase()] || 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200';
   }
 </script>
 
@@ -150,70 +151,34 @@
   {:else}
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-{isTestManagementEnabled ? '4' : '3'} gap-4 mb-6">
-      <div class="rounded p-4 border shadow-sm hover:shadow-md transition-shadow" style="background: linear-gradient(135deg, var(--ds-surface-raised) 0%, rgba(59, 130, 246, 0.02) 100%); border-color: var(--ds-border);">
-        <div class="flex items-center">
-          <div class="flex-shrink-0">
-            <div class="w-6 h-6 bg-blue-50 rounded-md flex items-center justify-center">
-              <Briefcase class="w-3.5 h-3.5 text-blue-600" />
-            </div>
-          </div>
-          <div class="ml-3 w-0 flex-1">
-            <dl>
-              <dt class="text-xs font-medium truncate" style="color: var(--ds-text-subtle);">{t('workspaces.title')}</dt>
-              <dd class="text-xl font-semibold" style="color: var(--ds-text);">{stats.workspaces}</dd>
-            </dl>
-          </div>
-        </div>
-      </div>
+      <StatCard
+        icon={Briefcase}
+        label={t('workspaces.title')}
+        value={stats.workspaces}
+        color="blue"
+      />
 
-      <div class="rounded p-4 border shadow-sm hover:shadow-md transition-shadow" style="background: linear-gradient(135deg, var(--ds-surface-raised) 0%, rgba(34, 197, 94, 0.02) 100%); border-color: var(--ds-border);">
-        <div class="flex items-center">
-          <div class="flex-shrink-0">
-            <div class="w-6 h-6 bg-green-50 rounded-md flex items-center justify-center">
-              <Target class="w-3.5 h-3.5 text-green-600" />
-            </div>
-          </div>
-          <div class="ml-3 w-0 flex-1">
-            <dl>
-              <dt class="text-xs font-medium truncate" style="color: var(--ds-text-subtle);">{t('nav.milestones')}</dt>
-              <dd class="text-xl font-semibold" style="color: var(--ds-text);">{stats.milestones}</dd>
-            </dl>
-          </div>
-        </div>
-      </div>
+      <StatCard
+        icon={Target}
+        label={t('nav.milestones')}
+        value={stats.milestones}
+        color="green"
+      />
 
-      <div class="rounded p-4 border shadow-sm hover:shadow-md transition-shadow" style="background: linear-gradient(135deg, var(--ds-surface-raised) 0%, rgba(245, 101, 101, 0.02) 100%); border-color: var(--ds-border);">
-        <div class="flex items-center">
-          <div class="flex-shrink-0">
-            <div class="w-6 h-6 bg-orange-50 rounded-md flex items-center justify-center">
-              <AlertCircle class="w-3.5 h-3.5 text-orange-600" />
-            </div>
-          </div>
-          <div class="ml-3 w-0 flex-1">
-            <dl>
-              <dt class="text-xs font-medium truncate" style="color: var(--ds-text-subtle);">{t('items.title')}</dt>
-              <dd class="text-xl font-semibold" style="color: var(--ds-text);">{stats.items}</dd>
-            </dl>
-          </div>
-        </div>
-      </div>
+      <StatCard
+        icon={AlertCircle}
+        label={t('items.title')}
+        value={stats.items}
+        color="orange"
+      />
 
       {#if isTestManagementEnabled}
-        <div class="rounded p-4 border shadow-sm hover:shadow-md transition-shadow" style="background: linear-gradient(135deg, var(--ds-surface-raised) 0%, rgba(139, 69, 196, 0.02) 100%); border-color: var(--ds-border);">
-          <div class="flex items-center">
-            <div class="flex-shrink-0">
-              <div class="w-6 h-6 bg-purple-50 rounded-md flex items-center justify-center">
-                <TestTube class="w-3.5 h-3.5 text-purple-600" />
-              </div>
-            </div>
-            <div class="ml-3 w-0 flex-1">
-              <dl>
-                <dt class="text-xs font-medium truncate" style="color: var(--ds-text-subtle);">{t('testing.testPlans')}</dt>
-                <dd class="text-xl font-semibold" style="color: var(--ds-text);">{stats.testSets}</dd>
-              </dl>
-            </div>
-          </div>
-        </div>
+        <StatCard
+          icon={TestTube}
+          label={t('testing.testPlans')}
+          value={stats.testSets}
+          color="purple"
+        />
       {/if}
     </div>
 
@@ -228,7 +193,7 @@
           <div class="flex justify-between items-center">
             <span class="text-sm font-medium" style="color: var(--ds-text);">{t('dashboard.statusOpen')}</span>
             <div class="flex items-center">
-              <div class="w-32 bg-gray-200 rounded-full h-2 mr-3">
+              <div class="w-32 rounded-full h-2 mr-3" style="background-color: var(--ds-background-neutral);">
                 <div class="bg-blue-500 h-2 rounded-full" style="width: {stats.items > 0 ? (stats.openItems / stats.items * 100) : 0}%"></div>
               </div>
               <span class="text-sm font-medium" style="color: var(--ds-text);">{stats.openItems}</span>
@@ -237,7 +202,7 @@
           <div class="flex justify-between items-center">
             <span class="text-sm font-medium" style="color: var(--ds-text);">{t('dashboard.statusInProgress')}</span>
             <div class="flex items-center">
-              <div class="w-32 bg-gray-200 rounded-full h-2 mr-3">
+              <div class="w-32 rounded-full h-2 mr-3" style="background-color: var(--ds-background-neutral);">
                 <div class="bg-yellow-500 h-2 rounded-full" style="width: {stats.items > 0 ? (stats.inProgressItems / stats.items * 100) : 0}%"></div>
               </div>
               <span class="text-sm font-medium" style="color: var(--ds-text);">{stats.inProgressItems}</span>
@@ -246,7 +211,7 @@
           <div class="flex justify-between items-center">
             <span class="text-sm font-medium" style="color: var(--ds-text);">{t('dashboard.statusClosed')}</span>
             <div class="flex items-center">
-              <div class="w-32 bg-gray-200 rounded-full h-2 mr-3">
+              <div class="w-32 rounded-full h-2 mr-3" style="background-color: var(--ds-background-neutral);">
                 <div class="bg-green-500 h-2 rounded-full" style="width: {stats.items > 0 ? (stats.closedItems / stats.items * 100) : 0}%"></div>
               </div>
               <span class="text-sm font-medium" style="color: var(--ds-text);">{stats.closedItems}</span>
@@ -270,7 +235,7 @@
                 }));
               }, 50);
             }}
-            class="w-full text-left px-3 py-2.5 rounded-md border hover:bg-gray-50 transition-colors group"
+            class="w-full text-left px-3 py-2.5 rounded-md border transition-colors group hover-bg"
             style="border-color: var(--ds-border);"
           >
             <div class="flex items-center">
@@ -283,7 +248,7 @@
           </button>
           <button
             onclick={() => window.location.href = '/milestones'}
-            class="w-full text-left px-3 py-2.5 rounded-md border hover:bg-gray-50 transition-colors group"
+            class="w-full text-left px-3 py-2.5 rounded-md border transition-colors group hover-bg"
             style="border-color: var(--ds-border);"
           >
             <div class="flex items-center">
@@ -296,7 +261,7 @@
           </button>
           <button
             onclick={() => window.location.href = '/workspaces'}
-            class="w-full text-left px-3 py-2.5 rounded-md border hover:bg-gray-50 transition-colors group"
+            class="w-full text-left px-3 py-2.5 rounded-md border transition-colors group hover-bg"
             style="border-color: var(--ds-border);"
           >
             <div class="flex items-center">
@@ -333,7 +298,7 @@
             </thead>
             <tbody class="divide-y" style="divide-color: var(--ds-border);">
               {#each recentItems as item (item.id)}
-                <tr class="hover:bg-gray-50">
+                <tr class="transition-colors" onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'} onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}>
                   <td class="px-4 py-3">
                     <div class="font-medium text-sm" style="color: var(--ds-text);">{item.title}</div>
                     {#if item.description}
@@ -342,7 +307,7 @@
                   </td>
                   <td class="px-4 py-3 text-sm" style="color: var(--ds-text);">{item.workspace_name || '—'}</td>
                   <td class="px-4 py-3">
-                    <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-md bg-gray-100 text-gray-800">
+                    <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-md" style="background-color: var(--ds-background-neutral); color: var(--ds-text);">
                       {item.status_name || 'No Status'}
                     </span>
                   </td>

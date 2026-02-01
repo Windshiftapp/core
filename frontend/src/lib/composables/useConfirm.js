@@ -35,8 +35,3 @@ export function confirm(options = {}) {
     });
   });
 }
-
-// Helper function to hide confirmation dialog
-export function hideConfirm() {
-  confirmDialog.update(state => ({ ...state, show: false }));
-}

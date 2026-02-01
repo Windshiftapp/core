@@ -80,10 +80,10 @@
   onRetry={loadRecentActivity}
 >
   {#snippet children()}
-    <div class="flex flex-col divide-y divide-gray-100 rounded-xl border border-gray-200">
+    <div class="flex flex-col rounded-xl border recent-items-list" style="border-color: var(--ds-border);">
       {#each items as item (item.item_id)}
         <a
-          class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition"
+          class="flex items-center gap-3 px-4 py-3 transition recent-item-row"
           href={`/workspaces/${item.workspace_id}/items/${item.item_id}`}
         >
           <div class="flex-shrink-0">
@@ -92,12 +92,12 @@
             </div>
           </div>
           <div class="min-w-0 flex-1">
-            <p class="truncate text-sm font-medium text-slate-900">{item.title}</p>
-            <p class="text-xs text-slate-500">
+            <p class="truncate text-sm font-medium" style="color: var(--ds-text);">{item.title}</p>
+            <p class="text-xs" style="color: var(--ds-text-subtle);">
               {item.workspace_key}-{item.workspace_item_number}
             </p>
           </div>
-          <div class="text-xs text-slate-400">
+          <div class="text-xs" style="color: var(--ds-text-subtlest);">
             {formatRelativeCompact(item.lastActivityDate)}
           </div>
         </a>
@@ -105,3 +105,12 @@
     </div>
   {/snippet}
 </WidgetState>
+
+<style>
+  .recent-items-list > :not(:last-child) {
+    border-bottom: 1px solid var(--ds-border);
+  }
+  .recent-item-row:hover {
+    background-color: var(--ds-background-neutral-hovered);
+  }
+</style>

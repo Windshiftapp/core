@@ -19,10 +19,10 @@
   {#snippet children()}
     <div class="space-y-3">
       {#each sprints as sprint}
-        <div class="p-3 bg-gray-50 rounded border border-gray-200">
-          <p class="text-sm font-medium text-gray-900">{sprint.name}</p>
-          <p class="text-xs text-gray-500">{sprint.start_date} - {sprint.end_date}</p>
-          <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
+        <div class="p-3 rounded border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+          <p class="text-sm font-medium" style="color: var(--ds-text);">{sprint.name}</p>
+          <p class="text-xs" style="color: var(--ds-text-subtle);">{sprint.start_date} - {sprint.end_date}</p>
+          <div class="mt-2 w-full rounded-full h-2" style="background-color: var(--ds-background-neutral);">
             <div
               class="h-2 rounded-full bg-blue-600"
               style="width: {sprint.progress}%"

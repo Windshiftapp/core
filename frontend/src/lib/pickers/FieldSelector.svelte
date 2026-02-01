@@ -178,13 +178,13 @@
       number: 'bg-green-100 text-green-800',
       date: 'bg-purple-100 text-purple-800',
       enum: 'bg-orange-100 text-orange-800',
-      boolean: 'bg-gray-100 text-gray-800',
+      boolean: 'bg-neutral-100 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-200',
       user: 'bg-indigo-100 text-indigo-800',
       reference: 'bg-pink-100 text-pink-800',
       select: 'bg-orange-100 text-orange-800',
       textarea: 'bg-blue-100 text-blue-800'
     };
-    return colors[type] || 'bg-gray-100 text-gray-800';
+    return colors[type] || 'bg-neutral-100 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-200';
   }
 
   $: if (searchQuery !== undefined) {
@@ -200,13 +200,12 @@
     type="button"
     onclick={toggleDropdown}
     disabled={disabled}
-    class="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-    class:bg-gray-50={disabled}
-    class:hover:bg-gray-50={!disabled}
+    class="w-full flex items-center justify-between px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+    style="border-color: var(--ds-border); background-color: {disabled ? 'var(--ds-background-neutral)' : 'var(--ds-surface)'};"
   >
     {#if selectedField}
       <div class="flex items-center gap-2 flex-1 min-w-0">
-        <span class="font-medium text-gray-900 truncate">{selectedField.name}</span>
+        <span class="font-medium truncate" style="color: var(--ds-text);">{selectedField.name}</span>
         <span class="text-xs px-1.5 py-0.5 rounded {getFieldTypeColor(selectedField.type)}">
           {getFieldTypeLabel(selectedField.type)}
         </span>
@@ -218,24 +217,24 @@
         <button
           type="button"
           onclick={(e) => { e.stopPropagation(); clearSelection(); }}
-          class="p-1 hover:bg-gray-200 rounded transition-colors"
+          class="p-1 rounded transition-colors hover-bg"
           title={t('pickers.clearSelection')}
         >
-          <X class="w-4 h-4 text-gray-500" />
+          <X class="w-4 h-4" style="color: var(--ds-text-subtle);" />
         </button>
-        <ChevronDown class="w-4 h-4 text-gray-500" />
+        <ChevronDown class="w-4 h-4" style="color: var(--ds-text-subtle);" />
       </div>
     {:else}
-      <span class="text-gray-500">{resolvedPlaceholder}</span>
-      <ChevronDown class="w-4 h-4 text-gray-500" />
+      <span style="color: var(--ds-text-subtle);">{resolvedPlaceholder}</span>
+      <ChevronDown class="w-4 h-4" style="color: var(--ds-text-subtle);" />
     {/if}
   </button>
 
   <!-- Dropdown Menu -->
   {#if isOpen}
-    <div class="absolute z-50 mt-1 w-full max-w-md bg-white border border-gray-300 rounded shadow-lg overflow-hidden">
+    <div class="absolute z-50 mt-1 w-full max-w-md border rounded shadow-lg overflow-hidden" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
       <!-- Search Input -->
-      <div class="p-2 border-b border-gray-200">
+      <div class="p-2" style="border-bottom: 1px solid var(--ds-border);">
         <SearchInput
           bind:value={searchQuery}
           placeholder={t('pickers.searchFields')}
@@ -247,14 +246,14 @@
       <!-- Field List -->
       <div class="max-h-96 overflow-y-auto">
         {#if filteredFields.length === 0}
-          <div class="p-4 text-center text-gray-500 text-sm">
+          <div class="p-4 text-center text-sm" style="color: var(--ds-text-subtle);">
             {t('pickers.noFieldsFound', { query: searchQuery })}
           </div>
         {:else}
           {#each filteredFields as group}
-            <div class="border-b border-gray-100 last:border-b-0">
+            <div class="last:border-b-0" style="border-bottom: 1px solid var(--ds-border);">
               <!-- Category Header -->
-              <div class="px-3 py-2 bg-gray-50 text-xs font-semibold text-gray-700 uppercase tracking-wide">
+              <div class="px-3 py-2 text-xs font-semibold uppercase tracking-wide" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
                 {group.category}
               </div>
 
@@ -263,12 +262,12 @@
                 <button
                   type="button"
                   onclick={() => selectField(field)}
-                  class="w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors focus:outline-none focus:bg-gray-100"
+                  class="w-full px-3 py-2 text-left transition-colors focus:outline-none field-item-btn"
                 >
                   <div class="flex items-center justify-between">
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-2">
-                        <span class="font-medium text-gray-900">{field.name}</span>
+                        <span class="font-medium" style="color: var(--ds-text);">{field.name}</span>
                         <span class="text-xs px-1.5 py-0.5 rounded {getFieldTypeColor(field.type)}">
                           {getFieldTypeLabel(field.type)}
                         </span>
@@ -277,7 +276,7 @@
                         {/if}
                       </div>
                       {#if field.description}
-                        <p class="text-xs text-gray-500 mt-0.5">{field.description}</p>
+                        <p class="text-xs mt-0.5" style="color: var(--ds-text-subtle);">{field.description}</p>
                       {/if}
                     </div>
                   </div>
@@ -290,3 +289,15 @@
     </div>
   {/if}
 </div>
+
+<style>
+  .hover-bg:hover {
+    background-color: var(--ds-background-neutral-hovered);
+  }
+  .field-item-btn:hover {
+    background-color: var(--ds-background-neutral-hovered);
+  }
+  .field-item-btn:focus {
+    background-color: var(--ds-background-neutral);
+  }
+</style>

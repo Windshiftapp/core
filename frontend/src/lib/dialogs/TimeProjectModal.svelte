@@ -1,10 +1,10 @@
 <script>
-  import Modal from './Modal.svelte';
-  import Button from '../components/Button.svelte';
+  import FormModal from './FormModal.svelte';
   import Input from '../components/Input.svelte';
   import Select from '../components/Select.svelte';
   import Textarea from '../components/Textarea.svelte';
   import Label from '../components/Label.svelte';
+  import ColorPicker from '../editors/ColorPicker.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   // Props
@@ -28,185 +28,97 @@
     oncancel = () => {}
   } = $props();
 
-  // Color options - matching IconSelector's palette
-  const colorOptions = [
-    '#7c3aed', '#2563eb', '#059669', '#dc2626', '#ea580c',
-    '#6b7280', '#8b5cf6', '#3b82f6', '#10b981', '#ef4444',
-    '#f59e0b', '#84cc16', '#06b6d4', '#ec4899', '#f97316',
-    '#64748b', '#7c2d12', '#1e40af', '#065f46', '#991b1b',
-    '#92400e', '#365314', '#0e7490', '#be185d', '#9a3412'
-  ];
-
-  function selectColor(color) {
-    formData.color = color;
-  }
-
-  function handleSubmit() {
+  function handleSave() {
     if (formData.name.trim()) {
       onsave();
     }
   }
-
-  function handleCancel() {
-    oncancel();
-  }
 </script>
 
-{#if isOpen}
-  <Modal
-    {isOpen}
-    onSubmit={handleSubmit}
-    submitDisabled={!formData.name.trim()}
-    maxWidth="max-w-2xl"
-    onclose={handleCancel}
-    let:submitHint
-  >
-    <div class="p-6">
-      <h3 class="text-xl font-semibold mb-6" style="color: var(--ds-text);">
-        {isEditing ? t('timeProject.editProject') : t('timeProject.newProject')}
-      </h3>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <Label required class="mb-2">{t('timeProject.projectName')}</Label>
-          <Input bind:value={formData.name} required />
-        </div>
-
-        <div>
-          <Label class="mb-2">{t('timeProject.status')}</Label>
-          <Select bind:value={formData.status}>
-            {#each statusOptions as status}
-              <option value={status}>{status}</option>
-            {/each}
-          </Select>
-        </div>
-
-        <div>
-          <Label class="mb-2">{t('timeProject.customerOptional')}</Label>
-          <Select bind:value={formData.customer_id}>
-            <option value="">{t('timeProject.none')}</option>
-            {#each customers.filter(c => c.active) as customer}
-              <option value={customer.id}>{customer.name}</option>
-            {/each}
-          </Select>
-        </div>
-
-        <div>
-          <Label class="mb-2">{t('timeProject.categoryOptional')}</Label>
-          <Select bind:value={formData.category_id}>
-            <option value="">{t('timeProject.none')}</option>
-            {#each categories as category}
-              <option value={category.id}>{category.name}</option>
-            {/each}
-          </Select>
-        </div>
-      </div>
-
-      <div class="mt-6">
-        <Label class="mb-2">{t('timeProject.hourlyRate')}</Label>
-        <Input type="number" bind:value={formData.hourly_rate} min="0" step="0.01" />
-      </div>
-
-      <div class="mt-6">
-        <Label class="mb-2">{t('timeProject.maxHours')}</Label>
-        <Input type="number" bind:value={formData.settings.max_hours} min="0" step="0.5" placeholder={t('timeProject.maxHoursPlaceholder')} />
-        <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-          {t('timeProject.maxHoursHint')}
-        </div>
-      </div>
-
-      <!-- Color Picker -->
-      <div class="mt-6">
-        <Label class="mb-2">{t('timeProject.projectColor')}</Label>
-
-        <!-- Color Preview -->
-        {#if formData.color}
-          <div class="flex items-center gap-3 mb-3 p-3 rounded border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-            <div class="w-8 h-8 rounded flex-shrink-0" style="background-color: {formData.color};"></div>
-            <div class="flex-1">
-              <div class="text-sm font-medium" style="color: var(--ds-text);">{formData.color}</div>
-            </div>
-            <button
-              onclick={() => formData.color = ''}
-              class="text-sm px-3 py-1 rounded hover-bg transition-colors"
-              style="color: var(--ds-text-subtle);"
-              type="button"
-            >
-              {t('common.clear')}
-            </button>
-          </div>
-        {/if}
-
-        <!-- Color Grid -->
-        <div class="color-grid">
-          {#each colorOptions as color}
-            <button
-              type="button"
-              class="color-option"
-              class:selected={formData.color === color}
-              style="background-color: {color}"
-              onclick={() => selectColor(color)}
-              title={color}
-            ></button>
-          {/each}
-        </div>
-      </div>
-
-      <div class="mt-6">
-        <Label class="mb-2">{t('common.description')}</Label>
-        <Textarea bind:value={formData.description} rows={3} />
-      </div>
-
-      <div class="mt-8 flex gap-3">
-        <Button
-          variant="primary"
-          onclick={handleSubmit}
-          disabled={!formData.name.trim()}
-          size="medium"
-          keyboardHint={submitHint}
-        >
-          {isEditing ? t('timeProject.updateProject') : t('timeProject.createProject')}
-        </Button>
-        <Button
-          variant="default"
-          onclick={handleCancel}
-          size="medium"
-          keyboardHint="Esc"
-        >
-          {t('common.cancel')}
-        </Button>
-      </div>
+<FormModal
+  {isOpen}
+  title={t('timeProject.newProject')}
+  editTitle={t('timeProject.editProject')}
+  {isEditing}
+  onSave={handleSave}
+  onCancel={oncancel}
+  saveLabel={isEditing ? t('timeProject.updateProject') : t('timeProject.createProject')}
+  saveDisabled={!formData.name.trim()}
+  maxWidth="max-w-2xl"
+>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div>
+      <Label required class="mb-2">{t('timeProject.projectName')}</Label>
+      <Input bind:value={formData.name} required />
     </div>
-  </Modal>
-{/if}
 
-<style>
-  .color-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
-    gap: 8px;
-    padding: 4px;
-  }
+    <div>
+      <Label class="mb-2">{t('timeProject.status')}</Label>
+      <Select bind:value={formData.status}>
+        {#each statusOptions as status}
+          <option value={status}>{status}</option>
+        {/each}
+      </Select>
+    </div>
 
-  .color-option {
-    width: 32px;
-    height: 32px;
-    border: 2px solid transparent;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
-  }
+    <div>
+      <Label class="mb-2">{t('timeProject.customerOptional')}</Label>
+      <Select bind:value={formData.customer_id}>
+        <option value="">{t('timeProject.none')}</option>
+        {#each customers.filter(c => c.active) as customer}
+          <option value={customer.id}>{customer.name}</option>
+        {/each}
+      </Select>
+    </div>
 
-  .color-option:hover {
-    transform: scale(1.1);
-    border-color: rgba(255, 255, 255, 0.8);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  }
+    <div>
+      <Label class="mb-2">{t('timeProject.categoryOptional')}</Label>
+      <Select bind:value={formData.category_id}>
+        <option value="">{t('timeProject.none')}</option>
+        {#each categories as category}
+          <option value={category.id}>{category.name}</option>
+        {/each}
+      </Select>
+    </div>
+  </div>
 
-  .color-option.selected {
-    border-color: #374151;
-    box-shadow: 0 0 0 2px #3b82f6;
-  }
+  <div class="mt-6">
+    <Label class="mb-2">{t('timeProject.hourlyRate')}</Label>
+    <Input type="number" bind:value={formData.hourly_rate} min="0" step="0.01" />
+  </div>
 
-</style>
+  <div class="mt-6">
+    <Label class="mb-2">{t('timeProject.maxHours')}</Label>
+    <Input type="number" bind:value={formData.settings.max_hours} min="0" step="0.5" placeholder={t('timeProject.maxHoursPlaceholder')} />
+    <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+      {t('timeProject.maxHoursHint')}
+    </div>
+  </div>
+
+  <!-- Color Picker -->
+  <div class="mt-6">
+    <div class="flex items-center gap-3 mb-2">
+      <Label>{t('timeProject.projectColor')}</Label>
+      {#if formData.color}
+        <div class="flex items-center gap-2">
+          <div class="w-6 h-6 rounded flex-shrink-0" style="background-color: {formData.color}; border: 1px solid var(--ds-border);"></div>
+          <span class="text-xs" style="color: var(--ds-text-subtle);">{formData.color}</span>
+          <button
+            onclick={() => formData.color = ''}
+            class="text-xs px-2 py-0.5 rounded hover-bg transition-colors"
+            style="color: var(--ds-text-subtle);"
+            type="button"
+          >
+            {t('common.clear')}
+          </button>
+        </div>
+      {/if}
+    </div>
+    <ColorPicker bind:value={formData.color} />
+  </div>
+
+  <div class="mt-6">
+    <Label class="mb-2">{t('common.description')}</Label>
+    <Textarea bind:value={formData.description} rows={3} />
+  </div>
+</FormModal>

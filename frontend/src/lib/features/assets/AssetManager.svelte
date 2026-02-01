@@ -540,21 +540,21 @@
     <div class="mb-6" style="border-bottom: 1px solid var(--ds-border);">
       <nav class="flex gap-4">
         <button
-          class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'types' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}"
+          class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'types' ? 'border-blue-500 text-blue-600' : 'border-transparent asset-tab-inactive'}"
           onclick={() => activeTab = 'types'}
         >
           <Settings class="w-4 h-4 inline mr-1" />
           {t('assets.types')}
         </button>
         <button
-          class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'categories' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}"
+          class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'categories' ? 'border-blue-500 text-blue-600' : 'border-transparent asset-tab-inactive'}"
           onclick={() => activeTab = 'categories'}
         >
           <FolderTree class="w-4 h-4 inline mr-1" />
           {t('assets.categories')}
         </button>
         <button
-          class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'permissions' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}"
+          class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'permissions' ? 'border-blue-500 text-blue-600' : 'border-transparent asset-tab-inactive'}"
           onclick={() => activeTab = 'permissions'}
         >
           <Users class="w-4 h-4 inline mr-1" />
@@ -591,7 +591,7 @@
           <div slot="name" let:item={row}>
             <span class="font-medium">{row.name}</span>
             {#if row.description}
-              <p class="text-xs text-gray-500">{row.description}</p>
+              <p class="text-xs" style="color: var(--ds-text-subtle);">{row.description}</p>
             {/if}
           </div>
           <div slot="color" let:item={row}>
@@ -902,7 +902,7 @@
         <div class="flex gap-2">
           <button
             type="button"
-            class="flex-1 px-3 py-2 text-sm rounded-lg border transition-colors {roleFormData.type === 'user' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}"
+            class="flex-1 px-3 py-2 text-sm rounded-lg border transition-colors {roleFormData.type === 'user' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'role-toggle-inactive'}"
             onclick={() => roleFormData.type = 'user'}
           >
             <User class="w-4 h-4 inline mr-1" />
@@ -910,7 +910,7 @@
           </button>
           <button
             type="button"
-            class="flex-1 px-3 py-2 text-sm rounded-lg border transition-colors {roleFormData.type === 'group' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}"
+            class="flex-1 px-3 py-2 text-sm rounded-lg border transition-colors {roleFormData.type === 'group' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'role-toggle-inactive'}"
             onclick={() => roleFormData.type = 'group'}
           >
             <Users class="w-4 h-4 inline mr-1" />
@@ -972,4 +972,20 @@
   onSave={handleFieldsSubmit}
   onCancel={handleFieldsCancel}
 />
+
+<style>
+  .asset-tab-inactive {
+    color: var(--ds-text-subtle);
+  }
+  .asset-tab-inactive:hover {
+    color: var(--ds-text);
+  }
+  .role-toggle-inactive {
+    border-color: var(--ds-border);
+    color: var(--ds-text-subtle);
+  }
+  .role-toggle-inactive:hover {
+    background-color: var(--ds-background-neutral-hovered);
+  }
+</style>
 

@@ -59,7 +59,7 @@
 {#if loading}
   <div class="text-center py-8">
     <Spinner class="mx-auto" />
-    <p class="text-sm text-gray-500 mt-2">{t('components.diagram.loading')}</p>
+    <p class="text-sm mt-2" style="color: var(--ds-text-subtle);">{t('components.diagram.loading')}</p>
   </div>
 {:else if diagrams && diagrams.length > 0}
   <div class="attachment-list space-y-1">
@@ -71,7 +71,7 @@
             <!-- Diagram icon -->
             <div class="flex-shrink-0">
               <div class="flex items-center justify-center w-8 h-8">
-                <Workflow class="w-5 h-5 text-gray-500" />
+                <Workflow class="w-5 h-5" style="color: var(--ds-text-subtle);" />
               </div>
             </div>
 
@@ -82,7 +82,7 @@
                   {diagram.name}
                 </p>
               </div>
-              <div class="flex items-center gap-2 text-xs text-gray-500">
+              <div class="flex items-center gap-2 text-xs" style="color: var(--ds-text-subtle);">
                 {#if diagram.updated_by_name}
                   <span>{formatDate(diagram.updated_at)}</span>
                   <span>•</span>
@@ -103,9 +103,9 @@
                 {#snippet children()}
                   <button
                     onclick={() => onEdit(diagram)}
-                    class="p-1 rounded hover:bg-blue-50"
+                    class="p-1 rounded hover:bg-blue-50 diagram-edit-btn"
                   >
-                    <Pencil class="w-4 h-4 text-gray-500 hover:text-blue-500" />
+                    <Pencil class="w-4 h-4" />
                   </button>
                 {/snippet}
               </Tooltip>
@@ -114,9 +114,9 @@
                 {#snippet children()}
                   <button
                     onclick={() => handleDelete(diagram.id)}
-                    class="p-1 rounded hover:bg-red-50"
+                    class="p-1 rounded hover:bg-red-50 diagram-delete-btn"
                   >
-                    <Trash2 class="w-4 h-4 text-gray-500 hover:text-red-500" />
+                    <Trash2 class="w-4 h-4" />
                   </button>
                 {/snippet}
               </Tooltip>
@@ -127,3 +127,18 @@
     {/each}
   </div>
 {/if}
+
+<style>
+  .diagram-edit-btn {
+    color: var(--ds-text-subtle);
+  }
+  .diagram-edit-btn:hover {
+    color: #3b82f6;
+  }
+  .diagram-delete-btn {
+    color: var(--ds-text-subtle);
+  }
+  .diagram-delete-btn:hover {
+    color: #ef4444;
+  }
+</style>

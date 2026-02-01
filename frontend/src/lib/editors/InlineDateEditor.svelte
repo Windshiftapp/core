@@ -13,7 +13,7 @@
   $: effectivePlaceholder = placeholder || t('editors.selectDate');
   export let className = '';
   export let editingClass = 'border-blue-500 ring-1 ring-blue-500';
-  export let displayClass = 'hover:bg-gray-50 cursor-text';
+  export let displayClass = 'hover-bg cursor-text';
   export let enableSingleClick = false;
   export let enableDoubleClick = false;
   
@@ -186,7 +186,7 @@
         onblur={handleBlur}
       />
       {#if error}
-        <div class="absolute top-full left-0 mt-1 text-xs text-red-600 bg-white px-2 py-1 border border-red-200 rounded shadow-sm z-10">
+        <div class="absolute top-full left-0 mt-1 text-xs text-red-600 px-2 py-1 border border-red-200 rounded shadow-sm z-10" style="background-color: var(--ds-surface);">
           {error}
         </div>
       {/if}
@@ -194,7 +194,7 @@
     
     <div class="flex items-center gap-1">
       {#if saving}
-        <Loader2 class="w-4 h-4 animate-spin text-gray-400" />
+        <Loader2 class="w-4 h-4 animate-spin" style="color: var(--ds-text-subtle);" />
       {:else}
         <button
           type="button"
@@ -207,7 +207,8 @@
         <button
           type="button"
           onclick={cancelEditing}
-          class="p-1 text-gray-400 hover:bg-gray-50 rounded"
+          class="p-1 rounded hover-bg"
+          style="color: var(--ds-text-subtle);"
           title={t('editors.cancelEscape')}
         >
           <X class="w-4 h-4" />
@@ -221,11 +222,17 @@
     onclick={handleClick}
     ondblclick={handleDoubleClick}
     class="text-left w-full px-2 py-1 text-sm rounded transition-colors flex items-center gap-2 {displayClass} {className}"
-    class:text-gray-400={!value}
+    style={!value ? 'color: var(--ds-text-subtle);' : ''}
     class:cursor-pointer={enableSingleClick || enableDoubleClick}
     {disabled}
   >
-    <Calendar class="w-4 h-4 text-gray-400" />
+    <Calendar class="w-4 h-4" style="color: var(--ds-text-subtle);" />
     {displayValue || effectivePlaceholder}
   </button>
 {/if}
+
+<style>
+  .hover-bg:hover {
+    background-color: var(--ds-background-neutral-hovered);
+  }
+</style>

@@ -92,12 +92,15 @@
     <div class="flex flex-col gap-2">
       {#each tasks as task}
         <a
-          class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 px-4 py-3 transition hover:-translate-y-px hover:border-blue-200 hover:shadow-sm"
+          class="flex items-center justify-between gap-4 rounded-xl border px-4 py-3 transition hover:-translate-y-px hover:shadow-sm"
+          style="border-color: var(--ds-border);"
           href={`/workspaces/${task.workspace_id}/items/${task.id}`}
+          onmouseenter={(e) => e.currentTarget.style.borderColor = 'var(--ds-border-focused)'}
+          onmouseleave={(e) => e.currentTarget.style.borderColor = 'var(--ds-border)'}
         >
           <div class="min-w-0 flex-1">
-            <p class="truncate text-sm font-semibold text-slate-900">{task.title}</p>
-            <p class="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+            <p class="truncate text-sm font-semibold" style="color: var(--ds-text);">{task.title}</p>
+            <p class="mt-0.5 flex items-center gap-1 text-xs" style="color: var(--ds-text-subtle);">
               <span>{task.workspace_key}-{task.workspace_item_number}</span>
               {#if task.status_name}
                 <span aria-hidden="true">•</span>
@@ -110,7 +113,7 @@
               {formatDueDate(task.dueDate)}
             </span>
             {#if task.priority_name}
-              <span class="uppercase tracking-wide text-[0.65rem] text-gray-500">
+              <span class="uppercase tracking-wide text-[0.65rem]" style="color: var(--ds-text-subtle);">
                 {task.priority_name}
               </span>
             {/if}

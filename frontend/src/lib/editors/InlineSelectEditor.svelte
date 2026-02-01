@@ -13,7 +13,7 @@
 
   $: effectivePlaceholder = placeholder || t('common.select') + '...';
   export let className = '';
-  export let displayClass = 'hover:bg-gray-50 cursor-pointer';
+  export let displayClass = 'hover-bg cursor-pointer';
   export let allowClear = false;
   
   let editing = false;
@@ -151,7 +151,7 @@
     
     <div class="flex items-center gap-1">
       {#if saving}
-        <Loader2 class="w-4 h-4 animate-spin text-gray-400" />
+        <Loader2 class="w-4 h-4 animate-spin" style="color: var(--ds-text-subtle);" />
       {:else}
         <button
           type="button"
@@ -164,7 +164,8 @@
         <button
           type="button"
           onclick={cancelEditing}
-          class="p-1 text-gray-400 hover:bg-gray-50 rounded"
+          class="p-1 rounded hover-bg"
+          style="color: var(--ds-text-subtle);"
           title={t('editors.cancelEscape')}
         >
           <X class="w-4 h-4" />
@@ -177,12 +178,12 @@
     type="button"
     onclick={startEditing}
     class="inline-flex items-center gap-2 px-2 py-1 text-sm rounded transition-colors {displayClass} {className}"
-    class:text-gray-400={!currentOption}
+    style={!currentOption ? 'color: var(--ds-text-subtle);' : ''}
     {disabled}
   >
-    <span 
+    <span
       class="flex items-center gap-2"
-      class:text-gray-500={!currentOption}
+      style={!currentOption ? 'color: var(--ds-text-subtle);' : ''}
     >
       {#if currentOption && displayColor}
         <span 
@@ -192,6 +193,12 @@
       {/if}
       {displayText}
     </span>
-    <ChevronDown class="w-3 h-3 text-gray-400" />
+    <ChevronDown class="w-3 h-3" style="color: var(--ds-text-subtle);" />
   </button>
 {/if}
+
+<style>
+  .hover-bg:hover {
+    background-color: var(--ds-background-neutral-hovered);
+  }
+</style>

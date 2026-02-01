@@ -134,10 +134,10 @@
 </script>
 
 <div class="overdue-items-widget">
-  <div class="flex items-center justify-between mb-4 text-xs text-gray-500">
+  <div class="flex items-center justify-between mb-4 text-xs" style="color: var(--ds-text-subtle);">
     <span>{loading ? t('widgets.overdueItems.loadingStatus') : t('widgets.overdueItems.itemCount', { count: overdueItems.length })}</span>
     <button
-      class="flex items-center gap-1 text-gray-500 hover:text-red-600 transition-colors disabled:opacity-50"
+      class="flex items-center gap-1 transition-colors disabled:opacity-50 refresh-btn"
       onclick={handleRefresh}
       disabled={loading || !workspaceId}
       aria-label={t('widgets.overdueItems.refreshAriaLabel')}
@@ -166,8 +166,8 @@
           >
             <div class="flex items-center gap-3 flex-1 min-w-0">
               <div class="min-w-0">
-                <p class="text-sm font-semibold text-gray-900 truncate">{item.title}</p>
-                <div class="flex flex-wrap items-center gap-3 text-xs mt-1 text-gray-500">
+                <p class="text-sm font-semibold truncate" style="color: var(--ds-text);">{item.title}</p>
+                <div class="flex flex-wrap items-center gap-3 text-xs mt-1" style="color: var(--ds-text-subtle);">
                   <span class="font-mono">{getItemKey(item)}</span>
                   <span class="text-red-600 font-medium">{formatDueDate(item.due_date)}</span>
                 </div>
@@ -186,6 +186,14 @@
 <style>
   .overdue-items-widget button:disabled svg {
     opacity: 0.6;
+  }
+
+  .refresh-btn {
+    color: var(--ds-text-subtle);
+  }
+
+  .refresh-btn:hover {
+    color: #dc2626;
   }
 
   .error-state {
