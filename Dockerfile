@@ -14,10 +14,15 @@ COPY go.mod go.sum ./
 # Copy source code
 COPY . .
 
-# Build frontend - clean install to avoid architecture issues
+# Build frontend - clean install with explicit platform targeting
 WORKDIR /build/frontend
+ARG TARGETPLATFORM
+ARG TARGETARCH
 RUN rm -rf node_modules package-lock.json && \
-    npm install --force && \
+    npm config set target_arch ${TARGETARCH:-x64} && \
+    npm config set target_platform linux && \
+    npm install --force --ignore-scripts && \
+    npm rebuild && \
     npm run build
 
 # Build backend with static linking (native architecture)
