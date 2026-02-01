@@ -270,7 +270,7 @@ func TestPlanningService_IsIterationGlobal(t *testing.T) {
 	env := setupPlanningTestEnv(t, db)
 
 	t.Run("GlobalIteration", func(t *testing.T) {
-		isGlobal, err := service.IsIterationGlobal(env.IterationID)
+		isGlobal, _, err := service.IsIterationGlobal(env.IterationID)
 		if err != nil {
 			t.Fatalf("Expected no error, got: %v", err)
 		}
@@ -281,7 +281,7 @@ func TestPlanningService_IsIterationGlobal(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-		_, err := service.IsIterationGlobal(99999)
+		_, _, err := service.IsIterationGlobal(99999)
 		if err == nil {
 			t.Error("Expected error for non-existent iteration")
 		}
@@ -1015,7 +1015,7 @@ func TestPlanningService_IsIterationGlobal_True(t *testing.T) {
 	service := NewPlanningService(db)
 	env := setupPlanningTestEnv(t, db)
 
-	isGlobal, err := service.IsIterationGlobal(env.IterationID)
+	isGlobal, _, err := service.IsIterationGlobal(env.IterationID)
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
@@ -1045,7 +1045,7 @@ func TestPlanningService_IsIterationGlobal_False(t *testing.T) {
 		t.Fatalf("Failed to create iteration: %v", err)
 	}
 
-	isGlobal, err := service.IsIterationGlobal(iteration.ID)
+	isGlobal, _, err := service.IsIterationGlobal(iteration.ID)
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}

@@ -117,7 +117,7 @@ tests/cmd/testreport/testreport
 .ssh
 
 # Runtime plugins directory (plugins are loaded at runtime, not committed)
-plugins/
+/plugins/
 !plugins/.gitkeep
 bin
 WINDSHIFT.md
