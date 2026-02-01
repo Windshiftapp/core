@@ -3,7 +3,7 @@
 FROM golang:1.24.6-alpine AS builder
 
 # Install build dependencies
-RUN apk add --no-cache gcc musl-dev nodejs npm git
+RUN apk add --no-cache gcc musl-dev nodejs npm git tzdata
 
 # Set working directory
 WORKDIR /build
