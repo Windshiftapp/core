@@ -1,0 +1,29 @@
+# Octocov configuration for frontend coverage
+# https://github.com/k1LoW/octocov
+
+coverage:
+  paths:
+    - coverage/lcov.info
+  acceptable: 50%
+  # Exclude test files and utilities
+  exclude:
+    - "**/*.test.ts"
+    - "**/*.test.js"
+    - "**/*.spec.ts"
+    - "**/*.spec.js"
+    - "**/test/**"
+    - "**/__tests__/**"
+
+# Enable PR comments with coverage diff
+comment:
+  enable: true
+  hideFooterLink: false
+
+# Store coverage data in GitHub artifacts for historical tracking
+diff:
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}
+
+report:
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}

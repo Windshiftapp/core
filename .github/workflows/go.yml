@@ -1,0 +1,132 @@
+name: Go CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run tests with coverage
+        run: |
+          go test -tags="test" -race -coverprofile=coverage.out -covermode=atomic -timeout=5m ./...
+
+      - name: Upload coverage to Octocov
+        uses: k1LoW/octocov-action@v1
+        if: github.event_name == 'pull_request'
+
+  deadcode:
+    name: Deadcode Analysis
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install deadcode
+        run: go install golang.org/x/tools/cmd/deadcode@latest
+
+      - name: Run deadcode analysis
+        id: deadcode
+        run: |
+          set +e
+          OUTPUT=$(deadcode -test ./... 2>&1)
+          EXIT_CODE=$?
+          set -e
+
+          if [ -n "$OUTPUT" ]; then
+            echo "found=true" >> $GITHUB_OUTPUT
+            # Escape for GitHub Actions
+            OUTPUT="${OUTPUT//'%'/'%25'}"
+            OUTPUT="${OUTPUT//$'\n'/'%0A'}"
+            OUTPUT="${OUTPUT//$'\r'/'%0D'}"
+            echo "output=$OUTPUT" >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment on PR with deadcode findings
+        if: steps.deadcode.outputs.found == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const output = `${{ steps.deadcode.outputs.output }}`.replace(/%0A/g, '\n').replace(/%0D/g, '\r').replace(/%25/g, '%');
+            const body = `## 🔍 Deadcode Analysis
+
+            <details>
+            <summary>Found potentially unused code (click to expand)</summary>
+
+            \`\`\`
+            ${output}
+            \`\`\`
+
+            </details>
+
+            > These functions may be unused. Consider removing them if they're no longer needed.`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        run: |
+          go build -tags="!test" -ldflags="-s -w" -o windshift .

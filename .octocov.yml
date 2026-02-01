@@ -1,0 +1,39 @@
+# Octocov configuration for Go backend coverage
+# https://github.com/k1LoW/octocov
+
+coverage:
+  paths:
+    - coverage.out
+  acceptable: 60%
+  # Exclude generated files and test utilities
+  exclude:
+    - "**/*_test.go"
+    - "**/testutil/**"
+    - "**/mock_*.go"
+
+codeToTestRatio:
+  enable: true
+  acceptable: 1:0.3
+
+testExecutionTime:
+  enable: true
+  acceptable: 300s  # 5 minutes
+
+# Enable PR comments with coverage diff
+comment:
+  enable: true
+  hideFooterLink: false
+
+# Store coverage data in GitHub artifacts for historical tracking
+diff:
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}
+
+report:
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}
+
+# Badge configuration
+badge:
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}

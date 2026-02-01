@@ -1,0 +1,10 @@
+# Default owners for everything
+* @windshiftapp/core
+
+# Frontend
+/frontend/ @windshiftapp/frontend
+
+# Infrastructure and CI
+/.github/ @windshiftapp/platform
+/Dockerfile @windshiftapp/platform
+/docker-compose*.yml @windshiftapp/platform
