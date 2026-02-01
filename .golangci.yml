@@ -1,8 +1,6 @@
 run:
   timeout: 5m
   tests: false
-  build-tags:
-    - "!test"
 
 linters:
   enable:
