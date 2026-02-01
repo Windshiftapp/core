@@ -18,7 +18,7 @@ require (
 	github.com/extism/go-sdk v1.7.1
 	github.com/go-playground/validator/v10 v10.28.0
 	github.com/go-webauthn/webauthn v0.15.0
-	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/securecookie v1.1.2
 	github.com/jub0bs/cors v0.9.2
