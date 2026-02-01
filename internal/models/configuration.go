@@ -27,7 +27,6 @@ type ConfigurationSet struct {
 	ItemTypeConfigs   []ItemTypeConfig  `json:"item_type_configs,omitempty"`   // Item type configurations with optional workflow and screen overrides
 	// Priorities associated with this configuration set
 	PriorityIDs        []int             `json:"priority_ids,omitempty"`        // IDs of associated priorities
-	Priorities         []string          `json:"priorities,omitempty"`          // Deprecated: no longer populated, use PrioritiesDetailed
 	PrioritiesDetailed []PriorityDisplay `json:"priorities_detailed,omitempty"` // Full priority data with icons and colors
 	// Screen assignments for different contexts
 	CreateScreenID   *int   `json:"create_screen_id,omitempty"`

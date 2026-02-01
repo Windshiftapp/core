@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"crypto/rand"
-	"crypto/tls"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
@@ -676,24 +675,6 @@ func (h *ChannelHandler) testSMTPConfig(config models.ChannelConfig) bool {
 		return false
 	}
 	defer conn.Close()
-
-	// If TLS is enabled, test TLS connection
-	// TODO: Add SMTPUseTLS field to models.ChannelConfig
-	if false /* config.SMTPUseTLS */ {
-		tlsConfig := &tls.Config{
-			ServerName:         config.SMTPHost,
-			InsecureSkipVerify: false, // Require valid certificate
-			MinVersion:         tls.VersionTLS12,
-		}
-
-		tlsConn := tls.Client(conn, tlsConfig)
-		if err := tlsConn.Handshake(); err != nil {
-			// Log SMTP TLS handshake failure
-			logger.Get().Debug("SMTP TLS handshake failed", "error", err)
-			return false
-		}
-		tlsConn.Close()
-	}
 
 	return true // Connection test successful
 }

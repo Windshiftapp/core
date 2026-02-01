@@ -73,12 +73,6 @@ func (g *RouteGroup) HandleWithMiddleware(pattern string, h http.HandlerFunc, mw
 	g.mux.Handle(fullPattern, chain.ThenFunc(h))
 }
 
-// HandleHandler registers an http.Handler (not HandlerFunc) with the group's middleware.
-// Deprecated: Use HandleH instead.
-func (g *RouteGroup) HandleHandler(pattern string, h http.Handler) {
-	g.HandleH(pattern, h)
-}
-
 // Group creates a sub-group with additional prefix and middleware.
 // The new group inherits this group's prefix and middleware.
 func (g *RouteGroup) Group(prefix string, mw ...func(http.Handler) http.Handler) *RouteGroup {
