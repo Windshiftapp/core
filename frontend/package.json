@@ -51,7 +51,7 @@
     "@milkdown/components": "^7.17.2",
     "@milkdown/kit": "^7.17.2",
     "@milkdown/plugin-listener": "^7.17.2",
-    "@milkdown/theme-nord": "^7.17.2",
+    "@milkdown/theme-nord": "^7.18.0",
     "@tailwindcss/vite": "^4.1.11",
     "@xyflow/svelte": "^1.3.0",
     "d3-time-format": "^4.1.0",
