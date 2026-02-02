@@ -89,7 +89,7 @@ jobs:
         run: npm run build
 
       - name: Upload bundle analysis
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: bundle-stats
           path: frontend/dist/bundle-analyzer.html
