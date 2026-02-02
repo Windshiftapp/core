@@ -1373,22 +1373,18 @@ func SetupPortalChannel(t *testing.T, server *TestServer, workspaceID int) strin
 }
 
 // SubmitPortalRequest submits a request through the portal for a specific portal customer.
-// The customerEmail must match the email used when creating the portal customer, so that
-// the submission is linked to the correct portal_customer record.
+// Requires portal authentication token from CreatePortalCustomerWithSession.
 // Returns the created item ID.
-func SubmitPortalRequest(t *testing.T, server *TestServer, portalSlug, customerEmail, title string) int {
+func SubmitPortalRequest(t *testing.T, server *TestServer, portalSlug, portalToken, title string) int {
 	t.Helper()
 
 	submissionData := map[string]interface{}{
 		"title":       title,
 		"description": "Test portal submission",
-		"name":        "Test Customer",
-		"email":       customerEmail,
 	}
 
 	endpoint := fmt.Sprintf("/portal/%s/submit", portalSlug)
-	// Submit without auth (portal submit is public, uses email to find/create customer)
-	submitResp := MakeUnauthenticatedRequest(t, server, http.MethodPost, endpoint, submissionData)
+	submitResp := MakePortalRequest(t, server, portalToken, http.MethodPost, endpoint, submissionData)
 	defer submitResp.Body.Close()
 
 	AssertStatusCode(t, submitResp, http.StatusCreated)

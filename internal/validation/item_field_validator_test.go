@@ -433,8 +433,8 @@ func setupTestData(t *testing.T, tdb *testutils.TestDB) *TestData {
 	if err != nil {
 		// Create time project if none exists
 		projectResult, err := tdb.DB.Exec(`
-			INSERT INTO time_projects (name, description, active, created_at, updated_at)
-			VALUES ('Test Project', 'Test project', 1, ?, ?)
+			INSERT INTO time_projects (name, description, created_at, updated_at)
+			VALUES ('Test Project', 'Test project', ?, ?)
 		`, now, now)
 		if err != nil {
 			t.Fatalf("Failed to create time project: %v", err)

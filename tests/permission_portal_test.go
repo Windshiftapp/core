@@ -114,9 +114,9 @@ func TestPortalCustomer_IDOR_Isolation(t *testing.T) {
 	_, tokenA := CreatePortalCustomerWithSession(t, server, "Customer A", "customerA@test.com")
 	_, tokenB := CreatePortalCustomerWithSession(t, server, "Customer B", "customerB@test.com")
 
-	// Each customer submits a request (using their email so items are linked to the right customer)
-	itemIDA := SubmitPortalRequest(t, server, portalSlug, "customerA@test.com", "Request from Customer A")
-	itemIDB := SubmitPortalRequest(t, server, portalSlug, "customerB@test.com", "Request from Customer B")
+	// Each customer submits a request (using their token for authentication)
+	itemIDA := SubmitPortalRequest(t, server, portalSlug, tokenA, "Request from Customer A")
+	itemIDB := SubmitPortalRequest(t, server, portalSlug, tokenB, "Request from Customer B")
 
 	t.Logf("Customer A item: %d, Customer B item: %d", itemIDA, itemIDB)
 
@@ -192,8 +192,8 @@ func TestInternalUser_CannotImpersonatePortalCustomer(t *testing.T) {
 	portalSlug := SetupPortalChannel(t, server, workspaceID)
 
 	// Create portal customer and submit a request
-	_, _ = CreatePortalCustomerWithSession(t, server, "Real Customer", "real@test.com")
-	itemID := SubmitPortalRequest(t, server, portalSlug, "real@test.com", "Real customer request")
+	_, portalToken := CreatePortalCustomerWithSession(t, server, "Real Customer", "real@test.com")
+	itemID := SubmitPortalRequest(t, server, portalSlug, portalToken, "Real customer request")
 
 	// Create an internal user (no linked portal customer)
 	_, username, password := CreateTestUserWithCredentials(t, server, "internaluser", "internal@test.com")

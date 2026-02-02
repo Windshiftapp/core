@@ -467,8 +467,8 @@ func setupUpdateServiceTestData(t *testing.T, tdb *testutils.TestDB) *UpdateServ
 	err = tdb.DB.QueryRow("SELECT id FROM time_projects LIMIT 1").Scan(&projectID)
 	if err != nil {
 		projectResult, err := tdb.DB.Exec(`
-			INSERT INTO time_projects (name, description, active, created_at, updated_at)
-			VALUES ('Test Project', 'Test project', 1, ?, ?)
+			INSERT INTO time_projects (name, description, created_at, updated_at)
+			VALUES ('Test Project', 'Test project', ?, ?)
 		`, now, now)
 		if err != nil {
 			t.Fatalf("Failed to create time project: %v", err)
@@ -477,11 +477,11 @@ func setupUpdateServiceTestData(t *testing.T, tdb *testutils.TestDB) *UpdateServ
 		projectID = int(projectID64)
 	}
 
-	// Create test item
+	// Create test item (without status_id so we can test status changes)
 	itemResult, err := tdb.DB.Exec(`
-		INSERT INTO items (workspace_id, workspace_item_number, title, description, status, is_task,
+		INSERT INTO items (workspace_id, workspace_item_number, title, description, is_task,
 		                   frac_index, path, created_at, updated_at)
-		VALUES (?, 1, 'Test Item', 'Test Description', 'open', 0, 'a0', '/1/', ?, ?)
+		VALUES (?, 1, 'Test Item', 'Test Description', 0, 'a0', '/1/', ?, ?)
 	`, workspaceID, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create test item: %v", err)

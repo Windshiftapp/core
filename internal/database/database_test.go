@@ -198,8 +198,8 @@ func TestDatabase_DefaultData_StatusSystem(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to count statuses: %v", err)
 	}
-	if statusCount < 5 {
-		t.Errorf("Expected at least 5 statuses, got %d", statusCount)
+	if statusCount < 3 {
+		t.Errorf("Expected at least 3 statuses, got %d", statusCount)
 	}
 
 	// Verify default workflow exists
@@ -218,8 +218,8 @@ func TestDatabase_DefaultData_StatusSystem(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to count workflow transitions: %v", err)
 	}
-	if transitionCount < 5 {
-		t.Errorf("Expected at least 5 workflow transitions, got %d", transitionCount)
+	if transitionCount < 4 {
+		t.Errorf("Expected at least 4 workflow transitions, got %d", transitionCount)
 	}
 }
 

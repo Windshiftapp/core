@@ -8,14 +8,8 @@ import (
 	"time"
 
 	"windshift/internal/models"
-	"windshift/internal/services"
 	"windshift/internal/testutils"
 )
-
-// mockNotifService is a no-op notification service for time tracking tests
-type mockNotifService struct{}
-
-func (m *mockNotifService) EmitEvent(event *services.NotificationEvent) {}
 
 func TestTimeWorklogHandler_Create_Success(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
@@ -42,8 +36,8 @@ func TestTimeWorklogHandler_Create_Success(t *testing.T) {
 	}
 
 	// Create work item for linking
-	mockNotificationService := &mockNotifService{}
-	itemHandler := NewItemHandler(tdb.GetDatabase(), nil, nil, mockNotificationService)
+	permService, actTracker, notifService := createTestServices(t, *tdb)
+	itemHandler := NewItemHandler(tdb.GetDatabase(), permService, actTracker, notifService)
 	item := models.Item{
 		WorkspaceID: data.WorkspaceID,
 		Title:       "Test Work Item",

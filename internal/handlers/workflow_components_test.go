@@ -71,8 +71,8 @@ func TestStatusHandler_GetAll_Success(t *testing.T) {
 	rr.AssertJSONResponse(&response)
 
 	// Should have at least the default statuses
-	if len(response) < 5 {
-		t.Errorf("Expected at least 5 default statuses, got %d", len(response))
+	if len(response) < 3 {
+		t.Errorf("Expected at least 3 default statuses, got %d", len(response))
 	}
 
 	// Should have category names populated

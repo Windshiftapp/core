@@ -286,6 +286,9 @@ func TestPortalWorkflow(t *testing.T) {
 	})
 
 	// ===== PORTAL SUBMISSION TESTS =====
+	// Create portal customer for authenticated submissions
+	_, portalToken := CreatePortalCustomerWithSession(t, server, "Test User", "testuser@example.com")
+
 	var createdBugItemID int
 
 	t.Run("SubmitBugReportThroughPortal", func(t *testing.T) {
@@ -293,8 +296,6 @@ func TestPortalWorkflow(t *testing.T) {
 			"request_type_id": bugReportTypeID,
 			"title":           "Login page crashes on mobile",
 			"description":     "When attempting to login on mobile devices, the app crashes immediately after entering credentials.",
-			"name":            "Test User",
-			"email":           "testuser@example.com",
 			"custom_fields": map[string]interface{}{
 				fmt.Sprintf("%d", environmentFieldID): "Production",
 				fmt.Sprintf("%d", priorityFieldID):    "High",
@@ -302,7 +303,7 @@ func TestPortalWorkflow(t *testing.T) {
 		}
 
 		endpoint := fmt.Sprintf("/portal/%s/submit", portalSlug)
-		resp := MakeAuthRequest(t, server, http.MethodPost, endpoint, submissionData)
+		resp := MakePortalRequest(t, server, portalToken, http.MethodPost, endpoint, submissionData)
 		defer resp.Body.Close()
 
 		AssertStatusCode(t, resp, http.StatusCreated)
@@ -399,15 +400,13 @@ func TestPortalWorkflow(t *testing.T) {
 			"request_type_id": featureRequestTypeID,
 			"title":           "Add dark mode support",
 			"description":     "Users have requested a dark mode option for better viewing at night.",
-			"name":            "Another User",
-			"email":           "anotheruser@example.com",
 			"custom_fields": map[string]interface{}{
 				fmt.Sprintf("%d", priorityFieldID): "Medium",
 			},
 		}
 
 		endpoint := fmt.Sprintf("/portal/%s/submit", portalSlug)
-		resp := MakeAuthRequest(t, server, http.MethodPost, endpoint, submissionData)
+		resp := MakePortalRequest(t, server, portalToken, http.MethodPost, endpoint, submissionData)
 		defer resp.Body.Close()
 
 		AssertStatusCode(t, resp, http.StatusCreated)

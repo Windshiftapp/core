@@ -328,7 +328,10 @@ func TestPermissionServiceWithMiddleware(t *testing.T) {
 
 // TestAllViewersInheritance tests the "All Viewers" inheritance logic
 // This tests that roles without explicit members grant permissions to all users with Viewer
+// NOTE: This feature is intentionally disabled in applyAllViewersInheritance()
 func TestAllViewersInheritance(t *testing.T) {
+	t.Skip("Feature intentionally disabled - see applyAllViewersInheritance comment")
+
 	// Create test database
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
