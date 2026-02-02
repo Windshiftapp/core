@@ -10,8 +10,6 @@ import (
 	"testing"
 
 	"windshift/internal/database"
-
-	_ "github.com/mattn/go-sqlite3"
 )
 
 // SharedMemoryDSN is the recommended DSN for in-memory test databases.

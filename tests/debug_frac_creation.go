@@ -1,18 +1,19 @@
 package tests
 
 import (
-	"windshift/internal/services"
 	"database/sql"
 	"fmt"
 	"testing"
-	
-	_ "github.com/mattn/go-sqlite3"
+
+	_ "modernc.org/sqlite"
+
+	"windshift/internal/services"
 )
 
 func TestDebugFracCreation(t *testing.T) {
 	server, _ := StartTestServer(t, "sqlite")
 	
-	db, err := sql.Open("sqlite3", server.DBPath)
+	db, err := sql.Open("sqlite", server.DBPath)
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}

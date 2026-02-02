@@ -1,8 +1,6 @@
 package stress
 
 import (
-	"windshift/internal/services"
-	tests "windshift/tests"
 	"database/sql"
 	"fmt"
 	"math/rand"
@@ -11,7 +9,10 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
+
+	"windshift/internal/services"
+	tests "windshift/tests"
 )
 
 // TestFractionalIndexingStressTest performs comprehensive stress testing of fractional indexing
@@ -25,7 +26,7 @@ func TestFractionalIndexingStressTest(t *testing.T) {
 	tests.CreateBearerToken(t, server)
 
 	// Open database connection
-	db, err := sql.Open("sqlite3", server.DBPath)
+	db, err := sql.Open("sqlite", server.DBPath)
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
