@@ -55,7 +55,7 @@ func checkSetupStatusWithRetry(db database.Database, maxRetries int, initialDela
 	return false, nil
 }
 
-func createCORSMiddleware(allowedHosts string, serverPort string, disableCSRF bool) func(http.Handler) http.Handler {
+func createCORSMiddleware(allowedHosts string, serverPort string, disableCSRF bool, useProxy bool) func(http.Handler) http.Handler {
 	var origins []string
 
 	if disableCSRF {
@@ -75,10 +75,14 @@ func createCORSMiddleware(allowedHosts string, serverPort string, disableCSRF bo
 
 			origins = append(origins, "https://"+host)
 
-			if serverPort != "80" && serverPort != "443" {
-				origins = append(origins, "http://"+host+":"+serverPort)
+			// Only add http:// origins when NOT behind a trusted proxy
+			// The jub0bs/cors library rejects insecure origins with credentialed requests
+			if !useProxy {
+				if serverPort != "80" && serverPort != "443" {
+					origins = append(origins, "http://"+host+":"+serverPort)
+				}
+				origins = append(origins, "http://"+host)
 			}
-			origins = append(origins, "http://"+host)
 		}
 	}
 

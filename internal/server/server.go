@@ -596,7 +596,7 @@ func (s *Server) initialize() error {
 	systemHandler := handlers.NewSystemHandler(shutdownChan)
 
 	// Build API middleware chain
-	corsMiddleware := createCORSMiddleware(cfg.AllowedHosts, effectivePort, cfg.DisableCSRF)
+	corsMiddleware := createCORSMiddleware(cfg.AllowedHosts, effectivePort, cfg.DisableCSRF, cfg.UseProxy)
 	apiMiddleware := router.MiddlewareChain{corsMiddleware, authMiddleware.OptionalAuth}
 
 	if !cfg.DisableCSRF {
