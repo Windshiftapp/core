@@ -35,6 +35,12 @@ services:
       # - DB_SSLMODE=disable
     volumes:
       - windshift-data:/data
+      # tmpfs for /tmp - needed for SQLite WAL mode in scratch containers
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          size: 64M
+          mode: 1777
     restart: unless-stopped
     # --- Traefik labels (uncomment when using traefik service) ---
     # labels:

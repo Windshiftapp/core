@@ -119,7 +119,7 @@ func NewDB(dataSourceName string) (*DB, error) {
 		"&_pragma=synchronous(NORMAL)" +
 		"&_pragma=temp_store(MEMORY)" +
 		"&_pragma=cache_size(-16000)" +
-		"&_pragma=mmap_size(30000000000)" +
+		"&_pragma=mmap_size(0)" + // Disable mmap for better Docker compatibility
 		"&_pragma=journal_size_limit(6144000)"
 
 	db, err := sql.Open("sqlite3", connectionString)
@@ -139,7 +139,7 @@ func NewDB(dataSourceName string) (*DB, error) {
 		"PRAGMA foreign_keys=ON",
 		"PRAGMA temp_store=MEMORY",
 		"PRAGMA cache_size=-262144", // 256MB cache
-		"PRAGMA mmap_size=30000000000",
+		"PRAGMA mmap_size=0", // Disable mmap for better Docker compatibility
 		"PRAGMA journal_size_limit=6144000",
 	}
 
