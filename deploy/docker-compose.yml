@@ -1,0 +1,125 @@
+# Windshift Production Docker Compose Configuration
+#
+# Quick Start:
+#   1. Run ./init.sh to generate .env file with SSO_SECRET
+#   2. Edit .env and set DOMAIN to your hostname
+#   3. Run: docker compose up -d
+#
+# For PostgreSQL: Uncomment the postgres service and related environment variables
+# For Traefik: Uncomment the traefik service and labels on windshift service
+
+services:
+  windshift:
+    image: ghcr.io/windshiftapp/core:latest
+    container_name: windshift
+    ports:
+      - "8080:8080"
+    environment:
+      - BASE_URL=https://${DOMAIN}
+      - PORT=8080
+      - USE_PROXY=true
+      - SSO_SECRET=${SSO_SECRET}
+      - ATTACHMENT_PATH=/data/attachments
+      - DB_PATH=/data/windshift.db
+      - LOG_LEVEL=info
+      - LOG_FORMAT=json
+      # --- PostgreSQL (uncomment when using postgres service) ---
+      # - DB_DRIVER=postgres
+      # - DB_HOST=postgres
+      # - DB_PORT=5432
+      # - DB_USER=windshift
+      # - DB_PASSWORD=${POSTGRES_PASSWORD}
+      # - DB_NAME=windshift
+      # - DB_SSLMODE=disable
+    volumes:
+      - windshift-data:/data
+    restart: unless-stopped
+    # --- Traefik labels (uncomment when using traefik service) ---
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.windshift.rule=Host(`${DOMAIN}`)"
+    #   - "traefik.http.routers.windshift.entrypoints=websecure"
+    #   - "traefik.http.routers.windshift.tls.certresolver=letsencrypt"
+    #   - "traefik.http.services.windshift.loadbalancer.server.port=8080"
+    # networks:
+    #   - traefik
+    depends_on: []
+      # --- PostgreSQL dependency (uncomment when using postgres service) ---
+      # postgres:
+      #   condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL (uncomment to use instead of SQLite)
+  # ---------------------------------------------------------------------------
+  # When using PostgreSQL:
+  #   1. Uncomment this service
+  #   2. Uncomment the DB_* environment variables in windshift service above
+  #   3. Uncomment the depends_on section in windshift service
+  #   4. Set POSTGRES_PASSWORD in your .env file
+  #   5. Uncomment postgres-data volume below
+  # ---------------------------------------------------------------------------
+  # postgres:
+  #   image: postgres:17-alpine
+  #   container_name: windshift-postgres
+  #   environment:
+  #     POSTGRES_USER: windshift
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #     POSTGRES_DB: windshift
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U windshift -d windshift"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Traefik Reverse Proxy (uncomment for built-in HTTPS with Let's Encrypt)
+  # ---------------------------------------------------------------------------
+  # When using Traefik:
+  #   1. Uncomment this service
+  #   2. Uncomment the labels and networks in windshift service above
+  #   3. Set TRAEFIK_HOST and LETSENCRYPT_EMAIL in your .env file
+  #   4. Uncomment the traefik network below
+  #   5. Remove or comment out the ports section in windshift service
+  # ---------------------------------------------------------------------------
+  # traefik:
+  #   image: traefik:v3.0
+  #   container_name: windshift-traefik
+  #   command:
+  #     - "--api.dashboard=false"
+  #     - "--providers.docker=true"
+  #     - "--providers.docker.exposedbydefault=false"
+  #     - "--entrypoints.web.address=:80"
+  #     - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+  #     - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+  #     - "--entrypoints.websecure.address=:443"
+  #     - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+  #     - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+  #     - "--certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}"
+  #     - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - "/var/run/docker.sock:/var/run/docker.sock:ro"
+  #     - "traefik-certs:/letsencrypt"
+  #   restart: unless-stopped
+  #   networks:
+  #     - traefik
+
+volumes:
+  windshift-data:
+    name: windshift-data
+  # --- PostgreSQL volume (uncomment when using postgres service) ---
+  # postgres-data:
+  #   name: windshift-postgres-data
+  # --- Traefik certificates volume (uncomment when using traefik service) ---
+  # traefik-certs:
+  #   name: windshift-traefik-certs
+
+# --- Traefik network (uncomment when using traefik service) ---
+# networks:
+#   traefik:
+#     name: windshift-traefik
