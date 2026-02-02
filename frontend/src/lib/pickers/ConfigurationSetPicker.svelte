@@ -157,9 +157,13 @@
   }}
   onfocus={(e) => {
     e.currentTarget.style.borderColor = 'var(--ds-border-focused)';
+    if (!disabled) {
+      e.currentTarget.style.backgroundColor = 'var(--ds-background-input-hovered)';
+    }
   }}
   onblur={(e) => {
     e.currentTarget.style.borderColor = 'var(--ds-border)';
+    e.currentTarget.style.backgroundColor = 'var(--ds-background-input)';
   }}
 >
   <div class="flex items-center gap-2 flex-1 min-w-0">
@@ -262,6 +266,17 @@
             e.currentTarget.style.backgroundColor = 'transparent';
           }
         }}
+        onfocus={(e) => {
+          highlightedIndex = 0;
+          if (value !== null) {
+            e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)';
+          }
+        }}
+        onblur={(e) => {
+          if (value !== null && highlightedIndex !== 0) {
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }
+        }}
       >
         <div class="flex items-center gap-3">
           <div class="w-7 h-7 rounded flex items-center justify-center flex-shrink-0"
@@ -299,6 +314,17 @@
             }
           }}
           onmouseout={(e) => {
+            if (!isSelected && highlightedIndex !== itemIndex) {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }
+          }}
+          onfocus={(e) => {
+            highlightedIndex = itemIndex;
+            if (!isSelected) {
+              e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)';
+            }
+          }}
+          onblur={(e) => {
             if (!isSelected && highlightedIndex !== itemIndex) {
               e.currentTarget.style.backgroundColor = 'transparent';
             }

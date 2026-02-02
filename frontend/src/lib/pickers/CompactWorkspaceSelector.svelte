@@ -117,6 +117,14 @@
   onmouseout={(e) => {
     e.currentTarget.style.backgroundColor = 'var(--ds-surface)';
   }}
+  onfocus={(e) => {
+    if (!disabled) {
+      e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, var(--ds-background-neutral-hovered))';
+    }
+  }}
+  onblur={(e) => {
+    e.currentTarget.style.backgroundColor = 'var(--ds-surface)';
+  }}
 >
   {#if selectedWorkspace}
     {#if selectedWorkspace.avatar_url}
@@ -202,6 +210,15 @@
               e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)';
             }}
             onmouseout={(e) => {
+              if (index !== highlightedIndex) {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }
+            }}
+            onfocus={(e) => {
+              highlightedIndex = index;
+              e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)';
+            }}
+            onblur={(e) => {
               if (index !== highlightedIndex) {
                 e.currentTarget.style.backgroundColor = 'transparent';
               }

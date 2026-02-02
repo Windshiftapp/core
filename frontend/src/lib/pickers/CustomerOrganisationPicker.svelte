@@ -243,6 +243,15 @@
                 e.currentTarget.style.backgroundColor = 'transparent';
               }
             }}
+            onfocus={(e) => {
+              highlightedIndex = 0;
+              e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)';
+            }}
+            onblur={(e) => {
+              if (highlightedIndex !== 0) {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }
+            }}
           >
             <span style="color: var(--ds-text-subtle);">{resolvedUnassignedLabel}</span>
           </button>
@@ -272,6 +281,17 @@
               }
             }}
             onmouseout={(e) => {
+              if (!isSelected && highlightedIndex !== itemIndex) {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }
+            }}
+            onfocus={(e) => {
+              highlightedIndex = itemIndex;
+              if (!isSelected) {
+                e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)';
+              }
+            }}
+            onblur={(e) => {
               if (!isSelected && highlightedIndex !== itemIndex) {
                 e.currentTarget.style.backgroundColor = 'transparent';
               }

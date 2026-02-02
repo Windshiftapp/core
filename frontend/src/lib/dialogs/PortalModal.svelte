@@ -42,15 +42,26 @@
 
 {#if isOpen}
   <div
-    class="fixed inset-0 flex items-center justify-center z-50 p-4"
-    style={`background-color: rgba(0, 0, 0, ${backdropOpacity}); backdrop-filter: ${backdropBlur};`}
-    onclick={handleBackdropClick}
+    class="fixed inset-0 z-50 p-4"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby={title ? 'modal-title' : undefined}
   >
-    <div
-      class={`w-full ${maxWidth} rounded-2xl shadow-2xl overflow-hidden`}
-      style={`background-color: ${isDarkMode ? '#1e293b' : '#ffffff'};`}
-      onclick={(e) => e.stopPropagation()}
-    >
+    <!-- Backdrop button - tabindex=-1 keeps it out of tab order, keyboard users use Escape -->
+    <button
+      type="button"
+      class="absolute inset-0 w-full h-full cursor-default"
+      style={`background-color: rgba(0, 0, 0, ${backdropOpacity}); backdrop-filter: ${backdropBlur};`}
+      onclick={close}
+      tabindex="-1"
+      aria-label="Close dialog"
+    ></button>
+    <!-- Modal content -->
+    <div class="relative flex items-center justify-center w-full h-full pointer-events-none">
+      <div
+        class={`w-full ${maxWidth} rounded-2xl shadow-2xl overflow-hidden pointer-events-auto`}
+        style={`background-color: ${isDarkMode ? '#1e293b' : '#ffffff'};`}
+      >
       {#if showHeader}
         <div
           class={`${headerPaddingClass} border-b flex items-center justify-between`}
@@ -82,6 +93,7 @@
 
       <div class={bodyClass}>
         <slot />
+      </div>
       </div>
     </div>
   </div>

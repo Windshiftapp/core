@@ -93,8 +93,7 @@
   });
 </script>
 
-<!-- svelte-ignore a11y-mouse-events-have-key-events -->
-<div on:mouseenter={loadPersonalWorkspaceIfNeeded}>
+<div onmouseenter={loadPersonalWorkspaceIfNeeded} onfocusin={loadPersonalWorkspaceIfNeeded}>
 <DropdownMenu
   triggerAvatar={showAvatar ? authStore.currentUser?.avatar_url : null}
   triggerText={expanded && label ? label : (showAvatar ? '' : userInitials)}

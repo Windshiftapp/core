@@ -13,7 +13,14 @@
     id = undefined,
     class: className = '',
     // Optional ref binding for parent components that need the raw input element
-    inputRef = $bindable(null)
+    inputRef = $bindable(null),
+    // Event handlers
+    oninput = undefined,
+    onchange = undefined,
+    onfocus = undefined,
+    onblur = undefined,
+    onkeydown = undefined,
+    onkeyup = undefined
   } = $props();
   export { className as class };
 
@@ -32,6 +39,7 @@
   ].filter(Boolean).join(' '));
 </script>
 
+<!-- svelte-ignore a11y_autofocus -->
 <input
   {type}
   {id}
@@ -46,10 +54,10 @@
   {step}
   class={allClasses}
   style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-  on:input
-  on:change
-  on:focus
-  on:blur
-  on:keydown
-  on:keyup
+  {oninput}
+  {onchange}
+  {onfocus}
+  {onblur}
+  {onkeydown}
+  {onkeyup}
 />

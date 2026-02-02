@@ -205,6 +205,8 @@
                 style="color: var(--ds-text); background-color: {store.formData.item_type_id === itemType.id ? 'var(--ds-background-selected)' : 'transparent'};"
                 onmouseover={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)'}
                 onmouseout={(e) => e.currentTarget.style.backgroundColor = store.formData.item_type_id === itemType.id ? 'var(--ds-background-selected)' : 'transparent'}
+                onfocus={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)'}
+                onblur={(e) => e.currentTarget.style.backgroundColor = store.formData.item_type_id === itemType.id ? 'var(--ds-background-selected)' : 'transparent'}
                 onclick={() => {
                   store.setItemType(itemType.id);
                   closePopover();
@@ -346,6 +348,8 @@
         style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: var(--ds-text-subtle);"
         onmouseover={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, var(--ds-background-neutral-hovered))'}
         onmouseout={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
+        onfocus={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, var(--ds-background-neutral-hovered))'}
+        onblur={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
       >
         <MoreHorizontal size={14} />
       </button>

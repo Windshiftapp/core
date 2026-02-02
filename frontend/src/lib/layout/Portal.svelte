@@ -367,10 +367,12 @@
 
                   <!-- Dropdown Menu -->
                   {#if portalStore.showMainMenu}
-                    <div
-                      class="fixed inset-0 z-[-1]"
+                    <button
+                      type="button"
+                      class="fixed inset-0 z-[-1] cursor-default"
                       onclick={() => portalStore.showMainMenu = false}
-                    ></div>
+                      aria-label="Close menu"
+                    ></button>
 
                     <div
                       class="absolute top-12 right-0 min-w-[200px] rounded shadow-2xl border overflow-hidden"

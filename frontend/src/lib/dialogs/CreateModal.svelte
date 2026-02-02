@@ -378,6 +378,8 @@
                     style="color: var(--ds-text); background-color: {selectedType === type.value ? 'var(--ds-background-selected)' : 'transparent'};"
                     onmouseover={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)'}
                     onmouseout={(e) => e.currentTarget.style.backgroundColor = selectedType === type.value ? 'var(--ds-background-selected)' : 'transparent'}
+                    onfocus={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)'}
+                    onblur={(e) => e.currentTarget.style.backgroundColor = selectedType === type.value ? 'var(--ds-background-selected)' : 'transparent'}
                     onclick={() => {
                       selectType(type.value);
                       closePopover();
@@ -421,6 +423,8 @@
           style="color: var(--ds-text-subtle);"
           onmouseover={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
           onmouseout={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+          onfocus={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
+          onblur={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
           aria-label="Close"
         >
           <X size={16} />

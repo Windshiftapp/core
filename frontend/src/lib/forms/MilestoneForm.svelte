@@ -143,6 +143,8 @@
               style="color: var(--ds-text);"
               onmouseover={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)'}
               onmouseout={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              onfocus={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)'}
+              onblur={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               onclick={() => {
                 form.setValue('status', status.value);
                 closePopover();

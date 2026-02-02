@@ -6,7 +6,10 @@
     size = 'medium',
     id = undefined,
     class: className = '',
-    children
+    children,
+    onchange = undefined,
+    onfocus = undefined,
+    onblur = undefined
   } = $props();
   export { className as class };
 
@@ -32,9 +35,9 @@
   {required}
   class={allClasses}
   style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-  on:change
-  on:focus
-  on:blur
+  {onchange}
+  {onfocus}
+  {onblur}
 >
   {@render children?.()}
 </select>

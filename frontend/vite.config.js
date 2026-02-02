@@ -2,15 +2,12 @@ import { defineConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import { preprocessMeltUI } from '@melt-ui/pp'
 import { visualizer } from 'rollup-plugin-visualizer'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    svelte({
-      preprocess: [preprocessMeltUI()]
-    }),
+    svelte(),  // Uses svelte.config.js for preprocessors
     react(),
     tailwindcss(),
     visualizer({
@@ -38,6 +35,7 @@ export default defineConfig({
     }
   },
   build: {
+    sourcemap: true,  // Generate .map files for debugging
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {

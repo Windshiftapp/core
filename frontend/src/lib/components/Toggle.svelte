@@ -26,11 +26,15 @@
 </script>
 
 {#if label}
-  <label class="inline-flex items-center gap-3 {labelPosition === 'left' ? 'flex-row-reverse' : ''} {disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}">
+  <div
+    class="inline-flex items-center gap-3 {labelPosition === 'left' ? 'flex-row-reverse' : ''} {disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}"
+    role="group"
+  >
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={label}
       {disabled}
       class="relative inline-flex items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--ds-border-focused)]
              disabled:cursor-not-allowed {currentSize.button} {className}"
@@ -42,7 +46,7 @@
       ></span>
     </button>
     <span class="text-sm text-[var(--ds-text)]">{label}</span>
-  </label>
+  </div>
 {:else}
   <button
     type="button"
