@@ -40,6 +40,11 @@ export default defineConfig({
             '@milkdown/kit/core',
             '@milkdown/kit/preset/commonmark',
             '@milkdown/kit/preset/gfm',
+            '@milkdown/kit/plugin/listener',
+            '@milkdown/kit/plugin/upload',
+            '@milkdown/kit/utils',
+            '@milkdown/utils',
+            '@milkdown/kit/component/image-block',
             '@milkdown/theme-nord'
           ],
           'd3': ['d3-scale', 'd3-shape', 'd3-time-format'],
