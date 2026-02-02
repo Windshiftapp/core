@@ -4,25 +4,27 @@ This document explains how to build Windshift for multiple platforms.
 
 ## Quick Build
 
-### Build Everything (Recommended)
+### Using the Makefile (Recommended)
+
 ```bash
-# Build both server and ws client for all platforms
-./build-all.sh
+# Build everything (frontend + server)
+make all
 
-# Clean and build everything
-./build-all.sh --clean
+# Clean and rebuild
+make clean && make all
 
-# Build only the server
-./build-all.sh --server-only
+# Build server only
+make build
 
-# Build only the ws client
-./build-all.sh --client-only
+# Build frontend only
+make frontend
 
-# Get help
-./build-all.sh --help
+# Show all available make targets
+make help
 ```
 
 ### Manual Build
+
 ```bash
 # Build frontend
 cd frontend
@@ -41,22 +43,69 @@ cd ../..
 
 ## Build Output
 
-The build script creates the following structure:
+### Development Builds (Makefile)
+
+The Makefile produces binaries in the project root:
+
+```
+windshift           # Main server binary (current platform)
+windshift_unix      # Linux binary (from make build-linux)
+windshift.exe       # Windows binary (from make build-windows)
+```
+
+### Release Builds (release.sh)
+
+The release script creates a `dist/` structure:
 
 ```
 dist/
-├── server/
+├── binaries/
 │   ├── windshift-linux-amd64
 │   ├── windshift-linux-arm64
 │   ├── windshift-windows-amd64.exe
 │   ├── windshift-darwin-amd64
 │   └── windshift-darwin-arm64
-└── client/
-    ├── ws-linux-amd64
-    ├── ws-linux-arm64
-    ├── ws-windows-amd64.exe
-    ├── ws-darwin-amd64
-    └── ws-darwin-arm64
+└── releases/
+    ├── windshift-v1.0.0-linux-amd64.tar.gz
+    ├── windshift-v1.0.0-linux-arm64.tar.gz
+    ├── windshift-v1.0.0-windows-amd64.zip
+    ├── windshift-v1.0.0-darwin-amd64.tar.gz
+    ├── windshift-v1.0.0-darwin-arm64.tar.gz
+    └── SHA256SUMS.txt
+```
+
+## Cross-Platform/Release Builds
+
+### Using the Makefile
+
+```bash
+# Cross-compile for Linux
+make build-linux
+
+# Cross-compile for Windows
+make build-windows
+```
+
+### Using release.sh (Full Release)
+
+```bash
+# Full release with binaries + Docker + GitHub release
+./release.sh release -v v1.0.0 -n releases/v1.0.0.md
+
+# Build binaries and packages locally (no publish)
+./release.sh build -v v1.0.0
+
+# Build and push Docker images only
+./release.sh push -v v1.0.0-dev
+
+# Dry run to preview actions
+./release.sh release -v v1.0.0 -n releases/v1.0.0.md --dry-run
+
+# Skip frontend build (use existing dist/)
+./release.sh build --skip-frontend
+
+# Show help
+./release.sh --help
 ```
 
 ## Supported Platforms
@@ -69,24 +118,6 @@ dist/
 | macOS (Intel) | ✅ | ✅ |
 | macOS (Apple Silicon) | ✅ | ✅ |
 
-## Cross-Compilation
-
-Go makes cross-compilation easy. You can build for any platform from any platform:
-
-```bash
-# Build server for Linux from macOS/Windows
-GOOS=linux GOARCH=amd64 go build -o windshift-linux main.go
-
-# Build ws client for Windows from Linux/macOS
-cd cmd/ws
-GOOS=windows GOARCH=amd64 go build -o ws-windows.exe
-cd ../..
-
-# Build for ARM64 (Apple Silicon, ARM Linux)
-GOOS=darwin GOARCH=arm64 go build -o windshift-darwin-arm64 main.go
-GOOS=linux GOARCH=arm64 go build -o windshift-linux-arm64 main.go
-```
-
 ## Build Requirements
 
 ### For Server + Frontend
@@ -97,37 +128,40 @@ GOOS=linux GOARCH=arm64 go build -o windshift-linux-arm64 main.go
 ### For WS Client Only
 - **Go 1.21+** - Client compilation only
 
+### For Cross-Compilation (release.sh)
+- **Zig** - Cross-compilation toolchain (optional, native builds work without it)
+- **Docker + Buildx** - Multi-arch Docker images
+
 ## Usage Examples
 
 ### Linux
 ```bash
-# Extract and run
-tar -xzf windshift-linux-amd64.tar.gz
-./dist/server/windshift-linux-amd64 &
-./dist/client/ws-linux-amd64 workspace list
+# After building
+./windshift &
+./cmd/ws/ws workspace list
 ```
 
 ### Windows
 ```bash
-# Extract and run
-dist\server\windshift-windows-amd64.exe
-dist\client\ws-windows-amd64.exe workspace list
+# After building
+windshift.exe
+cmd\ws\ws.exe workspace list
 ```
 
 ### macOS
 ```bash
-# Extract and run
-./dist/server/windshift-darwin-arm64 &
-./dist/client/ws-darwin-arm64 workspace list
+# After building
+./windshift &
+./cmd/ws/ws workspace list
 ```
 
 ## Build Optimization
 
-The build script uses these Go build flags for production:
+Production builds use these Go build flags:
 
 - `-ldflags "-s -w"` - Strip debug information and reduce binary size
+- `-tags="!test"` - Exclude test code from production binaries
 - Version information embedded at build time
-- Static linking for standalone binaries
 
 ## Troubleshooting
 
@@ -135,7 +169,7 @@ The build script uses these Go build flags for production:
 ```bash
 # Clear npm cache and reinstall
 cd frontend
-rm -rf node_modules package-lock.json  
+rm -rf node_modules package-lock.json
 npm install
 npm run build
 ```
@@ -154,21 +188,31 @@ go clean -modcache
 
 **Windows**: If you don't have `zip` command available, Windows archives won't be created but binaries will still build.
 
-**macOS**: If you get permission errors, make sure the build script is executable:
-```bash
-chmod +x build-all.sh
-```
+**macOS**: Darwin binaries can only be built on macOS hosts due to CGO requirements.
 
 **Linux**: Ensure you have sufficient disk space. Cross-compilation creates multiple large binaries.
 
-## Build Script Features
+## Makefile Targets
 
-- 🎯 **Smart Platform Detection** - Automatically builds for all supported platforms
-- 🧹 **Clean Builds** - Optional cleanup of previous builds  
-- 📦 **Modular Building** - Build server-only or client-only
-- 🎨 **Colorized Output** - Clear progress indication
-- 📊 **Build Summary** - Shows file sizes and locations
-- 🔧 **Error Handling** - Stops on any build failure
-- 📋 **Documentation** - Generates usage examples
+Run `make help` to see all available targets:
 
-The build script is production-ready and handles edge cases like missing dependencies, wrong directories, and cross-platform differences.
+**Production builds:**
+- `make build` - Build production binary (excludes test code)
+- `make build-linux` - Cross-compile for Linux
+- `make build-windows` - Cross-compile for Windows
+- `make release` - Full production release build
+
+**Development builds:**
+- `make dev-build` - Development binary (includes test utils)
+- `make dev` - Full development cycle
+
+**Testing:**
+- `make test` - Run all unit tests
+- `make test-coverage` - Run tests with coverage report
+- `make test-verbose` - Run tests with verbose output
+
+**Utilities:**
+- `make frontend` - Build frontend only
+- `make clean` - Clean build artifacts
+- `make deps` - Update dependencies
+- `make verify-size` - Compare binary sizes with/without tests
