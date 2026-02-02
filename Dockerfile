@@ -43,6 +43,10 @@ RUN CGO_ENABLED=1 \
     go build -ldflags '-s -w -linkmode external -extldflags "-static"' \
     -o windshift main.go
 
+# Create data directory with correct ownership for scratch image
+# Docker copies these permissions to named volumes on first mount
+RUN mkdir -p /data/attachments && chown -R 65534:65534 /data
+
 # Stage 3: Scratch runtime (minimal image)
 FROM scratch
 
@@ -54,6 +58,10 @@ COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 
 # Copy binary
 COPY --from=builder /build/windshift /windshift
+
+# Copy data directory with correct ownership (65534:65534)
+# This ensures named volumes inherit proper permissions on first mount
+COPY --from=builder /data /data
 
 # Expose default port
 EXPOSE 8080
