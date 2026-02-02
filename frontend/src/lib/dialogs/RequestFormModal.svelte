@@ -473,8 +473,8 @@
               <p class="text-sm" style="color: {isDarkMode ? '#93c5fd' : '#1e40af'};">
                 {#if authStore.isAuthenticated && authStore.currentUser}
                   {t('requestForm.submittingAs', { name: `${authStore.currentUser?.first_name} ${authStore.currentUser?.last_name}`, email: authStore.currentUser?.email })}
-                {:else if portalAuthStore.isAuthenticated && portalAuthStore.customer}
-                  {t('requestForm.submittingAs', { name: portalAuthStore.customer.name || t('portal.portalCustomer'), email: portalAuthStore.customer.email })}
+                {:else if $portalAuthStore.isAuthenticated && $portalAuthStore.customer}
+                  {t('requestForm.submittingAs', { name: $portalAuthStore.customer.name || t('portal.portalCustomer'), email: $portalAuthStore.customer.email })}
                 {/if}
               </p>
             </div>

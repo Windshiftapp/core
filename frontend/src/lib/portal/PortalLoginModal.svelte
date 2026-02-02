@@ -1,10 +1,13 @@
 <script>
+  import { createEventDispatcher } from 'svelte';
   import { X, Mail, User, Lock, Building2 } from 'lucide-svelte';
   import { portalStore } from '../stores/portal.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
   import { authStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
   import Button from '../components/Button.svelte';
+
+  const dispatch = createEventDispatcher();
 
   let email = $state('');
   let password = $state('');
@@ -48,6 +51,7 @@
     if (result.success) {
       // Refresh portal auth state to detect internal user session
       await portalAuthStore.checkAuth(portalStore.currentSlug);
+      dispatch('loginsuccess');
       closeModal();
     } else {
       internalError = authStore.error || 'Login failed';
@@ -98,7 +102,7 @@
       style="background-color: {portalStore.isDarkMode ? '#1e293b' : '#ffffff'};"
       onclick={(e) => e.stopPropagation()}
     >
-      {#if portalAuthStore.emailSent}
+      {#if $portalAuthStore.emailSent}
         <!-- Email Sent Confirmation - Gradient Header -->
         <div
           class="px-8 py-12 text-white text-center relative"
@@ -164,9 +168,9 @@
 
         <!-- Form Content -->
         <div class="px-8 py-6">
-          {#if portalAuthStore.error}
+          {#if $portalAuthStore.error}
             <div class="mb-4 p-3 rounded" style="background-color: {portalStore.isDarkMode ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2'}; border: 1px solid {portalStore.isDarkMode ? 'rgba(239, 68, 68, 0.3)' : '#fecaca'};">
-              <p class="text-sm" style="color: {portalStore.isDarkMode ? '#fca5a5' : '#dc2626'};">{portalAuthStore.error}</p>
+              <p class="text-sm" style="color: {portalStore.isDarkMode ? '#fca5a5' : '#dc2626'};">{$portalAuthStore.error}</p>
             </div>
           {/if}
 
@@ -187,7 +191,7 @@
                   required
                   class="block w-full pl-10 pr-3 py-2.5 rounded leading-5 focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
                   style="background-color: {portalStore.isDarkMode ? '#334155' : '#f9fafb'}; color: {portalStore.isDarkMode ? '#e2e8f0' : '#111827'}; border: 1px solid {portalStore.isDarkMode ? '#475569' : '#e5e7eb'};"
-                  disabled={portalAuthStore.loading}
+                  disabled={$portalAuthStore.loading}
                 />
               </div>
             </div>
@@ -196,13 +200,13 @@
               variant="primary"
               type="submit"
               fullWidth={true}
-              loading={portalAuthStore.loading}
-              disabled={portalAuthStore.loading || !email.trim()}
+              loading={$portalAuthStore.loading}
+              disabled={$portalAuthStore.loading || !email.trim()}
             >
-              {#if !portalAuthStore.loading}
+              {#if !$portalAuthStore.loading}
                 <Mail class="w-4 h-4 mr-2" />
               {/if}
-              {portalAuthStore.loading ? t('portal.sending') : t('portal.sendMagicLink')}
+              {$portalAuthStore.loading ? t('portal.sending') : t('portal.sendMagicLink')}
             </Button>
           </form>
 

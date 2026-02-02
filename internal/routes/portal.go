@@ -7,6 +7,9 @@ func RegisterPortalRoutes(deps *Deps) {
 	api := deps.API
 	customersPerm := deps.PermissionMiddleware.RequireGlobalPermission("customers.manage")
 
+	// Public portal attachment endpoint (for logos, backgrounds - no auth required)
+	api.Handle("GET /portal-assets/{id}", deps.Portal.Portal.DownloadPortalAttachment)
+
 	// Public portal API endpoints (OptionalAuth - work both authenticated and unauthenticated)
 	api.Handle("GET /portal/{slug}", deps.Portal.Portal.GetPortal)
 	api.Handle("GET /portal/{slug}/request-types", deps.Portal.Portal.GetRequestTypes)

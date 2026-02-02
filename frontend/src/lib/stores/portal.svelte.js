@@ -459,20 +459,25 @@ async function loadRequestTypes() {
     // Use portal endpoint instead of channel endpoint for proper auth handling
     const types = await api.requestTypes.getForPortal(currentSlug);
 
-    // Fetch field counts in parallel
-    const typesWithFields = await Promise.all(
-      types.map(async (rt) => {
-        try {
-          const fields = await api.requestTypes.getFields(rt.id);
-          return { ...rt, field_count: fields.length };
-        } catch (err) {
-          console.error(`Failed to load fields for request type ${rt.id}:`, err);
-          return { ...rt, field_count: 0 };
-        }
-      })
-    );
-
-    requestTypes = typesWithFields;
+    // Only fetch field counts for internal users (requires session auth)
+    // Portal customers don't have access to the internal fields endpoint
+    if (authStore.isAuthenticated) {
+      const typesWithFields = await Promise.all(
+        types.map(async (rt) => {
+          try {
+            const fields = await api.requestTypes.getFields(rt.id);
+            return { ...rt, field_count: fields.length };
+          } catch (err) {
+            console.error(`Failed to load fields for request type ${rt.id}:`, err);
+            return { ...rt, field_count: 0 };
+          }
+        })
+      );
+      requestTypes = typesWithFields;
+    } else {
+      // For portal customers, skip field count fetching
+      requestTypes = types.map(rt => ({ ...rt, field_count: 0 }));
+    }
   } catch (err) {
     console.error('Failed to load request types:', err);
   } finally {
@@ -736,7 +741,7 @@ function closeSearchResults() {
 
 // My Requests functions
 async function loadMyRequests() {
-  if (!authStore.isAuthenticated || !currentSlug) return;
+  if ((!authStore.isAuthenticated && !portalAuthStore.isAuthenticated) || !currentSlug) return;
 
   try {
     loadingRequests = true;

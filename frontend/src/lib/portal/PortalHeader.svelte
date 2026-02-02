@@ -8,13 +8,13 @@
   let hoveredMenuItem = $state(null);
 
   // Check if user is internal (either via authStore or portalAuth detecting internal session)
-  let isInternalUser = $derived(authStore.isAuthenticated || portalAuthStore.isInternal);
+  let isInternalUser = $derived($authStore.isAuthenticated || $portalAuthStore.isInternal);
 
   // Combined check: either internal admin OR portal customer is authenticated
-  let isAnyUserAuthenticated = $derived(authStore.isAuthenticated || portalAuthStore.isAuthenticated);
+  let isAnyUserAuthenticated = $derived($authStore.isAuthenticated || $portalAuthStore.isAuthenticated);
 
   async function handleLogout() {
-    if (portalAuthStore.isAuthenticated && !portalAuthStore.isInternal) {
+    if ($portalAuthStore.isAuthenticated && !$portalAuthStore.isInternal) {
       // Portal customer logout
       await portalAuthStore.logout(portalStore.currentSlug);
     } else {
@@ -180,7 +180,7 @@
         class="absolute top-14 right-0 w-64 rounded shadow-2xl border overflow-hidden"
         style="background-color: var(--ds-surface-card); border-color: var(--ds-border);"
       >
-        {#if portalAuthStore.isAuthenticated && portalAuthStore.isInternal && portalAuthStore.user}
+        {#if $portalAuthStore.isAuthenticated && $portalAuthStore.isInternal && $portalAuthStore.user}
           <!-- Internal User Info (detected via portal auth) -->
           <div class="px-4 py-3 border-b" style="border-color: var(--ds-border);">
             <div class="flex items-center gap-3">
@@ -189,9 +189,9 @@
               </div>
               <div class="flex-1">
                 <div class="font-medium text-sm" style="color: var(--ds-text);">
-                  {portalAuthStore.user.name}
+                  {$portalAuthStore.user.name}
                 </div>
-                <div class="text-xs" style="color: var(--ds-text-subtle);">{portalAuthStore.user.email}</div>
+                <div class="text-xs" style="color: var(--ds-text-subtle);">{$portalAuthStore.user.email}</div>
               </div>
             </div>
           </div>
@@ -219,7 +219,7 @@
               <span class="text-sm">{t('portal.signOut')}</span>
             </button>
           </div>
-        {:else if portalAuthStore.isAuthenticated && portalAuthStore.customer}
+        {:else if $portalAuthStore.isAuthenticated && $portalAuthStore.customer}
           <!-- Portal Customer Info (Magic Link Auth) -->
           <div class="px-4 py-3 border-b" style="border-color: var(--ds-border);">
             <div class="flex items-center gap-3">
@@ -228,9 +228,9 @@
               </div>
               <div class="flex-1">
                 <div class="font-medium text-sm" style="color: var(--ds-text);">
-                  {portalAuthStore.customer.name || t('portal.portalCustomer') || 'Portal Customer'}
+                  {$portalAuthStore.customer.name || t('portal.portalCustomer') || 'Portal Customer'}
                 </div>
-                <div class="text-xs" style="color: var(--ds-text-subtle);">{portalAuthStore.customer.email}</div>
+                <div class="text-xs" style="color: var(--ds-text-subtle);">{$portalAuthStore.customer.email}</div>
               </div>
             </div>
           </div>
@@ -258,12 +258,12 @@
               <span class="text-sm">{t('portal.signOut')}</span>
             </button>
           </div>
-        {:else if authStore.isAuthenticated && authStore.currentUser}
+        {:else if $authStore.isAuthenticated && $authStore.currentUser}
           <!-- Internal Admin User Info -->
           <div class="px-4 py-3 border-b" style="border-color: var(--ds-border);">
             <div class="flex items-center gap-3">
-              {#if authStore.currentUser.avatar_url}
-                <img src={authStore.currentUser.avatar_url} alt={authStore.currentUser.username} class="w-10 h-10 rounded-full" />
+              {#if $authStore.currentUser.avatar_url}
+                <img src={$authStore.currentUser.avatar_url} alt={$authStore.currentUser.username} class="w-10 h-10 rounded-full" />
               {:else}
                 <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background-color: var(--ds-background-neutral);">
                   <User class="w-5 h-5" style="color: var(--ds-text);" />
@@ -271,9 +271,9 @@
               {/if}
               <div class="flex-1">
                 <div class="font-medium text-sm" style="color: var(--ds-text);">
-                  {authStore.currentUser.first_name} {authStore.currentUser.last_name}
+                  {$authStore.currentUser.first_name} {$authStore.currentUser.last_name}
                 </div>
-                <div class="text-xs" style="color: var(--ds-text-subtle);">{authStore.currentUser.email}</div>
+                <div class="text-xs" style="color: var(--ds-text-subtle);">{$authStore.currentUser.email}</div>
               </div>
             </div>
           </div>

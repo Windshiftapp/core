@@ -402,8 +402,16 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Return success response
 	if isAvatar || isWorkspaceAvatar || isCustomerAvatar || isWorkspaceBackground || isPortalBackground || isPortalLogo || isHubLogo {
-		// For avatars, backgrounds, and logos, return the attachment download URL
-		downloadURL := fmt.Sprintf("/api/attachments/%d/download", attachmentID)
+		// For avatars, backgrounds, and logos, return the appropriate download URL
+		// Portal branding (logo, background, hub_logo) uses public endpoint, others use authenticated endpoint
+		var downloadURL string
+		if isPortalBackground || isPortalLogo || isHubLogo {
+			// Public endpoint for portal branding (no auth required)
+			downloadURL = fmt.Sprintf("/api/portal-assets/%d", attachmentID)
+		} else {
+			// Authenticated endpoint for user avatars
+			downloadURL = fmt.Sprintf("/api/attachments/%d/download", attachmentID)
+		}
 		message := "Avatar uploaded successfully"
 		urlKey := "avatar_url"
 		if isWorkspaceAvatar {

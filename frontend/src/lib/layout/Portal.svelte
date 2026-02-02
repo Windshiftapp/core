@@ -70,9 +70,9 @@
   // Track previous auth state to detect login events
   let previousAuthState = $state(false);
 
-  // Derived authentication state - direct store access (Svelte 5 reactive)
+  // Derived authentication state - use $ prefix for proper store subscriptions
   let isUserAuthenticated = $derived(
-    authStore.isAuthenticated || portalAuthStore.isAuthenticated
+    $authStore.isAuthenticated || $portalAuthStore.isAuthenticated
   );
 
   onMount(async () => {
@@ -151,11 +151,15 @@
 
   // Watch for auth state changes to reload request types after login
   $effect(() => {
-    const currentAuth = authStore.isAuthenticated || portalAuthStore.isAuthenticated;
+    const currentAuth = $authStore.isAuthenticated || $portalAuthStore.isAuthenticated;
 
     // Only reload when auth state changes from false to true (login)
     if (authCheckComplete && currentAuth && !previousAuthState && portalStore.currentSlug) {
       portalStore.loadRequestTypes();
+      // Also reload My Requests if that view is currently showing
+      if (portalStore.showMyRequests) {
+        portalStore.loadMyRequests();
+      }
     }
 
     previousAuthState = currentAuth;
@@ -196,7 +200,8 @@
   }
 
   function handleFieldsSaved() {
-    console.log('Fields saved successfully');
+    // Reload request types to update field counts
+    portalStore.loadRequestTypes();
   }
 
   async function openRequestTypeModal(mode, requestType = null) {
@@ -220,7 +225,7 @@
     }
 
     // Check if authenticated (either internal or portal customer)
-    const isAuthenticated = authStore.isAuthenticated || portalAuthStore.isAuthenticated;
+    const isAuthenticated = $authStore.isAuthenticated || $portalAuthStore.isAuthenticated;
 
     if (!isAuthenticated) {
       // Store request type to open after login
@@ -380,7 +385,7 @@
                         <span class="font-medium">{t('portal.backToApp')}</span>
                       </button>
 
-                      {#if authStore.isAuthenticated}
+                      {#if $authStore.isAuthenticated}
                         {#if !portalStore.isEditing}
                           <button
                             onclick={() => { portalStore.toggleEditing(); portalStore.showMainMenu = false; }}
@@ -425,7 +430,7 @@
                       class="absolute top-14 right-0 w-64 rounded shadow-2xl border overflow-hidden"
                       style="background-color: var(--ds-surface-card); border-color: var(--ds-border);"
                     >
-                      {#if portalAuthStore.isAuthenticated && portalAuthStore.customer}
+                      {#if $portalAuthStore.isAuthenticated && $portalAuthStore.customer}
                         <!-- Portal Customer Info (Magic Link Auth) -->
                         <div class="px-4 py-3 border-b" style="border-color: var(--ds-border);">
                           <div class="flex items-center gap-3">
@@ -434,9 +439,9 @@
                             </div>
                             <div class="flex-1">
                               <div class="font-medium text-sm" style="color: var(--ds-text);">
-                                {portalAuthStore.customer.name || t('portal.portalCustomer') || 'Portal Customer'}
+                                {$portalAuthStore.customer.name || t('portal.portalCustomer') || 'Portal Customer'}
                               </div>
-                              <div class="text-xs" style="color: var(--ds-text-subtle);">{portalAuthStore.customer.email}</div>
+                              <div class="text-xs" style="color: var(--ds-text-subtle);">{$portalAuthStore.customer.email}</div>
                             </div>
                           </div>
                         </div>
@@ -463,12 +468,12 @@
                             <span class="text-sm">{t('auth.signOut')}</span>
                           </button>
                         </div>
-                      {:else if authStore.isAuthenticated && authStore.currentUser}
+                      {:else if $authStore.isAuthenticated && $authStore.currentUser}
                         <!-- Internal Admin User Info -->
                         <div class="px-4 py-3 border-b" style="border-color: var(--ds-border);">
                           <div class="flex items-center gap-3">
-                            {#if authStore.currentUser.avatar_url}
-                              <img src={authStore.currentUser.avatar_url} alt={authStore.currentUser.username} class="w-10 h-10 rounded-full" />
+                            {#if $authStore.currentUser.avatar_url}
+                              <img src={$authStore.currentUser.avatar_url} alt={$authStore.currentUser.username} class="w-10 h-10 rounded-full" />
                             {:else}
                               <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background-color: var(--ds-background-neutral);">
                                 <User class="w-5 h-5" style="color: var(--ds-text);" />
@@ -476,9 +481,9 @@
                             {/if}
                             <div class="flex-1">
                               <div class="font-medium text-sm" style="color: var(--ds-text);">
-                                {authStore.currentUser.first_name} {authStore.currentUser.last_name}
+                                {$authStore.currentUser.first_name} {$authStore.currentUser.last_name}
                               </div>
-                              <div class="text-xs" style="color: var(--ds-text-subtle);">{authStore.currentUser.email}</div>
+                              <div class="text-xs" style="color: var(--ds-text-subtle);">{$authStore.currentUser.email}</div>
                             </div>
                           </div>
                         </div>
@@ -639,7 +644,7 @@
     {/if}
 
     <!-- Portal Login Modal (Magic Link) - always accessible -->
-    <PortalLoginModal />
+    <PortalLoginModal on:loginsuccess={handleLoginSuccess} />
 
     <!-- Magic Link Verification - always accessible -->
     {#if verifyToken}

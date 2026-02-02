@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +31,7 @@ type PortalHandler struct {
 	sessionManager       *auth.SessionManager
 	portalSessionManager *auth.PortalSessionManager
 	ipExtractor          *utils.IPExtractor
+	portalService        *services.PortalService
 }
 
 // getClientIP extracts the client IP with proxy validation
@@ -113,6 +115,21 @@ func (h *PortalHandler) getInternalUserGroupIDs(ctx context.Context, r *http.Req
 	return groupIDs
 }
 
+// getInternalUserID returns the user ID if the request is from an internal user session
+// Returns nil if not authenticated via internal session
+func (h *PortalHandler) getInternalUserID(r *http.Request) *int {
+	clientIP := h.getClientIP(r)
+	sessionToken, err := h.sessionManager.GetSessionFromRequest(r)
+	if err != nil {
+		return nil
+	}
+	session, err := h.sessionManager.ValidateSession(sessionToken, clientIP)
+	if err != nil || session == nil {
+		return nil
+	}
+	return &session.UserID
+}
+
 // getPortalCustomerOrgID returns the customer organisation ID for a portal customer
 // Returns nil if no organisation is associated
 func (h *PortalHandler) getPortalCustomerOrgID(ctx context.Context, portalCustomerID int) *int {
@@ -166,6 +183,7 @@ func NewPortalHandler(db database.Database, sessionManager *auth.SessionManager,
 		sessionManager:       sessionManager,
 		portalSessionManager: portalSessionManager,
 		ipExtractor:          ipExtractor,
+		portalService:        services.NewPortalService(db),
 	}
 }
 
@@ -688,22 +706,11 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get or create portal customer
-	var customerID int
+	// For portal customers, grant channel access
+	// Internal users don't need portal customer records - they're tracked via user_id
 	if portalCustomerID != nil {
-		// Portal customer already authenticated via magic link
-		customerID = *portalCustomerID
-	} else if authenticatedUserID != nil {
-		// Internal user - get or create linked portal customer
-		customerID, err = h.getOrCreatePortalCustomer(ctx, authenticatedUserID, "", "")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		h.grantChannelAccess(ctx, *portalCustomerID, channel.ID)
 	}
-
-	// Grant channel access
-	h.grantChannelAccess(ctx, customerID, channel.ID)
 
 	// Validate request type visibility (security check)
 	if submission.RequestTypeID != nil {
@@ -767,7 +774,7 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 		ItemTypeID:              validationResult.itemTypeID,
 		Priority:                "medium",
 		CreatorID:               authenticatedUserID,
-		CreatorPortalCustomerID: &customerID,
+		CreatorPortalCustomerID: portalCustomerID, // nil for internal users, set for portal customers
 		ChannelID:               &channel.ID,
 		RequestTypeID:           submission.RequestTypeID,
 	})
@@ -958,90 +965,37 @@ func (h *PortalHandler) GetMyRequests(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get portal customer ID (supports both portal session and internal user session)
-	portalCustomerID, err := h.getPortalCustomerID(ctx, r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+	// Check for internal user first
+	internalUserID := h.getInternalUserID(r)
+
+	// Check for portal customer
+	var portalCustomerID *int
+	if h.portalSessionManager != nil {
+		portalToken, _ := h.portalSessionManager.GetPortalSessionFromRequest(r)
+		if portalToken != "" {
+			if session, err := h.portalSessionManager.ValidatePortalSession(portalToken); err == nil && session != nil {
+				portalCustomerID = &session.PortalCustomerID
+			}
+		}
+	}
+
+	// Must have at least one auth type
+	if internalUserID == nil && portalCustomerID == nil {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
 	}
 
-	// Get all requests submitted by this portal customer through this channel
-	requestsQuery := `
-		SELECT
-			i.id, i.workspace_id, i.workspace_item_number, i.title, i.description,
-			i.status_id, i.priority_id, i.created_at, i.updated_at,
-			i.channel_id, i.request_type_id,
-			w.name AS workspace_name,
-			w.key AS workspace_key,
-			rt.name AS request_type_name,
-			rt.icon AS request_type_icon,
-			rt.color AS request_type_color,
-			(SELECT COUNT(*) FROM comments WHERE item_id = i.id AND (is_private = false OR is_private IS NULL)) AS comment_count
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN request_types rt ON i.request_type_id = rt.id
-		WHERE i.creator_portal_customer_id = ? AND i.channel_id = ?
-		ORDER BY i.created_at DESC
-	`
+	// Use service to get requests based on auth type
+	var requests []services.PortalRequestSummary
+	if internalUserID != nil {
+		requests, err = h.portalService.GetRequestsByCreatorID(ctx, *internalUserID, channel.ID)
+	} else {
+		requests, err = h.portalService.GetRequestsByPortalCustomerID(ctx, *portalCustomerID, channel.ID)
+	}
 
-	requestRows, err := h.db.QueryContext(ctx, requestsQuery, portalCustomerID, channel.ID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to fetch requests: %v", err), http.StatusInternalServerError)
 		return
-	}
-	defer requestRows.Close()
-
-	type RequestSummary struct {
-		ID                  int     `json:"id"`
-		WorkspaceID         int     `json:"workspace_id"`
-		WorkspaceItemNumber int     `json:"workspace_item_number"`
-		WorkspaceName       string  `json:"workspace_name"`
-		WorkspaceKey        string  `json:"workspace_key"`
-		Title               string  `json:"title"`
-		Description         string  `json:"description"`
-		Status              string  `json:"status"`
-		Priority            string  `json:"priority"`
-		CreatedAt           string  `json:"created_at"`
-		UpdatedAt           string  `json:"updated_at"`
-		ChannelID           *int    `json:"channel_id"`
-		RequestTypeID       *int    `json:"request_type_id"`
-		RequestTypeName     *string `json:"request_type_name"`
-		RequestTypeIcon     *string `json:"request_type_icon"`
-		RequestTypeColor    *string `json:"request_type_color"`
-		CommentCount        int     `json:"comment_count"`
-	}
-
-	var requests []RequestSummary
-	for requestRows.Next() {
-		var req RequestSummary
-		var requestTypeName, requestTypeIcon, requestTypeColor sql.NullString
-		err := requestRows.Scan(
-			&req.ID, &req.WorkspaceID, &req.WorkspaceItemNumber, &req.Title, &req.Description,
-			&req.Status, &req.Priority, &req.CreatedAt, &req.UpdatedAt,
-			&req.ChannelID, &req.RequestTypeID,
-			&req.WorkspaceName, &req.WorkspaceKey,
-			&requestTypeName, &requestTypeIcon, &requestTypeColor,
-			&req.CommentCount,
-		)
-		if err != nil {
-			continue
-		}
-
-		if requestTypeName.Valid {
-			req.RequestTypeName = &requestTypeName.String
-		}
-		if requestTypeIcon.Valid {
-			req.RequestTypeIcon = &requestTypeIcon.String
-		}
-		if requestTypeColor.Valid {
-			req.RequestTypeColor = &requestTypeColor.String
-		}
-
-		requests = append(requests, req)
-	}
-
-	if requests == nil {
-		requests = []RequestSummary{}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -1102,105 +1056,50 @@ func (h *PortalHandler) GetRequestDetail(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Get portal customer ID (supports both portal session and internal user session)
-	portalCustomerIDPtr, err := h.getPortalCustomerID(ctx, r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+	// Check for internal user first
+	internalUserID := h.getInternalUserID(r)
+
+	// Check for portal customer
+	var portalCustomerID *int
+	if h.portalSessionManager != nil {
+		portalToken, _ := h.portalSessionManager.GetPortalSessionFromRequest(r)
+		if portalToken != "" {
+			if session, err := h.portalSessionManager.ValidatePortalSession(portalToken); err == nil && session != nil {
+				portalCustomerID = &session.PortalCustomerID
+			}
+		}
+	}
+
+	// Must have at least one auth type
+	if internalUserID == nil && portalCustomerID == nil {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
 	}
-	portalCustomerID := *portalCustomerIDPtr
 
-	// Get the request details and verify ownership
-	detailQuery := `
-		SELECT
-			i.id, i.workspace_id, i.workspace_item_number, i.title, i.description,
-			i.status_id, i.priority_id, i.created_at, i.updated_at,
-			i.channel_id, i.request_type_id, i.creator_portal_customer_id,
-			w.name AS workspace_name,
-			w.key AS workspace_key,
-			rt.name AS request_type_name,
-			rt.icon AS request_type_icon,
-			rt.color AS request_type_color
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN request_types rt ON i.request_type_id = rt.id
-		WHERE i.id = ?
-	`
-
-	var item struct {
-		ID                      int
-		WorkspaceID             int
-		WorkspaceItemNumber     int
-		Title                   string
-		Description             string
-		Status                  string
-		Priority                string
-		CreatedAt               string
-		UpdatedAt               string
-		ChannelID               *int
-		RequestTypeID           *int
-		CreatorPortalCustomerID *int
-		WorkspaceName           string
-		WorkspaceKey            string
-		RequestTypeName         sql.NullString
-		RequestTypeIcon         sql.NullString
-		RequestTypeColor        sql.NullString
-	}
-
-	err = h.db.QueryRowContext(ctx, detailQuery, itemID).Scan(
-		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &item.Title, &item.Description,
-		&item.Status, &item.Priority, &item.CreatedAt, &item.UpdatedAt,
-		&item.ChannelID, &item.RequestTypeID, &item.CreatorPortalCustomerID,
-		&item.WorkspaceName, &item.WorkspaceKey,
-		&item.RequestTypeName, &item.RequestTypeIcon, &item.RequestTypeColor,
-	)
-
-	if err == sql.ErrNoRows {
-		http.Error(w, "Request not found", http.StatusNotFound)
-		return
-	}
+	// Use service to verify ownership
+	isOwner, err := h.portalService.VerifyRequestOwnership(ctx, itemID, channel.ID, internalUserID, portalCustomerID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to fetch request: %v", err), http.StatusInternalServerError)
 		return
 	}
-
-	// Verify that this request was submitted by the authenticated portal customer
-	// and was submitted through this portal (use same error to prevent IDOR enumeration)
-	if item.CreatorPortalCustomerID == nil || *item.CreatorPortalCustomerID != portalCustomerID ||
-		item.ChannelID == nil || *item.ChannelID != channel.ID {
+	if !isOwner {
 		http.Error(w, "Request not found", http.StatusNotFound)
 		return
 	}
 
-	// Build response
-	response := map[string]interface{}{
-		"id":                    item.ID,
-		"workspace_id":          item.WorkspaceID,
-		"workspace_item_number": item.WorkspaceItemNumber,
-		"workspace_name":        item.WorkspaceName,
-		"workspace_key":         item.WorkspaceKey,
-		"title":                 item.Title,
-		"description":           item.Description,
-		"status":                item.Status,
-		"priority":              item.Priority,
-		"created_at":            item.CreatedAt,
-		"updated_at":            item.UpdatedAt,
-		"channel_id":            item.ChannelID,
-		"request_type_id":       item.RequestTypeID,
+	// Get the request details
+	detail, err := h.portalService.GetRequestDetail(ctx, itemID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to fetch request: %v", err), http.StatusInternalServerError)
+		return
 	}
-
-	if item.RequestTypeName.Valid {
-		response["request_type_name"] = item.RequestTypeName.String
-	}
-	if item.RequestTypeIcon.Valid {
-		response["request_type_icon"] = item.RequestTypeIcon.String
-	}
-	if item.RequestTypeColor.Valid {
-		response["request_type_color"] = item.RequestTypeColor.String
+	if detail == nil {
+		http.Error(w, "Request not found", http.StatusNotFound)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(detail)
 }
 
 // GetRequestComments returns comments for a specific request
@@ -1217,142 +1116,56 @@ func (h *PortalHandler) GetRequestComments(w http.ResponseWriter, r *http.Reques
 	defer cancel()
 
 	// Find channel by portal slug
-	var channel models.Channel
-	query := `
-		SELECT id, name, type, config, status
-		FROM channels
-		WHERE type = 'portal'
-		ORDER BY created_at DESC
-	`
-
-	rows, err := h.db.QueryContext(ctx, query)
+	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
 	if err != nil {
 		http.Error(w, "Portal not found", http.StatusNotFound)
 		return
 	}
-	defer rows.Close()
+	channel := portalResult.channel
 
-	var found bool
-	for rows.Next() {
-		if err := rows.Scan(&channel.ID, &channel.Name, &channel.Type, &channel.Config, &channel.Status); err != nil {
-			continue
-		}
+	// Check for internal user first
+	internalUserID := h.getInternalUserID(r)
 
-		// Parse config to check slug
-		var config models.ChannelConfig
-		if channel.Config != "" {
-			if err := json.Unmarshal([]byte(channel.Config), &config); err != nil {
-				continue
+	// Check for portal customer
+	var portalCustomerID *int
+	if h.portalSessionManager != nil {
+		portalToken, _ := h.portalSessionManager.GetPortalSessionFromRequest(r)
+		if portalToken != "" {
+			if session, err := h.portalSessionManager.ValidatePortalSession(portalToken); err == nil && session != nil {
+				portalCustomerID = &session.PortalCustomerID
 			}
 		}
-
-		if config.PortalSlug == slug && config.PortalEnabled {
-			found = true
-			break
-		}
 	}
 
-	if !found {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+	// Must have at least one auth type
+	if internalUserID == nil && portalCustomerID == nil {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
 	}
 
-	// Get portal customer ID (supports both portal session and internal user session)
-	portalCustomerIDPtr, err := h.getPortalCustomerID(ctx, r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
-	portalCustomerID := *portalCustomerIDPtr
-
-	// Verify the item belongs to this portal customer and was submitted through this channel
-	verifyQuery := `
-		SELECT creator_portal_customer_id, channel_id
-		FROM items
-		WHERE id = ?
-	`
-	var creatorPortalCustomerID *int
-	var itemChannelID *int
-	err = h.db.QueryRowContext(ctx, verifyQuery, itemID).Scan(&creatorPortalCustomerID, &itemChannelID)
-	if err == sql.ErrNoRows {
-		http.Error(w, "Request not found", http.StatusNotFound)
-		return
-	}
+	// Use service to verify ownership
+	isOwner, err := h.portalService.VerifyRequestOwnership(ctx, itemID, channel.ID, internalUserID, portalCustomerID)
 	if err != nil {
 		http.Error(w, "Failed to verify request", http.StatusInternalServerError)
 		return
 	}
-
-	// Check ownership and channel (use same error to prevent IDOR enumeration)
-	if creatorPortalCustomerID == nil || *creatorPortalCustomerID != portalCustomerID ||
-		itemChannelID == nil || *itemChannelID != channel.ID {
+	if !isOwner {
 		http.Error(w, "Request not found", http.StatusNotFound)
 		return
 	}
 
-	// Get comments (exclude private/internal comments from portal view)
-	commentsQuery := `
-		SELECT
-			c.id, c.item_id, c.author_id, c.portal_customer_id, c.content, c.created_at, c.updated_at,
-			COALESCE(u.first_name || ' ' || u.last_name, pc.name, 'Unknown') AS author_name,
-			COALESCE(u.email, pc.email, '') AS author_email
-		FROM comments c
-		LEFT JOIN users u ON c.author_id = u.id
-		LEFT JOIN portal_customers pc ON c.portal_customer_id = pc.id
-		WHERE c.item_id = ? AND (c.is_private = false OR c.is_private IS NULL)
-		ORDER BY c.created_at ASC
-	`
-
-	commentRows, err := h.db.QueryContext(ctx, commentsQuery, itemID)
+	// Use service to get comments
+	comments, err := h.portalService.GetRequestComments(ctx, itemID)
 	if err != nil {
 		http.Error(w, "Failed to fetch comments", http.StatusInternalServerError)
 		return
-	}
-	defer commentRows.Close()
-
-	type Comment struct {
-		ID               int    `json:"id"`
-		ItemID           int    `json:"item_id"`
-		AuthorID         *int   `json:"author_id,omitempty"`
-		PortalCustomerID *int   `json:"portal_customer_id,omitempty"`
-		Content          string `json:"content"`
-		CreatedAt        string `json:"created_at"`
-		UpdatedAt        string `json:"updated_at"`
-		AuthorName       string `json:"author_name"`
-		AuthorEmail      string `json:"author_email"`
-	}
-
-	var comments []Comment
-	for commentRows.Next() {
-		var comment Comment
-		var authorID, portalCustomerID sql.NullInt64
-		err := commentRows.Scan(
-			&comment.ID, &comment.ItemID, &authorID, &portalCustomerID, &comment.Content,
-			&comment.CreatedAt, &comment.UpdatedAt, &comment.AuthorName, &comment.AuthorEmail,
-		)
-		if err != nil {
-			continue
-		}
-		if authorID.Valid {
-			id := int(authorID.Int64)
-			comment.AuthorID = &id
-		}
-		if portalCustomerID.Valid {
-			id := int(portalCustomerID.Int64)
-			comment.PortalCustomerID = &id
-		}
-		comments = append(comments, comment)
-	}
-
-	if comments == nil {
-		comments = []Comment{}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(comments)
 }
 
-// AddRequestComment adds a comment to a request from a portal customer
+// AddRequestComment adds a comment to a request from a portal customer or internal user
 func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	itemIDStr := r.PathValue("itemId")
@@ -1366,75 +1179,40 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 	defer cancel()
 
 	// Find channel by portal slug
-	var channel models.Channel
-	query := `
-		SELECT id, name, type, config, status
-		FROM channels
-		WHERE type = 'portal'
-		ORDER BY created_at DESC
-	`
-
-	rows, err := h.db.QueryContext(ctx, query)
+	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
 	if err != nil {
 		http.Error(w, "Portal not found", http.StatusNotFound)
 		return
 	}
-	defer rows.Close()
+	channel := portalResult.channel
 
-	var found bool
-	for rows.Next() {
-		if err := rows.Scan(&channel.ID, &channel.Name, &channel.Type, &channel.Config, &channel.Status); err != nil {
-			continue
-		}
+	// Check for internal user first
+	internalUserID := h.getInternalUserID(r)
 
-		// Parse config to check slug
-		var config models.ChannelConfig
-		if channel.Config != "" {
-			if err := json.Unmarshal([]byte(channel.Config), &config); err != nil {
-				continue
+	// Check for portal customer
+	var portalCustomerID *int
+	if h.portalSessionManager != nil {
+		portalToken, _ := h.portalSessionManager.GetPortalSessionFromRequest(r)
+		if portalToken != "" {
+			if session, err := h.portalSessionManager.ValidatePortalSession(portalToken); err == nil && session != nil {
+				portalCustomerID = &session.PortalCustomerID
 			}
 		}
-
-		if config.PortalSlug == slug && config.PortalEnabled {
-			found = true
-			break
-		}
 	}
 
-	if !found {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+	// Must have at least one auth type
+	if internalUserID == nil && portalCustomerID == nil {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
 	}
 
-	// Get portal customer ID (supports both portal session and internal user session)
-	portalCustomerIDPtr, err := h.getPortalCustomerID(ctx, r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
-	portalCustomerID := *portalCustomerIDPtr
-
-	// Verify the item belongs to this portal customer and was submitted through this channel
-	verifyQuery := `
-		SELECT creator_portal_customer_id, channel_id
-		FROM items
-		WHERE id = ?
-	`
-	var creatorPortalCustomerID *int
-	var itemChannelID *int
-	err = h.db.QueryRowContext(ctx, verifyQuery, itemID).Scan(&creatorPortalCustomerID, &itemChannelID)
-	if err == sql.ErrNoRows {
-		http.Error(w, "Request not found", http.StatusNotFound)
-		return
-	}
+	// Use service to verify ownership
+	isOwner, err := h.portalService.VerifyRequestOwnership(ctx, itemID, channel.ID, internalUserID, portalCustomerID)
 	if err != nil {
 		http.Error(w, "Failed to verify request", http.StatusInternalServerError)
 		return
 	}
-
-	// Check ownership and channel (use same error to prevent IDOR enumeration)
-	if creatorPortalCustomerID == nil || *creatorPortalCustomerID != portalCustomerID ||
-		itemChannelID == nil || *itemChannelID != channel.ID {
+	if !isOwner {
 		http.Error(w, "Request not found", http.StatusNotFound)
 		return
 	}
@@ -1456,16 +1234,51 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 	// Sanitize comment content to prevent XSS
 	sanitizedContent := utils.StripHTMLTags(commentData.Content)
 
-	// Insert comment with portal_customer_id
+	// Insert comment based on auth type
 	now := time.Now()
-	insertQuery := `
-		INSERT INTO comments (item_id, portal_customer_id, content, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?)
-	`
-	result, err := h.db.ExecWriteContext(ctx, insertQuery, itemID, portalCustomerID, sanitizedContent, now, now)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to add comment: %v", err), http.StatusInternalServerError)
-		return
+	var result sql.Result
+	var authorName, authorEmail string
+	var responseAuthorID *int
+	var responsePortalCustomerID *int
+
+	if internalUserID != nil {
+		// Internal user: use author_id
+		insertQuery := `
+			INSERT INTO comments (item_id, author_id, content, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?)
+		`
+		result, err = h.db.ExecWriteContext(ctx, insertQuery, itemID, *internalUserID, sanitizedContent, now, now)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to add comment: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		// Fetch the user's name for the response
+		nameQuery := `SELECT COALESCE(first_name || ' ' || last_name, 'Unknown'), COALESCE(email, '') FROM users WHERE id = ?`
+		if scanErr := h.db.QueryRowContext(ctx, nameQuery, *internalUserID).Scan(&authorName, &authorEmail); scanErr != nil {
+			authorName = "Unknown"
+			authorEmail = ""
+		}
+		responseAuthorID = internalUserID
+	} else {
+		// Portal customer: use portal_customer_id
+		insertQuery := `
+			INSERT INTO comments (item_id, portal_customer_id, content, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?)
+		`
+		result, err = h.db.ExecWriteContext(ctx, insertQuery, itemID, *portalCustomerID, sanitizedContent, now, now)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to add comment: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		// Fetch the portal customer's name for the response
+		nameQuery := `SELECT COALESCE(name, 'Unknown'), COALESCE(email, '') FROM portal_customers WHERE id = ?`
+		if scanErr := h.db.QueryRowContext(ctx, nameQuery, *portalCustomerID).Scan(&authorName, &authorEmail); scanErr != nil {
+			authorName = "Unknown"
+			authorEmail = ""
+		}
+		responsePortalCustomerID = portalCustomerID
 	}
 
 	commentID, err := result.LastInsertId()
@@ -1474,25 +1287,21 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Fetch the portal customer's name for the response
-	var authorName, authorEmail string
-	nameQuery := `SELECT COALESCE(name, 'Unknown'), COALESCE(email, '') FROM portal_customers WHERE id = ?`
-	err = h.db.QueryRowContext(ctx, nameQuery, portalCustomerID).Scan(&authorName, &authorEmail)
-	if err != nil {
-		authorName = "Unknown"
-		authorEmail = ""
-	}
-
 	// Return the created comment
 	response := map[string]interface{}{
-		"id":                  commentID,
-		"item_id":             itemID,
-		"portal_customer_id":  portalCustomerID,
-		"content":             sanitizedContent,
-		"created_at":          now,
-		"updated_at":          now,
-		"author_name":         authorName,
-		"author_email":        authorEmail,
+		"id":           commentID,
+		"item_id":      itemID,
+		"content":      sanitizedContent,
+		"created_at":   now,
+		"updated_at":   now,
+		"author_name":  authorName,
+		"author_email": authorEmail,
+	}
+	if responseAuthorID != nil {
+		response["author_id"] = *responseAuthorID
+	}
+	if responsePortalCustomerID != nil {
+		response["portal_customer_id"] = *responsePortalCustomerID
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -1715,6 +1524,69 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+// DownloadPortalAttachment serves portal branding attachments (logos, backgrounds) without authentication
+func (h *PortalHandler) DownloadPortalAttachment(w http.ResponseWriter, r *http.Request) {
+	attachmentIDStr := r.PathValue("id")
+	attachmentID, err := strconv.Atoi(attachmentIDStr)
+	if err != nil {
+		http.Error(w, "Invalid attachment ID", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Get attachment info including category
+	var filePath, mimeType, originalFilename, category string
+	var fileSize int64
+	err = h.db.QueryRowContext(ctx, `
+		SELECT file_path, mime_type, original_filename, file_size, COALESCE(category, '') as category
+		FROM attachments WHERE id = ?
+	`, attachmentID).Scan(&filePath, &mimeType, &originalFilename, &fileSize, &category)
+
+	if err == sql.ErrNoRows {
+		http.Error(w, "Attachment not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		slog.Error("failed to query attachment", slog.String("component", "portal"), slog.Any("error", err))
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	// Security check: Only allow portal branding attachments (logos, backgrounds)
+	allowedCategories := map[string]bool{
+		"portal_logo":       true,
+		"portal_background": true,
+		"hub_logo":          true,
+	}
+
+	if !allowedCategories[category] {
+		// Return 404 to prevent enumeration of non-portal attachments
+		http.Error(w, "Attachment not found", http.StatusNotFound)
+		return
+	}
+
+	// Open and serve the file
+	file, err := os.Open(filePath)
+	if err != nil {
+		slog.Error("failed to open attachment file", slog.String("component", "portal"), slog.String("path", filePath), slog.Any("error", err))
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+	defer file.Close()
+
+	// Set headers
+	w.Header().Set("Content-Type", mimeType)
+	w.Header().Set("Content-Length", strconv.FormatInt(fileSize, 10))
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "public, max-age=86400") // Cache for 1 day
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", originalFilename))
+
+	// Serve file
+	io.Copy(w, file)
 }
 
 // GetAssetReports returns asset reports for a portal, filtered by visibility
