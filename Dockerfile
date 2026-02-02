@@ -3,7 +3,9 @@
 # Stage 1: Build frontend on HOST platform (no QEMU emulation needed)
 # Using --platform=$BUILDPLATFORM ensures this runs natively on x86-64
 # which avoids QEMU issues with native Node.js binaries (esbuild, rollup, etc.)
-FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend-builder
+# Default to linux/amd64 for legacy Docker builder compatibility
+ARG BUILDPLATFORM=linux/amd64
+FROM --platform=${BUILDPLATFORM} node:22-alpine AS frontend-builder
 
 WORKDIR /build
 
