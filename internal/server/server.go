@@ -775,9 +775,7 @@ func (s *Server) initialize() error {
 
 			mux.Handle("GET /remoteEntry.js", fileServer)
 			mux.Handle("GET /assets/", fileServer)
-			mux.Handle("GET /vite.svg", fileServer)
-			mux.Handle("GET /cmicon-2.svg", fileServer)
-			mux.Handle("GET /windshift-2.svg", fileServer)
+			mux.Handle("GET /windshift-3.svg", fileServer)
 
 			mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 				if len(r.URL.Path) >= 4 && r.URL.Path[:4] == "/api" {
