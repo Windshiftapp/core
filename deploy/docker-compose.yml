@@ -25,6 +25,9 @@ services:
       - LOG_FORMAT=json
       - DISABLE_PLUGINS=${DISABLE_PLUGINS:-false}
       - ENABLE_ADMIN_FALLBACK=${ENABLE_ADMIN_FALLBACK:-false}
+      # Temp directories for SQLite in scratch containers
+      - TMPDIR=/tmp
+      - SQLITE_TMPDIR=/tmp
       # --- PostgreSQL (uncomment when using postgres service) ---
       # - DB_DRIVER=postgres
       # - DB_HOST=postgres

@@ -3,7 +3,8 @@ package database
 import (
 	"context"
 	"database/sql"
-	_ "github.com/mattn/go-sqlite3"
+
+	_ "modernc.org/sqlite"
 )
 
 // SQLiteDB wraps the existing DB struct to implement the Database interface
@@ -32,7 +33,7 @@ func (s *SQLiteDB) GetDB() *sql.DB {
 
 // GetDriverName returns the database driver name
 func (s *SQLiteDB) GetDriverName() string {
-	return "sqlite3"
+	return "sqlite"
 }
 
 // Query executes a query that returns rows

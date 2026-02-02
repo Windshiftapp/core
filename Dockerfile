@@ -22,8 +22,8 @@ RUN npm run build
 # Stage 2: Build Go binary (target platform, uses QEMU for arm64)
 FROM golang:1.24.6-alpine AS builder
 
-# Install build dependencies (nodejs/npm no longer needed)
-RUN apk add --no-cache gcc musl-dev git tzdata
+# Install build dependencies (no gcc/musl-dev needed - pure Go SQLite driver)
+RUN apk add --no-cache git tzdata
 
 # Set working directory
 WORKDIR /build
@@ -38,9 +38,9 @@ COPY . .
 # Static files (JS/CSS/HTML) are architecture-independent
 COPY --from=frontend-builder /build/dist ./frontend/dist
 
-# Build backend with static linking
-RUN CGO_ENABLED=1 \
-    go build -ldflags '-s -w -linkmode external -extldflags "-static"' \
+# Build backend (pure Go, no CGO needed)
+RUN CGO_ENABLED=0 \
+    go build -ldflags '-s -w' \
     -o windshift main.go
 
 # Create data directory with placeholder file for proper volume initialization

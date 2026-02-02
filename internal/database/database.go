@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 //go:embed schema/items.sql
@@ -122,7 +122,7 @@ func NewDB(dataSourceName string) (*DB, error) {
 		"&_pragma=mmap_size(0)" + // Disable mmap for better Docker compatibility
 		"&_pragma=journal_size_limit(6144000)"
 
-	db, err := sql.Open("sqlite3", connectionString)
+	db, err := sql.Open("sqlite", connectionString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
@@ -154,7 +154,7 @@ func NewDB(dataSourceName string) (*DB, error) {
 	db.SetMaxIdleConns(12)  // Keep 10% idle connections
 
 	// Create dedicated write connection with only 1 max connection to serialize writes
-	writeConn, err := sql.Open("sqlite3", connectionString)
+	writeConn, err := sql.Open("sqlite", connectionString)
 	if err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("failed to open write connection: %w", err)
