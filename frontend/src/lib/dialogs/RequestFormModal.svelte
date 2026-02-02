@@ -71,7 +71,12 @@
       success = false;
 
       // Load request type fields configuration
-      fields = await api.requestTypes.getFields(requestType.id);
+      // Use portal API if on portal, otherwise use internal API
+      if (portalSlug) {
+        fields = await api.portal.getRequestTypeFields(portalSlug, requestType.id);
+      } else {
+        fields = await api.requestTypes.getFields(requestType.id);
+      }
 
       // Calculate steps from field data
       const stepNumbers = [...new Set(fields.map(f => f.step_number || 1))].sort((a, b) => a - b);

@@ -44,6 +44,9 @@ export const portal = {
     method: 'POST',
     body: JSON.stringify({ content }),
   }),
+
+  // Get request type fields (portal-authenticated)
+  getRequestTypeFields: (slug, requestTypeId) => fetchAPI(`/portal/${slug}/request-types/${requestTypeId}/fields`),
 };
 
 // Portal Customers Management (requires customers.manage permission)

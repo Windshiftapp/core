@@ -405,3 +405,124 @@ func (am *AuthMiddleware) handleVerificationError(w http.ResponseWriter, r *http
 	w.WriteHeader(statusCode)
 	_, _ = w.Write([]byte(message))
 }
+
+// PortalAuthMiddleware handles authentication for portal routes (accepts both session types)
+type PortalAuthMiddleware struct {
+	sessionManager       *auth.SessionManager
+	portalSessionManager *auth.PortalSessionManager
+	useProxy             bool
+	additionalProxies    []net.IP
+}
+
+// NewPortalAuthMiddleware creates a new portal authentication middleware
+func NewPortalAuthMiddleware(sessionManager *auth.SessionManager, portalSessionManager *auth.PortalSessionManager, useProxy bool, additionalProxies []string) *PortalAuthMiddleware {
+	// Parse additional proxy IPs (beyond auto-trusted private ranges)
+	var additionalIPs []net.IP
+	for _, proxyStr := range additionalProxies {
+		if ip := net.ParseIP(strings.TrimSpace(proxyStr)); ip != nil {
+			additionalIPs = append(additionalIPs, ip)
+		}
+	}
+
+	return &PortalAuthMiddleware{
+		sessionManager:       sessionManager,
+		portalSessionManager: portalSessionManager,
+		useProxy:             useProxy,
+		additionalProxies:    additionalIPs,
+	}
+}
+
+// getClientIP extracts the client IP address from request with proxy validation
+func (pam *PortalAuthMiddleware) getClientIP(r *http.Request) string {
+	// Get the immediate client IP (could be proxy)
+	remoteAddr := r.RemoteAddr
+	if colonIndex := strings.LastIndex(remoteAddr, ":"); colonIndex != -1 {
+		remoteAddr = remoteAddr[:colonIndex]
+	}
+
+	clientIP := net.ParseIP(remoteAddr)
+	if clientIP == nil {
+		return remoteAddr // Return as-is if parsing fails
+	}
+
+	// Only trust proxy headers if the request comes from a trusted proxy
+	if utils.IsTrustedProxy(clientIP, pam.useProxy, pam.additionalProxies) {
+		// Check X-Forwarded-For header (for proxies)
+		forwarded := r.Header.Get("X-Forwarded-For")
+		if forwarded != "" {
+			// Validate and extract the first (original client) IP
+			ips := strings.Split(forwarded, ",")
+			for _, ipStr := range ips {
+				ipStr = strings.TrimSpace(ipStr)
+				if ip := net.ParseIP(ipStr); ip != nil && !ip.IsLoopback() && !ip.IsMulticast() && !ip.IsUnspecified() {
+					return ipStr
+				}
+			}
+		}
+
+		// Check X-Real-IP header
+		realIP := r.Header.Get("X-Real-IP")
+		if realIP != "" {
+			if ip := net.ParseIP(realIP); ip != nil && !ip.IsLoopback() && !ip.IsMulticast() && !ip.IsUnspecified() {
+				return realIP
+			}
+		}
+	}
+
+	// Fall back to direct connection IP
+	return remoteAddr
+}
+
+// RequirePortalAuth middleware accepts either internal session OR portal customer session
+func (pam *PortalAuthMiddleware) RequirePortalAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		clientIP := pam.getClientIP(r)
+
+		// Try internal session first (via X-Session-Token header)
+		if sessionToken := r.Header.Get("X-Session-Token"); sessionToken != "" {
+			session, err := pam.sessionManager.ValidateSession(sessionToken, clientIP)
+			if err == nil {
+				ctx := context.WithValue(r.Context(), ContextKeySession, session)
+				ctx = context.WithValue(ctx, ContextKeyUser, session.User)
+				ctx = context.WithValue(ctx, ContextKeyAuthMethod, "session-header")
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+		}
+
+		// Try internal session cookie
+		if token, err := pam.sessionManager.GetSessionFromRequest(r); err == nil {
+			if session, err := pam.sessionManager.ValidateSession(token, clientIP); err == nil {
+				ctx := context.WithValue(r.Context(), ContextKeySession, session)
+				ctx = context.WithValue(ctx, ContextKeyUser, session.User)
+				ctx = context.WithValue(ctx, ContextKeyAuthMethod, "session")
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+		}
+
+		// Try portal session
+		if pam.portalSessionManager != nil {
+			if token, err := pam.portalSessionManager.GetPortalSessionFromRequest(r); err == nil && token != "" {
+				if portalSession, err := pam.portalSessionManager.ValidatePortalSession(token); err == nil {
+					ctx := context.WithValue(r.Context(), ContextKeyPortalSession, portalSession)
+					ctx = context.WithValue(ctx, ContextKeyPortalCustomerID, portalSession.PortalCustomerID)
+					ctx = context.WithValue(ctx, ContextKeyAuthMethod, "portal-session")
+					next.ServeHTTP(w, r.WithContext(ctx))
+					return
+				}
+			}
+		}
+
+		// Neither auth type succeeded
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		response := authErrorResponse{
+			Error: "Authentication required",
+			Code:  "AUTHENTICATION_REQUIRED",
+		}
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			slog.Error("failed to encode auth error response", slog.Any("error", err))
+		}
+	})
+}

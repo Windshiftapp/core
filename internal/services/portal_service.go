@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"windshift/internal/database"
 )
@@ -283,4 +284,97 @@ func (s *PortalService) GetRequestComments(ctx context.Context, itemID int) ([]P
 	}
 
 	return comments, nil
+}
+
+// RequestTypeField represents a field in a request type form
+type RequestTypeField struct {
+	ID                  int       `json:"id"`
+	RequestTypeID       int       `json:"request_type_id"`
+	FieldIdentifier     string    `json:"field_identifier"`
+	FieldType           string    `json:"field_type"`
+	DisplayOrder        int       `json:"display_order"`
+	IsRequired          bool      `json:"is_required"`
+	DisplayName         *string   `json:"display_name"`
+	Description         *string   `json:"description"`
+	StepNumber          int       `json:"step_number"`
+	VirtualFieldType    *string   `json:"virtual_field_type"`
+	VirtualFieldOptions *string   `json:"virtual_field_options"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+	FieldName           string    `json:"field_name"`
+	FieldLabel          string    `json:"field_label"`
+}
+
+// GetRequestTypeFields gets fields for a request type
+func (s *PortalService) GetRequestTypeFields(ctx context.Context, requestTypeID int) ([]RequestTypeField, error) {
+	query := `
+		SELECT rtf.id, rtf.request_type_id, rtf.field_identifier, rtf.field_type,
+		       rtf.display_order, rtf.is_required, rtf.display_name, rtf.description,
+		       COALESCE(rtf.step_number, 1) as step_number,
+		       rtf.virtual_field_type, rtf.virtual_field_options,
+		       rtf.created_at, rtf.updated_at,
+		       CASE
+		           WHEN rtf.field_type = 'virtual' THEN rtf.field_identifier
+		           ELSE COALESCE(cfd.name, rtf.field_identifier)
+		       END as field_name,
+		       CASE
+		           WHEN rtf.display_name IS NOT NULL AND rtf.display_name != '' THEN rtf.display_name
+		           WHEN rtf.field_type = 'virtual' THEN rtf.field_identifier
+		           ELSE COALESCE(cfd.name, rtf.field_identifier)
+		       END as field_label
+		FROM request_type_fields rtf
+		LEFT JOIN custom_field_definitions cfd ON rtf.field_type = 'custom'
+		    AND rtf.field_identifier = CAST(cfd.id AS TEXT)
+		WHERE rtf.request_type_id = ?
+		ORDER BY rtf.step_number, rtf.display_order, rtf.id`
+
+	rows, err := s.db.QueryContext(ctx, query, requestTypeID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch request type fields: %w", err)
+	}
+	defer rows.Close()
+
+	var fields []RequestTypeField
+	for rows.Next() {
+		var field RequestTypeField
+		var displayName, description, virtualFieldType, virtualFieldOptions sql.NullString
+		err := rows.Scan(
+			&field.ID, &field.RequestTypeID, &field.FieldIdentifier, &field.FieldType,
+			&field.DisplayOrder, &field.IsRequired, &displayName, &description,
+			&field.StepNumber, &virtualFieldType, &virtualFieldOptions,
+			&field.CreatedAt, &field.UpdatedAt,
+			&field.FieldName, &field.FieldLabel,
+		)
+		if err != nil {
+			continue
+		}
+		if displayName.Valid {
+			field.DisplayName = &displayName.String
+		}
+		if description.Valid {
+			field.Description = &description.String
+		}
+		if virtualFieldType.Valid {
+			field.VirtualFieldType = &virtualFieldType.String
+		}
+		if virtualFieldOptions.Valid {
+			field.VirtualFieldOptions = &virtualFieldOptions.String
+		}
+		fields = append(fields, field)
+	}
+
+	if fields == nil {
+		fields = []RequestTypeField{}
+	}
+
+	return fields, nil
+}
+
+// ValidateRequestTypeBelongsToChannel verifies request type is in the channel
+func (s *PortalService) ValidateRequestTypeBelongsToChannel(ctx context.Context, requestTypeID, channelID int) (bool, error) {
+	var exists bool
+	err := s.db.QueryRowContext(ctx,
+		"SELECT EXISTS(SELECT 1 FROM request_types WHERE id = ? AND channel_id = ? AND is_active = true)",
+		requestTypeID, channelID).Scan(&exists)
+	return exists, err
 }

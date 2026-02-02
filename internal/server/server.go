@@ -613,6 +613,9 @@ func (s *Server) initialize() error {
 	scimMiddleware := router.MiddlewareChain{corsMiddleware, s.scimRateLimiter.Limit}
 	scimGroup := router.NewRouteGroup(mux, "/scim/v2", scimMiddleware...)
 
+	// Create portal auth middleware (accepts both internal and portal sessions)
+	portalAuthMiddleware := middleware.NewPortalAuthMiddleware(sessionManager, portalSessionManager, cfg.UseProxy, additionalProxyList)
+
 	// Build route dependencies
 	routeDeps := &routes.Deps{
 		API:       api,
@@ -623,6 +626,7 @@ func (s *Server) initialize() error {
 		PermissionMiddleware: permissionMiddleware,
 		SCIMAuthMiddleware:   scimAuthMiddleware,
 		CSRFMiddleware:       csrfMiddleware,
+		PortalAuthMiddleware: portalAuthMiddleware,
 		DisableCSRF:          cfg.DisableCSRF,
 
 		LoginRateLimiter:    s.loginRateLimiter,

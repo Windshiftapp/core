@@ -15,6 +15,7 @@ import (
 	"time"
 	"windshift/internal/auth"
 	"windshift/internal/database"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
@@ -128,6 +129,24 @@ func (h *PortalHandler) getInternalUserID(r *http.Request) *int {
 		return nil
 	}
 	return &session.UserID
+}
+
+// getAuthFromContext extracts auth info from context (set by RequirePortalAuth middleware)
+// Returns (internalUserID, portalCustomerID) - one will be set, the other nil
+func (h *PortalHandler) getAuthFromContext(r *http.Request) (*int, *int) {
+	ctx := r.Context()
+
+	// Check for internal user (set by middleware)
+	if session, ok := ctx.Value(middleware.ContextKeySession).(*auth.Session); ok && session != nil {
+		return &session.UserID, nil
+	}
+
+	// Check for portal customer (set by middleware)
+	if portalCustomerID, ok := ctx.Value(middleware.ContextKeyPortalCustomerID).(int); ok {
+		return nil, &portalCustomerID
+	}
+
+	return nil, nil
 }
 
 // getPortalCustomerOrgID returns the customer organisation ID for a portal customer
@@ -675,36 +694,8 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 	submission.Title = utils.StripHTMLTags(submission.Title)
 	submission.Description = utils.StripHTMLTags(submission.Description)
 
-	// Check if user is authenticated via internal session
-	var authenticatedUserID *int
-	sessionToken, err := h.sessionManager.GetSessionFromRequest(r)
-	if err == nil {
-		clientIP := h.getClientIP(r)
-		session, err := h.sessionManager.ValidateSession(sessionToken, clientIP)
-		if err == nil && session != nil {
-			slog.Debug("user authenticated via internal session", slog.String("component", "portal"), slog.Int("user_id", session.UserID))
-			authenticatedUserID = &session.UserID
-		}
-	}
-
-	// Check if user is authenticated via portal session (magic link)
-	var portalCustomerID *int
-	if h.portalSessionManager != nil {
-		portalToken, err := h.portalSessionManager.GetPortalSessionFromRequest(r)
-		if err == nil && portalToken != "" {
-			portalSession, err := h.portalSessionManager.ValidatePortalSession(portalToken)
-			if err == nil && portalSession != nil {
-				slog.Debug("user authenticated via portal session", slog.String("component", "portal"), slog.Int("portal_customer_id", portalSession.PortalCustomerID))
-				portalCustomerID = &portalSession.PortalCustomerID
-			}
-		}
-	}
-
-	// Require authentication (either internal or portal)
-	if authenticatedUserID == nil && portalCustomerID == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
-		return
-	}
+	// Get auth info from context (middleware already validated)
+	authenticatedUserID, portalCustomerID := h.getAuthFromContext(r)
 
 	// For portal customers, grant channel access
 	// Internal users don't need portal customer records - they're tracked via user_id
@@ -965,25 +956,8 @@ func (h *PortalHandler) GetMyRequests(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check for internal user first
-	internalUserID := h.getInternalUserID(r)
-
-	// Check for portal customer
-	var portalCustomerID *int
-	if h.portalSessionManager != nil {
-		portalToken, _ := h.portalSessionManager.GetPortalSessionFromRequest(r)
-		if portalToken != "" {
-			if session, err := h.portalSessionManager.ValidatePortalSession(portalToken); err == nil && session != nil {
-				portalCustomerID = &session.PortalCustomerID
-			}
-		}
-	}
-
-	// Must have at least one auth type
-	if internalUserID == nil && portalCustomerID == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
-		return
-	}
+	// Get auth info from context (middleware already validated)
+	internalUserID, portalCustomerID := h.getAuthFromContext(r)
 
 	// Use service to get requests based on auth type
 	var requests []services.PortalRequestSummary
@@ -1056,25 +1030,8 @@ func (h *PortalHandler) GetRequestDetail(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Check for internal user first
-	internalUserID := h.getInternalUserID(r)
-
-	// Check for portal customer
-	var portalCustomerID *int
-	if h.portalSessionManager != nil {
-		portalToken, _ := h.portalSessionManager.GetPortalSessionFromRequest(r)
-		if portalToken != "" {
-			if session, err := h.portalSessionManager.ValidatePortalSession(portalToken); err == nil && session != nil {
-				portalCustomerID = &session.PortalCustomerID
-			}
-		}
-	}
-
-	// Must have at least one auth type
-	if internalUserID == nil && portalCustomerID == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
-		return
-	}
+	// Get auth info from context (middleware already validated)
+	internalUserID, portalCustomerID := h.getAuthFromContext(r)
 
 	// Use service to verify ownership
 	isOwner, err := h.portalService.VerifyRequestOwnership(ctx, itemID, channel.ID, internalUserID, portalCustomerID)
@@ -1123,25 +1080,8 @@ func (h *PortalHandler) GetRequestComments(w http.ResponseWriter, r *http.Reques
 	}
 	channel := portalResult.channel
 
-	// Check for internal user first
-	internalUserID := h.getInternalUserID(r)
-
-	// Check for portal customer
-	var portalCustomerID *int
-	if h.portalSessionManager != nil {
-		portalToken, _ := h.portalSessionManager.GetPortalSessionFromRequest(r)
-		if portalToken != "" {
-			if session, err := h.portalSessionManager.ValidatePortalSession(portalToken); err == nil && session != nil {
-				portalCustomerID = &session.PortalCustomerID
-			}
-		}
-	}
-
-	// Must have at least one auth type
-	if internalUserID == nil && portalCustomerID == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
-		return
-	}
+	// Get auth info from context (middleware already validated)
+	internalUserID, portalCustomerID := h.getAuthFromContext(r)
 
 	// Use service to verify ownership
 	isOwner, err := h.portalService.VerifyRequestOwnership(ctx, itemID, channel.ID, internalUserID, portalCustomerID)
@@ -1186,25 +1126,8 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 	}
 	channel := portalResult.channel
 
-	// Check for internal user first
-	internalUserID := h.getInternalUserID(r)
-
-	// Check for portal customer
-	var portalCustomerID *int
-	if h.portalSessionManager != nil {
-		portalToken, _ := h.portalSessionManager.GetPortalSessionFromRequest(r)
-		if portalToken != "" {
-			if session, err := h.portalSessionManager.ValidatePortalSession(portalToken); err == nil && session != nil {
-				portalCustomerID = &session.PortalCustomerID
-			}
-		}
-	}
-
-	// Must have at least one auth type
-	if internalUserID == nil && portalCustomerID == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
-		return
-	}
+	// Get auth info from context (middleware already validated)
+	internalUserID, portalCustomerID := h.getAuthFromContext(r)
 
 	// Use service to verify ownership
 	isOwner, err := h.portalService.VerifyRequestOwnership(ctx, itemID, channel.ID, internalUserID, portalCustomerID)
@@ -1702,4 +1625,48 @@ func (h *PortalHandler) GetAssetReports(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(assetReports)
+}
+
+// GetRequestTypeFields returns fields for a request type (portal-aware authentication)
+// Accepts either internal session OR portal customer session
+func (h *PortalHandler) GetRequestTypeFields(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+	requestTypeIDStr := r.PathValue("id")
+	requestTypeID, err := strconv.Atoi(requestTypeIDStr)
+	if err != nil {
+		http.Error(w, "Invalid request type ID", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Find channel by portal slug
+	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
+	if err != nil {
+		http.Error(w, "Portal not found", http.StatusNotFound)
+		return
+	}
+
+	// Verify request type belongs to this channel
+	valid, err := h.portalService.ValidateRequestTypeBelongsToChannel(ctx, requestTypeID, portalResult.channel.ID)
+	if err != nil {
+		http.Error(w, "Failed to validate request type", http.StatusInternalServerError)
+		return
+	}
+	if !valid {
+		http.Error(w, "Request type not found", http.StatusNotFound)
+		return
+	}
+
+	// Get fields from service
+	fields, err := h.portalService.GetRequestTypeFields(ctx, requestTypeID)
+	if err != nil {
+		slog.Error("failed to get request type fields", slog.String("component", "portal"), slog.Int("request_type_id", requestTypeID), slog.Any("error", err))
+		http.Error(w, "Failed to get request type fields", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(fields)
 }

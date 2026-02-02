@@ -16,4 +16,8 @@ const (
 	CSRFExempt ContextKey = "csrf_exempt"
 	// SCIMToken stores the SCIM token (*models.SCIMToken)
 	SCIMToken ContextKey = "scim_token"
+	// PortalSession stores the portal customer session (*auth.PortalSession)
+	PortalSession ContextKey = "portal_session"
+	// PortalCustomerID stores the portal customer ID (int)
+	PortalCustomerID ContextKey = "portal_customer_id"
 )

@@ -26,6 +26,7 @@ type Deps struct {
 	PermissionMiddleware *middleware.PermissionMiddleware
 	SCIMAuthMiddleware   *middleware.SCIMAuthMiddleware
 	CSRFMiddleware       *middleware.CSRFMiddleware
+	PortalAuthMiddleware *middleware.PortalAuthMiddleware
 	DisableCSRF          bool
 
 	// Rate limiters

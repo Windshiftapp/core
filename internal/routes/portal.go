@@ -15,7 +15,6 @@ func RegisterPortalRoutes(deps *Deps) {
 	api.Handle("GET /portal/{slug}/request-types", deps.Portal.Portal.GetRequestTypes)
 	api.Handle("GET /portal/{slug}/asset-reports", deps.Portal.Portal.GetAssetReports)
 	api.Handle("GET /portal/{slug}/asset-reports/{id}/execute", deps.Portal.Portal.ExecuteAssetReport)
-	api.HandleH("POST /portal/{slug}/submit", deps.PortalSubmitLimiter.Limit(http.HandlerFunc(deps.Portal.Portal.SubmitToPortal)))
 	api.HandleH("POST /portal/{slug}/knowledge-base/search", deps.PortalSearchLimiter.Limit(http.HandlerFunc(deps.Portal.Portal.SearchKnowledgeBase)))
 
 	// Portal customer authentication endpoints (magic link)
@@ -26,11 +25,22 @@ func RegisterPortalRoutes(deps *Deps) {
 		api.Handle("GET /portal/{slug}/auth/me", deps.Portal.PortalAuth.GetCurrentCustomer)
 	}
 
-	// Portal request tracking endpoints (OptionalAuth)
-	api.Handle("GET /portal/{slug}/my-requests", deps.Portal.Portal.GetMyRequests)
-	api.Handle("GET /portal/{slug}/requests/{itemId}", deps.Portal.Portal.GetRequestDetail)
-	api.Handle("GET /portal/{slug}/requests/{itemId}/comments", deps.Portal.Portal.GetRequestComments)
-	api.Handle("POST /portal/{slug}/requests/{itemId}/comments", deps.Portal.Portal.AddRequestComment)
+	// Portal-authenticated endpoints (accept both internal and portal sessions)
+	if deps.PortalAuthMiddleware != nil {
+		portalAuth := deps.PortalAuthMiddleware.RequirePortalAuth
+
+		// Request type fields
+		api.HandleH("GET /portal/{slug}/request-types/{id}/fields", portalAuth(http.HandlerFunc(deps.Portal.Portal.GetRequestTypeFields)))
+
+		// Submission (with rate limiting)
+		api.HandleH("POST /portal/{slug}/submit", deps.PortalSubmitLimiter.Limit(portalAuth(http.HandlerFunc(deps.Portal.Portal.SubmitToPortal))))
+
+		// Request tracking endpoints
+		api.HandleH("GET /portal/{slug}/my-requests", portalAuth(http.HandlerFunc(deps.Portal.Portal.GetMyRequests)))
+		api.HandleH("GET /portal/{slug}/requests/{itemId}", portalAuth(http.HandlerFunc(deps.Portal.Portal.GetRequestDetail)))
+		api.HandleH("GET /portal/{slug}/requests/{itemId}/comments", portalAuth(http.HandlerFunc(deps.Portal.Portal.GetRequestComments)))
+		api.HandleH("POST /portal/{slug}/requests/{itemId}/comments", portalAuth(http.HandlerFunc(deps.Portal.Portal.AddRequestComment)))
+	}
 
 	// Portal Customer Management
 	api.HandleH("GET /portal-customers", customersPerm(http.HandlerFunc(deps.Portal.PortalCustomer.GetPortalCustomers)))
