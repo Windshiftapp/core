@@ -23,6 +23,8 @@ services:
       - DB_PATH=/data/windshift.db
       - LOG_LEVEL=info
       - LOG_FORMAT=json
+      - DISABLE_PLUGINS=${DISABLE_PLUGINS:-false}
+      - ENABLE_ADMIN_FALLBACK=${ENABLE_ADMIN_FALLBACK:-false}
       # --- PostgreSQL (uncomment when using postgres service) ---
       # - DB_DRIVER=postgres
       # - DB_HOST=postgres
