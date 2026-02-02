@@ -1,7 +1,8 @@
 <script>
   import { onDestroy } from 'svelte';
-  import { timeFormat } from 'd3-time-format';
   import { api } from '../api.js';
+
+  const shortDateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
   import { getCollection } from '../features/collections/collectionService.js';
   import { Edit3, Plus, X, LayoutGrid, GripVertical, Pencil, Trash2 } from 'lucide-svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
@@ -287,7 +288,7 @@
         completedByWeekData.push({
           date: new Date(weekStart),
           count: completedCount,
-          label: `Week of ${timeFormat('%b %d')(weekStart)}`
+          label: `Week of ${shortDateFormat.format(weekStart)}`
         });
       }
 

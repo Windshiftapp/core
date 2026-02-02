@@ -123,3 +123,7 @@ bin
 WINDSHIFT.md
 AGENTS.md
 docs
+
+# Old build artifacts
+ws
+ws.toml

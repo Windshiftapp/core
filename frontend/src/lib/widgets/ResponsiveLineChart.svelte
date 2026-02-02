@@ -1,6 +1,5 @@
 <script>
   import { onMount } from 'svelte';
-  import { timeFormat } from 'd3-time-format';
   import { t } from '../stores/i18n.svelte.js';
 
   export let chartData = [];
@@ -18,7 +17,11 @@
 
   const padding = { top: 24, right: showYAxis ? 16 : 32, bottom: 24, left: showYAxis ? 48 : 32 };
   const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-  const formatDate = timeFormat('%m/%d');
+  function formatDate(date) {
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${month}/${day}`;
+  }
   const gradientId = `${gradientPrefix}-${Math.random().toString(36).slice(2, 9)}`;
 
   let container;

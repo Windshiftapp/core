@@ -199,8 +199,7 @@ func (am *AuthMiddleware) shouldSkipAuth(r *http.Request) bool {
 	// Skip auth for static files
 	if strings.HasPrefix(path, "/assets/") ||
 		strings.HasPrefix(path, "/favicon.ico") ||
-		strings.HasPrefix(path, "/manifest.json") ||
-		strings.HasPrefix(path, "/cmicon") {
+		strings.HasPrefix(path, "/manifest.json") {
 		return true
 	}
 
