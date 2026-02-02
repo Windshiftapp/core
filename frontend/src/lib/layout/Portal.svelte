@@ -67,6 +67,9 @@
   // Track if we've synced the URL state (to avoid re-syncing on every change)
   let urlStateSynced = $state(false);
 
+  // Track previous auth state to detect login events
+  let previousAuthState = $state(false);
+
   // Derived authentication state - direct store access (Svelte 5 reactive)
   let isUserAuthenticated = $derived(
     authStore.isAuthenticated || portalAuthStore.isAuthenticated
@@ -144,6 +147,18 @@
         }
       }
     }
+  });
+
+  // Watch for auth state changes to reload request types after login
+  $effect(() => {
+    const currentAuth = authStore.isAuthenticated || portalAuthStore.isAuthenticated;
+
+    // Only reload when auth state changes from false to true (login)
+    if (authCheckComplete && currentAuth && !previousAuthState && portalStore.currentSlug) {
+      portalStore.loadRequestTypes();
+    }
+
+    previousAuthState = currentAuth;
   });
 
   // Apply theme CSS variables when isDarkMode changes

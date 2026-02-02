@@ -447,15 +447,17 @@ async function saveKnowledgeBaseConfig() {
 
 /**
  * Load request types
+ * Uses portal endpoint to properly handle portal customer authentication
  */
 async function loadRequestTypes() {
-  if (!portalData || !portalData.channel_id) return;
+  if (!portalData || !currentSlug) return;
   if (isLoadingRequestTypes) return;
 
   try {
     isLoadingRequestTypes = true;
     loadingRequestTypes = true;
-    const types = await api.requestTypes.getForChannel(portalData.channel_id);
+    // Use portal endpoint instead of channel endpoint for proper auth handling
+    const types = await api.requestTypes.getForPortal(currentSlug);
 
     // Fetch field counts in parallel
     const typesWithFields = await Promise.all(
