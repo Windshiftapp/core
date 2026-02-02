@@ -1,6 +1,6 @@
 <script>
   import { X, Mail, User, Lock, Building2 } from 'lucide-svelte';
-  import { portalStore, gradients } from '../stores/portal.svelte.js';
+  import { portalStore } from '../stores/portal.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
   import { authStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
@@ -80,19 +80,6 @@
     }
   }
 
-  // Compute background style - image takes priority over gradient (same logic as PortalHero)
-  const headerBackgroundStyle = $derived(() => {
-    if (portalStore.backgroundImageUrl) {
-      return `background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${portalStore.backgroundImageUrl}) center/cover no-repeat;`;
-    }
-    // Use selected gradient, or fall back to first gradient with a value
-    const gradientValue = gradients[portalStore.selectedGradient]?.value;
-    if (gradientValue) {
-      return `background: ${gradientValue};`;
-    }
-    // Fall back to first gradient with a value (index 1 = "Blue to Purple")
-    return `background: ${gradients[1].value};`;
-  });
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -115,7 +102,7 @@
         <!-- Email Sent Confirmation - Gradient Header -->
         <div
           class="px-8 py-12 text-white text-center relative"
-          style="{headerBackgroundStyle()}"
+          style="{portalStore.headerBackgroundStyle}"
         >
           <div class="absolute top-4 right-4">
             <button
@@ -154,7 +141,7 @@
         <!-- Magic Link Login Form - Gradient Header -->
         <div
           class="px-8 py-12 text-white text-center relative"
-          style="{headerBackgroundStyle()}"
+          style="{portalStore.headerBackgroundStyle}"
         >
           <div class="absolute top-4 right-4">
             <button
@@ -240,7 +227,7 @@
         <!-- Internal Login Form - Gradient Header -->
         <div
           class="px-8 py-12 text-white text-center relative"
-          style="{headerBackgroundStyle()}"
+          style="{portalStore.headerBackgroundStyle}"
         >
           <div class="absolute top-4 right-4">
             <button

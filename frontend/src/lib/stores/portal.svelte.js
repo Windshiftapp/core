@@ -918,6 +918,18 @@ export const portalStore = {
   get selectedBackgroundCategory() { return selectedBackgroundCategory; },
   get hasBackgroundImage() { return backgroundImageUrl !== null && backgroundImageUrl !== ''; },
   get hasGradient() { return !backgroundImageUrl && selectedGradient > 0 && gradients[selectedGradient]?.value; },
+  // Computed header background style - image takes priority over gradient
+  get headerBackgroundStyle() {
+    if (backgroundImageUrl) {
+      return `background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${backgroundImageUrl}) center/cover no-repeat;`;
+    }
+    const gradientValue = gradients[selectedGradient]?.value;
+    if (gradientValue) {
+      return `background: ${gradientValue};`;
+    }
+    // Fall back to first gradient with a value (index 1 = "Blue to Purple")
+    return `background: ${gradients[1].value};`;
+  },
 
   // Getters for logo state
   get logoUrl() { return logoUrl; },

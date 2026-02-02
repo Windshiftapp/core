@@ -2,7 +2,7 @@
   import { api } from '../api.js';
   import { authStore } from '../stores';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
-  import { portalStore, gradients, iconMap } from '../stores/portal.svelte.js';
+  import { portalStore, iconMap } from '../stores/portal.svelte.js';
   import Button from '../components/Button.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import Spinner from '../components/Spinner.svelte';
@@ -49,11 +49,6 @@
   let isLastStep = $derived(currentStep === Math.max(...steps));
   let isFirstStep = $derived(currentStep === Math.min(...steps));
 
-  // Get gradient - use portal gradient or fallback
-  let gradientValue = $derived(
-    gradients[portalStore.selectedGradient]?.value ||
-    gradients[0].value
-  );
 
   // Load fields when modal opens
   $effect(() => {
@@ -260,7 +255,7 @@
     <!-- Gradient Header with Integrated Stepper -->
     <div
       class="px-8 pt-8 pb-6 text-white text-center relative"
-      style="background: {gradientValue};"
+      style="{portalStore.headerBackgroundStyle}"
     >
       <!-- Close button -->
       <button
