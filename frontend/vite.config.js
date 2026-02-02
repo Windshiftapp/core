@@ -21,6 +21,13 @@ export default defineConfig({
       template: 'treemap'
     })
   ],
+  optimizeDeps: {
+    include: [
+      '@milkdown/core',
+      '@milkdown/kit',
+      '@milkdown/theme-nord'
+    ]
+  },
   server: {
     port: 5555,
     proxy: {
@@ -37,6 +44,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           'milkdown': [
+            '@milkdown/core',
             '@milkdown/kit/core',
             '@milkdown/kit/preset/commonmark',
             '@milkdown/kit/preset/gfm',

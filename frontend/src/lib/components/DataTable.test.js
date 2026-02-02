@@ -22,6 +22,18 @@ vi.mock('./EmptyState.svelte', () => {
   };
 });
 
+// Mock the i18n store
+vi.mock('../stores/i18n.svelte.js', () => ({
+  t: vi.fn((key, params = {}) => {
+    const translations = {
+      'components.dataTable.showingRange': `Showing ${params.start}–${params.end} of ${params.total}`,
+      'components.pagination.pageOf': `Page ${params.current} of ${params.total}`,
+      'common.noData': 'No data available'
+    };
+    return translations[key] || key;
+  })
+}));
+
 describe('DataTable', () => {
   const sampleColumns = [
     { key: 'name', label: 'Name' },
