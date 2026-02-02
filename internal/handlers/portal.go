@@ -1670,3 +1670,30 @@ func (h *PortalHandler) GetRequestTypeFields(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(fields)
 }
+
+// GetCustomFields returns custom field definitions used by this portal's request types
+// Accepts either internal session OR portal customer session
+func (h *PortalHandler) GetCustomFields(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Find channel by portal slug
+	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
+	if err != nil {
+		http.Error(w, "Portal not found", http.StatusNotFound)
+		return
+	}
+
+	// Get custom fields used by this channel's request types
+	fields, err := h.portalService.GetCustomFieldsForChannel(ctx, portalResult.channel.ID)
+	if err != nil {
+		slog.Error("failed to get custom fields for channel", slog.String("component", "portal"), slog.Int("channel_id", portalResult.channel.ID), slog.Any("error", err))
+		http.Error(w, "Failed to get custom fields", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(fields)
+}

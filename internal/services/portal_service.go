@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/models"
 )
 
 // PortalService encapsulates database logic for portal requests
@@ -377,4 +378,57 @@ func (s *PortalService) ValidateRequestTypeBelongsToChannel(ctx context.Context,
 		"SELECT EXISTS(SELECT 1 FROM request_types WHERE id = ? AND channel_id = ? AND is_active = true)",
 		requestTypeID, channelID).Scan(&exists)
 	return exists, err
+}
+
+// GetCustomFieldsForChannel returns custom field definitions used by request types in this channel
+func (s *PortalService) GetCustomFieldsForChannel(ctx context.Context, channelID int) ([]models.CustomFieldDefinition, error) {
+	query := `
+		SELECT DISTINCT cfd.id, cfd.name, cfd.field_type, cfd.description,
+		       cfd.required, cfd.options, cfd.display_order, cfd.system_default,
+		       cfd.applies_to_portal_customers, cfd.applies_to_customer_organisations,
+		       cfd.created_at, cfd.updated_at
+		FROM custom_field_definitions cfd
+		WHERE cfd.id IN (
+		    SELECT CAST(rtf.field_identifier AS INTEGER)
+		    FROM request_type_fields rtf
+		    JOIN request_types rt ON rtf.request_type_id = rt.id
+		    WHERE rt.channel_id = ?
+		      AND rt.is_active = true
+		      AND rtf.field_type = 'custom'
+		)
+		ORDER BY cfd.display_order, cfd.name`
+
+	rows, err := s.db.QueryContext(ctx, query, channelID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch custom fields for channel: %w", err)
+	}
+	defer rows.Close()
+
+	var fields []models.CustomFieldDefinition
+	for rows.Next() {
+		var field models.CustomFieldDefinition
+		var description, options sql.NullString
+		err := rows.Scan(
+			&field.ID, &field.Name, &field.FieldType, &description,
+			&field.Required, &options, &field.DisplayOrder, &field.SystemDefault,
+			&field.AppliesToPortalCustomers, &field.AppliesToCustomerOrganisations,
+			&field.CreatedAt, &field.UpdatedAt,
+		)
+		if err != nil {
+			continue
+		}
+		if description.Valid {
+			field.Description = description.String
+		}
+		if options.Valid {
+			field.Options = options.String
+		}
+		fields = append(fields, field)
+	}
+
+	if fields == nil {
+		fields = []models.CustomFieldDefinition{}
+	}
+
+	return fields, nil
 }

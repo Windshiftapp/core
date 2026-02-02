@@ -47,6 +47,9 @@ export const portal = {
 
   // Get request type fields (portal-authenticated)
   getRequestTypeFields: (slug, requestTypeId) => fetchAPI(`/portal/${slug}/request-types/${requestTypeId}/fields`),
+
+  // Get custom fields used by this portal's request types (portal-authenticated)
+  getCustomFields: (slug) => fetchAPI(`/portal/${slug}/custom-fields`),
 };
 
 // Portal Customers Management (requires customers.manage permission)

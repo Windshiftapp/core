@@ -29,8 +29,9 @@ func RegisterPortalRoutes(deps *Deps) {
 	if deps.PortalAuthMiddleware != nil {
 		portalAuth := deps.PortalAuthMiddleware.RequirePortalAuth
 
-		// Request type fields
+		// Request type fields and custom fields
 		api.HandleH("GET /portal/{slug}/request-types/{id}/fields", portalAuth(http.HandlerFunc(deps.Portal.Portal.GetRequestTypeFields)))
+		api.HandleH("GET /portal/{slug}/custom-fields", portalAuth(http.HandlerFunc(deps.Portal.Portal.GetCustomFields)))
 
 		// Submission (with rate limiting)
 		api.HandleH("POST /portal/{slug}/submit", deps.PortalSubmitLimiter.Limit(portalAuth(http.HandlerFunc(deps.Portal.Portal.SubmitToPortal))))

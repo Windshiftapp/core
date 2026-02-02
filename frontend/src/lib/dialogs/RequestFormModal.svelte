@@ -83,9 +83,14 @@
       steps = stepNumbers.length > 0 ? stepNumbers : [1];
       currentStep = Math.min(...steps);
 
-      // Load all custom field definitions for rendering
-      const allCustomFields = await api.customFields.getAll();
-      customFieldDefinitions = allCustomFields || [];
+      // Load custom field definitions for rendering
+      // Use portal API if on portal (only returns fields used by this portal)
+      // Otherwise use internal API (returns all fields)
+      if (portalSlug) {
+        customFieldDefinitions = await api.portal.getCustomFields(portalSlug) || [];
+      } else {
+        customFieldDefinitions = await api.customFields.getAll() || [];
+      }
 
       // Initialize custom field values (for both custom and virtual fields)
       customFieldValues = {};
