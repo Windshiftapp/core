@@ -302,15 +302,18 @@ func (h *SCIMHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Insert user
-	var userID int64
-	err = h.db.QueryRow(`
+	result, err := h.db.Exec(`
 		INSERT INTO users (email, username, first_name, last_name, is_active,
 		                   scim_external_id, scim_managed, email_verified)
 		VALUES (?, ?, ?, ?, ?, ?, true, true)
-		RETURNING id
-	`, email, scimUser.UserName, firstName, lastName, scimUser.Active, scimUser.ExternalID).Scan(&userID)
+	`, email, scimUser.UserName, firstName, lastName, scimUser.Active, scimUser.ExternalID)
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to create user: "+err.Error(), "")
+		return
+	}
+	userID, err := result.LastInsertId()
+	if err != nil {
+		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to get user ID: "+err.Error(), "")
 		return
 	}
 
@@ -622,14 +625,17 @@ func (h *SCIMHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Insert group
-	var groupID int64
-	err = h.db.QueryRow(`
+	result, err := h.db.Exec(`
 		INSERT INTO groups (name, description, scim_external_id, scim_managed, is_active)
 		VALUES (?, '', ?, true, true)
-		RETURNING id
-	`, scimGroup.DisplayName, scimGroup.ExternalID).Scan(&groupID)
+	`, scimGroup.DisplayName, scimGroup.ExternalID)
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to create group: "+err.Error(), "")
+		return
+	}
+	groupID, err := result.LastInsertId()
+	if err != nil {
+		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to get group ID: "+err.Error(), "")
 		return
 	}
 
