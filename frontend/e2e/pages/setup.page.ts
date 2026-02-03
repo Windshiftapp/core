@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 /**
  * Page Object for the Welcome Assistant (Initial Setup)
@@ -13,9 +13,12 @@ export class SetupPage {
   readonly passwordInput = 'input[type="password"], input[name="password"]';
   readonly firstNameInput = 'input[name="first_name"], input[name="firstName"]';
   readonly lastNameInput = 'input[name="last_name"], input[name="lastName"]';
-  readonly timeTrackingCheckbox = 'input[type="checkbox"][name="time_tracking"], label:has-text("Time Tracking")';
-  readonly testManagementCheckbox = 'input[type="checkbox"][name="test_management"], label:has-text("Test Management")';
-  readonly submitButton = 'button[type="submit"], button:has-text("Complete Setup"), button:has-text("Get Started")';
+  readonly timeTrackingCheckbox =
+    'input[type="checkbox"][name="time_tracking"], label:has-text("Time Tracking")';
+  readonly testManagementCheckbox =
+    'input[type="checkbox"][name="test_management"], label:has-text("Test Management")';
+  readonly submitButton =
+    'button[type="submit"], button:has-text("Complete Setup"), button:has-text("Get Started")';
   readonly successMessage = 'text=Setup completed, text=Welcome';
 
   /**
@@ -58,10 +61,7 @@ export class SetupPage {
   /**
    * Configure module settings
    */
-  async configureModules(options: {
-    timeTracking?: boolean;
-    testManagement?: boolean;
-  }) {
+  async configureModules(options: { timeTracking?: boolean; testManagement?: boolean }) {
     if (options.timeTracking !== undefined) {
       const checkbox = this.page.locator(this.timeTrackingCheckbox);
       const isChecked = await checkbox.isChecked().catch(() => false);

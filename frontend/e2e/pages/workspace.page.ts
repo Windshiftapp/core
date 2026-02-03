@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 /**
  * Page Object for Workspace Management
@@ -19,7 +19,8 @@ export class WorkspacePage {
   readonly editButton = 'button:has-text("Edit")';
   readonly deleteButton = 'button:has-text("Delete")';
   readonly confirmDeleteButton = 'button:has-text("Confirm"), button:has-text("Delete")';
-  readonly successToast = 'text=created successfully, text=updated successfully, text=deleted successfully';
+  readonly successToast =
+    'text=created successfully, text=updated successfully, text=deleted successfully';
   readonly errorToast = '.error, .error-message, [role="alert"]';
 
   /**
@@ -49,11 +50,7 @@ export class WorkspacePage {
   /**
    * Fill workspace form
    */
-  async fillForm(data: {
-    name: string;
-    key: string;
-    description: string;
-  }) {
+  async fillForm(data: { name: string; key: string; description: string }) {
     await this.page.fill(this.nameInput, data.name);
     await this.page.fill(this.keyInput, data.key);
     await this.page.fill(this.descriptionInput, data.description);
@@ -70,11 +67,7 @@ export class WorkspacePage {
   /**
    * Create a new workspace
    */
-  async createWorkspace(data: {
-    name: string;
-    key: string;
-    description: string;
-  }) {
+  async createWorkspace(data: { name: string; key: string; description: string }) {
     await this.goto();
     await this.clickCreate();
     await this.fillForm(data);
@@ -115,11 +108,14 @@ export class WorkspacePage {
   /**
    * Edit a workspace
    */
-  async editWorkspace(currentName: string, newData: {
-    name?: string;
-    key?: string;
-    description?: string;
-  }) {
+  async editWorkspace(
+    currentName: string,
+    newData: {
+      name?: string;
+      key?: string;
+      description?: string;
+    }
+  ) {
     await this.goto();
 
     // Find and click edit button for the workspace

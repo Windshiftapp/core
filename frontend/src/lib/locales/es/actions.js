@@ -8,7 +8,8 @@ export default {
     create: 'Crear Acción',
     createFirst: 'Crear Tu Primera Acción',
     noActions: 'Aún no hay acciones',
-    noActionsDescription: 'Crea acciones para automatizar tus flujos de trabajo basados en eventos de elementos',
+    noActionsDescription:
+      'Crea acciones para automatizar tus flujos de trabajo basados en eventos de elementos',
     enabled: 'Activado',
     disabled: 'Desactivado',
     enable: 'Activar',
@@ -24,7 +25,8 @@ export default {
       itemUpdated: 'Elemento Actualizado',
       itemLinked: 'Elemento Vinculado',
       respondToCascades: 'Responder a cambios activados por acciones',
-      respondToCascadesHint: 'Cuando está activado, esta acción también se ejecutará cuando sea activada por otras acciones, no solo por cambios del usuario.'
+      respondToCascadesHint:
+        'Cuando está activado, esta acción también se ejecutará cuando sea activada por otras acciones, no solo por cambios del usuario.',
     },
 
     nodes: {
@@ -33,7 +35,7 @@ export default {
       setStatus: 'Establecer Estado',
       addComment: 'Agregar Comentario',
       notifyUser: 'Notificar Usuario',
-      condition: 'Condición'
+      condition: 'Condición',
     },
 
     addNodes: 'Agregar Nodos',
@@ -64,18 +66,18 @@ export default {
       triggerType: 'Tipo de Disparador',
       fromStatus: 'Desde Estado',
       toStatus: 'Hasta Estado',
-      anyStatus: 'Cualquier Estado'
+      anyStatus: 'Cualquier Estado',
     },
 
     recipients: {
       assignee: 'Asignado',
       creator: 'Creador',
-      specific: 'Usuarios Específicos'
+      specific: 'Usuarios Específicos',
     },
 
     condition: {
       true: 'Sí',
-      false: 'No'
+      false: 'No',
     },
 
     operators: {
@@ -85,7 +87,7 @@ export default {
       greaterThan: 'Mayor que',
       lessThan: 'Menor que',
       isEmpty: 'Está Vacío',
-      isNotEmpty: 'No Está Vacío'
+      isNotEmpty: 'No Está Vacío',
     },
 
     logs: {
@@ -100,7 +102,7 @@ export default {
       completedAt: 'Completado a las',
       error: 'Error',
       details: 'Detalles',
-      viewDetails: 'Ver Detalles'
+      viewDetails: 'Ver Detalles',
     },
 
     trace: {
@@ -111,50 +113,52 @@ export default {
       addComment: 'Comentario {prefix}agregado: "{content}"',
       notifyUser: 'Notificación enviada a {count} usuario(s)',
       notifySkipped: 'Notificación omitida: {reason}',
-      conditionResult: 'La condición resultó en {result}'
+      conditionResult: 'La condición resultó en {result}',
     },
 
     test: {
       title: 'Probar Acción',
-      description: 'Selecciona un elemento para ejecutar esta acción. La acción se ejecutará inmediatamente, sin esperar el disparador normal.',
+      description:
+        'Selecciona un elemento para ejecutar esta acción. La acción se ejecutará inmediatamente, sin esperar el disparador normal.',
       selectItem: 'Seleccionar Elemento',
       itemPlaceholder: 'Buscar un elemento...',
       execute: 'Ejecutar Acción',
       run: 'Prueba',
       executionFailed: 'Error al ejecutar la acción',
-      executionQueued: 'Acción en cola para ejecución'
+      executionQueued: 'Acción en cola para ejecución',
     },
 
     placeholders: {
       title: 'Marcadores Disponibles',
-      description: 'Usa estos marcadores en tu plantilla. Se reemplazarán con valores reales cuando se ejecute la acción.',
+      description:
+        'Usa estos marcadores en tu plantilla. Se reemplazarán con valores reales cuando se ejecute la acción.',
       showReference: 'Mostrar referencia de marcadores',
       categories: {
         item: 'Campos del Elemento',
         user: 'Usuario Actual',
         old: 'Valores Anteriores',
-        trigger: 'Contexto del Disparador'
+        trigger: 'Contexto del Disparador',
       },
       item: {
         title: 'Título del elemento',
         id: 'ID del elemento',
         statusId: 'ID del estado',
         assigneeId: 'ID del usuario asignado',
-        any: 'Cualquier campo del elemento'
+        any: 'Cualquier campo del elemento',
       },
       user: {
         name: 'Nombre completo del usuario',
         email: 'Correo del usuario',
-        id: 'ID del usuario'
+        id: 'ID del usuario',
       },
       old: {
         description: 'Valor anterior antes del cambio',
-        example: 'Valor anterior de cualquier campo'
+        example: 'Valor anterior de cualquier campo',
       },
       trigger: {
         itemId: 'ID del elemento disparador',
-        workspaceId: 'ID del espacio de trabajo'
-      }
-    }
-  }
+        workspaceId: 'ID del espacio de trabajo',
+      },
+    },
+  },
 };

@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { derived, writable } from 'svelte/store';
 import { api } from '../api.js';
 
 /**
@@ -15,7 +15,7 @@ function createSSOStore() {
     enabled: false,
     providerName: null,
     providerSlug: null,
-    allowPasswordLogin: true
+    allowPasswordLogin: true,
   });
   const statusLoading = writable(true);
   const statusError = writable(null);
@@ -34,8 +34,26 @@ function createSSOStore() {
 
   // Combined derived store for easy subscription
   const combined = derived(
-    [status, statusLoading, statusError, providers, providersLoading, providersError, externalAccounts, externalAccountsLoading],
-    ([$status, $statusLoading, $statusError, $providers, $providersLoading, $providersError, $externalAccounts, $externalAccountsLoading]) => ({
+    [
+      status,
+      statusLoading,
+      statusError,
+      providers,
+      providersLoading,
+      providersError,
+      externalAccounts,
+      externalAccountsLoading,
+    ],
+    ([
+      $status,
+      $statusLoading,
+      $statusError,
+      $providers,
+      $providersLoading,
+      $providersError,
+      $externalAccounts,
+      $externalAccountsLoading,
+    ]) => ({
       // Public status
       enabled: $status.enabled,
       providerName: $status.providerName,
@@ -49,7 +67,7 @@ function createSSOStore() {
       providersError: $providersError,
       // User external accounts
       externalAccounts: $externalAccounts,
-      externalAccountsLoading: $externalAccountsLoading
+      externalAccountsLoading: $externalAccountsLoading,
     })
   );
 
@@ -67,7 +85,7 @@ function createSSOStore() {
           enabled: data.enabled,
           providerName: data.provider_name || null,
           providerSlug: data.provider_slug || null,
-          allowPasswordLogin: data.allow_password_login !== false
+          allowPasswordLogin: data.allow_password_login !== false,
         });
         statusLoading.set(false);
       } catch (err) {
@@ -76,7 +94,7 @@ function createSSOStore() {
           enabled: false,
           providerName: null,
           providerSlug: null,
-          allowPasswordLogin: true
+          allowPasswordLogin: true,
         });
         statusLoading.set(false);
         statusError.set(err.message);
@@ -86,7 +104,7 @@ function createSSOStore() {
     // Start SSO login (redirects to IdP)
     startLogin(rememberMe = false) {
       let currentStatus;
-      status.subscribe(s => currentStatus = s)();
+      status.subscribe((s) => (currentStatus = s))();
 
       if (!currentStatus.enabled || !currentStatus.providerSlug) {
         console.error('SSO not enabled or provider not configured');
@@ -241,7 +259,7 @@ function createSSOStore() {
 
       // Check if SSO is enabled first - no need to check verification if SSO isn't configured
       let currentStatus;
-      status.subscribe(s => currentStatus = s)();
+      status.subscribe((s) => (currentStatus = s))();
 
       if (!currentStatus.enabled) {
         // No SSO configured - skip the API call entirely
@@ -274,7 +292,7 @@ function createSSOStore() {
         console.error('Failed to resend verification email:', err);
         throw err;
       }
-    }
+    },
   };
 }
 

@@ -21,7 +21,7 @@ export const toasts = {
     });
     fn(toastsState);
     return () => {};
-  }
+  },
 };
 
 /**
@@ -47,7 +47,7 @@ export function addToast(options) {
     showCloseButton: options.showCloseButton ?? true,
     clickable: options.clickable ?? false,
     onClick: options.onClick || null,
-    createdAt: Date.now()
+    createdAt: Date.now(),
   };
 
   // Add to beginning (newest first)
@@ -61,7 +61,7 @@ export function addToast(options) {
  * @param {number} id - Toast ID to remove
  */
 export function removeToast(id) {
-  toastsState = toastsState.filter(toast => toast.id !== id);
+  toastsState = toastsState.filter((toast) => toast.id !== id);
 }
 
 /**

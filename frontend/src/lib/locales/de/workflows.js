@@ -19,7 +19,7 @@ export default {
     noStatuses: 'Keine Status gefunden',
     statusCreated: 'Status erfolgreich erstellt',
     statusUpdated: 'Status erfolgreich aktualisiert',
-    statusDeleted: 'Status erfolgreich gelöscht'
+    statusDeleted: 'Status erfolgreich gelöscht',
   },
 
   priorities: {
@@ -40,7 +40,7 @@ export default {
     high: 'Hoch',
     medium: 'Mittel',
     low: 'Niedrig',
-    lowest: 'Niedrigste'
+    lowest: 'Niedrigste',
   },
 
   workflows: {
@@ -63,7 +63,8 @@ export default {
     workflowUpdated: 'Workflow erfolgreich aktualisiert',
     workflowDeleted: 'Workflow erfolgreich gelöscht',
     enterWorkflowName: 'Bitte geben Sie einen Workflow-Namen ein',
-    confirmDeleteWorkflow: 'Möchten Sie "{name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
+    confirmDeleteWorkflow:
+      'Möchten Sie "{name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
     confirmDeleteTransition: 'Möchten Sie diesen Übergang wirklich löschen?',
     design: 'Gestalten',
     noStatusesAvailable: 'Keine Status verfügbar',
@@ -74,8 +75,10 @@ export default {
     setAsDefault: 'Als Standard-Workflow festlegen',
     backToWorkflows: 'Zurück zu Workflows',
     workflowDesigner: 'Workflow-Designer',
-    designerHint: 'Ziehen Sie Status aus dem linken Bereich und verbinden Sie sie durch Ziehen von Verbindungspunkten',
-    failedToLoadDesigner: 'Workflow-Designer konnte nicht geladen werden. Bitte aktualisieren Sie die Seite.',
+    designerHint:
+      'Ziehen Sie Status aus dem linken Bereich und verbinden Sie sie durch Ziehen von Verbindungspunkten',
+    failedToLoadDesigner:
+      'Workflow-Designer konnte nicht geladen werden. Bitte aktualisieren Sie die Seite.',
     loadingWorkflowData: 'Workflow-Daten werden geladen...',
     loadingDesigner: 'Workflow-Designer wird geladen...',
     failedToLoadDesignerTitle: 'Workflow-Designer konnte nicht geladen werden',
@@ -89,7 +92,8 @@ export default {
     statusesInWorkflow: '{count} Status im Workflow',
     transitionsDefined: '{count} Übergänge definiert',
     startDesigning: 'Beginnen Sie mit der Gestaltung Ihres Workflows',
-    clickStatusesToAdd: 'Klicken Sie auf Status im linken Bereich, um sie zur Leinwand hinzuzufügen',
+    clickStatusesToAdd:
+      'Klicken Sie auf Status im linken Bereich, um sie zur Leinwand hinzuzufügen',
     connectByDragging: 'Verbinden Sie Status durch Ziehen von Verbindungspunkten',
     saveWorkflow: 'Workflow speichern',
     failedToSaveDesign: 'Workflow-Design konnte nicht gespeichert werden',
@@ -98,7 +102,7 @@ export default {
     initial: 'Anfang',
     setStart: 'Start setzen',
     removeFromWorkflow: 'Aus Workflow entfernen',
-    swapDirection: 'Richtung tauschen'
+    swapDirection: 'Richtung tauschen',
   },
 
   screens: {
@@ -115,7 +119,7 @@ export default {
     screenCreated: 'Maske erfolgreich erstellt',
     screenUpdated: 'Maske erfolgreich aktualisiert',
     screenDeleted: 'Maske erfolgreich gelöscht',
-    cannotDeleteDefault: 'Die Standardmaske kann nicht gelöscht werden'
+    cannotDeleteDefault: 'Die Standardmaske kann nicht gelöscht werden',
   },
 
   screensPage: {
@@ -147,14 +151,16 @@ export default {
     custom: 'Benutzerdefiniert',
     fields: 'Felder',
     noScreens: 'Keine Masken gefunden. Erstellen Sie Ihre erste Maske, um zu beginnen.',
-    cannotDeleteDefault: 'Die Standardmaske kann nicht gelöscht werden. Diese Maske wird für Arbeitsbereiche ohne Konfigurationsset benötigt.',
-    confirmDeleteScreen: 'Möchten Sie die Maske "{name}" wirklich löschen? Dies betrifft alle Arbeitsbereiche, die diese Maske verwenden.',
+    cannotDeleteDefault:
+      'Die Standardmaske kann nicht gelöscht werden. Diese Maske wird für Arbeitsbereiche ohne Konfigurationsset benötigt.',
+    confirmDeleteScreen:
+      'Möchten Sie die Maske "{name}" wirklich löschen? Dies betrifft alle Arbeitsbereiche, die diese Maske verwenden.',
     fieldWidths: {
       full: 'Volle Breite',
       half: 'Halbe Breite',
       third: 'Ein Drittel',
-      quarter: 'Ein Viertel'
-    }
+      quarter: 'Ein Viertel',
+    },
   },
 
   statusCategory: {
@@ -164,8 +170,9 @@ export default {
     color: 'Farbe',
     setAsDefault: 'Als Standardkategorie festlegen',
     marksWorkCompleted: 'Markiert Arbeit als abgeschlossen',
-    marksWorkCompletedHelp: 'Vorgänge, die in Status dieser Kategorie verschoben werden, werden in Berichten und Überprüfungen als abgeschlossen behandelt.',
+    marksWorkCompletedHelp:
+      'Vorgänge, die in Status dieser Kategorie verschoben werden, werden in Berichten und Überprüfungen als abgeschlossen behandelt.',
     updateCategory: 'Kategorie aktualisieren',
-    createCategory: 'Kategorie erstellen'
-  }
+    createCategory: 'Kategorie erstellen',
+  },
 };

@@ -13,22 +13,22 @@
  */
 export function buildFolderTree(folders = [], countField = 'test_case_count') {
   const folderMap = new Map();
-  (folders || []).forEach(folder => {
+  (folders || []).forEach((folder) => {
     folderMap.set(folder.id, {
       ...folder,
       children: [],
-      total_count: folder[countField] || 0
+      total_count: folder[countField] || 0,
     });
   });
 
-  folderMap.forEach(folder => {
+  folderMap.forEach((folder) => {
     if (folder.parent_id && folderMap.has(folder.parent_id)) {
       folderMap.get(folder.parent_id).children.push(folder);
     }
   });
 
   const roots = [];
-  folderMap.forEach(folder => {
+  folderMap.forEach((folder) => {
     if (!folder.parent_id || !folderMap.has(folder.parent_id)) {
       roots.push(folder);
     }
@@ -40,7 +40,7 @@ export function buildFolderTree(folders = [], countField = 'test_case_count') {
       if (orderDiff !== 0) return orderDiff;
       return a.name.localeCompare(b.name);
     });
-    nodes.forEach(child => sortNodes(child.children));
+    nodes.forEach((child) => sortNodes(child.children));
   };
 
   const computeTotals = (node) => {
@@ -50,7 +50,7 @@ export function buildFolderTree(folders = [], countField = 'test_case_count') {
   };
 
   sortNodes(roots);
-  roots.forEach(node => computeTotals(node));
+  roots.forEach((node) => computeTotals(node));
   return roots;
 }
 
@@ -65,7 +65,7 @@ export function buildFolderTree(folders = [], countField = 'test_case_count') {
 export function flattenFolderTree(tree = [], collapsed = new Set()) {
   const result = [];
   const traverse = (nodes, depth = 0) => {
-    nodes.forEach(node => {
+    nodes.forEach((node) => {
       result.push({ node, depth });
       if (node.children && node.children.length > 0 && !collapsed.has(node.id)) {
         traverse(node.children, depth + 1);
@@ -87,10 +87,10 @@ export function getFolderPath(folderId, folders = []) {
   if (folderId === null || folderId === undefined) {
     return null;
   }
-  const folder = folders.find(f => f.id === folderId);
+  const folder = folders.find((f) => f.id === folderId);
   if (!folder) return null;
   if (folder.parent_id) {
-    const parent = folders.find(f => f.id === folder.parent_id);
+    const parent = folders.find((f) => f.id === folder.parent_id);
     return parent ? `${parent.name} / ${folder.name}` : folder.name;
   }
   return folder.name;
@@ -150,7 +150,7 @@ export function createCollapsedState(initial = new Set()) {
 
     getSet() {
       return collapsed;
-    }
+    },
   };
 }
 
@@ -162,7 +162,7 @@ export function createCollapsedState(initial = new Set()) {
  */
 export function getRootFolderOptions(folders = []) {
   return (folders || [])
-    .filter(folder => folder.parent_id === null || folder.parent_id === undefined)
+    .filter((folder) => folder.parent_id === null || folder.parent_id === undefined)
     .sort((a, b) => {
       const orderDiff = (a.sort_order || 0) - (b.sort_order || 0);
       if (orderDiff !== 0) return orderDiff;

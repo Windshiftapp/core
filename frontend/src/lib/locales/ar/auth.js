@@ -38,7 +38,7 @@ export default {
     resendCode: 'إعادة إرسال الرمز',
     verificationSent: 'تم إرسال رمز التحقق إلى بريدك الإلكتروني',
     sso: 'تسجيل الدخول الموحد',
-    continueWith: 'المتابعة باستخدام {provider}'
+    continueWith: 'المتابعة باستخدام {provider}',
   },
 
   users: {
@@ -85,13 +85,14 @@ export default {
     deactivateUser: 'إلغاء تفعيل المستخدم',
     confirmDelete: 'هل أنت متأكد من حذف {name}؟ لا يمكن التراجع عن هذا الإجراء.',
     confirmActivate: 'هل أنت متأكد من تفعيل {name}؟ سيتمكنون من الوصول إلى النظام.',
-    confirmDeactivate: 'هل أنت متأكد من إلغاء تفعيل {name}؟ لن يتمكنوا بعد الآن من الوصول إلى النظام.',
+    confirmDeactivate:
+      'هل أنت متأكد من إلغاء تفعيل {name}؟ لن يتمكنوا بعد الآن من الوصول إلى النظام.',
     failedToLoad: 'فشل في تحميل المستخدمين',
     failedToSave: 'فشل في حفظ المستخدم',
     failedToDelete: 'فشل في حذف المستخدم',
     failedToActivate: 'فشل في تفعيل المستخدم',
     failedToDeactivate: 'فشل في إلغاء تفعيل المستخدم',
-    failedToResetPassword: 'فشل في إعادة تعيين كلمة المرور'
+    failedToResetPassword: 'فشل في إعادة تعيين كلمة المرور',
   },
 
   security: {
@@ -107,7 +108,7 @@ export default {
     tokenCreated: 'تم إنشاء الرمز بنجاح',
     tokenRevoked: 'تم إلغاء الرمز بنجاح',
     copyToken: 'نسخ الرمز',
-    tokenWarning: 'تأكد من نسخ الرمز الآن. لن تتمكن من رؤيته مرة أخرى.'
+    tokenWarning: 'تأكد من نسخ الرمز الآن. لن تتمكن من رؤيته مرة أخرى.',
   },
 
   portalLogin: {
@@ -125,6 +126,6 @@ export default {
     signIn: 'تسجيل الدخول',
     emailRequired: 'البريد الإلكتروني أو اسم المستخدم مطلوب',
     passwordRequired: 'كلمة المرور مطلوبة',
-    webAuthnNotSupported: 'WebAuthn غير مدعوم في هذا المتصفح'
-  }
+    webAuthnNotSupported: 'WebAuthn غير مدعوم في هذا المتصفح',
+  },
 };

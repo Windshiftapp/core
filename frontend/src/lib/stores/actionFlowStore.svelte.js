@@ -21,14 +21,14 @@ class ActionFlowStore {
    */
   get selectedNode() {
     if (!this.selectedNodeId) return null;
-    return this.nodes.find(n => n.id === this.selectedNodeId) || null;
+    return this.nodes.find((n) => n.id === this.selectedNodeId) || null;
   }
 
   /**
    * Get the trigger node from the nodes array.
    */
   get triggerNode() {
-    return this.nodes.find(n => n.type === 'trigger') || null;
+    return this.nodes.find((n) => n.type === 'trigger') || null;
   }
 
   /**
@@ -53,32 +53,34 @@ class ActionFlowStore {
 
     // Convert action data to SvelteFlow format
     if (action.nodes && action.nodes.length > 0) {
-      this.nodes = action.nodes.map(node => ({
+      this.nodes = action.nodes.map((node) => ({
         id: `node-${node.id}`,
         type: node.node_type,
         position: { x: node.position_x, y: node.position_y },
         data: {
           nodeId: node.id,
           config: this.#parseConfig(node.node_config),
-          statuses
-        }
+          statuses,
+        },
       }));
     } else {
       // Create default trigger node
-      this.nodes = [{
-        id: 'node-trigger',
-        type: 'trigger',
-        position: { x: 100, y: 200 },
-        data: {
-          triggerType: action.trigger_type,
-          config: this.#parseConfig(action.trigger_config),
-          statuses
-        }
-      }];
+      this.nodes = [
+        {
+          id: 'node-trigger',
+          type: 'trigger',
+          position: { x: 100, y: 200 },
+          data: {
+            triggerType: action.trigger_type,
+            config: this.#parseConfig(action.trigger_config),
+            statuses,
+          },
+        },
+      ];
     }
 
     if (action.edges && action.edges.length > 0) {
-      this.edges = action.edges.map(edge => ({
+      this.edges = action.edges.map((edge) => ({
         id: `edge-${edge.id}`,
         source: `node-${edge.source_node_id}`,
         target: `node-${edge.target_node_id}`,
@@ -88,8 +90,8 @@ class ActionFlowStore {
         data: {
           edgeType: edge.edge_type,
           sourceHandle: edge.source_handle,
-          targetHandle: edge.target_handle
-        }
+          targetHandle: edge.target_handle,
+        },
       }));
     } else {
       this.edges = [];
@@ -103,14 +105,14 @@ class ActionFlowStore {
    * @param {Object} configUpdates - Object with config properties to merge
    */
   updateNodeConfig(nodeId, configUpdates) {
-    this.nodes = this.nodes.map(node => {
+    this.nodes = this.nodes.map((node) => {
       if (node.id !== nodeId) return node;
       return {
         ...node,
         data: {
           ...node.data,
-          config: { ...node.data?.config, ...configUpdates }
-        }
+          config: { ...node.data?.config, ...configUpdates },
+        },
       };
     });
   }
@@ -121,14 +123,14 @@ class ActionFlowStore {
    * @param {Object} dataUpdates - Object with data properties to merge
    */
   updateNodeData(nodeId, dataUpdates) {
-    this.nodes = this.nodes.map(node => {
+    this.nodes = this.nodes.map((node) => {
       if (node.id !== nodeId) return node;
       return {
         ...node,
         data: {
           ...node.data,
-          ...dataUpdates
-        }
+          ...dataUpdates,
+        },
       };
     });
   }
@@ -154,11 +156,11 @@ class ActionFlowStore {
    * @param {Object} position - New position { x, y }
    */
   updateNodePosition(nodeId, position) {
-    this.nodes = this.nodes.map(node => {
+    this.nodes = this.nodes.map((node) => {
       if (node.id !== nodeId) return node;
       return {
         ...node,
-        position: { ...position }
+        position: { ...position },
       };
     });
   }
@@ -174,12 +176,12 @@ class ActionFlowStore {
       type: nodeType,
       position: position || {
         x: 300 + Math.random() * 200,
-        y: 100 + Math.random() * 300
+        y: 100 + Math.random() * 300,
       },
       data: {
         config: this.#getDefaultConfig(nodeType),
-        statuses: this.statuses
-      }
+        statuses: this.statuses,
+      },
     };
 
     this.nodes = [...this.nodes, newNode];
@@ -192,10 +194,8 @@ class ActionFlowStore {
    * @param {string} nodeId - The node ID to remove
    */
   removeNode(nodeId) {
-    this.nodes = this.nodes.filter(node => node.id !== nodeId);
-    this.edges = this.edges.filter(edge =>
-      edge.source !== nodeId && edge.target !== nodeId
-    );
+    this.nodes = this.nodes.filter((node) => node.id !== nodeId);
+    this.edges = this.edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId);
 
     // Clear selection if removed node was selected
     if (this.selectedNodeId === nodeId) {
@@ -238,7 +238,7 @@ class ActionFlowStore {
       type: 'action',
       sourceHandle,
       targetHandle,
-      data: { edgeType }
+      data: { edgeType },
     };
 
     this.edges = [...this.edges, newEdge];
@@ -250,7 +250,7 @@ class ActionFlowStore {
    * @param {Array<string>} edgeIds - Array of edge IDs to remove
    */
   removeEdges(edgeIds) {
-    this.edges = this.edges.filter(edge => !edgeIds.includes(edge.id));
+    this.edges = this.edges.filter((edge) => !edgeIds.includes(edge.id));
   }
 
   /**
@@ -268,19 +268,18 @@ class ActionFlowStore {
    * @param {Object} updates - Object with edge properties to merge (source, target, sourceHandle, targetHandle)
    */
   updateEdge(edgeId, updates) {
-    this.edges = this.edges.map(edge => {
+    this.edges = this.edges.map((edge) => {
       if (edge.id !== edgeId) return edge;
 
       // Determine edgeType based on new sourceHandle
       const sourceHandle = updates.sourceHandle ?? edge.sourceHandle;
-      const edgeType = sourceHandle === 'true' || sourceHandle === 'false'
-        ? sourceHandle
-        : 'default';
+      const edgeType =
+        sourceHandle === 'true' || sourceHandle === 'false' ? sourceHandle : 'default';
 
       return {
         ...edge,
         ...updates,
-        data: { ...edge.data, edgeType }
+        data: { ...edge.data, edgeType },
       };
     });
   }
@@ -318,18 +317,18 @@ class ActionFlowStore {
         node_type: node.type,
         node_config: JSON.stringify(node.data?.config || {}),
         position_x: node.position.x,
-        position_y: node.position.y
+        position_y: node.position.y,
       };
     });
 
     const actionEdges = this.edges.map((edge, index) => ({
       id: index + 1,
       action_id: baseAction?.id,
-      source_node_id: nodeIdMap[edge.source] || parseInt(edge.source.replace('node-', '')),
-      target_node_id: nodeIdMap[edge.target] || parseInt(edge.target.replace('node-', '')),
+      source_node_id: nodeIdMap[edge.source] || parseInt(edge.source.replace('node-', ''), 10),
+      target_node_id: nodeIdMap[edge.target] || parseInt(edge.target.replace('node-', ''), 10),
       edge_type: edge.data?.edgeType || 'default',
       source_handle: edge.sourceHandle,
-      target_handle: edge.targetHandle
+      target_handle: edge.targetHandle,
     }));
 
     // Get trigger config from trigger node
@@ -343,7 +342,7 @@ class ActionFlowStore {
       trigger_type: this.triggerType,
       trigger_config: triggerConfig,
       nodes: actionNodes,
-      edges: actionEdges
+      edges: actionEdges,
     };
   }
 
@@ -394,7 +393,7 @@ class ActionFlowStore {
           asset_tag: '',
           category_id: null,
           status_id: null,
-          field_mappings: []
+          field_mappings: [],
         };
       default:
         return {};

@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 /**
  * Page Object for User Management (Admin)
@@ -9,14 +9,16 @@ export class UserPage {
   // Selectors
   readonly adminLink = 'a:has-text("Admin"), nav a[href="/admin"]';
   readonly usersTab = 'button:has-text("Users"), a:has-text("Users")';
-  readonly createUserButton = 'button:has-text("Create User"), button:has-text("Add User"), button:has-text("New User")';
+  readonly createUserButton =
+    'button:has-text("Create User"), button:has-text("Add User"), button:has-text("New User")';
   readonly userModal = 'div[role="dialog"], .modal, .user-modal';
   readonly emailInput = 'input[name="email"], input[type="email"]';
   readonly usernameInput = 'input[name="username"]';
   readonly firstNameInput = 'input[name="first_name"], input[name="firstName"]';
   readonly lastNameInput = 'input[name="last_name"], input[name="lastName"]';
   readonly passwordInput = 'input[name="password"], input[type="password"]';
-  readonly isActiveCheckbox = 'input[name="is_active"], input[type="checkbox"]:near(label:has-text("Active"))';
+  readonly isActiveCheckbox =
+    'input[name="is_active"], input[type="checkbox"]:near(label:has-text("Active"))';
   readonly saveButton = 'button[type="submit"], button:has-text("Save"), button:has-text("Create")';
   readonly cancelButton = 'button:has-text("Cancel"), button:has-text("Close")';
   readonly userRow = '.user-row, tr, [data-testid="user-row"]';
@@ -136,12 +138,15 @@ export class UserPage {
   /**
    * Edit a user
    */
-  async editUser(username: string, newData: {
-    email?: string;
-    firstName?: string;
-    lastName?: string;
-    isActive?: boolean;
-  }) {
+  async editUser(
+    username: string,
+    newData: {
+      email?: string;
+      firstName?: string;
+      lastName?: string;
+      isActive?: boolean;
+    }
+  ) {
     await this.goto();
 
     // Find and click edit button

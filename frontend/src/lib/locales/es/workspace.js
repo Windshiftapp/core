@@ -50,8 +50,8 @@ export default {
       noOrganisationsFound: 'No se encontraron organizaciones',
       noCustomersFound: 'No se encontraron clientes',
       unassigned: 'No asignado',
-      allCustomersAssigned: 'Todos los clientes estan asignados a organizaciones'
-    }
+      allCustomersAssigned: 'Todos los clientes estan asignados a organizaciones',
+    },
   },
 
   items: {
@@ -94,7 +94,7 @@ export default {
     assignedToYou: 'Asignado a usted',
     createdByYou: 'Creado por usted',
     recentlyViewed: 'Visto recientemente',
-    recentlyUpdated: 'Actualizado recientemente'
+    recentlyUpdated: 'Actualizado recientemente',
   },
 
   comments: {},
@@ -111,6 +111,6 @@ export default {
     addLink: 'Agregar enlace',
     removeLink: 'Quitar enlace',
     linkText: 'Texto del enlace',
-    linkUrl: 'URL'
-  }
+    linkUrl: 'URL',
+  },
 };

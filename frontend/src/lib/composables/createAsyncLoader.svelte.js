@@ -15,7 +15,7 @@ export function createAsyncLoader(fetchFn) {
     error = null;
 
     try {
-      data = await fetchFn() || [];
+      data = (await fetchFn()) || [];
     } catch (e) {
       console.error('Failed to load data:', e);
       error = e.message || 'Failed to load data';
@@ -31,10 +31,16 @@ export function createAsyncLoader(fetchFn) {
   }
 
   return {
-    get data() { return data; },
-    get loading() { return loading; },
-    get error() { return error; },
+    get data() {
+      return data;
+    },
+    get loading() {
+      return loading;
+    },
+    get error() {
+      return error;
+    },
     load,
-    refetch
+    refetch,
   };
 }

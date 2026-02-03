@@ -91,14 +91,14 @@ export default {
       phone: 'Phone',
       textarea: 'Text Area',
       user: 'User',
-      rating: 'Rating'
+      rating: 'Rating',
     },
     fieldCategories: {
       basic: 'Basic Fields',
       dates: 'Date Fields',
       people: 'People',
       workflow: 'Workflow',
-      custom: 'Custom Fields'
+      custom: 'Custom Fields',
     },
     fields: {
       title: { name: 'Title', description: 'Item title' },
@@ -121,7 +121,7 @@ export default {
       links: { name: 'Links', description: 'Related items' },
       attachments: { name: 'Attachments', description: 'File attachments' },
       comments: { name: 'Comments', description: 'Discussion comments' },
-      watchers: { name: 'Watchers', description: 'Users watching this item' }
+      watchers: { name: 'Watchers', description: 'Users watching this item' },
     },
 
     // Icon Selector
@@ -176,7 +176,7 @@ export default {
     searchTestCases: 'Search test cases...',
 
     // Workflow Picker
-    selectWorkflow: 'Select workflow'
+    selectWorkflow: 'Select workflow',
   },
 
   editors: {
@@ -200,7 +200,7 @@ export default {
     bulletList: 'Bullet List',
     numberedList: 'Numbered List',
     insertImage: 'Insert Image',
-    userNotFound: 'User not found'
+    userNotFound: 'User not found',
   },
 
   dialogs: {
@@ -215,22 +215,32 @@ export default {
       deleteItem: 'Are you sure you want to delete "{name}"? This cannot be undone.',
       deleteSection: 'Are you sure you want to delete this section?',
       discardChanges: 'You have unsaved changes. Are you sure you want to cancel?',
-      dismissAllNotifications: 'Are you sure you want to dismiss all notifications? This cannot be undone.',
+      dismissAllNotifications:
+        'Are you sure you want to dismiss all notifications? This cannot be undone.',
       removeAvatar: 'Are you sure you want to remove your profile picture?',
-      revokeCalendarFeed: 'Are you sure you want to revoke your calendar feed URL? Any calendars using this URL will stop syncing.',
+      revokeCalendarFeed:
+        'Are you sure you want to revoke your calendar feed URL? Any calendars using this URL will stop syncing.',
       deleteTheme: 'Are you sure you want to delete this theme? This cannot be undone.',
-      resetBoardConfig: 'Are you sure you want to reset to default board configuration? This will delete your custom configuration.',
-      deleteCustomField: 'Are you sure you want to delete the custom field "{name}"? This will remove it from all projects.',
-      deleteLinkType: 'Are you sure you want to delete this link type? This will also remove all links of this type.',
+      resetBoardConfig:
+        'Are you sure you want to reset to default board configuration? This will delete your custom configuration.',
+      deleteCustomField:
+        'Are you sure you want to delete the custom field "{name}"? This will remove it from all projects.',
+      deleteLinkType:
+        'Are you sure you want to delete this link type? This will also remove all links of this type.',
       deleteAsset: 'Are you sure you want to delete this asset?',
-      deleteAssetSet: 'Are you sure you want to delete this asset set? This will delete all assets, types, and categories within it.',
-      deleteAssetType: 'Are you sure you want to delete this asset type? Assets using this type will no longer have a type assigned.',
-      deleteCategory: 'Are you sure you want to delete this category? Child categories will be moved to the parent.',
+      deleteAssetSet:
+        'Are you sure you want to delete this asset set? This will delete all assets, types, and categories within it.',
+      deleteAssetType:
+        'Are you sure you want to delete this asset type? Assets using this type will no longer have a type assigned.',
+      deleteCategory:
+        'Are you sure you want to delete this category? Child categories will be moved to the parent.',
       revokeRole: 'Are you sure you want to revoke this role?',
       quitApplication: 'Are you sure you want to quit the application? The server will shut down.',
-      deleteConnection: 'Are you sure you want to delete this connection? This action cannot be undone.',
+      deleteConnection:
+        'Are you sure you want to delete this connection? This action cannot be undone.',
       deleteWidget: 'Delete this section? All widgets in this section will be removed.',
-      deleteScreen: 'Are you sure you want to delete screen "{name}"? This will affect all workspaces using this screen.'
+      deleteScreen:
+        'Are you sure you want to delete screen "{name}"? This will affect all workspaces using this screen.',
     },
     // Alert messages for alert() dialogs
     alerts: {
@@ -240,10 +250,12 @@ export default {
       noTimerRunning: 'No timer is currently running.',
       timerSyncing: 'Timer is currently syncing. Please wait and try again.',
       startTimerFromItem: 'Please start a timer from within a work item to provide context.',
-      cannotDeleteDefaultScreen: 'Cannot delete the default screen. This screen is required for workspaces without a configuration set.',
+      cannotDeleteDefaultScreen:
+        'Cannot delete the default screen. This screen is required for workspaces without a configuration set.',
       applicationShuttingDown: 'Application is shutting down...',
       pdfExportComingSoon: 'PDF export coming soon for time-block view',
-      configUpdatedSuccess: 'Configuration set updated successfully. All work items are already using statuses from the new workflow.',
+      configUpdatedSuccess:
+        'Configuration set updated successfully. All work items are already using statuses from the new workflow.',
       failedToSave: 'Failed to save: {error}',
       failedToDelete: 'Failed to delete: {error}',
       failedToUpdate: 'Failed to update: {error}',
@@ -265,19 +277,20 @@ export default {
       errorAddingTestCase: 'Error adding test case: {error}',
       failedToCreateLabel: 'Failed to create label: {error}',
       failedToSaveLayout: 'Failed to save layout changes',
-      statusInUseByTransitions: 'Cannot delete "{name}" because it is being used in {count} workflow transition(s). To delete this status, go to Workflow Management, remove all transitions that use this status, then try deleting the status again.'
-    }
+      statusInUseByTransitions:
+        'Cannot delete "{name}" because it is being used in {count} workflow transition(s). To delete this status, go to Workflow Management, remove all transitions that use this status, then try deleting the status again.',
+    },
   },
 
   components: {
     // Avatar component
     avatar: {
-      defaultAlt: 'Avatar'
+      defaultAlt: 'Avatar',
     },
 
     // DataTable component
     dataTable: {
-      showingRange: 'Showing {start}–{end} of {total}'
+      showingRange: 'Showing {start}–{end} of {total}',
     },
 
     // Diagram components
@@ -292,12 +305,12 @@ export default {
       nameRequired: 'Please enter a diagram name',
       saveError: 'Failed to save diagram',
       unsavedChanges: 'Unsaved changes',
-      unsavedChangesConfirm: 'You have unsaved changes. Are you sure you want to close?'
+      unsavedChangesConfirm: 'You have unsaved changes. Are you sure you want to close?',
     },
 
     // ErrorState component
     errorState: {
-      title: 'Something went wrong'
+      title: 'Something went wrong',
     },
 
     // Pagination component
@@ -308,7 +321,7 @@ export default {
       previousPage: 'Previous page',
       nextPage: 'Next page',
       goToPage: 'Go to page {page}',
-      pageOf: 'Page {current} of {total}'
+      pageOf: 'Page {current} of {total}',
     },
 
     // UserAvatar component
@@ -322,8 +335,8 @@ export default {
       themeCycle: 'Click to cycle: Light → Dark → System',
       themeLight: 'Light',
       themeDark: 'Dark',
-      themeSystem: 'System'
-    }
+      themeSystem: 'System',
+    },
   },
 
   aria: {
@@ -340,7 +353,7 @@ export default {
     notifications: 'Notifications',
     adminSettings: 'Admin settings',
     userMenu: 'User menu',
-    clearSearch: 'Clear search'
+    clearSearch: 'Clear search',
   },
 
   layout: {
@@ -350,7 +363,7 @@ export default {
     deleteSection: 'Delete section',
     editMode: 'Edit Mode',
     editDisplaySettings: 'Edit display settings',
-    items: 'items'
+    items: 'items',
   },
 
   widgets: {
@@ -359,23 +372,23 @@ export default {
     mediumWidth: 'Medium (2/3 width)',
     fullWidth: 'Full width',
     chart: {
-      items: 'items'
+      items: 'items',
     },
     completionChart: {
-      emptyMessage: 'No completion data available'
+      emptyMessage: 'No completion data available',
     },
     createdChart: {
-      emptyMessage: 'No creation data available'
+      emptyMessage: 'No creation data available',
     },
     milestoneProgress: {
       emptyTitle: 'No milestones',
-      emptySubtitle: 'Create milestones to track progress'
-    }
+      emptySubtitle: 'Create milestones to track progress',
+    },
   },
 
   footer: {
     platformName: 'Windshift Work Management Platform',
     aboutWindshift: 'About Windshift',
-    reportProblem: 'Report a problem'
-  }
+    reportProblem: 'Report a problem',
+  },
 };

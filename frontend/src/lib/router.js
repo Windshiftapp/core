@@ -4,7 +4,7 @@ import { writable } from 'svelte/store';
 export const currentRoute = writable({
   path: '/',
   params: {},
-  query: {}
+  query: {},
 });
 
 // Available routes
@@ -97,7 +97,7 @@ const routes = {
   '/portal/:slug': 'portal',
   '/portal/:slug/verify': 'portal',
   '/about': 'about',
-  '/404': '404'
+  '/404': '404',
 };
 
 // Parse URL parameters
@@ -105,14 +105,14 @@ function parseParams(path, route) {
   const params = {};
   const pathParts = path.split('/').filter(Boolean);
   const routeParts = route.split('/').filter(Boolean);
-  
+
   routeParts.forEach((part, index) => {
     if (part.startsWith(':')) {
       const paramName = part.slice(1);
       params[paramName] = pathParts[index];
     }
   });
-  
+
   return params;
 }
 
@@ -147,7 +147,7 @@ function updateRoute() {
     // Try to find a parameterized route match
     for (const [route, view] of Object.entries(routes)) {
       if (route.includes(':')) {
-        const routeRegex = new RegExp('^' + route.replace(/:[^/]+/g, '([^/]+)') + '$');
+        const routeRegex = new RegExp(`^${route.replace(/:[^/]+/g, '([^/]+)')}$`);
         if (routeRegex.test(path)) {
           matchedRoute = view;
           params = parseParams(path, route);
@@ -166,7 +166,7 @@ function updateRoute() {
     path,
     view: matchedRoute,
     params,
-    query: parseQuery(search)
+    query: parseQuery(search),
   });
 }
 
@@ -174,15 +174,15 @@ function updateRoute() {
 export function initRouter() {
   // Update route on page load
   updateRoute();
-  
+
   // Handle browser back/forward buttons
   window.addEventListener('popstate', updateRoute);
-  
+
   // Handle link clicks
   document.addEventListener('click', (e) => {
     // Use closest() to find the anchor tag even when clicking nested elements
     const anchor = e.target.closest('a');
-    if (anchor && anchor.href && anchor.href.startsWith(window.location.origin)) {
+    if (anchor?.href?.startsWith(window.location.origin)) {
       e.preventDefault();
       const url = new URL(anchor.href);
       navigate(url.pathname + url.search);
@@ -193,7 +193,7 @@ export function initRouter() {
 // Get current view for routing
 export function getCurrentView() {
   let currentView = 'workspaces';
-  currentRoute.subscribe(route => {
+  currentRoute.subscribe((route) => {
     if (route.view && route.view !== '404') {
       currentView = route.view;
     }
@@ -203,9 +203,11 @@ export function getCurrentView() {
 
 // Check if a view is a workspace-related route
 export function isWorkspaceRoute(view) {
-  return view === 'workspaces' ||
-         view === 'personal-workspace' ||
-         view?.startsWith('workspace-') ||
-         view?.startsWith('test-') ||
-         view === 'item-detail';
+  return (
+    view === 'workspaces' ||
+    view === 'personal-workspace' ||
+    view?.startsWith('workspace-') ||
+    view?.startsWith('test-') ||
+    view === 'item-detail'
+  );
 }

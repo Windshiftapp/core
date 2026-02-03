@@ -33,7 +33,7 @@ export default {
     noOverdueItems: 'Sin elementos vencidos',
     loadingRecentItems: 'Cargando elementos recientes...',
     loadingTasks: 'Cargando sus tareas...',
-    loadingOverdueItems: 'Cargando elementos vencidos...'
+    loadingOverdueItems: 'Cargando elementos vencidos...',
   },
 
   search: {
@@ -48,10 +48,10 @@ export default {
     saveSearch: 'Guardar busqueda',
     clearSearch: 'Limpiar busqueda',
     advancedSearch: 'Busqueda avanzada',
-    recentSearches: 'Busquedas recientes'
+    recentSearches: 'Busquedas recientes',
   },
 
   about: {},
 
-  onboarding: {}
+  onboarding: {},
 };

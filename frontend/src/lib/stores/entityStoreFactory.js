@@ -36,7 +36,7 @@ export function createEntityStore(apiMethods, entityName, options = {}) {
     async add(entityData) {
       try {
         const newEntity = await apiMethods.create(entityData);
-        update(entities => [...entities, newEntity]);
+        update((entities) => [...entities, newEntity]);
         return newEntity;
       } catch (error) {
         console.error(`Failed to add ${entityName}:`, error);
@@ -49,8 +49,8 @@ export function createEntityStore(apiMethods, entityName, options = {}) {
       try {
         const updatedEntity = await apiMethods.update(entityId, updates);
 
-        update(entities => {
-          const index = entities.findIndex(e => e.id === entityId);
+        update((entities) => {
+          const index = entities.findIndex((e) => e.id === entityId);
           if (index !== -1) {
             entities[index] = updatedEntity;
           }
@@ -69,8 +69,8 @@ export function createEntityStore(apiMethods, entityName, options = {}) {
       try {
         await apiMethods.delete(entityId);
 
-        update(entities => {
-          return entities.filter(e => e.id !== entityId);
+        update((entities) => {
+          return entities.filter((e) => e.id !== entityId);
         });
 
         return true;
@@ -83,7 +83,7 @@ export function createEntityStore(apiMethods, entityName, options = {}) {
     // Reset store (useful for testing or logout)
     reset() {
       set([]);
-    }
+    },
   };
 
   // Optionally expose set for direct updates

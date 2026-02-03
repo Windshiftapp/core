@@ -34,7 +34,8 @@ export default {
     dismiss: 'Dismiss',
     // Email verification
     verifyEmail: 'Please verify your email address',
-    verifyEmailDescription: 'We\'ve sent a verification link to your email. Click the link to complete your account setup.',
+    verifyEmailDescription:
+      "We've sent a verification link to your email. Click the link to complete your account setup.",
     verificationEmailSent: 'Verification email sent!',
     sending: 'Sending...',
     resendEmail: 'Resend email',
@@ -50,8 +51,8 @@ export default {
       milestones: 'Milestones',
       all: 'All',
       unreadOnly: 'Unread Only',
-      readOnly: 'Read Only'
-    }
+      readOnly: 'Read Only',
+    },
   },
 
   channels: {
@@ -84,7 +85,7 @@ export default {
     category: 'Category',
     allChannels: 'All Channels',
     allCategories: 'All Categories',
-    manageCategories: 'Manage Categories'
+    manageCategories: 'Manage Categories',
   },
 
   channel: {
@@ -190,9 +191,10 @@ export default {
     mailbox: 'Mailbox',
     mailboxHelp: 'The folder to poll for new emails',
     markAsRead: 'Mark as read after processing',
-    markAsReadHelp: 'Mark emails as read once they\'ve been converted to items',
+    markAsReadHelp: "Mark emails as read once they've been converted to items",
     deleteAfterProcess: 'Delete after processing',
-    deleteAfterProcessHelp: 'Remove emails from the mailbox after creating items (use with caution)',
+    deleteAfterProcessHelp:
+      'Remove emails from the mailbox after creating items (use with caution)',
     comingSoon: 'Configuration for {type} channels coming soon',
     lastActivity: 'Last activity',
 
@@ -235,7 +237,7 @@ export default {
     sendTestEmail: 'Send Test Email',
     sendingTestEmail: 'Sending test email...',
     testEmailSent: 'Test email sent successfully! Configuration has been saved.',
-    testEmailFailed: 'Test email failed'
+    testEmailFailed: 'Test email failed',
   },
 
   portal: {
@@ -248,9 +250,11 @@ export default {
     signInDescription: 'Enter your email to receive a sign-in link',
     enterEmail: 'Enter your email address',
     sendMagicLink: 'Send sign-in link',
-    noAccountNeeded: "You don't need to create an account. Just enter your email and we'll send you a sign-in link.",
+    noAccountNeeded:
+      "You don't need to create an account. Just enter your email and we'll send you a sign-in link.",
     checkYourEmail: 'Check your email',
-    magicLinkSent: "We've sent a sign-in link to your email. Click the link to access your portal account.",
+    magicLinkSent:
+      "We've sent a sign-in link to your email. Click the link to access your portal account.",
     linkExpiresIn: 'The link expires in 15 minutes.',
     useAnotherEmail: 'Use a different email',
 
@@ -324,7 +328,8 @@ export default {
     addSection: 'Add Section',
     noContentSections: 'No content sections configured yet.',
     dropHereToAdd: 'Drop here to add request type',
-    noRequestTypesInSection: 'No request types in this section yet. Drag request types here from the sidebar.',
+    noRequestTypesInSection:
+      'No request types in this section yet. Drag request types here from the sidebar.',
 
     // Customize panel
     customize: {
@@ -336,9 +341,11 @@ export default {
       gradientStyle: 'Gradient Style',
       gradients: 'Gradients',
       gradientDescription: 'Choose a gradient for the portal hero section.',
-      backgroundDescription: 'Choose a gradient or background image for the portal hero section. Background images will override the gradient selection.',
+      backgroundDescription:
+        'Choose a gradient or background image for the portal hero section. Background images will override the gradient selection.',
       navigationComingSoon: 'Navigation customization coming soon.',
-      requestTypesDescription: 'Drag and drop request types to reorder. Click the menu to edit, rename, or delete.',
+      requestTypesDescription:
+        'Drag and drop request types to reorder. Click the menu to edit, rename, or delete.',
       creates: 'Creates',
       fields: 'Fields',
       addFields: 'Add Fields',
@@ -347,13 +354,16 @@ export default {
       markAsActive: 'Mark as Active',
       noRequestTypes: 'No request types configured yet.',
       addRequestType: 'Add Request Type',
-      confirmDeleteRequestType: 'Are you sure you want to delete this request type? This cannot be undone.',
+      confirmDeleteRequestType:
+        'Are you sure you want to delete this request type? This cannot be undone.',
       // Knowledge base section
       docmostKnowledgeBase: 'Docmost Knowledge Base',
-      docmostDescription: 'Connect your Docmost knowledge base to enable search functionality in the portal',
+      docmostDescription:
+        'Connect your Docmost knowledge base to enable search functionality in the portal',
       docmostShareLink: 'Docmost Share Link',
       docmostShareLinkPlaceholder: 'https://wiki.example.com/share/abc123xyz',
-      docmostShareLinkHelp: 'Enter the full Docmost share link (e.g., https://wiki.example.com/share/u1gkl0jk1u)',
+      docmostShareLinkHelp:
+        'Enter the full Docmost share link (e.g., https://wiki.example.com/share/u1gkl0jk1u)',
       parsedConfiguration: 'Parsed Configuration:',
       baseURL: 'Base URL:',
       shareID: 'Share ID:',
@@ -368,12 +378,13 @@ export default {
       docmostStep5: 'Paste it above',
       // Logo section
       logo: 'Portal Logo',
-      logoHelp: 'Upload a logo to display in the portal header. If not set, the hub logo will be used as a fallback.',
+      logoHelp:
+        'Upload a logo to display in the portal header. If not set, the hub logo will be used as a fallback.',
       // Asset reports section
       assetReports: 'Asset Reports',
       assetReportsDescription: 'Configure asset reports that portal users can view.',
       noAssetReports: 'No asset reports configured yet.',
-      addAssetReport: 'Add Asset Report'
+      addAssetReport: 'Add Asset Report',
     },
 
     // Visibility settings
@@ -393,8 +404,8 @@ export default {
       hasRestrictions: 'Visibility restricted',
       orLogicHint: 'User must belong to at least one selected group OR organization',
       noGroupsAvailable: 'No groups available',
-      noOrganizationsAvailable: 'No organizations available'
-    }
+      noOrganizationsAvailable: 'No organizations available',
+    },
   },
 
   requestForm: {
@@ -405,16 +416,16 @@ export default {
     yourName: 'Your name',
     yourEmail: 'Your email',
     emailPlaceholder: 'your@email.com',
-    emailFollowUp: 'We\'ll use this to follow up on your request',
+    emailFollowUp: "We'll use this to follow up on your request",
     submittingAs: 'Submitting as {name} ({email})',
     nameRequired: 'Name is required',
     emailRequired: 'Email is required',
     submitting: 'Submitting...',
     submitRequest: 'Submit Request',
-    requestSubmittedSuccess: 'Request submitted successfully! We\'ll get back to you soon.',
+    requestSubmittedSuccess: "Request submitted successfully! We'll get back to you soon.",
     failedToLoadFields: 'Failed to load form fields',
     failedToSubmit: 'Failed to submit request',
-    selectOption: 'Select an option...'
+    selectOption: 'Select an option...',
   },
 
   requestTypeFields: {
@@ -429,7 +440,8 @@ export default {
     requiredField: 'Required field',
     required: 'Required',
     noFieldsInStep: 'No fields in Step {step}. Add fields below.',
-    stepHasNoFields: 'This step has no fields. Drag fields from the available list or add a virtual field.',
+    stepHasNoFields:
+      'This step has no fields. Drag fields from the available list or add a virtual field.',
     virtualField: 'Virtual',
     virtual: 'Virtual',
     defaultField: 'Default Field',
@@ -470,7 +482,7 @@ export default {
     dragToReorder: 'Drag to reorder fields',
     dropFieldsHere: 'Drop fields here',
     failedToLoadFields: 'Failed to load fields',
-    failedToSaveFields: 'Failed to save fields'
+    failedToSaveFields: 'Failed to save fields',
   },
 
   // Portal Hub translations
@@ -511,6 +523,7 @@ export default {
     of: 'of',
     // Logo
     logo: 'Hub Logo',
-    logoHelp: 'This logo will be displayed on the Hub and used as a fallback for portals without their own logo.'
-  }
+    logoHelp:
+      'This logo will be displayed on the Hub and used as a fallback for portals without their own logo.',
+  },
 };

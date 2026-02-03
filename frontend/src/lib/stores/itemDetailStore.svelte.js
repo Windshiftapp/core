@@ -28,7 +28,7 @@ class ItemDetailStore {
     iteration: { active: false, value: null },
     project: { active: false, value: null },
     assignee: { active: false, value: null },
-    customFields: { active: {}, values: {} }
+    customFields: { active: {}, values: {} },
   });
 
   // === Related Data (cached) ===
@@ -102,11 +102,11 @@ class ItemDetailStore {
    */
   get statusOptions() {
     if (this.availableStatusTransitions.length > 0) {
-      return this.availableStatusTransitions.map(transition => ({
+      return this.availableStatusTransitions.map((transition) => ({
         id: transition.id,
         value: transition.value,
         label: transition.name,
-        categoryColor: transition.category_color || null
+        categoryColor: transition.category_color || null,
       }));
     }
     return this.loadingStatusTransitions ? [{ value: '', label: 'Loading...' }] : [];
@@ -144,7 +144,7 @@ class ItemDetailStore {
         worklogsData,
         customersData,
         workItemsData,
-        workspacesData
+        workspacesData,
       ] = await Promise.all([
         api.items.get(itemId),
         api.workspaces.get(workspaceId),
@@ -157,7 +157,7 @@ class ItemDetailStore {
         api.time.worklogs.getByItem(itemId),
         api.customerOrganisations.getAll(),
         api.items.getAll({ limit: 100 }),
-        api.workspaces.getAll()
+        api.workspaces.getAll(),
       ]);
 
       this.item = itemData;
@@ -173,7 +173,7 @@ class ItemDetailStore {
       let allMilestones = milestonesData || [];
       if (this.workspace?.milestone_categories?.length > 0) {
         const allowedCategoryIds = this.workspace.milestone_categories;
-        this.milestones = allMilestones.filter(m => allowedCategoryIds.includes(m.category_id));
+        this.milestones = allMilestones.filter((m) => allowedCategoryIds.includes(m.category_id));
       } else {
         this.milestones = allMilestones;
       }
@@ -239,7 +239,7 @@ class ItemDetailStore {
   async reloadWorklogs() {
     if (!this.itemId) return;
     try {
-      this.timeWorklogs = await api.time.worklogs.getByItem(this.itemId) || [];
+      this.timeWorklogs = (await api.time.worklogs.getByItem(this.itemId)) || [];
     } catch (err) {
       console.error('Failed to reload worklogs:', err);
     }
@@ -277,7 +277,7 @@ class ItemDetailStore {
     if (!this.item?.id) return;
     try {
       this.loadingDiagrams = true;
-      this.diagrams = await api.getDiagrams(this.item.id) || [];
+      this.diagrams = (await api.getDiagrams(this.item.id)) || [];
     } catch (err) {
       console.error('Failed to load diagrams:', err);
       this.diagrams = [];
@@ -337,9 +337,9 @@ class ItemDetailStore {
       const ancestors = await api.items.getAncestors(this.item.id);
       try {
         const itemTypesData = await api.itemTypes.getAll();
-        this.parentHierarchy = ancestors.map(ancestor => {
+        this.parentHierarchy = ancestors.map((ancestor) => {
           if (ancestor.item_type_id) {
-            const itemType = itemTypesData.find(type => type.id === ancestor.item_type_id);
+            const itemType = itemTypesData.find((type) => type.id === ancestor.item_type_id);
             return { ...ancestor, itemType };
           }
           return ancestor;
@@ -358,22 +358,26 @@ class ItemDetailStore {
     try {
       const [itemTypesData, hierarchyLevels] = await Promise.all([
         api.itemTypes.getAll(),
-        api.hierarchyLevels.getAll()
+        api.hierarchyLevels.getAll(),
       ]);
 
       this.itemTypes = itemTypesData || [];
 
       if (this.item.item_type_id) {
-        this.currentItemType = this.itemTypes.find(type => type.id === this.item.item_type_id);
+        this.currentItemType = this.itemTypes.find((type) => type.id === this.item.item_type_id);
         if (this.currentItemType) {
-          this.currentHierarchyLevel = hierarchyLevels.find(level => level.level === this.currentItemType.hierarchy_level);
+          this.currentHierarchyLevel = hierarchyLevels.find(
+            (level) => level.level === this.currentItemType.hierarchy_level
+          );
         }
       }
 
       // Find available sub-issue types (next level down)
       if (this.currentItemType && this.currentHierarchyLevel) {
         const nextLevel = this.currentHierarchyLevel.level + 1;
-        this.availableSubIssueTypes = this.itemTypes.filter(type => type.hierarchy_level === nextLevel);
+        this.availableSubIssueTypes = this.itemTypes.filter(
+          (type) => type.hierarchy_level === nextLevel
+        );
       } else {
         this.availableSubIssueTypes = [];
       }
@@ -391,7 +395,8 @@ class ItemDetailStore {
 
       if (this.workspace?.configuration_set_id) {
         const configSet = await api.configurationSets.get(this.workspace.configuration_set_id);
-        screenId = configSet?.edit_screen_id || configSet?.create_screen_id || configSet?.view_screen_id;
+        screenId =
+          configSet?.edit_screen_id || configSet?.create_screen_id || configSet?.view_screen_id;
       }
 
       if (!screenId) screenId = 1;
@@ -399,11 +404,11 @@ class ItemDetailStore {
       const screen = await api.screens.get(screenId);
       const screenFields = screen?.fields || [];
 
-      this.workspaceScreenFields = screenFields.filter(field => field.field_type === 'custom');
+      this.workspaceScreenFields = screenFields.filter((field) => field.field_type === 'custom');
 
       const configuredSystemFields = screenFields
-        .filter(field => field.field_type === 'system')
-        .map(field => field.field_identifier);
+        .filter((field) => field.field_type === 'system')
+        .map((field) => field.field_identifier);
 
       if (configuredSystemFields.length > 0) {
         this.workspaceScreenSystemFields = configuredSystemFields;
@@ -421,7 +426,9 @@ class ItemDetailStore {
     if (!this.workspaceId) return;
     try {
       const allActions = await api.actions.getAll(this.workspaceId);
-      this.manualActions = (allActions || []).filter(a => a.trigger_type === 'manual' && a.is_enabled);
+      this.manualActions = (allActions || []).filter(
+        (a) => a.trigger_type === 'manual' && a.is_enabled
+      );
     } catch (err) {
       console.error('Failed to load manual actions:', err);
       this.manualActions = [];
@@ -438,7 +445,8 @@ class ItemDetailStore {
       const fieldId = field.replace('custom_field_', '');
       this.editing.customFields.active[fieldId] = true;
       const currentValue = this.item.custom_field_values?.[fieldId];
-      this.editing.customFields.values[fieldId] = currentValue !== null && currentValue !== undefined ? currentValue : '';
+      this.editing.customFields.values[fieldId] =
+        currentValue !== null && currentValue !== undefined ? currentValue : '';
       // Trigger reactivity
       this.editing = { ...this.editing };
     } else {
@@ -532,14 +540,18 @@ class ItemDetailStore {
         this.item = {
           ...this.item,
           iteration_id: newIteration,
-          iteration_name: iterationName !== undefined ? iterationName : this.item.iteration_name
+          iteration_name: iterationName !== undefined ? iterationName : this.item.iteration_name,
         };
       } else if (field === 'project') {
         const newProject = directValue !== null ? directValue : this.editing.project.value;
         if (typeof newProject === 'object' && newProject !== null) {
           updateData.project_id = newProject.project_id;
           updateData.inherit_project = newProject.inherit_project;
-          this.item = { ...this.item, project_id: newProject.project_id, inherit_project: newProject.inherit_project };
+          this.item = {
+            ...this.item,
+            project_id: newProject.project_id,
+            inherit_project: newProject.inherit_project,
+          };
         } else {
           if (newProject === this.item.project_id) {
             this.cancelEditing('project');
@@ -558,19 +570,26 @@ class ItemDetailStore {
         this.item = {
           ...this.item,
           assignee_id: newAssignee,
-          assignee_name: assigneeName !== undefined ? assigneeName : this.item.assignee_name
+          assignee_name: assigneeName !== undefined ? assigneeName : this.item.assignee_name,
         };
       } else if (field.startsWith('custom_field_')) {
         const fieldId = field.replace('custom_field_', '');
-        let newValue = directValue !== null ? directValue : this.editing.customFields.values[fieldId];
+        let newValue =
+          directValue !== null ? directValue : this.editing.customFields.values[fieldId];
         const currentValue = this.item.custom_field_values?.[fieldId] || '';
 
         // Convert number fields
-        const fieldDef = this.customFieldDefinitions.find(f => f.id === parseInt(fieldId));
-        if (fieldDef?.field_type === 'number' && newValue !== null && newValue !== undefined && newValue !== '') {
+        const fieldDef = this.customFieldDefinitions.find((f) => f.id === parseInt(fieldId, 10));
+        if (
+          fieldDef?.field_type === 'number' &&
+          newValue !== null &&
+          newValue !== undefined &&
+          newValue !== ''
+        ) {
           newValue = parseFloat(newValue);
-          if (isNaN(newValue)) {
-            newValue = directValue !== null ? directValue : this.editing.customFields.values[fieldId];
+          if (Number.isNaN(newValue)) {
+            newValue =
+              directValue !== null ? directValue : this.editing.customFields.values[fieldId];
           }
         }
 
@@ -581,7 +600,7 @@ class ItemDetailStore {
 
         updateData.custom_field_values = {
           ...(this.item.custom_field_values || {}),
-          [fieldId]: newValue
+          [fieldId]: newValue,
         };
       }
 
@@ -634,7 +653,7 @@ class ItemDetailStore {
       milestone: 'milestone_id',
       iteration: 'iteration_id',
       assignee: 'assignee_id',
-      project: 'project_id'
+      project: 'project_id',
     };
     if (fieldMap[field] && this.editing[field]) {
       this.editing[field].value = this.item[fieldMap[field]];
@@ -666,10 +685,10 @@ class ItemDetailStore {
     try {
       await api.links.create({
         source_type: 'item',
-        source_id: parseInt(this.itemId),
+        source_id: parseInt(this.itemId, 10),
         target_type: targetType,
-        target_id: parseInt(targetId),
-        link_type_id: parseInt(linkTypeId)
+        target_id: parseInt(targetId, 10),
+        link_type_id: parseInt(linkTypeId, 10),
       });
       // Reload to refresh links
       await this.loadItem(this.workspaceId, this.itemId);
@@ -800,7 +819,7 @@ class ItemDetailStore {
       iteration: { active: false, value: null },
       project: { active: false, value: null },
       assignee: { active: false, value: null },
-      customFields: { active: {}, values: {} }
+      customFields: { active: {}, values: {} },
     };
 
     this.parentHierarchy = [];

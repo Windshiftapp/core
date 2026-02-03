@@ -90,14 +90,14 @@ export default {
       phone: 'Telefon',
       textarea: 'Textbereich',
       user: 'Benutzer',
-      rating: 'Bewertung'
+      rating: 'Bewertung',
     },
     fieldCategories: {
       basic: 'Grundfelder',
       dates: 'Datumsfelder',
       people: 'Personen',
       workflow: 'Workflow',
-      custom: 'Benutzerdefinierte Felder'
+      custom: 'Benutzerdefinierte Felder',
     },
     fields: {
       title: { name: 'Titel', description: 'Eintragstitel' },
@@ -108,7 +108,10 @@ export default {
       assignee: { name: 'Bearbeiter', description: 'Zugewiesener Benutzer' },
       reporter: { name: 'Ersteller', description: 'Wer den Eintrag erstellt hat' },
       createdAt: { name: 'Erstellt am', description: 'Wann der Eintrag erstellt wurde' },
-      updatedAt: { name: 'Aktualisiert am', description: 'Wann der Eintrag zuletzt aktualisiert wurde' },
+      updatedAt: {
+        name: 'Aktualisiert am',
+        description: 'Wann der Eintrag zuletzt aktualisiert wurde',
+      },
       dueDate: { name: 'Fälligkeitsdatum', description: 'Wann der Eintrag fällig ist' },
       startDate: { name: 'Startdatum', description: 'Wann die Arbeit beginnt' },
       estimate: { name: 'Schätzung', description: 'Geschätzter Aufwand' },
@@ -120,7 +123,7 @@ export default {
       links: { name: 'Verknüpfungen', description: 'Verwandte Einträge' },
       attachments: { name: 'Anhänge', description: 'Dateianhänge' },
       comments: { name: 'Kommentare', description: 'Diskussionskommentare' },
-      watchers: { name: 'Beobachter', description: 'Benutzer, die diesen Eintrag beobachten' }
+      watchers: { name: 'Beobachter', description: 'Benutzer, die diesen Eintrag beobachten' },
     },
 
     // Icon Selector
@@ -175,7 +178,7 @@ export default {
     searchTestCases: 'Testfälle suchen...',
 
     // Workflow Picker
-    selectWorkflow: 'Workflow auswählen'
+    selectWorkflow: 'Workflow auswählen',
   },
 
   editors: {
@@ -199,7 +202,7 @@ export default {
     bulletList: 'Aufzählungsliste',
     numberedList: 'Nummerierte Liste',
     insertImage: 'Bild einfügen',
-    userNotFound: 'Benutzer nicht gefunden'
+    userNotFound: 'Benutzer nicht gefunden',
   },
 
   dialogs: {
@@ -211,37 +214,53 @@ export default {
     update: 'Aktualisieren',
     // Confirmation messages for confirm() dialogs
     confirmations: {
-      deleteItem: 'Möchten Sie "{name}" wirklich löschen? Dies kann nicht rückgängig gemacht werden.',
+      deleteItem:
+        'Möchten Sie "{name}" wirklich löschen? Dies kann nicht rückgängig gemacht werden.',
       deleteSection: 'Möchten Sie diesen Abschnitt wirklich löschen?',
       discardChanges: 'Sie haben ungespeicherte Änderungen. Möchten Sie wirklich abbrechen?',
-      dismissAllNotifications: 'Möchten Sie wirklich alle Benachrichtigungen verwerfen? Dies kann nicht rückgängig gemacht werden.',
+      dismissAllNotifications:
+        'Möchten Sie wirklich alle Benachrichtigungen verwerfen? Dies kann nicht rückgängig gemacht werden.',
       removeAvatar: 'Möchten Sie Ihr Profilbild wirklich entfernen?',
-      revokeCalendarFeed: 'Möchten Sie Ihre Kalender-Feed-URL wirklich widerrufen? Kalender, die diese URL verwenden, werden nicht mehr synchronisiert.',
-      deleteTheme: 'Möchten Sie dieses Design wirklich löschen? Dies kann nicht rückgängig gemacht werden.',
-      resetBoardConfig: 'Möchten Sie wirklich auf die Standard-Board-Konfiguration zurücksetzen? Ihre benutzerdefinierte Konfiguration wird gelöscht.',
-      deleteCustomField: 'Möchten Sie das benutzerdefinierte Feld "{name}" wirklich löschen? Es wird aus allen Projekten entfernt.',
-      deleteLinkType: 'Möchten Sie diesen Verknüpfungstyp wirklich löschen? Alle Verknüpfungen dieses Typs werden ebenfalls entfernt.',
+      revokeCalendarFeed:
+        'Möchten Sie Ihre Kalender-Feed-URL wirklich widerrufen? Kalender, die diese URL verwenden, werden nicht mehr synchronisiert.',
+      deleteTheme:
+        'Möchten Sie dieses Design wirklich löschen? Dies kann nicht rückgängig gemacht werden.',
+      resetBoardConfig:
+        'Möchten Sie wirklich auf die Standard-Board-Konfiguration zurücksetzen? Ihre benutzerdefinierte Konfiguration wird gelöscht.',
+      deleteCustomField:
+        'Möchten Sie das benutzerdefinierte Feld "{name}" wirklich löschen? Es wird aus allen Projekten entfernt.',
+      deleteLinkType:
+        'Möchten Sie diesen Verknüpfungstyp wirklich löschen? Alle Verknüpfungen dieses Typs werden ebenfalls entfernt.',
       deleteAsset: 'Möchten Sie dieses Asset wirklich löschen?',
-      deleteAssetSet: 'Möchten Sie dieses Asset-Set wirklich löschen? Alle Assets, Typen und Kategorien darin werden gelöscht.',
-      deleteAssetType: 'Möchten Sie diesen Asset-Typ wirklich löschen? Assets mit diesem Typ haben dann keinen Typ mehr zugewiesen.',
-      deleteCategory: 'Möchten Sie diese Kategorie wirklich löschen? Unterkategorien werden zur übergeordneten Kategorie verschoben.',
+      deleteAssetSet:
+        'Möchten Sie dieses Asset-Set wirklich löschen? Alle Assets, Typen und Kategorien darin werden gelöscht.',
+      deleteAssetType:
+        'Möchten Sie diesen Asset-Typ wirklich löschen? Assets mit diesem Typ haben dann keinen Typ mehr zugewiesen.',
+      deleteCategory:
+        'Möchten Sie diese Kategorie wirklich löschen? Unterkategorien werden zur übergeordneten Kategorie verschoben.',
       revokeRole: 'Möchten Sie diese Rolle wirklich widerrufen?',
-      quitApplication: 'Möchten Sie die Anwendung wirklich beenden? Der Server wird heruntergefahren.',
-      deleteConnection: 'Möchten Sie diese Verbindung wirklich löschen? Dies kann nicht rückgängig gemacht werden.',
-      deleteWidget: 'Diesen Abschnitt löschen? Alle Widgets in diesem Abschnitt werden entfernt.'
+      quitApplication:
+        'Möchten Sie die Anwendung wirklich beenden? Der Server wird heruntergefahren.',
+      deleteConnection:
+        'Möchten Sie diese Verbindung wirklich löschen? Dies kann nicht rückgängig gemacht werden.',
+      deleteWidget: 'Diesen Abschnitt löschen? Alle Widgets in diesem Abschnitt werden entfernt.',
     },
     // Alert messages for alert() dialogs
     alerts: {
       nameRequired: 'Name ist erforderlich',
       pleaseSelectImage: 'Bitte wählen Sie eine Bilddatei aus',
-      timerAlreadyRunning: 'Ein Timer läuft bereits. Bitte stoppen Sie ihn, bevor Sie einen neuen starten.',
+      timerAlreadyRunning:
+        'Ein Timer läuft bereits. Bitte stoppen Sie ihn, bevor Sie einen neuen starten.',
       noTimerRunning: 'Kein Timer läuft derzeit.',
       timerSyncing: 'Timer wird synchronisiert. Bitte warten Sie und versuchen Sie es erneut.',
-      startTimerFromItem: 'Bitte starten Sie einen Timer innerhalb eines Arbeitselements, um Kontext zu liefern.',
-      cannotDeleteDefaultScreen: 'Der Standardbildschirm kann nicht gelöscht werden. Dieser Bildschirm ist für Arbeitsbereiche ohne Konfigurationssatz erforderlich.',
+      startTimerFromItem:
+        'Bitte starten Sie einen Timer innerhalb eines Arbeitselements, um Kontext zu liefern.',
+      cannotDeleteDefaultScreen:
+        'Der Standardbildschirm kann nicht gelöscht werden. Dieser Bildschirm ist für Arbeitsbereiche ohne Konfigurationssatz erforderlich.',
       applicationShuttingDown: 'Anwendung wird heruntergefahren...',
       pdfExportComingSoon: 'PDF-Export für Zeitblock-Ansicht kommt bald',
-      configUpdatedSuccess: 'Konfigurationssatz erfolgreich aktualisiert. Alle Arbeitselemente verwenden bereits Status aus dem neuen Workflow.',
+      configUpdatedSuccess:
+        'Konfigurationssatz erfolgreich aktualisiert. Alle Arbeitselemente verwenden bereits Status aus dem neuen Workflow.',
       failedToSave: 'Speichern fehlgeschlagen: {error}',
       failedToDelete: 'Löschen fehlgeschlagen: {error}',
       failedToUpdate: 'Aktualisieren fehlgeschlagen: {error}',
@@ -252,7 +271,8 @@ export default {
       failedToApplyConfig: 'Konfigurationsänderung konnte nicht angewendet werden: {error}',
       failedToAddManager: 'Manager konnte nicht hinzugefügt werden: {error}',
       failedToRemoveManager: 'Manager konnte nicht entfernt werden: {error}',
-      failedToSaveWorkspace: 'Projekt konnte nicht gespeichert werden. Bitte überprüfen Sie Ihre Eingabe und versuchen Sie es erneut.',
+      failedToSaveWorkspace:
+        'Projekt konnte nicht gespeichert werden. Bitte überprüfen Sie Ihre Eingabe und versuchen Sie es erneut.',
       failedToResetConfig: 'Konfiguration konnte nicht zurückgesetzt werden: {error}',
       failedToToggleStatus: 'Verknüpfungstyp-Status konnte nicht umgeschaltet werden: {error}',
       failedToAssignRole: 'Rolle konnte nicht zugewiesen werden: {error}',
@@ -263,19 +283,20 @@ export default {
       errorAddingTestCase: 'Fehler beim Hinzufügen des Testfalls: {error}',
       failedToCreateLabel: 'Label konnte nicht erstellt werden: {error}',
       failedToSaveLayout: 'Layout-Änderungen konnten nicht gespeichert werden',
-      statusInUseByTransitions: '"{name}" kann nicht gelöscht werden, da es in {count} Workflow-Übergang(en) verwendet wird. Um diesen Status zu löschen, gehen Sie zur Workflow-Verwaltung, entfernen Sie alle Übergänge, die diesen Status verwenden, und versuchen Sie dann erneut, den Status zu löschen.'
-    }
+      statusInUseByTransitions:
+        '"{name}" kann nicht gelöscht werden, da es in {count} Workflow-Übergang(en) verwendet wird. Um diesen Status zu löschen, gehen Sie zur Workflow-Verwaltung, entfernen Sie alle Übergänge, die diesen Status verwenden, und versuchen Sie dann erneut, den Status zu löschen.',
+    },
   },
 
   components: {
     // Avatar component
     avatar: {
-      defaultAlt: 'Avatar'
+      defaultAlt: 'Avatar',
     },
 
     // DataTable component
     dataTable: {
-      showingRange: 'Zeige {start}–{end} von {total}'
+      showingRange: 'Zeige {start}–{end} von {total}',
     },
 
     // Diagram components
@@ -290,12 +311,12 @@ export default {
       nameRequired: 'Bitte geben Sie einen Diagrammnamen ein',
       saveError: 'Diagramm konnte nicht gespeichert werden',
       unsavedChanges: 'Ungespeicherte Änderungen',
-      unsavedChangesConfirm: 'Sie haben ungespeicherte Änderungen. Möchten Sie wirklich schließen?'
+      unsavedChangesConfirm: 'Sie haben ungespeicherte Änderungen. Möchten Sie wirklich schließen?',
     },
 
     // ErrorState component
     errorState: {
-      title: 'Etwas ist schiefgelaufen'
+      title: 'Etwas ist schiefgelaufen',
     },
 
     // Pagination component
@@ -306,7 +327,7 @@ export default {
       previousPage: 'Vorherige Seite',
       nextPage: 'Nächste Seite',
       goToPage: 'Gehe zu Seite {page}',
-      pageOf: 'Seite {current} von {total}'
+      pageOf: 'Seite {current} von {total}',
     },
 
     // UserAvatar component
@@ -320,8 +341,8 @@ export default {
       themeCycle: 'Klicken zum Wechseln: Hell → Dunkel → System',
       themeLight: 'Hell',
       themeDark: 'Dunkel',
-      themeSystem: 'System'
-    }
+      themeSystem: 'System',
+    },
   },
 
   aria: {
@@ -338,7 +359,7 @@ export default {
     notifications: 'Benachrichtigungen',
     adminSettings: 'Admin-Einstellungen',
     userMenu: 'Benutzermenü',
-    clearSearch: 'Suche löschen'
+    clearSearch: 'Suche löschen',
   },
 
   layout: {
@@ -348,7 +369,7 @@ export default {
     deleteSection: 'Abschnitt löschen',
     editMode: 'Bearbeitungsmodus',
     editDisplaySettings: 'Anzeigeeinstellungen bearbeiten',
-    items: 'Einträge'
+    items: 'Einträge',
   },
 
   widgets: {
@@ -357,23 +378,23 @@ export default {
     mediumWidth: 'Mittel (2/3 Breite)',
     fullWidth: 'Volle Breite',
     chart: {
-      items: 'Einträge'
+      items: 'Einträge',
     },
     completionChart: {
-      emptyMessage: 'Keine Abschlussdaten verfügbar'
+      emptyMessage: 'Keine Abschlussdaten verfügbar',
     },
     createdChart: {
-      emptyMessage: 'Keine Erstellungsdaten verfügbar'
+      emptyMessage: 'Keine Erstellungsdaten verfügbar',
     },
     milestoneProgress: {
       emptyTitle: 'Keine Meilensteine',
-      emptySubtitle: 'Erstellen Sie Meilensteine, um den Fortschritt zu verfolgen'
-    }
+      emptySubtitle: 'Erstellen Sie Meilensteine, um den Fortschritt zu verfolgen',
+    },
   },
 
   footer: {
     platformName: 'Windshift Arbeitsmanagement-Plattform',
     aboutWindshift: 'Über Windshift',
-    reportProblem: 'Problem melden'
-  }
+    reportProblem: 'Problem melden',
+  },
 };

@@ -1,13 +1,13 @@
-import { defineConfig } from 'vite'
-import { svelte } from '@sveltejs/vite-plugin-svelte'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-import { visualizer } from 'rollup-plugin-visualizer'
+import { svelte } from '@sveltejs/vite-plugin-svelte';
+import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react';
+import { visualizer } from 'rollup-plugin-visualizer';
+import { defineConfig } from 'vite';
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    svelte(),  // Uses svelte.config.js for preprocessors
+    svelte(), // Uses svelte.config.js for preprocessors
     react(),
     tailwindcss(),
     visualizer({
@@ -15,15 +15,11 @@ export default defineConfig({
       open: false,
       gzipSize: true,
       brotliSize: true,
-      template: 'treemap'
-    })
+      template: 'treemap',
+    }),
   ],
   optimizeDeps: {
-    include: [
-      '@milkdown/core',
-      '@milkdown/kit',
-      '@milkdown/theme-nord'
-    ]
+    include: ['@milkdown/core', '@milkdown/kit', '@milkdown/theme-nord'],
   },
   server: {
     port: 5555,
@@ -31,17 +27,17 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:7777',
         changeOrigin: true,
-      }
-    }
+      },
+    },
   },
   build: {
-    sourcemap: true,  // Generate .map files for debugging
+    sourcemap: true, // Generate .map files for debugging
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
       output: {
         manualChunks: {
-          'milkdown': [
+          milkdown: [
             '@milkdown/core',
             '@milkdown/kit/core',
             '@milkdown/kit/preset/commonmark',
@@ -51,14 +47,14 @@ export default defineConfig({
             '@milkdown/kit/utils',
             '@milkdown/utils',
             '@milkdown/kit/component/image-block',
-            '@milkdown/theme-nord'
+            '@milkdown/theme-nord',
           ],
-          'd3': ['d3-scale', 'd3-shape', 'd3-time-format'],
-          'excalidraw': ['@excalidraw/excalidraw'],
-          'svelteflow': ['@xyflow/svelte'],
-          'dnd': ['@atlaskit/pragmatic-drag-and-drop']
-        }
-      }
-    }
-  }
-})
+          d3: ['d3-scale', 'd3-shape', 'd3-time-format'],
+          excalidraw: ['@excalidraw/excalidraw'],
+          svelteflow: ['@xyflow/svelte'],
+          dnd: ['@atlaskit/pragmatic-drag-and-drop'],
+        },
+      },
+    },
+  },
+});

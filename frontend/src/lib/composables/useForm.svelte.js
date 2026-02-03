@@ -7,12 +7,14 @@ export const validators = {
    * @param {string} message - Error message to display
    * @returns {Function} Validator function
    */
-  required: (message = 'This field is required') => (value) => {
-    if (value === null || value === undefined) return message;
-    if (typeof value === 'string' && value.trim() === '') return message;
-    if (Array.isArray(value) && value.length === 0) return message;
-    return null;
-  },
+  required:
+    (message = 'This field is required') =>
+    (value) => {
+      if (value === null || value === undefined) return message;
+      if (typeof value === 'string' && value.trim() === '') return message;
+      if (Array.isArray(value) && value.length === 0) return message;
+      return null;
+    },
 
   /**
    * Validates minimum string length
@@ -43,11 +45,13 @@ export const validators = {
    * @param {string} message - Error message
    * @returns {Function} Validator function
    */
-  email: (message = 'Invalid email address') => (value) => {
-    if (!value) return null;
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(String(value)) ? null : message;
-  },
+  email:
+    (message = 'Invalid email address') =>
+    (value) => {
+      if (!value) return null;
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return emailRegex.test(String(value)) ? null : message;
+    },
 
   /**
    * Validates against a regex pattern
@@ -55,23 +59,27 @@ export const validators = {
    * @param {string} message - Error message
    * @returns {Function} Validator function
    */
-  pattern: (pattern, message = 'Invalid format') => (value) => {
-    if (!value) return null;
-    return pattern.test(String(value)) ? null : message;
-  },
+  pattern:
+    (pattern, message = 'Invalid format') =>
+    (value) => {
+      if (!value) return null;
+      return pattern.test(String(value)) ? null : message;
+    },
 
   /**
    * Composes multiple validators into one
    * @param  {...Function} validatorFns - Validators to compose
    * @returns {Function} Combined validator function
    */
-  compose: (...validatorFns) => (value) => {
-    for (const validator of validatorFns) {
-      const error = validator(value);
-      if (error) return error;
-    }
-    return null;
-  }
+  compose:
+    (...validatorFns) =>
+    (value) => {
+      for (const validator of validatorFns) {
+        const error = validator(value);
+        if (error) return error;
+      }
+      return null;
+    },
 };
 
 /**
@@ -115,7 +123,7 @@ function deepClone(obj) {
 
   const cloned = {};
   for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+    if (Object.hasOwn(obj, key)) {
       cloned[key] = deepClone(obj[key]);
     }
   }
@@ -310,14 +318,30 @@ export function useForm({ initialValues, schema = {}, onSubmit, transforms = {} 
 
   return {
     // State getters (reactive)
-    get values() { return values; },
-    get errors() { return errors; },
-    get touched() { return touched; },
-    get isDirty() { return isDirty; },
-    get isValid() { return isValid; },
-    get isSubmitting() { return isSubmitting; },
-    get submitError() { return submitError; },
-    get submitSuccess() { return submitSuccess; },
+    get values() {
+      return values;
+    },
+    get errors() {
+      return errors;
+    },
+    get touched() {
+      return touched;
+    },
+    get isDirty() {
+      return isDirty;
+    },
+    get isValid() {
+      return isValid;
+    },
+    get isSubmitting() {
+      return isSubmitting;
+    },
+    get submitError() {
+      return submitError;
+    },
+    get submitSuccess() {
+      return submitSuccess;
+    },
 
     // Methods
     setValue,
@@ -326,6 +350,6 @@ export function useForm({ initialValues, schema = {}, onSubmit, transforms = {} 
     validate,
     reset,
     submit,
-    getFormData
+    getFormData,
   };
 }

@@ -62,20 +62,23 @@ export default {
     createNewIssue: 'Create New Issue',
     nextStep: 'Next Step',
     noTestSteps: 'No Test Steps',
-    noTestStepsDescription: 'This test case doesn\'t have any defined steps yet. You can add steps to make it executable.',
+    noTestStepsDescription:
+      "This test case doesn't have any defined steps yet. You can add steps to make it executable.",
     previousCase: 'Previous Case',
     nextCase: 'Next Case',
     caseOfTotal: 'Case {current} of {total}',
     testRunNotFound: 'Test run not found or no test cases available',
     backToTestRuns: 'Back to Test Runs',
     finishTestExecution: 'Finish Test Execution',
-    finishConfirmMessage: 'Are you sure you want to finish this test execution? This will mark the test run as complete.',
+    finishConfirmMessage:
+      'Are you sure you want to finish this test execution? This will mark the test run as complete.',
     failedToFinish: 'Failed to finish test execution. Please try again.',
     unknownItem: 'Unknown Item',
     // Test Cases page
     addTestCase: 'Add Test Case',
     editTestCase: 'Edit Test Case',
-    deleteTestCaseConfirm: 'Are you sure you want to delete this test case? This action cannot be undone.',
+    deleteTestCaseConfirm:
+      'Are you sure you want to delete this test case? This action cannot be undone.',
     noTestCasesFound: 'No test cases found',
     noTestCasesWithLabel: 'No test cases found with the selected label filter.',
     createFirstTestCase: "Click 'Add Test Case' to create your first test case in this folder.",
@@ -98,10 +101,13 @@ export default {
     parentFolderOptional: 'Parent folder (optional)',
     topLevelFolder: 'Top-level folder',
     subfoldersNestingNote: 'Subfolders can only be nested one level deep.',
-    deleteFolderConfirm: 'Are you sure you want to delete this folder? This action cannot be undone.',
+    deleteFolderConfirm:
+      'Are you sure you want to delete this folder? This action cannot be undone.',
     estimatedDuration: 'Estimated Duration',
-    preconditionsPlaceholder: 'Describe the conditions that must be met before running this test case...',
-    testCaseStepsInfo: 'After creating this test case, you can add individual test steps with specific actions, data, and expected results for precise test execution.',
+    preconditionsPlaceholder:
+      'Describe the conditions that must be met before running this test case...',
+    testCaseStepsInfo:
+      'After creating this test case, you can add individual test steps with specific actions, data, and expected results for precise test execution.',
     pressToOpenSteps: 'Press 1-9 to open steps',
     // Labels management
     manageLabels: 'Manage Labels',
@@ -174,10 +180,13 @@ export default {
     templateNamePlaceholder: 'e.g., Sprint Regression Template',
     createTemplate: 'Create Template',
     deleteTemplate: 'Delete Template',
-    deleteTemplateConfirm: 'Are you sure you want to delete "{name}"? This will not delete existing test runs created from this template.',
+    deleteTemplateConfirm:
+      'Are you sure you want to delete "{name}"? This will not delete existing test runs created from this template.',
     noTemplatesYet: 'No templates yet',
-    createTemplatesHint: 'Create templates to quickly start test runs with predefined configurations',
-    createTemplateToReuse: 'Create a template to quickly start test runs with predefined configurations.',
+    createTemplatesHint:
+      'Create templates to quickly start test runs with predefined configurations',
+    createTemplateToReuse:
+      'Create a template to quickly start test runs with predefined configurations.',
     executeTemplate: 'Execute Template',
     templateNameRequired: 'Template name cannot be empty',
     failedToUpdateTemplate: 'Failed to update template. Please try again.',
@@ -191,7 +200,8 @@ export default {
     results: 'Results',
     progress: 'Progress',
     noExecutionsYet: 'No executions yet',
-    clickExecuteTemplate: 'Click "Execute Template" to create your first test run from this template',
+    clickExecuteTemplate:
+      'Click "Execute Template" to create your first test run from this template',
     quickStats: 'Quick Stats',
     totalExecutions: 'Total Executions',
     testPlanDetails: 'Test Plan Details',
@@ -268,7 +278,7 @@ export default {
     lastFailed: 'Last Failed',
     failCount: 'Fail Count',
     blockedTests: 'Blocked Tests',
-    noBlockedTests: 'No blocked tests'
+    noBlockedTests: 'No blocked tests',
   },
 
   testCase: {
@@ -280,15 +290,15 @@ export default {
     preconditions: 'Preconditions',
     testSteps: 'Test Steps',
     noStepsDefined: 'No Steps Defined',
-    noStepsHelp: 'This test case doesn\'t have any steps yet.',
+    noStepsHelp: "This test case doesn't have any steps yet.",
     addSteps: 'Add Steps',
     action: 'Action',
     data: 'Data',
     expectedResult: 'Expected Result',
     recentExecutions: 'Recent Executions',
-    noExecutions: 'This test case hasn\'t been executed in any recent test runs.',
+    noExecutions: "This test case hasn't been executed in any recent test runs.",
     set: 'Set',
     template: 'Template',
-    backToItem: 'Back to Item'
-  }
+    backToItem: 'Back to Item',
+  },
 };

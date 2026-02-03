@@ -1,18 +1,19 @@
 /**
  * Spanish (es) translations - Aggregated module
  */
-import common from './common.js';
-import auth from './auth.js';
-import workspace from './workspace.js';
+
+import actions from './actions.js';
 import admin from './admin.js';
+import auth from './auth.js';
+import channels from './channels.js';
+import common from './common.js';
+import misc from './misc.js';
+import navigation from './navigation.js';
 import testing from './testing.js';
 import time from './time.js';
-import channels from './channels.js';
-import workflows from './workflows.js';
 import ui from './ui.js';
-import navigation from './navigation.js';
-import misc from './misc.js';
-import actions from './actions.js';
+import workflows from './workflows.js';
+import workspace from './workspace.js';
 
 export default {
   ...common,
@@ -26,5 +27,5 @@ export default {
   ...ui,
   ...navigation,
   ...misc,
-  ...actions
+  ...actions,
 };

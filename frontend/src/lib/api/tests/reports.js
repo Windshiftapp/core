@@ -7,6 +7,8 @@ export const reports = {
     if (options.milestoneId) params.append('milestone_id', options.milestoneId);
     if (options.days) params.append('days', options.days);
     const queryString = params.toString();
-    return fetchAPI(`/workspaces/${workspaceId}/test-reports/summary${queryString ? '?' + queryString : ''}`);
+    return fetchAPI(
+      `/workspaces/${workspaceId}/test-reports/summary${queryString ? `?${queryString}` : ''}`
+    );
   },
 };

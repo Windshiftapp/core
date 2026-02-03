@@ -19,7 +19,7 @@ export default {
     noItemTypes: 'No se encontraron tipos de elementos',
     itemTypeCreated: 'Tipo de elemento creado correctamente',
     itemTypeUpdated: 'Tipo de elemento actualizado correctamente',
-    itemTypeDeleted: 'Tipo de elemento eliminado correctamente'
+    itemTypeDeleted: 'Tipo de elemento eliminado correctamente',
   },
 
   fields: {
@@ -51,7 +51,7 @@ export default {
     multiSelect: 'Seleccion multiple',
     checkbox: 'Casilla de verificacion',
     user: 'Usuario',
-    url: 'URL'
+    url: 'URL',
   },
 
   categories: {
@@ -71,7 +71,7 @@ export default {
     categoryDeleted: 'Categoria eliminada correctamente',
     deleteWarning: 'Los elementos en esta categoria quedaran sin categoria',
     selectCategory: 'Seleccionar categoria',
-    uncategorized: 'Sin categoria'
+    uncategorized: 'Sin categoria',
   },
 
   projects: {
@@ -90,7 +90,7 @@ export default {
     loadingProjects: 'Cargando proyectos...',
     projectCreated: 'Proyecto creado correctamente',
     projectUpdated: 'Proyecto actualizado correctamente',
-    projectDeleted: 'Proyecto eliminado correctamente'
+    projectDeleted: 'Proyecto eliminado correctamente',
   },
 
   sprints: {
@@ -112,7 +112,7 @@ export default {
     sprintUpdated: 'Sprint actualizado correctamente',
     sprintDeleted: 'Sprint eliminado correctamente',
     sprintStarted: 'Sprint iniciado correctamente',
-    sprintCompleted: 'Sprint completado correctamente'
+    sprintCompleted: 'Sprint completado correctamente',
   },
 
   iterations: {},
@@ -133,7 +133,7 @@ export default {
     timestamp: 'Marca de tiempo',
     details: 'Detalles',
     ipAddress: 'Direccion IP',
-    noEvents: 'No se encontraron eventos de auditoria'
+    noEvents: 'No se encontraron eventos de auditoria',
   },
 
   connections: {
@@ -149,7 +149,7 @@ export default {
     connectionUpdated: 'Conexion actualizada correctamente',
     connectionDeleted: 'Conexion eliminada',
     connectionSuccessful: 'Conexion exitosa',
-    testConnection: 'Probar conexion'
+    testConnection: 'Probar conexion',
   },
 
   migration: {
@@ -159,7 +159,7 @@ export default {
     migrationCompleted: 'Migracion completada',
     migrationSuccess: 'Todos los elementos han sido migrados correctamente',
     targetWorkspace: 'Espacio de trabajo de destino',
-    targetWorkspaceRequired: 'El espacio de trabajo de destino es requerido'
+    targetWorkspaceRequired: 'El espacio de trabajo de destino es requerido',
   },
 
   members: {
@@ -167,12 +167,12 @@ export default {
     subtitle: 'Administrar miembros del equipo',
     addMember: 'Agregar miembro',
     removeMember: 'Quitar miembro',
-    searchMembers: 'Buscar miembros por nombre o correo...'
+    searchMembers: 'Buscar miembros por nombre o correo...',
   },
 
   configuration: {
     title: 'Configuracion',
-    searchConfigurationSets: 'Buscar conjuntos de configuracion...'
+    searchConfigurationSets: 'Buscar conjuntos de configuracion...',
   },
 
   auditLog: {},
@@ -182,12 +182,12 @@ export default {
   setup: {
     goBackEsc: 'Volver (Esc)',
     continueNextStepEnter: 'Continuar al siguiente paso (Enter)',
-    completeSetupEnter: 'Completar configuracion (Enter)'
+    completeSetupEnter: 'Completar configuracion (Enter)',
   },
 
   createModal: {},
 
   scm: {},
 
-  organization: {}
+  organization: {},
 };

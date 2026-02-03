@@ -195,7 +195,7 @@ html[data-color-mode="light"] {
   /* =================================================================
      GRADIENT ANIMATION COLORS
      ================================================================= */
-  --ds-gradient-start: #2874BB;
+  --ds-gradient-start: #2874bb;
   --ds-gradient-mid: #3b82f6;
-  --ds-gradient-end: #1AB1BC;
+  --ds-gradient-end: #1ab1bc;
 }

@@ -19,7 +19,7 @@ export default {
     noStatuses: 'لم يتم العثور على حالات',
     statusCreated: 'تم إنشاء الحالة بنجاح',
     statusUpdated: 'تم تحديث الحالة بنجاح',
-    statusDeleted: 'تم حذف الحالة بنجاح'
+    statusDeleted: 'تم حذف الحالة بنجاح',
   },
 
   priorities: {
@@ -40,7 +40,7 @@ export default {
     high: 'عالي',
     medium: 'متوسط',
     low: 'منخفض',
-    lowest: 'أدنى'
+    lowest: 'أدنى',
   },
 
   workflows: {
@@ -59,7 +59,7 @@ export default {
     noWorkflows: 'لم يتم العثور على سير عمل',
     workflowCreated: 'تم إنشاء سير العمل بنجاح',
     workflowUpdated: 'تم تحديث سير العمل بنجاح',
-    workflowDeleted: 'تم حذف سير العمل بنجاح'
+    workflowDeleted: 'تم حذف سير العمل بنجاح',
 
     // Note: Additional workflow designer keys
     // fall back to English for missing keys
@@ -79,7 +79,7 @@ export default {
     screenCreated: 'تم إنشاء الشاشة بنجاح',
     screenUpdated: 'تم تحديث الشاشة بنجاح',
     screenDeleted: 'تم حذف الشاشة بنجاح',
-    cannotDeleteDefault: 'لا يمكن حذف الشاشة الافتراضية'
+    cannotDeleteDefault: 'لا يمكن حذف الشاشة الافتراضية',
   },
 
   screensPage: {
@@ -88,5 +88,5 @@ export default {
 
   statusCategory: {
     // Status category section - falls back to English for missing keys
-  }
+  },
 };

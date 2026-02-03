@@ -148,13 +148,17 @@
       // Get statuses for this workspace (uses workflow from config set or default workflow)
       statuses = await api.workspaces.getStatuses(workspaceId) || [];
 
-      // Load board configuration if exists
-      try {
-        boardConfig = await api.collections.getBoardConfiguration(collectionId, workspaceId);
-      } catch (error) {
-        if (error.status !== 404) {
-          console.error('Failed to load board configuration:', error);
+      // Load board configuration if exists (only for non-default collections)
+      if (collectionId) {
+        try {
+          boardConfig = await api.collections.getBoardConfiguration(collectionId, workspaceId);
+        } catch (error) {
+          if (error.status !== 404) {
+            console.error('Failed to load board configuration:', error);
+          }
+          boardConfig = null;
         }
+      } else {
         boardConfig = null;
       }
 

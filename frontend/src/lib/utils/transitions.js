@@ -3,7 +3,7 @@
  * Provides reusable, accessible animations with spring physics
  */
 
-import { cubicOut, backOut, quintOut } from 'svelte/easing';
+import { backOut, cubicOut, quintOut } from 'svelte/easing';
 
 /**
  * Check if user prefers reduced motion
@@ -34,27 +34,22 @@ export function getMotionSafeDuration(duration) {
  *   </div>
  * {/each}
  */
-export function staggerFly(node, {
-  index = 0,
-  y = 20,
-  x = 0,
-  delay = 0,
-  duration = 300,
-  stagger = 50,
-  easing = cubicOut
-}) {
+export function staggerFly(
+  _node,
+  { index = 0, y = 20, x = 0, delay = 0, duration = 300, stagger = 50, easing = cubicOut }
+) {
   if (prefersReducedMotion()) {
     return { duration: 0 };
   }
 
   return {
-    delay: delay + (index * stagger),
+    delay: delay + index * stagger,
     duration,
     easing,
     css: (t) => `
       transform: translate(${(1 - t) * x}px, ${(1 - t) * y}px);
       opacity: ${t};
-    `
+    `,
   };
 }
 
@@ -67,12 +62,7 @@ export function staggerFly(node, {
  *   Modal content
  * </div>
  */
-export function springScale(node, {
-  delay = 0,
-  duration = 400,
-  start = 0.95,
-  easing = backOut
-}) {
+export function springScale(_node, { delay = 0, duration = 400, start = 0.95, easing = backOut }) {
   if (prefersReducedMotion()) {
     return { duration: 0 };
   }
@@ -84,7 +74,7 @@ export function springScale(node, {
     css: (t) => `
       transform: scale(${start + (1 - start) * t});
       opacity: ${t};
-    `
+    `,
   };
 }
 
@@ -97,12 +87,7 @@ export function springScale(node, {
  *   Glass panel
  * </div>
  */
-export function fadeBlur(node, {
-  delay = 0,
-  duration = 300,
-  blur = 4,
-  easing = cubicOut
-}) {
+export function fadeBlur(_node, { delay = 0, duration = 300, blur = 4, easing = cubicOut }) {
   if (prefersReducedMotion()) {
     return { duration: 0 };
   }
@@ -114,7 +99,7 @@ export function fadeBlur(node, {
     css: (t) => `
       opacity: ${t};
       filter: blur(${(1 - t) * blur}px);
-    `
+    `,
   };
 }
 
@@ -127,12 +112,7 @@ export function fadeBlur(node, {
  *   Lifted card
  * </div>
  */
-export function cardLift(node, {
-  delay = 0,
-  duration = 200,
-  y = 4,
-  easing = cubicOut
-}) {
+export function cardLift(_node, { delay = 0, duration = 200, y = 4, easing = cubicOut }) {
   if (prefersReducedMotion()) {
     return { duration: 0 };
   }
@@ -143,7 +123,7 @@ export function cardLift(node, {
     easing,
     css: (t) => `
       transform: translateY(${(1 - t) * y * -1}px);
-    `
+    `,
   };
 }
 
@@ -154,13 +134,16 @@ export function cardLift(node, {
  * @example
  * <aside in:slideIn={{ direction: 'left' }}>
  */
-export function slideIn(node, {
-  delay = 0,
-  duration = 300,
-  direction = 'right', // 'left', 'right', 'up', 'down'
-  distance = 20,
-  easing = quintOut
-}) {
+export function slideIn(
+  _node,
+  {
+    delay = 0,
+    duration = 300,
+    direction = 'right', // 'left', 'right', 'up', 'down'
+    distance = 20,
+    easing = quintOut,
+  }
+) {
   if (prefersReducedMotion()) {
     return { duration: 0 };
   }
@@ -169,7 +152,7 @@ export function slideIn(node, {
     left: `translateX(-${distance}px)`,
     right: `translateX(${distance}px)`,
     up: `translateY(-${distance}px)`,
-    down: `translateY(${distance}px)`
+    down: `translateY(${distance}px)`,
   };
 
   const startTransform = transforms[direction] || transforms.right;
@@ -179,9 +162,9 @@ export function slideIn(node, {
     duration,
     easing,
     css: (t) => `
-      transform: ${t === 1 ? 'none' : startTransform.replace(/\d+/, d => (1 - t) * parseInt(d))};
+      transform: ${t === 1 ? 'none' : startTransform.replace(/\d+/, (d) => (1 - t) * parseInt(d, 10))};
       opacity: ${t};
-    `
+    `,
   };
 }
 
@@ -189,12 +172,7 @@ export function slideIn(node, {
  * Pop transition with scale and opacity
  * Good for tooltips, popovers, and quick reveals
  */
-export function pop(node, {
-  delay = 0,
-  duration = 200,
-  start = 0.9,
-  easing = backOut
-}) {
+export function pop(_node, { delay = 0, duration = 200, start = 0.9, easing = backOut }) {
   if (prefersReducedMotion()) {
     return { duration: 0 };
   }
@@ -206,7 +184,7 @@ export function pop(node, {
     css: (t) => `
       transform: scale(${start + (1 - start) * t});
       opacity: ${t};
-    `
+    `,
   };
 }
 
@@ -234,7 +212,7 @@ export function animateCounter(target, callback, duration = 1000) {
     const progress = Math.min(elapsed / duration, 1);
 
     // Ease-out curve for natural feel
-    const easeOut = 1 - Math.pow(1 - progress, 3);
+    const easeOut = 1 - (1 - progress) ** 3;
     const value = Math.round(start + (target - start) * easeOut);
 
     callback(value);
@@ -253,14 +231,11 @@ export function animateCounter(target, callback, duration = 1000) {
  */
 export function createIndicatorSlide(fromY, toY, duration = 200) {
   return {
-    keyframes: [
-      { transform: `translateY(${fromY}px)` },
-      { transform: `translateY(${toY}px)` }
-    ],
+    keyframes: [{ transform: `translateY(${fromY}px)` }, { transform: `translateY(${toY}px)` }],
     options: {
       duration: prefersReducedMotion() ? 0 : duration,
       easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)', // Spring easing
-      fill: 'forwards'
-    }
+      fill: 'forwards',
+    },
   };
 }

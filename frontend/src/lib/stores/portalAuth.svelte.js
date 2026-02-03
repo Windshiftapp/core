@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { derived, writable } from 'svelte/store';
 import { api } from '../api.js';
 
 /**
@@ -28,7 +28,7 @@ function createPortalAuthStore() {
       isInternal: $isInternal,
       loading: $loading,
       error: $error,
-      emailSent: $emailSent
+      emailSent: $emailSent,
     })
   );
 
@@ -39,43 +39,43 @@ function createPortalAuthStore() {
     // Convenience getters for backwards compatibility with direct property access
     get customer() {
       let value;
-      customer.subscribe(v => value = v)();
+      customer.subscribe((v) => (value = v))();
       return value;
     },
 
     get user() {
       let value;
-      user.subscribe(v => value = v)();
+      user.subscribe((v) => (value = v))();
       return value;
     },
 
     get isAuthenticated() {
       let value;
-      isAuthenticated.subscribe(v => value = v)();
+      isAuthenticated.subscribe((v) => (value = v))();
       return value;
     },
 
     get isInternal() {
       let value;
-      isInternal.subscribe(v => value = v)();
+      isInternal.subscribe((v) => (value = v))();
       return value;
     },
 
     get loading() {
       let value;
-      loading.subscribe(v => value = v)();
+      loading.subscribe((v) => (value = v))();
       return value;
     },
 
     get error() {
       let value;
-      error.subscribe(v => value = v)();
+      error.subscribe((v) => (value = v))();
       return value;
     },
 
     get emailSent() {
       let value;
-      emailSent.subscribe(v => value = v)();
+      emailSent.subscribe((v) => (value = v))();
       return value;
     },
 
@@ -108,7 +108,7 @@ function createPortalAuthStore() {
           isAuthenticated.set(false);
           isInternal.set(false);
         }
-      } catch (err) {
+      } catch (_err) {
         // Not authenticated is not an error
         customer.set(null);
         user.set(null);
@@ -217,7 +217,7 @@ function createPortalAuthStore() {
       loading.set(false);
       error.set(null);
       emailSent.set(false);
-    }
+    },
   };
 }
 

@@ -34,9 +34,15 @@ async function reload() {
 }
 
 export const attachmentStatus = {
-  get enabled() { return enabled; },
-  get loaded() { return loaded; },
-  get loading() { return loading; },
+  get enabled() {
+    return enabled;
+  },
+  get loaded() {
+    return loaded;
+  },
+  get loading() {
+    return loading;
+  },
   load,
-  reload
+  reload,
 };

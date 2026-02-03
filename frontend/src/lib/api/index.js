@@ -1,84 +1,102 @@
 // Main API barrel export - assembles all domain modules into single api object
-import { get, post, put, del } from './core.js';
 
-// Domain imports
-import { items } from './items.js';
-import { workspaces, workspaceRoles } from './workspaces.js';
+import { actions } from './actions.js';
+import { securitySettings, setup, system, themes } from './admin.js';
+import {
+  assetCategories,
+  assetRoles,
+  assetSets,
+  assetStatuses,
+  assets,
+  assetTypes,
+  itemLinkedAssets,
+} from './assets.js';
 import { auth } from './auth.js';
-import { time, timer } from './time.js';
-import { statusCategories, statuses, workflows } from './workflows.js';
-import { assetSets, assetRoles, assetTypes, assetCategories, assetStatuses, assets, itemLinkedAssets } from './assets.js';
-import { portal, portalAuth, portalCustomers, contactRoles, customerOrganisations } from './portal.js';
-import { hub } from './hub.js';
-import { scmProviders, workspaceSCM, itemSCMLinks, userSCM } from './scm.js';
-import { channels, channelCategories, requestTypes, assetReports } from './channels.js';
-import { milestoneCategories, milestones, iterationTypes, iterations } from './milestones.js';
-import { permissions, groups } from './permissions.js';
-import { notifications, notificationSettings, configurationSetNotifications } from './notifications.js';
+import { assetReports, channelCategories, channels, requestTypes } from './channels.js';
+import { collectionCategories, collections } from './collections.js';
 import {
   configurationSets,
-  screens,
   customFields,
-  projectFieldRequirements,
-  itemTypes,
-  priorities,
   hierarchyLevels,
+  itemTypes,
+  links,
   linkTypes,
-  links
+  priorities,
+  projectFieldRequirements,
+  screens,
 } from './configuration.js';
+import { del, get, post, put } from './core.js';
+import { hub } from './hub.js';
+// Domain imports
+import { items } from './items.js';
+import { iterations, iterationTypes, milestoneCategories, milestones } from './milestones.js';
 import {
-  getUsers,
-  getUser,
+  attachmentSettings,
+  attachments,
+  calendarFeed,
+  createComment,
+  createDiagram,
+  deleteComment,
+  deleteDiagram,
+  getComments,
+  getDiagram,
+  getDiagrams,
+  homepage,
+  issues,
+  jiraImport,
+  personalLabels,
+  projects,
+  reviews,
+  search,
+  updateComment,
+  updateDiagram,
+} from './misc.js';
+import {
+  configurationSetNotifications,
+  notificationSettings,
+  notifications,
+} from './notifications.js';
+import { groups, permissions } from './permissions.js';
+import {
+  contactRoles,
+  customerOrganisations,
+  portal,
+  portalAuth,
+  portalCustomers,
+} from './portal.js';
+import { itemSCMLinks, scmProviders, userSCM, workspaceSCM } from './scm.js';
+import { sso } from './sso.js';
+import { tests } from './tests/index.js';
+import { time, timer } from './time.js';
+import {
+  activateUser,
+  completeFIDORegistration,
+  createApiToken,
+  createAppToken,
+  createSSHKey,
   createUser,
+  deactivateUser,
+  deleteUser,
+  getApiToken,
+  getApiTokens,
+  getUser,
+  getUserAppTokens,
+  getUserCredentials,
+  getUsers,
+  removeUserCredential,
+  resetUserPassword,
+  revokeApiToken,
+  revokeAppToken,
+  startFIDORegistration,
+  updateAppToken,
   updateUser,
   updateUserAvatar,
   updateUserRegionalSettings,
-  deleteUser,
-  resetUserPassword,
-  activateUser,
-  deactivateUser,
-  getUserCredentials,
-  startFIDORegistration,
-  completeFIDORegistration,
-  createSSHKey,
-  removeUserCredential,
-  getUserAppTokens,
-  createAppToken,
-  updateAppToken,
-  revokeAppToken,
-  getApiTokens,
-  createApiToken,
-  getApiToken,
-  revokeApiToken,
+  userPreferences,
   validateApiToken,
-  userPreferences
 } from './users.js';
-import { collections, collectionCategories } from './collections.js';
-import { sso } from './sso.js';
-import { setup, system, themes, securitySettings, authPolicy } from './admin.js';
-import {
-  projects,
-  issues,
-  search,
-  homepage,
-  getDiagrams,
-  getDiagram,
-  createDiagram,
-  updateDiagram,
-  deleteDiagram,
-  getComments,
-  createComment,
-  updateComment,
-  deleteComment,
-  attachments,
-  attachmentSettings,
-  reviews,
-  calendarFeed,
-  personalLabels,
-  jiraImport
-} from './misc.js';
-import { tests } from './tests/index.js';
-import { actions } from './actions.js';
+import { statusCategories, statuses, workflows } from './workflows.js';
+import { workspaceRoles, workspaces } from './workspaces.js';
 
 // Assemble the api object with the same structure as the original
 export const api = {
@@ -312,18 +330,25 @@ export const api = {
   actions,
 };
 
+// Security settings exports
+export {
+  authPolicy,
+  getAuthPolicy,
+  getAuthPolicyAffected,
+  getAuthPolicyPublicStatus,
+  getAuthPolicyStats,
+  getSecuritySettings,
+  updateAuthPolicy,
+  updateSecuritySettings,
+} from './admin.js';
+// Calendar feed exports
+export { createCalendarFeedToken, getCalendarFeedToken, revokeCalendarFeedToken } from './misc.js';
 // Export helper functions for backward compatibility
 export {
-  getNotificationSettings,
-  getNotificationSetting,
   createNotificationSetting,
-  updateNotificationSetting,
   deleteNotificationSetting,
   getAvailableNotificationEvents,
+  getNotificationSetting,
+  getNotificationSettings,
+  updateNotificationSetting,
 } from './notifications.js';
-
-// Security settings exports
-export { getSecuritySettings, updateSecuritySettings, authPolicy, getAuthPolicy, updateAuthPolicy, getAuthPolicyStats, getAuthPolicyAffected, getAuthPolicyPublicStatus } from './admin.js';
-
-// Calendar feed exports
-export { getCalendarFeedToken, createCalendarFeedToken, revokeCalendarFeedToken } from './misc.js';

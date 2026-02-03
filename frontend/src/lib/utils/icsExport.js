@@ -19,11 +19,15 @@ function escapeICS(text) {
  * Format a Date object to ICS datetime format (YYYYMMDDTHHMMSS)
  */
 function formatICSDate(date) {
-  return date.getFullYear().toString() +
+  return (
+    date.getFullYear().toString() +
     (date.getMonth() + 1).toString().padStart(2, '0') +
-    date.getDate().toString().padStart(2, '0') + 'T' +
+    date.getDate().toString().padStart(2, '0') +
+    'T' +
     date.getHours().toString().padStart(2, '0') +
-    date.getMinutes().toString().padStart(2, '0') + '00';
+    date.getMinutes().toString().padStart(2, '0') +
+    '00'
+  );
 }
 
 /**
@@ -43,7 +47,7 @@ export function createEvent({ uid, start, end, title, description, url, location
     `UID:${uid}`,
     `DTSTART:${formatICSDate(start)}`,
     `DTEND:${formatICSDate(end)}`,
-    `SUMMARY:${escapeICS(title)}`
+    `SUMMARY:${escapeICS(title)}`,
   ];
 
   if (description) {
@@ -72,7 +76,7 @@ export function generateICSContent(events, calendarName = 'Windshift Calendar') 
     'PRODID:-//Windshift//Calendar//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    `X-WR-CALNAME:${escapeICS(calendarName)}`
+    `X-WR-CALNAME:${escapeICS(calendarName)}`,
   ];
 
   const footer = ['END:VCALENDAR'];
@@ -103,8 +107,8 @@ export function downloadICS(content, filename) {
  */
 export function exportTasksToICS(tasks, baseUrl, filename) {
   const events = tasks
-    .filter(task => task.scheduledDate && task.scheduledTime)
-    .map(task => {
+    .filter((task) => task.scheduledDate && task.scheduledTime)
+    .map((task) => {
       const [year, month, day] = task.scheduledDate.split('-');
       const [hours, minutes] = task.scheduledTime.split(':');
       const start = new Date(year, month - 1, day, hours, minutes);
@@ -121,7 +125,7 @@ export function exportTasksToICS(tasks, baseUrl, filename) {
         end,
         title: task.title,
         description,
-        url: itemUrl
+        url: itemUrl,
       });
     });
 

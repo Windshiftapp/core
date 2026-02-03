@@ -142,7 +142,7 @@ export default {
     now: 'Ahora',
     never: 'Nunca',
     always: 'Siempre',
-    saved: 'Guardado correctamente'
+    saved: 'Guardado correctamente',
   },
 
   // Toast notifications
@@ -156,7 +156,7 @@ export default {
     created: 'Creado correctamente',
     updated: 'Actualizado correctamente',
     copied: 'Copiado al portapapeles',
-    failed: 'Operacion fallida'
+    failed: 'Operacion fallida',
   },
 
   // Backend error codes
@@ -181,7 +181,7 @@ export default {
     NETWORK_ERROR: 'Error de red. Por favor, verifique su conexion.',
     TIMEOUT: 'La solicitud expiro. Por favor, intente de nuevo.',
     UNKNOWN: 'Ocurrio un error desconocido.',
-    generic: 'Algo salio mal. Por favor, intente de nuevo.'
+    generic: 'Algo salio mal. Por favor, intente de nuevo.',
   },
 
   // Validation messages
@@ -201,7 +201,7 @@ export default {
     emailTaken: 'Este correo electronico ya esta en uso',
     usernameTaken: 'Este nombre de usuario ya esta en uso',
     slugInvalid: 'Solo se permiten letras minusculas, numeros y guiones',
-    fillRequired: 'Por favor, complete todos los campos requeridos'
+    fillRequired: 'Por favor, complete todos los campos requeridos',
   },
 
   // Placeholders
@@ -218,7 +218,7 @@ export default {
     optionalDescription: 'Descripcion opcional...',
     channelDescription: 'Breve descripcion del proposito del canal',
     columnName: 'Nombre de columna',
-    typeName: "Escriba '{name}' aqui"
+    typeName: "Escriba '{name}' aqui",
   },
 
   // Empty States
@@ -229,6 +229,6 @@ export default {
     noFieldChanges: 'No se detectaron cambios en campos',
     noRequirements: 'No hay requisitos configurados',
     configureFilter: 'Configure el filtro para ver elementos',
-    createToStart: 'Cree {item} para comenzar'
-  }
+    createToStart: 'Cree {item} para comenzar',
+  },
 };

@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test';
-import { UserPage } from '../pages/user.page';
+import { expect, test } from '@playwright/test';
 import { generateUser } from '../fixtures/test-data';
+import { UserPage } from '../pages/user.page';
 
 /**
  * User Management Tests

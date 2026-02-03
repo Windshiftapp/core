@@ -41,7 +41,7 @@ let hubSections = $state([]);
 let footerColumns = $state([
   { title: '', links: [] },
   { title: '', links: [] },
-  { title: '', links: [] }
+  { title: '', links: [] },
 ]);
 
 // Inbox state
@@ -90,7 +90,7 @@ async function loadHub() {
     footerColumns = data.config.footer_columns || [
       { title: '', links: [] },
       { title: '', links: [] },
-      { title: '', links: [] }
+      { title: '', links: [] },
     ];
 
     // Allow saves from user changes after initial load
@@ -163,7 +163,7 @@ async function handleLogoUpload(files) {
 
     const uploadResult = await response.json();
 
-    if (uploadResult && uploadResult.success && uploadResult.logo_url) {
+    if (uploadResult?.success && uploadResult.logo_url) {
       logoUrl = uploadResult.logo_url;
       saveCustomizations();
       console.log('Hub logo uploaded successfully');
@@ -221,7 +221,7 @@ function addSection() {
     title: '',
     subtitle: '',
     display_order: hubSections.length,
-    portal_ids: []
+    portal_ids: [],
   };
   hubSections = [...hubSections, newSection];
   saveCustomizations();
@@ -230,13 +230,13 @@ function addSection() {
 
 function deleteSection(sectionId) {
   hubSections = hubSections
-    .filter(s => s.id !== sectionId)
+    .filter((s) => s.id !== sectionId)
     .map((s, i) => ({ ...s, display_order: i }));
   saveCustomizations();
 }
 
 function updateSection(sectionId, field, value) {
-  hubSections = hubSections.map(s => {
+  hubSections = hubSections.map((s) => {
     if (s.id === sectionId) {
       return { ...s, [field]: value };
     }
@@ -262,12 +262,12 @@ function moveSectionDown(index) {
 }
 
 function addPortalToSection(sectionId, portalId) {
-  hubSections = hubSections.map(s => {
+  hubSections = hubSections.map((s) => {
     if (s.id === sectionId) {
       if (!s.portal_ids.includes(portalId)) {
         return {
           ...s,
-          portal_ids: [...s.portal_ids, portalId]
+          portal_ids: [...s.portal_ids, portalId],
         };
       }
     }
@@ -277,11 +277,11 @@ function addPortalToSection(sectionId, portalId) {
 }
 
 function removePortalFromSection(sectionId, portalId) {
-  hubSections = hubSections.map(s => {
+  hubSections = hubSections.map((s) => {
     if (s.id === sectionId) {
       return {
         ...s,
-        portal_ids: s.portal_ids.filter(id => id !== portalId)
+        portal_ids: s.portal_ids.filter((id) => id !== portalId),
       };
     }
     return s;
@@ -294,16 +294,16 @@ function removePortalFromSection(sectionId, portalId) {
  */
 function getSectionPortals(section) {
   return section.portal_ids
-    .map(id => portals.find(p => p.id === id))
-    .filter(p => p !== undefined);
+    .map((id) => portals.find((p) => p.id === id))
+    .filter((p) => p !== undefined);
 }
 
 /**
  * Get portals not assigned to any section
  */
 function getUnassignedPortals() {
-  const assignedIds = new Set(hubSections.flatMap(s => s.portal_ids));
-  return portals.filter(p => !assignedIds.has(p.id));
+  const assignedIds = new Set(hubSections.flatMap((s) => s.portal_ids));
+  return portals.filter((p) => !assignedIds.has(p.id));
 }
 
 // Footer management
@@ -312,7 +312,7 @@ function addFooterLink(columnIndex) {
     if (idx === columnIndex) {
       return {
         ...col,
-        links: [...col.links, { text: '', url: '' }]
+        links: [...col.links, { text: '', url: '' }],
       };
     }
     return col;
@@ -325,7 +325,7 @@ function removeFooterLink(columnIndex, linkIndex) {
     if (idx === columnIndex) {
       return {
         ...col,
-        links: col.links.filter((_, i) => i !== linkIndex)
+        links: col.links.filter((_, i) => i !== linkIndex),
       };
     }
     return col;
@@ -353,7 +353,7 @@ function updateFooterLink(columnIndex, linkIndex, field, value) {
             return { ...link, [field]: value };
           }
           return link;
-        })
+        }),
       };
     }
     return col;
@@ -369,7 +369,7 @@ async function loadInbox() {
       page: inboxPage,
       per_page: inboxPerPage,
       portal_id: inboxPortalFilter || undefined,
-      status: inboxStatusFilter || undefined
+      status: inboxStatusFilter || undefined,
     });
 
     inboxItems = data.items || [];
@@ -425,7 +425,7 @@ function reset() {
   footerColumns = [
     { title: '', links: [] },
     { title: '', links: [] },
-    { title: '', links: [] }
+    { title: '', links: [] },
   ];
   inboxItems = [];
   inboxLoading = false;
@@ -442,58 +442,134 @@ function reset() {
 // Export the store with getters and actions
 export const hubStore = {
   // Getters for core state
-  get hubConfig() { return hubConfig; },
-  get portals() { return portals; },
-  get loading() { return loading; },
-  get error() { return error; },
+  get hubConfig() {
+    return hubConfig;
+  },
+  get portals() {
+    return portals;
+  },
+  get loading() {
+    return loading;
+  },
+  get error() {
+    return error;
+  },
 
   // Getters for UI state
-  get isEditing() { return isEditing; },
-  get isDarkMode() { return isDarkMode; },
-  get showCustomizePanel() { return showCustomizePanel; },
-  get showInbox() { return showInbox; },
-  get selectedGradient() { return selectedGradient; },
-  get activeSection() { return activeSection; },
-  get searchQuery() { return searchQuery; },
+  get isEditing() {
+    return isEditing;
+  },
+  get isDarkMode() {
+    return isDarkMode;
+  },
+  get showCustomizePanel() {
+    return showCustomizePanel;
+  },
+  get showInbox() {
+    return showInbox;
+  },
+  get selectedGradient() {
+    return selectedGradient;
+  },
+  get activeSection() {
+    return activeSection;
+  },
+  get searchQuery() {
+    return searchQuery;
+  },
 
   // Getters for logo state
-  get logoUrl() { return logoUrl; },
-  get uploadingLogo() { return uploadingLogo; },
+  get logoUrl() {
+    return logoUrl;
+  },
+  get uploadingLogo() {
+    return uploadingLogo;
+  },
 
   // Getters for editable content
-  get editableTitle() { return editableTitle; },
-  get editableDescription() { return editableDescription; },
-  get editableSearchPlaceholder() { return editableSearchPlaceholder; },
-  get editableSearchHint() { return editableSearchHint; },
+  get editableTitle() {
+    return editableTitle;
+  },
+  get editableDescription() {
+    return editableDescription;
+  },
+  get editableSearchPlaceholder() {
+    return editableSearchPlaceholder;
+  },
+  get editableSearchHint() {
+    return editableSearchHint;
+  },
 
   // Getters for sections/footer
-  get hubSections() { return hubSections; },
-  get footerColumns() { return footerColumns; },
-  get draggedPortal() { return draggedPortal; },
+  get hubSections() {
+    return hubSections;
+  },
+  get footerColumns() {
+    return footerColumns;
+  },
+  get draggedPortal() {
+    return draggedPortal;
+  },
 
   // Getters for inbox
-  get inboxItems() { return inboxItems; },
-  get inboxLoading() { return inboxLoading; },
-  get inboxTotal() { return inboxTotal; },
-  get inboxPage() { return inboxPage; },
-  get inboxPerPage() { return inboxPerPage; },
-  get inboxTotalPages() { return inboxTotalPages; },
-  get inboxPortalFilter() { return inboxPortalFilter; },
-  get inboxStatusFilter() { return inboxStatusFilter; },
+  get inboxItems() {
+    return inboxItems;
+  },
+  get inboxLoading() {
+    return inboxLoading;
+  },
+  get inboxTotal() {
+    return inboxTotal;
+  },
+  get inboxPage() {
+    return inboxPage;
+  },
+  get inboxPerPage() {
+    return inboxPerPage;
+  },
+  get inboxTotalPages() {
+    return inboxTotalPages;
+  },
+  get inboxPortalFilter() {
+    return inboxPortalFilter;
+  },
+  get inboxStatusFilter() {
+    return inboxStatusFilter;
+  },
 
   // Setters for UI state
-  set isEditing(value) { isEditing = value; },
-  set showCustomizePanel(value) { showCustomizePanel = value; },
-  set showInbox(value) { showInbox = value; },
-  set activeSection(value) { activeSection = value; },
-  set searchQuery(value) { searchQuery = value; },
-  set draggedPortal(value) { draggedPortal = value; },
+  set isEditing(value) {
+    isEditing = value;
+  },
+  set showCustomizePanel(value) {
+    showCustomizePanel = value;
+  },
+  set showInbox(value) {
+    showInbox = value;
+  },
+  set activeSection(value) {
+    activeSection = value;
+  },
+  set searchQuery(value) {
+    searchQuery = value;
+  },
+  set draggedPortal(value) {
+    draggedPortal = value;
+  },
 
   // Setters for editable content
-  set editableTitle(value) { editableTitle = value; },
-  set editableDescription(value) { editableDescription = value; },
-  set editableSearchPlaceholder(value) { editableSearchPlaceholder = value; },
-  set editableSearchHint(value) { editableSearchHint = value; },
+  set editableTitle(value) {
+    editableTitle = value;
+  },
+  set editableDescription(value) {
+    editableDescription = value;
+  },
+  set editableSearchPlaceholder(value) {
+    editableSearchPlaceholder = value;
+  },
+  set editableSearchHint(value) {
+    editableSearchHint = value;
+  },
 
   // Actions
   loadHub,

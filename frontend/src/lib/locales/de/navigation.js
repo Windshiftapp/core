@@ -29,7 +29,7 @@ export default {
     loadingSearch: 'Suche wird geladen...',
     loadingCreateForm: 'Formular wird geladen...',
     loading: 'Wird geladen...',
-    retry: 'Erneut versuchen'
+    retry: 'Erneut versuchen',
   },
 
   commandPalette: {
@@ -49,63 +49,174 @@ export default {
       dashboard: { label: 'Dashboard', description: 'Analysen und Berichte anzeigen' },
       milestones: { label: 'Meilensteine', description: 'Projektmeilensteine verfolgen' },
       channels: { label: 'Kanäle', description: 'Kommunikationskanäle und Support' },
-      collections: { label: 'Sammlungen', description: 'Vorgangssammlungen und Ansichten verwalten' },
+      collections: {
+        label: 'Sammlungen',
+        description: 'Vorgangssammlungen und Ansichten verwalten',
+      },
       adminPanel: { label: 'Admin-Bereich', description: 'Systemadministration und Einstellungen' },
 
       // Test Management (labels aligned with workspace navigation)
       tests: { label: 'Tests', description: 'Testfälle, Pläne und Ausführungen verwalten' },
       testCases: { label: 'Testfälle', description: 'Testfälle anzeigen und verwalten' },
       testPlans: { label: 'Testpläne', description: 'Testpläne anzeigen und verwalten' },
-      testTemplates: { label: 'Vorlagen', description: 'Testvorlagen und wiederverwendbare Schritte' },
+      testTemplates: {
+        label: 'Vorlagen',
+        description: 'Testvorlagen und wiederverwendbare Schritte',
+      },
       testRuns: { label: 'Testläufe', description: 'Testausführungen anzeigen und verwalten' },
       testReports: { label: 'Berichte', description: 'Testausführungsberichte anzeigen' },
-      createTestCase: { label: 'Testfall erstellen', description: 'Neuen Testfall für Qualitätssicherung erstellen' },
-      createTestPlan: { label: 'Testplan erstellen', description: 'Neuen Testplan mit Testfällen erstellen' },
-      createTestRun: { label: 'Testlauf erstellen', description: 'Neuen Testlauf zur Ausführung erstellen' },
+      createTestCase: {
+        label: 'Testfall erstellen',
+        description: 'Neuen Testfall für Qualitätssicherung erstellen',
+      },
+      createTestPlan: {
+        label: 'Testplan erstellen',
+        description: 'Neuen Testplan mit Testfällen erstellen',
+      },
+      createTestRun: {
+        label: 'Testlauf erstellen',
+        description: 'Neuen Testlauf zur Ausführung erstellen',
+      },
 
       // Time Management
       timeTracking: { label: 'Zeiterfassung', description: 'Arbeitszeit erfassen und verwalten' },
-      timeReports: { label: 'Zeitberichte', description: 'Zeiterfassungsberichte und Analysen anzeigen' },
+      timeReports: {
+        label: 'Zeitberichte',
+        description: 'Zeiterfassungsberichte und Analysen anzeigen',
+      },
       timeProjects: { label: 'Zeitprojekte', description: 'Zeiterfassungsprojekte verwalten' },
-      logTime: { label: 'Zeit erfassen', description: 'Schnell einen neuen Zeiteintrag hinzufügen' },
-      startTimer: { label: 'Timer starten', description: 'Zeiterfassung für aktuelle Arbeit starten' },
+      logTime: {
+        label: 'Zeit erfassen',
+        description: 'Schnell einen neuen Zeiteintrag hinzufügen',
+      },
+      startTimer: {
+        label: 'Timer starten',
+        description: 'Zeiterfassung für aktuelle Arbeit starten',
+      },
       stopTimer: { label: 'Timer stoppen', description: 'Aktuelle Zeiterfassung beenden' },
 
       // Create Commands
-      createWorkItem: { label: 'Vorgang erstellen', description: 'Neuen Vorgang oder Aufgabe erstellen' },
-      createWorkspace: { label: 'Arbeitsbereich erstellen', description: 'Neuen Projektarbeitsbereich erstellen' },
-      createMilestone: { label: 'Meilenstein erstellen', description: 'Neuen Projektmeilenstein erstellen' },
-      createCollection: { label: 'Sammlung erstellen', description: 'Neue Vorgangssammlung erstellen' },
+      createWorkItem: {
+        label: 'Vorgang erstellen',
+        description: 'Neuen Vorgang oder Aufgabe erstellen',
+      },
+      createWorkspace: {
+        label: 'Arbeitsbereich erstellen',
+        description: 'Neuen Projektarbeitsbereich erstellen',
+      },
+      createMilestone: {
+        label: 'Meilenstein erstellen',
+        description: 'Neuen Projektmeilenstein erstellen',
+      },
+      createCollection: {
+        label: 'Sammlung erstellen',
+        description: 'Neue Vorgangssammlung erstellen',
+      },
 
       // Admin Commands
-      adminCustomFields: { label: 'Benutzerdefinierte Felder', description: 'Felddefinitionen verwalten' },
-      adminScreens: { label: 'Bildschirmverwaltung', description: 'Formularbildschirme und Layouts konfigurieren' },
-      adminHierarchyLevels: { label: 'Hierarchieebenen', description: 'Vorgangs-Hierarchieebenen konfigurieren' },
-      adminItemTypes: { label: 'Vorgangstypen', description: 'Vorgangstypen mit Icons und Farben verwalten' },
-      adminPriorities: { label: 'Prioritäten', description: 'Prioritätsstufen mit Icons und Farben konfigurieren' },
-      adminConfigSets: { label: 'Konfigurationssets', description: 'Konfigurationssets mit Workflows und Bildschirmen verwalten' },
+      adminCustomFields: {
+        label: 'Benutzerdefinierte Felder',
+        description: 'Felddefinitionen verwalten',
+      },
+      adminScreens: {
+        label: 'Bildschirmverwaltung',
+        description: 'Formularbildschirme und Layouts konfigurieren',
+      },
+      adminHierarchyLevels: {
+        label: 'Hierarchieebenen',
+        description: 'Vorgangs-Hierarchieebenen konfigurieren',
+      },
+      adminItemTypes: {
+        label: 'Vorgangstypen',
+        description: 'Vorgangstypen mit Icons und Farben verwalten',
+      },
+      adminPriorities: {
+        label: 'Prioritäten',
+        description: 'Prioritätsstufen mit Icons und Farben konfigurieren',
+      },
+      adminConfigSets: {
+        label: 'Konfigurationssets',
+        description: 'Konfigurationssets mit Workflows und Bildschirmen verwalten',
+      },
       adminStatuses: { label: 'Status', description: 'Einzelne Vorgangsstatus verwalten' },
-      adminStatusCategories: { label: 'Statuskategorien', description: 'Statuskategorien und Farben verwalten' },
-      adminWorkflows: { label: 'Workflow-Builder', description: 'Workflow-Übergänge entwerfen und verwalten' },
-      adminLinkTypes: { label: 'Verknüpfungstypen', description: 'Verknüpfungstypen zwischen Vorgängen verwalten' },
-      adminScmProviders: { label: 'SCM-Anbieter', description: 'GitHub, GitLab, Gitea und Bitbucket Integrationen konfigurieren' },
-      adminAttachments: { label: 'Anhänge', description: 'Anhangseinstellungen und Konfiguration verwalten' },
-      adminModules: { label: 'Moduleinstellungen', description: 'Zeiterfassung und Testmanagement-Module aktivieren oder deaktivieren' },
-      adminThemes: { label: 'Design-Einstellungen', description: 'Anwendungsthemen und Erscheinungsbild verwalten' },
-      adminUsers: { label: 'Benutzerverwaltung', description: 'Benutzer, Rollen und Berechtigungen verwalten' },
-      adminGroups: { label: 'Gruppenverwaltung', description: 'Benutzergruppen und Mitgliedschaften verwalten' },
-      adminPermissions: { label: 'Berechtigungen', description: 'Benutzerberechtigungen und Zugriffskontrolle verwalten' },
-      adminPermissionSets: { label: 'Berechtigungssets', description: 'Berechtigungsbündel für Konfigurationssets verwalten' },
-      adminWorkspaceRoles: { label: 'Arbeitsbereichsrollen', description: 'Arbeitsbereichsrollen und ihre Berechtigungen anzeigen' },
-      adminSso: { label: 'Single Sign-On', description: 'OIDC-Identitätsanbieter für SSO konfigurieren' },
-      adminSecurity: { label: 'Sicherheitseinstellungen', description: 'Kalender-Feeds und Plugin-Ausführung konfigurieren' },
-      adminSystemImport: { label: 'Systemimport', description: 'Daten aus anderen Systemen importieren' },
-      adminAssets: { label: 'Asset-Verwaltung', description: 'Asset-Typen und Kategorien konfigurieren' },
-      adminWorkspaces: { label: 'Arbeitsbereiche Admin', description: 'Arbeitsbereiche und Einstellungen verwalten' },
-      adminNotifications: { label: 'Benachrichtigungseinstellungen', description: 'Benachrichtigungskonfigurationen verwalten' },
+      adminStatusCategories: {
+        label: 'Statuskategorien',
+        description: 'Statuskategorien und Farben verwalten',
+      },
+      adminWorkflows: {
+        label: 'Workflow-Builder',
+        description: 'Workflow-Übergänge entwerfen und verwalten',
+      },
+      adminLinkTypes: {
+        label: 'Verknüpfungstypen',
+        description: 'Verknüpfungstypen zwischen Vorgängen verwalten',
+      },
+      adminScmProviders: {
+        label: 'SCM-Anbieter',
+        description: 'GitHub, GitLab, Gitea und Bitbucket Integrationen konfigurieren',
+      },
+      adminAttachments: {
+        label: 'Anhänge',
+        description: 'Anhangseinstellungen und Konfiguration verwalten',
+      },
+      adminModules: {
+        label: 'Moduleinstellungen',
+        description: 'Zeiterfassung und Testmanagement-Module aktivieren oder deaktivieren',
+      },
+      adminThemes: {
+        label: 'Design-Einstellungen',
+        description: 'Anwendungsthemen und Erscheinungsbild verwalten',
+      },
+      adminUsers: {
+        label: 'Benutzerverwaltung',
+        description: 'Benutzer, Rollen und Berechtigungen verwalten',
+      },
+      adminGroups: {
+        label: 'Gruppenverwaltung',
+        description: 'Benutzergruppen und Mitgliedschaften verwalten',
+      },
+      adminPermissions: {
+        label: 'Berechtigungen',
+        description: 'Benutzerberechtigungen und Zugriffskontrolle verwalten',
+      },
+      adminPermissionSets: {
+        label: 'Berechtigungssets',
+        description: 'Berechtigungsbündel für Konfigurationssets verwalten',
+      },
+      adminWorkspaceRoles: {
+        label: 'Arbeitsbereichsrollen',
+        description: 'Arbeitsbereichsrollen und ihre Berechtigungen anzeigen',
+      },
+      adminSso: {
+        label: 'Single Sign-On',
+        description: 'OIDC-Identitätsanbieter für SSO konfigurieren',
+      },
+      adminSecurity: {
+        label: 'Sicherheitseinstellungen',
+        description: 'Kalender-Feeds und Plugin-Ausführung konfigurieren',
+      },
+      adminSystemImport: {
+        label: 'Systemimport',
+        description: 'Daten aus anderen Systemen importieren',
+      },
+      adminAssets: {
+        label: 'Asset-Verwaltung',
+        description: 'Asset-Typen und Kategorien konfigurieren',
+      },
+      adminWorkspaces: {
+        label: 'Arbeitsbereiche Admin',
+        description: 'Arbeitsbereiche und Einstellungen verwalten',
+      },
+      adminNotifications: {
+        label: 'Benachrichtigungseinstellungen',
+        description: 'Benachrichtigungskonfigurationen verwalten',
+      },
 
       // System Commands
-      quitApp: { label: 'Anwendung beenden', description: 'Anwendungsserver ordnungsgemäß herunterfahren' },
+      quitApp: {
+        label: 'Anwendung beenden',
+        description: 'Anwendungsserver ordnungsgemäß herunterfahren',
+      },
 
       // Other
       portal: { label: 'Portal', description: 'Kundenportal-Verwaltung' },
@@ -118,9 +229,15 @@ export default {
       customers: { label: 'Kunden', description: 'Kundenorganisationen verwalten' },
 
       // Dynamic workspace commands
-      goToWorkspace: { label: 'Gehe zu {name}', description: 'Zum Arbeitsbereich {name} navigieren' },
-      workspaceOverview: { label: '{name} Übersicht', description: 'Arbeitsbereich-Dashboard mit Statistiken und Diagrammen anzeigen' }
-    }
+      goToWorkspace: {
+        label: 'Gehe zu {name}',
+        description: 'Zum Arbeitsbereich {name} navigieren',
+      },
+      workspaceOverview: {
+        label: '{name} Übersicht',
+        description: 'Arbeitsbereich-Dashboard mit Statistiken und Diagrammen anzeigen',
+      },
+    },
   },
 
   dashboard: {
@@ -183,7 +300,7 @@ export default {
     dueIn: 'Fällig in {days} Tagen',
     dueToday: 'Heute fällig',
     overdue: '{days} Tage überfällig',
-    done: '{done}/{total} erledigt'
+    done: '{done}/{total} erledigt',
   },
 
   search: {
@@ -198,21 +315,25 @@ export default {
     saveSearch: 'Suche speichern',
     clearSearch: 'Suche löschen',
     advancedSearch: 'Erweiterte Suche',
-    recentSearches: 'Letzte Suchen'
+    recentSearches: 'Letzte Suchen',
   },
 
   about: {
     title: 'Über Windshift',
     subtitle: 'Eine umfassende Arbeitsmanagement-Plattform für moderne Teams',
     whatIs: 'Was ist Windshift?',
-    description: 'Windshift ist eine leistungsstarke Arbeitsmanagement-Anwendung, die Projektverfolgung, Testmanagement, Zeiterfassung und Team-Zusammenarbeit in einer einheitlichen Plattform vereint. Mit modernen Technologien entwickelt und auf Flexibilität ausgelegt, passt sie sich dem individuellen Workflow Ihres Teams an.',
+    description:
+      'Windshift ist eine leistungsstarke Arbeitsmanagement-Anwendung, die Projektverfolgung, Testmanagement, Zeiterfassung und Team-Zusammenarbeit in einer einheitlichen Plattform vereint. Mit modernen Technologien entwickelt und auf Flexibilität ausgelegt, passt sie sich dem individuellen Workflow Ihres Teams an.',
     keyFeatures: 'Hauptfunktionen',
     projectManagement: 'Projektmanagement',
-    projectManagementDesc: 'Organisieren Sie Vorgänge hierarchisch mit benutzerdefinierten Feldern, Workflows und Statusverfolgung.',
+    projectManagementDesc:
+      'Organisieren Sie Vorgänge hierarchisch mit benutzerdefinierten Feldern, Workflows und Statusverfolgung.',
     testManagement: 'Testmanagement',
-    testManagementDesc: 'Erstellen Sie Testfälle, organisieren Sie Testpläne, führen Sie Testläufe durch und verfolgen Sie Fehler effizient.',
+    testManagementDesc:
+      'Erstellen Sie Testfälle, organisieren Sie Testpläne, führen Sie Testläufe durch und verfolgen Sie Fehler effizient.',
     timeTracking: 'Zeiterfassung',
-    timeTrackingDesc: 'Verfolgen Sie die Zeit für Projekte und Aufgaben mit detaillierten Berichten und Analysen.',
+    timeTrackingDesc:
+      'Verfolgen Sie die Zeit für Projekte und Aufgaben mit detaillierten Berichten und Analysen.',
     builtWith: 'Erstellt mit',
     frontend: 'Frontend',
     backend: 'Backend',
@@ -223,12 +344,13 @@ export default {
     builtBy: 'Erstellt mit',
     builtByTeam: 'vom Entwicklungsteam',
     reportIssues: 'Probleme melden',
-    getStarted: 'Loslegen'
+    getStarted: 'Loslegen',
   },
 
   onboarding: {
     welcomeTo: 'Willkommen bei Windshift',
-    getStartedMessage: 'Lassen Sie uns mit der Erstellung Ihres ersten Arbeitsbereichs und Vorgangs beginnen',
+    getStartedMessage:
+      'Lassen Sie uns mit der Erstellung Ihres ersten Arbeitsbereichs und Vorgangs beginnen',
     progress: 'Fortschritt',
     completed: 'abgeschlossen',
     of: 'von',
@@ -239,6 +361,6 @@ export default {
     trackTasks: 'Aufgaben, Fehler, Features und mehr verfolgen',
     createWorkItemBtn: 'Vorgang erstellen',
     dismissAssistant: 'Assistent schließen',
-    dismissOnboarding: 'Einführung schließen'
-  }
+    dismissOnboarding: 'Einführung schließen',
+  },
 };

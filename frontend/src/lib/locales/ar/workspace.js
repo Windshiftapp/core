@@ -50,8 +50,8 @@ export default {
       noOrganisationsFound: 'لم يتم العثور على مؤسسات',
       noCustomersFound: 'لم يتم العثور على عملاء',
       unassigned: 'غير معين',
-      allCustomersAssigned: 'تم تعيين جميع العملاء للمؤسسات'
-    }
+      allCustomersAssigned: 'تم تعيين جميع العملاء للمؤسسات',
+    },
   },
 
   items: {
@@ -94,7 +94,7 @@ export default {
     assignedToYou: 'معين إليك',
     createdByYou: 'تم إنشاؤه بواسطتك',
     recentlyViewed: 'شوهد مؤخراً',
-    recentlyUpdated: 'تم التحديث مؤخراً'
+    recentlyUpdated: 'تم التحديث مؤخراً',
   },
 
   comments: {
@@ -119,6 +119,6 @@ export default {
     addLink: 'إضافة رابط',
     removeLink: 'إزالة الرابط',
     linkText: 'نص الرابط',
-    linkUrl: 'الرابط'
-  }
+    linkUrl: 'الرابط',
+  },
 };

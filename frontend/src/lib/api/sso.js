@@ -11,30 +11,35 @@ export const sso = {
     if (rememberMe) params.append('remember_me', 'true');
     const query = params.toString();
     // This returns the URL to redirect to - the actual redirect is handled by browser
-    return `/api/sso/login/${slug}${query ? '?' + query : ''}`;
+    return `/api/sso/login/${slug}${query ? `?${query}` : ''}`;
   },
 
   // Admin endpoints (require system.admin)
   listProviders: () => fetchAPI('/sso/providers'),
   getProvider: (id) => fetchAPI(`/sso/providers/${id}`),
-  createProvider: (data) => fetchAPI('/sso/providers', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  updateProvider: (id, data) => fetchAPI(`/sso/providers/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  }),
-  deleteProvider: (id) => fetchAPI(`/sso/providers/${id}`, {
-    method: 'DELETE',
-  }),
-  testProvider: (id) => fetchAPI(`/sso/providers/${id}/test`, {
-    method: 'POST',
-  }),
+  createProvider: (data) =>
+    fetchAPI('/sso/providers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateProvider: (id, data) =>
+    fetchAPI(`/sso/providers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteProvider: (id) =>
+    fetchAPI(`/sso/providers/${id}`, {
+      method: 'DELETE',
+    }),
+  testProvider: (id) =>
+    fetchAPI(`/sso/providers/${id}/test`, {
+      method: 'POST',
+    }),
 
   // User external accounts (require auth)
   getExternalAccounts: () => fetchAPI('/sso/external-accounts'),
-  unlinkExternalAccount: (id) => fetchAPI(`/sso/external-accounts/${id}`, {
-    method: 'DELETE',
-  }),
+  unlinkExternalAccount: (id) =>
+    fetchAPI(`/sso/external-accounts/${id}`, {
+      method: 'DELETE',
+    }),
 };

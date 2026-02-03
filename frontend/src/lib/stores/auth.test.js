@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { get } from 'svelte/store';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the api module before importing authStore
 vi.mock('../api.js', () => ({
@@ -15,9 +15,9 @@ vi.mock('../api.js', () => ({
   },
 }));
 
+import { api } from '../api.js';
 // Import after mocking
 import { authStore } from './auth.svelte.js';
-import { api } from '../api.js';
 
 describe('authStore', () => {
   beforeEach(() => {

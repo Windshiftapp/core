@@ -24,7 +24,7 @@ export function useItemLinks(getItemId, onError) {
     link_type_id: null,
     target_id: null,
     target_title: '',
-    target_type: 'item'
+    target_type: 'item',
   });
 
   // Search state for link targets
@@ -86,7 +86,7 @@ export function useItemLinks(getItemId, onError) {
       if (addLinkData.target_type === 'item') {
         const result = await api.items.search({ q: query, limit: 10 });
         // Filter out the current item
-        searchResults = (result || []).filter(item => item.id !== itemId);
+        searchResults = (result || []).filter((item) => item.id !== itemId);
       } else if (addLinkData.target_type === 'test_case') {
         const result = await api.tests.testCases.search(query);
         searchResults = result || [];
@@ -112,7 +112,7 @@ export function useItemLinks(getItemId, onError) {
       await api.items.addLink(itemId, {
         link_type_id: addLinkData.link_type_id,
         target_id: addLinkData.target_id,
-        target_type: addLinkData.target_type
+        target_type: addLinkData.target_type,
       });
 
       // Reload links
@@ -159,7 +159,7 @@ export function useItemLinks(getItemId, onError) {
       link_type_id: null,
       target_id: null,
       target_title: '',
-      target_type: 'item'
+      target_type: 'item',
     };
     searchResults = [];
     searchQuery = '';
@@ -191,7 +191,7 @@ export function useItemLinks(getItemId, onError) {
    * Gets links filtered by type.
    */
   function getLinksByType(typeId) {
-    return itemLinks.filter(link => link.link_type_id === typeId);
+    return itemLinks.filter((link) => link.link_type_id === typeId);
   }
 
   /**
@@ -206,19 +206,41 @@ export function useItemLinks(getItemId, onError) {
 
   return {
     // State getters
-    get itemLinks() { return itemLinks; },
-    get linkTypes() { return linkTypes; },
-    get loadingLinks() { return loadingLinks; },
-    get showAddLinkForm() { return showAddLinkForm; },
-    get addLinkData() { return addLinkData; },
-    get searchResults() { return searchResults; },
-    get searchQuery() { return searchQuery; },
-    get searching() { return searching; },
+    get itemLinks() {
+      return itemLinks;
+    },
+    get linkTypes() {
+      return linkTypes;
+    },
+    get loadingLinks() {
+      return loadingLinks;
+    },
+    get showAddLinkForm() {
+      return showAddLinkForm;
+    },
+    get addLinkData() {
+      return addLinkData;
+    },
+    get searchResults() {
+      return searchResults;
+    },
+    get searchQuery() {
+      return searchQuery;
+    },
+    get searching() {
+      return searching;
+    },
 
     // State setters
-    set showAddLinkForm(value) { showAddLinkForm = value; },
-    set addLinkData(value) { addLinkData = value; },
-    set searchQuery(value) { searchQuery = value; },
+    set showAddLinkForm(value) {
+      showAddLinkForm = value;
+    },
+    set addLinkData(value) {
+      addLinkData = value;
+    },
+    set searchQuery(value) {
+      searchQuery = value;
+    },
 
     // Methods
     loadLinkTypes,
@@ -231,6 +253,6 @@ export function useItemLinks(getItemId, onError) {
     closeAddLinkForm,
     updateAddLinkField,
     getLinksByType,
-    resetAll
+    resetAll,
   };
 }

@@ -46,7 +46,6 @@ export default {
     selectAll: 'Alle auswählen',
     deselectAll: 'Alle abwählen',
     all: 'Alle',
-    none: 'Keine',
     enable: 'Aktivieren',
     disable: 'Deaktivieren',
     enabled: 'Aktiviert',
@@ -176,7 +175,7 @@ export default {
     noProject: 'Kein Projekt',
     global: 'Global',
     root: 'Stammordner',
-    saved: 'Erfolgreich gespeichert'
+    saved: 'Erfolgreich gespeichert',
   },
 
   // Toast notifications
@@ -190,7 +189,7 @@ export default {
     created: 'Erfolgreich erstellt',
     updated: 'Erfolgreich aktualisiert',
     copied: 'In Zwischenablage kopiert',
-    failed: 'Vorgang fehlgeschlagen'
+    failed: 'Vorgang fehlgeschlagen',
   },
 
   // Backend error codes
@@ -210,12 +209,13 @@ export default {
     CONFLICT: 'Diese Ressource existiert bereits.',
     ALREADY_EXISTS: 'Eine Ressource mit dieser Kennung existiert bereits.',
     RATE_LIMITED: 'Zu viele Anfragen. Bitte warten Sie und versuchen Sie es erneut.',
-    INTERNAL_ERROR: 'Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.',
+    INTERNAL_ERROR:
+      'Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.',
     SERVICE_UNAVAILABLE: 'Der Dienst ist vorübergehend nicht verfügbar.',
     NETWORK_ERROR: 'Netzwerkfehler. Bitte überprüfen Sie Ihre Verbindung.',
     TIMEOUT: 'Die Anfrage ist abgelaufen. Bitte versuchen Sie es erneut.',
     UNKNOWN: 'Ein unbekannter Fehler ist aufgetreten.',
-    generic: 'Etwas ist schief gelaufen. Bitte versuchen Sie es erneut.'
+    generic: 'Etwas ist schief gelaufen. Bitte versuchen Sie es erneut.',
   },
 
   // Validation messages
@@ -235,7 +235,7 @@ export default {
     emailTaken: 'Diese E-Mail-Adresse wird bereits verwendet',
     usernameTaken: 'Dieser Benutzername ist bereits vergeben',
     slugInvalid: 'Nur Kleinbuchstaben, Zahlen und Bindestriche erlaubt',
-    fillRequired: 'Bitte füllen Sie alle Pflichtfelder aus'
+    fillRequired: 'Bitte füllen Sie alle Pflichtfelder aus',
   },
 
   // Placeholders
@@ -254,7 +254,7 @@ export default {
     channelDescription: 'Kurze Beschreibung des Kanalzwecks',
     columnName: 'Spaltenname',
     typeName: "'{name}' hier eingeben",
-    searchWorkItems: 'Vorgänge suchen...'
+    searchWorkItems: 'Vorgänge suchen...',
   },
 
   // Empty States
@@ -265,6 +265,6 @@ export default {
     noFieldChanges: 'Keine Feldänderungen erkannt',
     noRequirements: 'Keine Anforderungen konfiguriert',
     configureFilter: 'Filter konfigurieren, um Einträge zu sehen',
-    createToStart: '{item} erstellen, um zu beginnen'
-  }
+    createToStart: '{item} erstellen, um zu beginnen',
+  },
 };

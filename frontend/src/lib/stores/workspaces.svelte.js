@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { derived, writable } from 'svelte/store';
 import { api } from '../api.js';
 
 // Current workspace store - automatically syncs with route
@@ -11,7 +11,7 @@ function createCurrentWorkspaceStore() {
 
     // Patch workspace with partial updates (no API call)
     patch(updates) {
-      update(ws => ws ? { ...ws, ...updates } : null);
+      update((ws) => (ws ? { ...ws, ...updates } : null));
     },
 
     // Load workspace by ID
@@ -42,7 +42,7 @@ function createCurrentWorkspaceStore() {
     clear() {
       set(null);
       lastWorkspaceId = null;
-    }
+    },
   };
 }
 
@@ -54,8 +54,8 @@ function createWorkspacesStore() {
   const loading = writable(false);
 
   // Derived store for regular (non-personal) workspaces
-  const regularWorkspaces = derived(workspaces, $workspaces =>
-    $workspaces.filter(ws => !ws.is_personal)
+  const regularWorkspaces = derived(workspaces, ($workspaces) =>
+    $workspaces.filter((ws) => !ws.is_personal)
   );
 
   // Create a derived store that combines all state for easy subscription
@@ -67,7 +67,7 @@ function createWorkspacesStore() {
       personalWorkspace: $personalWorkspace,
       loaded: $loaded,
       loading: $loading,
-      regularWorkspaces: $regularWorkspaces
+      regularWorkspaces: $regularWorkspaces,
     })
   );
 
@@ -115,19 +115,17 @@ function createWorkspacesStore() {
 
     // Add a new workspace to the store
     add(workspace) {
-      workspaces.update(ws => [...ws, workspace]);
+      workspaces.update((ws) => [...ws, workspace]);
     },
 
     // Update an existing workspace in the store
     updateWorkspace(id, updates) {
-      workspaces.update(ws =>
-        ws.map(w => w.id === id ? { ...w, ...updates } : w)
-      );
+      workspaces.update((ws) => ws.map((w) => (w.id === id ? { ...w, ...updates } : w)));
     },
 
     // Remove a workspace from the store
     remove(id) {
-      workspaces.update(ws => ws.filter(w => w.id !== id));
+      workspaces.update((ws) => ws.filter((w) => w.id !== id));
     },
 
     // Clear the store
@@ -136,7 +134,7 @@ function createWorkspacesStore() {
       personalWorkspace.set(null);
       loaded.set(false);
       loading.set(false);
-    }
+    },
   };
 }
 

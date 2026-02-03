@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 /**
  * Page Object for Work Item Management
@@ -7,10 +7,12 @@ export class ItemPage {
   constructor(private page: Page) {}
 
   // Selectors
-  readonly createItemButton = 'button:has-text("Create"), button:has-text("New Item"), button:has-text("Add Item"), [data-testid="create-item"]';
+  readonly createItemButton =
+    'button:has-text("Create"), button:has-text("New Item"), button:has-text("Add Item"), [data-testid="create-item"]';
   readonly itemModal = 'div[role="dialog"], .modal, .item-modal';
   readonly titleInput = 'input[name="title"], input[placeholder*="title"]';
-  readonly descriptionInput = 'textarea[name="description"], textarea[placeholder*="description"], .ProseMirror';
+  readonly descriptionInput =
+    'textarea[name="description"], textarea[placeholder*="description"], .ProseMirror';
   readonly statusSelect = 'select[name="status"], [name="status"]';
   readonly prioritySelect = 'select[name="priority"], [name="priority"]';
   readonly assigneeSelect = 'select[name="assignee"], [name="assignee"]';
@@ -84,13 +86,16 @@ export class ItemPage {
   /**
    * Create a new item
    */
-  async createItem(workspaceKey: string, data: {
-    title: string;
-    description?: string;
-    status?: string;
-    priority?: string;
-    parent?: string;
-  }) {
+  async createItem(
+    workspaceKey: string,
+    data: {
+      title: string;
+      description?: string;
+      status?: string;
+      priority?: string;
+      parent?: string;
+    }
+  ) {
     await this.gotoWorkspaceBacklog(workspaceKey);
     await this.clickCreate();
     await this.fillForm(data);
@@ -104,7 +109,9 @@ export class ItemPage {
    * Find item by title
    */
   async findItemByTitle(title: string) {
-    return this.page.locator(`${this.itemRow}:has-text("${title}"), ${this.itemCard}:has-text("${title}")`).first();
+    return this.page
+      .locator(`${this.itemRow}:has-text("${title}"), ${this.itemCard}:has-text("${title}")`)
+      .first();
   }
 
   /**
@@ -134,12 +141,15 @@ export class ItemPage {
   /**
    * Edit an item
    */
-  async editItem(currentTitle: string, newData: {
-    title?: string;
-    description?: string;
-    status?: string;
-    priority?: string;
-  }) {
+  async editItem(
+    currentTitle: string,
+    newData: {
+      title?: string;
+      description?: string;
+      status?: string;
+      priority?: string;
+    }
+  ) {
     // Find and click the item
     await this.clickItem(currentTitle);
 
@@ -189,7 +199,9 @@ export class ItemPage {
    * Verify item does not exist
    */
   async verifyItemDoesNotExist(title: string) {
-    const item = this.page.locator(`${this.itemRow}:has-text("${title}"), ${this.itemCard}:has-text("${title}")`);
+    const item = this.page.locator(
+      `${this.itemRow}:has-text("${title}"), ${this.itemCard}:has-text("${title}")`
+    );
     await expect(item).not.toBeVisible({ timeout: 5000 });
   }
 
@@ -219,12 +231,15 @@ export class ItemPage {
   /**
    * Create child item
    */
-  async createChildItem(parentTitle: string, childData: {
-    title: string;
-    description?: string;
-    status?: string;
-    priority?: string;
-  }) {
+  async createChildItem(
+    parentTitle: string,
+    childData: {
+      title: string;
+      description?: string;
+      status?: string;
+      priority?: string;
+    }
+  ) {
     // Navigate to parent item
     await this.clickItem(parentTitle);
 

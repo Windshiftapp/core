@@ -7,7 +7,14 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!**/dist", "!**/node_modules", "!**/.svelte-kit", "!**/build"]
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/node_modules",
+      "!**/.svelte-kit",
+      "!**/build",
+      "!**/*.svelte"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -27,7 +34,8 @@
         "noUselessLabel": "error",
         "noUselessRename": "error",
         "noAdjacentSpacesInRegex": "error",
-        "noArguments": "error"
+        "noArguments": "error",
+        "noStaticOnlyClass": "off"
       },
       "correctness": {
         "noConstAssign": "error",
@@ -56,7 +64,8 @@
       },
       "style": {
         "useConst": "off",
-        "useTemplate": "warn"
+        "useTemplate": "warn",
+        "noDescendingSpecificity": "off"
       },
       "suspicious": {
         "noAsyncPromiseExecutor": "error",
@@ -70,7 +79,7 @@
         "noDuplicateClassMembers": "error",
         "noDuplicateObjectKeys": "error",
         "noDuplicateParameters": "error",
-        "noEmptyBlockStatements": "warn",
+        "noEmptyBlockStatements": "off",
         "noExplicitAny": "off",
         "noExtraNonNullAssertion": "error",
         "noFallthroughSwitchClause": "error",
@@ -83,11 +92,14 @@
         "noShadowRestrictedNames": "error",
         "noUnsafeNegation": "error",
         "noWith": "error",
-        "noVar": "warn"
+        "noVar": "warn",
+        "noAssignInExpressions": "off",
+        "useIterableCallbackReturn": "off"
       }
     }
   },
   "javascript": {
+    "globals": ["vi"],
     "formatter": {
       "quoteStyle": "single",
       "jsxQuoteStyle": "double",
@@ -98,5 +110,30 @@
       "bracketSameLine": false,
       "quoteProperties": "asNeeded"
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["e2e/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedFunctionParameters": "off"
+          },
+          "suspicious": {
+            "noImplicitAnyLet": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/*.test.js", "**/*.test.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noEmptyBlockStatements": "off"
+          }
+        }
+      }
+    }
+  ]
 }

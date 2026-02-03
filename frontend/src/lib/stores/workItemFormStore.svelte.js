@@ -4,12 +4,11 @@
  * Centralizes form data, validation, data loading, and selection persistence.
  */
 import { api } from '../api.js';
-import { workspacesStore } from './workspaces.svelte.js';
 import { getSystemFieldName } from './fieldConfig.js';
 
 const STORAGE_KEYS = {
   workspace: 'vertex_create_modal_workspace',
-  itemType: 'vertex_create_modal_item_type'
+  itemType: 'vertex_create_modal_item_type',
 };
 
 // System fields that are auto-managed and should not be shown in create form
@@ -25,7 +24,7 @@ class WorkItemFormStore {
     priority_id: null,
     milestone_id: null,
     assignee_id: null,
-    item_type_id: null
+    item_type_id: null,
   });
   customFieldValues = $state({});
   validationErrors = $state([]);
@@ -81,7 +80,7 @@ class WorkItemFormStore {
    * Get the currently selected item type object.
    */
   get selectedItemType() {
-    return this.availableItemTypes.find(t => t.id === this.formData.item_type_id) || null;
+    return this.availableItemTypes.find((t) => t.id === this.formData.item_type_id) || null;
   }
 
   /**
@@ -97,23 +96,23 @@ class WorkItemFormStore {
    * Get the currently selected assignee object.
    */
   get selectedAssignee() {
-    return this.users.find(u => u.id === this.formData.assignee_id) || null;
+    return this.users.find((u) => u.id === this.formData.assignee_id) || null;
   }
 
   /**
    * Get the currently selected milestone object.
    */
   get selectedMilestone() {
-    return this.milestones.find(m => m.id === this.formData.milestone_id) || null;
+    return this.milestones.find((m) => m.id === this.formData.milestone_id) || null;
   }
 
   /**
    * Get non-required custom fields for the overflow menu.
    */
   get nonRequiredCustomFields() {
-    return this.customFields.filter(cf => {
+    return this.customFields.filter((cf) => {
       const screenField = this.screenFields.find(
-        f => f.field_type === 'custom' && parseInt(f.field_identifier) === cf.id
+        (f) => f.field_type === 'custom' && parseInt(f.field_identifier, 10) === cf.id
       );
       return !screenField?.is_required;
     });
@@ -123,10 +122,11 @@ class WorkItemFormStore {
    * Get required system fields that should be shown as full inputs.
    */
   get requiredSystemFields() {
-    return this.screenFields.filter(f =>
-      f.is_required &&
-      f.field_type === 'system' &&
-      !EXCLUDED_SYSTEM_FIELDS.includes(f.field_identifier)
+    return this.screenFields.filter(
+      (f) =>
+        f.is_required &&
+        f.field_type === 'system' &&
+        !EXCLUDED_SYSTEM_FIELDS.includes(f.field_identifier)
     );
   }
 
@@ -134,9 +134,9 @@ class WorkItemFormStore {
    * Get required custom fields that should be shown as full inputs.
    */
   get requiredCustomFields() {
-    return this.customFields.filter(cf => {
+    return this.customFields.filter((cf) => {
       const screenField = this.screenFields.find(
-        f => f.field_type === 'custom' && parseInt(f.field_identifier) === cf.id
+        (f) => f.field_type === 'custom' && parseInt(f.field_identifier, 10) === cf.id
       );
       return screenField?.is_required === true;
     });
@@ -206,7 +206,9 @@ class WorkItemFormStore {
       this.milestones = this.allMilestones;
     } else {
       const allowedCategoryIds = this.workspaceDetails.milestone_categories;
-      this.milestones = this.allMilestones.filter(m => allowedCategoryIds.includes(m.category_id));
+      this.milestones = this.allMilestones.filter((m) =>
+        allowedCategoryIds.includes(m.category_id)
+      );
     }
   }
 
@@ -237,7 +239,7 @@ class WorkItemFormStore {
     try {
       const [itemTypesResult, hierarchyLevelsResult] = await Promise.all([
         api.itemTypes.getAll(),
-        api.hierarchyLevels.getAll()
+        api.hierarchyLevels.getAll(),
       ]);
       this.itemTypes = itemTypesResult || [];
       this.hierarchyLevels = hierarchyLevelsResult || [];
@@ -266,8 +268,8 @@ class WorkItemFormStore {
 
     // Apply config set item type restrictions
     if (this.currentConfigSet?.item_type_configs?.length > 0) {
-      const allowedItemTypeIds = this.currentConfigSet.item_type_configs.map(c => c.item_type_id);
-      baseTypes = baseTypes.filter(t => allowedItemTypeIds.includes(t.id));
+      const allowedItemTypeIds = this.currentConfigSet.item_type_configs.map((c) => c.item_type_id);
+      baseTypes = baseTypes.filter((t) => allowedItemTypeIds.includes(t.id));
     }
 
     this.availableItemTypes = baseTypes.sort(
@@ -275,7 +277,10 @@ class WorkItemFormStore {
     );
 
     // Auto-select first item type if current is invalid
-    if (this.availableItemTypes.length > 0 && !this.availableItemTypes.find(t => t.id === this.formData.item_type_id)) {
+    if (
+      this.availableItemTypes.length > 0 &&
+      !this.availableItemTypes.find((t) => t.id === this.formData.item_type_id)
+    ) {
       this.formData.item_type_id = this.availableItemTypes[0].id;
     }
   }
@@ -318,7 +323,9 @@ class WorkItemFormStore {
    */
   #resolveCreateScreenId(itemTypeId) {
     if (this.currentConfigSet) {
-      const itemTypeConfig = this.currentConfigSet.item_type_configs?.find(c => c.item_type_id === itemTypeId);
+      const itemTypeConfig = this.currentConfigSet.item_type_configs?.find(
+        (c) => c.item_type_id === itemTypeId
+      );
       if (itemTypeConfig?.create_screen_id) return itemTypeConfig.create_screen_id;
       if (this.currentConfigSet.create_screen_id) return this.currentConfigSet.create_screen_id;
     }
@@ -338,18 +345,20 @@ class WorkItemFormStore {
       this.screenFields = fields || [];
 
       this.screenSystemFields = this.screenFields
-        .filter(field => field.field_type === 'system')
-        .map(field => field.field_identifier);
+        .filter((field) => field.field_type === 'system')
+        .map((field) => field.field_identifier);
 
       const customFieldIds = this.screenFields
-        .filter(field => field.field_type === 'custom')
-        .map(field => parseInt(field.field_identifier));
+        .filter((field) => field.field_type === 'custom')
+        .map((field) => parseInt(field.field_identifier, 10));
 
-      const filteredCustomFields = this.allCustomFields.filter(field => customFieldIds.includes(field.id));
+      const filteredCustomFields = this.allCustomFields.filter((field) =>
+        customFieldIds.includes(field.id)
+      );
 
       // Reset custom field values for new fields
       this.customFieldValues = {};
-      filteredCustomFields.forEach(field => {
+      filteredCustomFields.forEach((field) => {
         this.customFieldValues[field.id] = '';
       });
 
@@ -373,7 +382,7 @@ class WorkItemFormStore {
    * Check if a system field is required.
    */
   isFieldRequired(fieldIdentifier) {
-    const screenField = this.screenFields.find(f => f.field_identifier === fieldIdentifier);
+    const screenField = this.screenFields.find((f) => f.field_identifier === fieldIdentifier);
     return screenField?.is_required === true;
   }
 
@@ -476,7 +485,7 @@ class WorkItemFormStore {
    */
   applyStoredWorkspace(workspaces) {
     if (!this.formData.workspace_id && this.storedWorkspaceId && workspaces.length > 0) {
-      const storedWorkspace = workspaces.find(w => w.id === this.storedWorkspaceId);
+      const storedWorkspace = workspaces.find((w) => w.id === this.storedWorkspaceId);
       if (storedWorkspace) {
         this.setWorkspace(storedWorkspace);
       }
@@ -488,8 +497,15 @@ class WorkItemFormStore {
    */
   applyStoredItemType() {
     // Don't apply stored item type when creating child items
-    if (this.storedItemTypeId && this.availableItemTypes.length > 0 && !this.storedItemTypeApplied && !this.restrictedItemTypes) {
-      const storedItemType = this.availableItemTypes.find(type => type.id === this.storedItemTypeId);
+    if (
+      this.storedItemTypeId &&
+      this.availableItemTypes.length > 0 &&
+      !this.storedItemTypeApplied &&
+      !this.restrictedItemTypes
+    ) {
+      const storedItemType = this.availableItemTypes.find(
+        (type) => type.id === this.storedItemTypeId
+      );
       if (storedItemType) {
         this.formData.item_type_id = storedItemType.id;
       }
@@ -501,10 +517,18 @@ class WorkItemFormStore {
    * Apply config set default item type if no valid stored type.
    */
   applyConfigSetDefault() {
-    if (this.availableItemTypes.length > 0 && this.currentConfigSet?.default_item_type_id && !this.configSetDefaultApplied) {
-      const hasValidStoredType = this.storedItemTypeId && this.availableItemTypes.find(type => type.id === this.storedItemTypeId);
+    if (
+      this.availableItemTypes.length > 0 &&
+      this.currentConfigSet?.default_item_type_id &&
+      !this.configSetDefaultApplied
+    ) {
+      const hasValidStoredType =
+        this.storedItemTypeId &&
+        this.availableItemTypes.find((type) => type.id === this.storedItemTypeId);
       if (!hasValidStoredType) {
-        const configDefault = this.availableItemTypes.find(type => type.id === this.currentConfigSet.default_item_type_id);
+        const configDefault = this.availableItemTypes.find(
+          (type) => type.id === this.currentConfigSet.default_item_type_id
+        );
         if (configDefault) {
           this.formData.item_type_id = configDefault.id;
         }
@@ -529,17 +553,17 @@ class WorkItemFormStore {
           if (EXCLUDED_SYSTEM_FIELDS.includes(identifier)) {
             continue;
           }
-          const fieldKeyMap = { 'title': 'name' };
+          const fieldKeyMap = { title: 'name' };
           const formKey = fieldKeyMap[identifier] || identifier;
           const value = this.formData[formKey] ?? this.formData[`${formKey}_id`];
           if (!value) {
             errors.push(`${getSystemFieldName(identifier)} is required`);
           }
         } else if (field.field_type === 'custom') {
-          const fieldId = parseInt(field.field_identifier);
+          const fieldId = parseInt(field.field_identifier, 10);
           const value = this.customFieldValues[fieldId];
           if (value === undefined || value === null || value === '') {
-            const fieldDef = this.allCustomFields.find(f => f.id === fieldId);
+            const fieldDef = this.allCustomFields.find((f) => f.id === fieldId);
             errors.push(`${fieldDef?.name || 'Custom field'} is required`);
           }
         }
@@ -567,7 +591,7 @@ class WorkItemFormStore {
       status: 'open',
       item_type_id: this.formData.item_type_id,
       parent_id: this.parentItem?.id || null,
-      custom_field_values: this.customFieldValues
+      custom_field_values: this.customFieldValues,
     };
   }
 
@@ -585,7 +609,7 @@ class WorkItemFormStore {
       priority_id: null,
       milestone_id: null,
       assignee_id: null,
-      item_type_id: this.availableItemTypes.length > 0 ? this.availableItemTypes[0].id : null
+      item_type_id: this.availableItemTypes.length > 0 ? this.availableItemTypes[0].id : null,
     };
     this.customFieldValues = {};
     this.validationErrors = [];
@@ -644,7 +668,7 @@ class WorkItemFormStore {
       this.loadUsers(),
       this.loadMilestones(),
       this.loadItemTypes(),
-      this.loadCustomFields()
+      this.loadCustomFields(),
     ]);
     this.#initialized = true;
   }

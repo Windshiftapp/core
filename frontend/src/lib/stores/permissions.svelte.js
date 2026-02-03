@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { derived, writable } from 'svelte/store';
 import { api } from '../api.js';
 import { authStore } from './auth.svelte.js';
 
@@ -25,14 +25,11 @@ function createPermissionStore() {
       if (user.is_system_admin) return true;
 
       // Check if user has any admin-related permissions
-      const adminPermissions = $permissions.filter(p =>
-        p.permission_key === 'system.admin' ||
-        p.permission_key.startsWith('admin.')
+      const adminPermissions = $permissions.filter(
+        (p) => p.permission_key === 'system.admin' || p.permission_key.startsWith('admin.')
       );
 
-      return adminPermissions.some(perm =>
-        $userPermissions.has(perm.id)
-      );
+      return adminPermissions.some((perm) => $userPermissions.has(perm.id));
     }
   );
 
@@ -49,22 +46,19 @@ function createPermissionStore() {
       if (user.is_system_admin) return true;
 
       // Check if user has customers.manage permission
-      const hasPermission = $permissions.some(p =>
-        p.permission_key === 'customers.manage' && $userPermissions.has(p.id)
+      const hasPermission = $permissions.some(
+        (p) => p.permission_key === 'customers.manage' && $userPermissions.has(p.id)
       );
 
       return hasPermission;
     }
   );
 
-  const canAccessAssets = derived(
-    [authStore, hasAssetSets],
-    ([$authStore, $hasAssetSets]) => {
-      const user = $authStore.currentUser;
-      if (!user) return false;
-      return $hasAssetSets;
-    }
-  );
+  const canAccessAssets = derived([authStore, hasAssetSets], ([$authStore, $hasAssetSets]) => {
+    const user = $authStore.currentUser;
+    if (!user) return false;
+    return $hasAssetSets;
+  });
 
   const canAccessPortalHub = derived(
     [authStore, hasActivePortals],
@@ -77,8 +71,28 @@ function createPermissionStore() {
 
   // Create a combined derived store for easy subscription
   const combined = derived(
-    [permissions, userPermissions, loading, error, isSystemAdmin, canAccessAdmin, canAccessCustomers, canAccessAssets, canAccessPortalHub],
-    ([$permissions, $userPermissions, $loading, $error, $isSystemAdmin, $canAccessAdmin, $canAccessCustomers, $canAccessAssets, $canAccessPortalHub]) => ({
+    [
+      permissions,
+      userPermissions,
+      loading,
+      error,
+      isSystemAdmin,
+      canAccessAdmin,
+      canAccessCustomers,
+      canAccessAssets,
+      canAccessPortalHub,
+    ],
+    ([
+      $permissions,
+      $userPermissions,
+      $loading,
+      $error,
+      $isSystemAdmin,
+      $canAccessAdmin,
+      $canAccessCustomers,
+      $canAccessAssets,
+      $canAccessPortalHub,
+    ]) => ({
       permissions: $permissions,
       userPermissions: $userPermissions,
       loading: $loading,
@@ -87,7 +101,7 @@ function createPermissionStore() {
       canAccessAdmin: $canAccessAdmin,
       canAccessCustomers: $canAccessCustomers,
       canAccessAssets: $canAccessAssets,
-      canAccessPortalHub: $canAccessPortalHub
+      canAccessPortalHub: $canAccessPortalHub,
     })
   );
 
@@ -98,31 +112,31 @@ function createPermissionStore() {
     // Convenience getters for backward compatibility with direct property access
     get isSystemAdmin() {
       let value;
-      isSystemAdmin.subscribe(v => value = v)();
+      isSystemAdmin.subscribe((v) => (value = v))();
       return value;
     },
 
     get canAccessAdmin() {
       let value;
-      canAccessAdmin.subscribe(v => value = v)();
+      canAccessAdmin.subscribe((v) => (value = v))();
       return value;
     },
 
     get canAccessCustomers() {
       let value;
-      canAccessCustomers.subscribe(v => value = v)();
+      canAccessCustomers.subscribe((v) => (value = v))();
       return value;
     },
 
     get canAccessAssets() {
       let value;
-      canAccessAssets.subscribe(v => value = v)();
+      canAccessAssets.subscribe((v) => (value = v))();
       return value;
     },
 
     get canAccessPortalHub() {
       let value;
-      canAccessPortalHub.subscribe(v => value = v)();
+      canAccessPortalHub.subscribe((v) => (value = v))();
       return value;
     },
 
@@ -151,7 +165,7 @@ function createPermissionStore() {
       try {
         const response = await api.permissions.getUserPermissions(userId);
         const globalPermissionIds = new Set(
-          (response.global_permissions || []).map(p => p.permission_id)
+          (response.global_permissions || []).map((p) => p.permission_id)
         );
 
         userPermissions.set(globalPermissionIds);
@@ -209,7 +223,7 @@ function createPermissionStore() {
       if (user.is_system_admin) return true;
 
       let has = false;
-      userPermissions.subscribe(perms => has = perms.has(permissionId))();
+      userPermissions.subscribe((perms) => (has = perms.has(permissionId)))();
       return has;
     },
 
@@ -223,16 +237,16 @@ function createPermissionStore() {
 
       // Find permission by key and check if user has it
       let permission;
-      permissions.subscribe(perms => {
-        permission = perms.find(p => p.permission_key === permissionKey);
+      permissions.subscribe((perms) => {
+        permission = perms.find((p) => p.permission_key === permissionKey);
       })();
 
       if (!permission) return false;
 
       let has = false;
-      userPermissions.subscribe(perms => has = perms.has(permission.id))();
+      userPermissions.subscribe((perms) => (has = perms.has(permission.id)))();
       return has;
-    }
+    },
   };
 }
 

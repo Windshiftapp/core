@@ -9,24 +9,24 @@ export default {
   jiraImport: {
     title: {
       cloud: 'Jira Cloud Import',
-      datacenter: 'Jira Data Center Import'
+      datacenter: 'Jira Data Center Import',
     },
     subtitle: {
       cloud: 'Import work items from Jira Cloud',
-      datacenter: 'Import work items from Jira Data Center'
+      datacenter: 'Import work items from Jira Data Center',
     },
     steps: {
       connect: 'Connect',
       projects: 'Projects',
       mapping: 'Mapping',
       preview: 'Preview',
-      import: 'Import'
+      import: 'Import',
     },
     deploymentType: {
       cloud: 'Jira Cloud',
       cloudDesc: '*.atlassian.net',
       datacenter: 'Data Center',
-      datacenterDesc: 'Self-hosted'
+      datacenterDesc: 'Self-hosted',
     },
     form: {
       urlCloud: 'Jira Cloud URL',
@@ -37,7 +37,8 @@ export default {
       password: 'Password or Personal Access Token',
       generateToken: 'Generate a token',
       tokenHelpCloud: 'from your Atlassian account settings',
-      tokenHelpDatacenter: 'Use your password or a Personal Access Token from your Jira profile settings'
+      tokenHelpDatacenter:
+        'Use your password or a Personal Access Token from your Jira profile settings',
     },
     buttons: {
       connect: 'Connect',
@@ -51,23 +52,27 @@ export default {
       deselectAll: 'Deselect All',
       addNewConnection: 'Add New Connection',
       useExisting: 'Use Existing',
-      retryImport: 'Retry Import'
+      retryImport: 'Retry Import',
     },
     messages: {
       connected: 'Connected to {name}',
       selectConnection: 'Select an existing connection or create a new one',
-      credentialsHelpCloud: 'Enter your Jira Cloud credentials. You can generate an API token from your Atlassian account settings.',
-      credentialsHelpDatacenter: 'Enter your Jira Data Center credentials. Use your username and password or a Personal Access Token.',
-      reviewSummary: 'Review the import summary before proceeding. This operation may take several minutes for large projects.',
+      credentialsHelpCloud:
+        'Enter your Jira Cloud credentials. You can generate an API token from your Atlassian account settings.',
+      credentialsHelpDatacenter:
+        'Enter your Jira Data Center credentials. Use your username and password or a Personal Access Token.',
+      reviewSummary:
+        'Review the import summary before proceeding. This operation may take several minutes for large projects.',
       noAttachments: 'Attachments will not be imported',
-      noAttachmentsDesc: 'No attachment storage is configured. Set the --attachment-path parameter when starting the server to enable attachment imports.'
+      noAttachmentsDesc:
+        'No attachment storage is configured. Set the --attachment-path parameter when starting the server to enable attachment imports.',
     },
     projects: {
       selected: 'Select projects to import ({selected} of {total} selected)',
       openIssuesOnly: 'Import open issues only',
       openIssuesOnlyDesc: 'Excludes issues with status category "Done"',
       teamManaged: 'Team-managed',
-      issues: '{count} issues'
+      issues: '{count} issues',
     },
     mapping: {
       workspaces: 'Workspaces',
@@ -82,7 +87,7 @@ export default {
       versionsDesc: 'Jira versions will be imported as workspace milestones.',
       subtask: 'Sub-task',
       create: 'Create',
-      skip: 'Skip'
+      skip: 'Skip',
     },
     preview: {
       workspaces: 'Workspaces',
@@ -94,7 +99,7 @@ export default {
       users: 'Users',
       usersNew: '({count} new)',
       assets: 'Assets',
-      projectsToImport: 'Projects to Import'
+      projectsToImport: 'Projects to Import',
     },
     import: {
       importing: 'Importing...',
@@ -104,7 +109,7 @@ export default {
       failed: '{count} items failed to import.',
       ready: 'Ready to Import',
       readyDesc: 'Click "Start Import" to begin importing {count} items.',
-      progress: 'Progress'
+      progress: 'Progress',
     },
     errors: {
       connectionFailed: 'Failed to connect to Jira',
@@ -112,8 +117,8 @@ export default {
       analyzeFailed: 'Failed to analyze projects',
       importFailed: 'Failed to start import',
       loadConnectionsFailed: 'Failed to load connections',
-      deleteConnectionFailed: 'Failed to delete connection'
-    }
+      deleteConnectionFailed: 'Failed to delete connection',
+    },
   },
 
   itemTypes: {
@@ -129,7 +134,7 @@ export default {
     noItemTypes: 'No item types found',
     itemTypeCreated: 'Item type created successfully',
     itemTypeUpdated: 'Item type updated successfully',
-    itemTypeDeleted: 'Item type deleted successfully'
+    itemTypeDeleted: 'Item type deleted successfully',
   },
 
   fields: {
@@ -164,11 +169,16 @@ export default {
     user: 'User',
     url: 'URL',
     // Field type hints
-    milestoneHint: 'Milestone fields automatically reference system milestones. Users will be able to select from existing milestones when filling out this field.',
-    dateHint: 'Date fields allow users to select dates using a date picker. Values are stored in YYYY-MM-DD format.',
-    assetHint: 'Asset fields allow users to select assets from a specified asset set. You can optionally filter available assets using a QL query.',
-    portalCustomerHint: 'Portal Customer fields reference portal customers. Use with currentCustomer() in asset reports to filter by the logged-in portal customer.',
-    customerOrganisationHint: 'Customer Organisation fields reference customer organisations. Use with currentOrganisation() in asset reports to filter by the customer\'s organisation.'
+    milestoneHint:
+      'Milestone fields automatically reference system milestones. Users will be able to select from existing milestones when filling out this field.',
+    dateHint:
+      'Date fields allow users to select dates using a date picker. Values are stored in YYYY-MM-DD format.',
+    assetHint:
+      'Asset fields allow users to select assets from a specified asset set. You can optionally filter available assets using a QL query.',
+    portalCustomerHint:
+      'Portal Customer fields reference portal customers. Use with currentCustomer() in asset reports to filter by the logged-in portal customer.',
+    customerOrganisationHint:
+      "Customer Organisation fields reference customer organisations. Use with currentOrganisation() in asset reports to filter by the customer's organisation.",
   },
 
   categories: {
@@ -194,10 +204,11 @@ export default {
     addCategory: 'Add Category',
     categoryNamePlaceholder: 'Category name...',
     existingCategories: 'Existing Categories',
-    confirmDeleteCategory: 'Delete category "{name}"? Items in this category will become uncategorized.',
+    confirmDeleteCategory:
+      'Delete category "{name}"? Items in this category will become uncategorized.',
     failedToDeleteCategory: 'Failed to delete category. It may still be in use.',
     noCategoriesYet: 'No categories yet',
-    addFirstCategoryHint: 'Add your first category above.'
+    addFirstCategoryHint: 'Add your first category above.',
   },
 
   projects: {
@@ -216,7 +227,7 @@ export default {
     loadingProjects: 'Loading projects...',
     projectCreated: 'Project created successfully',
     projectUpdated: 'Project updated successfully',
-    projectDeleted: 'Project deleted successfully'
+    projectDeleted: 'Project deleted successfully',
   },
 
   sprints: {
@@ -263,7 +274,7 @@ export default {
     statusPlanned: 'Planned',
     statusActive: 'Active',
     statusCompleted: 'Completed',
-    statusCancelled: 'Cancelled'
+    statusCancelled: 'Cancelled',
   },
 
   iterations: {
@@ -277,7 +288,7 @@ export default {
       planned: 'Planned',
       active: 'Active',
       completed: 'Completed',
-      cancelled: 'Cancelled'
+      cancelled: 'Cancelled',
     },
     daysOverdue: '{count} days overdue',
     endsToday: 'Ends today',
@@ -287,6 +298,7 @@ export default {
     backToIterations: 'Back to Iterations',
     global: 'Global',
     thisWorkspace: 'This workspace',
+    overdue: 'Overdue',
     complete: 'complete',
     noItems: 'No items',
     summary: 'Summary',
@@ -307,7 +319,11 @@ export default {
     descriptionPlaceholder: 'Optional description',
     updateIteration: 'Update Iteration',
     dateRange: 'Date Range',
-    scope: 'Scope'
+    scope: 'Scope',
+    burndownChart: 'Burndown Chart',
+    idealProgress: 'Ideal',
+    ideal: 'Ideal',
+    noBurndownData: 'No burndown data available',
   },
 
   milestones: {
@@ -326,7 +342,7 @@ export default {
       planning: 'Planning',
       inProgress: 'In Progress',
       completed: 'Completed',
-      cancelled: 'Cancelled'
+      cancelled: 'Cancelled',
     },
     daysOverdue: '{count} days overdue',
     dueToday: 'Due today',
@@ -353,7 +369,7 @@ export default {
     local: 'Local',
     workspace: 'Workspace',
     selectWorkspace: 'Select workspace',
-    manageMilestoneCategories: 'Manage Milestone Categories'
+    manageMilestoneCategories: 'Manage Milestone Categories',
   },
 
   assets: {
@@ -417,7 +433,7 @@ export default {
     shortcutRotate: 'R: Rotate',
     shortcutFit: 'F: Fit',
     shortcutReset: '0: Reset',
-    shortcutClose: 'Esc: Close'
+    shortcutClose: 'Esc: Close',
   },
 
   personal: {
@@ -475,7 +491,7 @@ export default {
     placeholderAccomplishments: 'Describe your key accomplishments...',
     placeholderWentWell: 'What went well and why...',
     placeholderImprovements: 'Areas for improvement and next steps...',
-    startWriting: 'Start writing your reflection...'
+    startWriting: 'Start writing your reflection...',
   },
 
   audit: {
@@ -488,7 +504,7 @@ export default {
     timestamp: 'Timestamp',
     details: 'Details',
     ipAddress: 'IP Address',
-    noEvents: 'No audit events found'
+    noEvents: 'No audit events found',
   },
 
   connections: {
@@ -504,7 +520,7 @@ export default {
     connectionUpdated: 'Connection updated successfully',
     connectionDeleted: 'Connection deleted',
     connectionSuccessful: 'Connection successful',
-    testConnection: 'Test Connection'
+    testConnection: 'Test Connection',
   },
 
   migration: {
@@ -514,7 +530,7 @@ export default {
     migrationCompleted: 'Migration Completed',
     migrationSuccess: 'All items have been successfully migrated',
     targetWorkspace: 'Target Workspace',
-    targetWorkspaceRequired: 'Target workspace is required'
+    targetWorkspaceRequired: 'Target workspace is required',
   },
 
   members: {
@@ -522,12 +538,12 @@ export default {
     subtitle: 'Manage team members',
     addMember: 'Add Member',
     removeMember: 'Remove Member',
-    searchMembers: 'Search members by name or email...'
+    searchMembers: 'Search members by name or email...',
   },
 
   configuration: {
     title: 'Configuration',
-    searchConfigurationSets: 'Search configuration sets...'
+    searchConfigurationSets: 'Search configuration sets...',
   },
 
   auditLog: {
@@ -591,7 +607,7 @@ export default {
     customField: 'Custom Field',
     itemType: 'Item Type',
     permission: 'Permission',
-    group: 'Group'
+    group: 'Group',
   },
 
   migrationAssistant: {
@@ -633,15 +649,18 @@ export default {
     migrating: 'Migrating...',
     migrationCompleted: 'Migration Completed',
     allItemsMigrated: 'All items have been successfully migrated.',
-    pleaseSelectTargetStatuses: 'Please select target statuses for all items that require migration.',
-    pleaseSelectTargetItemTypes: 'Please select target item types for all items that require migration.',
+    pleaseSelectTargetStatuses:
+      'Please select target statuses for all items that require migration.',
+    pleaseSelectTargetItemTypes:
+      'Please select target item types for all items that require migration.',
     pleaseProvideDefaultValues: 'Please provide default values for all new required fields.',
-    pleaseSelectTargetPriorities: 'Please select target priorities for all items that require migration.'
+    pleaseSelectTargetPriorities:
+      'Please select target priorities for all items that require migration.',
   },
 
   setup: {
     welcomeTo: 'Welcome to {appName}',
-    setupMessage: 'Let\'s get your work management system set up',
+    setupMessage: "Let's get your work management system set up",
     setupProgress: 'Setup Progress',
     step: 'Step',
     of: 'of',
@@ -658,8 +677,9 @@ export default {
     testManagement: 'Test Management',
     testManagementDesc: 'Manage test cases, test runs, and quality assurance',
     setupComplete: 'Setup Complete!',
-    setupCompleteMessage: '{appName} is ready to use. You\'ll be redirected to the application shortly.',
-    whatsNext: 'What\'s Next?',
+    setupCompleteMessage:
+      "{appName} is ready to use. You'll be redirected to the application shortly.",
+    whatsNext: "What's Next?",
     whatsNextCreateWorkspace: 'Create your first workspace',
     whatsNextSetupWorkflows: 'Set up workflows and screens',
     whatsNextInviteTeam: 'Invite team members',
@@ -674,7 +694,7 @@ export default {
     setupError: 'An error occurred during setup. Please try again.',
     goBackEsc: 'Go back (Esc)',
     continueNextStepEnter: 'Continue to next step (Enter)',
-    completeSetupEnter: 'Complete setup (Enter)'
+    completeSetupEnter: 'Complete setup (Enter)',
   },
 
   createModal: {
@@ -716,7 +736,7 @@ export default {
     fillRequiredFields: 'Please fill in required fields:',
     selectWorkspaceFirst: 'Select a workspace first',
     // Buttons
-    create: 'Create'
+    create: 'Create',
   },
 
   scm: {
@@ -727,7 +747,7 @@ export default {
     selectRepository: 'Select a repository...',
     branchName: 'Branch Name',
     baseBranch: 'Base Branch',
-    baseBranchHelp: 'The branch to create from. Defaults to the repository\'s default branch.',
+    baseBranchHelp: "The branch to create from. Defaults to the repository's default branch.",
     creating: 'Creating...',
     branchCreatedSuccess: 'Branch created successfully',
     noReposLinked: 'No repositories linked to this workspace',
@@ -742,7 +762,7 @@ export default {
     prTitle: 'PR Title',
     description: 'Description',
     baseBranchPR: 'Base Branch',
-    baseBranchPRHelp: 'Leave empty to use the repository\'s default branch.',
+    baseBranchPRHelp: "Leave empty to use the repository's default branch.",
     createPR: 'Create PR',
     prCreatedSuccess: 'Pull request #{prNumber} created successfully',
     failedToCreatePR: 'Failed to create pull request',
@@ -772,7 +792,7 @@ export default {
     connectYourAccount: 'Connect your {provider} account',
     connectToCreate: 'Connect to create branches and pull requests directly from work items.',
     connect: 'Connect {provider}',
-    noLinksYet: 'No development links yet'
+    noLinksYet: 'No development links yet',
   },
 
   organization: {
@@ -794,6 +814,6 @@ export default {
     updateOrganization: 'Update Organization',
     createOrganization: 'Create Organization',
     pleaseSelectImage: 'Please select an image file',
-    failedToUploadAvatar: 'Failed to upload avatar'
-  }
+    failedToUploadAvatar: 'Failed to upload avatar',
+  },
 };

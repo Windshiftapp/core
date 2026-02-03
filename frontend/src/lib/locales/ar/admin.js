@@ -25,7 +25,7 @@ export default {
     admin: 'الإدارة',
     systemSettings: 'إعدادات النظام',
     organizationSettings: 'إعدادات المؤسسة',
-    workspaceSettings: 'إعدادات مساحة العمل'
+    workspaceSettings: 'إعدادات مساحة العمل',
 
     // Note: Additional admin settings sections (attachments, groups, notifications, etc.)
     // fall back to English for missing keys
@@ -51,7 +51,7 @@ export default {
     roleCreated: 'تم إنشاء الدور بنجاح',
     roleUpdated: 'تم تحديث الدور بنجاح',
     roleDeleted: 'تم حذف الدور بنجاح',
-    cannotDeleteSystemRole: 'لا يمكن حذف أدوار النظام'
+    cannotDeleteSystemRole: 'لا يمكن حذف أدوار النظام',
   },
 
   // Permissions
@@ -69,6 +69,6 @@ export default {
     manage: 'إدارة',
     view: 'عرض',
     edit: 'تعديل',
-    create: 'إنشاء'
-  }
+    create: 'إنشاء',
+  },
 };

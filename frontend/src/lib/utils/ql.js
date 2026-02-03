@@ -38,15 +38,15 @@ export const TokenType = {
   DATE: 'DATE',
 
   // Operators
-  EQUALS: 'EQUALS',           // =
-  NOT_EQUALS: 'NOT_EQUALS',   // !=, <>
-  LESS_THAN: 'LESS_THAN',     // <
-  LESS_EQUAL: 'LESS_EQUAL',   // <=
+  EQUALS: 'EQUALS', // =
+  NOT_EQUALS: 'NOT_EQUALS', // !=, <>
+  LESS_THAN: 'LESS_THAN', // <
+  LESS_EQUAL: 'LESS_EQUAL', // <=
   GREATER_THAN: 'GREATER_THAN', // >
   GREATER_EQUAL: 'GREATER_EQUAL', // >=
-  CONTAINS: 'CONTAINS',       // ~
-  IN: 'IN',                   // IN
-  NOT_IN: 'NOT_IN',          // NOT IN
+  CONTAINS: 'CONTAINS', // ~
+  IN: 'IN', // IN
+  NOT_IN: 'NOT_IN', // NOT IN
 
   // Logical operators
   AND: 'AND',
@@ -54,13 +54,13 @@ export const TokenType = {
   NOT: 'NOT',
 
   // Punctuation
-  LPAREN: 'LPAREN',           // (
-  RPAREN: 'RPAREN',           // )
-  COMMA: 'COMMA',             // ,
+  LPAREN: 'LPAREN', // (
+  RPAREN: 'RPAREN', // )
+  COMMA: 'COMMA', // ,
 
   // Special
   EOF: 'EOF',
-  FUNCTION: 'FUNCTION'
+  FUNCTION: 'FUNCTION',
 };
 
 /**
@@ -159,26 +159,28 @@ export class QLTokenizer {
       if (this.current === '"' || this.current === "'") {
         tokens.push({
           type: TokenType.STRING,
-          value: this.readString()
+          value: this.readString(),
         });
         continue;
       }
 
       // Numbers and dates (YYYY-MM-DD)
       if (/\d/.test(this.current)) {
-
         // Check if it's a date pattern (YYYY-MM-DD)
-        if (this.current && /\d/.test(this.current) &&
+        if (
+          this.current &&
+          /\d/.test(this.current) &&
           this.peekAhead(4) === '-' &&
-          this.peekAhead(7) === '-') {
+          this.peekAhead(7) === '-'
+        ) {
           tokens.push({
             type: TokenType.DATE,
-            value: this.readDate()
+            value: this.readDate(),
           });
         } else {
           tokens.push({
             type: TokenType.NUMBER,
-            value: this.readNumber()
+            value: this.readNumber(),
           });
         }
         continue;
@@ -200,12 +202,18 @@ export class QLTokenizer {
           case 'NOT':
             // Look ahead to see if it's "NOT IN"
             this.skipWhitespace();
-            if (this.current && this.input.slice(this.position, this.position + 2).toUpperCase() === 'IN') {
+            if (
+              this.current &&
+              this.input.slice(this.position, this.position + 2).toUpperCase() === 'IN'
+            ) {
               this.advance(); // N
               this.advance(); // O
               this.advance(); // T
               this.skipWhitespace();
-              if (this.current && this.input.slice(this.position, this.position + 2).toUpperCase() === 'IN') {
+              if (
+                this.current &&
+                this.input.slice(this.position, this.position + 2).toUpperCase() === 'IN'
+              ) {
                 this.advance(); // I
                 this.advance(); // N
                 tokens.push({ type: TokenType.NOT_IN, value: 'NOT IN' });
@@ -310,7 +318,7 @@ export const NodeType = {
   IDENTIFIER: 'IDENTIFIER',
   LITERAL: 'LITERAL',
   FUNCTION_CALL: 'FUNCTION_CALL',
-  LIST: 'LIST'
+  LIST: 'LIST',
 };
 
 /**
@@ -380,7 +388,7 @@ export class QLParser {
         type: NodeType.BINARY_OP,
         operator: operator.value,
         left,
-        right
+        right,
       };
     }
 
@@ -397,7 +405,7 @@ export class QLParser {
         type: NodeType.BINARY_OP,
         operator: operator.value,
         left,
-        right
+        right,
       };
     }
 
@@ -412,7 +420,7 @@ export class QLParser {
         type: NodeType.BINARY_OP,
         operator: operator.value,
         left: null,
-        right: operand
+        right: operand,
       };
     }
 
@@ -422,16 +430,24 @@ export class QLParser {
   comparison() {
     const left = this.primary();
 
-    if (this.match(TokenType.EQUALS, TokenType.NOT_EQUALS, TokenType.LESS_THAN,
-      TokenType.LESS_EQUAL, TokenType.GREATER_THAN, TokenType.GREATER_EQUAL,
-      TokenType.CONTAINS)) {
+    if (
+      this.match(
+        TokenType.EQUALS,
+        TokenType.NOT_EQUALS,
+        TokenType.LESS_THAN,
+        TokenType.LESS_EQUAL,
+        TokenType.GREATER_THAN,
+        TokenType.GREATER_EQUAL,
+        TokenType.CONTAINS
+      )
+    ) {
       const operator = this.advance();
       const right = this.primary();
       return {
         type: NodeType.COMPARISON,
         operator: operator.value,
         left,
-        right
+        right,
       };
     }
 
@@ -444,7 +460,7 @@ export class QLParser {
         type: NodeType.IN_EXPRESSION,
         operator: operator.value,
         field: left,
-        values
+        values,
       };
     }
 
@@ -456,7 +472,7 @@ export class QLParser {
       const token = this.advance();
       return {
         type: NodeType.IDENTIFIER,
-        value: token.value
+        value: token.value,
       };
     }
 
@@ -465,7 +481,7 @@ export class QLParser {
       return {
         type: NodeType.LITERAL,
         dataType: token.type,
-        value: token.value
+        value: token.value,
       };
     }
 
@@ -486,7 +502,7 @@ export class QLParser {
       return {
         type: NodeType.FUNCTION_CALL,
         name: token.value,
-        arguments: args
+        arguments: args,
       };
     }
 
@@ -508,7 +524,7 @@ export class QLParser {
       values.push({
         type: NodeType.LITERAL,
         dataType: token.type,
-        value: token.value
+        value: token.value,
       });
 
       while (this.match(TokenType.COMMA)) {
@@ -518,7 +534,7 @@ export class QLParser {
           values.push({
             type: NodeType.LITERAL,
             dataType: token.type,
-            value: token.value
+            value: token.value,
           });
         } else {
           this.error('Expected value after comma');
@@ -528,7 +544,7 @@ export class QLParser {
 
     return {
       type: NodeType.LIST,
-      values
+      values,
     };
   }
 }
@@ -542,7 +558,7 @@ export class QLEvaluator {
     this.workspaceMap = new Map();
 
     // Build workspace lookup map
-    workspaces.forEach(ws => {
+    workspaces.forEach((ws) => {
       this.workspaceMap.set(ws.id, ws);
       this.workspaceMap.set(ws.name.toLowerCase(), ws);
       this.workspaceMap.set(ws.key.toLowerCase(), ws);
@@ -608,26 +624,28 @@ export class QLEvaluator {
 
   evaluateInExpression(ast, item) {
     const fieldValue = this.evaluate(ast.field, item);
-    const values = ast.values.values.map(v => this.evaluate(v, item));
+    const values = ast.values.values.map((v) => this.evaluate(v, item));
 
-    const isIn = values.some(value => this.compareValues(fieldValue, value, 'equals'));
+    const isIn = values.some((value) => this.compareValues(fieldValue, value, 'equals'));
     return ast.operator === 'IN' ? isIn : !isIn;
   }
 
-  evaluateFunction(ast, item) {
+  evaluateFunction(ast, _item) {
     switch (ast.name.toLowerCase()) {
       case 'currentuser':
         return authStore.currentUser?.id?.toString() || null;
       case 'now':
         return new Date().toISOString();
-      case 'startofday':
+      case 'startofday': {
         const start = new Date();
         start.setHours(0, 0, 0, 0);
         return start.toISOString();
-      case 'endofday':
+      }
+      case 'endofday': {
         const end = new Date();
         end.setHours(23, 59, 59, 999);
         return end.toISOString();
+      }
       default:
         throw new Error(`Unknown function: ${ast.name}`);
     }
@@ -635,14 +653,16 @@ export class QLEvaluator {
 
   getFieldValue(fieldName, item) {
     switch (fieldName.toLowerCase()) {
-      case 'workspace':
+      case 'workspace': {
         const workspace = this.workspaceMap.get(item.workspace_id);
         return workspace ? workspace.name : 'Unknown';
+      }
       case 'workspaceid':
         return item.workspace_id;
-      case 'workspacekey':
+      case 'workspacekey': {
         const ws = this.workspaceMap.get(item.workspace_id);
         return ws ? ws.key : 'UNKNOWN';
+      }
       case 'status':
         return item.status;
       case 'priority':
@@ -705,7 +725,7 @@ export class QLEvaluator {
       const parser = new QLParser(tokens);
       const ast = parser.parse();
 
-      return items.filter(item => this.evaluate(ast, item));
+      return items.filter((item) => this.evaluate(ast, item));
     } catch (error) {
       console.error('QL Error:', error.message);
       throw error;
@@ -725,14 +745,14 @@ export class QLBuilder {
       if (filters.workspaces.length === 1) {
         conditions.push(`workspace = "${filters.workspaces[0]}"`);
       } else {
-        const workspaceNames = filters.workspaces.map(w => `"${w}"`).join(', ');
+        const workspaceNames = filters.workspaces.map((w) => `"${w}"`).join(', ');
         conditions.push(`workspace IN (${workspaceNames})`);
       }
     }
 
     // Status filter (use numeric IDs)
     if (filters.statuses && filters.statuses.length > 0) {
-      const statusIds = filters.statuses.filter(id => id !== null && id !== undefined);
+      const statusIds = filters.statuses.filter((id) => id !== null && id !== undefined);
       if (statusIds.length === 1) {
         conditions.push(`status_id = ${statusIds[0]}`);
       } else if (statusIds.length > 1) {
@@ -742,7 +762,7 @@ export class QLBuilder {
 
     // Priority filter (use numeric IDs)
     if (filters.priorities && filters.priorities.length > 0) {
-      const priorityIds = filters.priorities.filter(id => id !== null && id !== undefined);
+      const priorityIds = filters.priorities.filter((id) => id !== null && id !== undefined);
       if (priorityIds.length === 1) {
         conditions.push(`priority_id = ${priorityIds[0]}`);
       } else if (priorityIds.length > 1) {
@@ -751,16 +771,16 @@ export class QLBuilder {
     }
 
     // Search filter
-    if (filters.search && filters.search.trim()) {
+    if (filters.search?.trim()) {
       const searchTerm = filters.search.trim();
       conditions.push(`(title ~ "${searchTerm}" OR description ~ "${searchTerm}")`);
     }
 
     // Dynamic field filters
     if (filters.dynamicFields && filters.dynamicFields.length > 0) {
-      filters.dynamicFields.forEach(filter => {
+      filters.dynamicFields.forEach((filter) => {
         if (filter.field && (filter.value || (filter.values && filter.values.length > 0))) {
-          const condition = this.buildFieldCondition(filter);
+          const condition = QLBuilder.buildFieldCondition(filter);
           if (condition) {
             conditions.push(condition);
           }
@@ -784,16 +804,21 @@ export class QLBuilder {
 
     // Handle IN/NOT IN operators with multiple values
     if ((operator === 'IN' || operator === 'NOT IN') && values && values.length > 0) {
-      const valuesList = values.map(v => this.formatValue(v, field.type)).join(', ');
+      const valuesList = values.map((v) => QLBuilder.formatValue(v, field.type)).join(', ');
       return `${fieldId} ${operator} (${valuesList})`;
     }
 
     // Handle IN/NOT IN operators with single text value (comma-separated)
     if ((operator === 'IN' || operator === 'NOT IN') && value) {
       // Parse comma-separated values from the text input
-      const valueList = value.split(',').map(v => v.trim()).filter(v => v);
+      const valueList = value
+        .split(',')
+        .map((v) => v.trim())
+        .filter((v) => v);
       if (valueList.length > 0) {
-        const formattedValues = valueList.map(v => this.formatValue(v, field.type)).join(', ');
+        const formattedValues = valueList
+          .map((v) => QLBuilder.formatValue(v, field.type))
+          .join(', ');
         return `${fieldId} ${operator} (${formattedValues})`;
       }
       return null; // Empty value list
@@ -802,7 +827,7 @@ export class QLBuilder {
     // Handle single value operators
     if (!value && value !== 0 && value !== false) return null;
 
-    const formattedValue = this.formatValue(value, field.type);
+    const formattedValue = QLBuilder.formatValue(value, field.type);
 
     // Special handling for text contains operator
     if (operator === '~') {
@@ -854,7 +879,7 @@ export class QLBuilder {
     }
   }
 
-  static parseFiltersFromQuery(queryString, workspaces = [], priorities = [], statusesList = []) {
+  static parseFiltersFromQuery(queryString, _workspaces = [], priorities = [], statusesList = []) {
     // Parse a QL query back into UI filter objects
     // This is a simple implementation that handles common filter patterns
 
@@ -863,49 +888,55 @@ export class QLBuilder {
       statuses: [],
       priorities: [],
       search: '',
-      dynamicFields: []
+      dynamicFields: [],
     };
 
     if (!queryString || !queryString.trim()) {
       // Normalize legacy priority names to IDs if provided
       if (result.priorities.length > 0) {
-        result.priorities = result.priorities.map(priorityValue => {
-          if (typeof priorityValue === 'number') {
-            return priorityValue;
-          }
-          const normalizedValue = String(priorityValue).toLowerCase();
-          const matchingPriority = priorities.find(priority =>
-            priority.name?.toLowerCase() === normalizedValue
-          );
-          return matchingPriority ? matchingPriority.id : null;
-        }).filter(id => id !== null && id !== undefined);
+        result.priorities = result.priorities
+          .map((priorityValue) => {
+            if (typeof priorityValue === 'number') {
+              return priorityValue;
+            }
+            const normalizedValue = String(priorityValue).toLowerCase();
+            const matchingPriority = priorities.find(
+              (priority) => priority.name?.toLowerCase() === normalizedValue
+            );
+            return matchingPriority ? matchingPriority.id : null;
+          })
+          .filter((id) => id !== null && id !== undefined);
       }
 
       // Normalize legacy priority names to IDs if provided
       if (result.priorities.length > 0) {
-        result.priorities = result.priorities.map(priorityValue => {
-          if (typeof priorityValue === 'number') {
-            return priorityValue;
-          }
-          const normalizedValue = String(priorityValue).toLowerCase();
-          const matchingPriority = priorities.find(priority =>
-            priority.name?.toLowerCase() === normalizedValue
-          );
-          return matchingPriority ? matchingPriority.id : null;
-        }).filter(id => id !== null && id !== undefined);
+        result.priorities = result.priorities
+          .map((priorityValue) => {
+            if (typeof priorityValue === 'number') {
+              return priorityValue;
+            }
+            const normalizedValue = String(priorityValue).toLowerCase();
+            const matchingPriority = priorities.find(
+              (priority) => priority.name?.toLowerCase() === normalizedValue
+            );
+            return matchingPriority ? matchingPriority.id : null;
+          })
+          .filter((id) => id !== null && id !== undefined);
       }
 
       if (result.statuses.length > 0) {
-        result.statuses = result.statuses.map(statusValue => {
-          if (typeof statusValue === 'number') {
-            return statusValue;
-          }
-          const normalizedValue = String(statusValue).toLowerCase();
-          const matchingStatus = statusesList.find(status =>
-            (status.name || status.key || '').toLowerCase() === normalizedValue
-          );
-          return matchingStatus ? matchingStatus.id : null;
-        }).filter(id => id !== null && id !== undefined);
+        result.statuses = result.statuses
+          .map((statusValue) => {
+            if (typeof statusValue === 'number') {
+              return statusValue;
+            }
+            const normalizedValue = String(statusValue).toLowerCase();
+            const matchingStatus = statusesList.find(
+              (status) => (status.name || status.key || '').toLowerCase() === normalizedValue
+            );
+            return matchingStatus ? matchingStatus.id : null;
+          })
+          .filter((id) => id !== null && id !== undefined);
       }
 
       return result;
@@ -921,7 +952,7 @@ export class QLBuilder {
         const workspaceList = workspaceInMatch[1];
         result.workspaces = workspaceList
           .split(',')
-          .map(w => w.trim().replace(/["']/g, ''))
+          .map((w) => w.trim().replace(/["']/g, ''))
           .filter(Boolean);
       } else if (workspaceMatch) {
         // Single workspace
@@ -936,11 +967,11 @@ export class QLBuilder {
         const statusList = statusIdInMatch[1];
         result.statuses = statusList
           .split(',')
-          .map(s => parseInt(s.trim(), 10))
-          .filter(id => !isNaN(id));
+          .map((s) => parseInt(s.trim(), 10))
+          .filter((id) => !Number.isNaN(id));
       } else if (statusIdMatch) {
         const parsedId = parseInt(statusIdMatch[1], 10);
-        result.statuses = isNaN(parsedId) ? [] : [parsedId];
+        result.statuses = Number.isNaN(parsedId) ? [] : [parsedId];
       } else {
         // Legacy support for status names
         const statusMatch = queryString.match(/status\s*=\s*["']?(\w+)["']?/i);
@@ -950,7 +981,7 @@ export class QLBuilder {
           const statusList = statusInMatch[1];
           result.statuses = statusList
             .split(',')
-            .map(s => s.trim().replace(/["']/g, ''))
+            .map((s) => s.trim().replace(/["']/g, ''))
             .filter(Boolean);
         } else if (statusMatch) {
           result.statuses = [statusMatch[1]];
@@ -965,11 +996,11 @@ export class QLBuilder {
         const priorityList = priorityIdInMatch[1];
         result.priorities = priorityList
           .split(',')
-          .map(p => parseInt(p.trim(), 10))
-          .filter(id => !isNaN(id));
+          .map((p) => parseInt(p.trim(), 10))
+          .filter((id) => !Number.isNaN(id));
       } else if (priorityIdMatch) {
         const parsedId = parseInt(priorityIdMatch[1], 10);
-        result.priorities = isNaN(parsedId) ? [] : [parsedId];
+        result.priorities = Number.isNaN(parsedId) ? [] : [parsedId];
       } else {
         // Legacy support for priority names
         const priorityMatch = queryString.match(/priority\s*=\s*["']?(\w+)["']?/i);
@@ -979,7 +1010,7 @@ export class QLBuilder {
           const priorityList = priorityInMatch[1];
           result.priorities = priorityList
             .split(',')
-            .map(p => p.trim().replace(/["']/g, ''))
+            .map((p) => p.trim().replace(/["']/g, ''))
             .filter(Boolean);
         } else if (priorityMatch) {
           result.priorities = [priorityMatch[1]];
@@ -991,35 +1022,38 @@ export class QLBuilder {
       if (titleMatch) {
         result.search = titleMatch[1];
       }
-
     } catch (error) {
       console.error('Error parsing QL filters:', error);
     }
 
     if (result.priorities.length > 0) {
-      result.priorities = result.priorities.map(priorityValue => {
-        if (typeof priorityValue === 'number') {
-          return priorityValue;
-        }
-        const normalizedValue = String(priorityValue).toLowerCase();
-        const matchingPriority = priorities.find(priority =>
-          priority.name?.toLowerCase() === normalizedValue
-        );
-        return matchingPriority ? matchingPriority.id : null;
-      }).filter(id => id !== null && id !== undefined);
+      result.priorities = result.priorities
+        .map((priorityValue) => {
+          if (typeof priorityValue === 'number') {
+            return priorityValue;
+          }
+          const normalizedValue = String(priorityValue).toLowerCase();
+          const matchingPriority = priorities.find(
+            (priority) => priority.name?.toLowerCase() === normalizedValue
+          );
+          return matchingPriority ? matchingPriority.id : null;
+        })
+        .filter((id) => id !== null && id !== undefined);
     }
 
     if (result.statuses.length > 0) {
-      result.statuses = result.statuses.map(statusValue => {
-        if (typeof statusValue === 'number') {
-          return statusValue;
-        }
-        const normalizedValue = String(statusValue).toLowerCase();
-        const matchingStatus = statusesList.find(status =>
-          (status.name || status.key || '').toLowerCase() === normalizedValue
-        );
-        return matchingStatus ? matchingStatus.id : null;
-      }).filter(id => id !== null && id !== undefined);
+      result.statuses = result.statuses
+        .map((statusValue) => {
+          if (typeof statusValue === 'number') {
+            return statusValue;
+          }
+          const normalizedValue = String(statusValue).toLowerCase();
+          const matchingStatus = statusesList.find(
+            (status) => (status.name || status.key || '').toLowerCase() === normalizedValue
+          );
+          return matchingStatus ? matchingStatus.id : null;
+        })
+        .filter((id) => id !== null && id !== undefined);
     }
 
     return result;
@@ -1040,7 +1074,7 @@ export class AssetQLEvaluator {
     this.setMap = new Map();
 
     // Build set lookup map
-    assetSets.forEach(set => {
+    assetSets.forEach((set) => {
       this.setMap.set(set.id, set);
       this.setMap.set(set.name.toLowerCase(), set);
     });
@@ -1105,26 +1139,28 @@ export class AssetQLEvaluator {
 
   evaluateInExpression(ast, asset) {
     const fieldValue = this.evaluate(ast.field, asset);
-    const values = ast.values.values.map(v => this.evaluate(v, asset));
+    const values = ast.values.values.map((v) => this.evaluate(v, asset));
 
-    const isIn = values.some(value => this.compareValues(fieldValue, value, 'equals'));
+    const isIn = values.some((value) => this.compareValues(fieldValue, value, 'equals'));
     return ast.operator === 'IN' ? isIn : !isIn;
   }
 
-  evaluateFunction(ast, asset) {
+  evaluateFunction(ast, _asset) {
     switch (ast.name.toLowerCase()) {
       case 'currentuser':
         return authStore.currentUser?.id?.toString() || null;
       case 'now':
         return new Date().toISOString();
-      case 'startofday':
+      case 'startofday': {
         const start = new Date();
         start.setHours(0, 0, 0, 0);
         return start.toISOString();
-      case 'endofday':
+      }
+      case 'endofday': {
         const end = new Date();
         end.setHours(23, 59, 59, 999);
         return end.toISOString();
+      }
       default:
         throw new Error(`Unknown function: ${ast.name}`);
     }
@@ -1260,7 +1296,7 @@ export class AssetQLEvaluator {
       const parser = new QLParser(tokens);
       const ast = parser.parse();
 
-      return assets.filter(asset => this.evaluate(ast, asset));
+      return assets.filter((asset) => this.evaluate(ast, asset));
     } catch (error) {
       console.error('Asset QL Error:', error.message);
       throw error;
@@ -1280,7 +1316,7 @@ export class AssetQLBuilder {
       if (filters.sets.length === 1) {
         conditions.push(`set = "${filters.sets[0]}"`);
       } else {
-        const setNames = filters.sets.map(s => `"${s}"`).join(', ');
+        const setNames = filters.sets.map((s) => `"${s}"`).join(', ');
         conditions.push(`set IN (${setNames})`);
       }
     }
@@ -1290,7 +1326,7 @@ export class AssetQLBuilder {
       if (filters.statuses.length === 1) {
         conditions.push(`status = "${filters.statuses[0]}"`);
       } else {
-        const statusNames = filters.statuses.map(s => `"${s}"`).join(', ');
+        const statusNames = filters.statuses.map((s) => `"${s}"`).join(', ');
         conditions.push(`status IN (${statusNames})`);
       }
     }
@@ -1300,7 +1336,7 @@ export class AssetQLBuilder {
       if (filters.types.length === 1) {
         conditions.push(`type = "${filters.types[0]}"`);
       } else {
-        const typeNames = filters.types.map(t => `"${t}"`).join(', ');
+        const typeNames = filters.types.map((t) => `"${t}"`).join(', ');
         conditions.push(`type IN (${typeNames})`);
       }
     }
@@ -1310,15 +1346,17 @@ export class AssetQLBuilder {
       if (filters.categories.length === 1) {
         conditions.push(`category = "${filters.categories[0]}"`);
       } else {
-        const categoryNames = filters.categories.map(c => `"${c}"`).join(', ');
+        const categoryNames = filters.categories.map((c) => `"${c}"`).join(', ');
         conditions.push(`category IN (${categoryNames})`);
       }
     }
 
     // Search/text filter
-    if (filters.search && filters.search.trim()) {
+    if (filters.search?.trim()) {
       const searchTerm = filters.search.trim();
-      conditions.push(`(title ~ "${searchTerm}" OR description ~ "${searchTerm}" OR tag ~ "${searchTerm}")`);
+      conditions.push(
+        `(title ~ "${searchTerm}" OR description ~ "${searchTerm}" OR tag ~ "${searchTerm}")`
+      );
     }
 
     return conditions.join(' AND ');

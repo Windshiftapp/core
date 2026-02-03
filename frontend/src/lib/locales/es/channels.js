@@ -25,7 +25,7 @@ export default {
     emailNotifications: 'Notificaciones por correo',
     pushNotifications: 'Notificaciones push',
     channels: 'Canales',
-    searchNotifications: 'Buscar notificaciones...'
+    searchNotifications: 'Buscar notificaciones...',
   },
 
   channels: {
@@ -47,7 +47,7 @@ export default {
     searchChannels: 'Buscar canales...',
     testWebhook: 'Probar webhook',
     webhookSent: 'Webhook de prueba enviado correctamente!',
-    webhookFailed: 'Prueba de webhook fallida'
+    webhookFailed: 'Prueba de webhook fallida',
   },
 
   channel: {},
@@ -84,7 +84,8 @@ export default {
     addSection: 'Agregar seccion',
     noContentSections: 'Aun no hay secciones de contenido configuradas.',
     dropHereToAdd: 'Soltar aqui para agregar tipo de solicitud',
-    noRequestTypesInSection: 'Aun no hay tipos de solicitud en esta seccion. Arrastre tipos de solicitud aqui desde la barra lateral.'
+    noRequestTypesInSection:
+      'Aun no hay tipos de solicitud en esta seccion. Arrastre tipos de solicitud aqui desde la barra lateral.',
   },
 
   requestForm: {},
@@ -92,6 +93,6 @@ export default {
   requestTypeFields: {
     addNewStep: 'Agregar nuevo paso',
     removeCurrentStep: 'Quitar paso actual',
-    removeField: 'Quitar campo'
-  }
+    removeField: 'Quitar campo',
+  },
 };

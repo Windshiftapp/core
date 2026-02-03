@@ -88,6 +88,6 @@ export function createDurationSync() {
 
   return {
     guard,
-    isUpdating: () => isUpdating
+    isUpdating: () => isUpdating,
   };
 }

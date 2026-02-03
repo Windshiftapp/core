@@ -10,7 +10,7 @@ export const confirmDialog = writable({
   variant: 'danger',
   icon: null,
   onConfirm: null,
-  onCancel: null
+  onCancel: null,
 });
 
 // Helper function to show confirmation dialog
@@ -25,13 +25,13 @@ export function confirm(options = {}) {
       variant: options.variant || 'danger',
       icon: options.icon || null,
       onConfirm: () => {
-        confirmDialog.update(state => ({ ...state, show: false }));
+        confirmDialog.update((state) => ({ ...state, show: false }));
         resolve(true);
       },
       onCancel: () => {
-        confirmDialog.update(state => ({ ...state, show: false }));
+        confirmDialog.update((state) => ({ ...state, show: false }));
         resolve(false);
-      }
+      },
     });
   });
 }

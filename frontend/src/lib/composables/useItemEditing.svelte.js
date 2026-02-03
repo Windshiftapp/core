@@ -11,7 +11,7 @@
  * @param {Function} onError - Callback when an error occurs
  * @returns {Object} Editing state and functions
  */
-export function useItemEditing(getItem, onSave, onError) {
+export function useItemEditing(getItem, _onSave, _onError) {
   // Editing mode flags for each field
   let editingTitle = $state(false);
   let editingDescription = $state(false);
@@ -94,7 +94,7 @@ export function useItemEditing(getItem, onSave, onError) {
   /**
    * Cancels editing a field.
    */
-  function cancelEdit(field, customFieldId = null) {
+  function cancelEdit(field, _customFieldId = null) {
     switch (field) {
       case 'title':
         editingTitle = false;
@@ -153,10 +153,17 @@ export function useItemEditing(getItem, onSave, onError) {
    * Checks if any field is currently being edited.
    */
   function isAnyFieldEditing() {
-    return editingTitle || editingDescription || editingStatus ||
-           editingPriority || editingMilestone || editingIteration ||
-           editingProject || editingAssignee ||
-           Object.keys(editingCustomFields).length > 0;
+    return (
+      editingTitle ||
+      editingDescription ||
+      editingStatus ||
+      editingPriority ||
+      editingMilestone ||
+      editingIteration ||
+      editingProject ||
+      editingAssignee ||
+      Object.keys(editingCustomFields).length > 0
+    );
   }
 
   /**
@@ -187,59 +194,139 @@ export function useItemEditing(getItem, onSave, onError) {
 
   return {
     // Editing mode flags (getters)
-    get editingTitle() { return editingTitle; },
-    get editingDescription() { return editingDescription; },
-    get editingStatus() { return editingStatus; },
-    get editingPriority() { return editingPriority; },
-    get editingDueDate() { return editingDueDate; },
-    get editingMilestone() { return editingMilestone; },
-    get editingIteration() { return editingIteration; },
-    get editingProject() { return editingProject; },
-    get editingAssignee() { return editingAssignee; },
-    get editingCustomFields() { return editingCustomFields; },
+    get editingTitle() {
+      return editingTitle;
+    },
+    get editingDescription() {
+      return editingDescription;
+    },
+    get editingStatus() {
+      return editingStatus;
+    },
+    get editingPriority() {
+      return editingPriority;
+    },
+    get editingDueDate() {
+      return editingDueDate;
+    },
+    get editingMilestone() {
+      return editingMilestone;
+    },
+    get editingIteration() {
+      return editingIteration;
+    },
+    get editingProject() {
+      return editingProject;
+    },
+    get editingAssignee() {
+      return editingAssignee;
+    },
+    get editingCustomFields() {
+      return editingCustomFields;
+    },
 
     // Edit values (getters)
-    get editTitle() { return editTitle; },
-    get editDescription() { return editDescription; },
-    get editStatus() { return editStatus; },
-    get editPriority() { return editPriority; },
-    get editMilestone() { return editMilestone; },
-    get editIteration() { return editIteration; },
-    get editProject() { return editProject; },
-    get editAssignee() { return editAssignee; },
-    get editCustomFieldValues() { return editCustomFieldValues; },
+    get editTitle() {
+      return editTitle;
+    },
+    get editDescription() {
+      return editDescription;
+    },
+    get editStatus() {
+      return editStatus;
+    },
+    get editPriority() {
+      return editPriority;
+    },
+    get editMilestone() {
+      return editMilestone;
+    },
+    get editIteration() {
+      return editIteration;
+    },
+    get editProject() {
+      return editProject;
+    },
+    get editAssignee() {
+      return editAssignee;
+    },
+    get editCustomFieldValues() {
+      return editCustomFieldValues;
+    },
 
     // Setters for edit values
-    set editTitle(value) { editTitle = value; },
-    set editDescription(value) { editDescription = value; },
-    set editStatus(value) { editStatus = value; },
-    set editPriority(value) { editPriority = value; },
-    set editMilestone(value) { editMilestone = value; },
-    set editIteration(value) { editIteration = value; },
-    set editProject(value) { editProject = value; },
-    set editAssignee(value) { editAssignee = value; },
+    set editTitle(value) {
+      editTitle = value;
+    },
+    set editDescription(value) {
+      editDescription = value;
+    },
+    set editStatus(value) {
+      editStatus = value;
+    },
+    set editPriority(value) {
+      editPriority = value;
+    },
+    set editMilestone(value) {
+      editMilestone = value;
+    },
+    set editIteration(value) {
+      editIteration = value;
+    },
+    set editProject(value) {
+      editProject = value;
+    },
+    set editAssignee(value) {
+      editAssignee = value;
+    },
 
     // Setters for editing mode
-    set editingTitle(value) { editingTitle = value; },
-    set editingDescription(value) { editingDescription = value; },
-    set editingStatus(value) { editingStatus = value; },
-    set editingPriority(value) { editingPriority = value; },
-    set editingDueDate(value) { editingDueDate = value; },
-    set editingMilestone(value) { editingMilestone = value; },
-    set editingIteration(value) { editingIteration = value; },
-    set editingProject(value) { editingProject = value; },
-    set editingAssignee(value) { editingAssignee = value; },
-    set editingCustomFields(value) { editingCustomFields = value; },
-    set editCustomFieldValues(value) { editCustomFieldValues = value; },
+    set editingTitle(value) {
+      editingTitle = value;
+    },
+    set editingDescription(value) {
+      editingDescription = value;
+    },
+    set editingStatus(value) {
+      editingStatus = value;
+    },
+    set editingPriority(value) {
+      editingPriority = value;
+    },
+    set editingDueDate(value) {
+      editingDueDate = value;
+    },
+    set editingMilestone(value) {
+      editingMilestone = value;
+    },
+    set editingIteration(value) {
+      editingIteration = value;
+    },
+    set editingProject(value) {
+      editingProject = value;
+    },
+    set editingAssignee(value) {
+      editingAssignee = value;
+    },
+    set editingCustomFields(value) {
+      editingCustomFields = value;
+    },
+    set editCustomFieldValues(value) {
+      editCustomFieldValues = value;
+    },
 
     // Saving state
-    get saving() { return saving; },
-    set saving(value) { saving = value; },
+    get saving() {
+      return saving;
+    },
+    set saving(value) {
+      saving = value;
+    },
 
     // Methods
     startEditing,
     cancelEdit,
     isAnyFieldEditing,
-    resetAllEditing
+    resetAllEditing,
   };
 }

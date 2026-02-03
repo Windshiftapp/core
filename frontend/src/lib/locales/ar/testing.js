@@ -33,7 +33,7 @@ export default {
     skipped: 'تم تخطيه',
     notRun: 'لم يتم التشغيل',
     finishExecution: 'إنهاء التنفيذ',
-    testPlansSubtitle: 'تنظيم حالات الاختبار في خطط قابلة للتنفيذ'
+    testPlansSubtitle: 'تنظيم حالات الاختبار في خطط قابلة للتنفيذ',
 
     // Note: Additional testing keys (test execution, test cases page, labels management, etc.)
     // fall back to English for missing keys
@@ -41,5 +41,5 @@ export default {
 
   testCase: {
     // Test case section - falls back to English for missing keys
-  }
+  },
 };

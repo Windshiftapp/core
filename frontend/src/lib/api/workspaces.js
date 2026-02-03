@@ -7,20 +7,23 @@ export const workspaces = {
       if (value) params.append(key, value);
     });
     const queryString = params.toString();
-    return fetchAPI(`/workspaces${queryString ? '?' + queryString : ''}`);
+    return fetchAPI(`/workspaces${queryString ? `?${queryString}` : ''}`);
   },
   get: (id) => fetchAPI(`/workspaces/${id}`),
-  create: (data) => fetchAPI('/workspaces', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  update: (id, data) => fetchAPI(`/workspaces/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  }),
-  delete: (id) => fetchAPI(`/workspaces/${id}`, {
-    method: 'DELETE',
-  }),
+  create: (data) =>
+    fetchAPI('/workspaces', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  update: (id, data) =>
+    fetchAPI(`/workspaces/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  delete: (id) =>
+    fetchAPI(`/workspaces/${id}`, {
+      method: 'DELETE',
+    }),
   getProjects: (id) => fetchAPI(`/workspaces/${id}/projects`),
   getOrCreatePersonal: () => fetchAPI('/workspaces/personal'),
   getStats: (id, params = {}) => {
@@ -34,10 +37,11 @@ export const workspaces = {
     return fetchAPI(`/workspaces/${id}/stats${query ? `?${query}` : ''}`);
   },
   getHomepageLayout: (id) => fetchAPI(`/workspaces/${id}/homepage/layout`),
-  updateHomepageLayout: (id, layout) => fetchAPI(`/workspaces/${id}/homepage/layout`, {
-    method: 'PUT',
-    body: JSON.stringify(layout),
-  }),
+  updateHomepageLayout: (id, layout) =>
+    fetchAPI(`/workspaces/${id}/homepage/layout`, {
+      method: 'PUT',
+      body: JSON.stringify(layout),
+    }),
   getStatuses: (id) => fetchAPI(`/workspaces/${id}/statuses`),
 };
 
@@ -46,17 +50,18 @@ export const workspaceRoles = {
   get: (id) => fetchAPI(`/workspace-roles/${id}`),
   getWorkspaceAssignments: (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/role-assignments`),
   getEveryoneRole: (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/everyone-role`),
-  setEveryoneRole: (workspaceId, data) => fetchAPI(`/workspaces/${workspaceId}/everyone-role`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  }),
-  assignToUser: (data) => fetchAPI('/workspace-roles/assign', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  revokeFromUser: (userId, workspaceId, roleId) => fetchAPI(
-    `/users/${userId}/workspaces/${workspaceId}/roles/${roleId}`,
-    { method: 'DELETE' }
-  ),
-  getUserRoles: (userId, workspaceId) => fetchAPI(`/users/${userId}/workspaces/${workspaceId}/roles`),
+  setEveryoneRole: (workspaceId, data) =>
+    fetchAPI(`/workspaces/${workspaceId}/everyone-role`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  assignToUser: (data) =>
+    fetchAPI('/workspace-roles/assign', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  revokeFromUser: (userId, workspaceId, roleId) =>
+    fetchAPI(`/users/${userId}/workspaces/${workspaceId}/roles/${roleId}`, { method: 'DELETE' }),
+  getUserRoles: (userId, workspaceId) =>
+    fetchAPI(`/users/${userId}/workspaces/${workspaceId}/roles`),
 };

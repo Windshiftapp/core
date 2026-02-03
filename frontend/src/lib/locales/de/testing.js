@@ -18,7 +18,8 @@ export default {
     createTestRun: 'Testlauf erstellen',
     deleteTestCase: 'Testfall löschen',
     deleteTestPlan: 'Testplan löschen',
-    deleteTestPlanConfirm: 'Möchten Sie diesen Testplan wirklich löschen? Dies kann nicht rückgängig gemacht werden.',
+    deleteTestPlanConfirm:
+      'Möchten Sie diesen Testplan wirklich löschen? Dies kann nicht rückgängig gemacht werden.',
     addTestPlan: 'Testplan hinzufügen',
     createFirstTestPlan: 'Erstellen Sie Ihren ersten Testplan, um Testfälle zu organisieren',
     lastRun: 'Letzter Lauf',
@@ -59,22 +60,26 @@ export default {
     createNewIssue: 'Neues Problem erstellen',
     nextStep: 'Nächster Schritt',
     noTestSteps: 'Keine Testschritte',
-    noTestStepsDescription: 'Dieser Testfall hat noch keine definierten Schritte. Sie können Schritte hinzufügen, um ihn ausführbar zu machen.',
+    noTestStepsDescription:
+      'Dieser Testfall hat noch keine definierten Schritte. Sie können Schritte hinzufügen, um ihn ausführbar zu machen.',
     previousCase: 'Vorheriger Fall',
     nextCase: 'Nächster Fall',
     caseOfTotal: 'Fall {current} von {total}',
     testRunNotFound: 'Testlauf nicht gefunden oder keine Testfälle verfügbar',
     backToTestRuns: 'Zurück zu Testläufen',
     finishTestExecution: 'Testausführung beenden',
-    finishConfirmMessage: 'Sind Sie sicher, dass Sie diese Testausführung beenden möchten? Dadurch wird der Testlauf als abgeschlossen markiert.',
+    finishConfirmMessage:
+      'Sind Sie sicher, dass Sie diese Testausführung beenden möchten? Dadurch wird der Testlauf als abgeschlossen markiert.',
     failedToFinish: 'Testausführung konnte nicht beendet werden. Bitte versuchen Sie es erneut.',
     unknownItem: 'Unbekannter Eintrag',
     addTestCase: 'Testfall hinzufügen',
     editTestCase: 'Testfall bearbeiten',
-    deleteTestCaseConfirm: 'Sind Sie sicher, dass Sie diesen Testfall löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
+    deleteTestCaseConfirm:
+      'Sind Sie sicher, dass Sie diesen Testfall löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
     noTestCasesFound: 'Keine Testfälle gefunden',
     noTestCasesWithLabel: 'Keine Testfälle mit dem ausgewählten Label-Filter gefunden.',
-    createFirstTestCase: "Klicken Sie auf 'Testfall hinzufügen', um Ihren ersten Testfall in diesem Ordner zu erstellen.",
+    createFirstTestCase:
+      "Klicken Sie auf 'Testfall hinzufügen', um Ihren ersten Testfall in diesem Ordner zu erstellen.",
     allLabels: 'Alle Labels',
     noLabels: 'Keine Labels',
     draft: 'Entwurf',
@@ -94,10 +99,13 @@ export default {
     parentFolderOptional: 'Übergeordneter Ordner (optional)',
     topLevelFolder: 'Ordner auf oberster Ebene',
     subfoldersNestingNote: 'Unterordner können nur eine Ebene tief verschachtelt werden.',
-    deleteFolderConfirm: 'Sind Sie sicher, dass Sie diesen Ordner löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
+    deleteFolderConfirm:
+      'Sind Sie sicher, dass Sie diesen Ordner löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
     estimatedDuration: 'Geschätzte Dauer',
-    preconditionsPlaceholder: 'Beschreiben Sie die Bedingungen, die erfüllt sein müssen, bevor dieser Testfall ausgeführt wird...',
-    testCaseStepsInfo: 'Nach dem Erstellen dieses Testfalls können Sie einzelne Testschritte mit spezifischen Aktionen, Daten und erwarteten Ergebnissen für eine präzise Testausführung hinzufügen.',
+    preconditionsPlaceholder:
+      'Beschreiben Sie die Bedingungen, die erfüllt sein müssen, bevor dieser Testfall ausgeführt wird...',
+    testCaseStepsInfo:
+      'Nach dem Erstellen dieses Testfalls können Sie einzelne Testschritte mit spezifischen Aktionen, Daten und erwarteten Ergebnissen für eine präzise Testausführung hinzufügen.',
     pressToOpenSteps: 'Drücken Sie 1-9, um Schritte zu öffnen',
     manageLabels: 'Labels verwalten',
     clickLabelsToAssign: 'Klicken Sie auf Labels, um sie diesem Testfall zuzuweisen/zu entfernen',
@@ -116,7 +124,8 @@ export default {
     noLabelsMatchSearch: 'Keine Labels entsprechen Ihrer Suche',
     adjustSearchOrCreate: 'Versuchen Sie, Ihre Suche anzupassen oder ein neues Label zu erstellen.',
     noLabelsAvailable: 'Keine Labels verfügbar',
-    createFirstLabel: 'Erstellen Sie Ihr erstes Label, um mit der Organisation Ihrer Testfälle zu beginnen.',
+    createFirstLabel:
+      'Erstellen Sie Ihr erstes Label, um mit der Organisation Ihrer Testfälle zu beginnen.',
     labelsAssigned: '{count} Label(s) zugewiesen',
     step: 'Schritt',
     expectedResult: 'Erwartetes Ergebnis',
@@ -166,15 +175,20 @@ export default {
     templateNamePlaceholder: 'z.B. Sprint Regression Vorlage',
     createTemplate: 'Vorlage erstellen',
     deleteTemplate: 'Vorlage löschen',
-    deleteTemplateConfirm: 'Sind Sie sicher, dass Sie "{name}" löschen möchten? Vorhandene Testläufe, die aus dieser Vorlage erstellt wurden, werden nicht gelöscht.',
+    deleteTemplateConfirm:
+      'Sind Sie sicher, dass Sie "{name}" löschen möchten? Vorhandene Testläufe, die aus dieser Vorlage erstellt wurden, werden nicht gelöscht.',
     noTemplatesYet: 'Noch keine Vorlagen',
-    createTemplatesHint: 'Erstellen Sie Vorlagen, um Testläufe mit vordefinierten Konfigurationen schnell zu starten',
-    createTemplateToReuse: 'Erstellen Sie eine Vorlage, um Testläufe mit vordefinierten Konfigurationen schnell zu starten.',
+    createTemplatesHint:
+      'Erstellen Sie Vorlagen, um Testläufe mit vordefinierten Konfigurationen schnell zu starten',
+    createTemplateToReuse:
+      'Erstellen Sie eine Vorlage, um Testläufe mit vordefinierten Konfigurationen schnell zu starten.',
     executeTemplate: 'Vorlage ausführen',
     templateNameRequired: 'Vorlagenname darf nicht leer sein',
-    failedToUpdateTemplate: 'Vorlage konnte nicht aktualisiert werden. Bitte versuchen Sie es erneut.',
+    failedToUpdateTemplate:
+      'Vorlage konnte nicht aktualisiert werden. Bitte versuchen Sie es erneut.',
     failedToDeleteTemplate: 'Vorlage konnte nicht gelöscht werden. Bitte versuchen Sie es erneut.',
-    failedToStartExecution: 'Ausführung konnte nicht gestartet werden. Bitte versuchen Sie es erneut.',
+    failedToStartExecution:
+      'Ausführung konnte nicht gestartet werden. Bitte versuchen Sie es erneut.',
     templateInformation: 'Vorlageninformationen',
     templateDescriptionPlaceholder: 'Beschreibung für diese Vorlage hinzufügen...',
     noDescription: 'Keine Beschreibung vorhanden',
@@ -183,7 +197,8 @@ export default {
     results: 'Ergebnisse',
     progress: 'Fortschritt',
     noExecutionsYet: 'Noch keine Ausführungen',
-    clickExecuteTemplate: 'Klicken Sie auf "Vorlage ausführen", um Ihren ersten Testlauf aus dieser Vorlage zu erstellen',
+    clickExecuteTemplate:
+      'Klicken Sie auf "Vorlage ausführen", um Ihren ersten Testlauf aus dieser Vorlage zu erstellen',
     quickStats: 'Schnellstatistik',
     totalExecutions: 'Gesamte Ausführungen',
     testPlanDetails: 'Testplan-Details',
@@ -207,7 +222,8 @@ export default {
     adjustFiltersOrBroader: 'Versuchen Sie, Ihre Filter anzupassen oder Ihre Suche zu erweitern.',
     workItemsCoveredByTests: 'Von Tests abgedeckte Arbeitsaufgaben',
     itemsWithoutTestCoverage: 'Elemente ohne Testabdeckung',
-    selectWorkspacesAndTypes: 'Wählen Sie Arbeitsbereiche und Elementtypen aus, die in den Bericht aufgenommen werden sollen',
+    selectWorkspacesAndTypes:
+      'Wählen Sie Arbeitsbereiche und Elementtypen aus, die in den Bericht aufgenommen werden sollen',
     selectWorkspaces: 'Arbeitsbereiche auswählen',
     allWorkspaces: 'Alle Arbeitsbereiche',
     itemTypes: 'Elementtypen',
@@ -221,7 +237,8 @@ export default {
     deleteTestSet: 'Testplan löschen',
     deleteSetConfirm: 'Sind Sie sicher, dass Sie "{name}" löschen möchten?',
     noTestPlansYet: 'Noch keine Testpläne',
-    createTestPlanToOrganize: 'Erstellen Sie einen Testplan, um Testfälle zu organisieren und auszuführen.',
+    createTestPlanToOrganize:
+      'Erstellen Sie einen Testplan, um Testfälle zu organisieren und auszuführen.',
     testReportsTitle: 'Testberichte',
     testReportsSubtitle: 'Testausführungstrends und Ergebnisse analysieren',
     testRunReport: 'Testlauf-Bericht',
@@ -238,7 +255,8 @@ export default {
     configureRequirements: 'Anforderungen konfigurieren',
     configureRequirementTypes: 'Anforderungstypen konfigurieren',
     noRequirementTypesConfigured: 'Keine Anforderungstypen konfiguriert',
-    selectItemTypesForCoverage: 'Wählen Sie Elementtypen aus, die für die Abdeckungsberichte verfolgt werden sollen',
+    selectItemTypesForCoverage:
+      'Wählen Sie Elementtypen aus, die für die Abdeckungsberichte verfolgt werden sollen',
     selectItemTypesForCoverageAnalysis: 'Wählen Sie Elementtypen für die Abdeckungsanalyse aus',
     saveConfiguration: 'Konfiguration speichern',
     overview: 'Übersicht',
@@ -257,7 +275,7 @@ export default {
     lastFailed: 'Zuletzt fehlgeschlagen',
     failCount: 'Fehlerzähler',
     blockedTests: 'Blockierte Tests',
-    noBlockedTests: 'Keine blockierten Tests'
+    noBlockedTests: 'Keine blockierten Tests',
   },
 
   testCase: {
@@ -278,6 +296,6 @@ export default {
     noExecutions: 'Dieser Testfall wurde in keinem der letzten Testläufe ausgeführt.',
     set: 'Set',
     template: 'Vorlage',
-    backToItem: 'Zurück zum Vorgang'
-  }
+    backToItem: 'Zurück zum Vorgang',
+  },
 };

@@ -7,14 +7,14 @@ import { api } from '../api.js';
 let savedConnectionsState = $state({
   items: [],
   isLoading: false,
-  error: null
+  error: null,
 });
 
 // Import jobs list (for management page)
 let importJobsState = $state({
   items: [],
   isLoading: false,
-  error: null
+  error: null,
 });
 
 // Connection state
@@ -27,7 +27,7 @@ let connectionState = $state({
   instanceInfo: null,
   isConnecting: false,
   isConnected: false,
-  error: null
+  error: null,
 });
 
 // Projects state
@@ -36,23 +36,23 @@ let projectsState = $state({
   selected: [],
   openIssuesOnly: false,
   isLoading: false,
-  error: null
+  error: null,
 });
 
 // Analysis state
 let analysisState = $state({
   isAnalyzing: false,
   result: null,
-  error: null
+  error: null,
 });
 
 // Mappings state
 let mappingsState = $state({
-  workspaces: [],  // { jiraKey, jiraName, windshiftId, createNew, newWorkspaceName, newWorkspaceKey }
-  issueTypes: [],  // { jiraIds[], jiraName, isSubtask, hierarchyLevel, windshiftId, createNew } - deduplicated by name
-  statuses: [],    // { jiraIds[], jiraName, categoryKey, categoryName, color, windshiftId, createNew } - deduplicated by name
+  workspaces: [], // { jiraKey, jiraName, windshiftId, createNew, newWorkspaceName, newWorkspaceKey }
+  issueTypes: [], // { jiraIds[], jiraName, isSubtask, hierarchyLevel, windshiftId, createNew } - deduplicated by name
+  statuses: [], // { jiraIds[], jiraName, categoryKey, categoryName, color, windshiftId, createNew } - deduplicated by name
   customFields: [], // { jiraId, jiraName, windshiftType, action, windshiftId }
-  versions: []     // { jiraId, jiraName, projectKey, released, releaseDate, createNew }
+  versions: [], // { jiraId, jiraName, projectKey, released, releaseDate, createNew }
 });
 
 // Import state
@@ -62,7 +62,7 @@ let importState = $state({
   phase: 'idle',
   progress: null,
   error: null,
-  result: null
+  result: null,
 });
 
 // Wizard state
@@ -73,21 +73,37 @@ let wizardState = $state({
     { id: 'projects', label: 'Projects', completed: false },
     { id: 'mapping', label: 'Mapping', completed: false },
     { id: 'preview', label: 'Preview', completed: false },
-    { id: 'import', label: 'Import', completed: false }
-  ]
+    { id: 'import', label: 'Import', completed: false },
+  ],
 });
 
 // Export reactive getters
 export const jiraImport = {
   // Getters for reactive access
-  get savedConnections() { return savedConnectionsState; },
-  get importJobs() { return importJobsState; },
-  get connection() { return connectionState; },
-  get projects() { return projectsState; },
-  get analysis() { return analysisState; },
-  get mappings() { return mappingsState; },
-  get import() { return importState; },
-  get wizard() { return wizardState; },
+  get savedConnections() {
+    return savedConnectionsState;
+  },
+  get importJobs() {
+    return importJobsState;
+  },
+  get connection() {
+    return connectionState;
+  },
+  get projects() {
+    return projectsState;
+  },
+  get analysis() {
+    return analysisState;
+  },
+  get mappings() {
+    return mappingsState;
+  },
+  get import() {
+    return importState;
+  },
+  get wizard() {
+    return wizardState;
+  },
 
   // Load saved connections
   async loadSavedConnections() {
@@ -123,7 +139,9 @@ export const jiraImport = {
   async deleteSavedConnection(connectionId) {
     try {
       await api.jiraImport.deleteConnection(connectionId);
-      savedConnectionsState.items = savedConnectionsState.items.filter(c => c.id !== connectionId);
+      savedConnectionsState.items = savedConnectionsState.items.filter(
+        (c) => c.id !== connectionId
+      );
       return { success: true };
     } catch (err) {
       return { success: false, error: err.message || 'Failed to delete connection' };
@@ -151,7 +169,7 @@ export const jiraImport = {
         instance_url: url,
         email: email,
         api_token: token,
-        deployment_type: deploymentType
+        deployment_type: deploymentType,
       });
 
       connectionState.connectionId = response.connection_id;
@@ -185,7 +203,10 @@ export const jiraImport = {
     projectsState.error = null;
 
     try {
-      const projects = await api.jiraImport.getProjects(connectionState.connectionId, projectsState.openIssuesOnly);
+      const projects = await api.jiraImport.getProjects(
+        connectionState.connectionId,
+        projectsState.openIssuesOnly
+      );
       projectsState.available = projects;
     } catch (err) {
       projectsState.error = err.message || 'Failed to load projects';
@@ -207,7 +228,7 @@ export const jiraImport = {
   toggleProject(projectKey) {
     const idx = projectsState.selected.indexOf(projectKey);
     if (idx >= 0) {
-      projectsState.selected = projectsState.selected.filter(k => k !== projectKey);
+      projectsState.selected = projectsState.selected.filter((k) => k !== projectKey);
     } else {
       projectsState.selected = [...projectsState.selected, projectKey];
     }
@@ -216,8 +237,8 @@ export const jiraImport = {
   selectAllProjects() {
     // Only select company-managed projects (exclude team-managed)
     projectsState.selected = projectsState.available
-      .filter(p => !p.is_team_managed)
-      .map(p => p.key);
+      .filter((p) => !p.is_team_managed)
+      .map((p) => p.key);
   },
 
   deselectAllProjects() {
@@ -258,14 +279,14 @@ export const jiraImport = {
 
   initializeMappings(analysis) {
     // Initialize workspace mappings
-    mappingsState.workspaces = analysis.projects.map(p => ({
+    mappingsState.workspaces = analysis.projects.map((p) => ({
       jiraKey: p.key,
       jiraName: p.name,
       issueCount: p.issue_count,
       windshiftId: null,
       createNew: true,
       newWorkspaceName: p.name,
-      newWorkspaceKey: p.key
+      newWorkspaceKey: p.key,
     }));
 
     // Deduplicate issue types by name (keep all Jira IDs for mapping during import)
@@ -273,15 +294,15 @@ export const jiraImport = {
     for (const it of analysis.issue_types) {
       const existing = issueTypesByName.get(it.name);
       if (existing) {
-        existing.jiraIds.push(it.id);  // Add additional Jira ID
+        existing.jiraIds.push(it.id); // Add additional Jira ID
       } else {
         issueTypesByName.set(it.name, {
-          jiraIds: [it.id],  // Array of all Jira IDs with this name
+          jiraIds: [it.id], // Array of all Jira IDs with this name
           jiraName: it.name,
           isSubtask: it.subtask,
           hierarchyLevel: it.hierarchy_level,
           windshiftId: null,
-          createNew: true
+          createNew: true,
         });
       }
     }
@@ -292,33 +313,33 @@ export const jiraImport = {
     for (const s of analysis.statuses) {
       const existing = statusesByName.get(s.name);
       if (existing) {
-        existing.jiraIds.push(s.id);  // Add additional Jira ID
+        existing.jiraIds.push(s.id); // Add additional Jira ID
       } else {
         statusesByName.set(s.name, {
-          jiraIds: [s.id],  // Array of all Jira IDs with this name
+          jiraIds: [s.id], // Array of all Jira IDs with this name
           jiraName: s.name,
           categoryKey: s.category_key,
           categoryName: s.category_name,
           color: s.color,
           windshiftId: null,
-          createNew: true
+          createNew: true,
         });
       }
     }
     mappingsState.statuses = Array.from(statusesByName.values());
 
     // Initialize version mappings
-    mappingsState.versions = (analysis.versions || []).map(v => ({
+    mappingsState.versions = (analysis.versions || []).map((v) => ({
       jiraId: v.id,
       jiraName: v.name,
       projectKey: v.project_key,
       released: v.released,
       releaseDate: v.release_date,
-      createNew: true
+      createNew: true,
     }));
 
     // Initialize field mappings
-    mappingsState.customFields = analysis.custom_fields.map(f => ({
+    mappingsState.customFields = analysis.custom_fields.map((f) => ({
       jiraId: f.jira_field_id,
       jiraName: f.jira_field_name,
       jiraType: f.jira_field_type,
@@ -326,20 +347,20 @@ export const jiraImport = {
       canMap: f.can_map,
       notes: f.notes,
       action: f.can_map ? 'create' : 'skip', // 'create', 'map', 'skip'
-      windshiftId: null
+      windshiftId: null,
     }));
   },
 
   // Mapping setters
   setWorkspaceMapping(jiraKey, config) {
-    const mapping = mappingsState.workspaces.find(m => m.jiraKey === jiraKey);
+    const mapping = mappingsState.workspaces.find((m) => m.jiraKey === jiraKey);
     if (mapping) {
       Object.assign(mapping, config);
     }
   },
 
   setIssueTypeMapping(jiraName, windshiftId, createNew = false) {
-    const mapping = mappingsState.issueTypes.find(m => m.jiraName === jiraName);
+    const mapping = mappingsState.issueTypes.find((m) => m.jiraName === jiraName);
     if (mapping) {
       mapping.windshiftId = windshiftId;
       mapping.createNew = createNew;
@@ -347,7 +368,7 @@ export const jiraImport = {
   },
 
   setStatusMapping(jiraName, windshiftId, createNew = false) {
-    const mapping = mappingsState.statuses.find(m => m.jiraName === jiraName);
+    const mapping = mappingsState.statuses.find((m) => m.jiraName === jiraName);
     if (mapping) {
       mapping.windshiftId = windshiftId;
       mapping.createNew = createNew;
@@ -355,7 +376,7 @@ export const jiraImport = {
   },
 
   setFieldAction(jiraId, action, windshiftId = null) {
-    const mapping = mappingsState.customFields.find(m => m.jiraId === jiraId);
+    const mapping = mappingsState.customFields.find((m) => m.jiraId === jiraId);
     if (mapping) {
       mapping.action = action;
       mapping.windshiftId = windshiftId;
@@ -405,19 +426,19 @@ export const jiraImport = {
     if (!analysisState.result) return null;
 
     const users = analysisState.result.users || [];
-    const matchedUsers = users.filter(u => u.matched_user_id != null);
-    const unmatchedUsers = users.filter(u => u.matched_user_id == null);
+    const matchedUsers = users.filter((u) => u.matched_user_id != null);
+    const unmatchedUsers = users.filter((u) => u.matched_user_id == null);
 
     return {
       projectCount: projectsState.selected.length,
       issueCount: analysisState.result.total_issues,
       issueTypeCount: mappingsState.issueTypes.length,
       statusCount: mappingsState.statuses.length,
-      fieldCount: mappingsState.customFields.filter(f => f.action !== 'skip').length,
+      fieldCount: mappingsState.customFields.filter((f) => f.action !== 'skip').length,
       assetCount: analysisState.result.total_assets,
       userCount: users.length,
       matchedUserCount: matchedUsers.length,
-      unmatchedUserCount: unmatchedUsers.length
+      unmatchedUserCount: unmatchedUsers.length,
     };
   },
 
@@ -430,14 +451,14 @@ export const jiraImport = {
   // Get matched vs unmatched users
   getUserStats() {
     const users = this.getUsers();
-    const matched = users.filter(u => u.matched_user_id != null);
-    const unmatched = users.filter(u => u.matched_user_id == null);
+    const matched = users.filter((u) => u.matched_user_id != null);
+    const unmatched = users.filter((u) => u.matched_user_id == null);
     return {
       total: users.length,
       matched: matched.length,
       unmatched: unmatched.length,
       matchedUsers: matched,
-      unmatchedUsers: unmatched
+      unmatchedUsers: unmatched,
     };
   },
 
@@ -453,7 +474,7 @@ export const jiraImport = {
         connection_id: connectionState.connectionId,
         project_keys: projectsState.selected,
         open_issues_only: projectsState.openIssuesOnly,
-        mappings: mappingsState
+        mappings: mappingsState,
       });
 
       importState.jobId = response.job_id;
@@ -514,7 +535,7 @@ export const jiraImport = {
       instanceInfo: null,
       isConnecting: false,
       isConnected: false,
-      error: null
+      error: null,
     };
 
     projectsState = {
@@ -522,13 +543,13 @@ export const jiraImport = {
       selected: [],
       openIssuesOnly: false,
       isLoading: false,
-      error: null
+      error: null,
     };
 
     analysisState = {
       isAnalyzing: false,
       result: null,
-      error: null
+      error: null,
     };
 
     mappingsState = {
@@ -536,7 +557,7 @@ export const jiraImport = {
       issueTypes: [],
       statuses: [],
       customFields: [],
-      versions: []
+      versions: [],
     };
 
     importState = {
@@ -545,14 +566,14 @@ export const jiraImport = {
       phase: 'idle',
       progress: null,
       error: null,
-      result: null
+      result: null,
     };
 
     wizardState = {
       currentStep: 0,
-      steps: wizardState.steps.map(s => ({ ...s, completed: false }))
+      steps: wizardState.steps.map((s) => ({ ...s, completed: false })),
     };
-  }
+  },
 };
 
 export default jiraImport;

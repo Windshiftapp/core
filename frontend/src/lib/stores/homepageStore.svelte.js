@@ -46,7 +46,9 @@ class HomepageStore {
    * Check if in onboarding mode.
    */
   get isOnboarding() {
-    return (this.totalWorkspaceCount === 0 || this.totalItemCount === 0) && !this.onboardingDismissed;
+    return (
+      (this.totalWorkspaceCount === 0 || this.totalItemCount === 0) && !this.onboardingDismissed
+    );
   }
 
   // === Initialization ===
@@ -121,9 +123,9 @@ class HomepageStore {
     const hourString = now.toLocaleString('en-US', {
       timeZone: userTimezone,
       hour: 'numeric',
-      hour12: false
+      hour12: false,
     });
-    const hour = parseInt(hourString);
+    const hour = parseInt(hourString, 10);
 
     // Determine greeting based on time of day
     if (hour >= 5 && hour < 12) {
@@ -142,7 +144,7 @@ class HomepageStore {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
     });
   }
 

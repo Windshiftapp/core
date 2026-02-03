@@ -8,31 +8,35 @@ export const notifications = writable([]);
 let loadPromise = null;
 export function loadNotifications() {
   if (loadPromise) return loadPromise;
-  
-  loadPromise = api.notifications.getAll().then(data => {
-    // Handle null response (no notifications)
-    if (!data || !Array.isArray(data)) {
+
+  loadPromise = api.notifications
+    .getAll()
+    .then((data) => {
+      // Handle null response (no notifications)
+      if (!data || !Array.isArray(data)) {
+        notifications.set([]);
+        return [];
+      }
+
+      // Convert timestamp strings to Date objects
+      const processedNotifications = data.map((notification) => ({
+        ...notification,
+        timestamp: new Date(notification.timestamp),
+        actionUrl: notification.action_url, // Convert snake_case to camelCase
+      }));
+      notifications.set(processedNotifications);
+      return processedNotifications;
+    })
+    .catch((error) => {
+      console.error('Failed to load notifications:', error);
+      // Fall back to empty array on error
       notifications.set([]);
       return [];
-    }
-    
-    // Convert timestamp strings to Date objects
-    const processedNotifications = data.map(notification => ({
-      ...notification,
-      timestamp: new Date(notification.timestamp),
-      actionUrl: notification.action_url, // Convert snake_case to camelCase
-    }));
-    notifications.set(processedNotifications);
-    return processedNotifications;
-  }).catch(error => {
-    console.error('Failed to load notifications:', error);
-    // Fall back to empty array on error
-    notifications.set([]);
-    return [];
-  }).finally(() => {
-    loadPromise = null; // Reset promise
-  });
-  
+    })
+    .finally(() => {
+      loadPromise = null; // Reset promise
+    });
+
   return loadPromise;
 }
 
@@ -45,10 +49,8 @@ export const notificationActions = {
   markAsRead: async (id) => {
     try {
       await api.notifications.markAsRead(id);
-      notifications.update(items => 
-        items.map(item => 
-          item.id === id ? { ...item, read: true } : item
-        )
+      notifications.update((items) =>
+        items.map((item) => (item.id === id ? { ...item, read: true } : item))
       );
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
@@ -57,9 +59,7 @@ export const notificationActions = {
 
   // Dismiss notification (remove from list - local only for now)
   dismiss: (id) => {
-    notifications.update(items => 
-      items.filter(item => item.id !== id)
-    );
+    notifications.update((items) => items.filter((item) => item.id !== id));
   },
 
   // Mark all as read
@@ -67,18 +67,16 @@ export const notificationActions = {
     try {
       // Get current notifications to mark them all as read
       let currentNotifications = [];
-      notifications.subscribe(items => {
+      notifications.subscribe((items) => {
         currentNotifications = items;
       })();
-      
+
       // Mark each unread notification as read
-      const unreadNotifications = currentNotifications.filter(item => !item.read);
-      await Promise.all(unreadNotifications.map(item => api.notifications.markAsRead(item.id)));
-      
+      const unreadNotifications = currentNotifications.filter((item) => !item.read);
+      await Promise.all(unreadNotifications.map((item) => api.notifications.markAsRead(item.id)));
+
       // Update local state
-      notifications.update(items => 
-        items.map(item => ({ ...item, read: true }))
-      );
+      notifications.update((items) => items.map((item) => ({ ...item, read: true })));
     } catch (error) {
       console.error('Failed to mark all notifications as read:', error);
     }
@@ -90,9 +88,9 @@ export const notificationActions = {
       const newNotification = {
         timestamp: new Date(),
         read: false,
-        ...notification
+        ...notification,
       };
-      
+
       const createdNotification = await api.notifications.create(newNotification);
       // Convert response to match our format
       const processedNotification = {
@@ -100,8 +98,8 @@ export const notificationActions = {
         timestamp: new Date(createdNotification.timestamp),
         actionUrl: createdNotification.action_url,
       };
-      
-      notifications.update(items => [processedNotification, ...items]);
+
+      notifications.update((items) => [processedNotification, ...items]);
       return processedNotification;
     } catch (error) {
       console.error('Failed to create notification:', error);
@@ -116,7 +114,7 @@ export const notificationActions = {
 
   // Get unread count
   getUnreadCount: (items) => {
-    return items.filter(item => !item.read).length;
+    return items.filter((item) => !item.read).length;
   },
 
   // Format timestamp for display
@@ -132,5 +130,5 @@ export const notificationActions = {
     if (hours < 24) return `${hours}h ago`;
     if (days < 7) return `${days}d ago`;
     return timestamp.toLocaleDateString();
-  }
+  },
 };

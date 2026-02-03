@@ -32,8 +32,8 @@ export default {
     skipped: 'Omitido',
     notRun: 'No ejecutado',
     finishExecution: 'Finalizar ejecucion',
-    testPlansSubtitle: 'Organizar casos de prueba en planes ejecutables'
+    testPlansSubtitle: 'Organizar casos de prueba en planes ejecutables',
   },
 
-  testCase: {}
+  testCase: {},
 };

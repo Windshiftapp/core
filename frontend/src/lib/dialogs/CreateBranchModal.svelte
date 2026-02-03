@@ -112,6 +112,7 @@
   role="dialog"
   aria-modal="true"
   aria-labelledby="create-branch-title"
+  tabindex="-1"
 >
   <div
     class="w-full max-w-md rounded-xl shadow-xl border overflow-hidden"

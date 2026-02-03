@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test';
-import { SetupPage } from '../pages/setup.page';
+import { expect, test } from '@playwright/test';
 import { generateUser } from '../fixtures/test-data';
+import { SetupPage } from '../pages/setup.page';
 
 /**
  * Initial Setup Tests
@@ -169,7 +169,7 @@ test.describe('Application Setup', () => {
 
     // Should have session cookie
     const cookies = await page.context().cookies();
-    const hasSession = cookies.some(c => c.name === 'session' || c.name === 'windshift_session');
+    const hasSession = cookies.some((c) => c.name === 'session' || c.name === 'windshift_session');
     expect(hasSession).toBeTruthy();
   });
 });

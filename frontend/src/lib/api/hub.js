@@ -32,7 +32,7 @@ async function getInbox(params = {}) {
   if (params.status) query.set('status', params.status);
 
   const queryString = query.toString();
-  return get(`/hub/inbox${queryString ? '?' + queryString : ''}`);
+  return get(`/hub/inbox${queryString ? `?${queryString}` : ''}`);
 }
 
 /**
@@ -47,5 +47,5 @@ export const hub = {
   get: getHub,
   updateConfig,
   getInbox,
-  getInboxItem
+  getInboxItem,
 };

@@ -40,6 +40,8 @@ export const coverage = {
     if (options.itemTypeId) params.append('item_type_id', options.itemTypeId);
     if (options.search) params.append('search', options.search);
     const queryString = params.toString();
-    return fetchAPI(`/collections/${id}/test-coverage/requirements${queryString ? '?' + queryString : ''}`);
+    return fetchAPI(
+      `/collections/${id}/test-coverage/requirements${queryString ? `?${queryString}` : ''}`
+    );
   },
 };

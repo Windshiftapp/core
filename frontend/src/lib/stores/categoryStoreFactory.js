@@ -1,6 +1,15 @@
 import { writable } from 'svelte/store';
 
-const DEFAULT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899', '#06b6d4', '#84cc16'];
+const DEFAULT_COLORS = [
+  '#3b82f6',
+  '#10b981',
+  '#f59e0b',
+  '#8b5cf6',
+  '#ef4444',
+  '#ec4899',
+  '#06b6d4',
+  '#84cc16',
+];
 
 /**
  * Factory function to create a category store
@@ -42,10 +51,10 @@ export function createCategoryStore(apiMethods, entityName) {
         const newCategory = await apiMethods.create({
           name: categoryData.name.trim(),
           color: categoryData.color,
-          description: categoryData.description || ''
+          description: categoryData.description || '',
         });
 
-        update(categories => [...categories, newCategory]);
+        update((categories) => [...categories, newCategory]);
         return newCategory;
       } catch (error) {
         console.error(`Failed to add ${entityName} category:`, error);
@@ -58,8 +67,8 @@ export function createCategoryStore(apiMethods, entityName) {
       try {
         const updatedCategory = await apiMethods.update(categoryId, updates);
 
-        update(categories => {
-          const index = categories.findIndex(c => c.id === categoryId);
+        update((categories) => {
+          const index = categories.findIndex((c) => c.id === categoryId);
           if (index !== -1) {
             categories[index] = updatedCategory;
           }
@@ -78,8 +87,8 @@ export function createCategoryStore(apiMethods, entityName) {
       try {
         await apiMethods.delete(categoryId);
 
-        update(categories => {
-          return categories.filter(c => c.id !== categoryId);
+        update((categories) => {
+          return categories.filter((c) => c.id !== categoryId);
         });
 
         return true;
@@ -91,12 +100,12 @@ export function createCategoryStore(apiMethods, entityName) {
 
     // Get category by ID
     getById(categoryId, currentCategories) {
-      return currentCategories.find(c => c.id === categoryId);
+      return currentCategories.find((c) => c.id === categoryId);
     },
 
     // Reset store (useful for testing or logout)
     reset() {
       set([]);
-    }
+    },
   };
 }

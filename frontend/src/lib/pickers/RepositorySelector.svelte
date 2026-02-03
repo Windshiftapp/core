@@ -139,6 +139,7 @@
   role="dialog"
   aria-modal="true"
   aria-labelledby="repo-selector-title"
+  tabindex="-1"
 >
   <div
     class="w-full max-w-2xl max-h-[80vh] flex flex-col rounded-xl shadow-xl border overflow-hidden"

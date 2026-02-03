@@ -2,6 +2,8 @@
  * German (de) - Aggregated locale module
  * Combines all split locale modules into a single export
  */
+
+import actions from './actions.js';
 import admin from './admin.js';
 import auth from './auth.js';
 import channels from './channels.js';
@@ -13,7 +15,6 @@ import time from './time.js';
 import ui from './ui.js';
 import workflows from './workflows.js';
 import workspace from './workspace.js';
-import actions from './actions.js';
 
 export default {
   // Admin related (settings, roles, permissions)
@@ -52,5 +53,5 @@ export default {
   ...workspace,
 
   // Actions automation
-  ...actions
+  ...actions,
 };

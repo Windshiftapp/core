@@ -7,35 +7,35 @@ function createModuleSettingsStore() {
     time_tracking_enabled: true,
     test_management_enabled: true,
     loaded: false,
-    loading: false
+    loading: false,
   });
 
   return {
     subscribe,
-    
+
     // Load module settings from API (only if not already loaded)
     async load() {
-      update(state => {
+      update((state) => {
         if (state.loaded || state.loading) {
           return state; // Already loaded or loading
         }
         return { ...state, loading: true };
       });
-      
+
       try {
         const settings = await api.setup.getModuleSettings();
         set({
           ...settings,
           loaded: true,
-          loading: false
+          loading: false,
         });
       } catch (error) {
         console.error('Failed to load module settings:', error);
         // Keep default values but mark as loaded to prevent retrying constantly
-        update(state => ({
+        update((state) => ({
           ...state,
           loaded: true,
-          loading: false
+          loading: false,
         }));
       }
     },
@@ -44,9 +44,9 @@ function createModuleSettingsStore() {
     async update(newSettings) {
       try {
         await api.setup.updateModuleSettings(newSettings);
-        update(state => ({
+        update((state) => ({
           ...state,
-          ...newSettings
+          ...newSettings,
         }));
       } catch (error) {
         console.error('Failed to update module settings:', error);
@@ -60,10 +60,10 @@ function createModuleSettingsStore() {
         time_tracking_enabled: true,
         test_management_enabled: true,
         loaded: false,
-        loading: false
+        loading: false,
       });
       await this.load();
-    }
+    },
   };
 }
 

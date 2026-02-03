@@ -63,6 +63,7 @@
   onkeypress={(e) => e.key === 'Escape' && close()}
   role="dialog"
   aria-modal="true"
+  tabindex="-1"
   aria-labelledby="create-pr-title"
 >
   <div

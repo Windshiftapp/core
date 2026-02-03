@@ -8,12 +8,12 @@ export const SYSTEM_FIELDS = [
   { identifier: 'milestone', name: 'Milestone', type: 'select' },
   { identifier: 'iteration', name: 'Iteration', type: 'select' },
   { identifier: 'due_date', name: 'Due Date', type: 'date' },
-  { identifier: 'project', name: 'Project', type: 'select' }
+  { identifier: 'project', name: 'Project', type: 'select' },
 ];
 
 // Helper to get field by identifier
 export function getSystemField(identifier) {
-  return SYSTEM_FIELDS.find(f => f.identifier === identifier);
+  return SYSTEM_FIELDS.find((f) => f.identifier === identifier);
 }
 
 // Helper to get display name for a system field

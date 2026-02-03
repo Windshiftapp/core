@@ -20,10 +20,10 @@ export default {
     stopTimer: 'Detener temporizador',
     pauseTimer: 'Pausar temporizador',
     resumeTimer: 'Reanudar temporizador',
-    timeLogged: 'Tiempo registrado correctamente'
+    timeLogged: 'Tiempo registrado correctamente',
   },
 
   timeProject: {},
 
-  timeProjectCategory: {}
+  timeProjectCategory: {},
 };

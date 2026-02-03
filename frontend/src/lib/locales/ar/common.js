@@ -145,7 +145,7 @@ export default {
     always: 'دائماً',
 
     viewDetails: 'عرض التفاصيل',
-    saved: 'تم الحفظ بنجاح'
+    saved: 'تم الحفظ بنجاح',
   },
 
   // Toast notifications
@@ -159,7 +159,7 @@ export default {
     created: 'تم الإنشاء بنجاح',
     updated: 'تم التحديث بنجاح',
     copied: 'تم النسخ إلى الحافظة',
-    failed: 'فشلت العملية'
+    failed: 'فشلت العملية',
   },
 
   // Backend error codes
@@ -184,7 +184,7 @@ export default {
     NETWORK_ERROR: 'خطأ في الشبكة. يرجى التحقق من اتصالك.',
     TIMEOUT: 'انتهت مهلة الطلب. يرجى المحاولة مرة أخرى.',
     UNKNOWN: 'حدث خطأ غير معروف.',
-    generic: 'حدث خطأ ما. يرجى المحاولة مرة أخرى.'
+    generic: 'حدث خطأ ما. يرجى المحاولة مرة أخرى.',
   },
 
   // Validation messages
@@ -204,7 +204,7 @@ export default {
     emailTaken: 'هذا البريد الإلكتروني مستخدم بالفعل',
     usernameTaken: 'اسم المستخدم هذا مستخدم بالفعل',
     slugInvalid: 'يُسمح فقط بالأحرف الصغيرة والأرقام والشرطات',
-    fillRequired: 'يرجى ملء جميع الحقول المطلوبة'
+    fillRequired: 'يرجى ملء جميع الحقول المطلوبة',
   },
 
   // Placeholders
@@ -221,7 +221,7 @@ export default {
     optionalDescription: 'وصف اختياري...',
     channelDescription: 'وصف موجز لغرض هذه القناة',
     columnName: 'اسم العمود',
-    typeName: "اكتب '{name}' هنا"
+    typeName: "اكتب '{name}' هنا",
   },
 
   // Empty States
@@ -232,6 +232,6 @@ export default {
     noFieldChanges: 'لم يتم اكتشاف تغييرات في الحقول',
     noRequirements: 'لا توجد متطلبات مكونة',
     configureFilter: 'قم بتكوين الفلتر لرؤية العناصر',
-    createToStart: 'أنشئ {item} للبدء'
-  }
+    createToStart: 'أنشئ {item} للبدء',
+  },
 };

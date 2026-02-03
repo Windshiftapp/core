@@ -30,7 +30,7 @@ export default {
     loadingSearch: 'Loading Search...',
     loadingCreateForm: 'Loading Create Form...',
     loading: 'Loading...',
-    retry: 'Retry'
+    retry: 'Retry',
   },
 
   commandPalette: {
@@ -60,13 +60,25 @@ export default {
       testTemplates: { label: 'Templates', description: 'Template runs and shared steps' },
       testRuns: { label: 'Test Runs', description: 'View and manage test executions' },
       testReports: { label: 'Reports', description: 'View test execution reports' },
-      createTestCase: { label: 'Create Test Case', description: 'Create a new test case for quality assurance' },
-      createTestPlan: { label: 'Create Test Plan', description: 'Create a new test plan with test cases' },
-      createTestRun: { label: 'Create Test Run', description: 'Create a new test run template for execution' },
+      createTestCase: {
+        label: 'Create Test Case',
+        description: 'Create a new test case for quality assurance',
+      },
+      createTestPlan: {
+        label: 'Create Test Plan',
+        description: 'Create a new test plan with test cases',
+      },
+      createTestRun: {
+        label: 'Create Test Run',
+        description: 'Create a new test run template for execution',
+      },
 
       // Time Management
       timeTracking: { label: 'Time Tracking', description: 'Log and manage work time entries' },
-      timeReports: { label: 'Time Reports', description: 'View time tracking reports and analytics' },
+      timeReports: {
+        label: 'Time Reports',
+        description: 'View time tracking reports and analytics',
+      },
       timeProjects: { label: 'Time Projects', description: 'Manage time tracking projects' },
       logTime: { label: 'Log Time', description: 'Quickly add a new time entry' },
       startTimer: { label: 'Start Timer', description: 'Start tracking time for current work' },
@@ -76,37 +88,97 @@ export default {
       createWorkItem: { label: 'Create Work Item', description: 'Create a new work item or task' },
       createWorkspace: { label: 'Create Workspace', description: 'Create a new project workspace' },
       createMilestone: { label: 'Create Milestone', description: 'Create a new project milestone' },
-      createCollection: { label: 'Create Collection', description: 'Create a new work item collection' },
+      createCollection: {
+        label: 'Create Collection',
+        description: 'Create a new work item collection',
+      },
 
       // Admin Commands
       adminCustomFields: { label: 'Custom Fields', description: 'Manage custom field definitions' },
-      adminScreens: { label: 'Screen Management', description: 'Configure form screens and layouts' },
-      adminHierarchyLevels: { label: 'Hierarchy Levels', description: 'Configure work item hierarchy levels' },
-      adminItemTypes: { label: 'Item Types', description: 'Manage work item types with icons and colors' },
-      adminPriorities: { label: 'Priorities', description: 'Configure priority levels with icons and colors' },
-      adminConfigSets: { label: 'Configuration Sets', description: 'Manage configuration sets with workflows and screens' },
+      adminScreens: {
+        label: 'Screen Management',
+        description: 'Configure form screens and layouts',
+      },
+      adminHierarchyLevels: {
+        label: 'Hierarchy Levels',
+        description: 'Configure work item hierarchy levels',
+      },
+      adminItemTypes: {
+        label: 'Item Types',
+        description: 'Manage work item types with icons and colors',
+      },
+      adminPriorities: {
+        label: 'Priorities',
+        description: 'Configure priority levels with icons and colors',
+      },
+      adminConfigSets: {
+        label: 'Configuration Sets',
+        description: 'Manage configuration sets with workflows and screens',
+      },
       adminStatuses: { label: 'Statuses', description: 'Manage individual work item statuses' },
-      adminStatusCategories: { label: 'Status Categories', description: 'Manage status categories and colors' },
-      adminWorkflows: { label: 'Workflow Builder', description: 'Design and manage workflow transitions' },
+      adminStatusCategories: {
+        label: 'Status Categories',
+        description: 'Manage status categories and colors',
+      },
+      adminWorkflows: {
+        label: 'Workflow Builder',
+        description: 'Design and manage workflow transitions',
+      },
       adminLinkTypes: { label: 'Link Types', description: 'Manage link types between work items' },
-      adminScmProviders: { label: 'SCM Providers', description: 'Configure GitHub, GitLab, Gitea, and Bitbucket integrations' },
-      adminAttachments: { label: 'Attachments', description: 'Manage attachment settings and configuration' },
-      adminModules: { label: 'Module Settings', description: 'Enable or disable time tracking and test management modules' },
-      adminThemes: { label: 'Theme Settings', description: 'Manage application themes and appearance' },
+      adminScmProviders: {
+        label: 'SCM Providers',
+        description: 'Configure GitHub, GitLab, Gitea, and Bitbucket integrations',
+      },
+      adminAttachments: {
+        label: 'Attachments',
+        description: 'Manage attachment settings and configuration',
+      },
+      adminModules: {
+        label: 'Module Settings',
+        description: 'Enable or disable time tracking and test management modules',
+      },
+      adminThemes: {
+        label: 'Theme Settings',
+        description: 'Manage application themes and appearance',
+      },
       adminUsers: { label: 'User Management', description: 'Manage users, roles, and permissions' },
       adminGroups: { label: 'Group Management', description: 'Manage user groups and memberships' },
-      adminPermissions: { label: 'Permissions', description: 'Manage user permissions and access control' },
-      adminPermissionSets: { label: 'Permission Sets', description: 'Manage permission bundles for configuration sets' },
-      adminWorkspaceRoles: { label: 'Workspace Roles', description: 'View workspace roles and their permissions' },
-      adminSso: { label: 'Single Sign-On', description: 'Configure OIDC identity providers for SSO' },
-      adminSecurity: { label: 'Security Settings', description: 'Configure calendar feeds and plugin execution' },
+      adminPermissions: {
+        label: 'Permissions',
+        description: 'Manage user permissions and access control',
+      },
+      adminPermissionSets: {
+        label: 'Permission Sets',
+        description: 'Manage permission bundles for configuration sets',
+      },
+      adminWorkspaceRoles: {
+        label: 'Workspace Roles',
+        description: 'View workspace roles and their permissions',
+      },
+      adminSso: {
+        label: 'Single Sign-On',
+        description: 'Configure OIDC identity providers for SSO',
+      },
+      adminSecurity: {
+        label: 'Security Settings',
+        description: 'Configure calendar feeds and plugin execution',
+      },
       adminSystemImport: { label: 'System Import', description: 'Import data from other systems' },
-      adminAssets: { label: 'Asset Management', description: 'Configure asset types and categories' },
+      adminAssets: {
+        label: 'Asset Management',
+        description: 'Configure asset types and categories',
+      },
       adminWorkspaces: { label: 'Workspaces Admin', description: 'Manage workspaces and settings' },
-      adminNotifications: { label: 'Notification Settings', description: 'Manage notification configurations' },
+      adminNotifications: {
+        label: 'Notification Settings',
+        description: 'Manage notification configurations',
+      },
 
       // System Commands
-      quitApp: { label: 'Quit Application', description: 'Gracefully shut down the application server' },
+      quitApp: {
+        label: 'Quit Application',
+        description: 'Gracefully shut down the application server',
+      },
 
       // Other
       portal: { label: 'Portal', description: 'Customer portal management' },
@@ -120,8 +192,11 @@ export default {
 
       // Dynamic workspace commands
       goToWorkspace: { label: 'Go to {name}', description: 'Navigate to {name} workspace' },
-      workspaceOverview: { label: '{name} Overview', description: 'View workspace dashboard with stats and charts' }
-    }
+      workspaceOverview: {
+        label: '{name} Overview',
+        description: 'View workspace dashboard with stats and charts',
+      },
+    },
   },
 
   dashboard: {
@@ -184,7 +259,7 @@ export default {
     dueIn: 'Due in {days}d',
     dueToday: 'Due today',
     overdue: '{days}d overdue',
-    done: '{done}/{total} done'
+    done: '{done}/{total} done',
   },
 
   search: {
@@ -201,21 +276,25 @@ export default {
     advancedSearch: 'Advanced Search',
     recentSearches: 'Recent Searches',
     workItem: 'Work Item',
-    workspace: 'Workspace'
+    workspace: 'Workspace',
   },
 
   about: {
     title: 'About Windshift',
     subtitle: 'A comprehensive work management platform designed for modern teams',
     whatIs: 'What is Windshift?',
-    description: 'Windshift is a powerful work management application that brings together project tracking, test management, time tracking, and team collaboration in one unified platform. Built with modern technologies and designed for flexibility, it adapts to your team\'s unique workflow.',
+    description:
+      "Windshift is a powerful work management application that brings together project tracking, test management, time tracking, and team collaboration in one unified platform. Built with modern technologies and designed for flexibility, it adapts to your team's unique workflow.",
     keyFeatures: 'Key Features',
     projectManagement: 'Project Management',
-    projectManagementDesc: 'Organize work items hierarchically with custom fields, workflows, and status tracking.',
+    projectManagementDesc:
+      'Organize work items hierarchically with custom fields, workflows, and status tracking.',
     testManagement: 'Test Management',
-    testManagementDesc: 'Create test cases, organize test plans, execute test runs, and track defects efficiently.',
+    testManagementDesc:
+      'Create test cases, organize test plans, execute test runs, and track defects efficiently.',
     timeTracking: 'Time Tracking',
-    timeTrackingDesc: 'Track time spent on projects and tasks with detailed reporting and analytics.',
+    timeTrackingDesc:
+      'Track time spent on projects and tasks with detailed reporting and analytics.',
     builtWith: 'Built With',
     frontend: 'Frontend',
     backend: 'Backend',
@@ -226,12 +305,12 @@ export default {
     builtBy: 'Built with',
     builtByTeam: 'by the development team',
     reportIssues: 'Report Issues',
-    getStarted: 'Get Started'
+    getStarted: 'Get Started',
   },
 
   onboarding: {
     welcomeTo: 'Welcome to Windshift',
-    getStartedMessage: 'Let\'s get you started by creating your first workspace and work item',
+    getStartedMessage: "Let's get you started by creating your first workspace and work item",
     progress: 'Progress',
     completed: 'completed',
     of: 'of',
@@ -242,6 +321,6 @@ export default {
     trackTasks: 'Track tasks, bugs, features, and more',
     createWorkItemBtn: 'Create Work Item',
     dismissAssistant: 'Dismiss Assistant',
-    dismissOnboarding: 'Dismiss onboarding'
-  }
+    dismissOnboarding: 'Dismiss onboarding',
+  },
 };

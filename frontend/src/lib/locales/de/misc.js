@@ -8,24 +8,24 @@ export default {
   jiraImport: {
     title: {
       cloud: 'Jira Cloud Import',
-      datacenter: 'Jira Data Center Import'
+      datacenter: 'Jira Data Center Import',
     },
     subtitle: {
       cloud: 'Vorgänge aus Jira Cloud importieren',
-      datacenter: 'Vorgänge aus Jira Data Center importieren'
+      datacenter: 'Vorgänge aus Jira Data Center importieren',
     },
     steps: {
       connect: 'Verbinden',
       projects: 'Projekte',
       mapping: 'Zuordnung',
       preview: 'Vorschau',
-      import: 'Import'
+      import: 'Import',
     },
     deploymentType: {
       cloud: 'Jira Cloud',
       cloudDesc: '*.atlassian.net',
       datacenter: 'Data Center',
-      datacenterDesc: 'Selbst gehostet'
+      datacenterDesc: 'Selbst gehostet',
     },
     form: {
       urlCloud: 'Jira Cloud URL',
@@ -36,7 +36,8 @@ export default {
       password: 'Passwort oder persönliches Zugriffstoken',
       generateToken: 'Token generieren',
       tokenHelpCloud: 'aus Ihren Atlassian-Kontoeinstellungen',
-      tokenHelpDatacenter: 'Verwenden Sie Ihr Passwort oder ein persönliches Zugriffstoken aus Ihren Jira-Profileinstellungen'
+      tokenHelpDatacenter:
+        'Verwenden Sie Ihr Passwort oder ein persönliches Zugriffstoken aus Ihren Jira-Profileinstellungen',
     },
     buttons: {
       connect: 'Verbinden',
@@ -50,23 +51,27 @@ export default {
       deselectAll: 'Alle abwählen',
       addNewConnection: 'Neue Verbindung hinzufügen',
       useExisting: 'Vorhandene verwenden',
-      retryImport: 'Import wiederholen'
+      retryImport: 'Import wiederholen',
     },
     messages: {
       connected: 'Verbunden mit {name}',
       selectConnection: 'Wählen Sie eine bestehende Verbindung aus oder erstellen Sie eine neue',
-      credentialsHelpCloud: 'Geben Sie Ihre Jira Cloud Anmeldedaten ein. Sie können ein API-Token in Ihren Atlassian-Kontoeinstellungen generieren.',
-      credentialsHelpDatacenter: 'Geben Sie Ihre Jira Data Center Anmeldedaten ein. Verwenden Sie Ihren Benutzernamen und Ihr Passwort oder ein persönliches Zugriffstoken.',
-      reviewSummary: 'Überprüfen Sie die Import-Zusammenfassung vor dem Fortfahren. Dieser Vorgang kann bei großen Projekten mehrere Minuten dauern.',
+      credentialsHelpCloud:
+        'Geben Sie Ihre Jira Cloud Anmeldedaten ein. Sie können ein API-Token in Ihren Atlassian-Kontoeinstellungen generieren.',
+      credentialsHelpDatacenter:
+        'Geben Sie Ihre Jira Data Center Anmeldedaten ein. Verwenden Sie Ihren Benutzernamen und Ihr Passwort oder ein persönliches Zugriffstoken.',
+      reviewSummary:
+        'Überprüfen Sie die Import-Zusammenfassung vor dem Fortfahren. Dieser Vorgang kann bei großen Projekten mehrere Minuten dauern.',
       noAttachments: 'Anhänge werden nicht importiert',
-      noAttachmentsDesc: 'Kein Anhangsspeicher ist konfiguriert. Setzen Sie den --attachment-path Parameter beim Starten des Servers, um Anhänge zu importieren.'
+      noAttachmentsDesc:
+        'Kein Anhangsspeicher ist konfiguriert. Setzen Sie den --attachment-path Parameter beim Starten des Servers, um Anhänge zu importieren.',
     },
     projects: {
       selected: 'Projekte zum Importieren auswählen ({selected} von {total} ausgewählt)',
       openIssuesOnly: 'Nur offene Vorgänge importieren',
       openIssuesOnlyDesc: 'Schließt Vorgänge mit Statuskategorie "Erledigt" aus',
       teamManaged: 'Team-verwaltet',
-      issues: '{count} Vorgänge'
+      issues: '{count} Vorgänge',
     },
     mapping: {
       workspaces: 'Arbeitsbereiche',
@@ -76,12 +81,13 @@ export default {
       statuses: 'Status',
       statusesDesc: 'Status werden erstellt und nach Kategorie gruppiert',
       customFields: 'Benutzerdefinierte Felder',
-      customFieldsDesc: 'Benutzerdefinierte Felder, die zugeordnet werden können, werden in Windshift erstellt',
+      customFieldsDesc:
+        'Benutzerdefinierte Felder, die zugeordnet werden können, werden in Windshift erstellt',
       versions: 'Versionen / Meilensteine',
       versionsDesc: 'Jira-Versionen werden als Workspace-Meilensteine importiert.',
       subtask: 'Unteraufgabe',
       create: 'Erstellen',
-      skip: 'Überspringen'
+      skip: 'Überspringen',
     },
     preview: {
       workspaces: 'Arbeitsbereiche',
@@ -93,7 +99,7 @@ export default {
       users: 'Benutzer',
       usersNew: '({count} neu)',
       assets: 'Assets',
-      projectsToImport: 'Zu importierende Projekte'
+      projectsToImport: 'Zu importierende Projekte',
     },
     import: {
       importing: 'Importiere...',
@@ -103,7 +109,7 @@ export default {
       failed: '{count} Vorgänge konnten nicht importiert werden.',
       ready: 'Bereit zum Import',
       readyDesc: 'Klicken Sie auf "Import starten", um {count} Vorgänge zu importieren.',
-      progress: 'Fortschritt'
+      progress: 'Fortschritt',
     },
     errors: {
       connectionFailed: 'Verbindung zu Jira fehlgeschlagen',
@@ -111,8 +117,8 @@ export default {
       analyzeFailed: 'Projektanalyse fehlgeschlagen',
       importFailed: 'Import konnte nicht gestartet werden',
       loadConnectionsFailed: 'Verbindungen konnten nicht geladen werden',
-      deleteConnectionFailed: 'Verbindung konnte nicht gelöscht werden'
-    }
+      deleteConnectionFailed: 'Verbindung konnte nicht gelöscht werden',
+    },
   },
 
   sprints: {
@@ -160,7 +166,7 @@ export default {
     statusPlanned: 'Geplant',
     statusActive: 'Aktiv',
     statusCompleted: 'Abgeschlossen',
-    statusCancelled: 'Abgebrochen'
+    statusCancelled: 'Abgebrochen',
   },
 
   iterations: {
@@ -174,7 +180,7 @@ export default {
       planned: 'Geplant',
       active: 'Aktiv',
       completed: 'Abgeschlossen',
-      cancelled: 'Abgebrochen'
+      cancelled: 'Abgebrochen',
     },
     daysOverdue: '{count} Tage überfällig',
     endsToday: 'Endet heute',
@@ -183,6 +189,7 @@ export default {
     confirmDelete: 'Sind Sie sicher, dass Sie die Iteration "{name}" löschen möchten?',
     backToIterations: 'Zurück zu Iterationen',
     global: 'Global',
+    overdue: 'Überfällig',
     complete: 'abgeschlossen',
     noItems: 'Keine Elemente',
     summary: 'Zusammenfassung',
@@ -193,7 +200,8 @@ export default {
     noStatusData: 'Keine Statusdaten',
     workItems: 'Arbeitselemente',
     noItemsAssigned: 'Keine Elemente zugewiesen',
-    assignItemsHint: 'Weisen Sie dieser Iteration Arbeitselemente zu, um den Fortschritt zu verfolgen',
+    assignItemsHint:
+      'Weisen Sie dieser Iteration Arbeitselemente zu, um den Fortschritt zu verfolgen',
     editIteration: 'Iteration bearbeiten',
     iterationName: 'Iterationsname',
     iterationNamePlaceholder: 'z.B. Sprint 1',
@@ -204,7 +212,7 @@ export default {
     updateIteration: 'Iteration aktualisieren',
     thisWorkspace: 'Dieser Arbeitsbereich',
     dateRange: 'Zeitraum',
-    scope: 'Geltungsbereich'
+    scope: 'Geltungsbereich',
   },
 
   milestones: {
@@ -213,7 +221,8 @@ export default {
     subtitle: 'Releases und Fristen verfolgen',
     addMilestone: 'Meilenstein hinzufügen',
     noMilestones: 'Noch keine Meilensteine',
-    noMilestonesDescription: 'Erstellen Sie Ihren ersten Meilenstein, um Releases und Fristen zu verfolgen.',
+    noMilestonesDescription:
+      'Erstellen Sie Ihren ersten Meilenstein, um Releases und Fristen zu verfolgen.',
     noMilestonesInCategory: 'Keine Meilensteine in dieser Kategorie',
     allCategories: 'Alle Kategorien',
     manageCategories: 'Kategorien verwalten',
@@ -223,7 +232,7 @@ export default {
       planning: 'Planung',
       inProgress: 'In Bearbeitung',
       completed: 'Abgeschlossen',
-      cancelled: 'Abgebrochen'
+      cancelled: 'Abgebrochen',
     },
     daysOverdue: '{count} Tage überfällig',
     dueToday: 'Heute fällig',
@@ -236,7 +245,8 @@ export default {
     noStatusData: 'Keine Statusdaten',
     workItems: 'Arbeitselemente',
     noItemsAssigned: 'Keine Einträge zugewiesen',
-    assignItemsHint: 'Weisen Sie diesem Meilenstein Arbeitselemente zu, um den Fortschritt zu verfolgen',
+    assignItemsHint:
+      'Weisen Sie diesem Meilenstein Arbeitselemente zu, um den Fortschritt zu verfolgen',
     milestoneName: 'Meilenstein-Name',
     milestoneNamePlaceholder: 'z.B. Q1 Release, Beta-Launch',
     targetDate: 'Zieldatum',
@@ -250,7 +260,7 @@ export default {
     local: 'Lokal',
     workspace: 'Arbeitsbereich',
     selectWorkspace: 'Arbeitsbereich auswählen',
-    manageMilestoneCategories: 'Meilenstein-Kategorien verwalten'
+    manageMilestoneCategories: 'Meilenstein-Kategorien verwalten',
   },
 
   assets: {
@@ -265,7 +275,8 @@ export default {
     noAssetSets: 'Keine Asset-Sets',
     noAssetSetsDesc: 'Erstellen Sie Ihr erstes Asset-Set, um mit der Asset-Verwaltung zu beginnen.',
     selectAnAssetSet: 'Asset-Set auswählen',
-    selectAnAssetSetDesc: 'Wählen Sie ein Asset-Set aus der Dropdown-Liste oben, um Assets anzuzeigen und zu verwalten.',
+    selectAnAssetSetDesc:
+      'Wählen Sie ein Asset-Set aus der Dropdown-Liste oben, um Assets anzuzeigen und zu verwalten.',
     default: 'Standard',
 
     // Tabs
@@ -293,9 +304,11 @@ export default {
     // Berechtigungen
     assignRole: 'Rolle zuweisen',
     everyoneRole: 'Rolle für alle',
-    everyoneRoleDesc: 'Standardrolle für alle Benutzer. Individuelle Zuweisungen überschreiben diese.',
+    everyoneRoleDesc:
+      'Standardrolle für alle Benutzer. Individuelle Zuweisungen überschreiben diese.',
     noRoleAssignments: 'Keine Rollenzuweisungen',
-    noRoleAssignmentsDesc: 'Fügen Sie Rollenzuweisungen hinzu, um den Zugriff auf dieses Asset-Set zu steuern.',
+    noRoleAssignmentsDesc:
+      'Fügen Sie Rollenzuweisungen hinzu, um den Zugriff auf dieses Asset-Set zu steuern.',
     assignee: 'Bearbeiter',
     role: 'Rolle',
 
@@ -314,7 +327,7 @@ export default {
     shortcutRotate: 'R: Drehen',
     shortcutFit: 'F: Anpassen',
     shortcutReset: '0: Zurücksetzen',
-    shortcutClose: 'Esc: Schließen'
+    shortcutClose: 'Esc: Schließen',
   },
 
   personal: {
@@ -372,7 +385,7 @@ export default {
     placeholderAccomplishments: 'Beschreiben Sie Ihre wichtigsten Erfolge...',
     placeholderWentWell: 'Was gut lief und warum...',
     placeholderImprovements: 'Verbesserungsbereiche und nächste Schritte...',
-    startWriting: 'Beginnen Sie mit Ihrer Reflexion...'
+    startWriting: 'Beginnen Sie mit Ihrer Reflexion...',
   },
 
   connections: {
@@ -388,7 +401,7 @@ export default {
     connectionUpdated: 'Verbindung erfolgreich aktualisiert',
     connectionDeleted: 'Verbindung gelöscht',
     connectionSuccessful: 'Verbindung erfolgreich',
-    testConnection: 'Verbindung testen'
+    testConnection: 'Verbindung testen',
   },
 
   migration: {
@@ -398,7 +411,7 @@ export default {
     migrationCompleted: 'Migration abgeschlossen',
     migrationSuccess: 'Alle Einträge wurden erfolgreich migriert',
     targetWorkspace: 'Ziel-Arbeitsbereich',
-    targetWorkspaceRequired: 'Ziel-Arbeitsbereich ist erforderlich'
+    targetWorkspaceRequired: 'Ziel-Arbeitsbereich ist erforderlich',
   },
 
   migrationAssistant: {
@@ -412,7 +425,8 @@ export default {
     noMigrationRequired: 'Keine Migration erforderlich',
     allItemsCompatible: 'Alle Einträge ({count}) sind mit der neuen Konfiguration kompatibel.',
     migrationRequired: 'Migration erforderlich',
-    itemsNeedMigration: '{count} Einträge müssen migriert werden. Bitte überprüfen Sie die Zuordnungen unten.',
+    itemsNeedMigration:
+      '{count} Einträge müssen migriert werden. Bitte überprüfen Sie die Zuordnungen unten.',
     itemTypes: 'Eintragstypen',
     fields: 'Felder',
     status: 'Status',
@@ -440,10 +454,13 @@ export default {
     migrating: 'Migration läuft...',
     migrationCompleted: 'Migration abgeschlossen',
     allItemsMigrated: 'Alle Einträge wurden erfolgreich migriert.',
-    pleaseSelectTargetStatuses: 'Bitte wählen Sie Zielstatus für alle Einträge aus, die eine Migration erfordern.',
-    pleaseSelectTargetItemTypes: 'Bitte wählen Sie Zieltypen für alle Einträge aus, die eine Migration erfordern.',
+    pleaseSelectTargetStatuses:
+      'Bitte wählen Sie Zielstatus für alle Einträge aus, die eine Migration erfordern.',
+    pleaseSelectTargetItemTypes:
+      'Bitte wählen Sie Zieltypen für alle Einträge aus, die eine Migration erfordern.',
     pleaseProvideDefaultValues: 'Bitte geben Sie Standardwerte für alle neuen Pflichtfelder an.',
-    pleaseSelectTargetPriorities: 'Bitte wählen Sie Zielprioritäten für alle Einträge aus, die eine Migration erfordern.'
+    pleaseSelectTargetPriorities:
+      'Bitte wählen Sie Zielprioritäten für alle Einträge aus, die eine Migration erfordern.',
   },
 
   setup: {
@@ -453,7 +470,8 @@ export default {
     step: 'Schritt',
     of: 'von',
     createAdminAccount: 'Administrator-Konto erstellen',
-    adminAccountDesc: 'Dieses Konto hat vollen Zugriff zur Verwaltung Ihrer {appName}-Installation.',
+    adminAccountDesc:
+      'Dieses Konto hat vollen Zugriff zur Verwaltung Ihrer {appName}-Installation.',
     firstName: 'Vorname',
     lastName: 'Nachname',
     emailAddress: 'E-Mail-Adresse',
@@ -461,11 +479,13 @@ export default {
     password: 'Passwort',
     confirmPassword: 'Passwort bestätigen',
     configureModules: 'Module konfigurieren',
-    configureModulesDesc: 'Wählen Sie aus, welche Module aktiviert werden sollen. Sie können diese Einstellungen später ändern.',
+    configureModulesDesc:
+      'Wählen Sie aus, welche Module aktiviert werden sollen. Sie können diese Einstellungen später ändern.',
     testManagement: 'Testmanagement',
     testManagementDesc: 'Testfälle, Testläufe und Qualitätssicherung verwalten',
     setupComplete: 'Einrichtung abgeschlossen!',
-    setupCompleteMessage: '{appName} ist einsatzbereit. Sie werden in Kürze zur Anwendung weitergeleitet.',
+    setupCompleteMessage:
+      '{appName} ist einsatzbereit. Sie werden in Kürze zur Anwendung weitergeleitet.',
     whatsNext: 'Was kommt als Nächstes?',
     whatsNextCreateWorkspace: 'Ersten Arbeitsbereich erstellen',
     whatsNextSetupWorkflows: 'Workflows und Masken einrichten',
@@ -481,7 +501,7 @@ export default {
     setupError: 'Bei der Einrichtung ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.',
     goBackEsc: 'Zurück (Esc)',
     continueNextStepEnter: 'Weiter zum nächsten Schritt (Enter)',
-    completeSetupEnter: 'Einrichtung abschließen (Enter)'
+    completeSetupEnter: 'Einrichtung abschließen (Enter)',
   },
 
   createModal: {
@@ -516,7 +536,7 @@ export default {
     parent: 'Übergeordnet',
     fillRequiredFields: 'Bitte füllen Sie die Pflichtfelder aus:',
     selectWorkspaceFirst: 'Wählen Sie zuerst einen Arbeitsbereich',
-    create: 'Erstellen'
+    create: 'Erstellen',
   },
 
   scm: {
@@ -527,7 +547,8 @@ export default {
     selectRepository: 'Repository auswählen...',
     branchName: 'Branch-Name',
     baseBranch: 'Basis-Branch',
-    baseBranchHelp: 'Der Branch, von dem aus erstellt wird. Standard ist der Standard-Branch des Repositories.',
+    baseBranchHelp:
+      'Der Branch, von dem aus erstellt wird. Standard ist der Standard-Branch des Repositories.',
     creating: 'Wird erstellt...',
     branchCreatedSuccess: 'Branch erfolgreich erstellt',
     noReposLinked: 'Keine Repositories mit diesem Arbeitsbereich verknüpft',
@@ -570,9 +591,10 @@ export default {
     confirmRemoveLink: 'Sind Sie sicher, dass Sie diese Verknüpfung entfernen möchten?',
     noRepositoriesLinked: 'Keine Repositories mit diesem Arbeitsbereich verknüpft',
     connectYourAccount: 'Verbinden Sie Ihr {provider}-Konto',
-    connectToCreate: 'Verbinden Sie sich, um Branches und Pull Requests direkt aus Vorgängen zu erstellen.',
+    connectToCreate:
+      'Verbinden Sie sich, um Branches und Pull Requests direkt aus Vorgängen zu erstellen.',
     connect: '{provider} verbinden',
-    noLinksYet: 'Noch keine Entwicklungsverknüpfungen'
+    noLinksYet: 'Noch keine Entwicklungsverknüpfungen',
   },
 
   organization: {
@@ -588,13 +610,14 @@ export default {
     changeAvatar: 'Avatar ändern',
     uploadAvatar: 'Avatar hochladen',
     attachmentsRequired: 'Anhänge müssen aktiviert sein, um Organisations-Avatare hochzuladen',
-    uploadRecommendation: 'Empfohlen: Quadratische Bilder, mindestens 256x256 Pixel für beste Qualität',
+    uploadRecommendation:
+      'Empfohlen: Quadratische Bilder, mindestens 256x256 Pixel für beste Qualität',
     activeOrganization: 'Aktive Organisation',
     customFields: 'Benutzerdefinierte Felder',
     updateOrganization: 'Organisation aktualisieren',
     createOrganization: 'Organisation erstellen',
     pleaseSelectImage: 'Bitte Bilddatei auswählen',
-    failedToUploadAvatar: 'Avatar-Upload fehlgeschlagen'
+    failedToUploadAvatar: 'Avatar-Upload fehlgeschlagen',
   },
 
   fields: {
@@ -628,11 +651,16 @@ export default {
     user: 'Benutzer',
     url: 'URL',
     // Field type hints
-    milestoneHint: 'Meilenstein-Felder verweisen automatisch auf System-Meilensteine. Benutzer können beim Ausfüllen dieses Feldes aus vorhandenen Meilensteinen auswählen.',
-    dateHint: 'Datumsfelder ermöglichen Benutzern die Auswahl von Daten mit einer Datumsauswahl. Werte werden im Format JJJJ-MM-TT gespeichert.',
-    assetHint: 'Asset-Felder ermöglichen Benutzern die Auswahl von Assets aus einem bestimmten Asset-Set. Sie können verfügbare Assets optional mit einer QL-Abfrage filtern.',
-    portalCustomerHint: 'Portal-Kunden-Felder verweisen auf Portal-Kunden. Verwenden Sie currentCustomer() in Asset-Berichten, um nach dem angemeldeten Portal-Kunden zu filtern.',
-    customerOrganisationHint: 'Kundenorganisations-Felder verweisen auf Kundenorganisationen. Verwenden Sie currentOrganisation() in Asset-Berichten, um nach der Organisation des Kunden zu filtern.'
+    milestoneHint:
+      'Meilenstein-Felder verweisen automatisch auf System-Meilensteine. Benutzer können beim Ausfüllen dieses Feldes aus vorhandenen Meilensteinen auswählen.',
+    dateHint:
+      'Datumsfelder ermöglichen Benutzern die Auswahl von Daten mit einer Datumsauswahl. Werte werden im Format JJJJ-MM-TT gespeichert.',
+    assetHint:
+      'Asset-Felder ermöglichen Benutzern die Auswahl von Assets aus einem bestimmten Asset-Set. Sie können verfügbare Assets optional mit einer QL-Abfrage filtern.',
+    portalCustomerHint:
+      'Portal-Kunden-Felder verweisen auf Portal-Kunden. Verwenden Sie currentCustomer() in Asset-Berichten, um nach dem angemeldeten Portal-Kunden zu filtern.',
+    customerOrganisationHint:
+      'Kundenorganisations-Felder verweisen auf Kundenorganisationen. Verwenden Sie currentOrganisation() in Asset-Berichten, um nach der Organisation des Kunden zu filtern.',
   },
 
   itemTypes: {
@@ -648,7 +676,7 @@ export default {
     noItemTypes: 'Keine Eintragstypen gefunden',
     itemTypeCreated: 'Eintragstyp erfolgreich erstellt',
     itemTypeUpdated: 'Eintragstyp erfolgreich aktualisiert',
-    itemTypeDeleted: 'Eintragstyp erfolgreich gelöscht'
+    itemTypeDeleted: 'Eintragstyp erfolgreich gelöscht',
   },
 
   categories: {
@@ -674,10 +702,12 @@ export default {
     addCategory: 'Kategorie hinzufügen',
     categoryNamePlaceholder: 'Kategoriename...',
     existingCategories: 'Vorhandene Kategorien',
-    confirmDeleteCategory: 'Kategorie "{name}" löschen? Einträge in dieser Kategorie werden unkategorisiert.',
-    failedToDeleteCategory: 'Kategorie konnte nicht gelöscht werden. Sie wird möglicherweise noch verwendet.',
+    confirmDeleteCategory:
+      'Kategorie "{name}" löschen? Einträge in dieser Kategorie werden unkategorisiert.',
+    failedToDeleteCategory:
+      'Kategorie konnte nicht gelöscht werden. Sie wird möglicherweise noch verwendet.',
     noCategoriesYet: 'Noch keine Kategorien',
-    addFirstCategoryHint: 'Fügen Sie oben Ihre erste Kategorie hinzu.'
+    addFirstCategoryHint: 'Fügen Sie oben Ihre erste Kategorie hinzu.',
   },
 
   members: {
@@ -685,12 +715,12 @@ export default {
     subtitle: 'Teammitglieder verwalten',
     addMember: 'Mitglied hinzufügen',
     removeMember: 'Mitglied entfernen',
-    searchMembers: 'Mitglieder nach Name oder E-Mail suchen...'
+    searchMembers: 'Mitglieder nach Name oder E-Mail suchen...',
   },
 
   configuration: {
     title: 'Konfiguration',
-    searchConfigurationSets: 'Konfigurationssätze suchen...'
+    searchConfigurationSets: 'Konfigurationssätze suchen...',
   },
 
   audit: {
@@ -703,7 +733,7 @@ export default {
     timestamp: 'Zeitstempel',
     details: 'Details',
     ipAddress: 'IP-Adresse',
-    noEvents: 'Keine Audit-Ereignisse gefunden'
+    noEvents: 'Keine Audit-Ereignisse gefunden',
   },
 
   auditLog: {
@@ -767,7 +797,7 @@ export default {
     customField: 'Benutzerdefiniertes Feld',
     itemType: 'Eintragstyp',
     permission: 'Berechtigung',
-    group: 'Gruppe'
+    group: 'Gruppe',
   },
 
   projects: {
@@ -786,6 +816,6 @@ export default {
     loadingProjects: 'Lade Projekte...',
     projectCreated: 'Projekt erfolgreich erstellt',
     projectUpdated: 'Projekt erfolgreich aktualisiert',
-    projectDeleted: 'Projekt erfolgreich gelöscht'
-  }
+    projectDeleted: 'Projekt erfolgreich gelöscht',
+  },
 };

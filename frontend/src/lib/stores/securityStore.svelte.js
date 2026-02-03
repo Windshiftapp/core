@@ -50,7 +50,7 @@ class SecurityStore {
   confirmDialogConfig = $state({
     title: '',
     message: '',
-    action: null
+    action: null,
   });
 
   // === Change Password ===
@@ -58,7 +58,7 @@ class SecurityStore {
     current_password: '',
     new_password: '',
     confirm_password: '',
-    logout_all: false
+    logout_all: false,
   });
   changePasswordLoading = $state(false);
   changePasswordError = $state('');
@@ -121,7 +121,7 @@ class SecurityStore {
     if (!this.currentUserId) return;
     try {
       this.credentialsLoading = true;
-      this.credentials = await api.getUserCredentials(this.currentUserId) || [];
+      this.credentials = (await api.getUserCredentials(this.currentUserId)) || [];
     } catch (err) {
       console.warn('Failed to load credentials:', err);
       this.credentials = [];
@@ -133,7 +133,7 @@ class SecurityStore {
   async loadApiTokens() {
     try {
       this.tokensLoading = true;
-      this.apiTokens = await api.getApiTokens() || [];
+      this.apiTokens = (await api.getApiTokens()) || [];
     } catch (err) {
       console.warn('Failed to load API tokens:', err);
       this.apiTokens = [];
@@ -155,11 +155,15 @@ class SecurityStore {
       this.enrollingFIDO = true;
 
       // Start registration with server
-      const registrationData = await api.startFIDORegistration(this.currentUserId, this.newCredentialName.trim());
+      const registrationData = await api.startFIDORegistration(
+        this.currentUserId,
+        this.newCredentialName.trim()
+      );
 
       // Extract session ID and options
       const sessionId = registrationData.sessionId;
-      const publicKeyOptions = registrationData.publicKey || registrationData.options || registrationData;
+      const publicKeyOptions =
+        registrationData.publicKey || registrationData.options || registrationData;
 
       if (!publicKeyOptions || !publicKeyOptions.challenge) {
         throw new Error('Invalid registration response from server');
@@ -178,7 +182,7 @@ class SecurityStore {
       const completionData = {
         sessionId: sessionId,
         credentialName: this.newCredentialName.trim(),
-        response: credentialResponse
+        response: credentialResponse,
       };
 
       await api.completeFIDORegistration(this.currentUserId, completionData);
@@ -200,11 +204,16 @@ class SecurityStore {
   }
 
   async createSSHKey() {
-    if (!this.currentUserId || !this.newCredentialName.trim() || !this.newSSHPublicKey.trim()) return;
+    if (!this.currentUserId || !this.newCredentialName.trim() || !this.newSSHPublicKey.trim())
+      return;
 
     try {
       this.loading = true;
-      await api.createSSHKey(this.currentUserId, this.newCredentialName.trim(), this.newSSHPublicKey.trim());
+      await api.createSSHKey(
+        this.currentUserId,
+        this.newCredentialName.trim(),
+        this.newSSHPublicKey.trim()
+      );
       await this.loadCredentials();
       this.resetCredentialForm();
     } catch (err) {
@@ -233,7 +242,7 @@ class SecurityStore {
     this.confirmDialogConfig = {
       title: 'Remove Security Credential',
       message: `Are you sure you want to remove the security credential "${credentialName}"? This action cannot be undone.`,
-      action: () => this.removeCredential(credentialId)
+      action: () => this.removeCredential(credentialId),
     };
     this.showConfirmDialog = true;
   }
@@ -248,7 +257,7 @@ class SecurityStore {
       const tokenData = {
         name: this.newTokenName.trim(),
         permissions: this.newTokenScopes.length > 0 ? this.newTokenScopes : ['read'],
-        expires_at: this.newTokenExpiry || null
+        expires_at: this.newTokenExpiry || null,
       };
 
       const result = await api.createApiToken(tokenData);
@@ -282,7 +291,7 @@ class SecurityStore {
     this.confirmDialogConfig = {
       title: 'Revoke API Token',
       message: `Are you sure you want to revoke the token "${tokenName}"? This action cannot be undone and will immediately invalidate the token.`,
-      action: () => this.revokeApiToken(tokenId)
+      action: () => this.revokeApiToken(tokenId),
     };
     this.showConfirmDialog = true;
   }
@@ -309,7 +318,7 @@ class SecurityStore {
       await api.auth.changePassword({
         current_password: this.changePasswordData.current_password,
         new_password: this.changePasswordData.new_password,
-        logout_all: this.changePasswordData.logout_all
+        logout_all: this.changePasswordData.logout_all,
       });
       this.changePasswordSuccess = true;
 
@@ -349,7 +358,7 @@ class SecurityStore {
       current_password: '',
       new_password: '',
       confirm_password: '',
-      logout_all: false
+      logout_all: false,
     };
   }
 
@@ -419,7 +428,7 @@ class SecurityStore {
       current_password: '',
       new_password: '',
       confirm_password: '',
-      logout_all: false
+      logout_all: false,
     };
     this.changePasswordLoading = false;
     this.changePasswordError = '';

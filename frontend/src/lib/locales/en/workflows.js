@@ -20,7 +20,7 @@ export default {
     noStatuses: 'No statuses found',
     statusCreated: 'Status created successfully',
     statusUpdated: 'Status updated successfully',
-    statusDeleted: 'Status deleted successfully'
+    statusDeleted: 'Status deleted successfully',
   },
 
   priorities: {
@@ -42,7 +42,7 @@ export default {
     high: 'High',
     medium: 'Medium',
     low: 'Low',
-    lowest: 'Lowest'
+    lowest: 'Lowest',
   },
 
   workflows: {
@@ -65,7 +65,8 @@ export default {
     workflowUpdated: 'Workflow updated successfully',
     workflowDeleted: 'Workflow deleted successfully',
     enterWorkflowName: 'Please enter a workflow name',
-    confirmDeleteWorkflow: 'Are you sure you want to delete "{name}"? This action cannot be undone.',
+    confirmDeleteWorkflow:
+      'Are you sure you want to delete "{name}"? This action cannot be undone.',
     confirmDeleteTransition: 'Are you sure you want to delete this transition?',
     design: 'Design',
     noStatusesAvailable: 'No statuses available',
@@ -76,8 +77,10 @@ export default {
     setAsDefault: 'Set as default workflow',
     backToWorkflows: 'Back to Workflows',
     workflowDesigner: 'Workflow Designer',
-    designerHint: 'Drag statuses from the left panel, connect them by dragging from connection points',
-    failedToLoadDesigner: 'Failed to load the workflow designer. Please refresh the page and try again.',
+    designerHint:
+      'Drag statuses from the left panel, connect them by dragging from connection points',
+    failedToLoadDesigner:
+      'Failed to load the workflow designer. Please refresh the page and try again.',
     loadingWorkflowData: 'Loading workflow data...',
     loadingDesigner: 'Loading workflow designer...',
     failedToLoadDesignerTitle: 'Failed to load workflow designer',
@@ -100,7 +103,7 @@ export default {
     initial: 'Initial',
     setStart: 'Set start',
     removeFromWorkflow: 'Remove from workflow',
-    swapDirection: 'Swap direction'
+    swapDirection: 'Swap direction',
   },
 
   screens: {
@@ -117,7 +120,7 @@ export default {
     screenCreated: 'Screen created successfully',
     screenUpdated: 'Screen updated successfully',
     screenDeleted: 'Screen deleted successfully',
-    cannotDeleteDefault: 'Cannot delete the default screen'
+    cannotDeleteDefault: 'Cannot delete the default screen',
   },
 
   screensPage: {
@@ -149,14 +152,16 @@ export default {
     custom: 'custom',
     fields: 'Fields',
     noScreens: 'No screens found. Create your first screen to get started.',
-    cannotDeleteDefault: 'Cannot delete the default screen. This screen is required for workspaces without a configuration set.',
-    confirmDeleteScreen: 'Are you sure you want to delete screen "{name}"? This will affect all workspaces using this screen.',
+    cannotDeleteDefault:
+      'Cannot delete the default screen. This screen is required for workspaces without a configuration set.',
+    confirmDeleteScreen:
+      'Are you sure you want to delete screen "{name}"? This will affect all workspaces using this screen.',
     fieldWidths: {
       full: 'Full Width',
       half: 'Half Width',
       third: 'One Third',
-      quarter: 'One Quarter'
-    }
+      quarter: 'One Quarter',
+    },
   },
 
   statusCategory: {
@@ -166,8 +171,9 @@ export default {
     color: 'Color',
     setAsDefault: 'Set as default category',
     marksWorkCompleted: 'Marks work as completed',
-    marksWorkCompletedHelp: 'Items moved into statuses within this category will be treated as completed in reports and reviews.',
+    marksWorkCompletedHelp:
+      'Items moved into statuses within this category will be treated as completed in reports and reviews.',
     updateCategory: 'Update Category',
-    createCategory: 'Create Category'
-  }
+    createCategory: 'Create Category',
+  },
 };

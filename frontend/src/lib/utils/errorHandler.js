@@ -41,14 +41,14 @@ export function handleApiError(error, options = {}) {
  */
 export function parseApiError(error) {
   // If error already has code property, return as-is
-  if (error && error.code) {
+  if (error?.code) {
     return error;
   }
 
   // Try to extract error code from message
   // Backend errors are typically in format: "ERROR_CODE: Human readable message"
   // or JSON: {"error": "message", "code": "ERROR_CODE", "details": {...}}
-  if (error && error.message) {
+  if (error?.message) {
     const message = error.message;
 
     // Try to parse as JSON first
@@ -58,7 +58,7 @@ export function parseApiError(error) {
         code: parsed.code || 'UNKNOWN',
         message: parsed.error || parsed.message || message,
         details: parsed.details || {},
-        requestId: parsed.request_id
+        requestId: parsed.request_id,
       };
     } catch {
       // Not JSON, continue with other parsing
@@ -73,7 +73,7 @@ export function parseApiError(error) {
         return {
           code: potentialCode,
           message: message.substring(colonIndex + 1).trim(),
-          details: {}
+          details: {},
         };
       }
     }
@@ -83,7 +83,7 @@ export function parseApiError(error) {
   return {
     code: 'UNKNOWN',
     message: error?.message || String(error) || 'Unknown error',
-    details: {}
+    details: {},
   };
 }
 

@@ -26,7 +26,7 @@ export default {
     emailNotifications: 'إشعارات البريد الإلكتروني',
     pushNotifications: 'إشعارات الدفع',
     channels: 'القنوات',
-    searchNotifications: 'البحث في الإشعارات...'
+    searchNotifications: 'البحث في الإشعارات...',
 
     // Note: Additional notifications keys (email verification, etc.)
     // fall back to English for missing keys
@@ -51,7 +51,7 @@ export default {
     searchChannels: 'البحث في القنوات...',
     testWebhook: 'اختبار Webhook',
     webhookSent: 'تم إرسال اختبار Webhook بنجاح!',
-    webhookFailed: 'فشل اختبار Webhook'
+    webhookFailed: 'فشل اختبار Webhook',
 
     // Note: Additional channels keys (types, portal, webhook, email, categories)
     // fall back to English for missing keys
@@ -93,7 +93,8 @@ export default {
     addSection: 'إضافة قسم',
     noContentSections: 'لم يتم تكوين أقسام محتوى بعد.',
     dropHereToAdd: 'اسحب هنا لإضافة نوع الطلب',
-    noRequestTypesInSection: 'لا توجد أنواع طلبات في هذا القسم بعد. اسحب أنواع الطلبات هنا من الشريط الجانبي.'
+    noRequestTypesInSection:
+      'لا توجد أنواع طلبات في هذا القسم بعد. اسحب أنواع الطلبات هنا من الشريط الجانبي.',
   },
 
   requestForm: {
@@ -103,9 +104,9 @@ export default {
   requestTypeFields: {
     addNewStep: 'إضافة خطوة جديدة',
     removeCurrentStep: 'إزالة الخطوة الحالية',
-    removeField: 'إزالة الحقل'
+    removeField: 'إزالة الحقل',
 
     // Note: Additional request type fields keys
     // fall back to English for missing keys
-  }
+  },
 };

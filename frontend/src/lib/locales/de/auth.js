@@ -40,7 +40,8 @@ export default {
 
     // Password reset
     resetPasswordTitle: 'Passwort zurücksetzen',
-    resetPasswordInstructions: 'Geben Sie Ihre E-Mail-Adresse ein und wir senden Ihnen einen Link zum Zurücksetzen Ihres Passworts.',
+    resetPasswordInstructions:
+      'Geben Sie Ihre E-Mail-Adresse ein und wir senden Ihnen einen Link zum Zurücksetzen Ihres Passworts.',
     sendResetLink: 'Link senden',
     backToLogin: 'Zurück zur Anmeldung',
     resetLinkSent: 'Link zum Zurücksetzen gesendet',
@@ -68,7 +69,7 @@ export default {
     // Security key
     touchSecurityKey: 'Berühren Sie Ihren Sicherheitsschlüssel...',
     signInWithSecurityKey: 'Mit Sicherheitsschlüssel anmelden',
-    webAuthnNotSupported: 'WebAuthn wird von diesem Browser nicht unterstützt'
+    webAuthnNotSupported: 'WebAuthn wird von diesem Browser nicht unterstützt',
   },
 
   users: {
@@ -127,9 +128,12 @@ export default {
     // Confirmations & Errors
     activateUser: 'Benutzer aktivieren',
     deactivateUser: 'Benutzer deaktivieren',
-    confirmDelete: 'Möchten Sie {name} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
-    confirmActivate: 'Möchten Sie {name} wirklich aktivieren? Der Benutzer kann dann auf das System zugreifen.',
-    confirmDeactivate: 'Möchten Sie {name} wirklich deaktivieren? Der Benutzer kann nicht mehr auf das System zugreifen.',
+    confirmDelete:
+      'Möchten Sie {name} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
+    confirmActivate:
+      'Möchten Sie {name} wirklich aktivieren? Der Benutzer kann dann auf das System zugreifen.',
+    confirmDeactivate:
+      'Möchten Sie {name} wirklich deaktivieren? Der Benutzer kann nicht mehr auf das System zugreifen.',
     failedToLoad: 'Benutzer konnten nicht geladen werden',
     failedToSave: 'Benutzer konnte nicht gespeichert werden',
     failedToDelete: 'Benutzer konnte nicht gelöscht werden',
@@ -151,7 +155,8 @@ export default {
     accountSettings: 'Kontoeinstellungen',
     fullName: 'Vollständiger Name',
     myProfile: 'Mein Profil',
-    profileSubtitle: 'Verwalten Sie Ihre Profilinformationen, Ihr Avatar und Ihre regionalen Einstellungen',
+    profileSubtitle:
+      'Verwalten Sie Ihre Profilinformationen, Ihr Avatar und Ihre regionalen Einstellungen',
     profileInformation: 'Profilinformationen',
     profilePicture: 'Profilbild',
     uploadAndManageAvatar: 'Ihr Avatarbild hochladen und verwalten',
@@ -171,29 +176,33 @@ export default {
     saveSettings: 'Einstellungen speichern',
     settingsSaved: 'Einstellungen erfolgreich gespeichert',
     connectedAccounts: 'Verbundene Konten',
-    connectedAccountsDesc: 'Verbinden Sie Ihre Quellcodeverwaltungskonten, um Branches und Pull Requests zu erstellen',
+    connectedAccountsDesc:
+      'Verbinden Sie Ihre Quellcodeverwaltungskonten, um Branches und Pull Requests zu erstellen',
     calendarIntegration: 'Kalenderintegration',
     calendarIntegrationDesc: 'Abonnieren Sie Ihre geplanten Elemente in externen Kalender-Apps',
     loadCalendarFeedSettings: 'Kalender-Feed-Einstellungen laden',
     enableCalendarSubscription: 'Kalenderabonnement aktivieren',
-    calendarSubscriptionDesc: 'Generieren Sie eine Abonnement-URL, um Ihre geplanten Arbeitselemente mit externen Kalenderanwendungen zu synchronisieren.',
+    calendarSubscriptionDesc:
+      'Generieren Sie eine Abonnement-URL, um Ihre geplanten Arbeitselemente mit externen Kalenderanwendungen zu synchronisieren.',
     generateCalendarFeedUrl: 'Kalender-Feed-URL generieren',
     yourCalendarFeedUrl: 'Ihre Kalender-Feed-URL',
     showFullUrl: 'Vollständige URL anzeigen',
-    calendarFeedWarning: 'Teilen Sie diese URL nicht, da sie Zugriff auf Ihre geplanten Elemente gewährt.',
+    calendarFeedWarning:
+      'Teilen Sie diese URL nicht, da sie Zugriff auf Ihre geplanten Elemente gewährt.',
     lastSynced: 'Zuletzt synchronisiert',
     howToSubscribe: 'Wie abonnieren',
     copyFeedUrlStep: 'Kopieren Sie die Feed-URL oben',
     regenerateUrl: 'URL neu generieren',
     revokeFeed: 'Feed widerrufen',
-    regenerateUrlNote: 'Das Neugenerieren der URL macht Ihre aktuelle URL ungültig. Kalender, die die alte URL verwenden, müssen aktualisiert werden.',
+    regenerateUrlNote:
+      'Das Neugenerieren der URL macht Ihre aktuelle URL ungültig. Kalender, die die alte URL verwenden, müssen aktualisiert werden.',
     calendarFeedsDisabled: 'Kalender-Feeds wurden von Ihrem Administrator deaktiviert.',
     googleCalendar: 'Google Kalender',
     googleCalendarInstructions: 'Einstellungen > Kalender hinzufügen > Von URL > URL einfügen',
     outlook: 'Outlook',
     outlookInstructions: 'Kalender hinzufügen > Aus dem Web abonnieren > URL einfügen',
     appleCalendar: 'Apple Kalender',
-    appleCalendarInstructions: 'Ablage > Neues Kalenderabonnement > URL einfügen'
+    appleCalendarInstructions: 'Ablage > Neues Kalenderabonnement > URL einfügen',
   },
 
   security: {
@@ -209,7 +218,7 @@ export default {
     tokenCreated: 'Token erfolgreich erstellt',
     tokenRevoked: 'Token erfolgreich widerrufen',
     copyToken: 'Token kopieren',
-    tokenWarning: 'Kopieren Sie Ihren Token jetzt. Sie werden ihn nicht mehr sehen können.'
+    tokenWarning: 'Kopieren Sie Ihren Token jetzt. Sie werden ihn nicht mehr sehen können.',
   },
 
   portalLogin: {
@@ -227,6 +236,6 @@ export default {
     signIn: 'Anmelden',
     emailRequired: 'E-Mail oder Benutzername ist erforderlich',
     passwordRequired: 'Passwort ist erforderlich',
-    webAuthnNotSupported: 'WebAuthn wird von diesem Browser nicht unterstützt'
-  }
+    webAuthnNotSupported: 'WebAuthn wird von diesem Browser nicht unterstützt',
+  },
 };

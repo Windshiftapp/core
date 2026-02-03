@@ -18,7 +18,7 @@ export const SUPPORTED_LOCALES = [
   { code: 'en', name: 'English', direction: 'ltr' },
   { code: 'de', name: 'Deutsch', direction: 'ltr' },
   { code: 'es', name: 'Español', direction: 'ltr' },
-  { code: 'ar', name: 'العربية', direction: 'rtl' }
+  { code: 'ar', name: 'العربية', direction: 'rtl' },
 ];
 
 // Reactive state using Svelte 5 runes
@@ -27,9 +27,7 @@ let translations = $state({});
 let loading = $state(false);
 
 // Derived state
-const direction = $derived(
-  SUPPORTED_LOCALES.find(l => l.code === locale)?.direction || 'ltr'
-);
+const direction = $derived(SUPPORTED_LOCALES.find((l) => l.code === locale)?.direction || 'ltr');
 
 const isRTL = $derived(direction === 'rtl');
 
@@ -162,7 +160,7 @@ async function init() {
   // Check localStorage for saved preference
   if (typeof localStorage !== 'undefined') {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved && SUPPORTED_LOCALES.some(l => l.code === saved)) {
+    if (saved && SUPPORTED_LOCALES.some((l) => l.code === saved)) {
       initialLocale = saved;
     }
   }
@@ -170,7 +168,7 @@ async function init() {
   // Check browser language preference
   if (initialLocale === DEFAULT_LOCALE && typeof navigator !== 'undefined') {
     const browserLang = navigator.language?.split('-')[0];
-    if (browserLang && SUPPORTED_LOCALES.some(l => l.code === browserLang)) {
+    if (browserLang && SUPPORTED_LOCALES.some((l) => l.code === browserLang)) {
       initialLocale = browserLang;
     }
   }
@@ -183,7 +181,7 @@ async function init() {
  * @param {string} localeCode - New locale code
  */
 async function setLocale(localeCode) {
-  if (!SUPPORTED_LOCALES.some(l => l.code === localeCode)) {
+  if (!SUPPORTED_LOCALES.some((l) => l.code === localeCode)) {
     console.warn(`Unsupported locale: ${localeCode}`);
     return;
   }
@@ -211,17 +209,27 @@ function isLoading() {
 
 // Export the i18n store
 export const i18n = {
-  get locale() { return locale; },
-  get direction() { return direction; },
-  get isRTL() { return isRTL; },
-  get loading() { return loading; },
-  get supportedLocales() { return SUPPORTED_LOCALES; },
+  get locale() {
+    return locale;
+  },
+  get direction() {
+    return direction;
+  },
+  get isRTL() {
+    return isRTL;
+  },
+  get loading() {
+    return loading;
+  },
+  get supportedLocales() {
+    return SUPPORTED_LOCALES;
+  },
   init,
   setLocale,
   getLocale,
   isLoading,
   t,
-  translateError
+  translateError,
 };
 
 // Also export t and translateError directly for convenience

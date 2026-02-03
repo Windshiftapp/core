@@ -1,112 +1,112 @@
 import {
-  // Common item type icons
-  FileText,
-  Bug,
-  Lightbulb,
-  Rocket,
-  CheckSquare,
-  BookOpen,
-  Target,
-  Zap,
-  Flag,
-  Star,
-  Minus,
+  AlertCircle,
   // Alert & Status icons
   AlertTriangle,
-  AlertCircle,
-  Info,
-  CheckCircle,
-  XCircle,
-  HelpCircle,
-  Circle,
-  // Project & Organization icons
-  Settings,
-  Package,
-  Layers,
-  GitBranch,
-  Award,
-  Briefcase,
   Archive,
+  ArrowDown,
+  // Priority icons
+  ArrowUp,
+  Award,
+  BarChart,
+  // Workspace additional icons
+  Bell,
+  Bookmark,
+  BookOpen,
+  Briefcase,
+  Bug,
   Building,
   // Time & Calendar icons
   Calendar,
+  Camera,
+  CheckCircle,
+  CheckSquare,
+  Circle,
   Clock,
+  Cloud,
   // Development icons
   Code,
-  Terminal,
+  Coffee,
+  Compass,
+  Copy,
   Database,
-  Server,
+  Download,
   // Editing icons
   Edit,
+  ExternalLink,
   Eye,
-  PenTool,
-  Copy,
-  Scissors,
-  Trash,
+  Feather,
+  // Common item type icons
+  FileText,
+  Filter,
+  Flag,
   // Navigation & Location icons
   Folder,
-  Home,
-  MapPin,
-  Map,
+  Gift,
+  GitBranch,
   Globe,
+  Heart,
+  HelpCircle,
+  Home,
   // Media icons
   Image,
-  Video,
-  Music,
-  Play,
-  // Communication icons
-  Mail,
-  Phone,
-  MessageSquare,
-  Send,
+  Info,
   // Security icons
   Key,
-  Lock,
-  Shield,
+  Layers,
+  Lightbulb,
   // Link icons
   Link,
-  ExternalLink,
+  List,
+  Lock,
+  // Communication icons
+  Mail,
+  Map as MapIcon,
+  MapPin,
+  Megaphone,
+  MessageSquare,
+  Minus,
+  Monitor,
+  Music,
+  Package,
   Paperclip,
+  Pen,
+  PenTool,
+  Phone,
+  PieChart,
+  Play,
+  Plus,
+  Printer,
+  RefreshCw,
+  Rocket,
+  Save,
+  Scissors,
   // UI icons
   Search,
-  Filter,
-  Plus,
-  Download,
+  Send,
+  Server,
+  // Project & Organization icons
+  Settings,
+  Shield,
+  ShoppingCart,
+  Smile,
+  Star,
+  // Misc icons
+  Tag,
+  Target,
+  Terminal,
+  Trash,
+  Truck,
   Upload,
-  List,
   // Personal & Social icons
   User,
   Users,
-  Heart,
-  Smile,
-  // Misc icons
-  Tag,
-  Bookmark,
-  Wifi,
-  PieChart,
-  ShoppingCart,
-  // Priority icons
-  ArrowUp,
-  ArrowDown,
-  // Workspace additional icons
-  Bell,
-  Camera,
-  Coffee,
-  Compass,
-  Feather,
-  Gift,
-  Megaphone,
-  Monitor,
-  Pen,
-  Printer,
-  RefreshCw,
-  Save,
-  Wrench,
-  Truck,
+  Video,
   Volume2,
   Watch,
-  Cloud,
-  BarChart
+  Wifi,
+  Wrench,
+  XCircle,
+  Zap,
 } from 'lucide-svelte';
 
 /**
@@ -167,7 +167,7 @@ export const itemTypeIconMap = {
   Folder,
   Home,
   MapPin,
-  Map,
+  Map: MapIcon,
   Globe,
 
   // Media icons
@@ -211,7 +211,7 @@ export const itemTypeIconMap = {
   Bookmark,
   Wifi,
   PieChart,
-  ShoppingCart
+  ShoppingCart,
 };
 
 /**
@@ -281,7 +281,7 @@ export const priorityIconMap = {
   Scissors,
   Paperclip,
   Link,
-  ExternalLink
+  ExternalLink,
 };
 
 /**
@@ -361,7 +361,7 @@ export const workspaceIconMap = {
   Gift,
   Home,
   Layers,
-  Map,
+  Map: MapIcon,
   Megaphone,
   Monitor,
   Pen,
@@ -376,7 +376,7 @@ export const workspaceIconMap = {
   Briefcase,
   Cloud,
   BarChart,
-  Circle
+  Circle,
 };
 
 /**

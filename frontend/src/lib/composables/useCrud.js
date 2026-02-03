@@ -12,14 +12,7 @@ import { confirmDelete } from './useConfirm.js';
  * @param {string} options.itemName - Display name for confirmations (e.g. "status", "category")
  */
 export function useCrud(options) {
-  const {
-    loadFn,
-    createFn,
-    updateFn,
-    deleteFn,
-    defaultFormData = {},
-    itemName = 'item'
-  } = options;
+  const { loadFn, createFn, updateFn, deleteFn, defaultFormData = {}, itemName = 'item' } = options;
 
   // Reactive stores
   const items = writable([]);
@@ -34,7 +27,7 @@ export function useCrud(options) {
   async function loadItems() {
     loading.set(true);
     error.set(null);
-    
+
     try {
       const result = await loadFn();
       items.set(result || []);
@@ -58,12 +51,12 @@ export function useCrud(options) {
   function startEdit(item) {
     const editData = { ...defaultFormData };
     // Copy existing item data into form
-    Object.keys(item).forEach(key => {
+    Object.keys(item).forEach((key) => {
       if (key in editData) {
         editData[key] = item[key];
       }
     });
-    
+
     formData.set(editData);
     editingId.set(item.id);
     showCreateForm.set(true);
@@ -79,7 +72,7 @@ export function useCrud(options) {
   // Save item (create or update)
   async function saveItem(data = null) {
     let currentFormData, currentEditingId;
-    
+
     // Get current values
     if (data) {
       currentFormData = data.formData;
@@ -97,15 +90,13 @@ export function useCrud(options) {
       if (currentEditingId) {
         // Update existing item
         result = await updateFn(currentEditingId, currentFormData);
-        items.update(currentItems =>
-          currentItems.map(item => 
-            item.id === currentEditingId ? result : item
-          )
+        items.update((currentItems) =>
+          currentItems.map((item) => (item.id === currentEditingId ? result : item))
         );
       } else {
         // Create new item
         result = await createFn(currentFormData);
-        items.update(currentItems => [...currentItems, result]);
+        items.update((currentItems) => [...currentItems, result]);
       }
 
       // Close form on success
@@ -123,16 +114,14 @@ export function useCrud(options) {
   // Delete item with confirmation
   async function deleteItem(item) {
     const confirmed = await confirmDelete(item.name || item.title || item.id, itemName);
-    
+
     if (!confirmed) {
       return false;
     }
 
     try {
       await deleteFn(item.id);
-      items.update(currentItems =>
-        currentItems.filter(i => i.id !== item.id)
-      );
+      items.update((currentItems) => currentItems.filter((i) => i.id !== item.id));
       return true;
     } catch (err) {
       console.error(`Failed to delete ${itemName}:`, err);
@@ -144,7 +133,7 @@ export function useCrud(options) {
   // Helper to get current values (for use outside reactive context)
   function get(store) {
     let value;
-    store.subscribe(v => value = v)();
+    store.subscribe((v) => (value = v))();
     return value;
   }
 
@@ -164,6 +153,6 @@ export function useCrud(options) {
     startEdit,
     cancelForm,
     saveItem,
-    deleteItem
+    deleteItem,
   };
 }

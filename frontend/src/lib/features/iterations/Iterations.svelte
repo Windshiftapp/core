@@ -14,6 +14,7 @@
   import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
   import { currentRoute, navigate } from '../../router.js';
   import ColorDot from '../../components/ColorDot.svelte';
+  import Lozenge from '../../components/Lozenge.svelte';
   import SectionHeader from '../../layout/SectionHeader.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -54,21 +55,7 @@
 
   onMount(async () => {
     await loadData();
-
-    // Listen for manage iteration types event from navigation
-    document.addEventListener('manage-iteration-types', handleManageTypes);
   });
-
-  $effect(() => {
-    return () => {
-      document.removeEventListener('manage-iteration-types', handleManageTypes);
-    };
-  });
-
-  function handleManageTypes() {
-    // Navigate to admin panel iteration types tab
-    navigate('/admin/iteration-types');
-  }
 
   async function loadData() {
     try {
@@ -92,9 +79,10 @@
   }
 
   function handleIterationClick(iteration) {
-    if (isGlobalView) {
-      navigate(`/iterations/${iteration.id}`);
-    }
+    const url = workspaceId
+      ? `/iterations/${iteration.id}?workspaceId=${workspaceId}`
+      : `/iterations/${iteration.id}`;
+    navigate(url);
   }
 
   function startCreate() {
@@ -109,8 +97,7 @@
     showModal = true;
   }
 
-  async function handleSave(event) {
-    const data = event.detail;
+  async function handleSave(data) {
     try {
       if (editingIteration) {
         await api.iterations.update(editingIteration.id, data);
@@ -203,42 +190,47 @@
     return t('iterations.daysRemaining', { count: diffDays });
   }
 
+  function isOverdue(endDate, status) {
+    if (status === 'completed' || status === 'cancelled' || !endDate) return false;
+    const today = new Date();
+    const end = new Date(endDate);
+    return end < today;
+  }
+
   // DataTable configuration
   let columns = $derived([
+    {
+      key: 'status',
+      label: t('common.status'),
+      sortable: true,
+      width: 'w-40',
+      slot: 'status'
+    },
     {
       key: 'name',
       label: t('common.name'),
       sortable: true,
-      width: '25%',
       slot: 'name'
     },
     {
       key: 'type',
       label: t('common.type'),
       sortable: true,
-      width: '15%',
+      width: 'w-32',
       slot: 'type'
     },
     {
       key: 'date_range',
       label: t('iterations.dateRange'),
       sortable: true,
-      width: '20%',
+      width: 'w-48',
       slot: 'date_range'
     },
     {
-      key: 'status',
-      label: t('common.status'),
-      sortable: true,
-      width: '12%',
-      slot: 'status'
-    },
-    {
-      key: 'scope',
-      label: t('iterations.scope'),
-      sortable: true,
-      width: '15%',
-      slot: 'scope'
+      key: 'actions',
+      label: '',
+      width: 'w-16',
+      sortable: false
     }
   ]);
 
@@ -305,7 +297,7 @@
               {columns}
               data={filteredIterations}
               actionItems={buildIterationDropdownItems}
-              onRowClick={isGlobalView ? handleIterationClick : undefined}
+              onRowClick={handleIterationClick}
             >
               <div slot="name" let:item class="flex items-center gap-2">
                 <!-- Always reserve space for active indicator for consistent alignment -->
@@ -315,7 +307,7 @@
                 {:else}
                   <Building2 class="w-4 h-4" style="color: var(--ds-text-subtle); min-width: 16px;" />
                 {/if}
-                <span class="font-medium {isGlobalView ? 'hover:underline cursor-pointer' : ''}" style="color: var(--ds-text);">{item.name}</span>
+                <span class="font-medium hover:underline cursor-pointer" style="color: var(--ds-text);">{item.name}</span>
               </div>
 
               <div slot="type" let:item>
@@ -339,26 +331,16 @@
                 {/if}
               </div>
 
-              <span slot="status" let:item class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" style="{(() => {
-                const statusInfo = getStatusInfo(item.status);
-                const lozengeStyles = {
-                  grey: 'background-color: #f3f4f6; color: #6b7280;',
-                  blue: 'background-color: #dbeafe; color: #1e40af;',
-                  green: 'background-color: #dcfce7; color: #166534;',
-                  red: 'background-color: #fee2e2; color: #991b1b;'
-                };
-                return lozengeStyles[statusInfo.lozengeColor] || lozengeStyles.grey;
-              })()}">
-                {getStatusInfo(item.status).label}
-              </span>
-
-              <span slot="scope" let:item class="text-sm text-gray-600">
-                {#if item.is_global}
-                  {t('iterations.global')}
-                {:else}
-                  {item.workspace_name || t('iterations.thisWorkspace')}
+              <div slot="status" let:item class="flex items-center gap-2">
+                {#if item}
+                  {@const statusInfo = getStatusInfo(item.status)}
+                  {@const overdue = isOverdue(item.end_date, item.status)}
+                  <Lozenge color={statusInfo.lozengeColor} text={statusInfo.label} />
+                  {#if overdue}
+                    <Lozenge color="red" text={t('iterations.overdue')} />
+                  {/if}
                 {/if}
-              </span>
+              </div>
             </DataTable>
           {/key}
         </div>

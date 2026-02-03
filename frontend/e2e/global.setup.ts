@@ -1,6 +1,6 @@
-import { test as setup, expect } from '@playwright/test';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { expect, test as setup } from '@playwright/test';
 
 /**
  * Global setup that runs once before all tests
@@ -74,8 +74,8 @@ setup('complete application setup and authenticate', async ({ page, request }) =
 
   // Verify we're logged in by checking for auth cookie or redirect
   const cookies = await page.context().cookies();
-  const hasSessionCookie = cookies.some(cookie =>
-    cookie.name === 'session' || cookie.name === 'windshift_session'
+  const hasSessionCookie = cookies.some(
+    (cookie) => cookie.name === 'session' || cookie.name === 'windshift_session'
   );
 
   expect(hasSessionCookie).toBeTruthy();

@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { ArrowLeft, Calendar, Target, Edit, Trash2, ChevronDown, ChevronRight, MoreHorizontal, Globe, Building2 } from 'lucide-svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import BurndownChart from './BurndownChart.svelte';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import Button from '../../components/Button.svelte';
@@ -15,12 +16,13 @@
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
-  let { iterationId } = $props();
+  let { iterationId, workspaceId = null } = $props();
 
   let loading = $state(true);
   let error = $state(null);
   let progress = $state(null);
   let iteration = $state(null);
+  let burndownData = $state(null);
   let expandedCategories = $state({});
   let showEditModal = $state(false);
   let formData = $state({
@@ -53,12 +55,14 @@
     loading = true;
     error = null;
     try {
-      const [progressData, iterationData] = await Promise.all([
+      const [progressData, iterationData, burndownResult] = await Promise.all([
         api.iterations.getProgress(iterationId),
-        api.iterations.get(iterationId)
+        api.iterations.get(iterationId),
+        api.iterations.getBurndown(iterationId).catch(() => null)
       ]);
       progress = progressData;
       iteration = iterationData;
+      burndownData = burndownResult;
       // Expand all categories by default
       if (progress?.status_breakdown) {
         progress.status_breakdown.forEach(cat => {
@@ -74,7 +78,11 @@
   }
 
   function goBack() {
-    navigate('/iterations');
+    if (workspaceId) {
+      navigate(`/workspaces/${workspaceId}/iterations`);
+    } else {
+      navigate('/iterations');
+    }
   }
 
   function getStatusInfo(status) {
@@ -160,7 +168,7 @@
     if (confirm(t('iterations.confirmDelete', { name: progress?.iteration_name }))) {
       try {
         await api.iterations.delete(iterationId);
-        navigate('/iterations');
+        goBack();
       } catch (err) {
         console.error('Failed to delete iteration:', err);
         alert(t('dialogs.alerts.failedToDelete', { error: err.message || err }));
@@ -366,6 +374,13 @@
           </div>
         </div>
       </div>
+
+      <!-- Burndown Chart -->
+      {#if burndownData && burndownData.data_points?.length > 1}
+        <div class="rounded-xl border p-6 mb-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+          <BurndownChart {burndownData} />
+        </div>
+      {/if}
 
       <!-- Items Grouped by Category -->
       <div class="space-y-4">

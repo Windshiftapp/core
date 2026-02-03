@@ -1,7 +1,8 @@
 // Custom Milkdown plugin for rendering @mentions as styled chips
-import { $prose } from '@milkdown/kit/utils';
+
 import { Plugin, PluginKey } from '@milkdown/kit/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
+import { $prose } from '@milkdown/kit/utils';
 
 // Regex to find mentions in text: @username or @"Display Name"
 const MENTION_REGEX = /@([a-zA-Z0-9_.-]+)|@"([^"]+)"/g;
@@ -90,12 +91,12 @@ export const mentionDecorationPlugin = $prose(() => {
       apply(tr, old) {
         // Only recalculate if document changed
         return tr.docChanged ? createMentionDecorations(tr.doc) : old;
-      }
+      },
     },
     props: {
       decorations(state) {
         return this.getState(state);
-      }
-    }
+      },
+    },
   });
 });

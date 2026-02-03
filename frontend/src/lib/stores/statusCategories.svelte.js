@@ -4,7 +4,7 @@
  */
 
 import { api } from '../api.js';
-import { getTextColorForBackground, getStatusType } from '../utils/statusColors.js';
+import { getStatusType, getTextColorForBackground } from '../utils/statusColors.js';
 
 // Reactive state using Svelte 5 runes
 let categories = $state([]);
@@ -14,7 +14,7 @@ let categories = $state([]);
  */
 async function init() {
   try {
-    categories = await api.statusCategories.getAll() || [];
+    categories = (await api.statusCategories.getAll()) || [];
   } catch (error) {
     console.error('Failed to load status categories:', error);
     categories = [];
@@ -28,7 +28,7 @@ async function init() {
  */
 function getCategoryColor(categoryId) {
   if (!categoryId) return null;
-  const category = categories.find(c => c.id === categoryId);
+  const category = categories.find((c) => c.id === categoryId);
   return category?.color || null;
 }
 
@@ -64,11 +64,13 @@ function reset() {
 
 // Export the store object with reactive getters
 export const statusCategoriesStore = {
-  get categories() { return categories; },
+  get categories() {
+    return categories;
+  },
   init,
   getCategoryColor,
   getStatusStyle,
-  reset
+  reset,
 };
 
 // Direct exports for convenience

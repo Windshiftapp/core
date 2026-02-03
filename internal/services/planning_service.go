@@ -1096,6 +1096,249 @@ func (s *PlanningService) GetIterationProgress(iterationID int) (*IterationProgr
 }
 
 // ========================================
+// Iteration Burndown Chart
+// ========================================
+
+// BurndownDataPoint represents a single day's burndown data.
+type BurndownDataPoint struct {
+	Date      string `json:"date"`
+	Remaining int    `json:"remaining"`
+	Completed int    `json:"completed"`
+	Ideal     int    `json:"ideal"`
+}
+
+// IterationBurndownData represents the full burndown chart data.
+type IterationBurndownData struct {
+	IterationID int                 `json:"iteration_id"`
+	StartDate   string              `json:"start_date"`
+	EndDate     string              `json:"end_date"`
+	TotalItems  int                 `json:"total_items"`
+	DataPoints  []BurndownDataPoint `json:"data_points"`
+}
+
+// GetIterationBurndown calculates burndown data for an iteration by replaying item history.
+func (s *PlanningService) GetIterationBurndown(iterationID int) (*IterationBurndownData, error) {
+	// Get iteration details
+	iter, err := s.GetIteration(iterationID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse dates
+	startDate, err := time.Parse("2006-01-02", iter.StartDate)
+	if err != nil {
+		return nil, fmt.Errorf("invalid start date: %w", err)
+	}
+	endDate, err := time.Parse("2006-01-02", iter.EndDate)
+	if err != nil {
+		return nil, fmt.Errorf("invalid end date: %w", err)
+	}
+
+	// Get all items in this iteration with their current status category
+	rows, err := s.db.Query(`
+		SELECT i.id, COALESCE(sc.is_completed, false) as is_completed
+		FROM items i
+		LEFT JOIN statuses st ON i.status_id = st.id
+		LEFT JOIN status_categories sc ON st.category_id = sc.id
+		WHERE i.iteration_id = ?
+	`, iterationID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get iteration items: %w", err)
+	}
+	defer rows.Close()
+
+	// Build map of item IDs to their current completed state
+	itemStates := make(map[int]bool) // itemID -> isCompleted
+	for rows.Next() {
+		var itemID int
+		var isCompleted bool
+		if err := rows.Scan(&itemID, &isCompleted); err != nil {
+			continue
+		}
+		itemStates[itemID] = isCompleted
+	}
+
+	totalItems := len(itemStates)
+	if totalItems == 0 {
+		// Return empty data if no items
+		return &IterationBurndownData{
+			IterationID: iterationID,
+			StartDate:   iter.StartDate,
+			EndDate:     iter.EndDate,
+			TotalItems:  0,
+			DataPoints:  []BurndownDataPoint{},
+		}, nil
+	}
+
+	// Get all status changes for items in this iteration within the date range
+	// We need to work backwards from current state using history
+	historyRows, err := s.db.Query(`
+		SELECT ih.item_id, ih.changed_at, ih.old_value, ih.new_value
+		FROM item_history ih
+		JOIN items i ON ih.item_id = i.id
+		WHERE i.iteration_id = ?
+		  AND ih.field_name = 'status_id'
+		  AND ih.changed_at >= ?
+		ORDER BY ih.changed_at DESC
+	`, iterationID, startDate.Format("2006-01-02"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get item history: %w", err)
+	}
+	defer historyRows.Close()
+
+	// Collect all status change events
+	type statusChange struct {
+		ItemID    int
+		ChangedAt time.Time
+		OldValue  sql.NullString
+		NewValue  sql.NullString
+	}
+	var changes []statusChange
+
+	for historyRows.Next() {
+		var c statusChange
+		var changedAtStr string
+		if err := historyRows.Scan(&c.ItemID, &changedAtStr, &c.OldValue, &c.NewValue); err != nil {
+			continue
+		}
+		// Parse the datetime
+		c.ChangedAt, _ = time.Parse("2006-01-02 15:04:05", changedAtStr)
+		if c.ChangedAt.IsZero() {
+			c.ChangedAt, _ = time.Parse(time.RFC3339, changedAtStr)
+		}
+		changes = append(changes, c)
+	}
+
+	// Get status_id -> is_completed mapping
+	statusCompletedMap := make(map[int]bool)
+	statusRows, err := s.db.Query(`
+		SELECT s.id, COALESCE(sc.is_completed, false)
+		FROM statuses s
+		LEFT JOIN status_categories sc ON s.category_id = sc.id
+	`)
+	if err == nil {
+		defer statusRows.Close()
+		for statusRows.Next() {
+			var statusID int
+			var isCompleted bool
+			if err := statusRows.Scan(&statusID, &isCompleted); err == nil {
+				statusCompletedMap[statusID] = isCompleted
+			}
+		}
+	}
+
+	// Helper to check if a status_id string represents a completed status
+	isStatusCompleted := func(statusIDStr string) bool {
+		if statusIDStr == "" {
+			return false
+		}
+		var statusID int
+		if _, err := fmt.Sscanf(statusIDStr, "%d", &statusID); err != nil {
+			return false
+		}
+		return statusCompletedMap[statusID]
+	}
+
+	// Build daily data points
+	var dataPoints []BurndownDataPoint
+	today := time.Now().Truncate(24 * time.Hour)
+	effectiveEndDate := endDate
+	if today.Before(endDate) {
+		effectiveEndDate = today
+	}
+
+	totalDays := int(endDate.Sub(startDate).Hours()/24) + 1
+
+	// Start with current state and work backwards through history to build daily snapshots
+	// Clone current state for simulation
+	dayStates := make(map[int]bool)
+	for id, completed := range itemStates {
+		dayStates[id] = completed
+	}
+
+	// Build data for each day from end to start
+	type dayData struct {
+		date      string
+		remaining int
+		completed int
+	}
+	var dailyData []dayData
+
+	for d := effectiveEndDate; !d.Before(startDate); d = d.AddDate(0, 0, -1) {
+		dateStr := d.Format("2006-01-02")
+
+		// Apply any history changes that happened after this day (reverse them)
+		for _, c := range changes {
+			changeDate := c.ChangedAt.Truncate(24 * time.Hour)
+			if changeDate.Equal(d.AddDate(0, 0, 1)) || changeDate.After(d.AddDate(0, 0, 1)) {
+				// This change happened after our current day, so reverse it
+				// (set the item to its old state)
+				if _, exists := dayStates[c.ItemID]; exists {
+					dayStates[c.ItemID] = isStatusCompleted(c.OldValue.String)
+				}
+			}
+		}
+
+		// Filter changes to only those not yet processed
+		var remainingChanges []statusChange
+		for _, c := range changes {
+			changeDate := c.ChangedAt.Truncate(24 * time.Hour)
+			if changeDate.Before(d.AddDate(0, 0, 1)) {
+				remainingChanges = append(remainingChanges, c)
+			}
+		}
+		changes = remainingChanges
+
+		// Count completed and remaining
+		completed := 0
+		for _, isCompleted := range dayStates {
+			if isCompleted {
+				completed++
+			}
+		}
+		remaining := totalItems - completed
+
+		dailyData = append(dailyData, dayData{
+			date:      dateStr,
+			remaining: remaining,
+			completed: completed,
+		})
+	}
+
+	// Reverse to get chronological order
+	for i := len(dailyData) - 1; i >= 0; i-- {
+		dd := dailyData[i]
+		dayIndex := 0
+		d, _ := time.Parse("2006-01-02", dd.date)
+		dayIndex = int(d.Sub(startDate).Hours() / 24)
+
+		// Calculate ideal remaining for this day
+		ideal := totalItems
+		if totalDays > 1 {
+			ideal = totalItems - (dayIndex * totalItems / (totalDays - 1))
+			if ideal < 0 {
+				ideal = 0
+			}
+		}
+
+		dataPoints = append(dataPoints, BurndownDataPoint{
+			Date:      dd.date,
+			Remaining: dd.remaining,
+			Completed: dd.completed,
+			Ideal:     ideal,
+		})
+	}
+
+	return &IterationBurndownData{
+		IterationID: iterationID,
+		StartDate:   iter.StartDate,
+		EndDate:     iter.EndDate,
+		TotalItems:  totalItems,
+		DataPoints:  dataPoints,
+	}, nil
+}
+
+// ========================================
 // Validation Helpers
 // ========================================
 

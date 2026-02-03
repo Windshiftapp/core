@@ -49,7 +49,7 @@ export function formatDateLocale(dateString, options = {}) {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
-      ...options
+      ...options,
     };
     return date.toLocaleDateString(undefined, defaultOptions);
   } catch (error) {
@@ -67,7 +67,7 @@ export function formatDateShort(dateString) {
   return formatDateLocale(dateString, {
     year: 'numeric',
     month: 'short',
-    day: 'numeric'
+    day: 'numeric',
   });
 }
 
@@ -80,7 +80,7 @@ export function formatDateLong(dateString) {
   return formatDateLocale(dateString, {
     year: 'numeric',
     month: 'long',
-    day: 'numeric'
+    day: 'numeric',
   });
 }
 
@@ -95,7 +95,7 @@ export function formatDateTimeLocale(dateString) {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
   });
 }
 
@@ -146,7 +146,7 @@ export function isToday(dateString) {
     const date = new Date(dateString);
     const today = new Date();
     return date.toDateString() === today.toDateString();
-  } catch (error) {
+  } catch (_error) {
     return false;
   }
 }
@@ -162,7 +162,7 @@ export function isPast(dateString) {
     const date = new Date(dateString);
     const now = new Date();
     return date < now;
-  } catch (error) {
+  } catch (_error) {
     return false;
   }
 }
@@ -185,7 +185,7 @@ export function formatDateTimeWithTimezone(dateString, timezone = 'UTC', options
       hour: '2-digit',
       minute: '2-digit',
       timeZone: timezone,
-      ...options
+      ...options,
     };
     return date.toLocaleString(undefined, defaultOptions);
   } catch (error) {
@@ -211,12 +211,12 @@ export function formatHistoryTimestamp(dateString, timezone = 'UTC') {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
-      timeZone: timezone
+      timeZone: timezone,
     };
     const timeOptions = {
       hour: 'numeric',
       minute: '2-digit',
-      timeZone: timezone
+      timeZone: timezone,
     };
 
     const datePart = date.toLocaleDateString(undefined, dateOptions);
@@ -225,10 +225,10 @@ export function formatHistoryTimestamp(dateString, timezone = 'UTC') {
     // Get timezone abbreviation
     const formatter = new Intl.DateTimeFormat(undefined, {
       timeZone: timezone,
-      timeZoneName: 'short'
+      timeZoneName: 'short',
     });
     const parts = formatter.formatToParts(date);
-    const timeZonePart = parts.find(part => part.type === 'timeZoneName');
+    const timeZonePart = parts.find((part) => part.type === 'timeZoneName');
     const tzAbbr = timeZonePart ? timeZonePart.value : '';
 
     return `${datePart} at ${timePart} ${tzAbbr}`.trim();
@@ -246,7 +246,7 @@ export function formatHistoryTimestamp(dateString, timezone = 'UTC') {
  */
 export function getUserTimezone(currentUser) {
   // Use user's configured timezone if available
-  if (currentUser && currentUser.timezone) {
+  if (currentUser?.timezone) {
     return currentUser.timezone;
   }
 

@@ -17,6 +17,6 @@ export function mountReactComponent(node, Component, props = {}) {
     },
     update(newProps) {
       root.render(Component(newProps));
-    }
+    },
   };
 }

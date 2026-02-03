@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
+import { describe, expect, it, vi } from 'vitest';
 import DataTable from './DataTable.svelte';
 
 // Mock the lucide-svelte icons
@@ -12,13 +12,13 @@ vi.mock('lucide-svelte', () => ({
 // Mock child components - for Svelte 5, provide minimal component mocks
 vi.mock('./DropdownMenu.svelte', () => {
   return {
-    default: function MockDropdownMenu() { },
+    default: function MockDropdownMenu() {},
   };
 });
 
 vi.mock('./EmptyState.svelte', () => {
   return {
-    default: function MockEmptyState() { },
+    default: function MockEmptyState() {},
   };
 });
 
@@ -28,10 +28,10 @@ vi.mock('../stores/i18n.svelte.js', () => ({
     const translations = {
       'components.dataTable.showingRange': `Showing ${params.start}–${params.end} of ${params.total}`,
       'components.pagination.pageOf': `Page ${params.current} of ${params.total}`,
-      'common.noData': 'No data available'
+      'common.noData': 'No data available',
     };
     return translations[key] || key;
-  })
+  }),
 }));
 
 describe('DataTable', () => {
@@ -155,7 +155,7 @@ describe('DataTable', () => {
         {
           key: 'name',
           label: 'Name',
-          render: (item) => `<img src=x onerror="alert('xss')">`,
+          render: (_item) => `<img src=x onerror="alert('xss')">`,
         },
       ];
 

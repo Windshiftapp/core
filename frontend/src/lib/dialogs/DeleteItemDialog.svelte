@@ -177,6 +177,7 @@
     role="dialog"
     aria-modal="true"
     aria-labelledby="dialog-title"
+    tabindex="-1"
   >
     <div
       class="bg-white rounded-xl shadow-xl max-w-md w-full transform transition-all"

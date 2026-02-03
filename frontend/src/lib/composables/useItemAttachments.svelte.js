@@ -31,7 +31,7 @@ export function useItemAttachments(getItemId, showError = console.error) {
       enabled: attachmentStatus.enabled,
       attachment_path: null,
       max_file_size: 52428800, // 50MB default
-      allowed_mime_types: '[]'
+      allowed_mime_types: '[]',
     };
   }
 
@@ -56,7 +56,7 @@ export function useItemAttachments(getItemId, showError = console.error) {
       loading = true;
       const response = await api.attachments.getByItem(itemId, { page, limit });
 
-      if (response && response.attachments) {
+      if (response?.attachments) {
         // Handle paginated response
         attachments = response.attachments;
         pagination = response.pagination;
@@ -80,7 +80,7 @@ export function useItemAttachments(getItemId, showError = console.error) {
    * Handle attachment upload event from AttachmentList component
    * @param {CustomEvent} event - Upload event with detail { attachment, message }
    */
-  async function handleUpload(event) {
+  async function handleUpload(_event) {
     // Reload attachments to get updated pagination info
     if (isEnabled()) {
       await load(1, pageSize); // Go to first page to see new upload
@@ -189,12 +189,24 @@ export function useItemAttachments(getItemId, showError = console.error) {
   // Public API
   return {
     // State (reactive getters)
-    get attachments() { return attachments; },
-    get pagination() { return pagination; },
-    get settings() { return settings; },
-    get loading() { return loading; },
-    get currentPage() { return currentPage; },
-    get pageSize() { return pageSize; },
+    get attachments() {
+      return attachments;
+    },
+    get pagination() {
+      return pagination;
+    },
+    get settings() {
+      return settings;
+    },
+    get loading() {
+      return loading;
+    },
+    get currentPage() {
+      return currentPage;
+    },
+    get pageSize() {
+      return pageSize;
+    },
 
     // Methods
     loadSettings,
@@ -206,6 +218,6 @@ export function useItemAttachments(getItemId, showError = console.error) {
     handlePageSizeChange,
     uploadFiles,
     setPage,
-    setPageSize
+    setPageSize,
   };
 }

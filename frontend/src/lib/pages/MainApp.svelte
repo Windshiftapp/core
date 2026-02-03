@@ -195,7 +195,10 @@
       loadingMsg: 'Loading Iteration...',
       errorMsg: 'Failed to load Iteration',
       wrapper: 'surface-full',
-      getProps: (route) => ({ iterationId: route.params.id })
+      getProps: (route) => ({
+        iterationId: route.params.id,
+        workspaceId: route.query?.workspaceId || null
+      })
     },
     'assets': {
       loadingMsg: 'Loading Assets...',

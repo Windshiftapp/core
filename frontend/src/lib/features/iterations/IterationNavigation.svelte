@@ -1,6 +1,5 @@
 <script>
   import { onMount } from 'svelte';
-  import { Target } from 'lucide-svelte';
   import { navigate, currentRoute } from '../../router.js';
   import { api } from '../../api.js';
   import { getHexFromColorName } from '../../utils/colors.js';
@@ -33,11 +32,6 @@
     }
   }
 
-  function handleManageTypes() {
-    // Emit event to parent to show type management modal
-    const event = new CustomEvent('manage-iteration-types');
-    document.dispatchEvent(event);
-  }
 </script>
 
 <!-- Iteration Navigation Sidebar -->
@@ -84,17 +78,4 @@
     {/each}
   </nav>
 
-  <!-- Footer - Manage Types -->
-  <div class="pt-4 border-t" style="border-color: var(--ds-border);">
-    <button
-      onclick={handleManageTypes}
-      class="w-full px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors"
-      style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: var(--ds-text);"
-      onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered)'}
-      onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
-    >
-      <Target class="w-4 h-4" />
-      {t('iterations.manageTypes')}
-    </button>
-  </div>
 </div>

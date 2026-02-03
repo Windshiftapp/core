@@ -37,7 +37,7 @@ export default {
     resendCode: 'Reenviar codigo',
     verificationSent: 'Codigo de verificacion enviado a su correo',
     sso: 'Inicio de sesion unico',
-    continueWith: 'Continuar con {provider}'
+    continueWith: 'Continuar con {provider}',
   },
 
   users: {
@@ -84,13 +84,14 @@ export default {
     deactivateUser: 'Desactivar usuario',
     confirmDelete: 'Esta seguro de que desea eliminar a {name}? Esta accion no se puede deshacer.',
     confirmActivate: 'Esta seguro de que desea activar a {name}? Podran acceder al sistema.',
-    confirmDeactivate: 'Esta seguro de que desea desactivar a {name}? Ya no podran acceder al sistema.',
+    confirmDeactivate:
+      'Esta seguro de que desea desactivar a {name}? Ya no podran acceder al sistema.',
     failedToLoad: 'Error al cargar usuarios',
     failedToSave: 'Error al guardar usuario',
     failedToDelete: 'Error al eliminar usuario',
     failedToActivate: 'Error al activar usuario',
     failedToDeactivate: 'Error al desactivar usuario',
-    failedToResetPassword: 'Error al restablecer contrasena'
+    failedToResetPassword: 'Error al restablecer contrasena',
   },
 
   security: {
@@ -106,7 +107,7 @@ export default {
     tokenCreated: 'Token creado correctamente',
     tokenRevoked: 'Token revocado correctamente',
     copyToken: 'Copiar token',
-    tokenWarning: 'Asegurese de copiar su token ahora. No podra verlo de nuevo.'
+    tokenWarning: 'Asegurese de copiar su token ahora. No podra verlo de nuevo.',
   },
 
   portalLogin: {
@@ -121,6 +122,6 @@ export default {
     signingIn: 'Iniciando sesion...',
     signIn: 'Iniciar sesion',
     emailRequired: 'Se requiere correo electronico o nombre de usuario',
-    passwordRequired: 'Se requiere contrasena'
-  }
+    passwordRequired: 'Se requiere contrasena',
+  },
 };

@@ -10,8 +10,6 @@ export default {
     subtitle: 'Configure your application settings',
     general: 'General',
     appearance: 'Appearance',
-    notifications: 'Notifications',
-    security: 'Security',
     privacy: 'Privacy',
     language: 'Language',
     timezone: 'Timezone',
@@ -35,20 +33,35 @@ export default {
       integrationLinks: 'Integration & Links',
       usersAccess: 'Users & Access',
       communication: 'Communication',
-      assetManagement: 'Asset Management'
+      assetManagement: 'Asset Management',
     },
 
     // Admin panel item labels and descriptions (for Admin.svelte)
     adminItems: {
       customFields: { title: 'Custom Fields', description: 'Manage custom field definitions' },
       screens: { title: 'Screens', description: 'Configure form screens and layouts' },
-      hierarchyLevels: { title: 'Hierarchy Levels', description: 'Configure work item hierarchy levels' },
-      itemTypes: { title: 'Item Types', description: 'Manage work item types with icons and colors' },
-      priorities: { title: 'Priorities', description: 'Configure priority levels with icons and colors' },
+      hierarchyLevels: {
+        title: 'Hierarchy Levels',
+        description: 'Configure work item hierarchy levels',
+      },
+      itemTypes: {
+        title: 'Item Types',
+        description: 'Manage work item types with icons and colors',
+      },
+      priorities: {
+        title: 'Priorities',
+        description: 'Configure priority levels with icons and colors',
+      },
       configurationSets: { title: 'Configuration Sets', description: 'Manage configuration sets' },
-      statuses: { title: 'Statuses', description: 'Manage status categories and individual statuses' },
+      statuses: {
+        title: 'Statuses',
+        description: 'Manage status categories and individual statuses',
+      },
       workflows: { title: 'Workflows', description: 'Design and manage workflow transitions' },
-      scmProviders: { title: 'SCM Providers', description: 'Configure GitHub, GitLab, Gitea, and Bitbucket integrations' },
+      scmProviders: {
+        title: 'SCM Providers',
+        description: 'Configure GitHub, GitLab, Gitea, and Bitbucket integrations',
+      },
       systemImport: { title: 'System Import', description: 'Import data from external systems' },
       linkTypes: { title: 'Link Types', description: 'Manage link types between items' },
       attachments: { title: 'Attachments', description: 'Manage attachment settings' },
@@ -56,14 +69,26 @@ export default {
       themes: { title: 'Themes', description: 'Manage application themes and appearance' },
       users: { title: 'Users', description: 'Manage user accounts and profiles' },
       groups: { title: 'Groups', description: 'Manage user groups and memberships' },
-      permissions: { title: 'Global Permissions', description: 'Manage global permission definitions' },
-      workspaceRoles: { title: 'Workspace Roles', description: 'View workspace roles and their permissions' },
+      permissions: {
+        title: 'Global Permissions',
+        description: 'Manage global permission definitions',
+      },
+      workspaceRoles: {
+        title: 'Workspace Roles',
+        description: 'View workspace roles and their permissions',
+      },
       sso: { title: 'Single Sign-On', description: 'Configure OIDC identity providers for SSO' },
       security: { title: 'Security', description: 'Manage security settings and feature controls' },
       workspaces: { title: 'Workspaces', description: 'Manage workspaces and settings' },
-      notificationSettings: { title: 'Notification Settings', description: 'Manage notification configurations' },
-      channels: { title: 'Channels', description: 'Configure inbound and outbound channels, portals, and webhooks' },
-      assets: { title: 'Assets', description: 'Manage asset sets, types, categories, and assets' }
+      notificationSettings: {
+        title: 'Notification Settings',
+        description: 'Manage notification configurations',
+      },
+      channels: {
+        title: 'Channels',
+        description: 'Configure inbound and outbound channels, portals, and webhooks',
+      },
+      assets: { title: 'Assets', description: 'Manage asset sets, types, categories, and assets' },
     },
 
     // Attachment Settings
@@ -77,7 +102,8 @@ export default {
       notConfigured: 'Not configured',
       pathWritable: 'Path Writable',
       pathStatusUnknown: 'Path Status Unknown',
-      enableNote: 'To enable attachments, restart the windshift server with the --attachment-path flag.',
+      enableNote:
+        'To enable attachments, restart the windshift server with the --attachment-path flag.',
       enableExample: 'Example: ./windshift --attachment-path /path/to/attachments',
       generalSettings: 'General Settings',
       enableAttachments: 'Enable Attachments',
@@ -85,7 +111,8 @@ export default {
       maxFileSize: 'Maximum File Size (MB)',
       current: 'Current',
       fileTypeRestrictions: 'File Type Restrictions',
-      fileTypeRestrictionsDesc: 'Leave empty to allow all file types. Add specific MIME types to restrict uploads.',
+      fileTypeRestrictionsDesc:
+        'Leave empty to allow all file types. Add specific MIME types to restrict uploads.',
       quickAddCommonTypes: 'Quick Add Common Types',
       images: 'Images',
       documents: 'Documents',
@@ -98,9 +125,10 @@ export default {
       allowedMimeTypes: 'Allowed MIME Types',
       allFileTypesAllowed: 'All file types allowed',
       settingsSavedSuccess: 'Settings saved successfully',
-      notAvailable: 'Attachment functionality is not available. Configure an attachment directory to enable attachments.',
+      notAvailable:
+        'Attachment functionality is not available. Configure an attachment directory to enable attachments.',
       failedToLoad: 'Failed to load attachment settings',
-      failedToSave: 'Failed to save settings'
+      failedToSave: 'Failed to save settings',
     },
 
     // Group Manager
@@ -147,13 +175,14 @@ export default {
       confirmRemoveMember: 'Are you sure you want to remove this member from the group?',
       failedToAddMembers: 'Failed to add members',
       failedToRemoveMember: 'Failed to remove member',
-      failedToLoadDetails: 'Failed to load group details'
+      failedToLoadDetails: 'Failed to load group details',
     },
 
     // Notification Settings
     notifications: {
       title: 'Notification Settings',
-      subtitle: 'Create and manage notification configurations that can be assigned to configuration sets',
+      subtitle:
+        'Create and manage notification configurations that can be assigned to configuration sets',
       createSetting: 'Create Notification Setting',
       editSetting: 'Edit Notification Setting',
       setting: 'Setting',
@@ -161,7 +190,8 @@ export default {
       rulesConfigured: '{count} rules configured ({enabled} enabled)',
       noRules: '0 rules configured',
       createdBy: 'Created By',
-      noSettingsFound: 'No notification settings found. Create your first notification setting to get started.',
+      noSettingsFound:
+        'No notification settings found. Create your first notification setting to get started.',
       name: 'Name',
       namePlaceholder: 'e.g., Development Team Notifications',
       nameRequired: 'Name is required',
@@ -188,13 +218,14 @@ export default {
       failedToSave: 'Failed to save notification setting',
       failedToDelete: 'Failed to delete notification setting',
       failedToUpdate: 'Failed to update notification setting',
-      confirmDelete: 'Are you sure you want to delete "{name}"? This action cannot be undone.'
+      confirmDelete: 'Are you sure you want to delete "{name}"? This action cannot be undone.',
     },
 
     // Configuration Sets
     configSets: {
       title: 'Configuration Sets',
-      subtitle: 'Manage configuration sets that combine workflows and screens for different workspace contexts.',
+      subtitle:
+        'Manage configuration sets that combine workflows and screens for different workspace contexts.',
       addConfigSet: 'Add Configuration Set',
       createConfigSet: 'Create Configuration Set',
       editConfigSet: 'Edit Configuration Set',
@@ -232,13 +263,17 @@ export default {
       firstAvailable: 'First available',
       configurePerItemType: 'Configure per item type',
       preselectedItemType: 'Pre-selected item type when creating new items',
-      selectItemTypes: 'Select which item types are available in workspaces using this configuration set.',
+      selectItemTypes:
+        'Select which item types are available in workspaces using this configuration set.',
       workflowScreenOverrides: 'Workflow & Screen Overrides',
-      overridesDesc: 'Configure custom workflows and screens per item type. Use \'Default\' to inherit from the General tab.',
+      overridesDesc:
+        "Configure custom workflows and screens per item type. Use 'Default' to inherit from the General tab.",
       itemType: 'Item Type',
       default: 'Default',
-      selectPriorities: 'Select which priorities are available in workspaces using this configuration set.',
-      selectWorkspaces: 'Select which workspaces use this configuration set. A workspace can only belong to one configuration set.'
+      selectPriorities:
+        'Select which priorities are available in workspaces using this configuration set.',
+      selectWorkspaces:
+        'Select which workspaces use this configuration set. A workspace can only belong to one configuration set.',
     },
 
     // Permissions
@@ -275,7 +310,7 @@ export default {
       permissionRevokedFromUser: 'Permission revoked from user successfully',
       permissionRevokedFromGroup: 'Permission revoked from group successfully',
       failedToRevokePermission: 'Failed to revoke permission: ',
-      failedToRevokePermissionFromGroup: 'Failed to revoke permission from group: '
+      failedToRevokePermissionFromGroup: 'Failed to revoke permission from group: ',
     },
 
     // Permission Sets
@@ -299,7 +334,8 @@ export default {
       saveChanges: 'Save Changes',
       permissionAssignments: 'Permission Assignments',
       addAssignment: 'Add Assignment',
-      addAssignmentDesc: 'Select a role, group, or user below to add them to this permission. The assignment will be added immediately when selected.',
+      addAssignmentDesc:
+        'Select a role, group, or user below to add them to this permission. The assignment will be added immediately when selected.',
       addByRole: 'Add by Role',
       addByGroup: 'Add by Group',
       addByUser: 'Add by User',
@@ -317,7 +353,7 @@ export default {
       unknown: 'Unknown',
       searchAndSelectRole: 'Search and select a role...',
       searchAndSelectGroup: 'Search and select a group...',
-      searchAndSelectUser: 'Search and select a user...'
+      searchAndSelectUser: 'Search and select a user...',
     },
 
     // SCM Providers
@@ -372,7 +408,8 @@ export default {
       allWorkspaces: 'All workspaces can use this provider',
       restrictToWorkspaces: 'Restrict to specific workspaces',
       allowedWorkspaces: 'Allowed Workspaces',
-      noWorkspacesWarning: 'Warning: No workspaces selected. This provider will not be usable by any workspace.'
+      noWorkspacesWarning:
+        'Warning: No workspaces selected. This provider will not be usable by any workspace.',
     },
 
     // Security Settings
@@ -381,12 +418,14 @@ export default {
       subtitle: 'Manage security-related settings and feature controls',
       calendarFeeds: 'Calendar Feed Subscriptions',
       calendarFeedsDesc: 'Allow users to generate ICS feed URLs for external calendar apps',
-      calendarFeedsWarning: 'Warning: When disabled, existing calendar feeds will stop working immediately. Users will not be able to generate new feed URLs.',
+      calendarFeedsWarning:
+        'Warning: When disabled, existing calendar feeds will stop working immediately. Users will not be able to generate new feed URLs.',
       pluginExecution: 'Plugin CLI Command Execution',
       pluginExecutionDesc: 'Allow plugins to execute shell commands on the server',
-      pluginExecutionWarning: 'Warning: Enabling this setting allows plugins to execute shell commands. Commands are restricted to each plugin\'s own directory for security. Only enable if you trust all installed plugins.',
+      pluginExecutionWarning:
+        "Warning: Enabling this setting allows plugins to execute shell commands. Commands are restricted to each plugin's own directory for security. Only enable if you trust all installed plugins.",
       failedToLoad: 'Failed to load security settings',
-      failedToSave: 'Failed to save settings'
+      failedToSave: 'Failed to save settings',
     },
 
     // SSO Settings
@@ -400,7 +439,8 @@ export default {
       createProvider: 'Create Provider',
       deleteProvider: 'Delete Provider',
       noProviderConfigured: 'No SSO Provider Configured',
-      noProviderDescription: 'Add an OIDC identity provider to enable Single Sign-On for your users. Supports Keycloak, Authentik, Pocket ID, and other OIDC-compliant providers.',
+      noProviderDescription:
+        'Add an OIDC identity provider to enable Single Sign-On for your users. Supports Keycloak, Authentik, Pocket ID, and other OIDC-compliant providers.',
       slug: 'Slug',
       slugPlaceholder: 'e.g., authentik',
       slugHelp: 'Used in the SSO login URL',
@@ -438,11 +478,13 @@ export default {
       autoProvisionUsersDesc: 'Automatically create user accounts on first SSO login',
       manualUserCreationOnly: 'Manual user creation only',
       allowPasswordLogin: 'Allow password login',
-      allowPasswordLoginDesc: 'Users can still sign in with username/password. Disable for SSO-only mode.',
+      allowPasswordLoginDesc:
+        'Users can still sign in with username/password. Disable for SSO-only mode.',
       passwordLoginAllowed: 'Password login allowed',
       ssoOnlyMode: 'SSO-only mode',
       trustIdpEmailVerification: 'Trust IdP email verification',
-      trustIdpEmailVerificationDesc: 'When enabled, blocks login if the IdP explicitly reports the email as unverified. When the IdP doesn\'t report verification status, we\'ll send a verification email.',
+      trustIdpEmailVerificationDesc:
+        "When enabled, blocks login if the IdP explicitly reports the email as unverified. When the IdP doesn't report verification status, we'll send a verification email.",
       idpVerificationNotEnforced: 'IdP verification not enforced',
       testConnection: 'Test Connection',
       testing: 'Testing...',
@@ -450,11 +492,12 @@ export default {
       connectionFailed: 'Connection failed',
       connectionTestFailed: 'Connection test failed',
       confirmDeleteProvider: 'Are you sure you want to delete the SSO provider',
-      deleteWarning: 'This will unlink all external accounts and users will need to sign in with a password.',
+      deleteWarning:
+        'This will unlink all external accounts and users will need to sign in with a password.',
       failedToLoad: 'Failed to load SSO providers',
       failedToCreate: 'Failed to create SSO provider',
       failedToUpdate: 'Failed to update SSO provider',
-      failedToDelete: 'Failed to delete SSO provider'
+      failedToDelete: 'Failed to delete SSO provider',
     },
 
     // Channel Managers
@@ -473,9 +516,11 @@ export default {
       addedBy: 'Added by',
       on: 'on',
       removeManager: 'Remove Manager',
-      confirmRemoveMessage: 'Are you sure you want to remove {name} as a channel manager? They will no longer be able to configure or manage this channel.',
+      confirmRemoveMessage:
+        'Are you sure you want to remove {name} as a channel manager? They will no longer be able to configure or manage this channel.',
       note: 'Note:',
-      noteText: 'Channel managers can configure channel settings, test connections, and manage channel-specific settings. Global administrators always have access to all channels.'
+      noteText:
+        'Channel managers can configure channel settings, test connections, and manage channel-specific settings. Global administrators always have access to all channels.',
     },
 
     // Connected Accounts
@@ -493,7 +538,8 @@ export default {
       disconnecting: 'Disconnecting...',
       connect: 'Connect',
       account: 'Account',
-      footerNote: 'Connected accounts are used to create branches and pull requests in your name. Each user must connect their own account for proper attribution.'
+      footerNote:
+        'Connected accounts are used to create branches and pull requests in your name. Each user must connect their own account for proper attribution.',
     },
 
     // Link Types
@@ -510,7 +556,7 @@ export default {
       system: 'System',
       cannotDeleteSystem: 'Cannot delete system link types',
       nameRequired: 'Name is required',
-      failedToSave: 'Failed to save link type:'
+      failedToSave: 'Failed to save link type:',
     },
 
     // Status Categories
@@ -524,7 +570,7 @@ export default {
       default: 'Default',
       completed: 'Completed',
       nameRequired: 'Name is required',
-      failedToSave: 'Failed to save status category:'
+      failedToSave: 'Failed to save status category:',
     },
 
     // Item Types
@@ -539,7 +585,7 @@ export default {
       hierarchyLevel: 'Hierarchy Level',
       nameRequired: 'Name is required',
       failedToSave: 'Failed to save item type:',
-      noItemTypes: 'No item types configured yet.'
+      noItemTypes: 'No item types configured yet.',
     },
 
     // Hierarchy Levels
@@ -552,7 +598,7 @@ export default {
       description: 'Description',
       nameRequired: 'Hierarchy level name is required',
       failedToSave: 'Failed to save hierarchy level:',
-      confirmDelete: 'Are you sure you want to delete'
+      confirmDelete: 'Are you sure you want to delete',
     },
 
     // Module Settings (Plugins)
@@ -560,7 +606,8 @@ export default {
       title: 'Modules',
       subtitle: 'Enable or disable system modules and manage plugins',
       plugins: 'Plugins',
-      pluginsDisabledMessage: 'The plugin system has been disabled via server startup configuration.',
+      pluginsDisabledMessage:
+        'The plugin system has been disabled via server startup configuration.',
       uploadPlugin: 'Upload Plugin',
       dropOrSelect: 'Drag and drop plugin files here or click to select',
       supportedFormats: 'Supported formats: .zip or .wasm',
@@ -571,25 +618,29 @@ export default {
       pluginDeletedSuccess: 'Plugin {name} deleted successfully',
       confirmDeletePlugin: 'Are you sure you want to delete the plugin "{name}"?',
       wasmManifestRequired: 'Manifest Required for WASM Files',
-      wasmManifestRequiredDesc: 'WASM files must be accompanied by a manifest.json file that describes the plugin.',
+      wasmManifestRequiredDesc:
+        'WASM files must be accompanied by a manifest.json file that describes the plugin.',
       chooseManifest: 'Choose manifest.json',
       changeManifest: 'Change manifest.json',
       manifestSelected: 'Manifest selected: {name}',
       registeredRoutes: 'Registered Routes',
-      moduleSettingsNote: 'Changes to module settings take effect immediately. Disabling a module will hide it from the navigation.',
+      moduleSettingsNote:
+        'Changes to module settings take effect immediately. Disabling a module will hide it from the navigation.',
       failedToUpload: 'Upload failed: {error}',
       failedToReload: 'Failed to reload plugin: {error}',
       failedToDelete: 'Failed to delete plugin: {error}',
       pleaseSelectPlugin: 'Please select a plugin file',
-      wasmNeedsManifest: 'WASM files require a manifest.json file. Please select a manifest.json or upload a .zip file containing both files.',
+      wasmNeedsManifest:
+        'WASM files require a manifest.json file. Please select a manifest.json or upload a .zip file containing both files.',
       by: 'By',
       settingsSavedSuccess: 'Module settings saved successfully!',
-      failedToSave: 'Failed to save module settings. Please try again.'
+      failedToSave: 'Failed to save module settings. Please try again.',
     },
 
     // Workspace Roles
     workspaceRoles: {
-      readOnlyNote: 'Workspace roles are system-defined and cannot be edited. They serve as reference for understanding the permissions available in each role.'
+      readOnlyNote:
+        'Workspace roles are system-defined and cannot be edited. They serve as reference for understanding the permissions available in each role.',
     },
 
     // Board Configuration
@@ -607,8 +658,8 @@ export default {
       mappedStatuses: 'Mapped Statuses',
       noStatusesSelected: 'No statuses selected',
       backlogStatuses: 'Backlog Statuses',
-      backlogStatusesHelp: 'Items with these statuses will appear in the backlog'
-    }
+      backlogStatusesHelp: 'Items with these statuses will appear in the backlog',
+    },
   },
 
   // Roles and Permissions
@@ -631,7 +682,7 @@ export default {
     roleCreated: 'Role created successfully',
     roleUpdated: 'Role updated successfully',
     roleDeleted: 'Role deleted successfully',
-    cannotDeleteSystemRole: 'System roles cannot be deleted'
+    cannotDeleteSystemRole: 'System roles cannot be deleted',
   },
 
   // Permissions
@@ -650,6 +701,6 @@ export default {
     view: 'View',
     edit: 'Edit',
     create: 'Create',
-    noAccessMessage: 'You do not have permission to access this page.'
-  }
+    noAccessMessage: 'You do not have permission to access this page.',
+  },
 };

@@ -10,14 +10,14 @@ const collectionCache = new Map();
  */
 export async function getCollection(collectionId) {
   if (!collectionId) return null;
-  
+
   const id = String(collectionId);
-  
+
   // Check cache first
   if (collectionCache.has(id)) {
     return collectionCache.get(id);
   }
-  
+
   try {
     const collection = await api.collections.get(id);
     collectionCache.set(id, collection);
@@ -63,7 +63,7 @@ export async function checkItemVisibility(itemId, filters) {
     const items = response?.items || response || [];
 
     // Check if the item is in the results
-    return items.some(item => item.id === itemId);
+    return items.some((item) => item.id === itemId);
   } catch (error) {
     console.error(`Failed to check visibility for item ${itemId}:`, error);
     // If there's an error, assume the item is visible to avoid confusing the user

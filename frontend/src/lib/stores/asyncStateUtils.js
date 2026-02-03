@@ -118,7 +118,7 @@ export function createAsyncState(options = {}) {
     runSafe,
     reset,
     setLoading,
-    setError
+    setError,
   };
 }
 

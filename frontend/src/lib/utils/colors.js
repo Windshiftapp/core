@@ -22,7 +22,7 @@ export const colorNames = [
   'fuchsia',
   'pink',
   'rose',
-  'zinc'
+  'zinc',
 ];
 
 // Map color names to hex values (500-level for display as solid colors)
@@ -47,7 +47,7 @@ export const colorToHex = {
   zinc: '#71717a',
   // Aliases
   grey: '#71717a',
-  gray: '#71717a'
+  gray: '#71717a',
 };
 
 // Map hex values back to color names (for migration/compatibility)

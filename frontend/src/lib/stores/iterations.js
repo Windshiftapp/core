@@ -7,7 +7,7 @@ const baseStore = createEntityStore(
     getAll: (filters) => api.iterations.getAll(filters),
     create: (data) => api.iterations.create(data),
     update: (id, updates) => api.iterations.update(id, updates),
-    delete: (id) => api.iterations.delete(id)
+    delete: (id) => api.iterations.delete(id),
   },
   'iteration'
 );
@@ -19,17 +19,20 @@ export const iterationsStore = {
   // Filter iterations by type
   filterByType(iterations, typeId) {
     if (typeId === 'all' || !typeId) return iterations;
-    return iterations.filter(i => i.type_id === parseInt(typeId));
+    return iterations.filter((i) => i.type_id === parseInt(typeId, 10));
   },
 
   // Group iterations by type
   groupByType(iterations, types) {
-    const grouped = types.reduce((acc, type) => {
-      acc[type.name] = iterations.filter(i => i.type_id === type.id);
-      return acc;
-    }, {
-      'Uncategorized': iterations.filter(i => !i.type_id)
-    });
+    const grouped = types.reduce(
+      (acc, type) => {
+        acc[type.name] = iterations.filter((i) => i.type_id === type.id);
+        return acc;
+      },
+      {
+        Uncategorized: iterations.filter((i) => !i.type_id),
+      }
+    );
 
     return grouped;
   },
@@ -42,5 +45,5 @@ export const iterationsStore = {
       console.error('Failed to get iteration progress:', error);
       throw error;
     }
-  }
+  },
 };

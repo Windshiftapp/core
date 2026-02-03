@@ -24,7 +24,7 @@ export default {
     admin: 'Administracion',
     systemSettings: 'Configuracion del sistema',
     organizationSettings: 'Configuracion de la organizacion',
-    workspaceSettings: 'Configuracion del espacio de trabajo'
+    workspaceSettings: 'Configuracion del espacio de trabajo',
   },
 
   // Roles and Permissions
@@ -47,7 +47,7 @@ export default {
     roleCreated: 'Rol creado correctamente',
     roleUpdated: 'Rol actualizado correctamente',
     roleDeleted: 'Rol eliminado correctamente',
-    cannotDeleteSystemRole: 'Los roles del sistema no se pueden eliminar'
+    cannotDeleteSystemRole: 'Los roles del sistema no se pueden eliminar',
   },
 
   // Permissions
@@ -65,6 +65,6 @@ export default {
     manage: 'Administrar',
     view: 'Ver',
     edit: 'Editar',
-    create: 'Crear'
-  }
+    create: 'Crear',
+  },
 };

@@ -8,23 +8,23 @@ export const extensions = writable({});
  * @returns {Promise<void>}
  */
 export async function loadExtensions() {
-	try {
-		const response = await fetch('/api/plugins/extensions', {
-			credentials: 'include'
-		});
+  try {
+    const response = await fetch('/api/plugins/extensions', {
+      credentials: 'include',
+    });
 
-		if (!response.ok) {
-			console.error('Failed to load extensions:', response.statusText);
-			return;
-		}
+    if (!response.ok) {
+      console.error('Failed to load extensions:', response.statusText);
+      return;
+    }
 
-		const data = await response.json();
-		extensions.set(data);
+    const data = await response.json();
+    extensions.set(data);
 
-		console.log('Loaded plugin extensions:', data);
-	} catch (error) {
-		console.error('Error loading extensions:', error);
-	}
+    console.log('Loaded plugin extensions:', data);
+  } catch (error) {
+    console.error('Error loading extensions:', error);
+  }
 }
 
 /**
@@ -34,5 +34,5 @@ export async function loadExtensions() {
  * @returns {Array} Array of extensions for the given point
  */
 export function getExtensionsForPoint(extensionsData, point) {
-	return extensionsData[point] || [];
+  return extensionsData[point] || [];
 }

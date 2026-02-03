@@ -38,7 +38,7 @@ export default {
     noOverdueItems: 'لا توجد عناصر متأخرة',
     loadingRecentItems: 'جاري تحميل العناصر الأخيرة...',
     loadingTasks: 'جاري تحميل مهامك...',
-    loadingOverdueItems: 'جاري تحميل العناصر المتأخرة...'
+    loadingOverdueItems: 'جاري تحميل العناصر المتأخرة...',
 
     // Note: Additional dashboard keys (quick actions, activity, etc.)
     // fall back to English for missing keys
@@ -56,7 +56,7 @@ export default {
     saveSearch: 'حفظ البحث',
     clearSearch: 'مسح البحث',
     advancedSearch: 'البحث المتقدم',
-    recentSearches: 'عمليات البحث الأخيرة'
+    recentSearches: 'عمليات البحث الأخيرة',
   },
 
   about: {
@@ -65,5 +65,5 @@ export default {
 
   onboarding: {
     // Onboarding section - falls back to English for missing keys
-  }
+  },
 };

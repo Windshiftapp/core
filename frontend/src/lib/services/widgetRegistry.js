@@ -3,7 +3,7 @@
 
 export const widgetCategories = {
   BUILT_IN: 'built-in',
-  ADDITIONAL: 'additional'
+  ADDITIONAL: 'additional',
 };
 
 export const widgetRegistry = [
@@ -122,7 +122,7 @@ export const widgetRegistry = [
  * @returns {object|undefined} Widget metadata
  */
 export function getWidgetMetadata(type) {
-  return widgetRegistry.find(widget => widget.type === type);
+  return widgetRegistry.find((widget) => widget.type === type);
 }
 
 /**
@@ -131,7 +131,7 @@ export function getWidgetMetadata(type) {
  * @returns {Array} Filtered widgets
  */
 export function getWidgetsByCategory(category) {
-  return widgetRegistry.filter(widget => widget.category === category);
+  return widgetRegistry.filter((widget) => widget.category === category);
 }
 
 /**
@@ -150,5 +150,5 @@ export function getDefaultWidth(type) {
  * @returns {boolean} True if widget exists
  */
 export function isValidWidgetType(type) {
-  return widgetRegistry.some(widget => widget.type === type);
+  return widgetRegistry.some((widget) => widget.type === type);
 }

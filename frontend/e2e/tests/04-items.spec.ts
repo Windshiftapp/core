@@ -1,7 +1,7 @@
-import { test, expect } from '@playwright/test';
-import { WorkspacePage } from '../pages/workspace.page';
+import { expect, test } from '@playwright/test';
+import { generateChildItem, generateItem, generateWorkspace } from '../fixtures/test-data';
 import { ItemPage } from '../pages/item.page';
-import { generateWorkspace, generateItem, generateChildItem } from '../fixtures/test-data';
+import { WorkspacePage } from '../pages/workspace.page';
 
 /**
  * Work Item Management Tests
@@ -107,7 +107,7 @@ test.describe('Item Management', () => {
       await itemPage.page.waitForLoadState('networkidle');
 
       // Verify we're on item detail page
-      await expect(itemPage.page).toHaveURL(new RegExp(`/items/\\d+`));
+      await expect(itemPage.page).toHaveURL(/\/items\/\d+/);
     });
   });
 
@@ -149,7 +149,9 @@ test.describe('Item Management', () => {
       await itemPage.gotoWorkspaceBacklog(workspaceKey);
       await itemPage.clickItem(testItem.title);
 
-      await expect(itemPage.page.locator('.description, .ProseMirror')).toContainText(newDescription);
+      await expect(itemPage.page.locator('.description, .ProseMirror')).toContainText(
+        newDescription
+      );
     });
 
     test('should update item status', async () => {
@@ -317,7 +319,10 @@ test.describe('Item Management', () => {
       const inProgressItem = generateItem(0, 'progress');
 
       await itemPage.createItem(workspaceKey, { title: openItem.title, status: 'open' });
-      await itemPage.createItem(workspaceKey, { title: inProgressItem.title, status: 'in-progress' });
+      await itemPage.createItem(workspaceKey, {
+        title: inProgressItem.title,
+        status: 'in-progress',
+      });
 
       await itemPage.gotoWorkspaceBacklog(workspaceKey);
 

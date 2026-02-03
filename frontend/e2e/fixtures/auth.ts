@@ -1,4 +1,4 @@
-import { test as base, expect, Page, APIRequestContext } from '@playwright/test';
+import { type APIRequestContext, test as base, expect, type Page } from '@playwright/test';
 
 /**
  * Authentication fixtures for Playwright tests
@@ -78,7 +78,9 @@ export const test = base.extend<AuthFixtures>({
 
       // Verify login success
       const cookies = await pageContext.context().cookies();
-      const hasSession = cookies.some(c => c.name === 'session' || c.name === 'windshift_session');
+      const hasSession = cookies.some(
+        (c) => c.name === 'session' || c.name === 'windshift_session'
+      );
       expect(hasSession).toBeTruthy();
     };
     await use(login);

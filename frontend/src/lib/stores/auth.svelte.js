@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { derived, writable } from 'svelte/store';
 import { api } from '../api.js';
 
 function createAuthStore() {
@@ -17,7 +17,7 @@ function createAuthStore() {
       session: $session,
       isAuthenticated: $isAuthenticated,
       loading: $loading,
-      error: $error
+      error: $error,
     })
   );
 
@@ -28,25 +28,25 @@ function createAuthStore() {
     // Convenience getters for backwards compatibility with direct property access
     get currentUser() {
       let value;
-      user.subscribe(v => value = v)();
+      user.subscribe((v) => (value = v))();
       return value;
     },
 
     get isAuthenticated() {
       let value;
-      isAuthenticated.subscribe(v => value = v)();
+      isAuthenticated.subscribe((v) => (value = v))();
       return value;
     },
 
     get loading() {
       let value;
-      loading.subscribe(v => value = v)();
+      loading.subscribe((v) => (value = v))();
       return value;
     },
 
     get error() {
       let value;
-      error.subscribe(v => value = v)();
+      error.subscribe((v) => (value = v))();
       return value;
     },
 
@@ -61,7 +61,7 @@ function createAuthStore() {
         isAuthenticated.set(true);
         loading.set(false);
         error.set(null);
-      } catch (err) {
+      } catch (_err) {
         // If we can't get current user, user is not authenticated
         user.set(null);
         session.set(null);
@@ -87,7 +87,8 @@ function createAuthStore() {
           return {
             success: false,
             sso_required: true,
-            policy_message: response.policy_message || 'Password login is disabled. Please use SSO.'
+            policy_message:
+              response.policy_message || 'Password login is disabled. Please use SSO.',
           };
         }
 
@@ -105,7 +106,7 @@ function createAuthStore() {
           return {
             success: true,
             enrollment_required: response.enrollment_required || false,
-            policy_message: response.policy_message
+            policy_message: response.policy_message,
           };
         } else {
           isAuthenticated.set(false);
@@ -122,7 +123,7 @@ function createAuthStore() {
           return {
             success: false,
             sso_required: true,
-            policy_message: err.policy_message || 'Password login is disabled. Please use SSO.'
+            policy_message: err.policy_message || 'Password login is disabled. Please use SSO.',
           };
         }
 
@@ -224,7 +225,7 @@ function createAuthStore() {
     // Clear error
     clearError() {
       error.set(null);
-    }
+    },
   };
 }
 

@@ -21,7 +21,7 @@ export default {
     stopTimer: 'إيقاف المؤقت',
     pauseTimer: 'إيقاف مؤقت',
     resumeTimer: 'استئناف المؤقت',
-    timeLogged: 'تم تسجيل الوقت بنجاح'
+    timeLogged: 'تم تسجيل الوقت بنجاح',
 
     // Note: Additional time tracking keys (onboarding, categories, reports, timer, projects, calendar, entry, organizations)
     // fall back to English for missing keys
@@ -33,5 +33,5 @@ export default {
 
   timeProjectCategory: {
     // Time project category section - falls back to English for missing keys
-  }
+  },
 };

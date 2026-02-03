@@ -8,7 +8,8 @@ export default {
     create: 'Aktion erstellen',
     createFirst: 'Erste Aktion erstellen',
     noActions: 'Noch keine Aktionen',
-    noActionsDescription: 'Erstellen Sie Aktionen, um Ihre Workflows basierend auf Element-Ereignissen zu automatisieren',
+    noActionsDescription:
+      'Erstellen Sie Aktionen, um Ihre Workflows basierend auf Element-Ereignissen zu automatisieren',
     enabled: 'Aktiviert',
     disabled: 'Deaktiviert',
     enable: 'Aktivieren',
@@ -25,7 +26,8 @@ export default {
       itemLinked: 'Element verknüpft',
       manual: 'Manuell',
       respondToCascades: 'Auf durch Aktionen ausgelöste Änderungen reagieren',
-      respondToCascadesHint: 'Wenn aktiviert, wird diese Aktion auch ausgeführt, wenn sie durch andere Aktionen ausgelöst wird, nicht nur durch Benutzeränderungen.'
+      respondToCascadesHint:
+        'Wenn aktiviert, wird diese Aktion auch ausgeführt, wenn sie durch andere Aktionen ausgelöst wird, nicht nur durch Benutzeränderungen.',
     },
 
     nodes: {
@@ -36,7 +38,7 @@ export default {
       notifyUser: 'Benutzer benachrichtigen',
       condition: 'Bedingung',
       updateAsset: 'Asset aktualisieren',
-      createAsset: 'Asset erstellen'
+      createAsset: 'Asset erstellen',
     },
 
     addNodes: 'Knoten hinzufügen',
@@ -99,18 +101,18 @@ export default {
       assetStatus: 'Status',
       selectStatusOptional: 'Status auswählen (optional)...',
       requiredField: 'Erforderlich',
-      configureAssetCreation: 'Asset-Erstellung konfigurieren...'
+      configureAssetCreation: 'Asset-Erstellung konfigurieren...',
     },
 
     recipients: {
       assignee: 'Zugewiesener',
       creator: 'Ersteller',
-      specific: 'Bestimmte Benutzer'
+      specific: 'Bestimmte Benutzer',
     },
 
     condition: {
       true: 'Ja',
-      false: 'Nein'
+      false: 'Nein',
     },
 
     operators: {
@@ -120,7 +122,7 @@ export default {
       greaterThan: 'Größer als',
       lessThan: 'Kleiner als',
       isEmpty: 'Ist leer',
-      isNotEmpty: 'Ist nicht leer'
+      isNotEmpty: 'Ist nicht leer',
     },
 
     logs: {
@@ -135,7 +137,7 @@ export default {
       completedAt: 'Abgeschlossen um',
       error: 'Fehler',
       details: 'Details',
-      viewDetails: 'Details anzeigen'
+      viewDetails: 'Details anzeigen',
     },
 
     trace: {
@@ -150,50 +152,52 @@ export default {
       updateAsset: 'Asset #{asset_id} aktualisiert',
       updateAssetSkipped: 'Asset-Aktualisierung übersprungen: {reason}',
       createAsset: 'Asset #{asset_id} erstellt: {title}',
-      createAssetFailed: 'Asset-Erstellung fehlgeschlagen: {reason}'
+      createAssetFailed: 'Asset-Erstellung fehlgeschlagen: {reason}',
     },
 
     test: {
       title: 'Aktion testen',
-      description: 'Wählen Sie ein Element aus, für das diese Aktion ausgeführt werden soll. Die Aktion wird sofort ausgeführt und umgeht den normalen Auslöser.',
+      description:
+        'Wählen Sie ein Element aus, für das diese Aktion ausgeführt werden soll. Die Aktion wird sofort ausgeführt und umgeht den normalen Auslöser.',
       selectItem: 'Element auswählen',
       itemPlaceholder: 'Nach einem Element suchen...',
       execute: 'Aktion ausführen',
       run: 'Testlauf',
       executionFailed: 'Aktion konnte nicht ausgeführt werden',
-      executionQueued: 'Aktion zur Ausführung eingereiht'
+      executionQueued: 'Aktion zur Ausführung eingereiht',
     },
 
     placeholders: {
       title: 'Verfügbare Platzhalter',
-      description: 'Verwenden Sie diese Platzhalter in Ihrer Vorlage. Sie werden beim Ausführen der Aktion durch tatsächliche Werte ersetzt.',
+      description:
+        'Verwenden Sie diese Platzhalter in Ihrer Vorlage. Sie werden beim Ausführen der Aktion durch tatsächliche Werte ersetzt.',
       showReference: 'Platzhalter-Referenz anzeigen',
       categories: {
         item: 'Element-Felder',
         user: 'Aktueller Benutzer',
         old: 'Vorherige Werte',
-        trigger: 'Auslöser-Kontext'
+        trigger: 'Auslöser-Kontext',
       },
       item: {
         title: 'Element-Titel',
         id: 'Element-ID',
         statusId: 'Status-ID',
         assigneeId: 'Zugewiesener Benutzer-ID',
-        any: 'Beliebiges Element-Feld'
+        any: 'Beliebiges Element-Feld',
       },
       user: {
         name: 'Vollständiger Name des Benutzers',
         email: 'E-Mail des Benutzers',
-        id: 'Benutzer-ID'
+        id: 'Benutzer-ID',
       },
       old: {
         description: 'Vorheriger Wert vor der Änderung',
-        example: 'Vorheriger Wert eines beliebigen Feldes'
+        example: 'Vorheriger Wert eines beliebigen Feldes',
       },
       trigger: {
         itemId: 'Auslösendes Element-ID',
-        workspaceId: 'Arbeitsbereich-ID'
-      }
-    }
-  }
+        workspaceId: 'Arbeitsbereich-ID',
+      },
+    },
+  },
 };

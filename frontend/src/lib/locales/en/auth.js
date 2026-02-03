@@ -40,7 +40,7 @@ export default {
     continueWith: 'Continue with {provider}',
     orSignInWithPassword: 'or sign in with password',
     touchSecurityKey: 'Touch your security key...',
-    signInWithSecurityKey: 'Sign in with Security Key'
+    signInWithSecurityKey: 'Sign in with Security Key',
   },
 
   users: {
@@ -86,8 +86,10 @@ export default {
     activateUser: 'Activate User',
     deactivateUser: 'Deactivate User',
     confirmDelete: 'Are you sure you want to delete {name}? This action cannot be undone.',
-    confirmActivate: 'Are you sure you want to activate {name}? They will be able to access the system.',
-    confirmDeactivate: 'Are you sure you want to deactivate {name}? They will no longer be able to access the system.',
+    confirmActivate:
+      'Are you sure you want to activate {name}? They will be able to access the system.',
+    confirmDeactivate:
+      'Are you sure you want to deactivate {name}? They will no longer be able to access the system.',
     failedToLoad: 'Failed to load users',
     failedToSave: 'Failed to save user',
     failedToDelete: 'Failed to delete user',
@@ -118,12 +120,14 @@ export default {
     saveSettings: 'Save Settings',
     settingsSaved: 'Settings saved successfully',
     connectedAccounts: 'Connected Accounts',
-    connectedAccountsDesc: 'Connect your source control accounts to create branches and pull requests',
+    connectedAccountsDesc:
+      'Connect your source control accounts to create branches and pull requests',
     calendarIntegration: 'Calendar Integration',
     calendarIntegrationDesc: 'Subscribe to your scheduled items in external calendar apps',
     loadCalendarFeedSettings: 'Load Calendar Feed Settings',
     enableCalendarSubscription: 'Enable Calendar Subscription',
-    calendarSubscriptionDesc: 'Generate a subscription URL to sync your scheduled work items with external calendar applications.',
+    calendarSubscriptionDesc:
+      'Generate a subscription URL to sync your scheduled work items with external calendar applications.',
     generateCalendarFeedUrl: 'Generate Calendar Feed URL',
     yourCalendarFeedUrl: 'Your Calendar Feed URL',
     showFullUrl: 'Show Full URL',
@@ -133,14 +137,15 @@ export default {
     copyFeedUrlStep: 'Copy the feed URL above',
     regenerateUrl: 'Regenerate URL',
     revokeFeed: 'Revoke Feed',
-    regenerateUrlNote: 'Regenerating the URL will invalidate your current URL. Any calendars using the old URL will need to be updated.',
+    regenerateUrlNote:
+      'Regenerating the URL will invalidate your current URL. Any calendars using the old URL will need to be updated.',
     calendarFeedsDisabled: 'Calendar feeds are disabled by your administrator.',
     googleCalendar: 'Google Calendar',
     googleCalendarInstructions: 'Settings > Add calendar > From URL > Paste the URL',
     outlook: 'Outlook',
     outlookInstructions: 'Add calendar > Subscribe from web > Paste the URL',
     appleCalendar: 'Apple Calendar',
-    appleCalendarInstructions: 'File > New Calendar Subscription > Paste the URL'
+    appleCalendarInstructions: 'File > New Calendar Subscription > Paste the URL',
   },
 
   security: {
@@ -160,14 +165,15 @@ export default {
     enterSecurityKeyName: 'Please enter a name for this security key',
     webAuthnNotSupported: 'WebAuthn is not supported in this browser',
     invalidRegistrationChallenge: 'Invalid registration challenge from server',
-    noActiveFidoCredentials: 'No active FIDO credentials found. Please register a security key first.',
+    noActiveFidoCredentials:
+      'No active FIDO credentials found. Please register a security key first.',
     authenticationFailed: 'Authentication failed',
     authenticationCancelled: 'Authentication was cancelled or failed. Please try again.',
     failedToTestFidoLogin: 'Failed to test FIDO login',
     enterTokenName: 'Please enter a name for this token',
     confirmRevokeToken: 'Are you sure you want to revoke "{name}"? This action cannot be undone.',
     securityKeyFido: 'Security Key (FIDO2)',
-    authenticatorAppTotp: 'Authenticator App (TOTP)'
+    authenticatorAppTotp: 'Authenticator App (TOTP)',
   },
 
   portalLogin: {
@@ -185,6 +191,6 @@ export default {
     signIn: 'Sign In',
     emailRequired: 'Email or username is required',
     passwordRequired: 'Password is required',
-    webAuthnNotSupported: 'WebAuthn is not supported by this browser'
-  }
+    webAuthnNotSupported: 'WebAuthn is not supported by this browser',
+  },
 };

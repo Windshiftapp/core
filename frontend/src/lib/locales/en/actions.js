@@ -26,7 +26,8 @@ export default {
       itemLinked: 'Item Linked',
       manual: 'Manual',
       respondToCascades: 'Respond to action-triggered changes',
-      respondToCascadesHint: 'When enabled, this action will also run when triggered by other actions, not just user changes.'
+      respondToCascadesHint:
+        'When enabled, this action will also run when triggered by other actions, not just user changes.',
     },
 
     // Node types
@@ -38,7 +39,7 @@ export default {
       notifyUser: 'Notify User',
       condition: 'Condition',
       updateAsset: 'Update Asset',
-      createAsset: 'Create Asset'
+      createAsset: 'Create Asset',
     },
 
     // Node palette and tips
@@ -103,20 +104,20 @@ export default {
       assetStatus: 'Status',
       selectStatusOptional: 'Select status (optional)...',
       requiredField: 'Required',
-      configureAssetCreation: 'Configure asset creation...'
+      configureAssetCreation: 'Configure asset creation...',
     },
 
     // Recipients
     recipients: {
       assignee: 'Assignee',
       creator: 'Creator',
-      specific: 'Specific Users'
+      specific: 'Specific Users',
     },
 
     // Condition
     condition: {
       true: 'Yes',
-      false: 'No'
+      false: 'No',
     },
 
     // Operators
@@ -127,7 +128,7 @@ export default {
       greaterThan: 'Greater Than',
       lessThan: 'Less Than',
       isEmpty: 'Is Empty',
-      isNotEmpty: 'Is Not Empty'
+      isNotEmpty: 'Is Not Empty',
     },
 
     // Execution logs
@@ -143,7 +144,7 @@ export default {
       completedAt: 'Completed At',
       error: 'Error',
       details: 'Details',
-      viewDetails: 'View Details'
+      viewDetails: 'View Details',
     },
 
     // Execution trace
@@ -159,52 +160,54 @@ export default {
       updateAsset: 'Updated asset #{asset_id}',
       updateAssetSkipped: 'Asset update skipped: {reason}',
       createAsset: 'Created asset #{asset_id}: {title}',
-      createAssetFailed: 'Asset creation failed: {reason}'
+      createAssetFailed: 'Asset creation failed: {reason}',
     },
 
     // Test/manual execution
     test: {
       title: 'Test Action',
-      description: 'Select an item to run this action against. This will execute the action immediately, bypassing the normal trigger.',
+      description:
+        'Select an item to run this action against. This will execute the action immediately, bypassing the normal trigger.',
       selectItem: 'Select Item',
       itemPlaceholder: 'Search for an item...',
       execute: 'Run Action',
       run: 'Test Run',
       executionFailed: 'Failed to execute action',
-      executionQueued: 'Action queued for execution'
+      executionQueued: 'Action queued for execution',
     },
 
     // Placeholder reference
     placeholders: {
       title: 'Available Placeholders',
-      description: 'Use these placeholders in your template. They will be replaced with actual values when the action runs.',
+      description:
+        'Use these placeholders in your template. They will be replaced with actual values when the action runs.',
       showReference: 'Show placeholder reference',
       categories: {
         item: 'Item Fields',
         user: 'Current User',
         old: 'Previous Values',
-        trigger: 'Trigger Context'
+        trigger: 'Trigger Context',
       },
       item: {
         title: 'Item title',
         id: 'Item ID',
         statusId: 'Status ID',
         assigneeId: 'Assignee user ID',
-        any: 'Any item field'
+        any: 'Any item field',
       },
       user: {
         name: "User's full name",
         email: "User's email",
-        id: 'User ID'
+        id: 'User ID',
       },
       old: {
         description: 'Previous value before change',
-        example: 'Any field\'s previous value'
+        example: "Any field's previous value",
       },
       trigger: {
         itemId: 'Triggering item ID',
-        workspaceId: 'Workspace ID'
-      }
-    }
-  }
+        workspaceId: 'Workspace ID',
+      },
+    },
+  },
 };

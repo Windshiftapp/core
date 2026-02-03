@@ -4,7 +4,7 @@
  * Centralizes screen list, field editing, and drag-and-drop state.
  */
 import { api } from '../api.js';
-import { SYSTEM_FIELDS, getSystemFieldName } from './fieldConfig.js';
+import { getSystemFieldName, SYSTEM_FIELDS } from './fieldConfig.js';
 
 class ScreenEditorStore {
   // === Screens List ===
@@ -24,7 +24,7 @@ class ScreenEditorStore {
   editingScreen = $state(null);
   formData = $state({
     name: '',
-    description: ''
+    description: '',
   });
 
   // === Field Search ===
@@ -39,7 +39,7 @@ class ScreenEditorStore {
     { value: 'full', label: 'Full width' },
     { value: 'half', label: 'Half width' },
     { value: 'third', label: 'Third width' },
-    { value: 'quarter', label: 'Quarter width' }
+    { value: 'quarter', label: 'Quarter width' },
   ];
 
   // === Derived Values ===
@@ -50,20 +50,20 @@ class ScreenEditorStore {
   get allAvailableFields() {
     return [
       // System fields from shared config
-      ...SYSTEM_FIELDS.map(field => ({
+      ...SYSTEM_FIELDS.map((field) => ({
         ...field,
         type: 'system',
-        category: 'System Fields'
+        category: 'System Fields',
       })),
       // Custom fields
-      ...this.customFields.map(field => ({
+      ...this.customFields.map((field) => ({
         identifier: field.id.toString(),
         name: field.field_name || field.name,
         type: 'custom',
         category: 'Custom Fields',
         fieldType: field.field_type,
-        config: field.field_config
-      }))
+        config: field.field_config,
+      })),
     ];
   }
 
@@ -72,12 +72,19 @@ class ScreenEditorStore {
    */
   get availableFieldsFiltered() {
     return this.allAvailableFields
-      .filter(field =>
-        !this.screenFields.some(sf => sf.field_type === field.type && sf.field_identifier === field.identifier)
+      .filter(
+        (field) =>
+          !this.screenFields.some(
+            (sf) => sf.field_type === field.type && sf.field_identifier === field.identifier
+          )
       )
-      .filter(field =>
-        // Filter out Title and Status fields since they're always auto-added
-        !(field.type === 'system' && (field.identifier === 'title' || field.identifier === 'status'))
+      .filter(
+        (field) =>
+          // Filter out Title and Status fields since they're always auto-added
+          !(
+            field.type === 'system' &&
+            (field.identifier === 'title' || field.identifier === 'status')
+          )
       );
   }
 
@@ -85,11 +92,12 @@ class ScreenEditorStore {
    * Search-filtered available fields.
    */
   get searchFilteredFields() {
-    return this.availableFieldsFiltered.filter(field => {
+    return this.availableFieldsFiltered.filter((field) => {
       if (!this.fieldSearchQuery.trim()) return true;
       const query = this.fieldSearchQuery.toLowerCase();
-      return field.name.toLowerCase().includes(query) ||
-             field.identifier.toLowerCase().includes(query);
+      return (
+        field.name.toLowerCase().includes(query) || field.identifier.toLowerCase().includes(query)
+      );
     });
   }
 
@@ -130,7 +138,7 @@ class ScreenEditorStore {
     this.editingScreen = screen;
     this.formData = {
       name: screen.name,
-      description: screen.description || ''
+      description: screen.description || '',
     };
     this.showCreateForm = true;
   }
@@ -176,7 +184,9 @@ class ScreenEditorStore {
       this.screenFields = fields || [];
 
       // Ensure Title field is always present and first
-      const titleField = this.screenFields.find(f => f.field_type === 'system' && f.field_identifier === 'title');
+      const titleField = this.screenFields.find(
+        (f) => f.field_type === 'system' && f.field_identifier === 'title'
+      );
       if (!titleField) {
         const newTitleField = {
           screen_id: screen.id,
@@ -186,13 +196,18 @@ class ScreenEditorStore {
           is_required: true,
           field_width: 'full',
           field_name: 'Title',
-          field_label: 'Title'
+          field_label: 'Title',
         };
-        this.screenFields = [newTitleField, ...this.screenFields.map(f => ({ ...f, display_order: f.display_order + 1 }))];
+        this.screenFields = [
+          newTitleField,
+          ...this.screenFields.map((f) => ({ ...f, display_order: f.display_order + 1 })),
+        ];
       }
 
       // Ensure Status field is always present (after title)
-      const statusField = this.screenFields.find(f => f.field_type === 'system' && f.field_identifier === 'status');
+      const statusField = this.screenFields.find(
+        (f) => f.field_type === 'system' && f.field_identifier === 'status'
+      );
       if (!statusField) {
         const newStatusField = {
           screen_id: screen.id,
@@ -202,14 +217,18 @@ class ScreenEditorStore {
           is_required: false,
           field_width: 'half',
           field_name: 'Status',
-          field_label: 'Status'
+          field_label: 'Status',
         };
-        const titleIndex = this.screenFields.findIndex(f => f.field_type === 'system' && f.field_identifier === 'title');
+        const titleIndex = this.screenFields.findIndex(
+          (f) => f.field_type === 'system' && f.field_identifier === 'title'
+        );
         const insertIndex = titleIndex >= 0 ? titleIndex + 1 : 0;
         this.screenFields = [
           ...this.screenFields.slice(0, insertIndex),
           newStatusField,
-          ...this.screenFields.slice(insertIndex).map(f => ({ ...f, display_order: f.display_order + 1 }))
+          ...this.screenFields
+            .slice(insertIndex)
+            .map((f) => ({ ...f, display_order: f.display_order + 1 })),
         ];
       }
 
@@ -234,7 +253,11 @@ class ScreenEditorStore {
 
   addFieldToScreen(fieldData) {
     // Check if field already exists
-    if (this.screenFields.some(f => f.field_type === fieldData.type && f.field_identifier === fieldData.identifier)) {
+    if (
+      this.screenFields.some(
+        (f) => f.field_type === fieldData.type && f.field_identifier === fieldData.identifier
+      )
+    ) {
       return;
     }
 
@@ -246,7 +269,7 @@ class ScreenEditorStore {
       is_required: fieldData.identifier === 'title',
       field_width: 'full',
       field_name: fieldData.name,
-      field_label: fieldData.name
+      field_label: fieldData.name,
     };
 
     if (fieldData.type === 'custom') {
@@ -258,7 +281,11 @@ class ScreenEditorStore {
 
   addFieldAtPosition(fieldData, targetIndex, closestEdge) {
     // Check if field already exists
-    if (this.screenFields.some(f => f.field_type === fieldData.type && f.field_identifier === fieldData.identifier)) {
+    if (
+      this.screenFields.some(
+        (f) => f.field_type === fieldData.type && f.field_identifier === fieldData.identifier
+      )
+    ) {
       return;
     }
 
@@ -272,7 +299,7 @@ class ScreenEditorStore {
       is_required: fieldData.identifier === 'title',
       field_width: 'full',
       field_name: fieldData.name,
-      field_label: fieldData.name
+      field_label: fieldData.name,
     };
 
     if (fieldData.type === 'custom') {
@@ -301,7 +328,10 @@ class ScreenEditorStore {
     const field = this.screenFields[index];
 
     // Prevent removing the Title and Status fields
-    if (field.field_type === 'system' && (field.field_identifier === 'title' || field.field_identifier === 'status')) {
+    if (
+      field.field_type === 'system' &&
+      (field.field_identifier === 'title' || field.field_identifier === 'status')
+    ) {
       return;
     }
 
@@ -341,7 +371,7 @@ class ScreenEditorStore {
   // === Helpers ===
 
   getFieldWidthLabel(width) {
-    return this.fieldWidths.find(w => w.value === width)?.label || width;
+    return this.fieldWidths.find((w) => w.value === width)?.label || width;
   }
 
   getFieldDisplayName(field) {
@@ -356,7 +386,7 @@ class ScreenEditorStore {
   resetForm() {
     this.formData = {
       name: '',
-      description: ''
+      description: '',
     };
   }
 

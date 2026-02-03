@@ -7,21 +7,32 @@
    GRADIENT ANIMATIONS
    ================================================================= */
 @keyframes gradient-shift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 @keyframes gradient-rotate {
-  0% { filter: hue-rotate(0deg); }
-  100% { filter: hue-rotate(360deg); }
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(360deg);
+  }
 }
 
 /* =================================================================
    GLOW EFFECTS
    ================================================================= */
 @keyframes glow-pulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: var(--glow-primary-soft);
     opacity: 0.8;
   }
@@ -32,7 +43,8 @@
 }
 
 @keyframes glow-breathe {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.5;
     transform: scale(1);
   }
@@ -68,8 +80,12 @@
 }
 
 @keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes scale-in {
@@ -109,16 +125,23 @@
    LOADING & PROGRESS ANIMATIONS
    ================================================================= */
 @keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 @keyframes progress-fill {
-  from { width: 0%; }
+  from {
+    width: 0%;
+  }
 }
 
 @keyframes progress-glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 4px var(--ds-gradient-start);
   }
   50% {
@@ -130,7 +153,8 @@
    INDICATOR ANIMATIONS
    ================================================================= */
 @keyframes indicator-glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
   }
   50% {
@@ -147,19 +171,36 @@
   opacity: 0;
   animation: fade-up var(--duration-normal, 200ms) var(--ease-smooth, ease-out) forwards;
 }
-.animate-stagger > *:nth-child(1) { animation-delay: calc(0 * var(--stagger-delay, 50ms)); }
-.animate-stagger > *:nth-child(2) { animation-delay: calc(1 * var(--stagger-delay, 50ms)); }
-.animate-stagger > *:nth-child(3) { animation-delay: calc(2 * var(--stagger-delay, 50ms)); }
-.animate-stagger > *:nth-child(4) { animation-delay: calc(3 * var(--stagger-delay, 50ms)); }
-.animate-stagger > *:nth-child(5) { animation-delay: calc(4 * var(--stagger-delay, 50ms)); }
-.animate-stagger > *:nth-child(6) { animation-delay: calc(5 * var(--stagger-delay, 50ms)); }
-.animate-stagger > *:nth-child(7) { animation-delay: calc(6 * var(--stagger-delay, 50ms)); }
-.animate-stagger > *:nth-child(8) { animation-delay: calc(7 * var(--stagger-delay, 50ms)); }
+.animate-stagger > *:nth-child(1) {
+  animation-delay: calc(0 * var(--stagger-delay, 50ms));
+}
+.animate-stagger > *:nth-child(2) {
+  animation-delay: calc(1 * var(--stagger-delay, 50ms));
+}
+.animate-stagger > *:nth-child(3) {
+  animation-delay: calc(2 * var(--stagger-delay, 50ms));
+}
+.animate-stagger > *:nth-child(4) {
+  animation-delay: calc(3 * var(--stagger-delay, 50ms));
+}
+.animate-stagger > *:nth-child(5) {
+  animation-delay: calc(4 * var(--stagger-delay, 50ms));
+}
+.animate-stagger > *:nth-child(6) {
+  animation-delay: calc(5 * var(--stagger-delay, 50ms));
+}
+.animate-stagger > *:nth-child(7) {
+  animation-delay: calc(6 * var(--stagger-delay, 50ms));
+}
+.animate-stagger > *:nth-child(8) {
+  animation-delay: calc(7 * var(--stagger-delay, 50ms));
+}
 
 /* Hover lift effect */
 .hover-lift {
-  transition: transform var(--duration-normal, 200ms) var(--ease-smooth, ease-out),
-              box-shadow var(--duration-normal, 200ms) var(--ease-smooth, ease-out);
+  transition:
+    transform var(--duration-normal, 200ms) var(--ease-smooth, ease-out),
+    box-shadow var(--duration-normal, 200ms) var(--ease-smooth, ease-out);
 }
 .hover-lift:hover {
   transform: translateY(-4px);
@@ -168,8 +209,9 @@
 
 /* Subtle hover lift */
 .hover-lift-sm {
-  transition: transform var(--duration-fast, 100ms) var(--ease-smooth, ease-out),
-              box-shadow var(--duration-fast, 100ms) var(--ease-smooth, ease-out);
+  transition:
+    transform var(--duration-fast, 100ms) var(--ease-smooth, ease-out),
+    box-shadow var(--duration-fast, 100ms) var(--ease-smooth, ease-out);
 }
 .hover-lift-sm:hover {
   transform: translateY(-2px);
@@ -252,18 +294,13 @@
   overflow: hidden;
 }
 .shimmer::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.15),
-    transparent
-  );
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
   animation: shimmer 1.5s infinite;
 }
 
@@ -274,9 +311,9 @@
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
   }
 
   .gradient-animated {

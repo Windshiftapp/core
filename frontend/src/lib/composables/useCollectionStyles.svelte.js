@@ -73,14 +73,30 @@ export function useCollectionStyles(getWorkspace) {
   });
 
   return {
-    get hasGradient() { return hasGradient; },
-    get backgroundStyle() { return backgroundStyle; },
-    get textStyle() { return textStyle; },
-    get subtleTextStyle() { return subtleTextStyle; },
-    get glassTextStyle() { return glassTextStyle; },
-    get glassSubtleTextStyle() { return glassSubtleTextStyle; },
-    get cardBgStyle() { return cardBgStyle; },
-    get dropZoneBorderStyle() { return dropZoneBorderStyle; }
+    get hasGradient() {
+      return hasGradient;
+    },
+    get backgroundStyle() {
+      return backgroundStyle;
+    },
+    get textStyle() {
+      return textStyle;
+    },
+    get subtleTextStyle() {
+      return subtleTextStyle;
+    },
+    get glassTextStyle() {
+      return glassTextStyle;
+    },
+    get glassSubtleTextStyle() {
+      return glassSubtleTextStyle;
+    },
+    get cardBgStyle() {
+      return cardBgStyle;
+    },
+    get dropZoneBorderStyle() {
+      return dropZoneBorderStyle;
+    },
   };
 }
 

@@ -22,7 +22,7 @@ class TimeEntryStore {
     customer_id: '',
     project_id: '',
     date_from: '',
-    date_to: ''
+    date_to: '',
   });
 
   // === Modal State ===
@@ -36,7 +36,7 @@ class TimeEntryStore {
    * Get active projects.
    */
   get activeProjects() {
-    return this.projects.filter(p => p.status === 'Active');
+    return this.projects.filter((p) => p.status === 'Active');
   }
 
   /**
@@ -44,7 +44,7 @@ class TimeEntryStore {
    */
   get filteredProjects() {
     return this.filters.customer_id
-      ? this.activeProjects.filter(p => p.customer_id === parseInt(this.filters.customer_id))
+      ? this.activeProjects.filter((p) => p.customer_id === parseInt(this.filters.customer_id, 10))
       : this.activeProjects;
   }
 
@@ -75,7 +75,7 @@ class TimeEntryStore {
         this.loadCustomers(),
         this.loadProjects(),
         this.loadWorkItems(),
-        this.loadWorkspaces()
+        this.loadWorkspaces(),
       ]);
 
       // Show onboarding if no customers or projects
@@ -85,8 +85,12 @@ class TimeEntryStore {
 
       // Set default date range to current month
       const now = new Date();
-      this.filters.date_from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      this.filters.date_to = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      this.filters.date_from = new Date(now.getFullYear(), now.getMonth(), 1)
+        .toISOString()
+        .split('T')[0];
+      this.filters.date_to = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+        .toISOString()
+        .split('T')[0];
 
       // Reload worklogs with date filter
       await this.loadWorklogs();
@@ -100,7 +104,7 @@ class TimeEntryStore {
   async loadWorklogs() {
     try {
       this.worklogsLoading = true;
-      this.worklogs = await api.time.worklogs.getAll(this.filters) || [];
+      this.worklogs = (await api.time.worklogs.getAll(this.filters)) || [];
     } catch (err) {
       console.error('Failed to load worklogs:', err);
       this.worklogs = [];
@@ -111,7 +115,7 @@ class TimeEntryStore {
 
   async loadCustomers() {
     try {
-      this.customers = await api.customerOrganisations.getAll() || [];
+      this.customers = (await api.customerOrganisations.getAll()) || [];
     } catch (err) {
       console.error('Failed to load customers:', err);
       this.customers = [];
@@ -120,7 +124,7 @@ class TimeEntryStore {
 
   async loadProjects() {
     try {
-      this.projects = await api.time.projects.getAll() || [];
+      this.projects = (await api.time.projects.getAll()) || [];
     } catch (err) {
       console.error('Failed to load projects:', err);
       this.projects = [];
@@ -139,7 +143,7 @@ class TimeEntryStore {
 
   async loadWorkspaces() {
     try {
-      this.workspaces = await api.workspaces.getAll() || [];
+      this.workspaces = (await api.workspaces.getAll()) || [];
     } catch (err) {
       console.error('Failed to load workspaces:', err);
       this.workspaces = [];
@@ -170,7 +174,7 @@ class TimeEntryStore {
       customer_id: '',
       project_id: '',
       date_from: '',
-      date_to: ''
+      date_to: '',
     };
     this.loadWorklogs();
   }
@@ -286,7 +290,7 @@ class TimeEntryStore {
     return date.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
-      hour12: false
+      hour12: false,
     });
   }
 
@@ -323,7 +327,7 @@ class TimeEntryStore {
       customer_id: '',
       project_id: '',
       date_from: '',
-      date_to: ''
+      date_to: '',
     };
     this.showOnboarding = false;
     this.showTimeLogModal = false;

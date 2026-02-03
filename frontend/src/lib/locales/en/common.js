@@ -46,7 +46,6 @@ export default {
     selectAll: 'Select All',
     deselectAll: 'Deselect All',
     all: 'All',
-    none: 'None',
     enable: 'Enable',
     disable: 'Disable',
     enabled: 'Enabled',
@@ -183,7 +182,7 @@ export default {
     noProject: 'No Project',
     global: 'Global',
     root: 'Root',
-    saved: 'Saved successfully'
+    saved: 'Saved successfully',
   },
 
   // Toast notifications
@@ -197,7 +196,7 @@ export default {
     created: 'Created successfully',
     updated: 'Updated successfully',
     copied: 'Copied to clipboard',
-    failed: 'Operation failed'
+    failed: 'Operation failed',
   },
 
   // Backend error codes
@@ -235,7 +234,7 @@ export default {
 
     // Generic
     UNKNOWN: 'An unknown error occurred.',
-    generic: 'Something went wrong. Please try again.'
+    generic: 'Something went wrong. Please try again.',
   },
 
   // Validation messages
@@ -255,7 +254,7 @@ export default {
     emailTaken: 'This email is already in use',
     usernameTaken: 'This username is already taken',
     slugInvalid: 'Only lowercase letters, numbers, and hyphens allowed',
-    fillRequired: 'Please fill in all required fields'
+    fillRequired: 'Please fill in all required fields',
   },
 
   // Placeholders
@@ -274,7 +273,7 @@ export default {
     channelDescription: "Brief description of this channel's purpose",
     columnName: 'Column name',
     typeName: "Type '{name}' here",
-    searchWorkItems: 'Search work items...'
+    searchWorkItems: 'Search work items...',
   },
 
   // Empty States
@@ -285,6 +284,6 @@ export default {
     noFieldChanges: 'No field changes detected',
     noRequirements: 'No requirements configured',
     configureFilter: 'Configure filter to see items',
-    createToStart: 'Create {item} to get started'
-  }
+    createToStart: 'Create {item} to get started',
+  },
 };

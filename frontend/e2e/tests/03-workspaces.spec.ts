@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test';
-import { WorkspacePage } from '../pages/workspace.page';
+import { expect, test } from '@playwright/test';
 import { generateWorkspace } from '../fixtures/test-data';
+import { WorkspacePage } from '../pages/workspace.page';
 
 /**
  * Workspace Management Tests

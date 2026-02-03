@@ -65,19 +65,19 @@ export default {
         name: 'Name',
         email: 'Email',
         phone: 'Phone',
-        customerOrganisation: 'Customer Organisation'
+        customerOrganisation: 'Customer Organisation',
       },
       placeholders: {
         name: 'Enter customer name',
         email: 'customer@example.com',
-        phone: '+1 (555) 123-4567'
+        phone: '+1 (555) 123-4567',
       },
       metadata: {
         created: 'Created:',
         updated: 'Updated:',
-        linkedUser: 'Linked User:'
-      }
-    }
+        linkedUser: 'Linked User:',
+      },
+    },
   },
 
   items: {
@@ -154,7 +154,8 @@ export default {
     failedToSaveTimeEntry: 'Failed to save time entry',
     failedToDeleteTimeEntry: 'Failed to delete time entry',
     deleteTimeEntry: 'Delete Time Entry',
-    deleteTimeEntryConfirm: 'Are you sure you want to delete this time entry? This action cannot be undone.',
+    deleteTimeEntryConfirm:
+      'Are you sure you want to delete this time entry? This action cannot be undone.',
     noDescription: 'No description',
     itemCopiedAs: 'Work item copied successfully as {key}',
     clickToViewCopied: 'Click to view copied item',
@@ -170,7 +171,7 @@ export default {
     deleteAllOption: 'Delete all ({count} items)',
     deleteAllDescription: 'Permanently delete this item and all its descendants',
     reparentOption: 'Reparent children',
-    reparentDescription: 'Move children to this item\'s parent, then delete only this item',
+    reparentDescription: "Move children to this item's parent, then delete only this item",
     typeToConfirm: 'Type "{title}" to confirm deletion',
     confirmationPlaceholder: 'Type the title to confirm...',
     deleteAllItems: 'Delete All Items',
@@ -183,7 +184,8 @@ export default {
     selectNewParentPlaceholder: 'Choose a parent item...',
     makeRootItem: 'Make root items (no parent)',
     reparentLevelHint: 'Only showing items at the same hierarchy level',
-    noOtherItemsAtLevel: 'No other items at this level - select "Make root items" or choose from above',
+    noOtherItemsAtLevel:
+      'No other items at this level - select "Make root items" or choose from above',
     reparentToGrandparent: 'Children will be moved to the grandparent',
     childrenWillBecomeRoot: 'Children will become root items',
     failedToUpdateWatchStatus: 'Failed to update watch status',
@@ -255,7 +257,7 @@ export default {
     // Clipboard
     itemLinkCopied: 'Item link copied to clipboard',
     failedToCopyToClipboard: 'Failed to copy to clipboard',
-    copyError: 'Copy Error'
+    copyError: 'Copy Error',
   },
 
   comments: {
@@ -278,7 +280,7 @@ export default {
     internalNoteHint: 'Not visible on portal',
     internal: 'Internal',
     oldestFirst: 'Oldest first',
-    newestFirst: 'Newest first'
+    newestFirst: 'Newest first',
   },
 
   todo: {
@@ -299,7 +301,7 @@ export default {
     ofAssignedItemsRemaining: '{count} of {total} assigned items remaining',
     task: 'Task',
     dueDate: 'Due Date',
-    progress: 'Progress'
+    progress: 'Progress',
   },
 
   collectionTree: {
@@ -316,7 +318,7 @@ export default {
     pageOfTotal: 'Page {current} of {total}',
     issue: 'Issue',
     noStatus: 'No status',
-    workspaceNotFound: 'Workspace not found.'
+    workspaceNotFound: 'Workspace not found.',
   },
 
   collections: {
@@ -350,9 +352,11 @@ export default {
     changeWorkspace: 'Change Workspace',
     changeWorkspaceAssociation: 'Change Workspace Association',
     associateWithWorkspace: 'Associate with a Workspace',
-    workspaceAssociationDesc: 'Selecting a workspace will scope this collection to that workspace. Leave it unassigned to keep it global.',
+    workspaceAssociationDesc:
+      'Selecting a workspace will scope this collection to that workspace. Leave it unassigned to keep it global.',
     saveAssociation: 'Save Association',
-    workspaceAssociationNote: 'Only one workspace can be associated at a time. Removing the selection converts the collection back to a global view.',
+    workspaceAssociationNote:
+      'Only one workspace can be associated at a time. Removing the selection converts the collection back to a global view.',
     searchWorkspace: 'Search for a workspace...',
 
     // Categories
@@ -428,7 +432,8 @@ export default {
     public: 'Public',
     workspaceFilter: 'Workspace Filter',
     allWorkspaces: 'All workspaces',
-    noCollectionsFound: 'No collections found. Create your first collection to save and reuse work item queries.',
+    noCollectionsFound:
+      'No collections found. Create your first collection to save and reuse work item queries.',
     collectionCount: '{count} collection',
     collectionCountPlural: '{count} collections',
 
@@ -442,12 +447,13 @@ export default {
     showingWorkItems: 'Showing {count} work items',
 
     // Confirmations
-    confirmDeleteCollection: 'Are you sure you want to delete the collection "{name}"? This action cannot be undone.',
+    confirmDeleteCollection:
+      'Are you sure you want to delete the collection "{name}"? This action cannot be undone.',
     confirmDeleteItem: 'Are you sure you want to delete "{title}"? This action cannot be undone.',
     noQueryToSave: 'No query to save. Please set up some filters or enter a QL query first.',
 
     // Board view
-    boardSummary: 'Total: {itemCount} work items across {columnCount} columns'
+    boardSummary: 'Total: {itemCount} work items across {columnCount} columns',
   },
 
   links: {
@@ -456,7 +462,7 @@ export default {
     addLink: 'Add Link',
     removeLink: 'Remove link',
     linkText: 'Link text',
-    linkUrl: 'URL'
+    linkUrl: 'URL',
   },
 
   workspaceSettings: {
@@ -469,7 +475,7 @@ export default {
       members: 'Members',
       configurationSets: 'Configuration Sets',
       sourceControl: 'Source Control',
-      removeWorkspace: 'Remove Workspace'
+      removeWorkspace: 'Remove Workspace',
     },
 
     // Page header
@@ -477,7 +483,7 @@ export default {
     subtitle: 'Configure settings for {name}',
     breadcrumbs: {
       workspaces: 'Workspaces',
-      settings: 'Settings'
+      settings: 'Settings',
     },
 
     // Access denied
@@ -487,13 +493,17 @@ export default {
 
     // Mode tab
     displayMode: 'Display Mode',
-    displayModeDescription: 'Choose how this workspace is displayed. This affects the navigation layout and default behavior.',
+    displayModeDescription:
+      'Choose how this workspace is displayed. This affects the navigation layout and default behavior.',
     modeDefault: 'Default',
-    modeDefaultDescription: 'Full navigation sidebar with all workspace views, collections, and tools.',
+    modeDefaultDescription:
+      'Full navigation sidebar with all workspace views, collections, and tools.',
     modeBoard: 'Board',
-    modeBoardDescription: 'Simplified layout focused on the board view. Navigation is available through a compact toolbar.',
+    modeBoardDescription:
+      'Simplified layout focused on the board view. Navigation is available through a compact toolbar.',
     modeItsm: 'ITSM',
-    modeItsmDescription: 'Service management layout optimized for ticket handling and SLA tracking.',
+    modeItsmDescription:
+      'Service management layout optimized for ticket handling and SLA tracking.',
     modeComingSoon: 'Coming Soon',
 
     // General tab
@@ -507,11 +517,13 @@ export default {
     descriptionPlaceholder: 'Optional description for this workspace',
     defaultTimeProject: 'Default Time Tracking Project',
     noDefaultProject: 'No default project',
-    defaultTimeProjectHelp: 'Default project used when logging time from work items in this workspace. Can be overridden per work item.',
+    defaultTimeProjectHelp:
+      'Default project used when logging time from work items in this workspace. Can be overridden per work item.',
     defaultView: 'Default Workspace View',
     defaultViewHelp: 'Default view displayed when entering this workspace.',
     activeWorkspace: 'Active Workspace',
-    activeWorkspaceHelp: 'When inactive, only system admins and workspace admins can access this workspace. All data is preserved.',
+    activeWorkspaceHelp:
+      'When inactive, only system admins and workspace admins can access this workspace. All data is preserved.',
 
     // View options
     views: {
@@ -520,12 +532,13 @@ export default {
       list: 'List',
       tree: 'Tree',
       map: 'Map',
-      overview: 'Overview'
+      overview: 'Overview',
     },
 
     // Appearance tab
     visualIdentity: 'Visual Identity',
-    visualIdentityDescription: 'Customize the visual appearance of your workspace with icons, colors, and avatars.',
+    visualIdentityDescription:
+      'Customize the visual appearance of your workspace with icons, colors, and avatars.',
     workspaceIconColor: 'Workspace Icon & Color',
     workspaceAvatar: 'Workspace Avatar',
     customAvatar: 'Custom Avatar',
@@ -536,14 +549,16 @@ export default {
     uploadAvatar: 'Upload Avatar',
     attachmentsRequired: 'Attachments must be enabled to upload workspace icons',
     uploadRecommendation: 'Recommended: Square images, at least 256x256 pixels for best quality',
-    avatarOrIconNote: 'You can either use a custom avatar image or the icon & color combination above.',
+    avatarOrIconNote:
+      'You can either use a custom avatar image or the icon & color combination above.',
     uploading: 'Uploading...',
     avatarUploadedSuccess: 'Avatar uploaded successfully',
 
     // Categories tab
     projectCategoryRestrictions: 'Project Category Restrictions',
     selectProjectCategories: 'Select project categories...',
-    categoryRestrictionsHelp: 'Optionally restrict project selection to specific categories for this workspace. When set, users can only select projects from the chosen categories.',
+    categoryRestrictionsHelp:
+      'Optionally restrict project selection to specific categories for this workspace. When set, users can only select projects from the chosen categories.',
     leaveEmptyNote: 'Note: Leave empty to allow selection from all project categories.',
 
     // Configuration tab
@@ -577,21 +592,23 @@ export default {
     failedToDelete: 'Failed to delete workspace: {error}',
     pleaseConfirmDeletion: 'Please enter the workspace name exactly as shown to confirm deletion',
     pleaseSelectImage: 'Please select an image file',
-    failedToUploadAvatar: 'Failed to upload avatar: {error}'
+    failedToUploadAvatar: 'Failed to upload avatar: {error}',
   },
 
   lookAndFeel: {
     title: 'Look and Feel',
     subtitle: 'Customize the appearance and layout of your workspace',
     displayModeTitle: 'Display Mode',
-    displayModeDescription: 'Choose how this workspace is displayed. This affects the navigation layout and default behavior.',
+    displayModeDescription:
+      'Choose how this workspace is displayed. This affects the navigation layout and default behavior.',
     gradientTitle: 'Background & Gradient',
     gradientDescription: 'Choose a color scheme for your workspace',
     gradients: 'Gradients',
     backgroundImages: 'Background Images',
     currentBackground: 'Current Background',
     uploadCustomImage: 'Upload Custom Image',
-    backgroundUploadRecommendation: 'Recommended: High-resolution images (1920x1080 or larger) for best quality',
+    backgroundUploadRecommendation:
+      'Recommended: High-resolution images (1920x1080 or larger) for best quality',
     backgroundUploadedSuccess: 'Background image uploaded successfully',
     failedToUploadBackground: 'Failed to upload background: {error}',
     identityTitle: 'Workspace Identity',
@@ -603,6 +620,7 @@ export default {
     currentLogo: 'Current Logo',
     noLogoSet: 'No logo set',
     uploadLogo: 'Upload Logo',
-    logoRecommendation: 'Recommended: PNG or SVG with transparent background. Max height in header: 40-50px.'
-  }
+    logoRecommendation:
+      'Recommended: PNG or SVG with transparent background. Max height in header: 40-50px.',
+  },
 };

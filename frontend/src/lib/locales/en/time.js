@@ -29,7 +29,8 @@ export default {
     start: 'Start',
     end: 'End',
     duration: 'Duration',
-    durationHelperText: 'Enter start time + duration (2h) to auto-calculate end time, or enter start + end times to auto-calculate duration. Time formats: 1h, 30m, 1h30m, 2h15m, 1d (=8h)',
+    durationHelperText:
+      'Enter start time + duration (2h) to auto-calculate end time, or enter start + end times to auto-calculate duration. Time formats: 1h, 30m, 1h30m, 2h15m, 1d (=8h)',
 
     // Onboarding
     onboarding: {
@@ -38,9 +39,11 @@ export default {
       setupProgress: 'Setup Progress',
       stepOf: 'Step {current} of {total}',
       createCustomerTitle: 'Create Your First Customer Organization',
-      createCustomerDescription: 'A customer organization represents the company or entity you\'re doing work for. This could be a client organization, your employer, or your own company.',
+      createCustomerDescription:
+        "A customer organization represents the company or entity you're doing work for. This could be a client organization, your employer, or your own company.",
       createProjectTitle: 'Create Your First Project',
-      createProjectDescription: 'Projects help organize your work within a customer. You can track time against specific projects.',
+      createProjectDescription:
+        'Projects help organize your work within a customer. You can track time against specific projects.',
       organizationNameRequired: 'Organization name is required',
       projectNameRequired: 'Project name is required',
       failedToCreateCustomer: 'Failed to create customer organization. Please try again.',
@@ -51,9 +54,9 @@ export default {
       contactPersonPlaceholder: 'John Smith',
       projectNamePlaceholder: 'e.g., Website Development, Consulting, General Work',
       projectDescriptionPlaceholder: 'Brief description of the project...',
-      hourlyRateHint: 'You can set this later if you\'re not sure',
+      hourlyRateHint: "You can set this later if you're not sure",
       skipForNow: 'Skip for now',
-      completeSetup: 'Complete Setup'
+      completeSetup: 'Complete Setup',
     },
 
     // Categories
@@ -65,7 +68,7 @@ export default {
       createFirstHint: 'Create your first category to organize projects',
       failedToSave: 'Failed to save category',
       failedToDelete: 'Failed to delete category',
-      confirmDelete: 'Are you sure you want to delete "{name}"?'
+      confirmDelete: 'Are you sure you want to delete "{name}"?',
     },
 
     // Reports
@@ -91,7 +94,7 @@ export default {
       loadingReports: 'Loading reports...',
       noEntriesFound: 'No time entries found for the selected filters.',
       totalTime: 'Total Time',
-      entriesShown: '{count} entries shown'
+      entriesShown: '{count} entries shown',
     },
 
     // Timer
@@ -100,7 +103,7 @@ export default {
       expandTimer: 'Expand timer',
       collapseTimer: 'Collapse timer',
       project: 'Project',
-      workspace: 'Workspace'
+      workspace: 'Workspace',
     },
 
     // Projects
@@ -125,7 +128,7 @@ export default {
       rate: 'Rate',
       projectName: 'Project Name',
       descriptionOptional: 'Description (Optional)',
-      hourlyRateOptional: 'Hourly Rate (Optional)'
+      hourlyRateOptional: 'Hourly Rate (Optional)',
     },
 
     // Calendar
@@ -142,7 +145,7 @@ export default {
       thisWeek: 'this week',
       nextWeek: 'Next week',
       newTaskPlaceholder: 'New task title...',
-      failedToCreateTask: 'Failed to create task'
+      failedToCreateTask: 'Failed to create task',
     },
 
     // Time Entry
@@ -159,7 +162,7 @@ export default {
       clearFiltersTitle: 'Clear all filters and show all time entries',
       noEntries: 'No time entries found. Log your first time entry to get started.',
       clickToView: 'Click to view {key}-{number}',
-      budgetExceeded: '- budget exceeded'
+      budgetExceeded: '- budget exceeded',
     },
 
     // Organizations (formerly Customers)
@@ -173,7 +176,7 @@ export default {
       contactPersonOptional: 'Contact Person (Optional)',
       failedToSave: 'Failed to save organization',
       deleteOrganization: 'Delete Organization',
-      confirmDelete: 'Are you sure you want to delete "{name}"?'
+      confirmDelete: 'Are you sure you want to delete "{name}"?',
     },
 
     // Permissions
@@ -195,10 +198,11 @@ export default {
       failedToAdd: 'Failed to add',
       failedToRemove: 'Failed to remove',
       managersNote: 'Managers:',
-      managersNoteText: 'Can edit project settings, manage members, and view all time entries for this project.',
+      managersNoteText:
+        'Can edit project settings, manage members, and view all time entries for this project.',
       membersNote: 'Members:',
-      membersNoteText: 'Can book time on this project and view their own time entries.'
-    }
+      membersNoteText: 'Can book time on this project and view their own time entries.',
+    },
   },
 
   timeProject: {
@@ -215,7 +219,7 @@ export default {
     maxHoursHint: 'Optional budget for reporting',
     projectColor: 'Project Color',
     updateProject: 'Update Project',
-    createProject: 'Create Project'
+    createProject: 'Create Project',
   },
 
   timeProjectCategory: {
@@ -225,6 +229,6 @@ export default {
     categoryNamePlaceholder: 'Development, Marketing, Operations...',
     optionalDescription: 'Optional description...',
     updateCategory: 'Update Category',
-    createCategory: 'Create Category'
-  }
+    createCategory: 'Create Category',
+  },
 };

@@ -8,8 +8,6 @@ export default {
     subtitle: 'Ihre Anwendungseinstellungen konfigurieren',
     general: 'Allgemein',
     appearance: 'Erscheinungsbild',
-    notifications: 'Benachrichtigungen',
-    security: 'Sicherheit',
     privacy: 'Datenschutz',
     language: 'Sprache',
     timezone: 'Zeitzone',
@@ -31,35 +29,86 @@ export default {
       integrationLinks: 'Integration & Verknüpfungen',
       usersAccess: 'Benutzer & Zugriff',
       communication: 'Kommunikation',
-      assetManagement: 'Asset-Verwaltung'
+      assetManagement: 'Asset-Verwaltung',
     },
 
     // Admin panel item labels and descriptions (for Admin.svelte)
     adminItems: {
-      customFields: { title: 'Benutzerdefinierte Felder', description: 'Benutzerdefinierte Felddefinitionen verwalten' },
-      screens: { title: 'Bildschirme', description: 'Formularbildschirme und Layouts konfigurieren' },
-      hierarchyLevels: { title: 'Hierarchieebenen', description: 'Hierarchieebenen für Vorgänge konfigurieren' },
-      itemTypes: { title: 'Vorgangstypen', description: 'Vorgangstypen mit Symbolen und Farben verwalten' },
-      priorities: { title: 'Prioritäten', description: 'Prioritätsstufen mit Symbolen und Farben konfigurieren' },
-      configurationSets: { title: 'Konfigurationssets', description: 'Konfigurationssets verwalten' },
+      customFields: {
+        title: 'Benutzerdefinierte Felder',
+        description: 'Benutzerdefinierte Felddefinitionen verwalten',
+      },
+      screens: {
+        title: 'Bildschirme',
+        description: 'Formularbildschirme und Layouts konfigurieren',
+      },
+      hierarchyLevels: {
+        title: 'Hierarchieebenen',
+        description: 'Hierarchieebenen für Vorgänge konfigurieren',
+      },
+      itemTypes: {
+        title: 'Vorgangstypen',
+        description: 'Vorgangstypen mit Symbolen und Farben verwalten',
+      },
+      priorities: {
+        title: 'Prioritäten',
+        description: 'Prioritätsstufen mit Symbolen und Farben konfigurieren',
+      },
+      configurationSets: {
+        title: 'Konfigurationssets',
+        description: 'Konfigurationssets verwalten',
+      },
       statuses: { title: 'Status', description: 'Statuskategorien und einzelne Status verwalten' },
       workflows: { title: 'Workflows', description: 'Workflow-Übergänge entwerfen und verwalten' },
-      scmProviders: { title: 'SCM-Anbieter', description: 'GitHub, GitLab, Gitea und Bitbucket Integrationen konfigurieren' },
-      systemImport: { title: 'System-Import', description: 'Daten aus externen Systemen importieren' },
-      linkTypes: { title: 'Verknüpfungstypen', description: 'Verknüpfungstypen zwischen Elementen verwalten' },
+      scmProviders: {
+        title: 'SCM-Anbieter',
+        description: 'GitHub, GitLab, Gitea und Bitbucket Integrationen konfigurieren',
+      },
+      systemImport: {
+        title: 'System-Import',
+        description: 'Daten aus externen Systemen importieren',
+      },
+      linkTypes: {
+        title: 'Verknüpfungstypen',
+        description: 'Verknüpfungstypen zwischen Elementen verwalten',
+      },
       attachments: { title: 'Anhänge', description: 'Anhang-Einstellungen verwalten' },
       modules: { title: 'Module', description: 'Systemmodule aktivieren oder deaktivieren' },
       themes: { title: 'Designs', description: 'Anwendungsdesigns und Erscheinungsbild verwalten' },
       users: { title: 'Benutzer', description: 'Benutzerkonten und Profile verwalten' },
       groups: { title: 'Gruppen', description: 'Benutzergruppen und Mitgliedschaften verwalten' },
-      permissions: { title: 'Globale Berechtigungen', description: 'Globale Berechtigungsdefinitionen verwalten' },
-      workspaceRoles: { title: 'Arbeitsbereich-Rollen', description: 'Arbeitsbereich-Rollen und deren Berechtigungen anzeigen' },
-      sso: { title: 'Single Sign-On', description: 'OIDC-Identitätsanbieter für SSO konfigurieren' },
-      security: { title: 'Sicherheit', description: 'Sicherheitseinstellungen und Funktionssteuerungen verwalten' },
-      workspaces: { title: 'Arbeitsbereiche', description: 'Arbeitsbereiche und Einstellungen verwalten' },
-      notificationSettings: { title: 'Benachrichtigungen', description: 'Benachrichtigungskonfigurationen verwalten' },
-      channels: { title: 'Kanäle', description: 'Eingehende und ausgehende Kanäle, Portale und Webhooks konfigurieren' },
-      assets: { title: 'Assets', description: 'Asset-Sets, -Typen, -Kategorien und Assets verwalten' }
+      permissions: {
+        title: 'Globale Berechtigungen',
+        description: 'Globale Berechtigungsdefinitionen verwalten',
+      },
+      workspaceRoles: {
+        title: 'Arbeitsbereich-Rollen',
+        description: 'Arbeitsbereich-Rollen und deren Berechtigungen anzeigen',
+      },
+      sso: {
+        title: 'Single Sign-On',
+        description: 'OIDC-Identitätsanbieter für SSO konfigurieren',
+      },
+      security: {
+        title: 'Sicherheit',
+        description: 'Sicherheitseinstellungen und Funktionssteuerungen verwalten',
+      },
+      workspaces: {
+        title: 'Arbeitsbereiche',
+        description: 'Arbeitsbereiche und Einstellungen verwalten',
+      },
+      notificationSettings: {
+        title: 'Benachrichtigungen',
+        description: 'Benachrichtigungskonfigurationen verwalten',
+      },
+      channels: {
+        title: 'Kanäle',
+        description: 'Eingehende und ausgehende Kanäle, Portale und Webhooks konfigurieren',
+      },
+      assets: {
+        title: 'Assets',
+        description: 'Asset-Sets, -Typen, -Kategorien und Assets verwalten',
+      },
     },
 
     // Attachment Settings
@@ -73,7 +122,8 @@ export default {
       notConfigured: 'Nicht konfiguriert',
       pathWritable: 'Pfad beschreibbar',
       pathStatusUnknown: 'Pfadstatus unbekannt',
-      enableNote: 'Um Anhänge zu aktivieren, starten Sie den windshift-Server mit dem --attachment-path Flag neu.',
+      enableNote:
+        'Um Anhänge zu aktivieren, starten Sie den windshift-Server mit dem --attachment-path Flag neu.',
       enableExample: 'Beispiel: ./windshift --attachment-path /pfad/zu/anhängen',
       generalSettings: 'Allgemeine Einstellungen',
       enableAttachments: 'Anhänge aktivieren',
@@ -81,7 +131,8 @@ export default {
       maxFileSize: 'Maximale Dateigröße (MB)',
       current: 'Aktuell',
       fileTypeRestrictions: 'Dateityp-Einschränkungen',
-      fileTypeRestrictionsDesc: 'Leer lassen, um alle Dateitypen zuzulassen. Spezifische MIME-Typen hinzufügen, um Uploads einzuschränken.',
+      fileTypeRestrictionsDesc:
+        'Leer lassen, um alle Dateitypen zuzulassen. Spezifische MIME-Typen hinzufügen, um Uploads einzuschränken.',
       quickAddCommonTypes: 'Häufige Typen schnell hinzufügen',
       images: 'Bilder',
       documents: 'Dokumente',
@@ -94,9 +145,10 @@ export default {
       allowedMimeTypes: 'Erlaubte MIME-Typen',
       allFileTypesAllowed: 'Alle Dateitypen erlaubt',
       settingsSavedSuccess: 'Einstellungen erfolgreich gespeichert',
-      notAvailable: 'Anhang-Funktionalität ist nicht verfügbar. Konfigurieren Sie ein Anhangverzeichnis, um Anhänge zu aktivieren.',
+      notAvailable:
+        'Anhang-Funktionalität ist nicht verfügbar. Konfigurieren Sie ein Anhangverzeichnis, um Anhänge zu aktivieren.',
       failedToLoad: 'Anhang-Einstellungen konnten nicht geladen werden',
-      failedToSave: 'Einstellungen konnten nicht gespeichert werden'
+      failedToSave: 'Einstellungen konnten nicht gespeichert werden',
     },
 
     // Group Manager
@@ -128,7 +180,8 @@ export default {
       edit: 'Bearbeiten',
       manageMembers: 'Mitglieder verwalten',
       delete: 'Löschen',
-      confirmDelete: 'Sind Sie sicher, dass Sie diese Gruppe löschen möchten? Alle Mitgliedschaften werden entfernt.',
+      confirmDelete:
+        'Sind Sie sicher, dass Sie diese Gruppe löschen möchten? Alle Mitgliedschaften werden entfernt.',
       failedToLoad: 'Gruppen konnten nicht geladen werden',
       failedToSave: 'Gruppe konnte nicht gespeichert werden',
       failedToDelete: 'Gruppe konnte nicht gelöscht werden',
@@ -140,16 +193,18 @@ export default {
       addMembers: 'Mitglieder hinzufügen',
       searchAndSelectUser: 'Benutzer suchen und auswählen...',
       usersToAdd: 'Hinzuzufügende Benutzer',
-      confirmRemoveMember: 'Sind Sie sicher, dass Sie dieses Mitglied aus der Gruppe entfernen möchten?',
+      confirmRemoveMember:
+        'Sind Sie sicher, dass Sie dieses Mitglied aus der Gruppe entfernen möchten?',
       failedToAddMembers: 'Mitglieder konnten nicht hinzugefügt werden',
       failedToRemoveMember: 'Mitglied konnte nicht entfernt werden',
-      failedToLoadDetails: 'Gruppendetails konnten nicht geladen werden'
+      failedToLoadDetails: 'Gruppendetails konnten nicht geladen werden',
     },
 
     // Notification Settings
     notifications: {
       title: 'Benachrichtigungseinstellungen',
-      subtitle: 'Benachrichtigungskonfigurationen erstellen und verwalten, die Konfigurationssets zugewiesen werden können',
+      subtitle:
+        'Benachrichtigungskonfigurationen erstellen und verwalten, die Konfigurationssets zugewiesen werden können',
       createSetting: 'Benachrichtigungseinstellung erstellen',
       editSetting: 'Benachrichtigungseinstellung bearbeiten',
       setting: 'Einstellung',
@@ -157,7 +212,8 @@ export default {
       rulesConfigured: '{count} Regeln konfiguriert ({enabled} aktiviert)',
       noRules: '0 Regeln konfiguriert',
       createdBy: 'Erstellt von',
-      noSettingsFound: 'Keine Benachrichtigungseinstellungen gefunden. Erstellen Sie Ihre erste Benachrichtigungseinstellung.',
+      noSettingsFound:
+        'Keine Benachrichtigungseinstellungen gefunden. Erstellen Sie Ihre erste Benachrichtigungseinstellung.',
       name: 'Name',
       namePlaceholder: 'z.B. Entwicklungsteam-Benachrichtigungen',
       nameRequired: 'Name ist erforderlich',
@@ -166,7 +222,8 @@ export default {
       activeCanBeAssigned: 'Aktiv (kann Konfigurationssets zugewiesen werden)',
       addRule: 'Regel hinzufügen',
       noEventRulesConfigured: 'Keine Ereignisregeln konfiguriert',
-      noEventRulesDesc: 'Regeln hinzufügen, um festzulegen, wann Benachrichtigungen gesendet werden sollen',
+      noEventRulesDesc:
+        'Regeln hinzufügen, um festzulegen, wann Benachrichtigungen gesendet werden sollen',
       rule: 'Regel',
       eventType: 'Ereignistyp',
       selectEventType: 'Ereignistyp auswählen...',
@@ -184,13 +241,15 @@ export default {
       failedToSave: 'Benachrichtigungseinstellung konnte nicht gespeichert werden',
       failedToDelete: 'Benachrichtigungseinstellung konnte nicht gelöscht werden',
       failedToUpdate: 'Benachrichtigungseinstellung konnte nicht aktualisiert werden',
-      confirmDelete: 'Sind Sie sicher, dass Sie "{name}" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.'
+      confirmDelete:
+        'Sind Sie sicher, dass Sie "{name}" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
     },
 
     // Configuration Sets
     configSets: {
       title: 'Konfigurationssets',
-      subtitle: 'Konfigurationssets verwalten, die Workflows und Ansichten für verschiedene Arbeitsbereichskontexte kombinieren.',
+      subtitle:
+        'Konfigurationssets verwalten, die Workflows und Ansichten für verschiedene Arbeitsbereichskontexte kombinieren.',
       addConfigSet: 'Konfigurationsset hinzufügen',
       createConfigSet: 'Konfigurationsset erstellen',
       editConfigSet: 'Konfigurationsset bearbeiten',
@@ -228,13 +287,17 @@ export default {
       firstAvailable: 'Erster verfügbarer',
       configurePerItemType: 'Pro Vorgangstyp konfigurieren',
       preselectedItemType: 'Vorausgewählter Vorgangstyp beim Erstellen neuer Vorgänge',
-      selectItemTypes: 'Wählen Sie, welche Vorgangstypen in Arbeitsbereichen mit diesem Konfigurationsset verfügbar sind.',
+      selectItemTypes:
+        'Wählen Sie, welche Vorgangstypen in Arbeitsbereichen mit diesem Konfigurationsset verfügbar sind.',
       workflowScreenOverrides: 'Workflow- und Ansichts-Überschreibungen',
-      overridesDesc: 'Benutzerdefinierte Workflows und Ansichten pro Vorgangstyp konfigurieren. \'Standard\' verwenden, um vom Allgemein-Tab zu erben.',
+      overridesDesc:
+        "Benutzerdefinierte Workflows und Ansichten pro Vorgangstyp konfigurieren. 'Standard' verwenden, um vom Allgemein-Tab zu erben.",
       itemType: 'Vorgangstyp',
       default: 'Standard',
-      selectPriorities: 'Wählen Sie, welche Prioritäten in Arbeitsbereichen mit diesem Konfigurationsset verfügbar sind.',
-      selectWorkspaces: 'Wählen Sie, welche Arbeitsbereiche dieses Konfigurationsset verwenden. Ein Arbeitsbereich kann nur einem Konfigurationsset angehören.'
+      selectPriorities:
+        'Wählen Sie, welche Prioritäten in Arbeitsbereichen mit diesem Konfigurationsset verfügbar sind.',
+      selectWorkspaces:
+        'Wählen Sie, welche Arbeitsbereiche dieses Konfigurationsset verwenden. Ein Arbeitsbereich kann nur einem Konfigurationsset angehören.',
     },
 
     // Permissions
@@ -267,11 +330,12 @@ export default {
       permissionGrantedToUser: 'Berechtigung erfolgreich an Benutzer erteilt',
       permissionGrantedToGroup: 'Berechtigung erfolgreich an Gruppe erteilt',
       failedToGrantPermission: 'Berechtigung konnte nicht erteilt werden: ',
-      cannotRevokeLastAdmin: 'Systemadministrator kann nicht vom letzten Administrator entzogen werden',
+      cannotRevokeLastAdmin:
+        'Systemadministrator kann nicht vom letzten Administrator entzogen werden',
       permissionRevokedFromUser: 'Berechtigung erfolgreich von Benutzer entzogen',
       permissionRevokedFromGroup: 'Berechtigung erfolgreich von Gruppe entzogen',
       failedToRevokePermission: 'Berechtigung konnte nicht entzogen werden: ',
-      failedToRevokePermissionFromGroup: 'Berechtigung konnte nicht von Gruppe entzogen werden: '
+      failedToRevokePermissionFromGroup: 'Berechtigung konnte nicht von Gruppe entzogen werden: ',
     },
 
     // Permission Sets
@@ -295,10 +359,11 @@ export default {
       saveChanges: 'Änderungen speichern',
       permissionAssignments: 'Berechtigungszuweisungen',
       addAssignment: 'Zuweisung hinzufügen',
-      addAssignmentDesc: 'Wählen Sie unten eine Rolle, Gruppe oder einen Benutzer aus, um sie dieser Berechtigung hinzuzufügen. Die Zuweisung wird sofort bei Auswahl hinzugefügt.',
+      addAssignmentDesc:
+        'Wählen Sie unten eine Rolle, Gruppe oder einen Benutzer aus, um sie dieser Berechtigung hinzuzufügen. Die Zuweisung wird sofort bei Auswahl hinzugefügt.',
       addByRole: 'Nach Rolle hinzufügen',
       addByGroup: 'Nach Gruppe hinzufügen',
-      addByUser: 'Nach Benutzer hinzufügen'
+      addByUser: 'Nach Benutzer hinzufügen',
     },
 
     // SCM Providers
@@ -353,7 +418,8 @@ export default {
       allWorkspaces: 'Alle Arbeitsbereiche können diesen Anbieter nutzen',
       restrictToWorkspaces: 'Auf bestimmte Arbeitsbereiche beschränken',
       allowedWorkspaces: 'Erlaubte Arbeitsbereiche',
-      noWorkspacesWarning: 'Warnung: Keine Arbeitsbereiche ausgewählt. Dieser Anbieter wird von keinem Arbeitsbereich nutzbar sein.'
+      noWorkspacesWarning:
+        'Warnung: Keine Arbeitsbereiche ausgewählt. Dieser Anbieter wird von keinem Arbeitsbereich nutzbar sein.',
     },
 
     // Security Settings
@@ -361,11 +427,14 @@ export default {
       title: 'Sicherheit',
       subtitle: 'Sicherheitsbezogene Einstellungen und Funktionssteuerungen verwalten',
       calendarFeeds: 'Kalender-Feed-Abonnements',
-      calendarFeedsDesc: 'Benutzern erlauben, ICS-Feed-URLs für externe Kalender-Apps zu generieren',
-      calendarFeedsWarning: 'Warnung: Bei Deaktivierung werden bestehende Kalender-Feeds sofort nicht mehr funktionieren.',
+      calendarFeedsDesc:
+        'Benutzern erlauben, ICS-Feed-URLs für externe Kalender-Apps zu generieren',
+      calendarFeedsWarning:
+        'Warnung: Bei Deaktivierung werden bestehende Kalender-Feeds sofort nicht mehr funktionieren.',
       pluginExecution: 'Plugin-CLI-Befehlsausführung',
       pluginExecutionDesc: 'Plugins erlauben, Shell-Befehle auf dem Server auszuführen',
-      pluginExecutionWarning: 'Warnung: Das Aktivieren dieser Einstellung erlaubt Plugins, Shell-Befehle auszuführen.'
+      pluginExecutionWarning:
+        'Warnung: Das Aktivieren dieser Einstellung erlaubt Plugins, Shell-Befehle auszuführen.',
     },
 
     // SSO Settings
@@ -379,7 +448,8 @@ export default {
       createProvider: 'Anbieter erstellen',
       deleteProvider: 'Anbieter löschen',
       noProviderConfigured: 'Kein SSO-Anbieter konfiguriert',
-      noProviderDescription: 'Fügen Sie einen OIDC-Identitätsanbieter hinzu, um Single Sign-On für Ihre Benutzer zu aktivieren. Unterstützt Keycloak, Authentik, Pocket ID und andere OIDC-kompatible Anbieter.',
+      noProviderDescription:
+        'Fügen Sie einen OIDC-Identitätsanbieter hinzu, um Single Sign-On für Ihre Benutzer zu aktivieren. Unterstützt Keycloak, Authentik, Pocket ID und andere OIDC-kompatible Anbieter.',
       slug: 'Slug',
       slugPlaceholder: 'z.B. authentik',
       slugHelp: 'Wird in der SSO-Login-URL verwendet',
@@ -404,7 +474,8 @@ export default {
       leaveEmptyToKeepCurrent: '(leer lassen, um aktuellen Wert zu behalten)',
       notConfigured: 'Nicht konfiguriert',
       callbackUrl: 'Callback-URL',
-      callbackUrlHelp: 'Konfigurieren Sie diese URL als Redirect/Callback-URL in Ihrem Identitätsanbieter',
+      callbackUrlHelp:
+        'Konfigurieren Sie diese URL als Redirect/Callback-URL in Ihrem Identitätsanbieter',
       scopes: 'Scopes',
       scopesHelp: 'Leerzeichen-getrennte Liste von OIDC-Scopes',
       enabled: 'Aktiviert',
@@ -417,11 +488,13 @@ export default {
       autoProvisionUsersDesc: 'Benutzerkonten automatisch bei erster SSO-Anmeldung erstellen',
       manualUserCreationOnly: 'Nur manuelle Benutzererstellung',
       allowPasswordLogin: 'Passwort-Anmeldung erlauben',
-      allowPasswordLoginDesc: 'Benutzer können sich weiterhin mit Benutzername/Passwort anmelden. Deaktivieren für SSO-only-Modus.',
+      allowPasswordLoginDesc:
+        'Benutzer können sich weiterhin mit Benutzername/Passwort anmelden. Deaktivieren für SSO-only-Modus.',
       passwordLoginAllowed: 'Passwort-Anmeldung erlaubt',
       ssoOnlyMode: 'Nur-SSO-Modus',
       trustIdpEmailVerification: 'IdP-E-Mail-Verifizierung vertrauen',
-      trustIdpEmailVerificationDesc: 'Bei Aktivierung wird die Anmeldung blockiert, wenn der IdP die E-Mail ausdrücklich als nicht verifiziert meldet. Wenn der IdP keinen Verifizierungsstatus meldet, senden wir eine Verifizierungs-E-Mail.',
+      trustIdpEmailVerificationDesc:
+        'Bei Aktivierung wird die Anmeldung blockiert, wenn der IdP die E-Mail ausdrücklich als nicht verifiziert meldet. Wenn der IdP keinen Verifizierungsstatus meldet, senden wir eine Verifizierungs-E-Mail.',
       idpVerificationNotEnforced: 'IdP-Verifizierung nicht erzwungen',
       testConnection: 'Verbindung testen',
       testing: 'Teste...',
@@ -429,11 +502,12 @@ export default {
       connectionFailed: 'Verbindung fehlgeschlagen',
       connectionTestFailed: 'Verbindungstest fehlgeschlagen',
       confirmDeleteProvider: 'Sind Sie sicher, dass Sie den SSO-Anbieter löschen möchten',
-      deleteWarning: 'Dies wird alle externen Konten trennen und Benutzer müssen sich mit einem Passwort anmelden.',
+      deleteWarning:
+        'Dies wird alle externen Konten trennen und Benutzer müssen sich mit einem Passwort anmelden.',
       failedToLoad: 'SSO-Anbieter konnten nicht geladen werden',
       failedToCreate: 'SSO-Anbieter konnte nicht erstellt werden',
       failedToUpdate: 'SSO-Anbieter konnte nicht aktualisiert werden',
-      failedToDelete: 'SSO-Anbieter konnte nicht gelöscht werden'
+      failedToDelete: 'SSO-Anbieter konnte nicht gelöscht werden',
     },
 
     // Channel Managers
@@ -446,7 +520,8 @@ export default {
       group: 'Gruppe',
       removeManager: 'Verwalter entfernen',
       note: 'Hinweis:',
-      noteText: 'Kanalverwalter können Kanaleinstellungen konfigurieren, Verbindungen testen und kanalspezifische Einstellungen verwalten.'
+      noteText:
+        'Kanalverwalter können Kanaleinstellungen konfigurieren, Verbindungen testen und kanalspezifische Einstellungen verwalten.',
     },
 
     // Connected Accounts
@@ -456,7 +531,8 @@ export default {
       noProvidersDesc: 'Ihr Administrator hat keine SCM-Anbieter mit OAuth konfiguriert.',
       connectDesc: 'Verbinden Sie Ihr Konto, um Branches und Pull Requests zu erstellen',
       disconnect: 'Trennen',
-      footerNote: 'Verbundene Konten werden verwendet, um Branches und Pull Requests in Ihrem Namen zu erstellen. Jeder Benutzer muss sein eigenes Konto für korrekte Zuordnung verbinden.'
+      footerNote:
+        'Verbundene Konten werden verwendet, um Branches und Pull Requests in Ihrem Namen zu erstellen. Jeder Benutzer muss sein eigenes Konto für korrekte Zuordnung verbinden.',
     },
 
     // Link Types
@@ -473,7 +549,7 @@ export default {
       system: 'System',
       cannotDeleteSystem: 'System-Verknüpfungstypen können nicht gelöscht werden',
       nameRequired: 'Name ist erforderlich',
-      failedToSave: 'Verknüpfungstyp konnte nicht gespeichert werden:'
+      failedToSave: 'Verknüpfungstyp konnte nicht gespeichert werden:',
     },
 
     // Status Categories
@@ -487,7 +563,7 @@ export default {
       default: 'Standard',
       completed: 'Abgeschlossen',
       nameRequired: 'Name ist erforderlich',
-      failedToSave: 'Statuskategorie konnte nicht gespeichert werden:'
+      failedToSave: 'Statuskategorie konnte nicht gespeichert werden:',
     },
 
     // Item Types
@@ -502,7 +578,7 @@ export default {
       hierarchyLevel: 'Hierarchieebene',
       nameRequired: 'Name ist erforderlich',
       failedToSave: 'Vorgangstyp konnte nicht gespeichert werden:',
-      noItemTypes: 'Noch keine Vorgangstypen konfiguriert.'
+      noItemTypes: 'Noch keine Vorgangstypen konfiguriert.',
     },
 
     // Hierarchy Levels
@@ -515,7 +591,7 @@ export default {
       description: 'Beschreibung',
       nameRequired: 'Name der Hierarchieebene ist erforderlich',
       failedToSave: 'Hierarchieebene konnte nicht gespeichert werden:',
-      confirmDelete: 'Sind Sie sicher, dass Sie löschen möchten'
+      confirmDelete: 'Sind Sie sicher, dass Sie löschen möchten',
     },
 
     // Module Settings (Plugins)
@@ -523,7 +599,8 @@ export default {
       title: 'Module',
       subtitle: 'Systemmodule aktivieren oder deaktivieren und Plugins verwalten',
       plugins: 'Plugins',
-      pluginsDisabledMessage: 'Das Plugin-System wurde über die Server-Startkonfiguration deaktiviert.',
+      pluginsDisabledMessage:
+        'Das Plugin-System wurde über die Server-Startkonfiguration deaktiviert.',
       uploadPlugin: 'Plugin hochladen',
       dropOrSelect: 'Plugin-Dateien hierher ziehen oder klicken zum Auswählen',
       supportedFormats: 'Unterstützte Formate: .zip oder .wasm',
@@ -534,25 +611,30 @@ export default {
       pluginDeletedSuccess: 'Plugin {name} erfolgreich gelöscht',
       confirmDeletePlugin: 'Sind Sie sicher, dass Sie das Plugin "{name}" löschen möchten?',
       wasmManifestRequired: 'Manifest für WASM-Dateien erforderlich',
-      wasmManifestRequiredDesc: 'WASM-Dateien müssen von einer manifest.json-Datei begleitet werden, die das Plugin beschreibt.',
+      wasmManifestRequiredDesc:
+        'WASM-Dateien müssen von einer manifest.json-Datei begleitet werden, die das Plugin beschreibt.',
       chooseManifest: 'manifest.json auswählen',
       changeManifest: 'manifest.json ändern',
       manifestSelected: 'Manifest ausgewählt: {name}',
       registeredRoutes: 'Registrierte Routen',
-      moduleSettingsNote: 'Änderungen an Moduleinstellungen werden sofort wirksam. Das Deaktivieren eines Moduls blendet es aus der Navigation aus.',
+      moduleSettingsNote:
+        'Änderungen an Moduleinstellungen werden sofort wirksam. Das Deaktivieren eines Moduls blendet es aus der Navigation aus.',
       failedToUpload: 'Hochladen fehlgeschlagen: {error}',
       failedToReload: 'Plugin konnte nicht neu geladen werden: {error}',
       failedToDelete: 'Plugin konnte nicht gelöscht werden: {error}',
       pleaseSelectPlugin: 'Bitte wählen Sie eine Plugin-Datei',
-      wasmNeedsManifest: 'WASM-Dateien benötigen eine manifest.json-Datei. Bitte wählen Sie eine manifest.json oder laden Sie eine .zip-Datei hoch, die beide Dateien enthält.',
+      wasmNeedsManifest:
+        'WASM-Dateien benötigen eine manifest.json-Datei. Bitte wählen Sie eine manifest.json oder laden Sie eine .zip-Datei hoch, die beide Dateien enthält.',
       by: 'Von',
       settingsSavedSuccess: 'Moduleinstellungen erfolgreich gespeichert!',
-      failedToSave: 'Moduleinstellungen konnten nicht gespeichert werden. Bitte versuchen Sie es erneut.'
+      failedToSave:
+        'Moduleinstellungen konnten nicht gespeichert werden. Bitte versuchen Sie es erneut.',
     },
 
     // Workspace Roles
     workspaceRoles: {
-      readOnlyNote: 'Arbeitsbereich-Rollen sind systemdefiniert und können nicht bearbeitet werden. Sie dienen als Referenz für die verfügbaren Berechtigungen jeder Rolle.'
+      readOnlyNote:
+        'Arbeitsbereich-Rollen sind systemdefiniert und können nicht bearbeitet werden. Sie dienen als Referenz für die verfügbaren Berechtigungen jeder Rolle.',
     },
 
     // Board Configuration
@@ -570,8 +652,8 @@ export default {
       mappedStatuses: 'Zugeordnete Status',
       noStatusesSelected: 'Keine Status ausgewählt',
       backlogStatuses: 'Backlog-Status',
-      backlogStatusesHelp: 'Einträge mit diesen Status erscheinen im Backlog'
-    }
+      backlogStatusesHelp: 'Einträge mit diesen Status erscheinen im Backlog',
+    },
   },
 
   roles: {
@@ -593,7 +675,7 @@ export default {
     roleCreated: 'Rolle erfolgreich erstellt',
     roleUpdated: 'Rolle erfolgreich aktualisiert',
     roleDeleted: 'Rolle erfolgreich gelöscht',
-    cannotDeleteSystemRole: 'Systemrollen können nicht gelöscht werden'
+    cannotDeleteSystemRole: 'Systemrollen können nicht gelöscht werden',
   },
 
   permissions: {
@@ -611,6 +693,6 @@ export default {
     view: 'Anzeigen',
     edit: 'Bearbeiten',
     create: 'Erstellen',
-    noAccessMessage: 'Sie haben keine Berechtigung, auf diese Seite zuzugreifen.'
-  }
+    noAccessMessage: 'Sie haben keine Berechtigung, auf diese Seite zuzugreifen.',
+  },
 };

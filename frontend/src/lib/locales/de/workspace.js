@@ -56,19 +56,19 @@ export default {
         name: 'Name',
         email: 'E-Mail',
         phone: 'Telefon',
-        customerOrganisation: 'Kundenorganisation'
+        customerOrganisation: 'Kundenorganisation',
       },
       placeholders: {
         name: 'Kundennamen eingeben',
         email: 'kunde@beispiel.de',
-        phone: '+49 (123) 456-7890'
+        phone: '+49 (123) 456-7890',
       },
       metadata: {
         created: 'Erstellt:',
         updated: 'Aktualisiert:',
-        linkedUser: 'Verknüpfter Benutzer:'
-      }
-    }
+        linkedUser: 'Verknüpfter Benutzer:',
+      },
+    },
   },
 
   items: {
@@ -122,7 +122,8 @@ export default {
     type: 'Typ',
     workItem: 'Vorgang',
     noProjectConfigured: 'Kein Projekt für Zeiterfassung konfiguriert',
-    setDefaultProject: 'Legen Sie ein Standardprojekt in den Arbeitsbereichs- oder Eintragseinstellungen fest, um Zeit zu erfassen',
+    setDefaultProject:
+      'Legen Sie ein Standardprojekt in den Arbeitsbereichs- oder Eintragseinstellungen fest, um Zeit zu erfassen',
     timeEntries: 'Zeiteinträge',
     startTimer: 'Timer starten',
     logTime: 'Zeit erfassen',
@@ -134,7 +135,8 @@ export default {
     errorLoadingWorkItem: 'Fehler beim Laden des Vorgangs',
     workItemNotFound: 'Vorgang nicht gefunden',
     timerBusy: 'Timer beschäftigt',
-    timerSyncingMessage: 'Timer wird gerade synchronisiert, bitte warten Sie einen Moment und versuchen Sie es erneut.',
+    timerSyncingMessage:
+      'Timer wird gerade synchronisiert, bitte warten Sie einen Moment und versuchen Sie es erneut.',
     timerAlreadyRunning: 'Timer läuft bereits',
     stopTimerFirst: 'Bitte stoppen Sie den aktuellen Timer, bevor Sie einen neuen starten.',
     workingOn: 'Arbeite an {title}',
@@ -142,13 +144,15 @@ export default {
     failedToSaveTimeEntry: 'Zeiteintrag konnte nicht gespeichert werden',
     failedToDeleteTimeEntry: 'Zeiteintrag konnte nicht gelöscht werden',
     deleteTimeEntry: 'Zeiteintrag löschen',
-    deleteTimeEntryConfirm: 'Sind Sie sicher, dass Sie diesen Zeiteintrag löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
+    deleteTimeEntryConfirm:
+      'Sind Sie sicher, dass Sie diesen Zeiteintrag löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
     noDescription: 'Keine Beschreibung',
     itemCopiedAs: 'Vorgang erfolgreich als {key} kopiert',
     clickToViewCopied: 'Klicken, um kopierten Vorgang anzuzeigen',
     failedToCopy: 'Kopieren fehlgeschlagen',
     deleteWorkItem: 'Vorgang löschen',
-    confirmDeleteItem: 'Sind Sie sicher, dass Sie "{title}" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
+    confirmDeleteItem:
+      'Sind Sie sicher, dass Sie "{title}" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
     failedToDelete: 'Löschen fehlgeschlagen',
 
     // Cascade delete dialog
@@ -158,7 +162,8 @@ export default {
     deleteAllOption: 'Alle löschen ({count} Einträge)',
     deleteAllDescription: 'Diesen Vorgang und alle untergeordneten Einträge dauerhaft löschen',
     reparentOption: 'Untergeordnete verschieben',
-    reparentDescription: 'Untergeordnete zum übergeordneten Eintrag verschieben, dann nur diesen Vorgang löschen',
+    reparentDescription:
+      'Untergeordnete zum übergeordneten Eintrag verschieben, dann nur diesen Vorgang löschen',
     typeToConfirm: '"{title}" eingeben, um das Löschen zu bestätigen',
     confirmationPlaceholder: 'Titel zur Bestätigung eingeben...',
     deleteAllItems: 'Alle Einträge löschen',
@@ -171,7 +176,8 @@ export default {
     selectNewParentPlaceholder: 'Übergeordneten Eintrag auswählen...',
     makeRootItem: 'Zu Stammeinträgen machen (ohne übergeordneten)',
     reparentLevelHint: 'Zeigt nur Einträge auf derselben Hierarchieebene',
-    noOtherItemsAtLevel: 'Keine anderen Einträge auf dieser Ebene - wählen Sie "Zu Stammeinträgen machen" oder wählen Sie aus der Liste oben',
+    noOtherItemsAtLevel:
+      'Keine anderen Einträge auf dieser Ebene - wählen Sie "Zu Stammeinträgen machen" oder wählen Sie aus der Liste oben',
     reparentToGrandparent: 'Untergeordnete werden zum Großelterneintrag verschoben',
     childrenWillBecomeRoot: 'Untergeordnete werden zu Stammeinträgen',
 
@@ -180,7 +186,8 @@ export default {
     unwatchWorkItem: 'Vorgang nicht mehr beobachten',
     watchWorkItem: 'Vorgang beobachten',
     noSubIssueTypes: 'Keine Untereintragstypen verfügbar',
-    cannotCreateChildItems: 'Für diese Hierarchieebene können keine untergeordneten Vorgänge erstellt werden.',
+    cannotCreateChildItems:
+      'Für diese Hierarchieebene können keine untergeordneten Vorgänge erstellt werden.',
     workItems: 'Vorgänge',
     linkedTo: 'verknüpft mit',
     goToLinkedWorkItem: 'Zum verknüpften Vorgang gehen',
@@ -229,7 +236,7 @@ export default {
     milestone: 'Meilenstein',
     iteration: 'Iteration',
     project: 'Projekt',
-    clickToViewDetails: 'Klicken, um Eintragsdetails anzuzeigen'
+    clickToViewDetails: 'Klicken, um Eintragsdetails anzuzeigen',
   },
 
   comments: {
@@ -252,7 +259,7 @@ export default {
     internalNoteHint: 'Nicht im Portal sichtbar',
     internal: 'Intern',
     oldestFirst: 'Älteste zuerst',
-    newestFirst: 'Neueste zuerst'
+    newestFirst: 'Neueste zuerst',
   },
 
   todo: {
@@ -271,7 +278,7 @@ export default {
     ofAssignedItemsRemaining: '{count} von {total} zugewiesenen Einträgen verbleibend',
     task: 'Aufgabe',
     dueDate: 'Fälligkeitsdatum',
-    progress: 'Fortschritt'
+    progress: 'Fortschritt',
   },
 
   collectionTree: {
@@ -288,7 +295,7 @@ export default {
     pageOfTotal: 'Seite {current} von {total}',
     issue: 'Vorgang',
     noStatus: 'Kein Status',
-    workspaceNotFound: 'Arbeitsbereich nicht gefunden.'
+    workspaceNotFound: 'Arbeitsbereich nicht gefunden.',
   },
 
   collections: {
@@ -315,9 +322,11 @@ export default {
     changeWorkspace: 'Arbeitsbereich ändern',
     changeWorkspaceAssociation: 'Arbeitsbereich-Zuordnung ändern',
     associateWithWorkspace: 'Mit Arbeitsbereich verknüpfen',
-    workspaceAssociationDesc: 'Die Auswahl eines Arbeitsbereichs beschränkt diese Sammlung auf diesen Arbeitsbereich. Lassen Sie die Auswahl leer, um sie global zu halten.',
+    workspaceAssociationDesc:
+      'Die Auswahl eines Arbeitsbereichs beschränkt diese Sammlung auf diesen Arbeitsbereich. Lassen Sie die Auswahl leer, um sie global zu halten.',
     saveAssociation: 'Zuordnung speichern',
-    workspaceAssociationNote: 'Es kann jeweils nur ein Arbeitsbereich zugeordnet werden. Das Entfernen der Auswahl wandelt die Sammlung zurück in eine globale Ansicht.',
+    workspaceAssociationNote:
+      'Es kann jeweils nur ein Arbeitsbereich zugeordnet werden. Das Entfernen der Auswahl wandelt die Sammlung zurück in eine globale Ansicht.',
     searchWorkspace: 'Arbeitsbereich suchen...',
     manageCategories: 'Kategorien verwalten',
     noCategory: 'Keine Kategorie',
@@ -350,7 +359,8 @@ export default {
     configure: 'Konfigurieren',
     map: 'Karte',
     noItemsInBacklog: 'Keine Einträge im Backlog',
-    noItemsInBacklogDesc: 'Alle Vorgänge sind entweder abgeschlossen oder es existieren noch keine Einträge.',
+    noItemsInBacklogDesc:
+      'Alle Vorgänge sind entweder abgeschlossen oder es existieren noch keine Einträge.',
     showingItemsFromBacklog: '{count} Einträge aus dem Backlog anzeigen',
     loadingStoryMap: 'Story Map wird geladen...',
     rootLevel: 'Stammebene',
@@ -377,20 +387,25 @@ export default {
     public: 'Öffentlich',
     workspaceFilter: 'Arbeitsbereich-Filter',
     allWorkspaces: 'Alle Arbeitsbereiche',
-    noCollectionsFound: 'Keine Sammlungen gefunden. Erstellen Sie Ihre erste Sammlung, um Vorgangsabfragen zu speichern und wiederzuverwenden.',
+    noCollectionsFound:
+      'Keine Sammlungen gefunden. Erstellen Sie Ihre erste Sammlung, um Vorgangsabfragen zu speichern und wiederzuverwenden.',
     collectionCount: '{count} Sammlung',
     collectionCountPlural: '{count} Sammlungen',
     addFiltersToStart: 'Fügen Sie Filter hinzu, um zu beginnen',
-    addFiltersDesc: 'Verwenden Sie die Seitenleistenfilter oder schreiben Sie eine Abfrage, um nach Vorgängen zu suchen.',
+    addFiltersDesc:
+      'Verwenden Sie die Seitenleistenfilter oder schreiben Sie eine Abfrage, um nach Vorgängen zu suchen.',
     loadingWorkspaces: 'Arbeitsbereiche werden geladen...',
     loadingWorkItems: 'Vorgänge werden geladen...',
     noWorkItemsFound: 'Keine Vorgänge gefunden',
     tryAdjustingFilters: 'Versuchen Sie, Ihre Filter oder Suchbegriffe anzupassen.',
     showingWorkItems: '{count} Vorgänge anzeigen',
-    confirmDeleteCollection: 'Möchten Sie die Sammlung "{name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
-    confirmDeleteItem: 'Möchten Sie "{title}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
-    noQueryToSave: 'Keine Abfrage zum Speichern. Bitte richten Sie zuerst einige Filter ein oder geben Sie eine QL-Abfrage ein.',
-    boardSummary: 'Gesamt: {itemCount} Vorgänge in {columnCount} Spalten'
+    confirmDeleteCollection:
+      'Möchten Sie die Sammlung "{name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
+    confirmDeleteItem:
+      'Möchten Sie "{title}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
+    noQueryToSave:
+      'Keine Abfrage zum Speichern. Bitte richten Sie zuerst einige Filter ein oder geben Sie eine QL-Abfrage ein.',
+    boardSummary: 'Gesamt: {itemCount} Vorgänge in {columnCount} Spalten',
   },
 
   links: {
@@ -399,7 +414,7 @@ export default {
     addLink: 'Link hinzufügen',
     removeLink: 'Link entfernen',
     linkText: 'Linktext',
-    linkUrl: 'URL'
+    linkUrl: 'URL',
   },
 
   workspaceSettings: {
@@ -411,7 +426,7 @@ export default {
       members: 'Mitglieder',
       configurationSets: 'Konfigurationssets',
       sourceControl: 'Versionskontrolle',
-      removeWorkspace: 'Arbeitsbereich entfernen'
+      removeWorkspace: 'Arbeitsbereich entfernen',
     },
 
     // Page header
@@ -419,12 +434,13 @@ export default {
     subtitle: 'Einstellungen für {name} konfigurieren',
     breadcrumbs: {
       workspaces: 'Arbeitsbereiche',
-      settings: 'Einstellungen'
+      settings: 'Einstellungen',
     },
 
     // Access denied
     accessDenied: 'Zugriff verweigert',
-    accessDeniedDescription: 'Sie benötigen Arbeitsbereich-Administrator-Berechtigungen, um auf die Einstellungen zuzugreifen.',
+    accessDeniedDescription:
+      'Sie benötigen Arbeitsbereich-Administrator-Berechtigungen, um auf die Einstellungen zuzugreifen.',
     backToWorkspace: 'Zurück zum Arbeitsbereich',
 
     // General tab
@@ -433,16 +449,19 @@ export default {
     workspaceNamePlaceholder: 'Arbeitsbereichsnamen eingeben',
     workspaceKey: 'Arbeitsbereichsschlüssel',
     workspaceKeyPlaceholder: 'z.B. DEV, TEST, PROD',
-    workspaceKeyHelp: 'Wird für Element-Präfixe verwendet (z.B. DEV-123). Nur Großbuchstaben und Zahlen.',
+    workspaceKeyHelp:
+      'Wird für Element-Präfixe verwendet (z.B. DEV-123). Nur Großbuchstaben und Zahlen.',
     description: 'Beschreibung',
     descriptionPlaceholder: 'Optionale Beschreibung für diesen Arbeitsbereich',
     defaultTimeProject: 'Standard-Zeiterfassungsprojekt',
     noDefaultProject: 'Kein Standardprojekt',
-    defaultTimeProjectHelp: 'Standardprojekt für die Zeiterfassung bei Vorgängen in diesem Arbeitsbereich. Kann pro Vorgang überschrieben werden.',
+    defaultTimeProjectHelp:
+      'Standardprojekt für die Zeiterfassung bei Vorgängen in diesem Arbeitsbereich. Kann pro Vorgang überschrieben werden.',
     defaultView: 'Standard-Arbeitsbereichsansicht',
     defaultViewHelp: 'Standardansicht beim Betreten dieses Arbeitsbereichs.',
     activeWorkspace: 'Aktiver Arbeitsbereich',
-    activeWorkspaceHelp: 'Wenn inaktiv, können nur System- und Arbeitsbereich-Administratoren auf diesen Arbeitsbereich zugreifen. Alle Daten bleiben erhalten.',
+    activeWorkspaceHelp:
+      'Wenn inaktiv, können nur System- und Arbeitsbereich-Administratoren auf diesen Arbeitsbereich zugreifen. Alle Daten bleiben erhalten.',
 
     // View options
     views: {
@@ -451,12 +470,13 @@ export default {
       list: 'Liste',
       tree: 'Baum',
       map: 'Karte',
-      overview: 'Übersicht'
+      overview: 'Übersicht',
     },
 
     // Appearance tab
     visualIdentity: 'Visuelle Identität',
-    visualIdentityDescription: 'Passen Sie das Erscheinungsbild Ihres Arbeitsbereichs mit Symbolen, Farben und Avataren an.',
+    visualIdentityDescription:
+      'Passen Sie das Erscheinungsbild Ihres Arbeitsbereichs mit Symbolen, Farben und Avataren an.',
     workspaceIconColor: 'Arbeitsbereichs-Symbol & Farbe',
     workspaceAvatar: 'Arbeitsbereichs-Avatar',
     customAvatar: 'Benutzerdefinierter Avatar',
@@ -466,16 +486,20 @@ export default {
     changeAvatar: 'Avatar ändern',
     uploadAvatar: 'Avatar hochladen',
     attachmentsRequired: 'Anhänge müssen aktiviert sein, um Arbeitsbereichs-Symbole hochzuladen',
-    uploadRecommendation: 'Empfohlen: Quadratische Bilder, mindestens 256x256 Pixel für beste Qualität',
-    avatarOrIconNote: 'Sie können entweder ein benutzerdefiniertes Avatar-Bild oder die oben ausgewählte Symbol-Farb-Kombination verwenden.',
+    uploadRecommendation:
+      'Empfohlen: Quadratische Bilder, mindestens 256x256 Pixel für beste Qualität',
+    avatarOrIconNote:
+      'Sie können entweder ein benutzerdefiniertes Avatar-Bild oder die oben ausgewählte Symbol-Farb-Kombination verwenden.',
     uploading: 'Wird hochgeladen...',
     avatarUploadedSuccess: 'Avatar erfolgreich hochgeladen',
 
     // Categories tab
     projectCategoryRestrictions: 'Projektkategorie-Einschränkungen',
     selectProjectCategories: 'Projektkategorien auswählen...',
-    categoryRestrictionsHelp: 'Beschränken Sie optional die Projektauswahl auf bestimmte Kategorien für diesen Arbeitsbereich. Wenn gesetzt, können Benutzer nur Projekte aus den gewählten Kategorien auswählen.',
-    leaveEmptyNote: 'Hinweis: Leer lassen, um die Auswahl aus allen Projektkategorien zu ermöglichen.',
+    categoryRestrictionsHelp:
+      'Beschränken Sie optional die Projektauswahl auf bestimmte Kategorien für diesen Arbeitsbereich. Wenn gesetzt, können Benutzer nur Projekte aus den gewählten Kategorien auswählen.',
+    leaveEmptyNote:
+      'Hinweis: Leer lassen, um die Auswahl aus allen Projektkategorien zu ermöglichen.',
 
     // Configuration tab
     activeConfiguration: 'Aktive Konfiguration',
@@ -506,27 +530,31 @@ export default {
     failedToSave: 'Speichern der Arbeitsbereichs-Einstellungen fehlgeschlagen: {error}',
     deletedSuccessfully: 'Arbeitsbereich "{name}" erfolgreich gelöscht',
     failedToDelete: 'Löschen des Arbeitsbereichs fehlgeschlagen: {error}',
-    pleaseConfirmDeletion: 'Bitte geben Sie den Arbeitsbereichsnamen genau wie angezeigt ein, um die Löschung zu bestätigen',
+    pleaseConfirmDeletion:
+      'Bitte geben Sie den Arbeitsbereichsnamen genau wie angezeigt ein, um die Löschung zu bestätigen',
     pleaseSelectImage: 'Bitte wählen Sie eine Bilddatei aus',
-    failedToUploadAvatar: 'Avatar-Upload fehlgeschlagen: {error}'
+    failedToUploadAvatar: 'Avatar-Upload fehlgeschlagen: {error}',
   },
 
   lookAndFeel: {
     title: 'Erscheinungsbild',
     subtitle: 'Passen Sie das Aussehen und Layout Ihres Arbeitsbereichs an',
     displayModeTitle: 'Anzeigemodus',
-    displayModeDescription: 'Wählen Sie, wie dieser Arbeitsbereich angezeigt wird. Dies beeinflusst das Navigationslayout und das Standardverhalten.',
+    displayModeDescription:
+      'Wählen Sie, wie dieser Arbeitsbereich angezeigt wird. Dies beeinflusst das Navigationslayout und das Standardverhalten.',
     gradientTitle: 'Hintergrund & Farbverlauf',
     gradientDescription: 'Wählen Sie ein Farbschema für Ihren Arbeitsbereich',
     gradients: 'Farbverläufe',
     backgroundImages: 'Hintergrundbilder',
     currentBackground: 'Aktueller Hintergrund',
     uploadCustomImage: 'Benutzerdefiniertes Bild hochladen',
-    backgroundUploadRecommendation: 'Empfohlen: Hochauflösende Bilder (1920x1080 oder größer) für beste Qualität',
+    backgroundUploadRecommendation:
+      'Empfohlen: Hochauflösende Bilder (1920x1080 oder größer) für beste Qualität',
     backgroundUploadedSuccess: 'Hintergrundbild erfolgreich hochgeladen',
     failedToUploadBackground: 'Hintergrundbild-Upload fehlgeschlagen: {error}',
     identityTitle: 'Arbeitsbereich-Identität',
-    identityDescription: 'Passen Sie das Symbol, die Farbe und den Avatar für Ihren Arbeitsbereich an',
+    identityDescription:
+      'Passen Sie das Symbol, die Farbe und den Avatar für Ihren Arbeitsbereich an',
     savedSuccessfully: 'Erscheinungsbild-Einstellungen erfolgreich gespeichert',
     failedToSave: 'Speichern der Erscheinungsbild-Einstellungen fehlgeschlagen: {error}',
     // Logo
@@ -534,6 +562,7 @@ export default {
     currentLogo: 'Aktuelles Logo',
     noLogoSet: 'Kein Logo gesetzt',
     uploadLogo: 'Logo hochladen',
-    logoRecommendation: 'Empfohlen: PNG oder SVG mit transparentem Hintergrund. Maximale Höhe im Header: 40-50px.'
-  }
+    logoRecommendation:
+      'Empfohlen: PNG oder SVG mit transparentem Hintergrund. Maximale Höhe im Header: 40-50px.',
+  },
 };

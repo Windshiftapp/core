@@ -520,3 +520,53 @@ func (h *IterationHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 
 	respondJSONOK(w, report)
 }
+
+// GetBurndown handles GET /api/iterations/{id}/burndown - returns iteration burndown chart data
+func (h *IterationHandler) GetBurndown(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	iterationID, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	// First check permission for this iteration (using service)
+	isGlobal, wsID, err := h.planningService.IsIterationGlobal(iterationID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondNotFound(w, r, "iteration")
+			return
+		}
+		respondInternalError(w, r, err)
+		return
+	}
+
+	// Check permission based on whether iteration is global or workspace-scoped
+	if isGlobal {
+		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
+		if err != nil || !hasGlobalPerm {
+			respondForbidden(w, r)
+			return
+		}
+	} else if wsID != nil {
+		if !RequireWorkspacePermission(w, r, user.ID, *wsID, models.PermissionItemView, h.permissionService) {
+			return
+		}
+	}
+
+	// Use service to get burndown data
+	burndown, err := h.planningService.GetIterationBurndown(iterationID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondNotFound(w, r, "iteration")
+			return
+		}
+		respondInternalError(w, r, err)
+		return
+	}
+
+	respondJSONOK(w, burndown)
+}

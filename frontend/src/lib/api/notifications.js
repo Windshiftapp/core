@@ -6,15 +6,17 @@ export const notifications = {
     if (params.limit) queryParams.append('limit', params.limit);
     if (params.offset) queryParams.append('offset', params.offset);
     const queryString = queryParams.toString();
-    return fetchAPI(`/notifications${queryString ? '?' + queryString : ''}`);
+    return fetchAPI(`/notifications${queryString ? `?${queryString}` : ''}`);
   },
-  create: (data) => fetchAPI('/notifications', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  markAsRead: (id) => fetchAPI(`/notifications/${id}/read`, {
-    method: 'PATCH',
-  }),
+  create: (data) =>
+    fetchAPI('/notifications', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  markAsRead: (id) =>
+    fetchAPI(`/notifications/${id}/read`, {
+      method: 'PATCH',
+    }),
 };
 
 // Notification Settings API
@@ -26,21 +28,24 @@ export const notificationSettings = {
   get: (id) => fetchAPI(`/notification-settings/${id}`),
 
   // Create a new notification setting
-  create: (data) => fetchAPI('/notification-settings', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
+  create: (data) =>
+    fetchAPI('/notification-settings', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   // Update a notification setting
-  update: (id, data) => fetchAPI(`/notification-settings/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  }),
+  update: (id, data) =>
+    fetchAPI(`/notification-settings/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
 
   // Delete a notification setting
-  delete: (id) => fetchAPI(`/notification-settings/${id}`, {
-    method: 'DELETE',
-  }),
+  delete: (id) =>
+    fetchAPI(`/notification-settings/${id}`, {
+      method: 'DELETE',
+    }),
 
   // Get available notification events
   getAvailableEvents: () => fetchAPI('/notification-settings/available-events'),
@@ -49,21 +54,25 @@ export const notificationSettings = {
 // Configuration Set Notification assignments
 export const configurationSetNotifications = {
   // Get all notification settings for a configuration set
-  getForConfigurationSet: (configSetId) => fetchAPI(`/configuration-sets/${configSetId}/notification-settings`),
+  getForConfigurationSet: (configSetId) =>
+    fetchAPI(`/configuration-sets/${configSetId}/notification-settings`),
 
   // Assign notification setting to configuration set
-  assign: (configSetId, data) => fetchAPI(`/configuration-sets/${configSetId}/notification-settings`, {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
+  assign: (configSetId, data) =>
+    fetchAPI(`/configuration-sets/${configSetId}/notification-settings`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   // Remove notification setting from configuration set
-  unassign: (configSetId, assignmentId) => fetchAPI(`/configuration-sets/${configSetId}/notification-settings/${assignmentId}`, {
-    method: 'DELETE',
-  }),
+  unassign: (configSetId, assignmentId) =>
+    fetchAPI(`/configuration-sets/${configSetId}/notification-settings/${assignmentId}`, {
+      method: 'DELETE',
+    }),
 
   // Get available notification settings for a configuration set (not yet assigned)
-  getAvailable: (configSetId) => fetchAPI(`/configuration-sets/${configSetId}/available-notification-settings`),
+  getAvailable: (configSetId) =>
+    fetchAPI(`/configuration-sets/${configSetId}/available-notification-settings`),
 };
 
 // Named exports for backward compatibility

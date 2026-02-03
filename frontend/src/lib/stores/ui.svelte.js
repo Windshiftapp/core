@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { derived, writable } from 'svelte/store';
 
 // Storage key for nav expanded state
 const NAV_EXPANDED_STORAGE_KEY = 'windshift-nav-expanded';
@@ -20,7 +20,7 @@ function createUIStore() {
   const navExpanded = writable(getInitialNavExpanded());
 
   // Persist navExpanded to localStorage on changes
-  navExpanded.subscribe(value => {
+  navExpanded.subscribe((value) => {
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem(NAV_EXPANDED_STORAGE_KEY, String(value));
@@ -35,7 +35,7 @@ function createUIStore() {
     [reviewFullscreen, navExpanded],
     ([$reviewFullscreen, $navExpanded]) => ({
       reviewFullscreen: $reviewFullscreen,
-      navExpanded: $navExpanded
+      navExpanded: $navExpanded,
     })
   );
 
@@ -46,7 +46,7 @@ function createUIStore() {
     // Convenience getter for backward compatibility
     get reviewFullscreen() {
       let value;
-      reviewFullscreen.subscribe(v => value = v)();
+      reviewFullscreen.subscribe((v) => (value = v))();
       return value;
     },
 
@@ -57,13 +57,13 @@ function createUIStore() {
 
     // Toggle reviewFullscreen
     toggleReviewFullscreen() {
-      reviewFullscreen.update(v => !v);
+      reviewFullscreen.update((v) => !v);
     },
 
     // Convenience getter for navExpanded
     get navExpanded() {
       let value;
-      navExpanded.subscribe(v => value = v)();
+      navExpanded.subscribe((v) => (value = v))();
       return value;
     },
 
@@ -74,8 +74,8 @@ function createUIStore() {
 
     // Toggle navExpanded
     toggleNavExpanded() {
-      navExpanded.update(v => !v);
-    }
+      navExpanded.update((v) => !v);
+    },
   };
 }
 

@@ -4,40 +4,180 @@
  */
 
 import { api } from '../api.js';
-import { authStore, attachmentStatus } from '../stores';
 import { navigate } from '../router.js';
-import { portalAuthStore } from './portalAuth.svelte.js';
+import { authStore } from '../stores';
 import { gradients } from '../utils/gradients.js';
+import { portalAuthStore } from './portalAuth.svelte.js';
 
 // Re-export gradients for backward compatibility
 export { gradients };
 
 // Icon mapping for request types
 import {
-  Target, Zap, BookOpen, CheckSquare, Bug, Minus, Star, Flag, Lightbulb,
-  Settings, User, Users, Calendar, Clock, MapPin, Search, Filter, Tag,
-  Bookmark, Heart, Shield, Key, Lock, Globe, Wifi, Database, Server,
-  Code, Terminal, FileText, Folder, Image, Video, Music, Download,
-  Upload, Send, Mail, Phone, MessageSquare, AlertCircle, Info,
-  CheckCircle, XCircle, HelpCircle, Archive, Trash, Edit, Copy,
-  Scissors, Paperclip, Link, ExternalLink, Package, Building,
-  Rocket, Award, Bell, Camera, Coffee, Compass, Feather, Gift, Home,
-  Layers, Map as MapIcon, Megaphone, Monitor, Pen, Printer, RefreshCw, Save, Smile,
-  Wrench, Truck, Volume2, Watch, Briefcase, Cloud, BarChart
+  AlertCircle,
+  Archive,
+  Award,
+  BarChart,
+  Bell,
+  Bookmark,
+  BookOpen,
+  Briefcase,
+  Bug,
+  Building,
+  Calendar,
+  Camera,
+  CheckCircle,
+  CheckSquare,
+  Clock,
+  Cloud,
+  Code,
+  Coffee,
+  Compass,
+  Copy,
+  Database,
+  Download,
+  Edit,
+  ExternalLink,
+  Feather,
+  FileText,
+  Filter,
+  Flag,
+  Folder,
+  Gift,
+  Globe,
+  Heart,
+  HelpCircle,
+  Home,
+  Image,
+  Info,
+  Key,
+  Layers,
+  Lightbulb,
+  Link,
+  Lock,
+  Mail,
+  Map as MapIcon,
+  MapPin,
+  Megaphone,
+  MessageSquare,
+  Minus,
+  Monitor,
+  Music,
+  Package,
+  Paperclip,
+  Pen,
+  Phone,
+  Printer,
+  RefreshCw,
+  Rocket,
+  Save,
+  Scissors,
+  Search,
+  Send,
+  Server,
+  Settings,
+  Shield,
+  Smile,
+  Star,
+  Tag,
+  Target,
+  Terminal,
+  Trash,
+  Truck,
+  Upload,
+  User,
+  Users,
+  Video,
+  Volume2,
+  Watch,
+  Wifi,
+  Wrench,
+  XCircle,
+  Zap,
 } from 'lucide-svelte';
 
 // Icon map export for components
 export const iconMap = {
-  Target, Zap, BookOpen, CheckSquare, Bug, Minus, Star, Flag, Lightbulb,
-  Settings, User, Users, Calendar, Clock, MapPin, Search, Filter, Tag,
-  Bookmark, Heart, Shield, Key, Lock, Globe, Wifi, Database, Server,
-  Code, Terminal, FileText, Folder, Image, Video, Music, Download,
-  Upload, Send, Mail, Phone, MessageSquare, AlertCircle, Info,
-  CheckCircle, XCircle, HelpCircle, Archive, Trash, Edit, Copy,
-  Scissors, Paperclip, Link, ExternalLink, Package, Building,
-  Rocket, Award, Bell, Camera, Coffee, Compass, Feather, Gift, Home,
-  Layers, Map: MapIcon, Megaphone, Monitor, Pen, Printer, RefreshCw, Save, Smile,
-  Wrench, Truck, Volume2, Watch, Briefcase, Cloud, BarChart
+  Target,
+  Zap,
+  BookOpen,
+  CheckSquare,
+  Bug,
+  Minus,
+  Star,
+  Flag,
+  Lightbulb,
+  Settings,
+  User,
+  Users,
+  Calendar,
+  Clock,
+  MapPin,
+  Search,
+  Filter,
+  Tag,
+  Bookmark,
+  Heart,
+  Shield,
+  Key,
+  Lock,
+  Globe,
+  Wifi,
+  Database,
+  Server,
+  Code,
+  Terminal,
+  FileText,
+  Folder,
+  Image,
+  Video,
+  Music,
+  Download,
+  Upload,
+  Send,
+  Mail,
+  Phone,
+  MessageSquare,
+  AlertCircle,
+  Info,
+  CheckCircle,
+  XCircle,
+  HelpCircle,
+  Archive,
+  Trash,
+  Edit,
+  Copy,
+  Scissors,
+  Paperclip,
+  Link,
+  ExternalLink,
+  Package,
+  Building,
+  Rocket,
+  Award,
+  Bell,
+  Camera,
+  Coffee,
+  Compass,
+  Feather,
+  Gift,
+  Home,
+  Layers,
+  Map: MapIcon,
+  Megaphone,
+  Monitor,
+  Pen,
+  Printer,
+  RefreshCw,
+  Save,
+  Smile,
+  Wrench,
+  Truck,
+  Volume2,
+  Watch,
+  Briefcase,
+  Cloud,
+  BarChart,
 };
 
 // Core state
@@ -95,7 +235,7 @@ let draggedAssetReport = $state(null);
 let footerColumns = $state([
   { title: '', links: [] },
   { title: '', links: [] },
-  { title: '', links: [] }
+  { title: '', links: [] },
 ]);
 
 // Knowledge base
@@ -150,7 +290,8 @@ async function loadPortal(slug) {
     selectedGradient = portalData.gradient || 0;
     isDarkMode = portalData.theme === 'dark';
     editableSearchPlaceholder = portalData.search_placeholder || 'Search the knowledge base...';
-    editableSearchHint = portalData.search_hint || 'Search for articles, guides, and answers to common questions';
+    editableSearchHint =
+      portalData.search_hint || 'Search for articles, guides, and answers to common questions';
     backgroundImageUrl = portalData.background_image_url || null;
     logoUrl = portalData.logo_url || null;
     hubLogoUrl = portalData.hub_logo_url || null;
@@ -159,7 +300,7 @@ async function loadPortal(slug) {
     footerColumns = portalData.footer_columns || [
       { title: '', links: [] },
       { title: '', links: [] },
-      { title: '', links: [] }
+      { title: '', links: [] },
     ];
 
     // Load portal sections
@@ -173,10 +314,7 @@ async function loadPortal(slug) {
 
     // Load request types and asset reports for rendering sections
     if (portalData.channel_id) {
-      await Promise.all([
-        loadRequestTypes(),
-        loadAssetReports()
-      ]);
+      await Promise.all([loadRequestTypes(), loadAssetReports()]);
     }
 
     // Allow saves from user changes after initial load
@@ -271,7 +409,7 @@ async function handleBackgroundUpload(files) {
 
     const uploadResult = await response.json();
 
-    if (uploadResult && uploadResult.success && uploadResult.background_url) {
+    if (uploadResult?.success && uploadResult.background_url) {
       selectBackgroundImage(uploadResult.background_url);
       console.log('Portal background uploaded successfully');
     }
@@ -311,7 +449,7 @@ async function handleLogoUpload(files) {
 
     const uploadResult = await response.json();
 
-    if (uploadResult && uploadResult.success && uploadResult.logo_url) {
+    if (uploadResult?.success && uploadResult.logo_url) {
       logoUrl = uploadResult.logo_url;
       saveCustomizations();
       console.log('Portal logo uploaded successfully');
@@ -341,7 +479,7 @@ function parseDocmostShareLink(link) {
 
   try {
     const url = new URL(link.trim());
-    const pathParts = url.pathname.split('/').filter(p => p);
+    const pathParts = url.pathname.split('/').filter((p) => p);
 
     if (pathParts.length >= 2 && pathParts[0] === 'share') {
       const shareID = pathParts[1];
@@ -441,7 +579,7 @@ async function saveKnowledgeBaseConfig() {
     console.log('Knowledge base configuration saved successfully');
   } catch (err) {
     console.error('Failed to save knowledge base configuration:', err);
-    alert('Failed to save knowledge base configuration: ' + (err.message || err));
+    alert(`Failed to save knowledge base configuration: ${err.message || err}`);
   }
 }
 
@@ -476,7 +614,7 @@ async function loadRequestTypes() {
       requestTypes = typesWithFields;
     } else {
       // For portal customers, skip field count fetching
-      requestTypes = types.map(rt => ({ ...rt, field_count: 0 }));
+      requestTypes = types.map((rt) => ({ ...rt, field_count: 0 }));
     }
   } catch (err) {
     console.error('Failed to load request types:', err);
@@ -496,7 +634,7 @@ async function loadAssetReports() {
     loadingAssetReports = true;
     const reports = await api.assetReports.getForChannel(portalData.channel_id);
     assetReports = reports;
-    hasAssetSets = reports.length > 0 || await checkAssetSetsExist();
+    hasAssetSets = reports.length > 0 || (await checkAssetSetsExist());
   } catch (err) {
     console.error('Failed to load asset reports:', err);
   } finally {
@@ -511,7 +649,7 @@ async function checkAssetSetsExist() {
   try {
     const sets = await api.assetSets.getAll();
     return sets && sets.length > 0;
-  } catch (err) {
+  } catch (_err) {
     return false;
   }
 }
@@ -522,9 +660,9 @@ async function checkAssetSetsExist() {
 function getSectionAssetReports(section, inCustomizeMode = false) {
   const reportIds = section.asset_report_ids || [];
   return reportIds
-    .map(id => assetReports.find(ar => ar.id === id))
-    .filter(ar => ar !== undefined)
-    .filter(ar => inCustomizeMode || ar.is_active);
+    .map((id) => assetReports.find((ar) => ar.id === id))
+    .filter((ar) => ar !== undefined)
+    .filter((ar) => inCustomizeMode || ar.is_active);
 }
 
 /**
@@ -532,9 +670,9 @@ function getSectionAssetReports(section, inCustomizeMode = false) {
  */
 function getSectionRequestTypes(section, inCustomizeMode = false) {
   return section.request_type_ids
-    .map(id => requestTypes.find(rt => rt.id === id))
-    .filter(rt => rt !== undefined)
-    .filter(rt => inCustomizeMode || rt.is_active);
+    .map((id) => requestTypes.find((rt) => rt.id === id))
+    .filter((rt) => rt !== undefined)
+    .filter((rt) => inCustomizeMode || rt.is_active);
 }
 
 // Portal Sections Management
@@ -544,7 +682,7 @@ function addSection() {
     title: '',
     subtitle: '',
     display_order: portalSections.length,
-    request_type_ids: []
+    request_type_ids: [],
   };
   portalSections = [...portalSections, newSection];
   saveCustomizations();
@@ -553,13 +691,13 @@ function addSection() {
 
 function deleteSection(sectionId) {
   portalSections = portalSections
-    .filter(s => s.id !== sectionId)
+    .filter((s) => s.id !== sectionId)
     .map((s, i) => ({ ...s, display_order: i }));
   saveCustomizations();
 }
 
 function updateSection(sectionId, field, value) {
-  portalSections = portalSections.map(s => {
+  portalSections = portalSections.map((s) => {
     if (s.id === sectionId) {
       return { ...s, [field]: value };
     }
@@ -585,12 +723,12 @@ function moveSectionDown(index) {
 }
 
 function addRequestTypeToSection(sectionId, requestTypeId) {
-  portalSections = portalSections.map(s => {
+  portalSections = portalSections.map((s) => {
     if (s.id === sectionId) {
       if (!s.request_type_ids.includes(requestTypeId)) {
         return {
           ...s,
-          request_type_ids: [...s.request_type_ids, requestTypeId]
+          request_type_ids: [...s.request_type_ids, requestTypeId],
         };
       }
     }
@@ -600,11 +738,11 @@ function addRequestTypeToSection(sectionId, requestTypeId) {
 }
 
 function removeRequestTypeFromSection(sectionId, requestTypeId) {
-  portalSections = portalSections.map(s => {
+  portalSections = portalSections.map((s) => {
     if (s.id === sectionId) {
       return {
         ...s,
-        request_type_ids: s.request_type_ids.filter(id => id !== requestTypeId)
+        request_type_ids: s.request_type_ids.filter((id) => id !== requestTypeId),
       };
     }
     return s;
@@ -613,13 +751,13 @@ function removeRequestTypeFromSection(sectionId, requestTypeId) {
 }
 
 function addAssetReportToSection(sectionId, reportId) {
-  portalSections = portalSections.map(s => {
+  portalSections = portalSections.map((s) => {
     if (s.id === sectionId) {
       const currentIds = s.asset_report_ids || [];
       if (!currentIds.includes(reportId)) {
         return {
           ...s,
-          asset_report_ids: [...currentIds, reportId]
+          asset_report_ids: [...currentIds, reportId],
         };
       }
     }
@@ -629,11 +767,11 @@ function addAssetReportToSection(sectionId, reportId) {
 }
 
 function removeAssetReportFromSection(sectionId, reportId) {
-  portalSections = portalSections.map(s => {
+  portalSections = portalSections.map((s) => {
     if (s.id === sectionId) {
       return {
         ...s,
-        asset_report_ids: (s.asset_report_ids || []).filter(id => id !== reportId)
+        asset_report_ids: (s.asset_report_ids || []).filter((id) => id !== reportId),
       };
     }
     return s;
@@ -647,7 +785,7 @@ function addFooterLink(columnIndex) {
     if (idx === columnIndex) {
       return {
         ...col,
-        links: [...col.links, { text: '', url: '' }]
+        links: [...col.links, { text: '', url: '' }],
       };
     }
     return col;
@@ -660,7 +798,7 @@ function removeFooterLink(columnIndex, linkIndex) {
     if (idx === columnIndex) {
       return {
         ...col,
-        links: col.links.filter((_, i) => i !== linkIndex)
+        links: col.links.filter((_, i) => i !== linkIndex),
       };
     }
     return col;
@@ -688,7 +826,7 @@ function updateFooterLink(columnIndex, linkIndex, field, value) {
             return { ...link, [field]: value };
           }
           return link;
-        })
+        }),
       };
     }
     return col;
@@ -778,7 +916,11 @@ async function addComment() {
 
   try {
     addingComment = true;
-    const comment = await api.portal.addRequestComment(currentSlug, selectedRequest.id, newCommentContent);
+    const comment = await api.portal.addRequestComment(
+      currentSlug,
+      selectedRequest.id,
+      newCommentContent
+    );
     requestComments = [...requestComments, comment];
     newCommentContent = '';
   } catch (err) {
@@ -884,7 +1026,7 @@ function reset() {
   footerColumns = [
     { title: '', links: [] },
     { title: '', links: [] },
-    { title: '', links: [] }
+    { title: '', links: [] },
   ];
   knowledgeBaseShareLink = '';
   searchQuery = '';
@@ -906,25 +1048,55 @@ function reset() {
 // Export the store with getters and actions
 export const portalStore = {
   // Getters for core state
-  get portalData() { return portalData; },
-  get loading() { return loading; },
-  get error() { return error; },
-  get currentSlug() { return currentSlug; },
+  get portalData() {
+    return portalData;
+  },
+  get loading() {
+    return loading;
+  },
+  get error() {
+    return error;
+  },
+  get currentSlug() {
+    return currentSlug;
+  },
 
   // Getters for UI state
-  get isEditing() { return isEditing; },
-  get isDarkMode() { return isDarkMode; },
-  get showCustomizePanel() { return showCustomizePanel; },
-  get showMyRequests() { return showMyRequests; },
-  get selectedGradient() { return selectedGradient; },
-  get activeSection() { return activeSection; },
+  get isEditing() {
+    return isEditing;
+  },
+  get isDarkMode() {
+    return isDarkMode;
+  },
+  get showCustomizePanel() {
+    return showCustomizePanel;
+  },
+  get showMyRequests() {
+    return showMyRequests;
+  },
+  get selectedGradient() {
+    return selectedGradient;
+  },
+  get activeSection() {
+    return activeSection;
+  },
 
   // Getters for background image state
-  get backgroundImageUrl() { return backgroundImageUrl; },
-  get uploadingBackground() { return uploadingBackground; },
-  get selectedBackgroundCategory() { return selectedBackgroundCategory; },
-  get hasBackgroundImage() { return backgroundImageUrl !== null && backgroundImageUrl !== ''; },
-  get hasGradient() { return !backgroundImageUrl && selectedGradient > 0 && gradients[selectedGradient]?.value; },
+  get backgroundImageUrl() {
+    return backgroundImageUrl;
+  },
+  get uploadingBackground() {
+    return uploadingBackground;
+  },
+  get selectedBackgroundCategory() {
+    return selectedBackgroundCategory;
+  },
+  get hasBackgroundImage() {
+    return backgroundImageUrl !== null && backgroundImageUrl !== '';
+  },
+  get hasGradient() {
+    return !backgroundImageUrl && selectedGradient > 0 && gradients[selectedGradient]?.value;
+  },
   // Computed header background style - image takes priority over gradient
   get headerBackgroundStyle() {
     if (backgroundImageUrl) {
@@ -939,84 +1111,188 @@ export const portalStore = {
   },
 
   // Getters for logo state
-  get logoUrl() { return logoUrl; },
-  get hubLogoUrl() { return hubLogoUrl; },
-  get uploadingLogo() { return uploadingLogo; },
-  get effectiveLogoUrl() { return logoUrl || hubLogoUrl; }, // Portal logo with hub fallback
+  get logoUrl() {
+    return logoUrl;
+  },
+  get hubLogoUrl() {
+    return hubLogoUrl;
+  },
+  get uploadingLogo() {
+    return uploadingLogo;
+  },
+  get effectiveLogoUrl() {
+    return logoUrl || hubLogoUrl;
+  }, // Portal logo with hub fallback
 
   // Getters for menu states
-  get showProfileMenu() { return showProfileMenu; },
-  get showMainMenu() { return showMainMenu; },
-  get showLoginDialog() { return showLoginDialog; },
+  get showProfileMenu() {
+    return showProfileMenu;
+  },
+  get showMainMenu() {
+    return showMainMenu;
+  },
+  get showLoginDialog() {
+    return showLoginDialog;
+  },
 
   // Getters for editable content
-  get editableTitle() { return editableTitle; },
-  get editableDescription() { return editableDescription; },
-  get editableSearchPlaceholder() { return editableSearchPlaceholder; },
-  get editableSearchHint() { return editableSearchHint; },
+  get editableTitle() {
+    return editableTitle;
+  },
+  get editableDescription() {
+    return editableDescription;
+  },
+  get editableSearchPlaceholder() {
+    return editableSearchPlaceholder;
+  },
+  get editableSearchHint() {
+    return editableSearchHint;
+  },
 
   // Getters for request types
-  get requestTypes() { return requestTypes; },
-  get loadingRequestTypes() { return loadingRequestTypes; },
+  get requestTypes() {
+    return requestTypes;
+  },
+  get loadingRequestTypes() {
+    return loadingRequestTypes;
+  },
 
   // Getters for asset reports
-  get assetReports() { return assetReports; },
-  get loadingAssetReports() { return loadingAssetReports; },
-  get hasAssetSets() { return hasAssetSets; },
+  get assetReports() {
+    return assetReports;
+  },
+  get loadingAssetReports() {
+    return loadingAssetReports;
+  },
+  get hasAssetSets() {
+    return hasAssetSets;
+  },
 
   // Getters for sections/footer
-  get portalSections() { return portalSections; },
-  get footerColumns() { return footerColumns; },
-  get draggedRequestType() { return draggedRequestType; },
-  get draggedAssetReport() { return draggedAssetReport; },
+  get portalSections() {
+    return portalSections;
+  },
+  get footerColumns() {
+    return footerColumns;
+  },
+  get draggedRequestType() {
+    return draggedRequestType;
+  },
+  get draggedAssetReport() {
+    return draggedAssetReport;
+  },
 
   // Getters for knowledge base
-  get knowledgeBaseShareLink() { return knowledgeBaseShareLink; },
+  get knowledgeBaseShareLink() {
+    return knowledgeBaseShareLink;
+  },
 
   // Getters for search
-  get searchQuery() { return searchQuery; },
-  get showSearchResults() { return showSearchResults; },
-  get searchResults() { return searchResults; },
-  get searchLoading() { return searchLoading; },
-  get searchError() { return searchError; },
+  get searchQuery() {
+    return searchQuery;
+  },
+  get showSearchResults() {
+    return showSearchResults;
+  },
+  get searchResults() {
+    return searchResults;
+  },
+  get searchLoading() {
+    return searchLoading;
+  },
+  get searchError() {
+    return searchError;
+  },
 
   // Getters for my requests
-  get myRequests() { return myRequests; },
-  get loadingRequests() { return loadingRequests; },
-  get selectedRequest() { return selectedRequest; },
-  get requestComments() { return requestComments; },
-  get loadingComments() { return loadingComments; },
-  get newCommentContent() { return newCommentContent; },
-  get addingComment() { return addingComment; },
-  get pendingRequestType() { return pendingRequestType; },
+  get myRequests() {
+    return myRequests;
+  },
+  get loadingRequests() {
+    return loadingRequests;
+  },
+  get selectedRequest() {
+    return selectedRequest;
+  },
+  get requestComments() {
+    return requestComments;
+  },
+  get loadingComments() {
+    return loadingComments;
+  },
+  get newCommentContent() {
+    return newCommentContent;
+  },
+  get addingComment() {
+    return addingComment;
+  },
+  get pendingRequestType() {
+    return pendingRequestType;
+  },
 
   // Setters for UI state
-  set isEditing(value) { isEditing = value; },
-  set showCustomizePanel(value) { showCustomizePanel = value; },
-  set showMyRequests(value) { showMyRequests = value; },
-  set activeSection(value) { activeSection = value; },
-  set showProfileMenu(value) { showProfileMenu = value; },
-  set showMainMenu(value) { showMainMenu = value; },
-  set showLoginDialog(value) { showLoginDialog = value; },
-  set draggedRequestType(value) { draggedRequestType = value; },
-  set draggedAssetReport(value) { draggedAssetReport = value; },
-  set selectedBackgroundCategory(value) { selectedBackgroundCategory = value; },
+  set isEditing(value) {
+    isEditing = value;
+  },
+  set showCustomizePanel(value) {
+    showCustomizePanel = value;
+  },
+  set showMyRequests(value) {
+    showMyRequests = value;
+  },
+  set activeSection(value) {
+    activeSection = value;
+  },
+  set showProfileMenu(value) {
+    showProfileMenu = value;
+  },
+  set showMainMenu(value) {
+    showMainMenu = value;
+  },
+  set showLoginDialog(value) {
+    showLoginDialog = value;
+  },
+  set draggedRequestType(value) {
+    draggedRequestType = value;
+  },
+  set draggedAssetReport(value) {
+    draggedAssetReport = value;
+  },
+  set selectedBackgroundCategory(value) {
+    selectedBackgroundCategory = value;
+  },
 
   // Setters for editable content
-  set editableTitle(value) { editableTitle = value; },
-  set editableDescription(value) { editableDescription = value; },
-  set editableSearchPlaceholder(value) { editableSearchPlaceholder = value; },
-  set editableSearchHint(value) { editableSearchHint = value; },
+  set editableTitle(value) {
+    editableTitle = value;
+  },
+  set editableDescription(value) {
+    editableDescription = value;
+  },
+  set editableSearchPlaceholder(value) {
+    editableSearchPlaceholder = value;
+  },
+  set editableSearchHint(value) {
+    editableSearchHint = value;
+  },
 
   // Setters for knowledge base
-  set knowledgeBaseShareLink(value) { knowledgeBaseShareLink = value; },
+  set knowledgeBaseShareLink(value) {
+    knowledgeBaseShareLink = value;
+  },
 
   // Setters for search
-  set searchQuery(value) { searchQuery = value; },
+  set searchQuery(value) {
+    searchQuery = value;
+  },
 
   // Setters for my requests
-  set newCommentContent(value) { newCommentContent = value; },
-  set pendingRequestType(value) { pendingRequestType = value; },
+  set newCommentContent(value) {
+    newCommentContent = value;
+  },
+  set pendingRequestType(value) {
+    pendingRequestType = value;
+  },
 
   // Actions
   loadPortal,

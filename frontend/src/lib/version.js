@@ -8,7 +8,7 @@ const versionName = envName && envName.trim() !== '' ? envName : versionInfo.nam
 
 export const version = {
   code: versionCode,
-  name: versionName
+  name: versionName,
 };
 
 export const versionLabel = version.name ? `${version.code} "${version.name}"` : version.code;

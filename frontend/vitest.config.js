@@ -1,6 +1,6 @@
-import { defineConfig } from 'vitest/config';
-import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { preprocessMeltUI } from '@melt-ui/pp';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   plugins: [
@@ -22,17 +22,12 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      exclude: [
-        'node_modules/',
-        'src/setupTests.js',
-        '**/*.test.{js,ts}',
-        '**/*.spec.{js,ts}',
-      ],
+      exclude: ['node_modules/', 'src/setupTests.js', '**/*.test.{js,ts}', '**/*.spec.{js,ts}'],
     },
     // Svelte 5 requires browser conditions for component tests
     alias: {
       // Ensure Svelte uses client-side code in tests
-      'svelte': 'svelte',
+      svelte: 'svelte',
     },
   },
   resolve: {

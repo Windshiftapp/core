@@ -20,7 +20,7 @@ export default {
     noItemTypes: 'لم يتم العثور على أنواع عناصر',
     itemTypeCreated: 'تم إنشاء نوع العنصر بنجاح',
     itemTypeUpdated: 'تم تحديث نوع العنصر بنجاح',
-    itemTypeDeleted: 'تم حذف نوع العنصر بنجاح'
+    itemTypeDeleted: 'تم حذف نوع العنصر بنجاح',
   },
 
   fields: {
@@ -52,7 +52,7 @@ export default {
     multiSelect: 'اختيار متعدد',
     checkbox: 'مربع اختيار',
     user: 'مستخدم',
-    url: 'رابط'
+    url: 'رابط',
   },
 
   categories: {
@@ -72,7 +72,7 @@ export default {
     categoryDeleted: 'تم حذف الفئة بنجاح',
     deleteWarning: 'ستصبح العناصر في هذه الفئة غير مصنفة',
     selectCategory: 'اختر فئة',
-    uncategorized: 'غير مصنف'
+    uncategorized: 'غير مصنف',
   },
 
   projects: {
@@ -91,7 +91,7 @@ export default {
     loadingProjects: 'جاري تحميل المشاريع...',
     projectCreated: 'تم إنشاء المشروع بنجاح',
     projectUpdated: 'تم تحديث المشروع بنجاح',
-    projectDeleted: 'تم حذف المشروع بنجاح'
+    projectDeleted: 'تم حذف المشروع بنجاح',
   },
 
   sprints: {
@@ -113,7 +113,7 @@ export default {
     sprintUpdated: 'تم تحديث السبرنت بنجاح',
     sprintDeleted: 'تم حذف السبرنت بنجاح',
     sprintStarted: 'تم بدء السبرنت بنجاح',
-    sprintCompleted: 'تم إكمال السبرنت بنجاح'
+    sprintCompleted: 'تم إكمال السبرنت بنجاح',
 
     // Note: Additional sprint/iteration modal keys
     // fall back to English for missing keys
@@ -121,7 +121,7 @@ export default {
 
   iterations: {
     title: 'التكرارات',
-    subtitle: 'إدارة السبرنتات والإصدارات'
+    subtitle: 'إدارة السبرنتات والإصدارات',
 
     // Note: Additional iterations keys
     // fall back to English for missing keys
@@ -129,7 +129,7 @@ export default {
 
   milestones: {
     title: 'المعالم',
-    subtitle: 'تتبع الإصدارات والمواعيد النهائية'
+    subtitle: 'تتبع الإصدارات والمواعيد النهائية',
 
     // Note: Additional milestones keys
     // fall back to English for missing keys
@@ -153,7 +153,7 @@ export default {
     timestamp: 'الطابع الزمني',
     details: 'التفاصيل',
     ipAddress: 'عنوان IP',
-    noEvents: 'لم يتم العثور على أحداث تدقيق'
+    noEvents: 'لم يتم العثور على أحداث تدقيق',
   },
 
   connections: {
@@ -169,7 +169,7 @@ export default {
     connectionUpdated: 'تم تحديث الاتصال بنجاح',
     connectionDeleted: 'تم حذف الاتصال',
     connectionSuccessful: 'الاتصال ناجح',
-    testConnection: 'اختبار الاتصال'
+    testConnection: 'اختبار الاتصال',
   },
 
   migration: {
@@ -179,7 +179,7 @@ export default {
     migrationCompleted: 'اكتمل الترحيل',
     migrationSuccess: 'تم ترحيل جميع العناصر بنجاح',
     targetWorkspace: 'مساحة العمل المستهدفة',
-    targetWorkspaceRequired: 'مساحة العمل المستهدفة مطلوبة'
+    targetWorkspaceRequired: 'مساحة العمل المستهدفة مطلوبة',
   },
 
   members: {
@@ -187,12 +187,12 @@ export default {
     subtitle: 'إدارة أعضاء الفريق',
     addMember: 'إضافة عضو',
     removeMember: 'إزالة العضو',
-    searchMembers: 'البحث عن أعضاء بالاسم أو البريد الإلكتروني...'
+    searchMembers: 'البحث عن أعضاء بالاسم أو البريد الإلكتروني...',
   },
 
   configuration: {
     title: 'التكوين',
-    searchConfigurationSets: 'البحث في مجموعات التكوين...'
+    searchConfigurationSets: 'البحث في مجموعات التكوين...',
   },
 
   auditLog: {
@@ -206,7 +206,7 @@ export default {
   setup: {
     goBackEsc: 'رجوع (Esc)',
     continueNextStepEnter: 'متابعة للخطوة التالية (Enter)',
-    completeSetupEnter: 'إكمال الإعداد (Enter)'
+    completeSetupEnter: 'إكمال الإعداد (Enter)',
 
     // Note: Additional setup keys
     // fall back to English for missing keys
@@ -222,5 +222,5 @@ export default {
 
   organization: {
     // Organization section - falls back to English for missing keys
-  }
+  },
 };

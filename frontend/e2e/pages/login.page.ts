@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 /**
  * Page Object for the Login Dialog
@@ -7,11 +7,15 @@ export class LoginPage {
   constructor(private page: Page) {}
 
   // Selectors
-  readonly loginDialog = 'div[role="dialog"]:has(input[type="password"]), .login-modal, .login-dialog';
-  readonly usernameInput = 'input[type="text"]:not([type="email"]), input[name="username"], input[placeholder*="username"]';
+  readonly loginDialog =
+    'div[role="dialog"]:has(input[type="password"]), .login-modal, .login-dialog';
+  readonly usernameInput =
+    'input[type="text"]:not([type="email"]), input[name="username"], input[placeholder*="username"]';
   readonly passwordInput = 'input[type="password"]';
-  readonly rememberMeCheckbox = 'input[type="checkbox"][name="remember"], label:has-text("Remember me")';
-  readonly loginButton = 'button[type="submit"], button:has-text("Login"), button:has-text("Sign in")';
+  readonly rememberMeCheckbox =
+    'input[type="checkbox"][name="remember"], label:has-text("Remember me")';
+  readonly loginButton =
+    'button[type="submit"], button:has-text("Login"), button:has-text("Sign in")';
   readonly errorMessage = '.error, .error-message, [role="alert"]';
   readonly forgotPasswordLink = 'a:has-text("Forgot password"), button:has-text("Forgot password")';
 
@@ -29,10 +33,9 @@ export class LoginPage {
   async isLoginDialogVisible(): Promise<boolean> {
     try {
       // First wait for either password input or the dialog itself
-      await this.page.waitForSelector(
-        `${this.passwordInput}, ${this.loginDialog}`,
-        { timeout: 5000 }
-      );
+      await this.page.waitForSelector(`${this.passwordInput}, ${this.loginDialog}`, {
+        timeout: 5000,
+      });
       return true;
     } catch {
       return false;
@@ -103,7 +106,7 @@ export class LoginPage {
     // After successful login, login dialog should disappear
     // and we should have a session cookie
     const cookies = await this.page.context().cookies();
-    const hasSession = cookies.some(c => c.name === 'session' || c.name === 'windshift_session');
+    const hasSession = cookies.some((c) => c.name === 'session' || c.name === 'windshift_session');
     expect(hasSession).toBeTruthy();
 
     // Login dialog should be gone
@@ -123,7 +126,7 @@ export class LoginPage {
    */
   async getErrorMessage(): Promise<string> {
     const errorElement = this.page.locator(this.errorMessage).first();
-    return await errorElement.textContent() || '';
+    return (await errorElement.textContent()) || '';
   }
 
   /**

@@ -2,37 +2,34 @@
  * Context-sensitive command store for the Command Palette
  * Allows components to dynamically register/unregister commands based on their context
  */
-import { writable, derived } from 'svelte/store';
+import { derived, writable } from 'svelte/store';
 
 // Store for all registered context commands
 const registeredCommands = writable(new Map());
 
 // Derived store that provides a flat array of all context commands
-export const contextCommands = derived(
-  registeredCommands,
-  ($registeredCommands) => {
-    const allCommands = [];
-    
-    // Flatten all commands from all registered components
-    for (const [componentId, commands] of $registeredCommands.entries()) {
-      for (const command of commands) {
-        allCommands.push({
-          ...command,
-          // Add metadata about which component registered this command
-          _registeredBy: componentId,
-          _isContextCommand: true
-        });
-      }
+export const contextCommands = derived(registeredCommands, ($registeredCommands) => {
+  const allCommands = [];
+
+  // Flatten all commands from all registered components
+  for (const [componentId, commands] of $registeredCommands.entries()) {
+    for (const command of commands) {
+      allCommands.push({
+        ...command,
+        // Add metadata about which component registered this command
+        _registeredBy: componentId,
+        _isContextCommand: true,
+      });
     }
-    
-    // Sort by priority: higher priority first
-    return allCommands.sort((a, b) => {
-      const aPriority = a.priority || 0;
-      const bPriority = b.priority || 0;
-      return bPriority - aPriority;
-    });
   }
-);
+
+  // Sort by priority: higher priority first
+  return allCommands.sort((a, b) => {
+    const aPriority = a.priority || 0;
+    const bPriority = b.priority || 0;
+    return bPriority - aPriority;
+  });
+});
 
 /**
  * Register context commands for a component
@@ -44,22 +41,22 @@ export function registerContextCommands(componentId, commands) {
     console.error('registerContextCommands: componentId is required');
     return;
   }
-  
+
   if (!Array.isArray(commands)) {
     console.error('registerContextCommands: commands must be an array');
     return;
   }
-  
+
   // Validate command structure
-  const validCommands = commands.filter(command => {
+  const validCommands = commands.filter((command) => {
     if (!command.id || !command.label) {
       console.error('registerContextCommands: command must have id and label', command);
       return false;
     }
     return true;
   });
-  
-  registeredCommands.update(map => {
+
+  registeredCommands.update((map) => {
     map.set(componentId, validCommands);
     return map;
   });
@@ -71,8 +68,8 @@ export function registerContextCommands(componentId, commands) {
  */
 export function unregisterContextCommands(componentId) {
   if (!componentId) return;
-  
-  registeredCommands.update(map => {
+
+  registeredCommands.update((map) => {
     map.delete(componentId);
     return map;
   });
@@ -93,7 +90,7 @@ export function updateContextCommands(componentId, commands) {
  */
 export function getAllRegisteredCommands() {
   let allCommands = {};
-  registeredCommands.subscribe(map => {
+  registeredCommands.subscribe((map) => {
     allCommands = Object.fromEntries(map);
   })();
   return allCommands;
@@ -116,9 +113,9 @@ export function createContextCommand(config) {
     enabled = true,
     visible = true,
     shortcut,
-    category = 'context'
+    category = 'context',
   } = config;
-  
+
   return {
     id,
     label,
@@ -131,7 +128,7 @@ export function createContextCommand(config) {
     visible,
     shortcut,
     category,
-    type: 'context-action'
+    type: 'context-action',
   };
 }
 
@@ -140,24 +137,24 @@ export function createContextCommand(config) {
  */
 export const COMMAND_CATEGORIES = {
   CONTEXT: 'context',
-  NAVIGATION: 'navigation', 
+  NAVIGATION: 'navigation',
   CREATE: 'create',
   ACTION: 'action',
   TIME: 'time',
   TEST: 'test',
-  ADMIN: 'admin'
+  ADMIN: 'admin',
 };
 
 /**
  * Priority levels for consistent command ordering
  */
 export const COMMAND_PRIORITIES = {
-  URGENT: 100,      // Critical context-specific actions
-  HIGH: 50,         // Important context actions  
-  NORMAL: 10,       // Default context commands
-  LOW: 5,           // Less important context commands
-  WORKSPACE: 3,     // Workspace-level commands
-  GLOBAL: 1         // Global application commands
+  URGENT: 100, // Critical context-specific actions
+  HIGH: 50, // Important context actions
+  NORMAL: 10, // Default context commands
+  LOW: 5, // Less important context commands
+  WORKSPACE: 3, // Workspace-level commands
+  GLOBAL: 1, // Global application commands
 };
 
 // Export the store subscription function for external use

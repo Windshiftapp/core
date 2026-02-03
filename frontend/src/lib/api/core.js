@@ -37,7 +37,7 @@ export async function getCSRFToken() {
     try {
       const response = await fetch(`${API_BASE}/csrf-token`, {
         method: 'GET',
-        credentials: 'same-origin'
+        credentials: 'same-origin',
       });
       if (response.ok) {
         const data = await response.json();
@@ -75,7 +75,11 @@ export async function fetchAPI(endpoint, options = {}) {
     // Clear token and retry once
     csrfToken = null;
     const token = await getCSRFToken();
-    if (token && options.method && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method.toUpperCase())) {
+    if (
+      token &&
+      options.method &&
+      ['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method.toUpperCase())
+    ) {
       headers['X-CSRF-Token'] = token;
       const retryResponse = await fetch(`${API_BASE}${endpoint}`, {
         ...options,
@@ -88,7 +92,7 @@ export async function fetchAPI(endpoint, options = {}) {
         let errorData = '';
         try {
           errorData = await retryResponse.text();
-        } catch (e) {
+        } catch (_e) {
           // If we can't read the error body, use the status text
         }
         throw createApiError(retryResponse, errorData);
@@ -99,7 +103,7 @@ export async function fetchAPI(endpoint, options = {}) {
       }
 
       const contentType = retryResponse.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
+      if (contentType?.includes('application/json')) {
         return retryResponse.json();
       }
 
@@ -118,7 +122,7 @@ export async function fetchAPI(endpoint, options = {}) {
     let errorData = '';
     try {
       errorData = await response.text();
-    } catch (e) {
+    } catch (_e) {
       // If we can't read the error body, use the status text
     }
     throw createApiError(response, errorData);
@@ -129,7 +133,7 @@ export async function fetchAPI(endpoint, options = {}) {
   }
 
   const contentType = response.headers.get('content-type');
-  if (contentType && contentType.includes('application/json')) {
+  if (contentType?.includes('application/json')) {
     return response.json();
   }
 
@@ -138,14 +142,17 @@ export async function fetchAPI(endpoint, options = {}) {
 
 // Generic HTTP methods
 export const get = (endpoint) => fetchAPI(endpoint);
-export const post = (endpoint, data) => fetchAPI(endpoint, {
-  method: 'POST',
-  body: JSON.stringify(data),
-});
-export const put = (endpoint, data) => fetchAPI(endpoint, {
-  method: 'PUT',
-  body: JSON.stringify(data),
-});
-export const del = (endpoint) => fetchAPI(endpoint, {
-  method: 'DELETE',
-});
+export const post = (endpoint, data) =>
+  fetchAPI(endpoint, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+export const put = (endpoint, data) =>
+  fetchAPI(endpoint, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+export const del = (endpoint) =>
+  fetchAPI(endpoint, {
+    method: 'DELETE',
+  });

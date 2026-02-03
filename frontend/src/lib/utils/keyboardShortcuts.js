@@ -24,146 +24,146 @@ const currentPlatform = getPlatform();
 const shortcuts = {
   global: {
     commandPalette: { key: 'k', modifierKey: true },
-    create: { key: 'c' }
+    create: { key: 'c' },
   },
   modal: {
     submit: { key: 'Enter', modifierKey: true },
-    cancel: { key: 'Escape' }
+    cancel: { key: 'Escape' },
   },
   ql: {
-    execute: { key: 'Enter', modifierKey: true }
+    execute: { key: 'Enter', modifierKey: true },
   },
   description: {
     save: { key: 'Enter', modifierKey: true },
-    cancel: { key: 'Escape' }
+    cancel: { key: 'Escape' },
   },
   workflow: {
     save: { key: 'Enter', modifierKey: true },
     new: { key: 'n' },
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   workspaces: {
     addWorkspace: { key: 'a' },
     submitForm: { key: 'Enter' },
-    cancelForm: { key: 'Escape' }
+    cancelForm: { key: 'Escape' },
   },
   testCases: {
     addTestCase: { key: 'a' },
     addFolder: { key: 'a', modifierKey: true },
     submitForm: { key: 'Enter' },
-    cancelForm: { key: 'Escape' }
+    cancelForm: { key: 'Escape' },
   },
   timeProjects: {
     addProject: { key: 'a' },
     addCategory: { key: 'a' },
     submitForm: { key: 'Enter' },
-    cancelForm: { key: 'Escape' }
+    cancelForm: { key: 'Escape' },
   },
   timeCustomers: {
     addCustomer: { key: 'a' },
     submitForm: { key: 'Enter' },
-    cancelForm: { key: 'Escape' }
+    cancelForm: { key: 'Escape' },
   },
   timeProjectCategories: {
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   statusCategories: {
     addCategory: { key: 'a' },
     submitForm: { key: 'Enter' },
-    cancelForm: { key: 'Escape' }
+    cancelForm: { key: 'Escape' },
   },
   workspaceMembers: {
     addMember: { key: 'a' },
     submitForm: { key: 'Enter' },
-    cancelForm: { key: 'Escape' }
+    cancelForm: { key: 'Escape' },
   },
   sso: {
     addProvider: { key: 'a' },
     submitForm: { key: 'Enter' },
-    cancelForm: { key: 'Escape' }
+    cancelForm: { key: 'Escape' },
   },
   scmProviders: {
     addProvider: { key: 'a' },
     submitForm: { key: 'Enter' },
-    cancelForm: { key: 'Escape' }
+    cancelForm: { key: 'Escape' },
   },
   channels: {
     addChannel: { key: 'a' },
     submitForm: { key: 'Enter' },
-    cancelForm: { key: 'Escape' }
+    cancelForm: { key: 'Escape' },
   },
   testSteps: {
-    addStep: { key: 'a' }
+    addStep: { key: 'a' },
   },
   timeEntry: {
     openLog: { key: 'a' },
-    toggleSelector: { key: 'l', modifierKey: true }
+    toggleSelector: { key: 'l', modifierKey: true },
   },
   // Settings
   statuses: {
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   customFields: {
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   themes: {
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   itemTypes: {
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   priorities: {
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   permissionSets: {
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   hierarchyLevels: {
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   configurationSets: {
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   // Features
   milestones: {
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   iterations: {
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   assets: {
-    upload: { key: 'a' }
+    upload: { key: 'a' },
   },
   customers: {
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   systemImport: {
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   linkTypes: {
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   collections: {
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   groups: {
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   users: {
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   notifications: {
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   // Pages
   screens: {
-    add: { key: 'a' }
+    add: { key: 'a' },
   },
   // Actions automation
   actions: {
     add: { key: 'a' },
     save: { key: 'Enter', modifierKey: true },
-    cancel: { key: 'Escape' }
+    cancel: { key: 'Escape' },
   },
   // Item detail
   itemDetail: {
@@ -171,8 +171,8 @@ const shortcuts = {
     logTime: { key: 'a' },
     fullscreen: { key: 'f', shiftKey: true },
     createChild: { key: 'w', shiftKey: true },
-    focusStatus: { key: 'f' }
-  }
+    focusStatus: { key: 'f' },
+  },
 };
 
 /**
@@ -187,13 +187,13 @@ export function getShortcut(context, action) {
     console.warn(`Unknown shortcut context: ${context}`);
     return null;
   }
-  
+
   const actionShortcuts = contextShortcuts[action];
   if (!actionShortcuts) {
     console.warn(`Unknown shortcut action: ${action} in context ${context}`);
     return null;
   }
-  
+
   if (actionShortcuts.key) {
     return actionShortcuts;
   }

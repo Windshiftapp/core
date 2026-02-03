@@ -18,7 +18,7 @@ export default {
     noStatuses: 'No se encontraron estados',
     statusCreated: 'Estado creado correctamente',
     statusUpdated: 'Estado actualizado correctamente',
-    statusDeleted: 'Estado eliminado correctamente'
+    statusDeleted: 'Estado eliminado correctamente',
   },
 
   priorities: {
@@ -39,7 +39,7 @@ export default {
     high: 'Alta',
     medium: 'Media',
     low: 'Baja',
-    lowest: 'Mas baja'
+    lowest: 'Mas baja',
   },
 
   workflows: {
@@ -58,7 +58,7 @@ export default {
     noWorkflows: 'No se encontraron flujos de trabajo',
     workflowCreated: 'Flujo de trabajo creado correctamente',
     workflowUpdated: 'Flujo de trabajo actualizado correctamente',
-    workflowDeleted: 'Flujo de trabajo eliminado correctamente'
+    workflowDeleted: 'Flujo de trabajo eliminado correctamente',
   },
 
   screens: {
@@ -75,10 +75,10 @@ export default {
     screenCreated: 'Pantalla creada correctamente',
     screenUpdated: 'Pantalla actualizada correctamente',
     screenDeleted: 'Pantalla eliminada correctamente',
-    cannotDeleteDefault: 'No se puede eliminar la pantalla predeterminada'
+    cannotDeleteDefault: 'No se puede eliminar la pantalla predeterminada',
   },
 
   screensPage: {},
 
-  statusCategory: {}
+  statusCategory: {},
 };

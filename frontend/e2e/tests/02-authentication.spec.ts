@@ -1,6 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { LoginPage } from '../pages/login.page';
-import { test as authTest } from '../fixtures/auth';
 
 /**
  * Authentication Tests
@@ -70,7 +69,9 @@ test.describe('Authentication', () => {
 
       // Check cookies
       const cookies = await page.context().cookies();
-      const sessionCookie = cookies.find(c => c.name === 'session' || c.name === 'windshift_session');
+      const sessionCookie = cookies.find(
+        (c) => c.name === 'session' || c.name === 'windshift_session'
+      );
 
       // With remember me, session cookie should have longer expiry
       expect(sessionCookie).toBeTruthy();
@@ -102,7 +103,9 @@ test.describe('Authentication', () => {
 
       // Verify session is cleared
       const cookies = await page.context().cookies();
-      const sessionCookie = cookies.find(c => c.name === 'session' || c.name === 'windshift_session');
+      const sessionCookie = cookies.find(
+        (c) => c.name === 'session' || c.name === 'windshift_session'
+      );
 
       // Session cookie should be removed or expired
       expect(sessionCookie).toBeFalsy();
@@ -173,7 +176,9 @@ test.describe('Authentication', () => {
       await page.waitForLoadState('networkidle');
 
       // Should see user avatar or menu
-      const userMenu = page.locator('[data-testid="user-menu"], .user-avatar, button:has-text("admin")');
+      const userMenu = page.locator(
+        '[data-testid="user-menu"], .user-avatar, button:has-text("admin")'
+      );
       await expect(userMenu.first()).toBeVisible({ timeout: 10000 });
     });
   });

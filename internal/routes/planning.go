@@ -37,6 +37,7 @@ func RegisterPlanningRoutes(deps *Deps) {
 	api.HandleH("PUT /iterations/{id}", auth(http.HandlerFunc(deps.Planning.Iteration.Update)))
 	api.HandleH("DELETE /iterations/{id}", auth(http.HandlerFunc(deps.Planning.Iteration.Delete)))
 	api.HandleH("GET /iterations/{id}/progress", auth(http.HandlerFunc(deps.Planning.Iteration.GetProgress)))
+	api.HandleH("GET /iterations/{id}/burndown", auth(http.HandlerFunc(deps.Planning.Iteration.GetBurndown)))
 
 	// Personal label endpoints
 	api.HandleH("GET /personal-labels", auth(http.HandlerFunc(deps.Planning.PersonalLabel.GetAll)))
