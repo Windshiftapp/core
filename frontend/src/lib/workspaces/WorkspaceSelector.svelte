@@ -1,7 +1,8 @@
 <script>
   import { BasePicker } from '../pickers';
   import { createEventDispatcher } from 'svelte';
-  import { Building } from 'lucide-svelte';
+  import { Package } from 'lucide-svelte';
+  import { workspaceIconMap } from '../utils/icons.js';
 
   const dispatch = createEventDispatcher();
 
@@ -48,11 +49,12 @@
           class="w-8 h-8 rounded flex-shrink-0 mt-0.5"
         />
       {:else}
+        {@const WorkspaceIcon = workspaceIconMap[workspace.icon] || Package}
         <div
           class="w-8 h-8 rounded flex items-center justify-center flex-shrink-0"
-          style="background-color: {workspace.color || '#E0E7FF'};"
+          style="background-color: {workspace.color || '#3b82f6'};"
         >
-          <Building size={16} style="color: {workspace.color ? '#fff' : 'var(--ds-text-subtle)'};" />
+          <WorkspaceIcon size={16} style="color: white;" />
         </div>
       {/if}
 

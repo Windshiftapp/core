@@ -1,12 +1,9 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { createPopover, melt } from '@melt-ui/svelte';
   import { Search, ChevronDown, Package } from 'lucide-svelte';
   import { workspaceIconMap, workspaceIconOptions } from '../utils/icons.js';
   import Label from '../components/Label.svelte';
   import { t } from '../stores/i18n.svelte.js';
-
-  const dispatch = createEventDispatcher();
 
   // Use centralized icon map for workspace icons
   const iconMap = workspaceIconMap;
@@ -21,19 +18,22 @@
     '#92400e', '#365314', '#0e7490', '#be185d', '#9a3412'
   ];
 
-  // Props
-  export let selectedIcon = 'Package';
-  export let selectedColor = '#3b82f6';
-  export let label = '';
-  export let compact = false;  // When true, shows compact trigger that opens popover
+  // Props - using Svelte 5 runes
+  let {
+    selectedIcon = $bindable('Package'),
+    selectedColor = $bindable('#3b82f6'),
+    label = '',
+    compact = false,
+    onchange = null
+  } = $props();
 
-  $: resolvedLabel = label || t('pickers.iconAndColor');
+  const resolvedLabel = $derived(label || t('pickers.iconAndColor'));
 
   // Search functionality
-  let searchQuery = '';
-  $: filteredIcons = iconOptions.filter(icon =>
+  let searchQuery = $state('');
+  const filteredIcons = $derived(iconOptions.filter(icon =>
     icon.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ));
 
   // Create popover for compact mode
   const {
@@ -56,7 +56,7 @@
 
   function selectIcon(icon) {
     selectedIcon = icon;
-    dispatch('change', { icon: selectedIcon, color: selectedColor });
+    onchange?.({ detail: { icon: selectedIcon, color: selectedColor } });
     if (compact) {
       $open = false;
     }
@@ -64,7 +64,7 @@
 
   function selectColor(color) {
     selectedColor = color;
-    dispatch('change', { icon: selectedIcon, color: selectedColor });
+    onchange?.({ detail: { icon: selectedIcon, color: selectedColor } });
     if (compact) {
       $open = false;
     }
@@ -72,7 +72,7 @@
 
   function handleColorInputChange(event) {
     selectedColor = event.target.value;
-    dispatch('change', { icon: selectedIcon, color: selectedColor });
+    onchange?.({ detail: { icon: selectedIcon, color: selectedColor } });
     // Don't close popover on custom color input - user might want to adjust
   }
 </script>

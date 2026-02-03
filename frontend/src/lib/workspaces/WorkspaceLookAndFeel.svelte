@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
-  import { workspacePermissions, currentWorkspace, attachmentStatus } from '../stores';
+  import { workspacePermissions, currentWorkspace, attachmentStatus, workspacesStore } from '../stores';
   import { workspaceGradientIndex, applyToAllViews as applyToAllViewsStore, workspaceBackgroundImageUrl } from '../stores/workspaceGradient.svelte.js';
   import { gradients } from '../utils/gradients.js';
   import { backgroundCategories, backgroundPresets, getPresetsByCategory } from '../utils/backgroundImages.js';
@@ -133,6 +133,14 @@
         icon,
         color,
         avatar_url: avatarUrl
+      });
+
+      // Also update the workspacesStore so the dropdown shows updated icon/color
+      workspacesStore.updateWorkspace(workspaceId, {
+        icon,
+        color,
+        avatar_url: avatarUrl,
+        display_mode: displayMode
       });
 
       // Update gradient and background stores

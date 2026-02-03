@@ -1,13 +1,20 @@
 <script>
   import { onDestroy } from 'svelte';
+  import { get } from 'svelte/store';
   import { api } from '../api.js';
+  import {
+    useGradientStyles,
+    loadWorkspaceGradient,
+    workspaceGradientIndex,
+    applyToAllViews as applyToAllViewsStore,
+    workspaceBackgroundImageUrl
+  } from '../stores/workspaceGradient.svelte.js';
 
   const shortDateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
   import { getCollection } from '../features/collections/collectionService.js';
   import { Edit3, Plus, X, LayoutGrid, GripVertical, Pencil, Trash2 } from 'lucide-svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { getDefaultWidth } from '../services/widgetRegistry.js';
-  import { gradients } from '../utils/gradients.js';
   import Button from '../components/Button.svelte';
   import BaseContainer from '../components/BaseContainer.svelte';
   import ViewHeader from '../layout/ViewHeader.svelte';
@@ -51,8 +58,6 @@
   // Homepage layout state
   let sections = [];
   let widgets = [];
-  let selectedGradient = 0;
-  let applyToAllViews = true;
   let isEditMode = false;
   let isCustomizeMode = false;
   let customizationCategory = 'built-in';
@@ -63,12 +68,8 @@
   let draggedWidget = null;
   let dropZoneStates = new Map(); // Map<sectionId, { isOver: boolean }>
 
-  // Reactive: determine if gradient is active
-  $: hasGradient = selectedGradient > 0 && gradients[selectedGradient]?.value;
-  $: backgroundStyle = hasGradient ? `background: ${gradients[selectedGradient].value};` : 'background-color: var(--ds-surface);';
-  $: titleStyle = hasGradient ? 'color: white;' : 'color: var(--ds-text);';
-  $: subtitleStyle = hasGradient ? 'color: rgba(255, 255, 255, 0.8);' : 'color: var(--ds-text-subtle);';
-  $: emptySectionStyle = hasGradient ? 'color: rgba(255, 255, 255, 0.6);' : 'color: var(--ds-text-subtlest);';
+  // Initialize gradient styles from global stores
+  const gradientStyles = useGradientStyles();
 
   // Section editing
   let editingSectionId = null;
@@ -316,26 +317,22 @@
 
   async function loadHomepageLayout() {
     try {
-      const layout = await api.workspaces.getHomepageLayout(workspaceId);
+      // Load gradient/background into global stores (handles gradient, applyToAllViews, backgroundImageUrl)
+      await loadWorkspaceGradient(workspaceId);
 
+      const layout = await api.workspaces.getHomepageLayout(workspaceId);
       if (layout && layout.sections && layout.sections.length > 0) {
         sections = layout.sections.sort((a, b) => a.display_order - b.display_order);
         widgets = layout.widgets || [];
-        selectedGradient = layout.gradient ?? 0;
-        applyToAllViews = layout.applyToAllViews ?? true;
       } else {
         // No layout exists, use defaults
         sections = getDefaultSections();
         widgets = getDefaultWidgets();
-        selectedGradient = 0;
-        applyToAllViews = true;
       }
     } catch (error) {
       console.error('Failed to load homepage layout:', error);
       sections = getDefaultSections();
       widgets = getDefaultWidgets();
-      selectedGradient = 0;
-      applyToAllViews = true;
     }
   }
 
@@ -353,8 +350,9 @@
           ...w,
           position: idx
         })),
-        gradient: selectedGradient,
-        applyToAllViews: applyToAllViews
+        gradient: get(workspaceGradientIndex),
+        applyToAllViews: get(applyToAllViewsStore),
+        backgroundImageUrl: get(workspaceBackgroundImageUrl) || ''
       };
 
       await api.workspaces.updateHomepageLayout(workspaceId, layout);
@@ -617,11 +615,11 @@
   bind:activeCategory={customizationCategory}
 />
 
-<div class="workspace-welcome-wrapper" style="{backgroundStyle}">
+<div class="workspace-welcome-wrapper" style="{gradientStyles.backgroundStyle}">
   <div class="workspace-welcome p-6">
     {#if loading}
       <div class="flex items-center justify-center h-64">
-        <p style={emptySectionStyle}>Loading workspace data...</p>
+        <p style={gradientStyles.emptyStateStyle}>Loading workspace data...</p>
       </div>
     {:else}
     <!-- Header -->
@@ -629,9 +627,9 @@
       viewName={workspace?.name || 'Workspace'}
       workspaceName="Homepage"
       collection={currentCollectionName !== 'Default' ? currentCollectionName : ''}
-      hasGradient={hasGradient}
-      textStyle={titleStyle}
-      subtleTextStyle={subtitleStyle}
+      hasGradient={gradientStyles.hasCustomBackground}
+      textStyle={gradientStyles.textStyle}
+      subtleTextStyle={gradientStyles.subtleTextStyle}
     >
       <svelte:fragment slot="actions">
         <div class="flex items-center gap-2">
@@ -716,9 +714,9 @@
             {:else}
               <!-- Display mode -->
               <div>
-                <h2 class="text-xl font-semibold" style={titleStyle}>{section.title}</h2>
+                <h2 class="text-xl font-semibold" style={gradientStyles.textStyle}>{section.title}</h2>
                 {#if section.subtitle}
-                  <p class="text-sm mt-1" style={subtitleStyle}>{section.subtitle}</p>
+                  <p class="text-sm mt-1" style={gradientStyles.subtleTextStyle}>{section.subtitle}</p>
                 {/if}
               </div>
 
@@ -751,7 +749,7 @@
             class:ring-2={dropZoneStates.get(section.id)?.isOver && draggedWidget && isCustomizeMode}
             class:ring-blue-400={dropZoneStates.get(section.id)?.isOver && draggedWidget && isCustomizeMode}
             style="{draggedWidget && isCustomizeMode
-              ? `border-color: ${dropZoneStates.get(section.id)?.isOver ? '#60a5fa' : (hasGradient ? 'rgba(255, 255, 255, 0.3)' : '#d1d5db')};
+              ? `border-color: ${dropZoneStates.get(section.id)?.isOver ? '#60a5fa' : (gradientStyles.hasCustomBackground ? 'rgba(255, 255, 255, 0.3)' : '#d1d5db')};
                  background-color: ${dropZoneStates.get(section.id)?.isOver ? 'rgba(96, 165, 250, 0.1)' : 'transparent'};
                  padding: 0.5rem;`
               : ''}"
@@ -797,7 +795,7 @@
                 {/each}
               </div>
             {:else}
-              <div class="text-center py-12" style={emptySectionStyle}>
+              <div class="text-center py-12" style={gradientStyles.emptyStateStyle}>
                 <p class="text-sm">No widgets in this section yet</p>
                 <p class="text-xs mt-1">Click "Customize" to add widgets</p>
               </div>
@@ -808,7 +806,7 @@
     </div>
 
     {#if sections.length === 0}
-      <div class="flex flex-col items-center justify-center py-16" style={emptySectionStyle}>
+      <div class="flex flex-col items-center justify-center py-16" style={gradientStyles.emptyStateStyle}>
         <LayoutGrid class="h-16 w-16 mb-4 opacity-30" />
         <p class="text-lg font-medium">No sections configured</p>
         <p class="text-sm mt-2">Click "Edit" to add sections to your homepage</p>

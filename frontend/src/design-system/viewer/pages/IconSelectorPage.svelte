@@ -1,6 +1,6 @@
 <script>
-  import IconSelector from '../../../lib/IconSelector.svelte'
-  import Label from '../../../lib/Label.svelte'
+  import IconSelector from '../../../lib/pickers/IconSelector.svelte'
+  import Label from '../../../lib/components/Label.svelte'
 
   let selectedIcon = $state('Target')
   let selectedColor = $state('#3b82f6')
@@ -31,7 +31,7 @@
         bind:selectedIcon
         bind:selectedColor
         label="Select Icon & Color"
-        on:change={handleChange}
+        onchange={handleChange}
       />
     </div>
     <p class="mt-4 text-xs" style="color: var(--ds-text-subtle);">
@@ -200,18 +200,28 @@
         <tbody style="color: var(--ds-text-subtle);">
           <tr style="border-bottom: 1px solid var(--ds-border);">
             <td class="p-2"><code>selectedIcon</code></td>
-            <td class="p-2">string</td>
+            <td class="p-2">string (bindable)</td>
             <td class="p-2">'Package'</td>
           </tr>
           <tr style="border-bottom: 1px solid var(--ds-border);">
             <td class="p-2"><code>selectedColor</code></td>
-            <td class="p-2">string (hex)</td>
+            <td class="p-2">string (hex, bindable)</td>
             <td class="p-2">'#3b82f6'</td>
           </tr>
-          <tr>
+          <tr style="border-bottom: 1px solid var(--ds-border);">
             <td class="p-2"><code>label</code></td>
             <td class="p-2">string</td>
             <td class="p-2">'Icon & Color'</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--ds-border);">
+            <td class="p-2"><code>compact</code></td>
+            <td class="p-2">boolean</td>
+            <td class="p-2">false</td>
+          </tr>
+          <tr>
+            <td class="p-2"><code>onchange</code></td>
+            <td class="p-2">function</td>
+            <td class="p-2">null</td>
           </tr>
         </tbody>
       </table>
@@ -234,7 +244,7 @@
         </thead>
         <tbody style="color: var(--ds-text-subtle);">
           <tr>
-            <td class="p-2"><code>on:change</code></td>
+            <td class="p-2"><code>onchange</code></td>
             <td class="p-2">Fired when icon or color changes. Contains <code>detail.icon</code> and <code>detail.color</code>.</td>
           </tr>
         </tbody>
