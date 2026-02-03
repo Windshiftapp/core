@@ -44,7 +44,7 @@ func NewSetupHandler(db database.Database, sessionManager SessionCreator, authMi
 func (h *SetupHandler) GetSetupStatus(w http.ResponseWriter, r *http.Request) {
 	status, err := h.getSetupStatus()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get setup status: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -56,31 +56,31 @@ func (h *SetupHandler) GetSetupStatus(w http.ResponseWriter, r *http.Request) {
 func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Request) {
 	var req models.SetupRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate the setup request
 	if err := h.validateSetupRequest(req); err != nil {
-		http.Error(w, fmt.Sprintf("Invalid setup request: %v", err), http.StatusBadRequest)
+		respondValidationError(w, r, fmt.Sprintf("Invalid setup request: %v", err))
 		return
 	}
 
 	// Check if setup is already completed
 	setupCompleted, err := h.getSettingBool("setup_completed")
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to check setup status: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if setupCompleted {
-		http.Error(w, "Setup has already been completed", http.StatusBadRequest)
+		respondBadRequest(w, r, "Setup has already been completed")
 		return
 	}
 
 	// Begin transaction for atomic setup
 	tx, err := h.DB.Begin()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to begin transaction: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
@@ -89,7 +89,7 @@ func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Reque
 	adminUser := req.AdminUser
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(adminUser.PasswordHash), bcrypt.DefaultCost)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to hash password: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -101,7 +101,7 @@ func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Reque
 		RETURNING id
 	`, adminUser.Email, adminUser.Username, adminUser.FirstName, adminUser.LastName, string(hashedPassword)).Scan(&userID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create admin user: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -109,7 +109,7 @@ func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Reque
 	var systemAdminPermissionID int
 	err = tx.QueryRow("SELECT id FROM permissions WHERE permission_key = 'system.admin'").Scan(&systemAdminPermissionID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get system.admin permission ID: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -118,7 +118,7 @@ func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Reque
 		VALUES (?, ?)
 	`, userID, systemAdminPermissionID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to grant system.admin permission: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -138,7 +138,7 @@ func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Reque
 			WHERE key = ?
 		`, strconv.FormatBool(setting.value), setting.key)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to update module setting %s: %v", setting.key, err), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to update module setting %s: %v", setting.key, err))
 			return
 		}
 	}
@@ -150,7 +150,7 @@ func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Reque
 		WHERE key = 'setup_completed'
 	`)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to mark setup as completed: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -160,13 +160,13 @@ func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Reque
 		WHERE key = 'admin_user_created'
 	`)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to mark admin user as created: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Commit the transaction
 	if err = tx.Commit(); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to commit setup: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -179,20 +179,20 @@ func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Reque
 	clientIP := h.getClientIP(r)
 	session, err := h.SessionManager.CreateSession(int(userID), clientIP, r.UserAgent(), false)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Setup completed but failed to create session: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Set session cookie
 	if err := h.SessionManager.SetSessionCookie(w, r, session.Token, false); err != nil {
-		http.Error(w, fmt.Sprintf("Setup completed but failed to set session cookie: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Return the updated setup status
 	status, err := h.getSetupStatus()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Setup completed but failed to get updated status: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -208,13 +208,13 @@ func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Reque
 func (h *SetupHandler) GetModuleSettings(w http.ResponseWriter, r *http.Request) {
 	timeTracking, err := h.getSettingBool("time_tracking_enabled")
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get time tracking setting: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	testManagement, err := h.getSettingBool("test_management_enabled")
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get test management setting: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -232,13 +232,13 @@ func (h *SetupHandler) UpdateModuleSettings(w http.ResponseWriter, r *http.Reque
 	// Get current user from context (required by middleware)
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	var settings models.ModuleSettings
 	if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -253,7 +253,7 @@ func (h *SetupHandler) UpdateModuleSettings(w http.ResponseWriter, r *http.Reque
 
 	tx, err := h.DB.Begin()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to begin transaction: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
@@ -265,13 +265,13 @@ func (h *SetupHandler) UpdateModuleSettings(w http.ResponseWriter, r *http.Reque
 			WHERE key = ?
 		`, strconv.FormatBool(setting.value), setting.key)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to update module setting %s: %v", setting.key, err), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to update module setting %s: %v", setting.key, err))
 			return
 		}
 	}
 
 	if err = tx.Commit(); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to commit module settings: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

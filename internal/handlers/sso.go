@@ -213,17 +213,17 @@ func (h *SSOHandler) StartLogin(w http.ResponseWriter, r *http.Request) {
 
 	provider, err := h.providerStore.GetBySlug(slug)
 	if err != nil {
-		http.Error(w, "SSO provider not found", http.StatusNotFound)
+		respondNotFound(w, r, "SSO provider")
 		return
 	}
 
 	if !provider.Enabled {
-		http.Error(w, "SSO provider is disabled", http.StatusBadRequest)
+		respondBadRequest(w, r, "SSO provider is disabled")
 		return
 	}
 
 	if provider.ProviderType != sso.ProviderTypeOIDC {
-		http.Error(w, "Provider type not supported", http.StatusBadRequest)
+		respondBadRequest(w, r, "Provider type not supported")
 		return
 	}
 
@@ -231,7 +231,7 @@ func (h *SSOHandler) StartLogin(w http.ResponseWriter, r *http.Request) {
 	clientSecret, err := h.encryption.Decrypt(provider.ClientSecretEncrypted)
 	if err != nil {
 		slog.Error("failed to decrypt client secret", slog.String("component", "sso"), slog.Any("error", err))
-		http.Error(w, "SSO configuration error", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -243,7 +243,7 @@ func (h *SSOHandler) StartLogin(w http.ResponseWriter, r *http.Request) {
 	relyingParty, err := h.oidcService.CreateRelyingParty(ctx, provider, redirectURI, clientSecret)
 	if err != nil {
 		slog.Error("failed to create relying party", slog.String("component", "sso"), slog.Any("error", err))
-		http.Error(w, "Failed to initialize SSO", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -408,7 +408,7 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 func (h *SSOHandler) ListProviders(w http.ResponseWriter, r *http.Request) {
 	providers, err := h.providerStore.List()
 	if err != nil {
-		http.Error(w, "Failed to list providers", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -425,16 +425,16 @@ func (h *SSOHandler) ListProviders(w http.ResponseWriter, r *http.Request) {
 func (h *SSOHandler) GetProvider(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid provider ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	provider, err := h.providerStore.GetByID(id)
 	if err != nil {
 		if err == sso.ErrProviderNotFound {
-			http.Error(w, "Provider not found", http.StatusNotFound)
+			respondNotFound(w, r, "provider")
 		} else {
-			http.Error(w, "Failed to get provider", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -447,56 +447,56 @@ func (h *SSOHandler) GetProvider(w http.ResponseWriter, r *http.Request) {
 func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 	var req SSOProviderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if req.Slug == "" {
-		http.Error(w, "Slug is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Slug is required")
 		return
 	}
 	if req.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 	if req.ProviderType == "" {
 		req.ProviderType = sso.ProviderTypeOIDC
 	}
 	if req.ProviderType != sso.ProviderTypeOIDC {
-		http.Error(w, "Only OIDC provider type is currently supported", http.StatusBadRequest)
+		respondValidationError(w, r, "Only OIDC provider type is currently supported")
 		return
 	}
 
 	// Validate OIDC-specific fields
 	if req.IssuerURL == "" {
-		http.Error(w, "Issuer URL is required for OIDC providers", http.StatusBadRequest)
+		respondValidationError(w, r, "Issuer URL is required for OIDC providers")
 		return
 	}
 	if req.ClientID == "" {
-		http.Error(w, "Client ID is required for OIDC providers", http.StatusBadRequest)
+		respondValidationError(w, r, "Client ID is required for OIDC providers")
 		return
 	}
 	if req.ClientSecret == "" {
-		http.Error(w, "Client secret is required for OIDC providers", http.StatusBadRequest)
+		respondValidationError(w, r, "Client secret is required for OIDC providers")
 		return
 	}
 
 	// MVP: Only allow one provider
 	count, err := h.providerStore.Count()
 	if err != nil {
-		http.Error(w, "Failed to check provider count", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if count > 0 {
-		http.Error(w, "Only one SSO provider is allowed in this version", http.StatusBadRequest)
+		respondValidationError(w, r, "Only one SSO provider is allowed in this version")
 		return
 	}
 
 	// Encrypt client secret
 	encryptedSecret, err := h.encryption.Encrypt(req.ClientSecret)
 	if err != nil {
-		http.Error(w, "Failed to encrypt client secret", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -529,9 +529,9 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.providerStore.Create(provider); err != nil {
 		if err == sso.ErrProviderExists {
-			http.Error(w, "A provider with this slug already exists", http.StatusConflict)
+			respondConflict(w, r, "A provider with this slug already exists")
 		} else {
-			http.Error(w, "Failed to create provider", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -545,7 +545,7 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 func (h *SSOHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid provider ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -553,16 +553,16 @@ func (h *SSOHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
 	existing, err := h.providerStore.GetByID(id)
 	if err != nil {
 		if err == sso.ErrProviderNotFound {
-			http.Error(w, "Provider not found", http.StatusNotFound)
+			respondNotFound(w, r, "provider")
 		} else {
-			http.Error(w, "Failed to get provider", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
 
 	var req SSOProviderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -594,7 +594,7 @@ func (h *SSOHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.providerStore.Update(existing); err != nil {
-		http.Error(w, "Failed to update provider", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -602,11 +602,11 @@ func (h *SSOHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
 	if req.ClientSecret != "" {
 		encryptedSecret, err := h.encryption.Encrypt(req.ClientSecret)
 		if err != nil {
-			http.Error(w, "Failed to encrypt client secret", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if err := h.providerStore.UpdateSecret(id, encryptedSecret); err != nil {
-			http.Error(w, "Failed to update client secret", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		existing.ClientSecretEncrypted = encryptedSecret
@@ -620,15 +620,15 @@ func (h *SSOHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
 func (h *SSOHandler) DeleteProvider(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid provider ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	if err := h.providerStore.Delete(id); err != nil {
 		if err == sso.ErrProviderNotFound {
-			http.Error(w, "Provider not found", http.StatusNotFound)
+			respondNotFound(w, r, "provider")
 		} else {
-			http.Error(w, "Failed to delete provider", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -640,16 +640,16 @@ func (h *SSOHandler) DeleteProvider(w http.ResponseWriter, r *http.Request) {
 func (h *SSOHandler) TestProvider(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid provider ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	provider, err := h.providerStore.GetByID(id)
 	if err != nil {
 		if err == sso.ErrProviderNotFound {
-			http.Error(w, "Provider not found", http.StatusNotFound)
+			respondNotFound(w, r, "provider")
 		} else {
-			http.Error(w, "Failed to get provider", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -657,7 +657,7 @@ func (h *SSOHandler) TestProvider(w http.ResponseWriter, r *http.Request) {
 	// Decrypt client secret
 	clientSecret, err := h.encryption.Decrypt(provider.ClientSecretEncrypted)
 	if err != nil {
-		http.Error(w, "Failed to decrypt client secret", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -697,13 +697,13 @@ func (h *SSOHandler) TestProvider(w http.ResponseWriter, r *http.Request) {
 func (h *SSOHandler) GetExternalAccounts(w http.ResponseWriter, r *http.Request) {
 	session, ok := r.Context().Value(middleware.ContextKeySession).(*auth.Session)
 	if !ok || session == nil {
-		http.Error(w, "Not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	accounts, err := h.userStore.GetExternalAccountsForUser(session.UserID)
 	if err != nil {
-		http.Error(w, "Failed to get external accounts", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -715,21 +715,21 @@ func (h *SSOHandler) GetExternalAccounts(w http.ResponseWriter, r *http.Request)
 func (h *SSOHandler) UnlinkExternalAccount(w http.ResponseWriter, r *http.Request) {
 	session, ok := r.Context().Value(middleware.ContextKeySession).(*auth.Session)
 	if !ok || session == nil {
-		http.Error(w, "Not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	accountID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid account ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	if err := h.userStore.UnlinkExternalAccount(accountID, session.UserID); err != nil {
 		if err == sso.ErrExternalAccountNotFound {
-			http.Error(w, "External account not found", http.StatusNotFound)
+			respondNotFound(w, r, "external account")
 		} else {
-			http.Error(w, "Failed to unlink account", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}

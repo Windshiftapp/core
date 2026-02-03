@@ -14,13 +14,13 @@ import (
 func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	assetID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid asset ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -28,22 +28,22 @@ func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
 	var setID int
 	err = h.db.QueryRow("SELECT set_id FROM assets WHERE id = ?", assetID).Scan(&setID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Asset not found", http.StatusNotFound)
+		respondNotFound(w, r, "asset")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check view permission
 	canView, err := h.canViewSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canView {
-		http.Error(w, "Access denied", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -68,7 +68,7 @@ func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
 
 	outgoingRows, err := h.db.Query(outgoingQuery, assetID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer outgoingRows.Close()
@@ -83,7 +83,7 @@ func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
 			&link.TargetTitle, &link.CreatedByName,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		outgoingLinks = append(outgoingLinks, link)
@@ -110,7 +110,7 @@ func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
 
 	incomingRows, err := h.db.Query(incomingQuery, assetID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer incomingRows.Close()
@@ -125,7 +125,7 @@ func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
 			&link.SourceTitle, &link.CreatedByName,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		incomingLinks = append(incomingLinks, link)
@@ -151,13 +151,13 @@ type CreateAssetLinkRequest struct {
 func (h *AssetHandler) CreateAssetLink(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	assetID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid asset ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -165,41 +165,41 @@ func (h *AssetHandler) CreateAssetLink(w http.ResponseWriter, r *http.Request) {
 	var setID int
 	err = h.db.QueryRow("SELECT set_id FROM assets WHERE id = ?", assetID).Scan(&setID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Asset not found", http.StatusNotFound)
+		respondNotFound(w, r, "asset")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check edit permission
 	canEdit, err := h.canEditSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canEdit {
-		http.Error(w, "Edit permission required", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	var req CreateAssetLinkRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate target type
 	validTargetTypes := map[string]bool{"item": true, "asset": true, "test_case": true}
 	if !validTargetTypes[req.TargetType] {
-		http.Error(w, "Invalid target_type. Must be 'item', 'asset', or 'test_case'", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid target_type. Must be 'item', 'asset', or 'test_case'")
 		return
 	}
 
 	// Prevent self-links
 	if req.TargetType == "asset" && req.TargetID == assetID {
-		http.Error(w, "Cannot create link to self", http.StatusBadRequest)
+		respondValidationError(w, r, "Cannot create link to self")
 		return
 	}
 
@@ -207,15 +207,15 @@ func (h *AssetHandler) CreateAssetLink(w http.ResponseWriter, r *http.Request) {
 	var linkTypeActive bool
 	err = h.db.QueryRow("SELECT active FROM link_types WHERE id = ?", req.LinkTypeID).Scan(&linkTypeActive)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Link type not found", http.StatusBadRequest)
+		respondValidationError(w, r, "Link type not found")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !linkTypeActive {
-		http.Error(w, "Link type is not active", http.StatusBadRequest)
+		respondValidationError(w, r, "Link type is not active")
 		return
 	}
 
@@ -230,9 +230,9 @@ func (h *AssetHandler) CreateAssetLink(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// Check for unique constraint violation
 		if err.Error() == "UNIQUE constraint failed: item_links.link_type_id, item_links.source_type, item_links.source_id, item_links.target_type, item_links.target_id" {
-			http.Error(w, "Link already exists", http.StatusConflict)
+			respondConflict(w, r, "Link already exists")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}

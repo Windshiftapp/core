@@ -61,7 +61,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	
 	if !h.IsEnabled() {
 		slog.Warn("upload failed: attachments not enabled", slog.String("component", "attachments"))
-		http.Error(w, "Attachments are not enabled on this server", http.StatusServiceUnavailable)
+		respondServiceUnavailable(w, r, "Attachments are not enabled on this server")
 		return
 	}
 
@@ -70,7 +70,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseMultipartForm(32 << 20)
 	if err != nil {
 		slog.Error("failed to parse form data", slog.String("component", "attachments"), slog.Any("error", err))
-		http.Error(w, "Failed to parse form data: "+err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Failed to parse form data: "+err.Error())
 		return
 	}
 
@@ -119,7 +119,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	// Validate entity_id is provided (except for avatars, backgrounds, and logos)
 	if entityIDStr == "" && !isAvatar && !isWorkspaceAvatar && !isCustomerAvatar && !isWorkspaceBackground && !isPortalBackground && !isPortalLogo && !isHubLogo {
 		slog.Debug("missing entity_id in form", slog.String("component", "attachments"))
-		http.Error(w, "entity_id is required", http.StatusBadRequest)
+		respondValidationError(w, r, "entity_id is required")
 		return
 	}
 
@@ -128,7 +128,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		entityID, err = strconv.Atoi(entityIDStr)
 		if err != nil {
 			slog.Error("invalid entity_id", slog.String("component", "attachments"), slog.Any("error", err))
-			http.Error(w, "Invalid entity_id", http.StatusBadRequest)
+			respondInvalidID(w, r, "entity_id")
 			return
 		}
 	}
@@ -146,7 +146,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 			checkQuery = "SELECT EXISTS(SELECT 1 FROM test_cases WHERE id = ?)"
 		default:
 			slog.Debug("unknown entity type", slog.String("component", "attachments"), slog.String("entity_type", entityType))
-			http.Error(w, "Unknown entity type", http.StatusBadRequest)
+			respondValidationError(w, r, "Unknown entity type")
 			return
 		}
 
@@ -154,12 +154,12 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		err = h.db.QueryRow(checkQuery, entityID).Scan(&exists)
 		if err != nil {
 			slog.Error("database error checking entity existence", slog.String("component", "attachments"), slog.Any("error", err))
-			http.Error(w, "Database error", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !exists {
 			slog.Debug("entity not found", slog.String("component", "attachments"), slog.String("entity_type", entityType), slog.Int("entity_id", entityID))
-			http.Error(w, fmt.Sprintf("%s not found", entityType), http.StatusNotFound)
+			respondNotFound(w, r, entityType)
 			return
 		}
 		slog.Debug("entity exists", slog.String("component", "attachments"), slog.String("entity_type", entityType), slog.Int("entity_id", entityID))
@@ -172,7 +172,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
 		slog.Error("failed to get file from form", slog.String("component", "attachments"), slog.Any("error", err))
-		http.Error(w, "Failed to get file from form: "+err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Failed to get file from form: "+err.Error())
 		return
 	}
 	defer file.Close()
@@ -183,7 +183,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	fileData, err := io.ReadAll(file)
 	if err != nil {
 		slog.Error("failed to read file data", slog.String("component", "attachments"), slog.Any("error", err))
-		http.Error(w, "Failed to read file data: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to read file data: %w", err))
 		return
 	}
 	slog.Debug("file data read", slog.String("component", "attachments"), slog.Int("bytes", len(fileData)))
@@ -192,7 +192,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("validating file extension", slog.String("component", "attachments"))
 	if err := h.validateFileExtension(fileHeader.Filename); err != nil {
 		slog.Warn("extension validation failed", slog.String("component", "attachments"), slog.Any("error", err))
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, err.Error())
 		return
 	}
 
@@ -201,7 +201,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	detectedMimeType, err := h.verifyFileContentFromBytes(fileData, fileHeader.Filename)
 	if err != nil {
 		slog.Warn("content verification failed", slog.String("component", "attachments"), slog.Any("error", err))
-		http.Error(w, "File content validation failed: "+err.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, "File content validation failed: "+err.Error())
 		return
 	}
 	slog.Debug("content verified", slog.String("component", "attachments"), slog.String("mime_type", detectedMimeType))
@@ -211,19 +211,19 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	settings, err := h.getAttachmentSettings()
 	if err != nil {
 		slog.Error("failed to get attachment settings", slog.String("component", "attachments"), slog.Any("error", err))
-		http.Error(w, "Failed to get attachment settings", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to get attachment settings: %w", err))
 		return
 	}
 	slog.Debug("attachment settings loaded", slog.String("component", "attachments"), slog.Bool("enabled", settings.Enabled), slog.Int64("max_size", settings.MaxFileSize))
 
 	if !settings.Enabled {
-		http.Error(w, "Attachments are disabled", http.StatusServiceUnavailable)
+		respondServiceUnavailable(w, r, "Attachments are disabled")
 		return
 	}
 
 	// Validate file size
 	if fileHeader.Size > settings.MaxFileSize {
-		http.Error(w, fmt.Sprintf("File too large. Maximum size: %d bytes", settings.MaxFileSize), http.StatusBadRequest)
+		respondValidationError(w, r, fmt.Sprintf("File too large. Maximum size: %d bytes", settings.MaxFileSize))
 		return
 	}
 
@@ -242,7 +242,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 				}
 
 				if !allowed {
-					http.Error(w, fmt.Sprintf("File type %s not allowed by server configuration", detectedMimeType), http.StatusBadRequest)
+					respondValidationError(w, r, fmt.Sprintf("File type %s not allowed by server configuration", detectedMimeType))
 					return
 				}
 			}
@@ -254,7 +254,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	uniqueFilename, err := h.generateUniqueFilename(fileHeader.Filename)
 	if err != nil {
 		slog.Error("failed to generate filename", slog.String("component", "attachments"), slog.Any("error", err))
-		http.Error(w, "Failed to generate filename", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to generate filename: %w", err))
 		return
 	}
 	slog.Debug("generated filename", slog.String("component", "attachments"), slog.String("unique_filename", uniqueFilename))
@@ -284,7 +284,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("creating directory", slog.String("component", "attachments"), slog.String("path", itemDir))
 	if err := os.MkdirAll(itemDir, 0755); err != nil {
 		slog.Error("failed to create directory", slog.String("component", "attachments"), slog.String("path", itemDir), slog.Any("error", err))
-		http.Error(w, "Failed to create attachment directory", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to create attachment directory: %w", err))
 		return
 	}
 
@@ -297,7 +297,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	err = os.WriteFile(filePath, fileData, 0644)
 	if err != nil {
 		slog.Error("failed to write file", slog.String("component", "attachments"), slog.String("path", filePath), slog.Any("error", err))
-		http.Error(w, "Failed to save file", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to save file: %w", err))
 		return
 	}
 	fileSize := int64(len(fileData))
@@ -363,7 +363,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("failed to save attachment record", slog.String("component", "attachments"), slog.Any("error", err))
 		os.Remove(filePath) // Clean up on error
-		http.Error(w, "Failed to save attachment record", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to save attachment record: %w", err))
 		return
 	}
 
@@ -470,14 +470,14 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 func (h *AttachmentHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 	itemID, err := strconv.Atoi(r.PathValue("itemId"))
 	if err != nil {
-		http.Error(w, "Invalid item ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "itemId")
 		return
 	}
 
 	// Get user from context and check permissions
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -486,10 +486,10 @@ func (h *AttachmentHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 	err = h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 			return
 		}
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -497,11 +497,11 @@ func (h *AttachmentHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 	if h.permissionService != nil {
 		canView, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionItemView)
 		if err != nil {
-			http.Error(w, "Permission check failed", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !canView {
-			http.Error(w, "Insufficient permissions to view attachments for this item", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	}
@@ -533,15 +533,15 @@ func (h *AttachmentHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 	err = h.db.QueryRow(`
 		SELECT COUNT(*) FROM attachments WHERE item_id = ?
 	`, itemID).Scan(&totalCount)
-	
+
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Query attachments with uploader info and pagination
 	rows, err := h.db.Query(`
-		SELECT a.id, a.item_id, a.filename, a.original_filename, a.mime_type, a.file_size, 
+		SELECT a.id, a.item_id, a.filename, a.original_filename, a.mime_type, a.file_size,
 		       a.uploaded_by, a.has_thumbnail, a.created_at,
 		       u.first_name || ' ' || u.last_name as uploader_name, u.email as uploader_email
 		FROM attachments a
@@ -550,9 +550,9 @@ func (h *AttachmentHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 		ORDER BY a.created_at DESC
 		LIMIT ? OFFSET ?
 	`, itemID, limit, offset)
-	
+
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -569,7 +569,7 @@ func (h *AttachmentHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 			&uploaderName, &uploaderEmail,
 		)
 		if err != nil {
-			http.Error(w, "Failed to scan attachment", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		
@@ -609,7 +609,7 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 	attachmentID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		slog.Error("invalid attachment ID", slog.String("component", "attachments"), slog.Any("error", err))
-		http.Error(w, "Invalid attachment ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -632,12 +632,12 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 
 	if err == sql.ErrNoRows {
 		slog.Debug("attachment not found in database", slog.String("component", "attachments"), slog.Int("attachment_id", attachmentID))
-		http.Error(w, "Attachment not found", http.StatusNotFound)
+		respondNotFound(w, r, "attachment")
 		return
 	}
 	if err != nil {
 		slog.Error("database error", slog.String("component", "attachments"), slog.Any("error", err))
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	slog.Debug("found attachment", slog.String("component", "attachments"), slog.String("original_filename", attachment.OriginalFilename), slog.String("path", attachment.FilePath))
@@ -646,13 +646,13 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 	absPath, err := filepath.Abs(attachment.FilePath)
 	if err != nil {
 		slog.Error("failed to resolve file path", slog.String("component", "attachments"), slog.Any("error", err))
-		http.Error(w, "Invalid file path", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid file path")
 		return
 	}
 	absBasePath, _ := filepath.Abs(h.attachmentPath)
 	if !strings.HasPrefix(absPath, absBasePath+string(os.PathSeparator)) {
 		slog.Warn("path traversal attempt detected", slog.String("component", "attachments"), slog.String("file_path", attachment.FilePath))
-		http.Error(w, "Invalid file path", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid file path")
 		return
 	}
 
@@ -660,7 +660,7 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("checking if file exists", slog.String("component", "attachments"), slog.String("file_path", attachment.FilePath))
 	if _, err := os.Stat(attachment.FilePath); os.IsNotExist(err) {
 		slog.Debug("file not found on disk", slog.String("component", "attachments"), slog.String("file_path", attachment.FilePath))
-		http.Error(w, "File not found", http.StatusNotFound)
+		respondNotFound(w, r, "file")
 		return
 	}
 
@@ -669,7 +669,7 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 	file, err := os.Open(attachment.FilePath)
 	if err != nil {
 		slog.Error("failed to open file", slog.String("component", "attachments"), slog.Any("error", err))
-		http.Error(w, "Failed to open file", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to open file: %w", err))
 		return
 	}
 	defer file.Close()
@@ -713,7 +713,7 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	attachmentID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid attachment ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -731,11 +731,11 @@ func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	var originalFilename string
 	err = h.db.QueryRow("SELECT file_path, item_id, original_filename FROM attachments WHERE id = ?", attachmentID).Scan(&filePath, &itemID, &originalFilename)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Attachment not found", http.StatusNotFound)
+		respondNotFound(w, r, "attachment")
 		return
 	}
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -750,18 +750,18 @@ func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Delete from database
 	result, err := h.db.ExecWrite("DELETE FROM attachments WHERE id = ?", attachmentID)
 	if err != nil {
-		http.Error(w, "Failed to delete attachment record", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to delete attachment record: %w", err))
 		return
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		http.Error(w, "Failed to verify deletion", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to verify deletion: %w", err))
 		return
 	}
 
 	if rowsAffected == 0 {
-		http.Error(w, "Attachment not found", http.StatusNotFound)
+		respondNotFound(w, r, "attachment")
 		return
 	}
 
@@ -778,7 +778,7 @@ func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 	attachmentID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid attachment ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -792,29 +792,29 @@ func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 	`, attachmentID).Scan(&hasThumbnail, &thumbnailPath, &mimeType)
 	
 	if err == sql.ErrNoRows {
-		http.Error(w, "Attachment not found", http.StatusNotFound)
+		respondNotFound(w, r, "attachment")
 		return
 	}
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if !hasThumbnail || thumbnailPath == "" {
-		http.Error(w, "No thumbnail available", http.StatusNotFound)
+		respondNotFound(w, r, "thumbnail")
 		return
 	}
 
 	// Check if thumbnail file exists
 	if _, err := os.Stat(thumbnailPath); os.IsNotExist(err) {
-		http.Error(w, "Thumbnail file not found", http.StatusNotFound)
+		respondNotFound(w, r, "thumbnail")
 		return
 	}
 
 	// Open thumbnail file
 	file, err := os.Open(thumbnailPath)
 	if err != nil {
-		http.Error(w, "Failed to open thumbnail", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to open thumbnail: %w", err))
 		return
 	}
 	defer file.Close()
@@ -822,7 +822,7 @@ func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 	// Get file info for size
 	fileInfo, err := file.Stat()
 	if err != nil {
-		http.Error(w, "Failed to get file info", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to get file info: %w", err))
 		return
 	}
 

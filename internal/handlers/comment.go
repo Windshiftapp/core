@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -62,14 +63,14 @@ func (h *CommentHandler) SetCommentService(commentService *services.CommentServi
 func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 	itemID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid item ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -78,21 +79,21 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 	err = h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 			return
 		}
-		http.Error(w, "Failed to fetch item: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to fetch item: %w", err))
 		return
 	}
 
 	// Check if user has permission to view items in this workspace
 	canView, err := h.canViewItem(user.ID, workspaceID)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 		return
 	}
 	if !canView {
-		http.Error(w, "Insufficient permissions to view comments in this workspace", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -109,7 +110,7 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query, itemID)
 	if err != nil {
-		http.Error(w, "Failed to fetch comments", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to fetch comments: %w", err))
 		return
 	}
 	defer rows.Close()
@@ -129,7 +130,7 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 			&customerName, &customerEmail,
 		)
 		if err != nil {
-			http.Error(w, "Failed to scan comment", http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to scan comment: %w", err))
 			return
 		}
 
@@ -163,7 +164,7 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = rows.Err(); err != nil {
-		http.Error(w, "Error reading comments", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("error reading comments: %w", err))
 		return
 	}
 
@@ -175,14 +176,14 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	itemID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid item ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -193,17 +194,17 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if strings.TrimSpace(reqBody.Content) == "" {
-		http.Error(w, "Content is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Content is required")
 		return
 	}
 
 	if reqBody.AuthorID <= 0 {
-		http.Error(w, "Author ID is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Author ID is required")
 		return
 	}
 
@@ -212,21 +213,21 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	err = h.db.QueryRow(`SELECT workspace_id FROM items WHERE id = ?`, itemID).Scan(&workspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 			return
 		}
-		http.Error(w, "Failed to fetch item: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to fetch item: %w", err))
 		return
 	}
 
 	// Check if user has permission to comment on items in this workspace
 	canComment, err := h.canCommentOnItem(user.ID, workspaceID)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 		return
 	}
 	if !canComment {
-		http.Error(w, "Insufficient permissions to comment on items in this workspace", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -234,11 +235,11 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	var exists bool
 	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", reqBody.AuthorID).Scan(&exists)
 	if err != nil {
-		http.Error(w, "Failed to verify author", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to verify author: %w", err))
 		return
 	}
 	if !exists {
-		http.Error(w, "Author not found", http.StatusNotFound)
+		respondNotFound(w, r, "user")
 		return
 	}
 
@@ -254,7 +255,7 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		})
 		if err != nil {
 			slog.Error("failed to create comment via service", slog.String("component", "comment"), slog.Any("error", err))
-			http.Error(w, "Failed to create comment", http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to create comment: %w", err))
 			return
 		}
 		commentID = result.CommentID
@@ -272,7 +273,7 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 			VALUES (?, ?, ?, ?, ?) RETURNING id
 		`, itemID, reqBody.AuthorID, sanitizedContent, now, now).Scan(&commentID)
 		if err != nil {
-			http.Error(w, "Failed to create comment", http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to create comment: %w", err))
 			return
 		}
 	}
@@ -280,7 +281,7 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	// Fetch the created comment with author details for response
 	comment, err := h.getCommentByID(int(commentID))
 	if err != nil {
-		http.Error(w, "Failed to fetch created comment", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to fetch created comment: %w", err))
 		return
 	}
 
@@ -293,14 +294,14 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 	commentID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid comment ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -309,10 +310,10 @@ func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 	err = h.db.QueryRow("SELECT item_id, author_id FROM comments WHERE id = ?", commentID).Scan(&itemID, &authorID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Comment not found", http.StatusNotFound)
+			respondNotFound(w, r, "comment")
 			return
 		}
-		http.Error(w, "Failed to fetch comment: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to fetch comment: %w", err))
 		return
 	}
 
@@ -329,7 +330,7 @@ func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 		WHERE i.id = ?
 	`, itemID).Scan(&workspaceID, &itemTitle, &workspaceItemNumber, &workspaceKey, &assigneeID, &creatorID)
 	if err != nil {
-		http.Error(w, "Failed to fetch item workspace: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to fetch item workspace: %w", err))
 		return
 	}
 
@@ -338,11 +339,11 @@ func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 	if !isAuthor {
 		canEditOthers, err := h.canEditOthersComments(user.ID, workspaceID)
 		if err != nil {
-			http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 			return
 		}
 		if !canEditOthers {
-			http.Error(w, "Insufficient permissions to edit this comment", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	}
@@ -352,12 +353,12 @@ func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if strings.TrimSpace(reqBody.Content) == "" {
-		http.Error(w, "Content is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Content is required")
 		return
 	}
 
@@ -372,25 +373,25 @@ func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 		WHERE id = ?
 	`, sanitizedContent, now, commentID)
 	if err != nil {
-		http.Error(w, "Failed to update comment", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to update comment: %w", err))
 		return
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		http.Error(w, "Failed to check update result", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to check update result: %w", err))
 		return
 	}
 
 	if rowsAffected == 0 {
-		http.Error(w, "Comment not found", http.StatusNotFound)
+		respondNotFound(w, r, "comment")
 		return
 	}
 
 	// Fetch the updated comment
 	comment, err := h.getCommentByID(commentID)
 	if err != nil {
-		http.Error(w, "Failed to fetch updated comment", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to fetch updated comment: %w", err))
 		return
 	}
 
@@ -446,14 +447,14 @@ func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 func (h *CommentHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 	commentID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid comment ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -462,10 +463,10 @@ func (h *CommentHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 	err = h.db.QueryRow("SELECT item_id, author_id FROM comments WHERE id = ?", commentID).Scan(&itemID, &authorID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Comment not found", http.StatusNotFound)
+			respondNotFound(w, r, "comment")
 			return
 		}
-		http.Error(w, "Failed to fetch comment: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to fetch comment: %w", err))
 		return
 	}
 
@@ -482,7 +483,7 @@ func (h *CommentHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 		WHERE i.id = ?
 	`, itemID).Scan(&workspaceID, &itemTitle, &workspaceItemNumber, &workspaceKey, &assigneeID, &creatorID)
 	if err != nil {
-		http.Error(w, "Failed to fetch item workspace: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to fetch item workspace: %w", err))
 		return
 	}
 
@@ -491,29 +492,29 @@ func (h *CommentHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 	if !isAuthor {
 		canEditOthers, err := h.canEditOthersComments(user.ID, workspaceID)
 		if err != nil {
-			http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 			return
 		}
 		if !canEditOthers {
-			http.Error(w, "Insufficient permissions to delete this comment", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	}
 
 	result, err := h.db.ExecWrite("DELETE FROM comments WHERE id = ?", commentID)
 	if err != nil {
-		http.Error(w, "Failed to delete comment", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to delete comment: %w", err))
 		return
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		http.Error(w, "Failed to check delete result", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to check delete result: %w", err))
 		return
 	}
 
 	if rowsAffected == 0 {
-		http.Error(w, "Comment not found", http.StatusNotFound)
+		respondNotFound(w, r, "comment")
 		return
 	}
 

@@ -110,13 +110,13 @@ func (h *PortalAuthHandler) RequestMagicLink(w http.ResponseWriter, r *http.Requ
 		Email string `json:"email"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	email := strings.TrimSpace(strings.ToLower(request.Email))
 	if email == "" {
-		http.Error(w, "Email is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Email is required")
 		return
 	}
 
@@ -177,12 +177,12 @@ func (h *PortalAuthHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Reque
 	// Find portal
 	_, _, err := h.findPortalBySlug(ctx, slug)
 	if err != nil {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+		respondNotFound(w, r, "portal")
 		return
 	}
 
 	if token == "" {
-		http.Error(w, "Token is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Token is required")
 		return
 	}
 
@@ -224,14 +224,14 @@ func (h *PortalAuthHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Reque
 	session, err := h.portalSessionManager.CreatePortalSession(result.PortalCustomerID, clientIP, userAgent)
 	if err != nil {
 		slog.Error("failed to create portal session", slog.String("component", "portal_auth"), slog.Any("error", err))
-		http.Error(w, "Failed to create session", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Set session cookie
 	if err := h.portalSessionManager.SetPortalSessionCookie(w, r, session.Token); err != nil {
 		slog.Error("failed to set portal session cookie", slog.String("component", "portal_auth"), slog.Any("error", err))
-		http.Error(w, "Failed to set session cookie", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -260,7 +260,7 @@ func (h *PortalAuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	// Find portal
 	_, _, err := h.findPortalBySlug(ctx, slug)
 	if err != nil {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+		respondNotFound(w, r, "portal")
 		return
 	}
 
@@ -296,7 +296,7 @@ func (h *PortalAuthHandler) GetCurrentCustomer(w http.ResponseWriter, r *http.Re
 	// Find portal
 	_, _, err := h.findPortalBySlug(ctx, slug)
 	if err != nil {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+		respondNotFound(w, r, "portal")
 		return
 	}
 

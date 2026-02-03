@@ -34,7 +34,7 @@ func NewWorkspaceRoleHandlerWithPool(db database.Database, permissionService *se
 
 // GetAll returns all workspace roles
 func (h *WorkspaceRoleHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	db, ok := h.requireReadDB(w)
+	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -46,7 +46,7 @@ func (h *WorkspaceRoleHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := db.Query(query)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -57,7 +57,7 @@ func (h *WorkspaceRoleHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		err := rows.Scan(&role.ID, &role.Name, &role.Description, &role.IsSystem,
 			&role.DisplayOrder, &role.CreatedAt, &role.UpdatedAt)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		roles = append(roles, role)
@@ -73,14 +73,14 @@ func (h *WorkspaceRoleHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 // Get returns a single workspace role with its permissions
 func (h *WorkspaceRoleHandler) Get(w http.ResponseWriter, r *http.Request) {
-	db, ok := h.requireReadDB(w)
+	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
 
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -93,11 +93,11 @@ func (h *WorkspaceRoleHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&role.DisplayOrder, &role.CreatedAt, &role.UpdatedAt)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Workspace role not found", http.StatusNotFound)
+		respondNotFound(w, r, "workspace_role")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -110,7 +110,7 @@ func (h *WorkspaceRoleHandler) Get(w http.ResponseWriter, r *http.Request) {
 		ORDER BY p.scope, p.permission_name
 	`, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer permRows.Close()
@@ -131,25 +131,25 @@ func (h *WorkspaceRoleHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // AssignRoleToUser assigns a role to a user in a workspace
 func (h *WorkspaceRoleHandler) AssignRoleToUser(w http.ResponseWriter, r *http.Request) {
-	readDB, ok := h.requireReadDB(w)
+	readDB, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
-	writeDB, ok := h.requireWriteDB(w)
+	writeDB, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
 
 	var req models.UserRoleAssignmentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Get current user ID
 	granterID := h.getSessionUserID(r)
 	if granterID == 0 {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -157,7 +157,7 @@ func (h *WorkspaceRoleHandler) AssignRoleToUser(w http.ResponseWriter, r *http.R
 	var roleExists bool
 	err := readDB.QueryRow("SELECT EXISTS(SELECT 1 FROM workspace_roles WHERE id = ?)", req.RoleID).Scan(&roleExists)
 	if err != nil || !roleExists {
-		http.Error(w, "Role not found", http.StatusNotFound)
+		respondNotFound(w, r, "role")
 		return
 	}
 
@@ -169,7 +169,7 @@ func (h *WorkspaceRoleHandler) AssignRoleToUser(w http.ResponseWriter, r *http.R
 	`, req.UserID, req.WorkspaceID, req.RoleID, granterID, time.Now(), granterID, time.Now())
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -216,30 +216,30 @@ func (h *WorkspaceRoleHandler) AssignRoleToUser(w http.ResponseWriter, r *http.R
 
 // RevokeRoleFromUser revokes a role from a user in a workspace
 func (h *WorkspaceRoleHandler) RevokeRoleFromUser(w http.ResponseWriter, r *http.Request) {
-	readDB, ok := h.requireReadDB(w)
+	readDB, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
-	writeDB, ok := h.requireWriteDB(w)
+	writeDB, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
 
 	userID, err := strconv.Atoi(r.PathValue("userId"))
 	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "userId")
 		return
 	}
 
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	roleID, err := strconv.Atoi(r.PathValue("roleId"))
 	if err != nil {
-		http.Error(w, "Invalid role ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "roleId")
 		return
 	}
 
@@ -249,13 +249,13 @@ func (h *WorkspaceRoleHandler) RevokeRoleFromUser(w http.ResponseWriter, r *http
 	`, userID, workspaceID, roleID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Role assignment not found", http.StatusNotFound)
+		respondNotFound(w, r, "role_assignment")
 		return
 	}
 
@@ -308,20 +308,20 @@ func (h *WorkspaceRoleHandler) RevokeRoleFromUser(w http.ResponseWriter, r *http
 
 // GetUserRolesInWorkspace returns all roles assigned to a user in a workspace
 func (h *WorkspaceRoleHandler) GetUserRolesInWorkspace(w http.ResponseWriter, r *http.Request) {
-	db, ok := h.requireReadDB(w)
+	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
 
 	userID, err := strconv.Atoi(r.PathValue("userId"))
 	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "userId")
 		return
 	}
 
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
@@ -334,7 +334,7 @@ func (h *WorkspaceRoleHandler) GetUserRolesInWorkspace(w http.ResponseWriter, r 
 	`, userID, workspaceID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -359,14 +359,14 @@ func (h *WorkspaceRoleHandler) GetUserRolesInWorkspace(w http.ResponseWriter, r 
 
 // GetWorkspaceRoleAssignments returns all users with their role assignments for a workspace
 func (h *WorkspaceRoleHandler) GetWorkspaceRoleAssignments(w http.ResponseWriter, r *http.Request) {
-	db, ok := h.requireReadDB(w)
+	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
 
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
@@ -384,7 +384,7 @@ func (h *WorkspaceRoleHandler) GetWorkspaceRoleAssignments(w http.ResponseWriter
 	`, workspaceID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -472,14 +472,14 @@ type everyoneRoleResponse struct {
 
 // GetEveryoneRole returns the role assigned to the implicit Everyone principal for a workspace.
 func (h *WorkspaceRoleHandler) GetEveryoneRole(w http.ResponseWriter, r *http.Request) {
-	db, ok := h.requireReadDB(w)
+	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
 
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
@@ -489,7 +489,7 @@ func (h *WorkspaceRoleHandler) GetEveryoneRole(w http.ResponseWriter, r *http.Re
 	`, workspaceID).Scan(&storedRole)
 
 	if err != nil && err != sql.ErrNoRows {
-		http.Error(w, fmt.Sprintf("Failed to load Everyone role: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to load Everyone role: %w", err))
 		return
 	}
 
@@ -497,7 +497,7 @@ func (h *WorkspaceRoleHandler) GetEveryoneRole(w http.ResponseWriter, r *http.Re
 	if err == sql.ErrNoRows {
 		viewerRole, err := h.getViewerRole()
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to load Viewer role: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to load Viewer role: %w", err))
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -522,7 +522,7 @@ func (h *WorkspaceRoleHandler) GetEveryoneRole(w http.ResponseWriter, r *http.Re
 
 	role, err := h.getWorkspaceRoleByID(int(storedRole.Int64))
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to load role %d: %v", storedRole.Int64, err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to load role %d: %w", storedRole.Int64, err))
 		return
 	}
 
@@ -541,26 +541,26 @@ type setEveryoneRoleRequest struct {
 
 // SetEveryoneRole assigns or removes the Everyone role for a workspace.
 func (h *WorkspaceRoleHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Request) {
-	writeDB, ok := h.requireWriteDB(w)
+	writeDB, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
 
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	var req setEveryoneRoleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	granterID := h.getSessionUserID(r)
 	if granterID == 0 {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -570,7 +570,7 @@ func (h *WorkspaceRoleHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Re
 	if req.RoleID != nil {
 		role, err := h.getWorkspaceRoleByID(*req.RoleID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Role not found: %v", err), http.StatusBadRequest)
+			respondNotFound(w, r, "role")
 			return
 		}
 		roleValue = sql.NullInt64{Int64: int64(*req.RoleID), Valid: true}
@@ -589,11 +589,11 @@ func (h *WorkspaceRoleHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Re
 		if !skipViewerCheck {
 			hasViewer, err := h.hasWorkspaceViewerAssignment(workspaceID)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("Failed to validate workspace access: %v", err), http.StatusInternalServerError)
+				respondInternalError(w, r, fmt.Errorf("failed to validate workspace access: %w", err))
 				return
 			}
 			if !hasViewer {
-				http.Error(w, "Cannot remove Everyone role without another viewer for the workspace", http.StatusBadRequest)
+				respondValidationError(w, r, "Cannot remove Everyone role without another viewer for the workspace")
 				return
 			}
 		}
@@ -606,7 +606,7 @@ func (h *WorkspaceRoleHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Re
 		ON CONFLICT(workspace_id) DO UPDATE SET role_id=excluded.role_id, granted_by=excluded.granted_by, granted_at=excluded.granted_at
 	`, workspaceID, roleValue, granterID, time.Now())
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to update Everyone role: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to update Everyone role: %w", err))
 		return
 	}
 

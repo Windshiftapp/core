@@ -804,10 +804,10 @@ func (s *Server) initialize() error {
 		}
 	}
 
-	// Apply middleware
+	// Apply middleware (recovery is outermost to catch all panics)
 	securityMiddleware := createSecurityHeaders(enableHTTPS, cfg.UseProxy, additionalProxyIPs)
 	compressionMiddleware := middleware.CreateCompressionMiddleware(cfg.UseProxy)
-	handler := compressionMiddleware(securityMiddleware(mux))
+	handler := middleware.Recovery(compressionMiddleware(securityMiddleware(mux)))
 
 	// Create HTTP server
 	s.httpServer = &http.Server{

@@ -196,8 +196,7 @@ func (h *SCMProviderHandler) refreshOAuthTokenIfNeeded(
 func (h *SCMProviderHandler) GetProviders(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(providerListQuery + " ORDER BY name")
 	if err != nil {
-		slog.Error("failed to get providers", slog.String("component", "scm"), slog.Any("error", err))
-		http.Error(w, "Failed to get providers", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -220,17 +219,16 @@ func (h *SCMProviderHandler) GetProviders(w http.ResponseWriter, r *http.Request
 func (h *SCMProviderHandler) GetProvider(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid provider ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "providerId")
 		return
 	}
 
 	provider, err := h.getProviderByID(id)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Provider not found", http.StatusNotFound)
+			respondNotFound(w, r, "scm_provider")
 		} else {
-			slog.Error("failed to get provider", slog.String("component", "scm"), slog.Int("provider_id", id), slog.Any("error", err))
-			http.Error(w, "Failed to get provider", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -243,13 +241,13 @@ func (h *SCMProviderHandler) GetProvider(w http.ResponseWriter, r *http.Request)
 func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 	var req models.SCMProviderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if req.Slug == "" || req.Name == "" || req.ProviderType == "" || req.AuthMethod == "" {
-		http.Error(w, "Missing required fields: slug, name, provider_type, auth_method", http.StatusBadRequest)
+		respondValidationError(w, r, "Missing required fields: slug, name, provider_type, auth_method")
 		return
 	}
 
@@ -259,7 +257,7 @@ func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Reque
 		models.SCMProviderTypeGitea:  true,
 	}
 	if !validTypes[req.ProviderType] {
-		http.Error(w, "Invalid provider type. Supported: github, gitea", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid provider type. Supported: github, gitea")
 		return
 	}
 
@@ -270,13 +268,13 @@ func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Reque
 		models.SCMAuthMethodGitHubApp: true,
 	}
 	if !validMethods[req.AuthMethod] {
-		http.Error(w, "Invalid auth method", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid auth method")
 		return
 	}
 
 	// GitHub App auth method is only valid for GitHub providers
 	if req.AuthMethod == models.SCMAuthMethodGitHubApp && req.ProviderType != models.SCMProviderTypeGitHub {
-		http.Error(w, "GitHub App auth method is only valid for GitHub providers", http.StatusBadRequest)
+		respondBadRequest(w, r, "GitHub App auth method is only valid for GitHub providers")
 		return
 	}
 
@@ -287,8 +285,7 @@ func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Reque
 	if req.OAuthClientSecret != "" {
 		oauthSecretEnc, err = h.encryption.Encrypt(req.OAuthClientSecret)
 		if err != nil {
-			slog.Error("failed to encrypt OAuth secret", slog.String("component", "scm"), slog.Any("error", err))
-			http.Error(w, "Failed to encrypt credentials", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
@@ -296,8 +293,7 @@ func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Reque
 	if req.PersonalAccessToken != "" {
 		patEnc, err = h.encryption.Encrypt(req.PersonalAccessToken)
 		if err != nil {
-			slog.Error("failed to encrypt PAT", slog.String("component", "scm"), slog.Any("error", err))
-			http.Error(w, "Failed to encrypt credentials", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
@@ -305,8 +301,7 @@ func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Reque
 	if req.GitHubAppPrivateKey != "" {
 		ghAppKeyEnc, err = h.encryption.Encrypt(req.GitHubAppPrivateKey)
 		if err != nil {
-			slog.Error("failed to encrypt GitHub App key", slog.String("component", "scm"), slog.Any("error", err))
-			http.Error(w, "Failed to encrypt credentials", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
@@ -321,8 +316,7 @@ func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Reque
 	if req.IsDefault {
 		_, err = h.db.Exec("UPDATE scm_providers SET is_default = 0 WHERE is_default = 1")
 		if err != nil {
-			slog.Error("failed to unset default providers", slog.String("component", "scm"), slog.Any("error", err))
-			http.Error(w, "Failed to update default provider", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
@@ -343,11 +337,10 @@ func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Reque
 		req.Scopes, workspaceRestrictionMode)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "duplicate key") {
-			http.Error(w, "Provider with this slug already exists", http.StatusConflict)
+			respondConflict(w, r, "Provider with this slug already exists")
 			return
 		}
-		slog.Error("failed to create provider", slog.String("component", "scm"), slog.Any("error", err))
-		http.Error(w, "Failed to create provider", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -355,8 +348,7 @@ func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Reque
 
 	provider, err := h.getProviderByID(int(id))
 	if err != nil {
-		slog.Error("failed to get created provider", slog.String("component", "scm"), slog.Int64("provider_id", id), slog.Any("error", err))
-		http.Error(w, "Provider created but failed to retrieve", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -369,13 +361,13 @@ func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Reque
 func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid provider ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "providerId")
 		return
 	}
 
 	var req models.SCMProviderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -383,9 +375,9 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 	_, err = h.getProviderByID(id)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Provider not found", http.StatusNotFound)
+			respondNotFound(w, r, "scm_provider")
 		} else {
-			http.Error(w, "Failed to get provider", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -396,7 +388,7 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 		models.SCMProviderTypeGitea:  true,
 	}
 	if req.ProviderType != "" && !validTypes[req.ProviderType] {
-		http.Error(w, "Invalid provider type. Supported: github, gitea", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid provider type. Supported: github, gitea")
 		return
 	}
 
@@ -407,13 +399,13 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 		models.SCMAuthMethodGitHubApp: true,
 	}
 	if req.AuthMethod != "" && !validMethods[req.AuthMethod] {
-		http.Error(w, "Invalid auth method", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid auth method")
 		return
 	}
 
 	// GitHub App auth method is only valid for GitHub providers
 	if req.AuthMethod == models.SCMAuthMethodGitHubApp && req.ProviderType != models.SCMProviderTypeGitHub {
-		http.Error(w, "GitHub App auth method is only valid for GitHub providers", http.StatusBadRequest)
+		respondBadRequest(w, r, "GitHub App auth method is only valid for GitHub providers")
 		return
 	}
 
@@ -423,8 +415,7 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 	if req.OAuthClientSecret != "" {
 		enc, err := h.encryption.Encrypt(req.OAuthClientSecret)
 		if err != nil {
-			slog.Error("failed to encrypt OAuth secret", slog.String("component", "scm"), slog.Int("provider_id", id), slog.Any("error", err))
-			http.Error(w, "Failed to encrypt credentials", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		oauthSecretEnc = &enc
@@ -433,8 +424,7 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 	if req.PersonalAccessToken != "" {
 		enc, err := h.encryption.Encrypt(req.PersonalAccessToken)
 		if err != nil {
-			slog.Error("failed to encrypt PAT", slog.String("component", "scm"), slog.Int("provider_id", id), slog.Any("error", err))
-			http.Error(w, "Failed to encrypt credentials", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		patEnc = &enc
@@ -443,8 +433,7 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 	if req.GitHubAppPrivateKey != "" {
 		enc, err := h.encryption.Encrypt(req.GitHubAppPrivateKey)
 		if err != nil {
-			slog.Error("failed to encrypt GitHub App key", slog.String("component", "scm"), slog.Int("provider_id", id), slog.Any("error", err))
-			http.Error(w, "Failed to encrypt credentials", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		ghAppKeyEnc = &enc
@@ -460,8 +449,7 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 	if req.IsDefault {
 		_, err = h.db.Exec("UPDATE scm_providers SET is_default = 0 WHERE is_default = 1 AND id != ?", id)
 		if err != nil {
-			slog.Error("failed to unset default providers", slog.String("component", "scm"), slog.Int("provider_id", id), slog.Any("error", err))
-			http.Error(w, "Failed to update default provider", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
@@ -499,18 +487,16 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 	_, err = h.db.Exec(query, args...)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "duplicate key") {
-			http.Error(w, "Provider with this slug already exists", http.StatusConflict)
+			respondConflict(w, r, "Provider with this slug already exists")
 			return
 		}
-		slog.Error("failed to update provider", slog.String("component", "scm"), slog.Int("provider_id", id), slog.Any("error", err))
-		http.Error(w, "Failed to update provider", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	provider, err := h.getProviderByID(id)
 	if err != nil {
-		slog.Error("failed to get updated provider", slog.String("component", "scm"), slog.Int("provider_id", id), slog.Any("error", err))
-		http.Error(w, "Provider updated but failed to retrieve", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -522,14 +508,13 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 func (h *SCMProviderHandler) DeleteProvider(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid provider ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "providerId")
 		return
 	}
 
 	result, err := h.db.Exec("DELETE FROM scm_providers WHERE id = ?", id)
 	if err != nil {
-		slog.Error("failed to delete provider", slog.String("component", "scm"), slog.Int("provider_id", id), slog.Any("error", err))
-		http.Error(w, "Failed to delete provider", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -538,7 +523,7 @@ func (h *SCMProviderHandler) DeleteProvider(w http.ResponseWriter, r *http.Reque
 		slog.Warn("failed to get rows affected", slog.String("component", "scm"), slog.Int("provider_id", id), slog.Any("error", err))
 		// Continue - the delete likely succeeded
 	} else if rowsAffected == 0 {
-		http.Error(w, "Provider not found", http.StatusNotFound)
+		respondNotFound(w, r, "scm_provider")
 		return
 	}
 
@@ -549,7 +534,7 @@ func (h *SCMProviderHandler) DeleteProvider(w http.ResponseWriter, r *http.Reque
 func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid provider ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "providerId")
 		return
 	}
 
@@ -576,10 +561,9 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Provider not found", http.StatusNotFound)
+			respondNotFound(w, r, "scm_provider")
 		} else {
-			slog.Error("failed to get provider for test", slog.String("component", "scm"), slog.Int("provider_id", id), slog.Any("error", err))
-			http.Error(w, "Failed to get provider", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -597,8 +581,7 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 		if oauthAccessTokenEnc.Valid && oauthAccessTokenEnc.String != "" {
 			token, err := h.encryption.Decrypt(oauthAccessTokenEnc.String)
 			if err != nil {
-				slog.Error("failed to decrypt OAuth token", slog.String("component", "scm"), slog.Int("provider_id", id), slog.Any("error", err))
-				http.Error(w, "Failed to decrypt credentials", http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 
@@ -639,8 +622,7 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 		if patEnc.Valid && patEnc.String != "" {
 			token, err := h.encryption.Decrypt(patEnc.String)
 			if err != nil {
-				slog.Error("failed to decrypt PAT", slog.String("component", "scm"), slog.Int("provider_id", id), slog.Any("error", err))
-				http.Error(w, "Failed to decrypt credentials", http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 			cfg.PersonalAccessToken = token
@@ -682,8 +664,7 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 		// Decrypt the private key
 		privateKey, err := h.encryption.Decrypt(ghAppKeyEnc.String)
 		if err != nil {
-			slog.Error("failed to decrypt GitHub App private key", slog.String("component", "scm"), slog.Int("provider_id", id), slog.Any("error", err))
-			http.Error(w, "Failed to decrypt credentials", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -740,23 +721,22 @@ func (h *SCMProviderHandler) StartOAuth(w http.ResponseWriter, r *http.Request) 
 	`, slug).Scan(&providerID, &providerType, &clientID, &baseURL, &oauthScopes)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Provider not found", http.StatusNotFound)
+			respondNotFound(w, r, "scm_provider")
 		} else {
-			slog.Error("failed to get provider", slog.String("component", "scm"), slog.String("slug", slug), slog.Any("error", err))
-			http.Error(w, "Failed to get provider", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
 
 	if !clientID.Valid || clientID.String == "" {
-		http.Error(w, "OAuth not configured for this provider", http.StatusBadRequest)
+		respondBadRequest(w, r, "OAuth not configured for this provider")
 		return
 	}
 
 	// Get user from context (requires authentication)
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	userID := user.ID
@@ -777,8 +757,7 @@ func (h *SCMProviderHandler) StartOAuth(w http.ResponseWriter, r *http.Request) 
 		VALUES (?, ?, ?, ?, ?)
 	`, providerID, state, redirectURI, userID, expiresAt)
 	if err != nil {
-		slog.Error("failed to store OAuth state", slog.String("component", "scm"), slog.String("slug", slug), slog.Any("error", err))
-		http.Error(w, "Failed to initiate OAuth", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -801,7 +780,7 @@ func (h *SCMProviderHandler) StartOAuth(w http.ResponseWriter, r *http.Request) 
 	case models.SCMProviderTypeGitea:
 		// Gitea/Forgejo OAuth - requires base_url since it's self-hosted
 		if !baseURL.Valid || baseURL.String == "" {
-			http.Error(w, "Base URL not configured for this provider", http.StatusBadRequest)
+			respondBadRequest(w, r, "Base URL not configured for this provider")
 			return
 		}
 		// Use configured scopes or default to read:repository write:repository
@@ -819,7 +798,7 @@ func (h *SCMProviderHandler) StartOAuth(w http.ResponseWriter, r *http.Request) 
 			state,
 		)
 	default:
-		http.Error(w, "OAuth not supported for this provider type", http.StatusBadRequest)
+		respondBadRequest(w, r, "OAuth not supported for this provider type")
 		return
 	}
 
@@ -1262,7 +1241,7 @@ func nullInt64(i *int64) interface{} {
 func (h *SCMProviderHandler) GetProviderAllowedWorkspaces(w http.ResponseWriter, r *http.Request) {
 	providerID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid provider ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "providerId")
 		return
 	}
 
@@ -1270,9 +1249,9 @@ func (h *SCMProviderHandler) GetProviderAllowedWorkspaces(w http.ResponseWriter,
 	_, err = h.getProviderByID(providerID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Provider not found", http.StatusNotFound)
+			respondNotFound(w, r, "scm_provider")
 		} else {
-			http.Error(w, "Failed to get provider", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -1286,8 +1265,7 @@ func (h *SCMProviderHandler) GetProviderAllowedWorkspaces(w http.ResponseWriter,
 		ORDER BY w.name
 	`, providerID)
 	if err != nil {
-		slog.Error("failed to list allowed workspaces", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Any("error", err))
-		http.Error(w, "Failed to list allowed workspaces", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -1320,7 +1298,7 @@ func (h *SCMProviderHandler) GetProviderAllowedWorkspaces(w http.ResponseWriter,
 func (h *SCMProviderHandler) AddWorkspaceToProviderAllowlist(w http.ResponseWriter, r *http.Request) {
 	providerID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid provider ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "providerId")
 		return
 	}
 
@@ -1328,12 +1306,12 @@ func (h *SCMProviderHandler) AddWorkspaceToProviderAllowlist(w http.ResponseWrit
 		WorkspaceID int `json:"workspace_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if req.WorkspaceID == 0 {
-		http.Error(w, "workspace_id is required", http.StatusBadRequest)
+		respondValidationError(w, r, "workspace_id is required")
 		return
 	}
 
@@ -1341,9 +1319,9 @@ func (h *SCMProviderHandler) AddWorkspaceToProviderAllowlist(w http.ResponseWrit
 	_, err = h.getProviderByID(providerID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Provider not found", http.StatusNotFound)
+			respondNotFound(w, r, "scm_provider")
 		} else {
-			http.Error(w, "Failed to get provider", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -1352,7 +1330,7 @@ func (h *SCMProviderHandler) AddWorkspaceToProviderAllowlist(w http.ResponseWrit
 	var workspaceExists bool
 	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", req.WorkspaceID).Scan(&workspaceExists)
 	if err != nil || !workspaceExists {
-		http.Error(w, "Workspace not found", http.StatusNotFound)
+		respondNotFound(w, r, "workspace")
 		return
 	}
 
@@ -1369,11 +1347,10 @@ func (h *SCMProviderHandler) AddWorkspaceToProviderAllowlist(w http.ResponseWrit
 	`, providerID, req.WorkspaceID, createdBy)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "duplicate key") {
-			http.Error(w, "Workspace is already in the allowlist", http.StatusConflict)
+			respondConflict(w, r, "Workspace is already in the allowlist")
 			return
 		}
-		slog.Error("failed to add workspace to allowlist", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Int("workspace_id", req.WorkspaceID), slog.Any("error", err))
-		http.Error(w, "Failed to add workspace to allowlist", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1385,13 +1362,13 @@ func (h *SCMProviderHandler) AddWorkspaceToProviderAllowlist(w http.ResponseWrit
 func (h *SCMProviderHandler) RemoveWorkspaceFromProviderAllowlist(w http.ResponseWriter, r *http.Request) {
 	providerID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid provider ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "providerId")
 		return
 	}
 
 	workspaceID, err := strconv.Atoi(r.PathValue("workspace_id"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
@@ -1399,9 +1376,9 @@ func (h *SCMProviderHandler) RemoveWorkspaceFromProviderAllowlist(w http.Respons
 	_, err = h.getProviderByID(providerID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Provider not found", http.StatusNotFound)
+			respondNotFound(w, r, "scm_provider")
 		} else {
-			http.Error(w, "Failed to get provider", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -1411,14 +1388,13 @@ func (h *SCMProviderHandler) RemoveWorkspaceFromProviderAllowlist(w http.Respons
 		WHERE provider_id = ? AND workspace_id = ?
 	`, providerID, workspaceID)
 	if err != nil {
-		slog.Error("failed to remove workspace from allowlist", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Int("workspace_id", workspaceID), slog.Any("error", err))
-		http.Error(w, "Failed to remove workspace from allowlist", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Workspace not in allowlist", http.StatusNotFound)
+		respondNotFound(w, r, "allowlist_entry")
 		return
 	}
 
@@ -1429,7 +1405,7 @@ func (h *SCMProviderHandler) RemoveWorkspaceFromProviderAllowlist(w http.Respons
 func (h *SCMProviderHandler) UpdateProviderAllowedWorkspaces(w http.ResponseWriter, r *http.Request) {
 	providerID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid provider ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "providerId")
 		return
 	}
 
@@ -1437,7 +1413,7 @@ func (h *SCMProviderHandler) UpdateProviderAllowedWorkspaces(w http.ResponseWrit
 		WorkspaceIDs []int `json:"workspace_ids"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -1445,9 +1421,9 @@ func (h *SCMProviderHandler) UpdateProviderAllowedWorkspaces(w http.ResponseWrit
 	_, err = h.getProviderByID(providerID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Provider not found", http.StatusNotFound)
+			respondNotFound(w, r, "scm_provider")
 		} else {
-			http.Error(w, "Failed to get provider", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -1461,8 +1437,7 @@ func (h *SCMProviderHandler) UpdateProviderAllowedWorkspaces(w http.ResponseWrit
 	// Start a transaction to replace the entire allowlist
 	tx, err := h.db.Begin()
 	if err != nil {
-		slog.Error("failed to start transaction", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Any("error", err))
-		http.Error(w, "Failed to update allowlist", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1472,8 +1447,7 @@ func (h *SCMProviderHandler) UpdateProviderAllowedWorkspaces(w http.ResponseWrit
 		if rbErr := tx.Rollback(); rbErr != nil {
 			slog.Error("failed to rollback transaction", slog.String("component", "scm"), slog.Any("error", rbErr))
 		}
-		slog.Error("failed to clear allowlist", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Any("error", err))
-		http.Error(w, "Failed to update allowlist", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1487,15 +1461,13 @@ func (h *SCMProviderHandler) UpdateProviderAllowedWorkspaces(w http.ResponseWrit
 			if rbErr := tx.Rollback(); rbErr != nil {
 				slog.Error("failed to rollback transaction", slog.String("component", "scm"), slog.Any("error", rbErr))
 			}
-			slog.Error("failed to add workspace to allowlist", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Int("workspace_id", workspaceID), slog.Any("error", err))
-			http.Error(w, "Failed to update allowlist", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		slog.Error("failed to commit transaction", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Any("error", err))
-		http.Error(w, "Failed to update allowlist", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1551,12 +1523,12 @@ type DiscoverGitHubAppInstallationsRequest struct {
 func (h *SCMProviderHandler) DiscoverGitHubAppInstallations(w http.ResponseWriter, r *http.Request) {
 	var req DiscoverGitHubAppInstallationsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if req.AppID == "" || req.PrivateKey == "" {
-		http.Error(w, "app_id and private_key are required", http.StatusBadRequest)
+		respondValidationError(w, r, "app_id and private_key are required")
 		return
 	}
 
@@ -1619,7 +1591,7 @@ func (h *SCMProviderHandler) DiscoverGitHubAppInstallations(w http.ResponseWrite
 func (h *SCMProviderHandler) RefreshGitHubAppInstallation(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid provider ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "providerId")
 		return
 	}
 
@@ -1634,28 +1606,27 @@ func (h *SCMProviderHandler) RefreshGitHubAppInstallation(w http.ResponseWriter,
 	`, id).Scan(&authMethod, &ghAppID, &ghAppKeyEnc, &ghOrgID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Provider not found", http.StatusNotFound)
+			respondNotFound(w, r, "scm_provider")
 		} else {
-			http.Error(w, "Failed to get provider", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
 
 	if authMethod != models.SCMAuthMethodGitHubApp {
-		http.Error(w, "Provider does not use GitHub App authentication", http.StatusBadRequest)
+		respondBadRequest(w, r, "Provider does not use GitHub App authentication")
 		return
 	}
 
 	if !ghAppID.Valid || !ghAppKeyEnc.Valid || !ghOrgID.Valid {
-		http.Error(w, "GitHub App not fully configured (missing app_id, private_key, or org_id)", http.StatusBadRequest)
+		respondBadRequest(w, r, "GitHub App not fully configured (missing app_id, private_key, or org_id)")
 		return
 	}
 
 	// Decrypt private key
 	privateKey, err := h.encryption.Decrypt(ghAppKeyEnc.String)
 	if err != nil {
-		slog.Error("failed to decrypt GitHub App key", slog.String("component", "scm"), slog.Int("provider_id", id), slog.Any("error", err))
-		http.Error(w, "Failed to decrypt credentials", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1669,7 +1640,7 @@ func (h *SCMProviderHandler) RefreshGitHubAppInstallation(w http.ResponseWriter,
 
 	provider, err := scm.NewGitHubProvider(cfg)
 	if err != nil {
-		http.Error(w, "Failed to initialize GitHub App: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to initialize GitHub App: %w", err))
 		return
 	}
 
@@ -1678,7 +1649,7 @@ func (h *SCMProviderHandler) RefreshGitHubAppInstallation(w http.ResponseWriter,
 
 	installations, err := provider.ListAppInstallations(ctx)
 	if err != nil {
-		http.Error(w, "Failed to list installations: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to list installations: %w", err))
 		return
 	}
 
@@ -1708,8 +1679,7 @@ func (h *SCMProviderHandler) RefreshGitHubAppInstallation(w http.ResponseWriter,
 		WHERE id = ?
 	`, fmt.Sprintf("%d", foundInstallation.ID), id)
 	if err != nil {
-		slog.Error("failed to update installation ID", slog.String("component", "scm"), slog.Int("provider_id", id), slog.Any("error", err))
-		http.Error(w, "Failed to update installation ID", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

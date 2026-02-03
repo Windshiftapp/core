@@ -37,7 +37,7 @@ type SSHKeyRequest struct {
 func (h *CredentialHandler) GetUserCredentials(w http.ResponseWriter, r *http.Request) {
     userID, err := strconv.Atoi(r.PathValue("userId"))
     if err != nil {
-        http.Error(w, "Invalid user ID", http.StatusBadRequest)
+        respondInvalidID(w, r, "userId")
         return
     }
 
@@ -57,7 +57,7 @@ func (h *CredentialHandler) GetUserCredentials(w http.ResponseWriter, r *http.Re
 
 	rows, err := h.db.Query(legacyQuery, userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -70,7 +70,7 @@ func (h *CredentialHandler) GetUserCredentials(w http.ResponseWriter, r *http.Re
 		err := rows.Scan(&id, &cred.UserID, &cred.CredentialType, &cred.CredentialName,
 			&cred.IsActive, &cred.CreatedAt, &cred.UpdatedAt, &lastUsedAt)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -93,7 +93,7 @@ func (h *CredentialHandler) GetUserCredentials(w http.ResponseWriter, r *http.Re
 
 	webauthnRows, err := h.db.Query(webauthnQuery, userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer webauthnRows.Close()
@@ -106,7 +106,7 @@ func (h *CredentialHandler) GetUserCredentials(w http.ResponseWriter, r *http.Re
 
 		err := webauthnRows.Scan(&id, &credentialName, &createdAt, &lastUsedAt)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -146,7 +146,7 @@ func (h *CredentialHandler) GetUserCredentials(w http.ResponseWriter, r *http.Re
 func (h *CredentialHandler) CreateSSHKey(w http.ResponseWriter, r *http.Request) {
 	userID, err := strconv.Atoi(r.PathValue("userId"))
 	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "userId")
 		return
 	}
 
@@ -156,25 +156,25 @@ func (h *CredentialHandler) CreateSSHKey(w http.ResponseWriter, r *http.Request)
 
 	var req SSHKeyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
 
 	// Validate input
 	if req.CredentialName == "" {
-		http.Error(w, "Credential name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Credential name is required")
 		return
 	}
 
 	if req.PublicKey == "" {
-		http.Error(w, "Public key is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Public key is required")
 		return
 	}
 
 	// Basic SSH public key validation
 	req.PublicKey = strings.TrimSpace(req.PublicKey)
 	if !isValidSSHPublicKey(req.PublicKey) {
-		http.Error(w, "Invalid SSH public key format", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid SSH public key format")
 		return
 	}
 
@@ -186,7 +186,7 @@ func (h *CredentialHandler) CreateSSHKey(w http.ResponseWriter, r *http.Request)
 
 	credentialJSON, err := json.Marshal(credentialData)
 	if err != nil {
-		http.Error(w, "Failed to process SSH key data", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -201,7 +201,7 @@ func (h *CredentialHandler) CreateSSHKey(w http.ResponseWriter, r *http.Request)
 	`, userID, "ssh", req.CredentialName, string(credentialJSON), fingerprint).Scan(&credentialID)
 
 	if err != nil {
-		http.Error(w, "Failed to save SSH key", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -254,7 +254,7 @@ func getSSHKeyType(key string) string {
 func (h *CredentialHandler) RemoveCredential(w http.ResponseWriter, r *http.Request) {
 	userID, err := strconv.Atoi(r.PathValue("userId"))
 	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "userId")
 		return
 	}
 
@@ -273,7 +273,7 @@ func (h *CredentialHandler) RemoveCredential(w http.ResponseWriter, r *http.Requ
 		`, credentialID, userID).Scan(&exists)
 
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -281,7 +281,7 @@ func (h *CredentialHandler) RemoveCredential(w http.ResponseWriter, r *http.Requ
 			// Delete from legacy table
 			_, err = h.db.ExecWrite(`DELETE FROM user_credentials WHERE id = ? AND user_id = ?`, credentialID, userID)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 			w.WriteHeader(http.StatusNoContent)
@@ -296,19 +296,19 @@ func (h *CredentialHandler) RemoveCredential(w http.ResponseWriter, r *http.Requ
 	`, credentialIDStr, userID).Scan(&exists)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if !exists {
-		http.Error(w, "Credential not found", http.StatusNotFound)
+		respondNotFound(w, r, "credential")
 		return
 	}
 
 	// Delete from WebAuthn table
 	_, err = h.db.ExecWrite(`DELETE FROM webauthn_credentials WHERE id = ? AND user_id = ?`, credentialIDStr, userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

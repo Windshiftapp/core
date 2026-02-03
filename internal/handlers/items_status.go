@@ -17,7 +17,7 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -34,21 +34,21 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check if user has permission to view this item's workspace
 	canView, permErr := h.canViewItem(user.ID, workspaceId)
 	if permErr != nil {
-		http.Error(w, "Permission check failed: "+permErr.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, permErr)
 		return
 	}
 	if !canView {
-		http.Error(w, "Insufficient permissions to view this item's status transitions", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -67,7 +67,7 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 	}
 	workflowId, err := workflowService.GetWorkflowIDForItem(workspaceId, itemTypeIdPtr)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -118,7 +118,7 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 		`, *workflowId, currentStatusId.Int64)
 
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		defer rows.Close()

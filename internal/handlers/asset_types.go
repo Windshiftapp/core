@@ -10,7 +10,6 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
-
 )
 
 // AssetTypeHandler handles asset type operations
@@ -33,24 +32,24 @@ func NewAssetTypeHandler(db database.Database, permissionService *services.Permi
 func (h *AssetTypeHandler) GetAssetTypes(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	setID, err := strconv.Atoi(r.PathValue("setId"))
 	if err != nil {
-		http.Error(w, "Invalid set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "setId")
 		return
 	}
 
 	// Check view permission
 	canView, err := h.assetHandler.canViewSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canView {
-		http.Error(w, "Access denied", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -67,7 +66,7 @@ func (h *AssetTypeHandler) GetAssetTypes(w http.ResponseWriter, r *http.Request)
 
 	rows, err := h.db.Query(query, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -84,7 +83,7 @@ func (h *AssetTypeHandler) GetAssetTypes(w http.ResponseWriter, r *http.Request)
 			&setName, &assetType.AssetCount,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -106,13 +105,13 @@ func (h *AssetTypeHandler) GetAssetTypes(w http.ResponseWriter, r *http.Request)
 func (h *AssetTypeHandler) GetAssetType(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	typeID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid type ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -120,22 +119,22 @@ func (h *AssetTypeHandler) GetAssetType(w http.ResponseWriter, r *http.Request) 
 	var setID int
 	err = h.db.QueryRow("SELECT set_id FROM asset_types WHERE id = ?", typeID).Scan(&setID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Asset type not found", http.StatusNotFound)
+		respondNotFound(w, r, "asset_type")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check view permission
 	canView, err := h.assetHandler.canViewSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canView {
-		http.Error(w, "Access denied", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -158,7 +157,7 @@ func (h *AssetTypeHandler) GetAssetType(w http.ResponseWriter, r *http.Request) 
 	)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -172,7 +171,7 @@ func (h *AssetTypeHandler) GetAssetType(w http.ResponseWriter, r *http.Request) 
 	// Get fields for this type
 	assetType.Fields, err = h.getTypeFields(typeID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -194,35 +193,35 @@ type CreateAssetTypeRequest struct {
 func (h *AssetTypeHandler) CreateAssetType(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	setID, err := strconv.Atoi(r.PathValue("setId"))
 	if err != nil {
-		http.Error(w, "Invalid set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "setId")
 		return
 	}
 
 	// Check admin permission (only admins can create types)
 	canAdmin, err := h.assetHandler.canAdminSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canAdmin {
-		http.Error(w, "Admin permission required", http.StatusForbidden)
+		respondAdminRequired(w, r)
 		return
 	}
 
 	var req CreateAssetTypeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if req.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 
@@ -247,7 +246,7 @@ func (h *AssetTypeHandler) CreateAssetType(w http.ResponseWriter, r *http.Reques
 	`, setID, req.Name, req.Description, req.Icon, req.Color, req.DisplayOrder, isActive, now, now).Scan(&typeID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -283,13 +282,13 @@ type UpdateAssetTypeRequest struct {
 func (h *AssetTypeHandler) UpdateAssetType(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	typeID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid type ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -297,33 +296,33 @@ func (h *AssetTypeHandler) UpdateAssetType(w http.ResponseWriter, r *http.Reques
 	var setID int
 	err = h.db.QueryRow("SELECT set_id FROM asset_types WHERE id = ?", typeID).Scan(&setID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Asset type not found", http.StatusNotFound)
+		respondNotFound(w, r, "asset_type")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check admin permission
 	canAdmin, err := h.assetHandler.canAdminSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canAdmin {
-		http.Error(w, "Admin permission required", http.StatusForbidden)
+		respondAdminRequired(w, r)
 		return
 	}
 
 	var req UpdateAssetTypeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if req.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 
@@ -343,13 +342,13 @@ func (h *AssetTypeHandler) UpdateAssetType(w http.ResponseWriter, r *http.Reques
 
 	result, err := h.db.ExecWrite(query, args...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Asset type not found", http.StatusNotFound)
+		respondNotFound(w, r, "asset_type")
 		return
 	}
 
@@ -372,13 +371,13 @@ func (h *AssetTypeHandler) UpdateAssetType(w http.ResponseWriter, r *http.Reques
 func (h *AssetTypeHandler) DeleteAssetType(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	typeID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid type ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -389,47 +388,47 @@ func (h *AssetTypeHandler) DeleteAssetType(w http.ResponseWriter, r *http.Reques
 		FROM asset_types WHERE id = ?
 	`, typeID, typeID).Scan(&setID, &assetCount)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Asset type not found", http.StatusNotFound)
+		respondNotFound(w, r, "asset_type")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check admin permission
 	canAdmin, err := h.assetHandler.canAdminSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canAdmin {
-		http.Error(w, "Admin permission required", http.StatusForbidden)
+		respondAdminRequired(w, r)
 		return
 	}
 
 	// Prevent deletion if assets exist
 	if assetCount > 0 {
-		http.Error(w, "Cannot delete type with existing assets. Delete or reassign assets first.", http.StatusConflict)
+		respondConflict(w, r, "Cannot delete type with existing assets. Delete or reassign assets first.")
 		return
 	}
 
 	// Delete type fields first
 	_, err = h.db.ExecWrite("DELETE FROM asset_type_fields WHERE asset_type_id = ?", typeID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	result, err := h.db.ExecWrite("DELETE FROM asset_types WHERE id = ?", typeID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Asset type not found", http.StatusNotFound)
+		respondNotFound(w, r, "asset_type")
 		return
 	}
 
@@ -440,13 +439,13 @@ func (h *AssetTypeHandler) DeleteAssetType(w http.ResponseWriter, r *http.Reques
 func (h *AssetTypeHandler) GetTypeFields(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	typeID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid type ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -454,28 +453,28 @@ func (h *AssetTypeHandler) GetTypeFields(w http.ResponseWriter, r *http.Request)
 	var setID int
 	err = h.db.QueryRow("SELECT set_id FROM asset_types WHERE id = ?", typeID).Scan(&setID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Asset type not found", http.StatusNotFound)
+		respondNotFound(w, r, "asset_type")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check view permission
 	canView, err := h.assetHandler.canViewSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canView {
-		http.Error(w, "Access denied", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	fields, err := h.getTypeFields(typeID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -496,13 +495,13 @@ type UpdateTypeFieldsRequest struct {
 func (h *AssetTypeHandler) UpdateTypeFields(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	typeID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid type ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -510,35 +509,35 @@ func (h *AssetTypeHandler) UpdateTypeFields(w http.ResponseWriter, r *http.Reque
 	var setID int
 	err = h.db.QueryRow("SELECT set_id FROM asset_types WHERE id = ?", typeID).Scan(&setID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Asset type not found", http.StatusNotFound)
+		respondNotFound(w, r, "asset_type")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check admin permission
 	canAdmin, err := h.assetHandler.canAdminSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canAdmin {
-		http.Error(w, "Admin permission required", http.StatusForbidden)
+		respondAdminRequired(w, r)
 		return
 	}
 
 	var req UpdateTypeFieldsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Start transaction
 	tx, err := h.db.Begin()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
@@ -546,7 +545,7 @@ func (h *AssetTypeHandler) UpdateTypeFields(w http.ResponseWriter, r *http.Reque
 	// Delete existing field assignments
 	_, err = tx.Exec("DELETE FROM asset_type_fields WHERE asset_type_id = ?", typeID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -558,20 +557,20 @@ func (h *AssetTypeHandler) UpdateTypeFields(w http.ResponseWriter, r *http.Reque
 			VALUES (?, ?, ?, ?, ?)
 		`, typeID, field.CustomFieldID, field.IsRequired, field.DisplayOrder, now)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
 
 	if err = tx.Commit(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Return updated fields
 	fields, err := h.getTypeFields(typeID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

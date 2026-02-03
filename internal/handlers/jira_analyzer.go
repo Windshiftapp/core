@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -13,7 +14,7 @@ import (
 func (h *JiraImportHandler) GetProjects(w http.ResponseWriter, r *http.Request) {
 	connectionID := r.URL.Query().Get("connection_id")
 	if connectionID == "" {
-		http.Error(w, "connection_id is required", http.StatusBadRequest)
+		respondValidationError(w, r, "connection_id is required")
 		return
 	}
 
@@ -22,13 +23,13 @@ func (h *JiraImportHandler) GetProjects(w http.ResponseWriter, r *http.Request) 
 
 	client, err := h.getClientForConnection(r.Context(), connectionID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get Jira client: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	projects, err := client.ListProjects(r.Context())
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to list projects: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -68,18 +69,18 @@ func (h *JiraImportHandler) GetProjects(w http.ResponseWriter, r *http.Request) 
 func (h *JiraImportHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 	var req JiraAnalyzeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if req.ConnectionID == "" || len(req.ProjectKeys) == 0 {
-		http.Error(w, "connection_id and project_keys are required", http.StatusBadRequest)
+		respondValidationError(w, r, "connection_id and project_keys are required")
 		return
 	}
 
 	client, err := h.getClientForConnection(r.Context(), req.ConnectionID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get Jira client: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -321,25 +322,25 @@ func (h *JiraImportHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 func (h *JiraImportHandler) GetAssetSchemas(w http.ResponseWriter, r *http.Request) {
 	connectionID := r.URL.Query().Get("connection_id")
 	if connectionID == "" {
-		http.Error(w, "connection_id is required", http.StatusBadRequest)
+		respondValidationError(w, r, "connection_id is required")
 		return
 	}
 
 	client, err := h.getClientForConnection(r.Context(), connectionID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get Jira client: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	schemas, err := client.ListObjectSchemas(r.Context())
 	if err != nil {
-		if err == jira.ErrAssetsNotAvailable {
+		if errors.Is(err, jira.ErrAssetsNotAvailable) {
 			// Assets API not available, return empty list
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode([]JiraAssetSchemaInfo{})
 			return
 		}
-		http.Error(w, fmt.Sprintf("Failed to list asset schemas: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -364,19 +365,19 @@ func (h *JiraImportHandler) GetAssetTypes(w http.ResponseWriter, r *http.Request
 	connectionID := r.URL.Query().Get("connection_id")
 
 	if connectionID == "" || schemaID == "" {
-		http.Error(w, "connection_id and schemaId are required", http.StatusBadRequest)
+		respondValidationError(w, r, "connection_id and schemaId are required")
 		return
 	}
 
 	client, err := h.getClientForConnection(r.Context(), connectionID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get Jira client: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	types, err := client.ListObjectTypes(r.Context(), schemaID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to list object types: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

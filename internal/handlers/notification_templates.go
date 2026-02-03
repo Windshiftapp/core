@@ -40,14 +40,14 @@ func (h *NotificationTemplateHandler) GetAllTemplates(w http.ResponseWriter, r *
 
 	query += " ORDER BY template_type, name"
 
-	db, ok := h.requireReadDB(w)
+	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
 
 	rows, err := db.Query(query, args...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -69,7 +69,7 @@ func (h *NotificationTemplateHandler) GetAllTemplates(w http.ResponseWriter, r *
 			&template.UpdatedAt,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -81,7 +81,7 @@ func (h *NotificationTemplateHandler) GetAllTemplates(w http.ResponseWriter, r *
 	}
 
 	if err = rows.Err(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -93,11 +93,11 @@ func (h *NotificationTemplateHandler) GetAllTemplates(w http.ResponseWriter, r *
 func (h *NotificationTemplateHandler) GetTemplate(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid template ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
-	db, ok := h.requireReadDB(w)
+	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -123,10 +123,10 @@ func (h *NotificationTemplateHandler) GetTemplate(w http.ResponseWriter, r *http
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Template not found", http.StatusNotFound)
+			respondNotFound(w, r, "template")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -142,19 +142,19 @@ func (h *NotificationTemplateHandler) GetTemplate(w http.ResponseWriter, r *http
 func (h *NotificationTemplateHandler) CreateTemplate(w http.ResponseWriter, r *http.Request) {
 	var template models.NotificationTemplate
 	if err := json.NewDecoder(r.Body).Decode(&template); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
 
 	// Validate required fields
 	if template.Name == "" || template.TemplateType == "" || template.Content == "" {
-		http.Error(w, "Name, template_type, and content are required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name, template_type, and content are required")
 		return
 	}
 
 	// Validate template type
 	if template.TemplateType != "header" && template.TemplateType != "footer" && template.TemplateType != "notification_type" {
-		http.Error(w, "Invalid template_type. Must be 'header', 'footer', or 'notification_type'", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid template_type. Must be 'header', 'footer', or 'notification_type'")
 		return
 	}
 
@@ -164,7 +164,7 @@ func (h *NotificationTemplateHandler) CreateTemplate(w http.ResponseWriter, r *h
 	template.Content = utils.StripHTMLTags(template.Content)
 	template.Description = utils.StripHTMLTags(template.Description)
 
-	db, ok := h.requireWriteDB(w)
+	db, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
@@ -178,10 +178,10 @@ func (h *NotificationTemplateHandler) CreateTemplate(w http.ResponseWriter, r *h
 
 	if err != nil {
 		if err.Error() == "UNIQUE constraint failed: notification_templates.name" {
-			http.Error(w, "Template name already exists", http.StatusConflict)
+			respondConflict(w, r, "Template name already exists")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -198,25 +198,25 @@ func (h *NotificationTemplateHandler) CreateTemplate(w http.ResponseWriter, r *h
 func (h *NotificationTemplateHandler) UpdateTemplate(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid template ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	var template models.NotificationTemplate
 	if err := json.NewDecoder(r.Body).Decode(&template); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
 
 	// Validate required fields
 	if template.Name == "" || template.TemplateType == "" || template.Content == "" {
-		http.Error(w, "Name, template_type, and content are required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name, template_type, and content are required")
 		return
 	}
 
 	// Validate template type
 	if template.TemplateType != "header" && template.TemplateType != "footer" && template.TemplateType != "notification_type" {
-		http.Error(w, "Invalid template_type. Must be 'header', 'footer', or 'notification_type'", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid template_type. Must be 'header', 'footer', or 'notification_type'")
 		return
 	}
 
@@ -226,7 +226,7 @@ func (h *NotificationTemplateHandler) UpdateTemplate(w http.ResponseWriter, r *h
 	template.Content = utils.StripHTMLTags(template.Content)
 	template.Description = utils.StripHTMLTags(template.Description)
 
-	db, ok := h.requireWriteDB(w)
+	db, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
@@ -240,21 +240,21 @@ func (h *NotificationTemplateHandler) UpdateTemplate(w http.ResponseWriter, r *h
 
 	if err != nil {
 		if err.Error() == "UNIQUE constraint failed: notification_templates.name" {
-			http.Error(w, "Template name already exists", http.StatusConflict)
+			respondConflict(w, r, "Template name already exists")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if rowsAffected == 0 {
-		http.Error(w, "Template not found", http.StatusNotFound)
+		respondNotFound(w, r, "template")
 		return
 	}
 
@@ -270,29 +270,29 @@ func (h *NotificationTemplateHandler) UpdateTemplate(w http.ResponseWriter, r *h
 func (h *NotificationTemplateHandler) DeleteTemplate(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid template ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
-	db, ok := h.requireWriteDB(w)
+	db, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
 
 	result, err := db.Exec(`DELETE FROM notification_templates WHERE id = ?`, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if rowsAffected == 0 {
-		http.Error(w, "Template not found", http.StatusNotFound)
+		respondNotFound(w, r, "template")
 		return
 	}
 

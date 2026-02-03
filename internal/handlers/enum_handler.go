@@ -25,7 +25,7 @@ func NewEnumHandler(service *services.EnumService, newEntity func() interface{})
 func (h *EnumHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	entities, err := h.service.GetAll()
 	if err != nil {
-		handleServiceError(w, err)
+		handleServiceError(w, r, err)
 		return
 	}
 	respondJSONOK(w, entities)
@@ -40,7 +40,7 @@ func (h *EnumHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	entity, err := h.service.GetByID(id)
 	if err != nil {
-		handleServiceError(w, err)
+		handleServiceError(w, r, err)
 		return
 	}
 	respondJSONOK(w, entity)
@@ -50,13 +50,13 @@ func (h *EnumHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *EnumHandler) Create(w http.ResponseWriter, r *http.Request) {
 	entity := h.newEntity()
 	if err := json.NewDecoder(r.Body).Decode(entity); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	created, err := h.service.Create(entity, r)
 	if err != nil {
-		handleServiceError(w, err)
+		handleServiceError(w, r, err)
 		return
 	}
 	respondJSONCreated(w, created)
@@ -71,13 +71,13 @@ func (h *EnumHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	entity := h.newEntity()
 	if err := json.NewDecoder(r.Body).Decode(entity); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	updated, err := h.service.Update(id, entity, r)
 	if err != nil {
-		handleServiceError(w, err)
+		handleServiceError(w, r, err)
 		return
 	}
 	respondJSONOK(w, updated)
@@ -91,17 +91,26 @@ func (h *EnumHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.Delete(id, r); err != nil {
-		handleServiceError(w, err)
+		handleServiceError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // handleServiceError converts service errors to HTTP responses
-func handleServiceError(w http.ResponseWriter, err error) {
+func handleServiceError(w http.ResponseWriter, r *http.Request, err error) {
 	if se, ok := err.(*services.ServiceError); ok {
-		http.Error(w, se.Message, se.StatusCode)
+		switch se.StatusCode {
+		case 400:
+			respondBadRequest(w, r, se.Message)
+		case 404:
+			respondNotFound(w, r, se.Message)
+		case 409:
+			respondConflict(w, r, se.Message)
+		default:
+			respondBadRequest(w, r, se.Message)
+		}
 		return
 	}
-	http.Error(w, err.Error(), http.StatusInternalServerError)
+	respondInternalError(w, r, err)
 }

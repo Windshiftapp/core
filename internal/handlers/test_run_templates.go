@@ -29,23 +29,23 @@ func NewTestRunTemplateHandlerWithPool(db database.Database, permissionService *
 func (h *TestRunTemplateHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
 	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
-	db, ok := h.requireReadDB(w)
+	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -60,7 +60,7 @@ func (h *TestRunTemplateHandler) GetAll(w http.ResponseWriter, r *http.Request) 
 		ORDER BY trt.id DESC
 	`, workspaceID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -76,7 +76,7 @@ func (h *TestRunTemplateHandler) GetAll(w http.ResponseWriter, r *http.Request) 
 			&template.CreatedAt, &template.UpdatedAt, &setName,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -95,29 +95,29 @@ func (h *TestRunTemplateHandler) GetAll(w http.ResponseWriter, r *http.Request) 
 func (h *TestRunTemplateHandler) Get(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
 	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
-	db, ok := h.requireReadDB(w)
+	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -142,11 +142,11 @@ func (h *TestRunTemplateHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Test run template not found", http.StatusNotFound)
+		respondNotFound(w, r, "test_run_template")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -158,34 +158,34 @@ func (h *TestRunTemplateHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *TestRunTemplateHandler) Create(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestManage)
 	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	var template models.TestRunTemplate
 	if err := json.NewDecoder(r.Body).Decode(&template); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
-	readDB, ok := h.requireReadDB(w)
+	readDB, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
 
-	writeDB, ok := h.requireWriteDB(w)
+	writeDB, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
@@ -195,7 +195,7 @@ func (h *TestRunTemplateHandler) Create(w http.ResponseWriter, r *http.Request) 
 		var count int
 		err = readDB.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", template.SetID, workspaceID).Scan(&count)
 		if err != nil || count == 0 {
-			http.Error(w, "Test set not found in workspace", http.StatusNotFound)
+			respondNotFound(w, r, "test_set")
 			return
 		}
 	}
@@ -208,7 +208,7 @@ func (h *TestRunTemplateHandler) Create(w http.ResponseWriter, r *http.Request) 
 	`, workspaceID, template.SetID, template.Name, template.Description, now, now).Scan(&id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -226,40 +226,40 @@ func (h *TestRunTemplateHandler) Create(w http.ResponseWriter, r *http.Request) 
 func (h *TestRunTemplateHandler) Update(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestManage)
 	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	var template models.TestRunTemplate
 	if err := json.NewDecoder(r.Body).Decode(&template); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
-	readDB, ok := h.requireReadDB(w)
+	readDB, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
 
-	writeDB, ok := h.requireWriteDB(w)
+	writeDB, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
@@ -269,7 +269,7 @@ func (h *TestRunTemplateHandler) Update(w http.ResponseWriter, r *http.Request) 
 		var count int
 		err = readDB.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", template.SetID, workspaceID).Scan(&count)
 		if err != nil || count == 0 {
-			http.Error(w, "Test set not found in workspace", http.StatusNotFound)
+			respondNotFound(w, r, "test_set")
 			return
 		}
 	}
@@ -282,7 +282,7 @@ func (h *TestRunTemplateHandler) Update(w http.ResponseWriter, r *http.Request) 
 	`, template.SetID, template.Name, template.Description, now, id, workspaceID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -298,36 +298,36 @@ func (h *TestRunTemplateHandler) Update(w http.ResponseWriter, r *http.Request) 
 func (h *TestRunTemplateHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestManage)
 	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
-	writeDB, ok := h.requireWriteDB(w)
+	writeDB, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
 
 	_, err = writeDB.Exec("DELETE FROM test_run_templates WHERE id = ? AND workspace_id = ?", id, workspaceID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -338,29 +338,29 @@ func (h *TestRunTemplateHandler) Delete(w http.ResponseWriter, r *http.Request) 
 func (h *TestRunTemplateHandler) GetExecutions(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	templateID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid template ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
 	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
-	db, ok := h.requireReadDB(w)
+	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -369,7 +369,7 @@ func (h *TestRunTemplateHandler) GetExecutions(w http.ResponseWriter, r *http.Re
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM test_run_templates WHERE id = ? AND workspace_id = ?", templateID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
-		http.Error(w, "Test run template not found", http.StatusNotFound)
+		respondNotFound(w, r, "test_run_template")
 		return
 	}
 
@@ -381,7 +381,7 @@ func (h *TestRunTemplateHandler) GetExecutions(w http.ResponseWriter, r *http.Re
 	`, templateID, workspaceID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -393,7 +393,7 @@ func (h *TestRunTemplateHandler) GetExecutions(w http.ResponseWriter, r *http.Re
 		var templateID sql.NullInt64
 		err := rows.Scan(&run.ID, &run.WorkspaceID, &templateID, &run.SetID, &run.Name, &run.StartedAt, &run.EndedAt, &run.CreatedAt)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if templateID.Valid {
@@ -410,34 +410,34 @@ func (h *TestRunTemplateHandler) GetExecutions(w http.ResponseWriter, r *http.Re
 func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	templateID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid template ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestExecute)
 	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
-	readDB, ok := h.requireReadDB(w)
+	readDB, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
 
-	writeDB, ok := h.requireWriteDB(w)
+	writeDB, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
@@ -451,11 +451,11 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 	`, templateID, workspaceID).Scan(&template.ID, &template.WorkspaceID, &template.SetID, &template.Name, &template.Description)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Test run template not found", http.StatusNotFound)
+		respondNotFound(w, r, "test_run_template")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -465,7 +465,7 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 		SELECT COUNT(*) FROM test_runs WHERE template_id = ? AND workspace_id = ?
 	`, templateID, workspaceID).Scan(&runCount)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -480,7 +480,7 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 	`, workspaceID, templateID, template.SetID, runName, now, now).Scan(&runID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -493,7 +493,7 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 		ORDER BY tc.id
 	`, template.SetID, workspaceID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -502,7 +502,7 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 	for rows.Next() {
 		var testCaseID int
 		if err := rows.Scan(&testCaseID); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -511,7 +511,7 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 			VALUES (?, ?, 'pending', ?, ?)
 		`, runID, testCaseID, time.Now(), time.Now())
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
@@ -526,7 +526,7 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 	`, runID).Scan(&run.ID, &run.WorkspaceID, &templateIDNullable, &run.SetID, &run.Name, &run.StartedAt, &run.EndedAt, &run.CreatedAt)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

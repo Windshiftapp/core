@@ -40,8 +40,8 @@ type CreateAppTokenRequest struct {
 
 // CreateAppTokenResponse represents the response after creating a token
 type CreateAppTokenResponse struct {
-	Token   string              `json:"token"`   // Full token (only shown once)
-	TokenID int                 `json:"token_id"`
+	Token    string              `json:"token"` // Full token (only shown once)
+	TokenID  int                 `json:"token_id"`
 	AppToken models.UserAppToken `json:"app_token"`
 }
 
@@ -49,7 +49,7 @@ type CreateAppTokenResponse struct {
 func (h *AppTokenHandler) GetUserAppTokens(w http.ResponseWriter, r *http.Request) {
 	userID, err := strconv.Atoi(r.PathValue("userId"))
 	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "userId")
 		return
 	}
 
@@ -59,14 +59,14 @@ func (h *AppTokenHandler) GetUserAppTokens(w http.ResponseWriter, r *http.Reques
 
 	query := `
 		SELECT id, user_id, token_name, token_prefix, scopes, expires_at, is_active, last_used_at, created_at, updated_at
-		FROM user_app_tokens 
-		WHERE user_id = ? 
+		FROM user_app_tokens
+		WHERE user_id = ?
 		ORDER BY created_at DESC
 	`
 
 	rows, err := h.db.Query(query, userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -75,11 +75,11 @@ func (h *AppTokenHandler) GetUserAppTokens(w http.ResponseWriter, r *http.Reques
 	for rows.Next() {
 		var token models.UserAppToken
 		var expiresAt, lastUsedAt sql.NullTime
-		
+
 		err := rows.Scan(&token.ID, &token.UserID, &token.TokenName, &token.TokenPrefix,
 			&token.Scopes, &expiresAt, &token.IsActive, &lastUsedAt, &token.CreatedAt, &token.UpdatedAt)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -105,7 +105,7 @@ func (h *AppTokenHandler) GetUserAppTokens(w http.ResponseWriter, r *http.Reques
 func (h *AppTokenHandler) CreateAppToken(w http.ResponseWriter, r *http.Request) {
 	userID, err := strconv.Atoi(r.PathValue("userId"))
 	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "userId")
 		return
 	}
 
@@ -116,12 +116,12 @@ func (h *AppTokenHandler) CreateAppToken(w http.ResponseWriter, r *http.Request)
 
 	var req CreateAppTokenRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if strings.TrimSpace(req.TokenName) == "" {
-		http.Error(w, "Token name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Token name is required")
 		return
 	}
 
@@ -129,18 +129,18 @@ func (h *AppTokenHandler) CreateAppToken(w http.ResponseWriter, r *http.Request)
 	var userExists bool
 	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", userID).Scan(&userExists)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !userExists {
-		http.Error(w, "User not found", http.StatusNotFound)
+		respondNotFound(w, r, "user")
 		return
 	}
 
 	// Generate secure token
 	token, tokenHash, tokenPrefix, err := generateAppToken()
 	if err != nil {
-		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -149,7 +149,7 @@ func (h *AppTokenHandler) CreateAppToken(w http.ResponseWriter, r *http.Request)
 	if req.ExpiresAt != nil && *req.ExpiresAt != "" {
 		parsedTime, err := time.Parse(time.RFC3339, *req.ExpiresAt)
 		if err != nil {
-			http.Error(w, "Invalid expiration date format", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid expiration date format")
 			return
 		}
 		expiresAt = &parsedTime
@@ -160,7 +160,7 @@ func (h *AppTokenHandler) CreateAppToken(w http.ResponseWriter, r *http.Request)
 	if len(req.Scopes) > 0 {
 		scopesBytes, err := json.Marshal(req.Scopes)
 		if err != nil {
-			http.Error(w, "Invalid scopes format", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid scopes format")
 			return
 		}
 		scopesJSON = string(scopesBytes)
@@ -175,7 +175,7 @@ func (h *AppTokenHandler) CreateAppToken(w http.ResponseWriter, r *http.Request)
 	`, userID, req.TokenName, tokenHash, tokenPrefix, scopesJSON, expiresAt, now, now).Scan(&tokenID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -205,24 +205,24 @@ func (h *AppTokenHandler) CreateAppToken(w http.ResponseWriter, r *http.Request)
 
 	tokenIDInt := int(tokenID)
 	logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAPITokenCreate,
-			ResourceType: logger.ResourceAPIToken,
-			ResourceID:   &tokenIDInt,
-			ResourceName: req.TokenName,
-			Details: map[string]interface{}{
-				"token_name":   req.TokenName,
-				"token_prefix": tokenPrefix,
-				"target_user_id": userID,
-				"target_username": username,
-				"scopes":       req.Scopes,
-				"expires_at":   expiresAt,
-			},
-			Success: true,
-		})
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionAPITokenCreate,
+		ResourceType: logger.ResourceAPIToken,
+		ResourceID:   &tokenIDInt,
+		ResourceName: req.TokenName,
+		Details: map[string]interface{}{
+			"token_name":      req.TokenName,
+			"token_prefix":    tokenPrefix,
+			"target_user_id":  userID,
+			"target_username": username,
+			"scopes":          req.Scopes,
+			"expires_at":      expiresAt,
+		},
+		Success: true,
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -233,7 +233,7 @@ func (h *AppTokenHandler) CreateAppToken(w http.ResponseWriter, r *http.Request)
 func (h *AppTokenHandler) RevokeAppToken(w http.ResponseWriter, r *http.Request) {
 	userID, err := strconv.Atoi(r.PathValue("userId"))
 	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "userId")
 		return
 	}
 
@@ -244,7 +244,7 @@ func (h *AppTokenHandler) RevokeAppToken(w http.ResponseWriter, r *http.Request)
 
 	tokenID, err := strconv.Atoi(r.PathValue("tokenId"))
 	if err != nil {
-		http.Error(w, "Invalid token ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "tokenId")
 		return
 	}
 
@@ -259,39 +259,39 @@ func (h *AppTokenHandler) RevokeAppToken(w http.ResponseWriter, r *http.Request)
 	`, tokenID, userID).Scan(&tokenName, &tokenPrefix, &expiresAt, &username)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Token not found", http.StatusNotFound)
+		respondNotFound(w, r, "token")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Delete the token
 	_, err = h.db.ExecWrite(`DELETE FROM user_app_tokens WHERE id = ? AND user_id = ?`, tokenID, userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Log audit event
 	logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAPITokenRevoke,
-			ResourceType: logger.ResourceAPIToken,
-			ResourceID:   &tokenID,
-			ResourceName: tokenName,
-			Details: map[string]interface{}{
-				"token_name":       tokenName,
-				"token_prefix":     tokenPrefix,
-				"target_user_id":   userID,
-				"target_username":  username,
-			},
-			Success: true,
-		})
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionAPITokenRevoke,
+		ResourceType: logger.ResourceAPIToken,
+		ResourceID:   &tokenID,
+		ResourceName: tokenName,
+		Details: map[string]interface{}{
+			"token_name":      tokenName,
+			"token_prefix":    tokenPrefix,
+			"target_user_id":  userID,
+			"target_username": username,
+		},
+		Success: true,
+	})
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -300,7 +300,7 @@ func (h *AppTokenHandler) RevokeAppToken(w http.ResponseWriter, r *http.Request)
 func (h *AppTokenHandler) UpdateAppToken(w http.ResponseWriter, r *http.Request) {
 	userID, err := strconv.Atoi(r.PathValue("userId"))
 	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "userId")
 		return
 	}
 
@@ -310,18 +310,18 @@ func (h *AppTokenHandler) UpdateAppToken(w http.ResponseWriter, r *http.Request)
 
 	tokenID, err := strconv.Atoi(r.PathValue("tokenId"))
 	if err != nil {
-		http.Error(w, "Invalid token ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "tokenId")
 		return
 	}
 
 	var req CreateAppTokenRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if strings.TrimSpace(req.TokenName) == "" {
-		http.Error(w, "Token name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Token name is required")
 		return
 	}
 
@@ -330,7 +330,7 @@ func (h *AppTokenHandler) UpdateAppToken(w http.ResponseWriter, r *http.Request)
 	if req.ExpiresAt != nil && *req.ExpiresAt != "" {
 		parsedTime, err := time.Parse(time.RFC3339, *req.ExpiresAt)
 		if err != nil {
-			http.Error(w, "Invalid expiration date format", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid expiration date format")
 			return
 		}
 		expiresAt = &parsedTime
@@ -341,7 +341,7 @@ func (h *AppTokenHandler) UpdateAppToken(w http.ResponseWriter, r *http.Request)
 	if len(req.Scopes) > 0 {
 		scopesBytes, err := json.Marshal(req.Scopes)
 		if err != nil {
-			http.Error(w, "Invalid scopes format", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid scopes format")
 			return
 		}
 		scopesJSON = string(scopesBytes)
@@ -349,24 +349,24 @@ func (h *AppTokenHandler) UpdateAppToken(w http.ResponseWriter, r *http.Request)
 
 	// Update the token
 	result, err := h.db.ExecWrite(`
-		UPDATE user_app_tokens 
+		UPDATE user_app_tokens
 		SET token_name = ?, scopes = ?, expires_at = ?, updated_at = ?
 		WHERE id = ? AND user_id = ?
 	`, req.TokenName, scopesJSON, expiresAt, time.Now(), tokenID, userID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if rowsAffected == 0 {
-		http.Error(w, "Token not found", http.StatusNotFound)
+		respondNotFound(w, r, "token")
 		return
 	}
 

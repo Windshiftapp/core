@@ -105,7 +105,7 @@ func NewSCMItemLinksHandler(db database.Database, encryption *sso.SecretEncrypti
 func (h *SCMItemLinksHandler) GetItemSCMLinks(w http.ResponseWriter, r *http.Request) {
 	itemID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid item ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -126,7 +126,7 @@ func (h *SCMItemLinksHandler) GetItemSCMLinks(w http.ResponseWriter, r *http.Req
 	`, itemID)
 	if err != nil {
 		slog.Error("failed to get links", slog.String("component", "scm_item_links"), slog.Any("error", err))
-		http.Error(w, "Failed to get SCM links", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -179,27 +179,27 @@ func (h *SCMItemLinksHandler) GetItemSCMLinks(w http.ResponseWriter, r *http.Req
 func (h *SCMItemLinksHandler) CreateItemSCMLink(w http.ResponseWriter, r *http.Request) {
 	itemID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid item ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	var req CreateItemSCMLinkRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if req.WorkspaceRepositoryID == 0 {
-		http.Error(w, "workspace_repository_id is required", http.StatusBadRequest)
+		respondValidationError(w, r, "workspace_repository_id is required")
 		return
 	}
 	if req.LinkType == "" {
-		http.Error(w, "link_type is required", http.StatusBadRequest)
+		respondValidationError(w, r, "link_type is required")
 		return
 	}
 	if req.ExternalID == "" {
-		http.Error(w, "external_id is required", http.StatusBadRequest)
+		respondValidationError(w, r, "external_id is required")
 		return
 	}
 
@@ -208,7 +208,7 @@ func (h *SCMItemLinksHandler) CreateItemSCMLink(w http.ResponseWriter, r *http.R
 	if linkType != models.SCMLinkTypePullRequest &&
 		linkType != models.SCMLinkTypeCommit &&
 		linkType != models.SCMLinkTypeBranch {
-		http.Error(w, "Invalid link_type. Must be pull_request, commit, or branch", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid link_type. Must be pull_request, commit, or branch")
 		return
 	}
 
@@ -217,9 +217,9 @@ func (h *SCMItemLinksHandler) CreateItemSCMLink(w http.ResponseWriter, r *http.R
 	err = h.db.QueryRow("SELECT 1 FROM items WHERE id = ?", itemID).Scan(&itemExists)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 		} else {
-			http.Error(w, "Failed to verify item", http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to verify item: %w", err))
 		}
 		return
 	}
@@ -234,21 +234,21 @@ func (h *SCMItemLinksHandler) CreateItemSCMLink(w http.ResponseWriter, r *http.R
 	`, req.WorkspaceRepositoryID).Scan(&repoWorkspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Repository not found", http.StatusNotFound)
+			respondNotFound(w, r, "repository")
 		} else {
-			http.Error(w, "Failed to verify repository", http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to verify repository: %w", err))
 		}
 		return
 	}
 
 	err = h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&itemWorkspaceID)
 	if err != nil {
-		http.Error(w, "Failed to verify item workspace", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to verify item workspace: %w", err))
 		return
 	}
 
 	if repoWorkspaceID != itemWorkspaceID {
-		http.Error(w, "Repository does not belong to the item's workspace", http.StatusBadRequest)
+		respondValidationError(w, r, "Repository does not belong to the item's workspace")
 		return
 	}
 
@@ -263,7 +263,7 @@ func (h *SCMItemLinksHandler) CreateItemSCMLink(w http.ResponseWriter, r *http.R
 	if err != nil {
 		slog.Error("failed to create link", slog.String("component", "scm_item_links"), slog.Any("error", err))
 		// Check for unique constraint violation
-		http.Error(w, "Failed to create SCM link. It may already exist.", http.StatusConflict)
+		respondConflict(w, r, "Failed to create SCM link. It may already exist.")
 		return
 	}
 
@@ -273,7 +273,7 @@ func (h *SCMItemLinksHandler) CreateItemSCMLink(w http.ResponseWriter, r *http.R
 	link, err := h.getLinkByID(int(id))
 	if err != nil {
 		slog.Error("failed to get created link", slog.String("component", "scm_item_links"), slog.Any("error", err))
-		http.Error(w, "Link created but failed to retrieve", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("link created but failed to retrieve: %w", err))
 		return
 	}
 
@@ -286,7 +286,7 @@ func (h *SCMItemLinksHandler) CreateItemSCMLink(w http.ResponseWriter, r *http.R
 func (h *SCMItemLinksHandler) DeleteItemSCMLink(w http.ResponseWriter, r *http.Request) {
 	linkID, err := strconv.Atoi(r.PathValue("linkId"))
 	if err != nil {
-		http.Error(w, "Invalid link ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "linkId")
 		return
 	}
 
@@ -295,9 +295,9 @@ func (h *SCMItemLinksHandler) DeleteItemSCMLink(w http.ResponseWriter, r *http.R
 	err = h.db.QueryRow("SELECT 1 FROM item_scm_links WHERE id = ?", linkID).Scan(&exists)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Link not found", http.StatusNotFound)
+			respondNotFound(w, r, "link")
 		} else {
-			http.Error(w, "Failed to verify link", http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to verify link: %w", err))
 		}
 		return
 	}
@@ -305,7 +305,7 @@ func (h *SCMItemLinksHandler) DeleteItemSCMLink(w http.ResponseWriter, r *http.R
 	_, err = h.db.Exec("DELETE FROM item_scm_links WHERE id = ?", linkID)
 	if err != nil {
 		slog.Error("failed to delete link", slog.String("component", "scm_item_links"), slog.Any("error", err))
-		http.Error(w, "Failed to delete link", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -316,7 +316,7 @@ func (h *SCMItemLinksHandler) DeleteItemSCMLink(w http.ResponseWriter, r *http.R
 func (h *SCMItemLinksHandler) RefreshItemSCMLink(w http.ResponseWriter, r *http.Request) {
 	linkID, err := strconv.Atoi(r.PathValue("linkId"))
 	if err != nil {
-		http.Error(w, "Invalid link ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "linkId")
 		return
 	}
 
@@ -326,14 +326,14 @@ func (h *SCMItemLinksHandler) RefreshItemSCMLink(w http.ResponseWriter, r *http.
 	err = h.syncService.RefreshItemSCMLink(ctx, linkID)
 	if err != nil {
 		slog.Error("failed to refresh link", slog.String("component", "scm_item_links"), slog.Any("error", err))
-		http.Error(w, "Failed to refresh link: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to refresh link: %w", err))
 		return
 	}
 
 	// Return the updated link
 	link, err := h.getLinkByID(linkID)
 	if err != nil {
-		http.Error(w, "Failed to retrieve updated link", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to retrieve updated link: %w", err))
 		return
 	}
 
@@ -345,7 +345,7 @@ func (h *SCMItemLinksHandler) RefreshItemSCMLink(w http.ResponseWriter, r *http.
 func (h *SCMItemLinksHandler) SyncWorkspaceRepository(w http.ResponseWriter, r *http.Request) {
 	repoID, err := strconv.Atoi(r.PathValue("repoId"))
 	if err != nil {
-		http.Error(w, "Invalid repository ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "repoId")
 		return
 	}
 
@@ -354,9 +354,9 @@ func (h *SCMItemLinksHandler) SyncWorkspaceRepository(w http.ResponseWriter, r *
 	err = h.db.QueryRow("SELECT 1 FROM workspace_repositories WHERE id = ?", repoID).Scan(&exists)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Repository not found", http.StatusNotFound)
+			respondNotFound(w, r, "repository")
 		} else {
-			http.Error(w, "Failed to verify repository", http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to verify repository: %w", err))
 		}
 		return
 	}
@@ -367,7 +367,7 @@ func (h *SCMItemLinksHandler) SyncWorkspaceRepository(w http.ResponseWriter, r *
 	err = h.syncService.SyncRepository(ctx, repoID)
 	if err != nil {
 		slog.Error("failed to sync repository", slog.String("component", "scm_item_links"), slog.Any("error", err))
-		http.Error(w, "Failed to sync repository: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to sync repository: %w", err))
 		return
 	}
 
@@ -382,7 +382,7 @@ func (h *SCMItemLinksHandler) SyncWorkspaceRepository(w http.ResponseWriter, r *
 func (h *SCMItemLinksHandler) GetWorkspaceRepositoriesForItem(w http.ResponseWriter, r *http.Request) {
 	itemID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid item ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -391,9 +391,9 @@ func (h *SCMItemLinksHandler) GetWorkspaceRepositoriesForItem(w http.ResponseWri
 	err = h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 		} else {
-			http.Error(w, "Failed to get item", http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to get item: %w", err))
 		}
 		return
 	}
@@ -411,7 +411,7 @@ func (h *SCMItemLinksHandler) GetWorkspaceRepositoriesForItem(w http.ResponseWri
 	`, workspaceID)
 	if err != nil {
 		slog.Error("failed to get repositories", slog.String("component", "scm_item_links"), slog.Any("error", err))
-		http.Error(w, "Failed to get repositories", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -445,23 +445,23 @@ func (h *SCMItemLinksHandler) GetWorkspaceRepositoriesForItem(w http.ResponseWri
 func (h *SCMItemLinksHandler) CreateBranchForItem(w http.ResponseWriter, r *http.Request) {
 	itemID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid item ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	var req CreateBranchForItemRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if req.WorkspaceRepositoryID == 0 {
-		http.Error(w, "workspace_repository_id is required", http.StatusBadRequest)
+		respondValidationError(w, r, "workspace_repository_id is required")
 		return
 	}
 	if req.BranchName == "" {
-		http.Error(w, "branch_name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "branch_name is required")
 		return
 	}
 
@@ -476,10 +476,10 @@ func (h *SCMItemLinksHandler) CreateBranchForItem(w http.ResponseWriter, r *http
 	`, itemID).Scan(&itemWorkspaceID, &itemKey, &itemTitle)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 		} else {
 			slog.Error("failed to get item", slog.String("component", "scm_item_links"), slog.Any("error", err))
-			http.Error(w, "Failed to get item", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -494,22 +494,22 @@ func (h *SCMItemLinksHandler) CreateBranchForItem(w http.ResponseWriter, r *http
 	`, req.WorkspaceRepositoryID).Scan(&repoWorkspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Repository not found", http.StatusNotFound)
+			respondNotFound(w, r, "repository")
 		} else {
-			http.Error(w, "Failed to verify repository", http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to verify repository: %w", err))
 		}
 		return
 	}
 
 	if repoWorkspaceID != itemWorkspaceID {
-		http.Error(w, "Repository does not belong to the item's workspace", http.StatusBadRequest)
+		respondValidationError(w, r, "Repository does not belong to the item's workspace")
 		return
 	}
 
 	// Get authenticated user for per-user OAuth tokens
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -530,7 +530,7 @@ func (h *SCMItemLinksHandler) CreateBranchForItem(w http.ResponseWriter, r *http
 			return
 		}
 		slog.Error("failed to create branch", slog.String("component", "scm_item_links"), slog.Any("error", err))
-		http.Error(w, "Failed to create branch: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to create branch: %w", err))
 		return
 	}
 
@@ -618,13 +618,13 @@ type CreatePRFromBranchResponse struct {
 func (h *SCMItemLinksHandler) CreatePRFromBranch(w http.ResponseWriter, r *http.Request) {
 	linkID, err := strconv.Atoi(r.PathValue("linkId"))
 	if err != nil {
-		http.Error(w, "Invalid link ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "linkId")
 		return
 	}
 
 	var req CreatePRFromBranchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -643,17 +643,17 @@ func (h *SCMItemLinksHandler) CreatePRFromBranch(w http.ResponseWriter, r *http.
 	`, linkID).Scan(&itemID, &workspaceRepoID, &branchName, &linkType, &itemKey, &itemTitle, &itemWorkspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Link not found", http.StatusNotFound)
+			respondNotFound(w, r, "link")
 		} else {
 			slog.Error("failed to get link", slog.String("component", "scm_item_links"), slog.Any("error", err))
-			http.Error(w, "Failed to get link", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
 
 	// Verify this is a branch link
 	if linkType != "branch" {
-		http.Error(w, "Can only create PR from a branch link", http.StatusBadRequest)
+		respondValidationError(w, r, "Can only create PR from a branch link")
 		return
 	}
 
@@ -695,10 +695,10 @@ func (h *SCMItemLinksHandler) CreatePRFromBranch(w http.ResponseWriter, r *http.
 	if err != nil {
 		slog.Error("failed to create PR", slog.String("component", "scm_item_links"), slog.Any("error", err))
 		if errors.Is(err, scm.ErrAlreadyExists) {
-			http.Error(w, "A pull request already exists for this branch", http.StatusConflict)
+			respondConflict(w, r, "A pull request already exists for this branch")
 			return
 		}
-		http.Error(w, "Failed to create pull request", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to create pull request: %w", err))
 		return
 	}
 
@@ -782,13 +782,13 @@ func (h *SCMItemLinksHandler) getLinkByID(id int) (*ItemSCMLinkResponse, error) 
 func (h *SCMItemLinksHandler) GetSCMConnectionStatus(w http.ResponseWriter, r *http.Request) {
 	itemID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid item ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -797,9 +797,9 @@ func (h *SCMItemLinksHandler) GetSCMConnectionStatus(w http.ResponseWriter, r *h
 	err = h.db.QueryRow(`SELECT workspace_id FROM items WHERE id = ?`, itemID).Scan(&workspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 		} else {
-			http.Error(w, "Failed to get item", http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to get item: %w", err))
 		}
 		return
 	}
@@ -817,7 +817,7 @@ func (h *SCMItemLinksHandler) GetSCMConnectionStatus(w http.ResponseWriter, r *h
 		ORDER BY sp.name
 	`, user.ID, workspaceID)
 	if err != nil {
-		http.Error(w, "Failed to get connection status", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to get connection status: %w", err))
 		return
 	}
 	defer rows.Close()

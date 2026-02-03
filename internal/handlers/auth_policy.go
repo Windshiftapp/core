@@ -128,7 +128,7 @@ func (h *AuthPolicyHandler) UpdateAuthPolicy(w http.ResponseWriter, r *http.Requ
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
 
@@ -140,7 +140,7 @@ func (h *AuthPolicyHandler) UpdateAuthPolicy(w http.ResponseWriter, r *http.Requ
 		AuthPolicySSOPrimary:         true,
 	}
 	if !validPolicies[req.Policy] {
-		http.Error(w, "Invalid policy value", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid policy value")
 		return
 	}
 
@@ -149,13 +149,13 @@ func (h *AuthPolicyHandler) UpdateAuthPolicy(w http.ResponseWriter, r *http.Requ
 
 	// password_passkey_2fa should not be used when SSO is configured (SSO provides 2FA)
 	if req.Policy == AuthPolicyPasswordPasskey2FA && ssoConfigured {
-		http.Error(w, "Password+Passkey 2FA policy is not recommended when SSO is configured", http.StatusBadRequest)
+		respondBadRequest(w, r, "Password+Passkey 2FA policy is not recommended when SSO is configured")
 		return
 	}
 
 	// sso_primary requires SSO to be configured
 	if req.Policy == AuthPolicySSOPrimary && !ssoConfigured {
-		http.Error(w, "SSO Primary policy requires SSO to be configured", http.StatusBadRequest)
+		respondBadRequest(w, r, "SSO Primary policy requires SSO to be configured")
 		return
 	}
 
@@ -200,12 +200,12 @@ func (h *AuthPolicyHandler) UpdateAuthPolicy(w http.ResponseWriter, r *http.Requ
 		`).Scan(&adminsWithoutPasskey)
 
 		if err != nil {
-			http.Error(w, "Failed to verify administrator passkey enrollment. Cannot safely enable this policy.", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
 		if adminsWithoutPasskey > 0 {
-			http.Error(w, "Cannot enable this policy: some administrators do not have passkeys enrolled. Enable --enable-fallback flag or ensure all admins have passkeys.", http.StatusBadRequest)
+			respondBadRequest(w, r, "Cannot enable this policy: some administrators do not have passkeys enrolled. Enable --enable-fallback flag or ensure all admins have passkeys.")
 			return
 		}
 	}
@@ -357,7 +357,7 @@ func (h *AuthPolicyHandler) GetAffectedUsers(w http.ResponseWriter, r *http.Requ
 
 	rows, err := h.db.Query(query)
 	if err != nil {
-		http.Error(w, "Failed to query affected users", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()

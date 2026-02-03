@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
 	"strconv"
 	"windshift/internal/models"
@@ -18,7 +19,7 @@ func (h *ItemHandler) GetChildren(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -27,28 +28,28 @@ func (h *ItemHandler) GetChildren(w http.ResponseWriter, r *http.Request) {
 	parentWorkspaceID, err := repo.GetWorkspaceID(id)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Parent item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 			return
 		}
-		http.Error(w, "Failed to fetch parent item: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to fetch parent item: %w", err))
 		return
 	}
 
 	// Check permission
 	canView, err := h.canViewItem(user.ID, parentWorkspaceID)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 		return
 	}
 	if !canView {
-		http.Error(w, "Insufficient permissions to view this item's children", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	// Get children using repository
 	children, err := repo.GetChildren(id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -71,7 +72,7 @@ func (h *ItemHandler) GetAncestors(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -80,34 +81,34 @@ func (h *ItemHandler) GetAncestors(w http.ResponseWriter, r *http.Request) {
 	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", id).Scan(&childWorkspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 			return
 		}
-		http.Error(w, "Failed to fetch item: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to fetch item: %w", err))
 		return
 	}
 
 	// Check if user has permission to view child item's workspace
 	canView, permErr := h.canViewItem(user.ID, childWorkspaceID)
 	if permErr != nil {
-		http.Error(w, "Permission check failed: "+permErr.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", permErr))
 		return
 	}
 	if !canView {
-		http.Error(w, "Insufficient permissions to view this item's ancestors", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	ancestors, err := h.hierarchyService.GetAncestors(id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Apply permission filtering to ancestors as well
 	filteredAncestors, err := h.filterItemsByPermissions(user.ID, ancestors)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 		return
 	}
 
@@ -124,7 +125,7 @@ func (h *ItemHandler) GetDescendantsNew(w http.ResponseWriter, r *http.Request) 
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -133,21 +134,21 @@ func (h *ItemHandler) GetDescendantsNew(w http.ResponseWriter, r *http.Request) 
 	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", id).Scan(&parentWorkspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 			return
 		}
-		http.Error(w, "Failed to fetch item: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to fetch item: %w", err))
 		return
 	}
 
 	// Check if user has permission to view parent item's workspace
 	canView, permErr := h.canViewItem(user.ID, parentWorkspaceID)
 	if permErr != nil {
-		http.Error(w, "Permission check failed: "+permErr.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", permErr))
 		return
 	}
 	if !canView {
-		http.Error(w, "Insufficient permissions to view this item's descendants", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -156,21 +157,21 @@ func (h *ItemHandler) GetDescendantsNew(w http.ResponseWriter, r *http.Request) 
 	if maxDepthStr := r.URL.Query().Get("max_depth"); maxDepthStr != "" {
 		maxDepth, err = strconv.Atoi(maxDepthStr)
 		if err != nil || maxDepth < 0 {
-			http.Error(w, "Invalid max_depth parameter", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid max_depth parameter")
 			return
 		}
 	}
 
 	descendants, err := h.hierarchyService.GetDescendants(id, maxDepth)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Apply permission filtering
 	filteredDescendants, err := h.filterItemsByPermissions(user.ID, descendants)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 		return
 	}
 
@@ -187,7 +188,7 @@ func (h *ItemHandler) GetTree(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -196,35 +197,35 @@ func (h *ItemHandler) GetTree(w http.ResponseWriter, r *http.Request) {
 	rootItem, err := repo.FindByID(id)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 			return
 		}
-		http.Error(w, "Failed to fetch item: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to fetch item: %w", err))
 		return
 	}
 
 	// Check if user has permission to view item's workspace
 	canView, permErr := h.canViewItem(user.ID, rootItem.WorkspaceID)
 	if permErr != nil {
-		http.Error(w, "Permission check failed: "+permErr.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", permErr))
 		return
 	}
 	if !canView {
-		http.Error(w, "Insufficient permissions to view this item", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	// Get all descendants
 	descendants, err := h.hierarchyService.GetDescendants(id, 0)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Apply permission filtering
 	filteredDescendants, err := h.filterItemsByPermissions(user.ID, descendants)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 		return
 	}
 
@@ -283,7 +284,7 @@ func (h *ItemHandler) GetChildrenNew(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -292,34 +293,34 @@ func (h *ItemHandler) GetChildrenNew(w http.ResponseWriter, r *http.Request) {
 	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", id).Scan(&parentWorkspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Parent item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 			return
 		}
-		http.Error(w, "Failed to fetch parent item: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to fetch parent item: %w", err))
 		return
 	}
 
 	// Check if user has permission to view parent item's workspace
 	canView, permErr := h.canViewItem(user.ID, parentWorkspaceID)
 	if permErr != nil {
-		http.Error(w, "Permission check failed: "+permErr.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", permErr))
 		return
 	}
 	if !canView {
-		http.Error(w, "Insufficient permissions to view this item's children", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	children, err := h.hierarchyService.GetChildren(id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Apply permission filtering
 	filteredChildren, err := h.filterItemsByPermissions(user.ID, children)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 		return
 	}
 

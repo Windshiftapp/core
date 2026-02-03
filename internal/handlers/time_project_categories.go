@@ -26,7 +26,7 @@ func (h *TimeProjectCategoryHandler) GetCategories(w http.ResponseWriter, r *htt
 		ORDER BY display_order ASC, name ASC
 	`)
 	if err != nil {
-		http.Error(w, "Failed to fetch categories: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -46,7 +46,7 @@ func (h *TimeProjectCategoryHandler) GetCategories(w http.ResponseWriter, r *htt
 			&c.UpdatedAt,
 		)
 		if err != nil {
-			http.Error(w, "Failed to scan category: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -88,11 +88,11 @@ func (h *TimeProjectCategoryHandler) GetCategory(w http.ResponseWriter, r *http.
 	)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Category not found", http.StatusNotFound)
+		respondNotFound(w, r, "category")
 		return
 	}
 	if err != nil {
-		http.Error(w, "Failed to fetch category: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -110,12 +110,12 @@ func (h *TimeProjectCategoryHandler) GetCategory(w http.ResponseWriter, r *http.
 func (h *TimeProjectCategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
 	var c models.TimeProjectCategory
 	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
-		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if c.Name == "" {
-		http.Error(w, "Category name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Category name is required")
 		return
 	}
 
@@ -123,7 +123,7 @@ func (h *TimeProjectCategoryHandler) CreateCategory(w http.ResponseWriter, r *ht
 	var maxOrder sql.NullInt64
 	err := h.db.QueryRow("SELECT MAX(display_order) FROM time_project_categories").Scan(&maxOrder)
 	if err != nil && err != sql.ErrNoRows {
-		http.Error(w, "Failed to determine display order: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -139,13 +139,13 @@ func (h *TimeProjectCategoryHandler) CreateCategory(w http.ResponseWriter, r *ht
 	`, c.Name, c.Description, c.Color, displayOrder, now, now)
 
 	if err != nil {
-		http.Error(w, "Failed to create category: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		http.Error(w, "Failed to get new category ID: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -166,12 +166,12 @@ func (h *TimeProjectCategoryHandler) UpdateCategory(w http.ResponseWriter, r *ht
 
 	var c models.TimeProjectCategory
 	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
-		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if c.Name == "" {
-		http.Error(w, "Category name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Category name is required")
 		return
 	}
 
@@ -179,11 +179,11 @@ func (h *TimeProjectCategoryHandler) UpdateCategory(w http.ResponseWriter, r *ht
 	var exists bool
 	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM time_project_categories WHERE id = ?)", id).Scan(&exists)
 	if err != nil {
-		http.Error(w, "Failed to check category existence: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !exists {
-		http.Error(w, "Category not found", http.StatusNotFound)
+		respondNotFound(w, r, "category")
 		return
 	}
 
@@ -195,7 +195,7 @@ func (h *TimeProjectCategoryHandler) UpdateCategory(w http.ResponseWriter, r *ht
 	`, c.Name, c.Description, c.Color, c.DisplayOrder, now, id)
 
 	if err != nil {
-		http.Error(w, "Failed to update category: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -216,29 +216,29 @@ func (h *TimeProjectCategoryHandler) DeleteCategory(w http.ResponseWriter, r *ht
 	var projectCount int
 	err := h.db.QueryRow("SELECT COUNT(*) FROM time_projects WHERE category_id = ?", id).Scan(&projectCount)
 	if err != nil {
-		http.Error(w, "Failed to check category usage: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if projectCount > 0 {
-		http.Error(w, "Cannot delete category: it is used by "+strconv.Itoa(projectCount)+" project(s)", http.StatusConflict)
+		respondConflict(w, r, "Cannot delete category: it is used by "+strconv.Itoa(projectCount)+" project(s)")
 		return
 	}
 
 	result, err := h.db.Exec("DELETE FROM time_project_categories WHERE id = ?", id)
 	if err != nil {
-		http.Error(w, "Failed to delete category: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		http.Error(w, "Failed to check deletion result: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if rowsAffected == 0 {
-		http.Error(w, "Category not found", http.StatusNotFound)
+		respondNotFound(w, r, "category")
 		return
 	}
 
@@ -253,7 +253,7 @@ func (h *TimeProjectCategoryHandler) ReorderCategories(w http.ResponseWriter, r 
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&orderUpdates); err != nil {
-		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -267,7 +267,7 @@ func (h *TimeProjectCategoryHandler) ReorderCategories(w http.ResponseWriter, r 
 		`, update.DisplayOrder, now, update.ID)
 
 		if err != nil {
-			http.Error(w, "Failed to update category order: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}

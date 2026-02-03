@@ -79,18 +79,18 @@ func (h *CalendarFeedHandler) isCalendarFeedEnabled() (bool, error) {
 func (h *CalendarFeedHandler) GetFeedToken(w http.ResponseWriter, r *http.Request) {
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	// Check if calendar feeds are enabled
 	enabled, err := h.isCalendarFeedEnabled()
 	if err != nil {
-		http.Error(w, "Failed to check calendar feed settings", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !enabled {
-		http.Error(w, "Calendar feeds are disabled by administrator", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -111,7 +111,7 @@ func (h *CalendarFeedHandler) GetFeedToken(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if err != nil {
-		http.Error(w, "Failed to get feed token", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -137,25 +137,25 @@ func (h *CalendarFeedHandler) GetFeedToken(w http.ResponseWriter, r *http.Reques
 func (h *CalendarFeedHandler) CreateFeedToken(w http.ResponseWriter, r *http.Request) {
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	// Check if calendar feeds are enabled
 	enabled, err := h.isCalendarFeedEnabled()
 	if err != nil {
-		http.Error(w, "Failed to check calendar feed settings", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !enabled {
-		http.Error(w, "Calendar feeds are disabled by administrator", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	// Generate new token
 	token, err := generateFeedToken()
 	if err != nil {
-		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -171,7 +171,7 @@ func (h *CalendarFeedHandler) CreateFeedToken(w http.ResponseWriter, r *http.Req
 		VALUES (?, ?, true, ?, ?)
 	`, user.ID, token, now, now)
 	if err != nil {
-		http.Error(w, "Failed to create feed token", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -195,19 +195,19 @@ func (h *CalendarFeedHandler) CreateFeedToken(w http.ResponseWriter, r *http.Req
 func (h *CalendarFeedHandler) RevokeFeedToken(w http.ResponseWriter, r *http.Request) {
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	result, err := h.db.Exec("DELETE FROM calendar_feed_tokens WHERE user_id = ?", user.ID)
 	if err != nil {
-		http.Error(w, "Failed to revoke feed token", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "No feed token found", http.StatusNotFound)
+		respondNotFound(w, r, "calendar_feed_token")
 		return
 	}
 
@@ -224,18 +224,18 @@ func (h *CalendarFeedHandler) ServeICSFeed(w http.ResponseWriter, r *http.Reques
 
 	// Validate token format
 	if !strings.HasPrefix(token, tokenPrefix) {
-		http.Error(w, "Invalid token format", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid token format")
 		return
 	}
 
 	// Check if calendar feeds are enabled
 	enabled, err := h.isCalendarFeedEnabled()
 	if err != nil {
-		http.Error(w, "Service unavailable", http.StatusServiceUnavailable)
+		respondServiceUnavailable(w, r, "Service unavailable")
 		return
 	}
 	if !enabled {
-		http.Error(w, "Calendar feeds are disabled", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -247,16 +247,16 @@ func (h *CalendarFeedHandler) ServeICSFeed(w http.ResponseWriter, r *http.Reques
 	`, token).Scan(&userID, &isActive)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Invalid or expired feed token", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	if err != nil {
-		http.Error(w, "Service error", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if !isActive {
-		http.Error(w, "Feed token has been revoked", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -266,7 +266,7 @@ func (h *CalendarFeedHandler) ServeICSFeed(w http.ResponseWriter, r *http.Reques
 	// Get user's scheduled items
 	icsContent, err := h.generateICSForUser(userID)
 	if err != nil {
-		http.Error(w, "Failed to generate calendar feed", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

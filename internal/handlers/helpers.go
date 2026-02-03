@@ -36,7 +36,7 @@ func parseIDParam(r *http.Request, paramName string) (int, error) {
 func requireIDParam(w http.ResponseWriter, r *http.Request, paramName string) (int, bool) {
 	id, err := parseIDParam(r, paramName)
 	if err != nil {
-		http.Error(w, "Invalid "+paramName, http.StatusBadRequest)
+		respondInvalidID(w, r, paramName)
 		return 0, false
 	}
 	return id, true

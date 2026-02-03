@@ -79,11 +79,11 @@ func (h *HubHandler) GetHub(w http.ResponseWriter, r *http.Request) {
 			},
 		}
 	} else if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get hub config: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	} else {
 		if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
-			http.Error(w, fmt.Sprintf("Failed to parse hub config: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
@@ -91,7 +91,7 @@ func (h *HubHandler) GetHub(w http.ResponseWriter, r *http.Request) {
 	// Get all enabled portal channels (filtered by user visibility)
 	portals, err := h.getEnabledPortals(ctx, isAdmin, userGroupIDs)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get portals: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -110,20 +110,20 @@ func (h *HubHandler) UpdateHubConfig(w http.ResponseWriter, r *http.Request) {
 	// Get current user for permission check
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	// Check if user is a system admin
 	isSystemAdmin, err := h.permissionService.IsSystemAdmin(user.ID)
 	if err != nil || !isSystemAdmin {
-		http.Error(w, "Admin access required", http.StatusForbidden)
+		respondAdminRequired(w, r)
 		return
 	}
 
 	var config models.PortalHubConfig
 	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
 
@@ -133,7 +133,7 @@ func (h *HubHandler) UpdateHubConfig(w http.ResponseWriter, r *http.Request) {
 	// Convert config to JSON
 	configJSON, err := json.Marshal(config)
 	if err != nil {
-		http.Error(w, "Failed to serialize config", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -144,7 +144,7 @@ func (h *HubHandler) UpdateHubConfig(w http.ResponseWriter, r *http.Request) {
 		ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP
 	`, string(configJSON), string(configJSON))
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to save hub config: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -205,7 +205,7 @@ func (h *HubHandler) GetHubInbox(w http.ResponseWriter, r *http.Request) {
 	countQuery := "SELECT COUNT(DISTINCT i.id) " + baseQuery
 	err := h.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to count inbox items: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -229,7 +229,7 @@ func (h *HubHandler) GetHubInbox(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get inbox items: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -246,7 +246,7 @@ func (h *HubHandler) GetHubInbox(w http.ResponseWriter, r *http.Request) {
 			&submitterName, &submitterEmail,
 		)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to scan inbox item: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if submitterName.Valid {
@@ -259,7 +259,7 @@ func (h *HubHandler) GetHubInbox(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = rows.Err(); err != nil {
-		http.Error(w, fmt.Sprintf("Error reading inbox items: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -280,7 +280,7 @@ func (h *HubHandler) GetHubInbox(w http.ResponseWriter, r *http.Request) {
 func (h *HubHandler) GetHubInboxItem(w http.ResponseWriter, r *http.Request) {
 	itemID, err := strconv.Atoi(r.PathValue("itemId"))
 	if err != nil {
-		http.Error(w, "Invalid item ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "itemId")
 		return
 	}
 
@@ -312,10 +312,10 @@ func (h *HubHandler) GetHubInboxItem(w http.ResponseWriter, r *http.Request) {
 		&submitterName, &submitterEmail,
 	)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Item not found", http.StatusNotFound)
+		respondNotFound(w, r, "item")
 		return
 	} else if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get item: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

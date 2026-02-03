@@ -37,7 +37,7 @@ func (h *JiraImportHandler) GetJobStatus(w http.ResponseWriter, r *http.Request)
 		WHERE id = ?
 	`, jobID).Scan(&status, &phase, &progressJSON, &resultJSON, &errorMessage, &startedAt, &completedAt)
 	if err != nil {
-		http.Error(w, "Job not found", http.StatusNotFound)
+		respondNotFound(w, r, "job")
 		return
 	}
 
@@ -78,7 +78,7 @@ func (h *JiraImportHandler) GetImportJobs(w http.ResponseWriter, r *http.Request
 		ORDER BY j.created_at DESC
 	`)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to list import jobs: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -139,12 +139,12 @@ func (h *JiraImportHandler) GetImportJobs(w http.ResponseWriter, r *http.Request
 func (h *JiraImportHandler) StartImport(w http.ResponseWriter, r *http.Request) {
 	var req StartImportRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if req.ConnectionID == "" || len(req.ProjectKeys) == 0 {
-		http.Error(w, "connection_id and project_keys are required", http.StatusBadRequest)
+		respondValidationError(w, r, "connection_id and project_keys are required")
 		return
 	}
 
@@ -161,7 +161,7 @@ func (h *JiraImportHandler) StartImport(w http.ResponseWriter, r *http.Request) 
 		"mappings":         req.Mappings,
 	})
 	if err != nil {
-		http.Error(w, "Failed to serialize config", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -171,7 +171,7 @@ func (h *JiraImportHandler) StartImport(w http.ResponseWriter, r *http.Request) 
 		VALUES (?, ?, 'queued', 'work_items', ?, ?)
 	`, jobID, req.ConnectionID, string(configJSON), userID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create import job: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1330,7 +1330,7 @@ func (h *JiraImportHandler) DeleteImportedData(w http.ResponseWriter, r *http.Re
 			END
 	`, jobID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get mappings: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -1422,7 +1422,7 @@ func (h *JiraImportHandler) DeleteImportedData(w http.ResponseWriter, r *http.Re
 func (h *JiraImportHandler) GetPreviousImports(w http.ResponseWriter, r *http.Request) {
 	projectKeys := r.URL.Query()["project_key"]
 	if len(projectKeys) == 0 {
-		http.Error(w, "At least one project_key is required", http.StatusBadRequest)
+		respondValidationError(w, r, "At least one project_key is required")
 		return
 	}
 
@@ -1437,7 +1437,7 @@ func (h *JiraImportHandler) GetPreviousImports(w http.ResponseWriter, r *http.Re
 		LIMIT 10
 	`)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to query previous imports: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()

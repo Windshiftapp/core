@@ -3,7 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net/http"
 	"time"
 
@@ -31,14 +31,14 @@ func NewUserPreferencesHandler(db interface {
 func (h *UserPreferencesHandler) GetUserPreferences(w http.ResponseWriter, r *http.Request) {
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	// Get user preferences
 	var prefsJSON string
 	err := h.DB.QueryRow("SELECT preferences FROM user_preferences WHERE user_id = ?", user.ID).Scan(&prefsJSON)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// Return default preferences
 		response := models.UserPreferencesResponse{
 			ColorMode: "system",
@@ -48,14 +48,14 @@ func (h *UserPreferencesHandler) GetUserPreferences(w http.ResponseWriter, r *ht
 		return
 	}
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get preferences: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Parse preferences JSON
 	var prefs models.UserPreferencesData
 	if err := json.Unmarshal([]byte(prefsJSON), &prefs); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to parse preferences: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -96,19 +96,19 @@ func (h *UserPreferencesHandler) GetUserPreferences(w http.ResponseWriter, r *ht
 func (h *UserPreferencesHandler) UpdateUserPreferences(w http.ResponseWriter, r *http.Request) {
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	var req models.UserPreferencesRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
 
 	// Validate color_mode
 	if req.ColorMode != "" && req.ColorMode != "light" && req.ColorMode != "dark" && req.ColorMode != "system" {
-		http.Error(w, "Invalid color_mode: must be 'light', 'dark', or 'system'", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid color_mode: must be 'light', 'dark', or 'system'")
 		return
 	}
 
@@ -117,11 +117,11 @@ func (h *UserPreferencesHandler) UpdateUserPreferences(w http.ResponseWriter, r 
 		var exists bool
 		err := h.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM themes WHERE id = ?)", *req.ThemeID).Scan(&exists)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to validate theme: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !exists {
-			http.Error(w, "Theme not found", http.StatusBadRequest)
+			respondNotFound(w, r, "theme")
 			return
 		}
 	}
@@ -132,8 +132,8 @@ func (h *UserPreferencesHandler) UpdateUserPreferences(w http.ResponseWriter, r 
 	err := h.DB.QueryRow("SELECT preferences FROM user_preferences WHERE user_id = ?", user.ID).Scan(&existingPrefsJSON)
 	if err == nil {
 		rowExists = true
-	} else if err != sql.ErrNoRows {
-		http.Error(w, fmt.Sprintf("Failed to get existing preferences: %v", err), http.StatusInternalServerError)
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -167,7 +167,7 @@ func (h *UserPreferencesHandler) UpdateUserPreferences(w http.ResponseWriter, r 
 	}
 
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to save preferences: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

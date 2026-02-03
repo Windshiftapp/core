@@ -38,11 +38,11 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 	`, configSetID).Scan(&configSet.ID, &configSet.Name, &configSet.WorkflowID, &configSet.DifferentiateByItemType, &workflowName)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Configuration set not found", http.StatusNotFound)
+		respondNotFound(w, r, "Configuration set")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -56,7 +56,7 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 		// If workspace filter is provided, only analyze that specific workspace
 		workspaceID, err := strconv.Atoi(workspaceFilter)
 		if err != nil {
-			http.Error(w, "Invalid workspace_id parameter", http.StatusBadRequest)
+			respondBadRequest(w, r, "Invalid workspace_id parameter")
 			return
 		}
 		affectedWorkspaces = []int{workspaceID}
@@ -70,7 +70,7 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 
 		workspaceRows, err := h.db.Query(workspaceQuery, configSetID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		defer workspaceRows.Close()
@@ -78,7 +78,7 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 		for workspaceRows.Next() {
 			var workspaceID int
 			if err := workspaceRows.Scan(&workspaceID); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 			affectedWorkspaces = append(affectedWorkspaces, workspaceID)
@@ -127,7 +127,7 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 
 		statusRows, err := h.db.Query(statusQuery, statusArgs...)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		defer statusRows.Close()
@@ -143,7 +143,7 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 			var itemCount int
 
 			if err := statusRows.Scan(&itemTypeID, &itemTypeName, &currentStatusID, &currentStatusName, &itemCount); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 
@@ -155,7 +155,7 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 			// Use first workspace for workflow lookup (they all share the same config set)
 			workflowID, err := workflowService.GetWorkflowIDForItem(affectedWorkspaces[0], itemTypeIDPtr)
 			if err != nil {
-				http.Error(w, "Failed to get workflow for item type: "+err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 
@@ -187,7 +187,7 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 
 				workflowStatusRows, err := h.db.Query(workflowStatusQuery, *workflowID)
 				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					respondInternalError(w, r, err)
 					return
 				}
 
@@ -195,7 +195,7 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 					var status models.Status
 					if err := workflowStatusRows.Scan(&status.ID, &status.Name); err != nil {
 						workflowStatusRows.Close()
-						http.Error(w, err.Error(), http.StatusInternalServerError)
+						respondInternalError(w, r, err)
 						return
 					}
 					normalizedName := normalizeStatusName(status.Name)
@@ -250,7 +250,7 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 
 		statusRows, err := h.db.Query(statusQuery, statusArgs...)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		defer statusRows.Close()
@@ -265,7 +265,7 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 
 		workflowStatusRows, err := h.db.Query(workflowStatusQuery, *configSet.WorkflowID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		defer workflowStatusRows.Close()
@@ -275,7 +275,7 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 		for workflowStatusRows.Next() {
 			var status models.Status
 			if err := workflowStatusRows.Scan(&status.ID, &status.Name); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 			normalizedName := normalizeStatusName(status.Name)
@@ -289,7 +289,7 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 			var itemCount int
 
 			if err := statusRows.Scan(&currentStatusID, &currentStatusName, &itemCount); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 
@@ -339,12 +339,12 @@ func (h *ConfigurationSetHandler) AnalyzeComprehensiveMigration(w http.ResponseW
 	// workspace_id is required for comprehensive migration
 	workspaceIDStr := r.URL.Query().Get("workspace_id")
 	if workspaceIDStr == "" {
-		http.Error(w, "workspace_id query parameter is required", http.StatusBadRequest)
+		respondBadRequest(w, r, "workspace_id query parameter is required")
 		return
 	}
 	workspaceID, err := strconv.Atoi(workspaceIDStr)
 	if err != nil {
-		http.Error(w, "Invalid workspace_id parameter", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid workspace_id parameter")
 		return
 	}
 
@@ -365,7 +365,7 @@ func (h *ConfigurationSetHandler) AnalyzeComprehensiveMigration(w http.ResponseW
 		sourceConfigSetName = "(No Configuration Set)"
 		// Don't return early - continue with migration analysis
 	} else if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -394,11 +394,11 @@ func (h *ConfigurationSetHandler) AnalyzeComprehensiveMigration(w http.ResponseW
 		WHERE cs.id = ?
 	`, targetConfigSetID).Scan(&targetConfigSetName, &targetWorkflowID, &targetWorkflowName)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Target configuration set not found", http.StatusNotFound)
+		respondNotFound(w, r, "Target configuration set")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

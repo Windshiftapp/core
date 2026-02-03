@@ -30,7 +30,7 @@ func (h *StatusHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -43,7 +43,7 @@ func (h *StatusHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			&status.IsDefault, &status.CreatedAt, &status.UpdatedAt,
 			&status.CategoryName, &status.CategoryColor)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -76,11 +76,11 @@ func (h *StatusHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&status.CategoryName, &status.CategoryColor)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Status not found", http.StatusNotFound)
+		respondNotFound(w, r, "status")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -90,17 +90,17 @@ func (h *StatusHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *StatusHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var status models.Status
 	if err := json.NewDecoder(r.Body).Decode(&status); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(status.Name) == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 	if status.CategoryID <= 0 {
-		http.Error(w, "Category ID is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Category ID is required")
 		return
 	}
 
@@ -108,11 +108,11 @@ func (h *StatusHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var categoryExists bool
 	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM status_categories WHERE id = ?)", status.CategoryID).Scan(&categoryExists)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !categoryExists {
-		http.Error(w, "Status category not found", http.StatusBadRequest)
+		respondValidationError(w, r, "Status category not found")
 		return
 	}
 
@@ -120,11 +120,11 @@ func (h *StatusHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var exists bool
 	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE name = ?)", status.Name).Scan(&exists)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if exists {
-		http.Error(w, "Status with this name already exists", http.StatusConflict)
+		respondConflict(w, r, "Status with this name already exists")
 		return
 	}
 
@@ -136,7 +136,7 @@ func (h *StatusHandler) Create(w http.ResponseWriter, r *http.Request) {
 	`, status.Name, status.Description, status.CategoryID, status.IsDefault, now, now).Scan(&id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -153,7 +153,7 @@ func (h *StatusHandler) Create(w http.ResponseWriter, r *http.Request) {
 		&createdStatus.CategoryName, &createdStatus.CategoryColor)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -168,17 +168,17 @@ func (h *StatusHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	var status models.Status
 	if err := json.NewDecoder(r.Body).Decode(&status); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(status.Name) == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 	if status.CategoryID <= 0 {
-		http.Error(w, "Category ID is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Category ID is required")
 		return
 	}
 
@@ -186,11 +186,11 @@ func (h *StatusHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var categoryExists bool
 	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM status_categories WHERE id = ?)", status.CategoryID).Scan(&categoryExists)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !categoryExists {
-		http.Error(w, "Status category not found", http.StatusBadRequest)
+		respondValidationError(w, r, "Status category not found")
 		return
 	}
 
@@ -198,23 +198,23 @@ func (h *StatusHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var exists bool
 	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE name = ? AND id != ?)", status.Name, id).Scan(&exists)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if exists {
-		http.Error(w, "Status with this name already exists", http.StatusConflict)
+		respondConflict(w, r, "Status with this name already exists")
 		return
 	}
 
 	now := time.Now()
 	_, err = h.db.ExecWrite(`
-		UPDATE statuses 
+		UPDATE statuses
 		SET name = ?, description = ?, category_id = ?, is_default = ?, updated_at = ?
 		WHERE id = ?
 	`, status.Name, status.Description, status.CategoryID, status.IsDefault, now, id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -231,7 +231,7 @@ func (h *StatusHandler) Update(w http.ResponseWriter, r *http.Request) {
 		&updatedStatus.CategoryName, &updatedStatus.CategoryColor)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -246,7 +246,7 @@ func (h *StatusHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	// Protect system-critical statuses from deletion
 	if id == constants.StatusIDOpen || id == constants.StatusIDDone {
-		http.Error(w, "Cannot delete Open or Done status - these are required by the system", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -254,12 +254,12 @@ func (h *StatusHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	var transitionCount int
 	err := h.db.QueryRow("SELECT COUNT(*) FROM workflow_transitions WHERE from_status_id = ? OR to_status_id = ?", id, id).Scan(&transitionCount)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if transitionCount > 0 {
-		http.Error(w, "Cannot delete status that is in use by workflow transitions", http.StatusConflict)
+		respondConflict(w, r, "Cannot delete status that is in use by workflow transitions")
 		return
 	}
 
@@ -267,18 +267,18 @@ func (h *StatusHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	var itemCount int
 	err = h.db.QueryRow("SELECT COUNT(*) FROM items WHERE status_id = ?", id).Scan(&itemCount)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if itemCount > 0 {
-		http.Error(w, "Cannot delete status that is in use by "+strconv.Itoa(itemCount)+" work item(s)", http.StatusConflict)
+		respondConflict(w, r, "Cannot delete status that is in use by "+strconv.Itoa(itemCount)+" work item(s)")
 		return
 	}
 
 	_, err = h.db.ExecWrite("DELETE FROM statuses WHERE id = ?", id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -296,7 +296,7 @@ func (h *StatusHandler) GetNonDoneStatusIDs(w http.ResponseWriter, r *http.Reque
 
 	rows, err := h.db.Query(query)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -306,7 +306,7 @@ func (h *StatusHandler) GetNonDoneStatusIDs(w http.ResponseWriter, r *http.Reque
 		var id int
 		err := rows.Scan(&id)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		statusIDs = append(statusIDs, id)

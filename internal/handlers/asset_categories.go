@@ -33,24 +33,24 @@ func NewAssetCategoryHandler(db database.Database, permissionService *services.P
 func (h *AssetCategoryHandler) GetCategories(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	setID, err := strconv.Atoi(r.PathValue("setId"))
 	if err != nil {
-		http.Error(w, "Invalid set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "setId")
 		return
 	}
 
 	// Check view permission
 	canView, err := h.assetHandler.canViewSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canView {
-		http.Error(w, "Access denied", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -73,7 +73,7 @@ func (h *AssetCategoryHandler) GetCategories(w http.ResponseWriter, r *http.Requ
 
 	rows, err := h.db.Query(query, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -91,7 +91,7 @@ func (h *AssetCategoryHandler) GetCategories(w http.ResponseWriter, r *http.Requ
 			&setName, &parentName, &cat.AssetCount,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -158,13 +158,13 @@ func (h *AssetCategoryHandler) buildCategoryTree(categories []models.AssetCatego
 func (h *AssetCategoryHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	categoryID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid category ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -172,22 +172,22 @@ func (h *AssetCategoryHandler) GetCategory(w http.ResponseWriter, r *http.Reques
 	var setID int
 	err = h.db.QueryRow("SELECT set_id FROM asset_categories WHERE id = ?", categoryID).Scan(&setID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Category not found", http.StatusNotFound)
+		respondNotFound(w, r, "category")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check view permission
 	canView, err := h.assetHandler.canViewSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canView {
-		http.Error(w, "Access denied", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -214,7 +214,7 @@ func (h *AssetCategoryHandler) GetCategory(w http.ResponseWriter, r *http.Reques
 	)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -240,35 +240,35 @@ type CreateCategoryRequest struct {
 func (h *AssetCategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	setID, err := strconv.Atoi(r.PathValue("setId"))
 	if err != nil {
-		http.Error(w, "Invalid set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "setId")
 		return
 	}
 
 	// Check edit permission
 	canEdit, err := h.assetHandler.canEditSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canEdit {
-		http.Error(w, "Edit permission required", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	var req CreateCategoryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if req.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 
@@ -277,15 +277,15 @@ func (h *AssetCategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Req
 		var parentSetID int
 		err = h.db.QueryRow("SELECT set_id FROM asset_categories WHERE id = ?", *req.ParentID).Scan(&parentSetID)
 		if err == sql.ErrNoRows {
-			http.Error(w, "Parent category not found", http.StatusBadRequest)
+			respondValidationError(w, r, "Parent category not found")
 			return
 		}
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if parentSetID != setID {
-			http.Error(w, "Parent category must belong to same set", http.StatusBadRequest)
+			respondValidationError(w, r, "Parent category must belong to same set")
 			return
 		}
 	}
@@ -295,7 +295,7 @@ func (h *AssetCategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Req
 	// Start transaction
 	tx, err := h.db.Begin()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
@@ -307,7 +307,7 @@ func (h *AssetCategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Req
 	`, setID, req.Name, req.Description, req.ParentID, now, now).Scan(&catID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -315,13 +315,13 @@ func (h *AssetCategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Req
 	if req.ParentID != nil {
 		err = h.updateParentCounts(tx, *req.ParentID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
 
 	if err = tx.Commit(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -351,13 +351,13 @@ type UpdateCategoryRequest struct {
 func (h *AssetCategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	categoryID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid category ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -365,33 +365,33 @@ func (h *AssetCategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Req
 	var setID int
 	err = h.db.QueryRow("SELECT set_id FROM asset_categories WHERE id = ?", categoryID).Scan(&setID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Category not found", http.StatusNotFound)
+		respondNotFound(w, r, "category")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check edit permission
 	canEdit, err := h.assetHandler.canEditSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canEdit {
-		http.Error(w, "Edit permission required", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	var req UpdateCategoryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if req.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 
@@ -403,13 +403,13 @@ func (h *AssetCategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Req
 	`, req.Name, req.Description, now, categoryID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Category not found", http.StatusNotFound)
+		respondNotFound(w, r, "category")
 		return
 	}
 
@@ -432,13 +432,13 @@ func (h *AssetCategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Req
 func (h *AssetCategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	categoryID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid category ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -452,54 +452,54 @@ func (h *AssetCategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Req
 		FROM asset_categories WHERE id = ?
 	`, categoryID, categoryID).Scan(&setID, &hasChildren, &parentID, &assetCount)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Category not found", http.StatusNotFound)
+		respondNotFound(w, r, "category")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check edit permission
 	canEdit, err := h.assetHandler.canEditSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canEdit {
-		http.Error(w, "Edit permission required", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	// Prevent deletion if has children
 	if hasChildren {
-		http.Error(w, "Cannot delete category with children. Delete children first.", http.StatusConflict)
+		respondConflict(w, r, "Cannot delete category with children. Delete children first.")
 		return
 	}
 
 	// Prevent deletion if has assets
 	if assetCount > 0 {
-		http.Error(w, "Cannot delete category with assets. Move or delete assets first.", http.StatusConflict)
+		respondConflict(w, r, "Cannot delete category with assets. Move or delete assets first.")
 		return
 	}
 
 	// Start transaction
 	tx, err := h.db.Begin()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
 
 	result, err := tx.Exec("DELETE FROM asset_categories WHERE id = ?", categoryID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Category not found", http.StatusNotFound)
+		respondNotFound(w, r, "category")
 		return
 	}
 
@@ -507,13 +507,13 @@ func (h *AssetCategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Req
 	if parentID.Valid {
 		err = h.updateParentCounts(tx, int(parentID.Int64))
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
 
 	if err = tx.Commit(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -529,13 +529,13 @@ type MoveCategoryRequest struct {
 func (h *AssetCategoryHandler) MoveCategory(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	categoryID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid category ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -544,28 +544,28 @@ func (h *AssetCategoryHandler) MoveCategory(w http.ResponseWriter, r *http.Reque
 	var oldParentID sql.NullInt64
 	err = h.db.QueryRow("SELECT set_id, parent_id FROM asset_categories WHERE id = ?", categoryID).Scan(&setID, &oldParentID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Category not found", http.StatusNotFound)
+		respondNotFound(w, r, "category")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check edit permission
 	canEdit, err := h.assetHandler.canEditSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canEdit {
-		http.Error(w, "Edit permission required", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	var req MoveCategoryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -573,33 +573,33 @@ func (h *AssetCategoryHandler) MoveCategory(w http.ResponseWriter, r *http.Reque
 	if req.ParentID != nil {
 		// Cannot be own parent
 		if *req.ParentID == categoryID {
-			http.Error(w, "Cannot move category to itself", http.StatusBadRequest)
+			respondValidationError(w, r, "Cannot move category to itself")
 			return
 		}
 
 		var parentSetID int
 		err = h.db.QueryRow("SELECT set_id FROM asset_categories WHERE id = ?", *req.ParentID).Scan(&parentSetID)
 		if err == sql.ErrNoRows {
-			http.Error(w, "New parent category not found", http.StatusBadRequest)
+			respondValidationError(w, r, "New parent category not found")
 			return
 		}
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if parentSetID != setID {
-			http.Error(w, "New parent must belong to same set", http.StatusBadRequest)
+			respondValidationError(w, r, "New parent must belong to same set")
 			return
 		}
 
 		// Check for circular reference (cannot move to a descendant)
 		isDescendant, err := h.isDescendant(*req.ParentID, categoryID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if isDescendant {
-			http.Error(w, "Cannot move category to one of its descendants", http.StatusBadRequest)
+			respondValidationError(w, r, "Cannot move category to one of its descendants")
 			return
 		}
 	}
@@ -609,7 +609,7 @@ func (h *AssetCategoryHandler) MoveCategory(w http.ResponseWriter, r *http.Reque
 	// Start transaction
 	tx, err := h.db.Begin()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
@@ -618,7 +618,7 @@ func (h *AssetCategoryHandler) MoveCategory(w http.ResponseWriter, r *http.Reque
 	_, err = tx.Exec("UPDATE asset_categories SET parent_id = ?, updated_at = ? WHERE id = ?",
 		req.ParentID, now, categoryID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -626,7 +626,7 @@ func (h *AssetCategoryHandler) MoveCategory(w http.ResponseWriter, r *http.Reque
 	if oldParentID.Valid {
 		err = h.updateParentCountsTx(tx, int(oldParentID.Int64))
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
@@ -635,13 +635,13 @@ func (h *AssetCategoryHandler) MoveCategory(w http.ResponseWriter, r *http.Reque
 	if req.ParentID != nil {
 		err = h.updateParentCountsTx(tx, *req.ParentID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
 
 	if err = tx.Commit(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

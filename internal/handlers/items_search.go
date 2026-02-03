@@ -28,14 +28,14 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 	// Get user from context
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	// Get accessible workspace IDs (includes active workspaces and inactive ones where user has admin access)
 	accessibleWorkspaceIDs, err := h.getAccessibleWorkspaceIDs(user)
 	if err != nil {
-		http.Error(w, "Failed to get accessible workspaces: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -53,7 +53,7 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 
 	// Validate and sanitize inputs
 	if len(textQuery) > maxSearchQueryLength {
-		http.Error(w, fmt.Sprintf("Search query too long (max %d characters)", maxSearchQueryLength), http.StatusBadRequest)
+		respondValidationError(w, r, fmt.Sprintf("Search query too long (max %d characters)", maxSearchQueryLength))
 		return
 	}
 
@@ -63,7 +63,7 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if _, err := strconv.Atoi(workspaceID); err != nil {
-			http.Error(w, "Invalid workspace ID format", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid workspace ID format")
 			return
 		}
 	}
@@ -75,7 +75,7 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, status := range statuses {
 		if status != "" && !allowedStatuses[status] {
-			http.Error(w, fmt.Sprintf("Invalid status: %s", status), http.StatusBadRequest)
+			respondValidationError(w, r, fmt.Sprintf("Invalid status: %s", status))
 			return
 		}
 	}
@@ -86,22 +86,22 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, priority := range priorities {
 		if priority != "" && !allowedPriorities[priority] {
-			http.Error(w, fmt.Sprintf("Invalid priority: %s", priority), http.StatusBadRequest)
+			respondValidationError(w, r, fmt.Sprintf("Invalid priority: %s", priority))
 			return
 		}
 	}
 
 	// Limit array sizes to prevent abuse
 	if len(workspaceIDs) > maxWorkspaceFilters {
-		http.Error(w, fmt.Sprintf("Too many workspace filters (max %d)", maxWorkspaceFilters), http.StatusBadRequest)
+		respondValidationError(w, r, fmt.Sprintf("Too many workspace filters (max %d)", maxWorkspaceFilters))
 		return
 	}
 	if len(statuses) > maxStatusFilters {
-		http.Error(w, fmt.Sprintf("Too many status filters (max %d)", maxStatusFilters), http.StatusBadRequest)
+		respondValidationError(w, r, fmt.Sprintf("Too many status filters (max %d)", maxStatusFilters))
 		return
 	}
 	if len(priorities) > maxPriorityFilters {
-		http.Error(w, fmt.Sprintf("Too many priority filters (max %d)", maxPriorityFilters), http.StatusBadRequest)
+		respondValidationError(w, r, fmt.Sprintf("Too many priority filters (max %d)", maxPriorityFilters))
 		return
 	}
 
@@ -213,7 +213,7 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 	if limitStr != "" {
 		parsedLimit, err := strconv.Atoi(limitStr)
 		if err != nil {
-			http.Error(w, "Invalid limit format", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid limit format")
 			return
 		}
 		// Enforce reasonable limits
@@ -230,7 +230,7 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query, args...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -250,7 +250,7 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 			&itemTypeName, &parentTitle,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -276,7 +276,7 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = rows.Err(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -284,7 +284,7 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 
 	filteredItems, err := h.filterItemsByPermissions(user.ID, items)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	items = filteredItems
@@ -307,14 +307,14 @@ func (h *ItemHandler) UpdateFracIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&fracIndexRequest); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -323,21 +323,21 @@ func (h *ItemHandler) UpdateFracIndex(w http.ResponseWriter, r *http.Request) {
 	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", id).Scan(&workspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 			return
 		}
-		http.Error(w, "Failed to fetch item: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check if user has permission to edit items in this workspace
 	canEdit, permErr := h.canEditItem(user.ID, workspaceID)
 	if permErr != nil {
-		http.Error(w, "Permission check failed: "+permErr.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, permErr)
 		return
 	}
 	if !canEdit {
-		http.Error(w, "Insufficient permissions to reorder items in this workspace", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -372,7 +372,7 @@ func (h *ItemHandler) UpdateFracIndex(w http.ResponseWriter, r *http.Request) {
 	var currentFracIndex sql.NullString
 	err = h.db.QueryRow("SELECT frac_index FROM items WHERE id = ?", id).Scan(&currentFracIndex)
 	if err != nil {
-		http.Error(w, "Failed to get current frac_index: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -394,14 +394,14 @@ func (h *ItemHandler) UpdateFracIndex(w http.ResponseWriter, r *http.Request) {
 
 	newFracIndex, err := services.KeyBetween(prevFracIndex, nextFracIndex)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to generate frac_index: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Update the item's frac_index
 	err = services.UpdateItemFracIndex(h.db.GetDB(), id, newFracIndex)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to update frac_index: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -440,27 +440,27 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 	// Get user from context
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	workspaceID := r.URL.Query().Get("workspace_id")
 	if workspaceID == "" {
-		http.Error(w, "workspace_id parameter is required", http.StatusBadRequest)
+		respondValidationError(w, r, "workspace_id parameter is required")
 		return
 	}
 
 	// Convert workspace ID to int for validation
 	wsID, err := strconv.Atoi(workspaceID)
 	if err != nil {
-		http.Error(w, "Invalid workspace_id format", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid workspace_id format")
 		return
 	}
 
 	// Get accessible workspace IDs
 	accessibleWorkspaceIDs, err := h.getAccessibleWorkspaceIDs(user)
 	if err != nil {
-		http.Error(w, "Failed to get accessible workspaces: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -474,7 +474,7 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !canAccess {
-		http.Error(w, "You don't have access to this workspace", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -493,7 +493,7 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 	if err == nil && backlogStatusIDsJSON.Valid && backlogStatusIDsJSON.String != "" {
 		// Parse the configured backlog status IDs
 		if err := json.Unmarshal([]byte(backlogStatusIDsJSON.String), &backlogStatusIDs); err != nil {
-			http.Error(w, "Failed to parse backlog configuration", http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to parse backlog configuration"))
 			return
 		}
 	} else {
@@ -506,7 +506,7 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 
 		statusRows, err := h.db.Query(statusQuery)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		defer statusRows.Close()
@@ -514,7 +514,7 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 		for statusRows.Next() {
 			var statusID int
 			if err := statusRows.Scan(&statusID); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 			backlogStatusIDs = append(backlogStatusIDs, statusID)
@@ -565,7 +565,7 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 		// Build workspace mapping for QL evaluation
 		workspaceMap, err := h.buildWorkspaceMap()
 		if err != nil {
-			http.Error(w, "Failed to load workspace mapping: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -573,7 +573,7 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 		evaluator := cql.NewEvaluator(workspaceMap)
 		qlSQL, qlArgs, err := evaluator.EvaluateToSQL(qlQuery)
 		if err != nil {
-			http.Error(w, "QL query error: "+err.Error(), http.StatusBadRequest)
+			respondValidationError(w, r, "QL query error: "+err.Error())
 			return
 		}
 
@@ -592,7 +592,7 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query, args...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -619,7 +619,7 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 			&priorityName, &priorityIcon, &priorityColor,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -667,7 +667,7 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 	// Filter items based on user permissions
 	filteredItems, err := h.filterItemsByPermissions(user.ID, items)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	items = filteredItems

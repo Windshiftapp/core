@@ -52,7 +52,7 @@ func NewAssetReportHandler(db database.Database) *AssetReportHandler {
 func (h *AssetReportHandler) GetAllForChannel(w http.ResponseWriter, r *http.Request) {
 	channelID, err := strconv.Atoi(r.PathValue("channel_id"))
 	if err != nil {
-		http.Error(w, "Invalid channel ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "channel_id")
 		return
 	}
 
@@ -70,7 +70,7 @@ func (h *AssetReportHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 
 	rows, err := h.db.Query(query, channelID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -85,7 +85,7 @@ func (h *AssetReportHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 			&ar.CreatedAt, &ar.UpdatedAt,
 			&ar.ChannelName, &ar.AssetSetName)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		ar.ColumnConfig = deserializeStringArray(columnConfig)
@@ -106,7 +106,7 @@ func (h *AssetReportHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 func (h *AssetReportHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -129,11 +129,11 @@ func (h *AssetReportHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&ar.ChannelName, &ar.AssetSetName)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Asset report not found", http.StatusNotFound)
+		respondNotFound(w, r, "asset_report")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -149,13 +149,13 @@ func (h *AssetReportHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 	channelID, err := strconv.Atoi(r.PathValue("channel_id"))
 	if err != nil {
-		http.Error(w, "Invalid channel ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "channel_id")
 		return
 	}
 
 	var ar models.AssetReport
 	if err := json.NewDecoder(r.Body).Decode(&ar); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -164,11 +164,11 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	if strings.TrimSpace(ar.Name) == "" {
-		http.Error(w, "Asset report name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Asset report name is required")
 		return
 	}
 	if ar.AssetSetID == 0 {
-		http.Error(w, "Asset set ID is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Asset set ID is required")
 		return
 	}
 
@@ -176,7 +176,7 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var channelExists bool
 	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM channels WHERE id = ?)", ar.ChannelID).Scan(&channelExists)
 	if err != nil || !channelExists {
-		http.Error(w, "Channel not found", http.StatusBadRequest)
+		respondBadRequest(w, r, "Channel not found")
 		return
 	}
 
@@ -184,7 +184,7 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var assetSetExists bool
 	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM asset_management_sets WHERE id = ?)", ar.AssetSetID).Scan(&assetSetExists)
 	if err != nil || !assetSetExists {
-		http.Error(w, "Asset set not found", http.StatusBadRequest)
+		respondBadRequest(w, r, "Asset set not found")
 		return
 	}
 
@@ -212,9 +212,9 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
-			http.Error(w, "Asset report with this name already exists for this channel", http.StatusConflict)
+			respondConflict(w, r, "Asset report with this name already exists for this channel")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -241,7 +241,7 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 	ar.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -276,7 +276,7 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -303,27 +303,27 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 	oldAR.VisibilityOrgIDs = deserializeIntArray(oldVisibilityOrgIDs)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Asset report not found", http.StatusNotFound)
+		respondNotFound(w, r, "asset_report")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	var ar models.AssetReport
 	if err := json.NewDecoder(r.Body).Decode(&ar); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(ar.Name) == "" {
-		http.Error(w, "Asset report name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Asset report name is required")
 		return
 	}
 	if ar.AssetSetID == 0 {
-		http.Error(w, "Asset set ID is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Asset set ID is required")
 		return
 	}
 
@@ -331,7 +331,7 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var assetSetExists bool
 	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM asset_management_sets WHERE id = ?)", ar.AssetSetID).Scan(&assetSetExists)
 	if err != nil || !assetSetExists {
-		http.Error(w, "Asset set not found", http.StatusBadRequest)
+		respondBadRequest(w, r, "Asset set not found")
 		return
 	}
 
@@ -346,9 +346,9 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
-			http.Error(w, "Asset report with this name already exists for this channel", http.StatusConflict)
+			respondConflict(w, r, "Asset report with this name already exists for this channel")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -375,7 +375,7 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 	ar.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -432,7 +432,7 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *AssetReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -446,11 +446,11 @@ func (h *AssetReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	`, id).Scan(&assetReportName, &channelID)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Asset report not found", http.StatusNotFound)
+		respondNotFound(w, r, "asset_report")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -488,7 +488,7 @@ func (h *AssetReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Delete the asset report
 	_, err = h.db.ExecWrite("DELETE FROM asset_reports WHERE id = ?", id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -518,7 +518,7 @@ func (h *AssetReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *AssetReportHandler) UpdateVisibility(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -526,7 +526,7 @@ func (h *AssetReportHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 	var exists bool
 	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM asset_reports WHERE id = ?)", id).Scan(&exists)
 	if err != nil || !exists {
-		http.Error(w, "Asset report not found", http.StatusNotFound)
+		respondNotFound(w, r, "asset_report")
 		return
 	}
 
@@ -536,7 +536,7 @@ func (h *AssetReportHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 		OrgIDs   []int `json:"org_ids"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -549,7 +549,7 @@ func (h *AssetReportHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 	`, serializeIntArray(req.GroupIDs), serializeIntArray(req.OrgIDs), now, id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -573,7 +573,7 @@ func (h *AssetReportHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 		&ar.ChannelName, &ar.AssetSetName)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

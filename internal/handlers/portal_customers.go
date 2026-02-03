@@ -63,7 +63,7 @@ func (h *PortalCustomersHandler) GetPortalCustomers(w http.ResponseWriter, r *ht
 
 	rows, err := h.db.Query(query)
 	if err != nil {
-		http.Error(w, "Failed to fetch portal customers", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -84,7 +84,7 @@ func (h *PortalCustomersHandler) GetPortalCustomers(w http.ResponseWriter, r *ht
 			&userFirstName, &userLastName, &userEmail, &orgName,
 		)
 		if err != nil {
-			http.Error(w, "Failed to scan customer", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -138,7 +138,7 @@ func (h *PortalCustomersHandler) GetPortalCustomer(w http.ResponseWriter, r *htt
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid customer ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -173,11 +173,11 @@ func (h *PortalCustomersHandler) GetPortalCustomer(w http.ResponseWriter, r *htt
 	)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Customer not found", http.StatusNotFound)
+		respondNotFound(w, r, "customer")
 		return
 	}
 	if err != nil {
-		http.Error(w, "Failed to fetch customer", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -200,7 +200,7 @@ func (h *PortalCustomersHandler) GetPortalCustomer(w http.ResponseWriter, r *htt
 	// Parse custom field values
 	if customFieldValuesStr.Valid && customFieldValuesStr.String != "" {
 		if err := json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
-			http.Error(w, "Failed to parse custom field values", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
@@ -223,7 +223,7 @@ func (h *PortalCustomersHandler) GetCustomerChannels(w http.ResponseWriter, r *h
 	idStr := r.PathValue("id")
 	customerID, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid customer ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -240,7 +240,7 @@ func (h *PortalCustomersHandler) GetCustomerChannels(w http.ResponseWriter, r *h
 
 	rows, err := h.db.Query(query, customerID)
 	if err != nil {
-		http.Error(w, "Failed to fetch customer channels", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -262,7 +262,7 @@ func (h *PortalCustomersHandler) GetCustomerChannels(w http.ResponseWriter, r *h
 			&ca.ChannelName, &ca.ChannelType,
 		)
 		if err != nil {
-			http.Error(w, "Failed to scan channel access", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		channels = append(channels, ca)
@@ -281,7 +281,7 @@ func (h *PortalCustomersHandler) GetCustomerSubmissions(w http.ResponseWriter, r
 	idStr := r.PathValue("id")
 	customerID, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid customer ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -299,7 +299,7 @@ func (h *PortalCustomersHandler) GetCustomerSubmissions(w http.ResponseWriter, r
 
 	rows, err := h.db.Query(query, customerID)
 	if err != nil {
-		http.Error(w, "Failed to fetch customer submissions", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -324,7 +324,7 @@ func (h *PortalCustomersHandler) GetCustomerSubmissions(w http.ResponseWriter, r
 			&s.WorkspaceName, &s.WorkspaceKey,
 		)
 		if err != nil {
-			http.Error(w, "Failed to scan submission", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		submissions = append(submissions, s)
@@ -351,17 +351,17 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if requestData.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 	if requestData.Email == "" {
-		http.Error(w, "Email is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Email is required")
 		return
 	}
 
@@ -371,7 +371,7 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 		var err error
 		customFieldValuesJSON, err = json.Marshal(requestData.CustomFieldValues)
 		if err != nil {
-			http.Error(w, "Invalid custom field values", http.StatusBadRequest)
+			respondBadRequest(w, r, "Invalid custom field values")
 			return
 		}
 	}
@@ -386,16 +386,16 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 	if err != nil {
 		// Check for unique constraint violation on email
 		if strings.Contains(err.Error(), "UNIQUE constraint failed: portal_customers.email") || strings.Contains(err.Error(), "duplicate key") {
-			http.Error(w, "A portal customer with this email address already exists", http.StatusConflict)
+			respondConflict(w, r, "A portal customer with this email address already exists")
 			return
 		}
-		http.Error(w, "Failed to create portal customer", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	customerID, err := result.LastInsertId()
 	if err != nil {
-		http.Error(w, "Failed to get customer ID", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -450,7 +450,7 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 	)
 
 	if err != nil {
-		http.Error(w, "Failed to fetch created customer", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -473,8 +473,7 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 	// Parse custom field values
 	if customFieldValuesStr.Valid && customFieldValuesStr.String != "" {
 		if err := json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
-			// Log error but don't fail the request
-			http.Error(w, "Failed to parse custom field values", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
@@ -498,7 +497,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomerOrganisation(w http.Respons
 	idStr := r.PathValue("id")
 	customerID, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid customer ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -507,7 +506,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomerOrganisation(w http.Respons
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -515,7 +514,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomerOrganisation(w http.Respons
 	query := `UPDATE portal_customers SET customer_organisation_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
 	_, err = h.db.ExecWrite(query, requestData.CustomerOrganisationID, customerID)
 	if err != nil {
-		http.Error(w, "Failed to update customer organisation", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -528,7 +527,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 	idStr := r.PathValue("id")
 	customerID, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid customer ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -543,17 +542,17 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if requestData.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 	if requestData.Email == "" {
-		http.Error(w, "Email is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Email is required")
 		return
 	}
 
@@ -562,7 +561,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 	if requestData.CustomFieldValues != nil && len(requestData.CustomFieldValues) > 0 {
 		customFieldValuesJSON, err = json.Marshal(requestData.CustomFieldValues)
 		if err != nil {
-			http.Error(w, "Invalid custom field values", http.StatusBadRequest)
+			respondBadRequest(w, r, "Invalid custom field values")
 			return
 		}
 	}
@@ -577,10 +576,10 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 	if err != nil {
 		// Check for unique constraint violation on email
 		if strings.Contains(err.Error(), "UNIQUE constraint failed: portal_customers.email") || strings.Contains(err.Error(), "duplicate key") {
-			http.Error(w, "A portal customer with this email address already exists", http.StatusConflict)
+			respondConflict(w, r, "A portal customer with this email address already exists")
 			return
 		}
-		http.Error(w, "Failed to update portal customer", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -589,7 +588,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 		err = h.assignRolesToPortalCustomer(customerID, requestData.RoleIDs)
 		if err != nil {
 			slog.Error("failed to update roles for portal customer", slog.String("component", "portal"), slog.Any("error", err))
-			http.Error(w, "Failed to update roles", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
@@ -626,7 +625,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 	)
 
 	if err != nil {
-		http.Error(w, "Failed to fetch updated customer", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -649,7 +648,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 	// Parse custom field values
 	if customFieldValuesStr.Valid && customFieldValuesStr.String != "" {
 		if err := json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
-			http.Error(w, "Failed to parse custom field values", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
@@ -672,7 +671,7 @@ func (h *PortalCustomersHandler) DeletePortalCustomer(w http.ResponseWriter, r *
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid customer ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -680,7 +679,7 @@ func (h *PortalCustomersHandler) DeletePortalCustomer(w http.ResponseWriter, r *
 	query := `DELETE FROM portal_customers WHERE id = ?`
 	_, err = h.db.ExecWrite(query, id)
 	if err != nil {
-		http.Error(w, "Failed to delete portal customer", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -692,7 +691,7 @@ func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, 
 	idStr := r.PathValue("id")
 	orgID, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid organisation ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -715,8 +714,7 @@ func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, 
 
 	rows, err := h.db.Query(query, orgID)
 	if err != nil {
-		slog.Error("failed to fetch organisation contacts", slog.String("component", "portal"), slog.Any("error", err))
-		http.Error(w, "Failed to fetch organisation contacts", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -737,8 +735,7 @@ func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, 
 			&userFirstName, &userLastName, &userEmail, &orgName,
 		)
 		if err != nil {
-			slog.Error("failed to scan contact", slog.String("component", "portal"), slog.Any("error", err))
-			http.Error(w, "Failed to scan contact", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 

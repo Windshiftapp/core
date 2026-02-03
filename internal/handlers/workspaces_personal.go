@@ -19,7 +19,7 @@ func (h *WorkspaceHandler) GetOrCreatePersonalWorkspace(w http.ResponseWriter, r
 	// Get authenticated user from context
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	userID := user.ID
@@ -53,7 +53,7 @@ func (h *WorkspaceHandler) GetOrCreatePersonalWorkspace(w http.ResponseWriter, r
 
 	if err != sql.ErrNoRows {
 		// Database error occurred
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -92,7 +92,7 @@ func (h *WorkspaceHandler) GetOrCreatePersonalWorkspace(w http.ResponseWriter, r
 	`, workspaceName, workspaceKey, description, true, nil, true, userID, now, now).Scan(&id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -117,7 +117,7 @@ func (h *WorkspaceHandler) GetOrCreatePersonalWorkspace(w http.ResponseWriter, r
 	workspace.TimeProjectName = timeProjectName.String
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

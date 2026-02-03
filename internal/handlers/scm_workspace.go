@@ -96,7 +96,7 @@ func NewSCMWorkspaceHandler(db database.Database, encryption *sso.SecretEncrypti
 func (h *SCMWorkspaceHandler) GetWorkspaceSCMConnections(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
@@ -113,8 +113,7 @@ func (h *SCMWorkspaceHandler) GetWorkspaceSCMConnections(w http.ResponseWriter, 
 		ORDER BY sp.name
 	`, workspaceID)
 	if err != nil {
-		slog.Error("failed to get connections", slog.String("component", "scm"), slog.Any("error", err))
-		http.Error(w, "Failed to get SCM connections", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -159,18 +158,18 @@ func (h *SCMWorkspaceHandler) GetWorkspaceSCMConnections(w http.ResponseWriter, 
 func (h *SCMWorkspaceHandler) CreateWorkspaceSCMConnection(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	var req CreateWorkspaceSCMConnectionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if req.SCMProviderID == 0 {
-		http.Error(w, "scm_provider_id is required", http.StatusBadRequest)
+		respondValidationError(w, r, "scm_provider_id is required")
 		return
 	}
 
@@ -179,16 +178,15 @@ func (h *SCMWorkspaceHandler) CreateWorkspaceSCMConnection(w http.ResponseWriter
 	err = h.db.QueryRow("SELECT enabled FROM scm_providers WHERE id = ?", req.SCMProviderID).Scan(&providerEnabled)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "SCM provider not found", http.StatusNotFound)
+			respondNotFound(w, r, "scm_provider")
 		} else {
-			slog.Error("failed to check provider", slog.String("component", "scm"), slog.Any("error", err))
-			http.Error(w, "Failed to verify provider", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
 
 	if !providerEnabled {
-		http.Error(w, "SCM provider is not enabled", http.StatusBadRequest)
+		respondBadRequest(w, r, "SCM provider is not enabled")
 		return
 	}
 
@@ -196,12 +194,11 @@ func (h *SCMWorkspaceHandler) CreateWorkspaceSCMConnection(w http.ResponseWriter
 	if h.providerHandler != nil {
 		allowed, err := h.providerHandler.IsWorkspaceAllowedForProvider(req.SCMProviderID, workspaceID)
 		if err != nil {
-			slog.Error("failed to check provider restrictions", slog.String("component", "scm"), slog.Any("error", err))
-			http.Error(w, "Failed to verify provider access", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !allowed {
-			http.Error(w, "Workspace is not allowed to use this SCM provider", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	}
@@ -222,7 +219,7 @@ func (h *SCMWorkspaceHandler) CreateWorkspaceSCMConnection(w http.ResponseWriter
 		nullString(req.DefaultBranchPattern), nullString(req.ItemKeyPattern), createdBy)
 	if err != nil {
 		slog.Error("failed to create connection", slog.String("component", "scm"), slog.Any("error", err))
-		http.Error(w, "Failed to create SCM connection. It may already exist.", http.StatusConflict)
+		respondConflict(w, r, "Failed to create SCM connection. It may already exist.")
 		return
 	}
 
@@ -231,8 +228,7 @@ func (h *SCMWorkspaceHandler) CreateWorkspaceSCMConnection(w http.ResponseWriter
 	// Get the created connection
 	conn, err := h.getConnectionByID(int(id))
 	if err != nil {
-		slog.Error("failed to get created connection", slog.String("component", "scm"), slog.Any("error", err))
-		http.Error(w, "Connection created but failed to retrieve", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -245,29 +241,28 @@ func (h *SCMWorkspaceHandler) CreateWorkspaceSCMConnection(w http.ResponseWriter
 func (h *SCMWorkspaceHandler) GetWorkspaceSCMConnection(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 	connID, err := strconv.Atoi(r.PathValue("connId"))
 	if err != nil {
-		http.Error(w, "Invalid connection ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "connectionId")
 		return
 	}
 
 	conn, err := h.getConnectionByID(connID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Connection not found", http.StatusNotFound)
+			respondNotFound(w, r, "connection")
 		} else {
-			slog.Error("failed to get connection", slog.String("component", "scm"), slog.Any("error", err))
-			http.Error(w, "Failed to get connection", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
 
 	// Verify connection belongs to this workspace
 	if conn.WorkspaceID != workspaceID {
-		http.Error(w, "Connection not found", http.StatusNotFound)
+		respondNotFound(w, r, "connection")
 		return
 	}
 
@@ -279,18 +274,18 @@ func (h *SCMWorkspaceHandler) GetWorkspaceSCMConnection(w http.ResponseWriter, r
 func (h *SCMWorkspaceHandler) UpdateWorkspaceSCMConnection(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 	connID, err := strconv.Atoi(r.PathValue("connId"))
 	if err != nil {
-		http.Error(w, "Invalid connection ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "connectionId")
 		return
 	}
 
 	var req UpdateWorkspaceSCMConnectionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -298,15 +293,15 @@ func (h *SCMWorkspaceHandler) UpdateWorkspaceSCMConnection(w http.ResponseWriter
 	conn, err := h.getConnectionByID(connID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Connection not found", http.StatusNotFound)
+			respondNotFound(w, r, "connection")
 		} else {
-			http.Error(w, "Failed to get connection", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
 
 	if conn.WorkspaceID != workspaceID {
-		http.Error(w, "Connection not found", http.StatusNotFound)
+		respondNotFound(w, r, "connection")
 		return
 	}
 
@@ -325,15 +320,14 @@ func (h *SCMWorkspaceHandler) UpdateWorkspaceSCMConnection(w http.ResponseWriter
 		WHERE id = ?
 	`, enabled, nullString(req.DefaultBranchPattern), nullString(req.ItemKeyPattern), connID)
 	if err != nil {
-		slog.Error("failed to update connection", slog.String("component", "scm"), slog.Any("error", err))
-		http.Error(w, "Failed to update connection", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Get updated connection
 	conn, err = h.getConnectionByID(connID)
 	if err != nil {
-		http.Error(w, "Updated but failed to retrieve", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -345,12 +339,12 @@ func (h *SCMWorkspaceHandler) UpdateWorkspaceSCMConnection(w http.ResponseWriter
 func (h *SCMWorkspaceHandler) DeleteWorkspaceSCMConnection(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 	connID, err := strconv.Atoi(r.PathValue("connId"))
 	if err != nil {
-		http.Error(w, "Invalid connection ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "connectionId")
 		return
 	}
 
@@ -359,23 +353,22 @@ func (h *SCMWorkspaceHandler) DeleteWorkspaceSCMConnection(w http.ResponseWriter
 	err = h.db.QueryRow("SELECT workspace_id FROM workspace_scm_connections WHERE id = ?", connID).Scan(&connWorkspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Connection not found", http.StatusNotFound)
+			respondNotFound(w, r, "connection")
 		} else {
-			http.Error(w, "Failed to verify connection", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
 
 	if connWorkspaceID != workspaceID {
-		http.Error(w, "Connection not found", http.StatusNotFound)
+		respondNotFound(w, r, "connection")
 		return
 	}
 
 	// Delete (cascade will handle repositories and item links)
 	_, err = h.db.Exec("DELETE FROM workspace_scm_connections WHERE id = ?", connID)
 	if err != nil {
-		slog.Error("failed to delete connection", slog.String("component", "scm"), slog.Any("error", err))
-		http.Error(w, "Failed to delete connection", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -386,12 +379,12 @@ func (h *SCMWorkspaceHandler) DeleteWorkspaceSCMConnection(w http.ResponseWriter
 func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 	connID, err := strconv.Atoi(r.PathValue("connId"))
 	if err != nil {
-		http.Error(w, "Invalid connection ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "connectionId")
 		return
 	}
 
@@ -403,15 +396,15 @@ func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r
 	`, connID).Scan(&connWorkspaceID, &providerID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Connection not found", http.StatusNotFound)
+			respondNotFound(w, r, "connection")
 		} else {
-			http.Error(w, "Failed to get connection", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
 
 	if connWorkspaceID != workspaceID {
-		http.Error(w, "Connection not found", http.StatusNotFound)
+		respondNotFound(w, r, "connection")
 		return
 	}
 
@@ -419,12 +412,11 @@ func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r
 	if h.providerHandler != nil {
 		allowed, err := h.providerHandler.IsWorkspaceAllowedForProvider(providerID, workspaceID)
 		if err != nil {
-			slog.Error("failed to check provider restrictions", slog.String("component", "scm"), slog.Any("error", err))
-			http.Error(w, "Failed to verify provider access", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !allowed {
-			http.Error(w, "Workspace access to this SCM provider has been restricted", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	}
@@ -512,12 +504,12 @@ func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r
 func (h *SCMWorkspaceHandler) GetLinkedRepositories(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 	connID, err := strconv.Atoi(r.PathValue("connId"))
 	if err != nil {
-		http.Error(w, "Invalid connection ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "connectionId")
 		return
 	}
 
@@ -526,15 +518,15 @@ func (h *SCMWorkspaceHandler) GetLinkedRepositories(w http.ResponseWriter, r *ht
 	err = h.db.QueryRow("SELECT workspace_id FROM workspace_scm_connections WHERE id = ?", connID).Scan(&connWorkspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Connection not found", http.StatusNotFound)
+			respondNotFound(w, r, "connection")
 		} else {
-			http.Error(w, "Failed to verify connection", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
 
 	if connWorkspaceID != workspaceID {
-		http.Error(w, "Connection not found", http.StatusNotFound)
+		respondNotFound(w, r, "connection")
 		return
 	}
 
@@ -547,8 +539,7 @@ func (h *SCMWorkspaceHandler) GetLinkedRepositories(w http.ResponseWriter, r *ht
 		ORDER BY repository_name
 	`, connID)
 	if err != nil {
-		slog.Error("failed to get repositories", slog.String("component", "scm"), slog.Any("error", err))
-		http.Error(w, "Failed to get repositories", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -583,23 +574,23 @@ func (h *SCMWorkspaceHandler) GetLinkedRepositories(w http.ResponseWriter, r *ht
 func (h *SCMWorkspaceHandler) LinkRepository(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 	connID, err := strconv.Atoi(r.PathValue("connId"))
 	if err != nil {
-		http.Error(w, "Invalid connection ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "connectionId")
 		return
 	}
 
 	var req LinkRepositoryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if req.RepositoryExternalID == "" || req.RepositoryName == "" || req.RepositoryURL == "" {
-		http.Error(w, "repository_external_id, repository_name, and repository_url are required", http.StatusBadRequest)
+		respondValidationError(w, r, "repository_external_id, repository_name, and repository_url are required")
 		return
 	}
 
@@ -608,15 +599,15 @@ func (h *SCMWorkspaceHandler) LinkRepository(w http.ResponseWriter, r *http.Requ
 	err = h.db.QueryRow("SELECT workspace_id, scm_provider_id FROM workspace_scm_connections WHERE id = ?", connID).Scan(&connWorkspaceID, &providerID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Connection not found", http.StatusNotFound)
+			respondNotFound(w, r, "connection")
 		} else {
-			http.Error(w, "Failed to verify connection", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
 
 	if connWorkspaceID != workspaceID {
-		http.Error(w, "Connection not found", http.StatusNotFound)
+		respondNotFound(w, r, "connection")
 		return
 	}
 
@@ -624,12 +615,11 @@ func (h *SCMWorkspaceHandler) LinkRepository(w http.ResponseWriter, r *http.Requ
 	if h.providerHandler != nil {
 		allowed, err := h.providerHandler.IsWorkspaceAllowedForProvider(providerID, workspaceID)
 		if err != nil {
-			slog.Error("failed to check provider restrictions", slog.String("component", "scm"), slog.Any("error", err))
-			http.Error(w, "Failed to verify provider access", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !allowed {
-			http.Error(w, "Workspace access to this SCM provider has been restricted", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	}
@@ -647,7 +637,7 @@ func (h *SCMWorkspaceHandler) LinkRepository(w http.ResponseWriter, r *http.Requ
 	`, connID, req.RepositoryExternalID, req.RepositoryName, req.RepositoryURL, defaultBranch)
 	if err != nil {
 		slog.Error("failed to link repository", slog.String("component", "scm"), slog.Any("error", err))
-		http.Error(w, "Failed to link repository. It may already be linked.", http.StatusConflict)
+		respondConflict(w, r, "Failed to link repository. It may already be linked.")
 		return
 	}
 
@@ -667,7 +657,7 @@ func (h *SCMWorkspaceHandler) LinkRepository(w http.ResponseWriter, r *http.Requ
 		&repo.IsActive, &lastSyncedAt, &repo.CreatedAt, &repo.UpdatedAt,
 	)
 	if err != nil {
-		http.Error(w, "Repository linked but failed to retrieve", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -684,20 +674,19 @@ func (h *SCMWorkspaceHandler) LinkRepository(w http.ResponseWriter, r *http.Requ
 func (h *SCMWorkspaceHandler) UnlinkRepository(w http.ResponseWriter, r *http.Request) {
 	repoID, err := strconv.Atoi(r.PathValue("repoId"))
 	if err != nil {
-		http.Error(w, "Invalid repository ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "repositoryId")
 		return
 	}
 
 	result, err := h.db.Exec("DELETE FROM workspace_repositories WHERE id = ?", repoID)
 	if err != nil {
-		slog.Error("failed to unlink repository", slog.String("component", "scm"), slog.Any("error", err))
-		http.Error(w, "Failed to unlink repository", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Repository not found", http.StatusNotFound)
+		respondNotFound(w, r, "repository")
 		return
 	}
 
@@ -708,7 +697,7 @@ func (h *SCMWorkspaceHandler) UnlinkRepository(w http.ResponseWriter, r *http.Re
 func (h *SCMWorkspaceHandler) GetAvailableSCMProviders(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
@@ -733,8 +722,7 @@ func (h *SCMWorkspaceHandler) GetAvailableSCMProviders(w http.ResponseWriter, r 
 		ORDER BY sp.name
 	`, workspaceID, workspaceID)
 	if err != nil {
-		slog.Error("failed to get available providers", slog.String("component", "scm"), slog.Any("error", err))
-		http.Error(w, "Failed to get providers", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -935,19 +923,19 @@ func (h *SCMWorkspaceHandler) getProviderInstanceWithWorkspaceCredentials(provid
 func (h *SCMWorkspaceHandler) StartWorkspaceOAuth(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 	connID, err := strconv.Atoi(r.PathValue("connId"))
 	if err != nil {
-		http.Error(w, "Invalid connection ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "connectionId")
 		return
 	}
 
 	// Get user from context
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -958,15 +946,15 @@ func (h *SCMWorkspaceHandler) StartWorkspaceOAuth(w http.ResponseWriter, r *http
 	`, connID).Scan(&connWorkspaceID, &providerID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Connection not found", http.StatusNotFound)
+			respondNotFound(w, r, "connection")
 		} else {
-			http.Error(w, "Failed to get connection", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
 
 	if connWorkspaceID != workspaceID {
-		http.Error(w, "Connection not found", http.StatusNotFound)
+		respondNotFound(w, r, "connection")
 		return
 	}
 
@@ -980,19 +968,18 @@ func (h *SCMWorkspaceHandler) StartWorkspaceOAuth(w http.ResponseWriter, r *http
 		FROM scm_providers WHERE id = ?
 	`, providerID).Scan(&providerType, &authMethod, &clientID, &baseURL, &oauthScopes, &providerSlug)
 	if err != nil {
-		slog.Error("failed to get provider", slog.String("component", "scm"), slog.Any("error", err))
-		http.Error(w, "Failed to get provider", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// OAuth is only valid for OAuth auth method
 	if authMethod != models.SCMAuthMethodOAuth {
-		http.Error(w, "This provider does not use OAuth authentication", http.StatusBadRequest)
+		respondBadRequest(w, r, "This provider does not use OAuth authentication")
 		return
 	}
 
 	if !clientID.Valid || clientID.String == "" {
-		http.Error(w, "OAuth not configured for this provider", http.StatusBadRequest)
+		respondBadRequest(w, r, "OAuth not configured for this provider")
 		return
 	}
 
@@ -1011,8 +998,7 @@ func (h *SCMWorkspaceHandler) StartWorkspaceOAuth(w http.ResponseWriter, r *http
 		VALUES (?, ?, ?, ?, ?, ?)
 	`, providerID, state, redirectURI, user.ID, workspaceID, expiresAt)
 	if err != nil {
-		slog.Error("failed to store OAuth state", slog.String("component", "scm"), slog.Any("error", err))
-		http.Error(w, "Failed to initiate OAuth", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1033,7 +1019,7 @@ func (h *SCMWorkspaceHandler) StartWorkspaceOAuth(w http.ResponseWriter, r *http
 		)
 	case models.SCMProviderTypeGitea:
 		if !baseURL.Valid || baseURL.String == "" {
-			http.Error(w, "Base URL not configured for this provider", http.StatusBadRequest)
+			respondBadRequest(w, r, "Base URL not configured for this provider")
 			return
 		}
 		scopes := "read:repository write:repository"
@@ -1049,7 +1035,7 @@ func (h *SCMWorkspaceHandler) StartWorkspaceOAuth(w http.ResponseWriter, r *http
 			state,
 		)
 	default:
-		http.Error(w, "OAuth not supported for this provider type", http.StatusBadRequest)
+		respondBadRequest(w, r, "OAuth not supported for this provider type")
 		return
 	}
 
@@ -1064,12 +1050,12 @@ func (h *SCMWorkspaceHandler) StartWorkspaceOAuth(w http.ResponseWriter, r *http
 func (h *SCMWorkspaceHandler) SetWorkspacePAT(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 	connID, err := strconv.Atoi(r.PathValue("connId"))
 	if err != nil {
-		http.Error(w, "Invalid connection ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "connectionId")
 		return
 	}
 
@@ -1077,12 +1063,12 @@ func (h *SCMWorkspaceHandler) SetWorkspacePAT(w http.ResponseWriter, r *http.Req
 		PersonalAccessToken string `json:"personal_access_token"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if req.PersonalAccessToken == "" {
-		http.Error(w, "personal_access_token is required", http.StatusBadRequest)
+		respondValidationError(w, r, "personal_access_token is required")
 		return
 	}
 
@@ -1093,15 +1079,15 @@ func (h *SCMWorkspaceHandler) SetWorkspacePAT(w http.ResponseWriter, r *http.Req
 	`, connID).Scan(&connWorkspaceID, &providerID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Connection not found", http.StatusNotFound)
+			respondNotFound(w, r, "connection")
 		} else {
-			http.Error(w, "Failed to get connection", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
 
 	if connWorkspaceID != workspaceID {
-		http.Error(w, "Connection not found", http.StatusNotFound)
+		respondNotFound(w, r, "connection")
 		return
 	}
 
@@ -1109,20 +1095,19 @@ func (h *SCMWorkspaceHandler) SetWorkspacePAT(w http.ResponseWriter, r *http.Req
 	var authMethod models.SCMAuthMethod
 	err = h.db.QueryRow("SELECT auth_method FROM scm_providers WHERE id = ?", providerID).Scan(&authMethod)
 	if err != nil {
-		http.Error(w, "Failed to get provider", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if authMethod != models.SCMAuthMethodPAT {
-		http.Error(w, "This provider does not use PAT authentication", http.StatusBadRequest)
+		respondBadRequest(w, r, "This provider does not use PAT authentication")
 		return
 	}
 
 	// Encrypt and store PAT
 	patEnc, err := h.encryption.Encrypt(req.PersonalAccessToken)
 	if err != nil {
-		slog.Error("failed to encrypt PAT", slog.String("component", "scm"), slog.Any("error", err))
-		http.Error(w, "Failed to encrypt credentials", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1133,8 +1118,7 @@ func (h *SCMWorkspaceHandler) SetWorkspacePAT(w http.ResponseWriter, r *http.Req
 		WHERE id = ?
 	`, patEnc, connID)
 	if err != nil {
-		slog.Error("failed to store PAT", slog.String("component", "scm"), slog.Any("error", err))
-		http.Error(w, "Failed to store credentials", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1150,12 +1134,12 @@ func (h *SCMWorkspaceHandler) SetWorkspacePAT(w http.ResponseWriter, r *http.Req
 func (h *SCMWorkspaceHandler) ClearWorkspaceCredentials(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 	connID, err := strconv.Atoi(r.PathValue("connId"))
 	if err != nil {
-		http.Error(w, "Invalid connection ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "connectionId")
 		return
 	}
 
@@ -1164,15 +1148,15 @@ func (h *SCMWorkspaceHandler) ClearWorkspaceCredentials(w http.ResponseWriter, r
 	err = h.db.QueryRow("SELECT workspace_id FROM workspace_scm_connections WHERE id = ?", connID).Scan(&connWorkspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Connection not found", http.StatusNotFound)
+			respondNotFound(w, r, "connection")
 		} else {
-			http.Error(w, "Failed to get connection", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
 
 	if connWorkspaceID != workspaceID {
-		http.Error(w, "Connection not found", http.StatusNotFound)
+		respondNotFound(w, r, "connection")
 		return
 	}
 
@@ -1187,8 +1171,7 @@ func (h *SCMWorkspaceHandler) ClearWorkspaceCredentials(w http.ResponseWriter, r
 		WHERE id = ?
 	`, connID)
 	if err != nil {
-		slog.Error("failed to clear credentials", slog.String("component", "scm"), slog.Any("error", err))
-		http.Error(w, "Failed to clear credentials", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1200,12 +1183,12 @@ func (h *SCMWorkspaceHandler) ClearWorkspaceCredentials(w http.ResponseWriter, r
 func (h *SCMWorkspaceHandler) GetWorkspaceConnectionAuthStatus(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 	connID, err := strconv.Atoi(r.PathValue("connId"))
 	if err != nil {
-		http.Error(w, "Invalid connection ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "connectionId")
 		return
 	}
 
@@ -1222,15 +1205,15 @@ func (h *SCMWorkspaceHandler) GetWorkspaceConnectionAuthStatus(w http.ResponseWr
 	`, connID).Scan(&connWorkspaceID, &providerID, &wsOAuthTokenEnc, &wsPATEnc, &wsOAuthExpiresAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Connection not found", http.StatusNotFound)
+			respondNotFound(w, r, "connection")
 		} else {
-			http.Error(w, "Failed to get connection", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
 
 	if connWorkspaceID != workspaceID {
-		http.Error(w, "Connection not found", http.StatusNotFound)
+		respondNotFound(w, r, "connection")
 		return
 	}
 
@@ -1242,7 +1225,7 @@ func (h *SCMWorkspaceHandler) GetWorkspaceConnectionAuthStatus(w http.ResponseWr
 		FROM scm_providers WHERE id = ?
 	`, providerID).Scan(&authMethod, &providerPATEnc, &ghAppPrivateKeyEnc)
 	if err != nil {
-		http.Error(w, "Failed to get provider", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

@@ -17,16 +17,10 @@ type CustomFieldHandler struct {
 	db database.Database
 }
 
-// logAndRespondError logs the actual error and responds with a generic message
-func (h *CustomFieldHandler) logAndRespondError(w http.ResponseWriter, err error, message string, statusCode int) {
-	slog.Error("custom field handler error", slog.String("component", "custom_fields"), slog.Any("error", err))
-	http.Error(w, message, statusCode)
-}
-
 // logAndRespondDatabaseError logs database errors and responds with a generic message
-func (h *CustomFieldHandler) logAndRespondDatabaseError(w http.ResponseWriter, err error) {
+func (h *CustomFieldHandler) logAndRespondDatabaseError(w http.ResponseWriter, r *http.Request, err error) {
 	slog.Error("database error in custom field handler", slog.String("component", "custom_fields"), slog.Any("error", err))
-	http.Error(w, "Internal server error", http.StatusInternalServerError)
+	respondInternalError(w, r, err)
 }
 
 func NewCustomFieldHandler(db database.Database) *CustomFieldHandler {
@@ -42,7 +36,7 @@ func (h *CustomFieldHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query)
 	if err != nil {
-		h.logAndRespondDatabaseError(w, err)
+		h.logAndRespondDatabaseError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -57,7 +51,7 @@ func (h *CustomFieldHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			&cf.AppliesToPortalCustomers, &cf.AppliesToCustomerOrganisations,
 			&cf.CreatedAt, &cf.UpdatedAt)
 		if err != nil {
-			h.logAndRespondDatabaseError(w, err)
+			h.logAndRespondDatabaseError(w, r, err)
 			return
 		}
 
@@ -97,11 +91,11 @@ func (h *CustomFieldHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&cf.CreatedAt, &cf.UpdatedAt)
 	
 	if err == sql.ErrNoRows {
-		http.Error(w, "Custom field not found", http.StatusNotFound)
+		respondNotFound(w, r, "custom_field")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -116,19 +110,19 @@ func (h *CustomFieldHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var cf models.CustomFieldDefinition
 	if err := json.NewDecoder(r.Body).Decode(&cf); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(cf.Name) == "" {
-		http.Error(w, "Field name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Field name is required")
 		return
 	}
 
 	// Validate field type
 	if cf.FieldType != "text" && cf.FieldType != "textarea" && cf.FieldType != "select" && cf.FieldType != "multiselect" && cf.FieldType != "number" && cf.FieldType != "milestone" && cf.FieldType != "date" && cf.FieldType != "user" && cf.FieldType != "iteration" && cf.FieldType != "asset" && cf.FieldType != "portalcustomer" && cf.FieldType != "customerorganisation" {
-		http.Error(w, "Invalid field type", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid field type")
 		return
 	}
 
@@ -139,11 +133,11 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 			QLQuery   string `json:"ql_query"`
 		}
 		if cf.Options == "" {
-			http.Error(w, "Asset fields require asset_set_id in options", http.StatusBadRequest)
+			respondValidationError(w, r, "Asset fields require asset_set_id in options")
 			return
 		}
 		if err := json.Unmarshal([]byte(cf.Options), &config); err != nil || config.AssetSetID == 0 {
-			http.Error(w, "Asset fields require asset_set_id in options", http.StatusBadRequest)
+			respondValidationError(w, r, "Asset fields require asset_set_id in options")
 			return
 		}
 	}
@@ -152,11 +146,11 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if (cf.FieldType == "select" || cf.FieldType == "multiselect") && cf.Options != "" {
 		var options []string
 		if err := json.Unmarshal([]byte(cf.Options), &options); err != nil {
-			http.Error(w, "Invalid options format", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid options format")
 			return
 		}
 		if len(options) == 0 {
-			http.Error(w, "Select fields must have at least one option", http.StatusBadRequest)
+			respondValidationError(w, r, "Select fields must have at least one option")
 			return
 		}
 	}
@@ -165,7 +159,7 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if cf.Options != "" && cf.FieldType != "asset" && cf.FieldType != "portalcustomer" && cf.FieldType != "customerorganisation" {
 		var testOptions []string
 		if err := json.Unmarshal([]byte(cf.Options), &testOptions); err != nil {
-			http.Error(w, "Invalid options JSON format", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid options JSON format")
 			return
 		}
 	}
@@ -185,7 +179,7 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 	   cf.AppliesToPortalCustomers, cf.AppliesToCustomerOrganisations, now, now).Scan(&id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -202,9 +196,9 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 		&createdCF.Required, &returnOptionsJSON, &createdCF.DisplayOrder, &createdCF.SystemDefault,
 		&createdCF.AppliesToPortalCustomers, &createdCF.AppliesToCustomerOrganisations,
 		&createdCF.CreatedAt, &createdCF.UpdatedAt)
-	
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -257,11 +251,11 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 		&oldCF.CreatedAt, &oldCF.UpdatedAt)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Custom field not found", http.StatusNotFound)
+		respondNotFound(w, r, "custom_field")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -271,19 +265,19 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	var cf models.CustomFieldDefinition
 	if err := json.NewDecoder(r.Body).Decode(&cf); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(cf.Name) == "" {
-		http.Error(w, "Field name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Field name is required")
 		return
 	}
 
 	// Validate field type
 	if cf.FieldType != "text" && cf.FieldType != "textarea" && cf.FieldType != "select" && cf.FieldType != "multiselect" && cf.FieldType != "number" && cf.FieldType != "milestone" && cf.FieldType != "date" && cf.FieldType != "user" && cf.FieldType != "iteration" && cf.FieldType != "asset" && cf.FieldType != "portalcustomer" && cf.FieldType != "customerorganisation" {
-		http.Error(w, "Invalid field type", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid field type")
 		return
 	}
 
@@ -294,11 +288,11 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 			QLQuery   string `json:"ql_query"`
 		}
 		if cf.Options == "" {
-			http.Error(w, "Asset fields require asset_set_id in options", http.StatusBadRequest)
+			respondValidationError(w, r, "Asset fields require asset_set_id in options")
 			return
 		}
 		if err := json.Unmarshal([]byte(cf.Options), &config); err != nil || config.AssetSetID == 0 {
-			http.Error(w, "Asset fields require asset_set_id in options", http.StatusBadRequest)
+			respondValidationError(w, r, "Asset fields require asset_set_id in options")
 			return
 		}
 	}
@@ -307,7 +301,7 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if cf.Options != "" && cf.FieldType != "asset" && cf.FieldType != "portalcustomer" && cf.FieldType != "customerorganisation" {
 		var testOptions []string
 		if err := json.Unmarshal([]byte(cf.Options), &testOptions); err != nil {
-			http.Error(w, "Invalid options JSON format", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid options JSON format")
 			return
 		}
 	}
@@ -324,9 +318,9 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 		WHERE id = ?
 	`, cf.Name, cf.FieldType, cf.Description, cf.Required, cf.Options, cf.DisplayOrder,
 	   cf.AppliesToPortalCustomers, cf.AppliesToCustomerOrganisations, now, id)
-	
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -343,9 +337,9 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 		&updatedCF.Required, &returnOptionsJSON, &updatedCF.DisplayOrder, &updatedCF.SystemDefault,
 		&updatedCF.AppliesToPortalCustomers, &updatedCF.AppliesToCustomerOrganisations,
 		&updatedCF.CreatedAt, &updatedCF.UpdatedAt)
-	
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -419,22 +413,22 @@ func (h *CustomFieldHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	`, id).Scan(&fieldName, &fieldType, &systemDefault)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Custom field not found", http.StatusNotFound)
+		respondNotFound(w, r, "custom_field")
 		return
 	}
 	if err != nil {
-		h.logAndRespondDatabaseError(w, err)
+		h.logAndRespondDatabaseError(w, r, err)
 		return
 	}
 
 	if systemDefault {
-		http.Error(w, "System default custom fields cannot be deleted", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	_, err = h.db.ExecWrite("DELETE FROM custom_field_definitions WHERE id = ?", id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

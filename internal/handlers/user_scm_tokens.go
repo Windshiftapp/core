@@ -44,7 +44,7 @@ func NewUserSCMTokenHandler(db database.Database, encryption *sso.SecretEncrypti
 func (h *UserSCMTokenHandler) GetUserConnections(w http.ResponseWriter, r *http.Request) {
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -58,7 +58,7 @@ func (h *UserSCMTokenHandler) GetUserConnections(w http.ResponseWriter, r *http.
 		ORDER BY ut.connected_at DESC
 	`, user.ID)
 	if err != nil {
-		http.Error(w, "Failed to get connections", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -75,7 +75,7 @@ func (h *UserSCMTokenHandler) GetUserConnections(w http.ResponseWriter, r *http.
 			&scmUsername, &scmAvatarURL, &conn.ConnectedAt, &lastUsedAt,
 		)
 		if err != nil {
-			http.Error(w, "Failed to scan connection", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -96,13 +96,13 @@ func (h *UserSCMTokenHandler) GetUserConnections(w http.ResponseWriter, r *http.
 func (h *UserSCMTokenHandler) GetConnectionStatus(w http.ResponseWriter, r *http.Request) {
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	providerID, err := strconv.Atoi(r.PathValue("provider_id"))
 	if err != nil {
-		http.Error(w, "Invalid provider ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "provider_id")
 		return
 	}
 
@@ -136,11 +136,11 @@ func (h *UserSCMTokenHandler) GetConnectionStatus(w http.ResponseWriter, r *http
 		`, providerID).Scan(&providerName, &providerType, &providerSlug, &authMethod)
 
 		if err == sql.ErrNoRows {
-			http.Error(w, "Provider not found", http.StatusNotFound)
+			respondNotFound(w, r, "provider")
 			return
 		}
 		if err != nil {
-			http.Error(w, "Failed to get provider", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -156,7 +156,7 @@ func (h *UserSCMTokenHandler) GetConnectionStatus(w http.ResponseWriter, r *http
 		return
 	}
 	if err != nil {
-		http.Error(w, "Failed to get connection status", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -177,13 +177,13 @@ func (h *UserSCMTokenHandler) GetConnectionStatus(w http.ResponseWriter, r *http
 func (h *UserSCMTokenHandler) DisconnectProvider(w http.ResponseWriter, r *http.Request) {
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	providerID, err := strconv.Atoi(r.PathValue("provider_id"))
 	if err != nil {
-		http.Error(w, "Invalid provider ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "provider_id")
 		return
 	}
 
@@ -192,13 +192,13 @@ func (h *UserSCMTokenHandler) DisconnectProvider(w http.ResponseWriter, r *http.
 		WHERE user_id = ? AND scm_provider_id = ?
 	`, user.ID, providerID)
 	if err != nil {
-		http.Error(w, "Failed to disconnect", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Connection not found", http.StatusNotFound)
+		respondNotFound(w, r, "connection")
 		return
 	}
 
@@ -213,7 +213,7 @@ func (h *UserSCMTokenHandler) DisconnectProvider(w http.ResponseWriter, r *http.
 func (h *UserSCMTokenHandler) GetAvailableProviders(w http.ResponseWriter, r *http.Request) {
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -229,7 +229,7 @@ func (h *UserSCMTokenHandler) GetAvailableProviders(w http.ResponseWriter, r *ht
 		ORDER BY sp.name
 	`, user.ID)
 	if err != nil {
-		http.Error(w, "Failed to get providers", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -258,7 +258,7 @@ func (h *UserSCMTokenHandler) GetAvailableProviders(w http.ResponseWriter, r *ht
 			&isConnected, &scmUsername, &scmAvatarURL, &connectedAt,
 		)
 		if err != nil {
-			http.Error(w, "Failed to scan provider", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 

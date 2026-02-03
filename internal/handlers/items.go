@@ -13,6 +13,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/restapi"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 	"windshift/internal/validation"
@@ -85,14 +86,14 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Get user from context
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	// Get accessible workspace IDs (includes active workspaces and inactive ones where user has admin access)
 	accessibleWorkspaceIDs, err := h.getAccessibleWorkspaceIDs(user)
 	if err != nil {
-		http.Error(w, "Failed to get accessible workspaces: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -152,7 +153,7 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		// Build workspace mapping for QL evaluation
 		workspaceMap, err := h.buildWorkspaceMap()
 		if err != nil {
-			http.Error(w, "Failed to load workspace mapping: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -160,7 +161,7 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		evaluator := cql.NewEvaluator(workspaceMap)
 		qlSQL, qlArgs, err := evaluator.EvaluateToSQL(qlQuery)
 		if err != nil {
-			http.Error(w, "QL query error: "+err.Error(), http.StatusBadRequest)
+			respondValidationError(w, r, "QL query error: "+err.Error())
 			return
 		}
 
@@ -204,7 +205,7 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		if level := r.URL.Query().Get("level"); level != "" {
 			levelInt, err := strconv.Atoi(level)
 			if err != nil {
-				http.Error(w, "Invalid level parameter: must be an integer", http.StatusBadRequest)
+				respondValidationError(w, r, "Invalid level parameter: must be an integer")
 				return
 			}
 			whereClause += " AND COALESCE(it.hierarchy_level, 0) = ?"
@@ -214,7 +215,7 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		if maxLevel := r.URL.Query().Get("max_level"); maxLevel != "" {
 			maxLevelInt, err := strconv.Atoi(maxLevel)
 			if err != nil {
-				http.Error(w, "Invalid max_level parameter: must be an integer", http.StatusBadRequest)
+				respondValidationError(w, r, "Invalid max_level parameter: must be an integer")
 				return
 			}
 			whereClause += " AND COALESCE(it.hierarchy_level, 0) <= ?"
@@ -276,7 +277,7 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	var totalCount int
 	err = h.db.QueryRow(countQuery, args...).Scan(&totalCount)
 	if err != nil {
-		http.Error(w, "Failed to get total count: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -286,7 +287,7 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(dataQuery, args...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -308,7 +309,7 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			&fracIndex, &item.CreatedAt, &item.UpdatedAt, &item.WorkspaceName, &item.WorkspaceKey, &itemTypeName, &parentTitle, &milestoneName, &iterationName, &projectName, &timeProjectName,
 			&assigneeName, &assigneeEmail, &assigneeAvatar, &creatorName, &creatorEmail, &statusName, &priorityName, &priorityIcon, &priorityColor)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -373,7 +374,7 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	filteredItems, err := h.filterItemsByPermissions(user.ID, items)
 	if err != nil {
 		slog.Error("permission check failed", slog.Int("user_id", user.ID), slog.String("operation", "GetAll"), slog.Any("error", err))
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	items = filteredItems
@@ -401,7 +402,7 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -410,10 +411,10 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 	result, err := crudService.GetByIDWithWorkspaceStatus(id)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	item := result.Item
@@ -421,11 +422,11 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Check if user has permission to view this item
 	canView, err := h.canViewItem(user.ID, item.WorkspaceID)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canView {
-		http.Error(w, "Insufficient permissions to view this item", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -433,11 +434,11 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if !result.WorkspaceActive {
 		canAccess, err := h.canAccessInactiveWorkspace(user, item.WorkspaceID)
 		if err != nil {
-			http.Error(w, "Error checking workspace access: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !canAccess {
-			http.Error(w, "This workspace is inactive and you don't have permission to access it", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	}
@@ -470,7 +471,7 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	var item models.Item
 	if err := json.NewDecoder(r.Body).Decode(&item); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, err.Error())
 		return
 	}
 	slog.Debug("item decoded", slog.Int("workspace_id", item.WorkspaceID), slog.String("title", item.Title))
@@ -478,7 +479,7 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	slog.Debug("user authenticated", slog.String("username", user.Username))
@@ -490,12 +491,12 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("checking permissions")
 	canEdit, err := h.canEditItem(user.ID, item.WorkspaceID)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	slog.Debug("permission check complete", slog.Bool("can_edit", canEdit))
 	if !canEdit {
-		http.Error(w, "Insufficient permissions to create items in this workspace", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -534,7 +535,7 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if !validationResult.Valid {
-		http.Error(w, validationResult.Error, http.StatusBadRequest)
+		respondValidationError(w, r, validationResult.Error)
 		return
 	}
 
@@ -559,7 +560,7 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if item.CustomFieldValues != nil {
 		customFieldValuesBytes, err := json.Marshal(item.CustomFieldValues)
 		if err != nil {
-			http.Error(w, "Invalid custom field values", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid custom field values")
 			return
 		}
 		customFieldValuesJSON = string(customFieldValuesBytes)
@@ -589,7 +590,7 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		slog.Error("failed to create item", slog.Any("error", err))
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	createServiceTime := time.Since(createServiceStart)
@@ -656,7 +657,7 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		slog.Error("failed to query created item", slog.Int64("item_id", id), slog.Any("error", err))
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -745,14 +746,14 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Parse update data from request body
 	var updateData map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&updateData); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, err.Error())
 		return
 	}
 
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -763,21 +764,21 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	err := h.db.QueryRow("SELECT workspace_id, status_id, item_type_id FROM items WHERE id = ?", id).Scan(&workspaceID, &currentStatusID, &itemTypeID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check if user has permission to edit items in this workspace
 	canEdit, err := h.canEditItem(user.ID, workspaceID)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canEdit {
-		http.Error(w, "Insufficient permissions to edit items in this workspace", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -792,7 +793,7 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		case int:
 			toStatusID = int64(v)
 		default:
-			http.Error(w, "Invalid status_id format", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid status_id format")
 			return
 		}
 
@@ -803,11 +804,11 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 			itemTypeIDPtr := utils.NullInt64ToPtr(itemTypeID)
 			valid, err := workflowService.IsValidStatusTransition(workspaceID, itemTypeIDPtr, currentStatusID.Int64, toStatusID)
 			if err != nil {
-				http.Error(w, "Failed to validate status transition: "+err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 			if !valid {
-				http.Error(w, "Invalid status transition: this status change is not allowed by the workflow", http.StatusBadRequest)
+				respondValidationError(w, r, "Invalid status transition: this status change is not allowed by the workflow")
 				return
 			}
 		}
@@ -832,11 +833,11 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// Check if it's a validation error
 		if valErr, ok := err.(*validation.ValidationError); ok {
-			http.Error(w, valErr.Error(), http.StatusBadRequest)
+			respondValidationError(w, r, valErr.Error())
 			return
 		}
 		// Generic error
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -996,7 +997,7 @@ func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -1005,46 +1006,46 @@ func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	item, err := repo.FindByID(id)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 			return
 		}
-		http.Error(w, "Failed to fetch item: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check permission
 	canDelete, err := h.canDeleteItem(user.ID, item.WorkspaceID)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canDelete {
-		http.Error(w, "Insufficient permissions to delete items in this workspace", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	// Delete using repository
 	tx, err := h.db.Begin()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
 
 	if err := repo.DeleteItemLinks(tx, id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if err := repo.ClearWorklogItemReferences(tx, id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if err := repo.Delete(tx, id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if err := tx.Commit(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1087,7 +1088,7 @@ func (h *ItemHandler) GetDeleteInfo(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -1095,28 +1096,28 @@ func (h *ItemHandler) GetDeleteInfo(w http.ResponseWriter, r *http.Request) {
 	item, err := repo.FindByID(id)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 			return
 		}
-		http.Error(w, "Failed to fetch item: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check permission - need at least view access
 	canEdit, err := h.canEditItem(user.ID, item.WorkspaceID)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canEdit {
-		http.Error(w, "Insufficient permissions", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	// Get descendant IDs
 	descendantIDs, err := repo.GetDescendantIDs(id)
 	if err != nil {
-		http.Error(w, "Failed to get descendants: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1149,7 +1150,7 @@ func (h *ItemHandler) ReparentChildren(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -1157,7 +1158,7 @@ func (h *ItemHandler) ReparentChildren(w http.ResponseWriter, r *http.Request) {
 		NewParentID *int `json:"newParentId"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid request body: "+err.Error())
 		return
 	}
 
@@ -1165,21 +1166,21 @@ func (h *ItemHandler) ReparentChildren(w http.ResponseWriter, r *http.Request) {
 	item, err := repo.FindByID(id)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 			return
 		}
-		http.Error(w, "Failed to fetch item: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check permission
 	canEdit, err := h.canEditItem(user.ID, item.WorkspaceID)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canEdit {
-		http.Error(w, "Insufficient permissions to modify items in this workspace", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -1188,14 +1189,14 @@ func (h *ItemHandler) ReparentChildren(w http.ResponseWriter, r *http.Request) {
 		newParent, err := repo.FindByID(*req.NewParentID)
 		if err != nil {
 			if err == repository.ErrNotFound {
-				http.Error(w, "New parent item not found", http.StatusNotFound)
+				respondNotFound(w, r, "item")
 				return
 			}
-			http.Error(w, "Failed to fetch new parent: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if newParent.WorkspaceID != item.WorkspaceID {
-			http.Error(w, "New parent must be in the same workspace", http.StatusBadRequest)
+			respondValidationError(w, r, "New parent must be in the same workspace")
 			return
 		}
 	}
@@ -1203,7 +1204,7 @@ func (h *ItemHandler) ReparentChildren(w http.ResponseWriter, r *http.Request) {
 	// Get direct children
 	children, err := repo.GetChildren(id)
 	if err != nil {
-		http.Error(w, "Failed to get children: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1215,7 +1216,7 @@ func (h *ItemHandler) ReparentChildren(w http.ResponseWriter, r *http.Request) {
 	// Start transaction
 	tx, err := h.db.Begin()
 	if err != nil {
-		http.Error(w, "Failed to begin transaction: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
@@ -1223,13 +1224,13 @@ func (h *ItemHandler) ReparentChildren(w http.ResponseWriter, r *http.Request) {
 	// Update parent_id for all direct children
 	for _, child := range children {
 		if err := repo.UpdateParent(tx, child.ID, req.NewParentID); err != nil {
-			http.Error(w, "Failed to update child parent: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		http.Error(w, "Failed to commit transaction: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1246,7 +1247,7 @@ func (h *ItemHandler) DeleteCascade(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -1255,21 +1256,21 @@ func (h *ItemHandler) DeleteCascade(w http.ResponseWriter, r *http.Request) {
 	item, err := repo.FindByID(id)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 			return
 		}
-		http.Error(w, "Failed to fetch item: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check permission
 	canDelete, err := h.canDeleteItem(user.ID, item.WorkspaceID)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canDelete {
-		http.Error(w, "Insufficient permissions to delete items in this workspace", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -1277,7 +1278,7 @@ func (h *ItemHandler) DeleteCascade(w http.ResponseWriter, r *http.Request) {
 	crudService := services.NewItemCRUDService(h.db)
 	result, err := crudService.Delete(id)
 	if err != nil {
-		http.Error(w, "Failed to delete item: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1322,7 +1323,7 @@ func (h *ItemHandler) Copy(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -1331,9 +1332,9 @@ func (h *ItemHandler) Copy(w http.ResponseWriter, r *http.Request) {
 	originalItem, err := repo.FindByID(id)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 		} else {
-			http.Error(w, fmt.Sprintf("Failed to get original item: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -1341,11 +1342,11 @@ func (h *ItemHandler) Copy(w http.ResponseWriter, r *http.Request) {
 	// Check permission
 	canEdit, err := h.canEditItem(user.ID, originalItem.WorkspaceID)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canEdit {
-		http.Error(w, "Insufficient permissions to copy items in this workspace", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -1355,21 +1356,21 @@ func (h *ItemHandler) Copy(w http.ResponseWriter, r *http.Request) {
 	// Generate frac_index for the copy
 	newFracIndex, err := services.GenerateFracIndexForNewItem(h.db.GetDB(), originalItem.WorkspaceID, originalItem.ParentID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to generate frac_index: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Create the copy in a transaction
 	tx, err := h.db.Begin()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
 
 	nextNum, err := repo.GetNextWorkspaceItemNumber(tx, originalItem.WorkspaceID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1393,12 +1394,12 @@ func (h *ItemHandler) Copy(w http.ResponseWriter, r *http.Request) {
 
 	copiedItemID, err := repo.Create(tx, newItem)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create copy: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if err := tx.Commit(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1418,7 +1419,11 @@ func (h *ItemHandler) Copy(w http.ResponseWriter, r *http.Request) {
 // GET /api/items/cache-stats
 func (h *ItemHandler) GetCacheStats(w http.ResponseWriter, r *http.Request) {
 	if h.itemCache == nil {
-		http.Error(w, "Item cache is not enabled", http.StatusServiceUnavailable)
+		respondError(w, r, &restapi.APIError{
+			StatusCode: http.StatusServiceUnavailable,
+			Code:       "SERVICE_UNAVAILABLE",
+			Message:    "Item cache is not enabled",
+		})
 		return
 	}
 

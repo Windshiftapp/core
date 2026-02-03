@@ -21,23 +21,23 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 	// Get the old configuration set for audit logging
 	oldCS, err := h.repo.FindByIDBasic(id)
 	if err == repository.ErrNotFound {
-		http.Error(w, "Configuration set not found", http.StatusNotFound)
+		respondNotFound(w, r, "configuration_set")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	var cs models.ConfigurationSet
 	if err := json.NewDecoder(r.Body).Decode(&cs); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(cs.Name) == "" {
-		http.Error(w, "Configuration set name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Configuration set name is required")
 		return
 	}
 
@@ -45,7 +45,7 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 	for _, workspaceID := range cs.WorkspaceIDs {
 		exists, err := h.repo.WorkspaceExists(workspaceID)
 		if err != nil || !exists {
-			http.Error(w, "One or more workspaces not found", http.StatusBadRequest)
+			respondBadRequest(w, r, "One or more workspaces not found")
 			return
 		}
 	}
@@ -57,7 +57,7 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 		for _, workspaceID := range cs.WorkspaceIDs {
 			currentConfigSetID, err := h.repo.GetWorkspaceConfigSetID(workspaceID)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 
@@ -117,14 +117,14 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 	// Start transaction
 	tx, err := h.db.Begin()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
 
 	// Update the configuration set
 	if err := h.repo.Update(tx, id, &cs); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -135,37 +135,37 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 		notificationSettingID = &nsID
 	}
 	if err := h.repo.SaveNotificationSetting(tx, id, notificationSettingID); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Save workspace assignments
 	if err := h.repo.SaveWorkspaceAssignments(tx, id, cs.WorkspaceIDs); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Save screen assignments
 	if err := h.repo.SaveScreenAssignments(tx, id, cs.CreateScreenID, cs.EditScreenID, cs.ViewScreenID); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Save item type configurations
 	if err := h.repo.SaveItemTypeConfigs(tx, id, cs.ItemTypeConfigs); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Save priority assignments
 	if err := h.repo.SavePriorityAssignments(tx, id, cs.PriorityIDs); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Commit transaction
 	if err = tx.Commit(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -180,7 +180,7 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 	// Load and return the updated configuration set with all relations
 	updatedCS, err := h.repo.FindByID(id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

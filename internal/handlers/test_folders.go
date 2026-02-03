@@ -69,18 +69,18 @@ func (h *TestFolderHandler) validateParentFolder(db *sql.DB, workspaceID int, pa
 	return nil
 }
 
-func (h *TestFolderHandler) writeParentValidationError(w http.ResponseWriter, err error) {
+func (h *TestFolderHandler) writeParentValidationError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, errParentFolderNotFound):
-		http.Error(w, errParentFolderNotFound.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, errParentFolderNotFound.Error())
 	case errors.Is(err, errNestedDepthExceeded):
-		http.Error(w, errNestedDepthExceeded.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, errNestedDepthExceeded.Error())
 	case errors.Is(err, errParentSelfReference):
-		http.Error(w, errParentSelfReference.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, errParentSelfReference.Error())
 	case errors.Is(err, errParentHasChildren):
-		http.Error(w, errParentHasChildren.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, errParentHasChildren.Error())
 	default:
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 	}
 }
 
@@ -98,7 +98,7 @@ func nullableParentID(parentID *int) sql.NullInt64 {
 func (h *TestFolderHandler) GetAllFolders(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
@@ -107,11 +107,11 @@ func (h *TestFolderHandler) GetAllFolders(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
 		return
 	}
 
-	db, ok := h.requireReadDB(w)
+	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -128,7 +128,7 @@ func (h *TestFolderHandler) GetAllFolders(w http.ResponseWriter, r *http.Request
 
 	rows, err := db.Query(query, workspaceID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -141,7 +141,7 @@ func (h *TestFolderHandler) GetAllFolders(w http.ResponseWriter, r *http.Request
 			&folder.CreatedAt, &folder.UpdatedAt, &folder.TestCaseCount,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		folders = append(folders, folder)
@@ -155,13 +155,13 @@ func (h *TestFolderHandler) GetAllFolders(w http.ResponseWriter, r *http.Request
 func (h *TestFolderHandler) GetFolder(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid folder ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -170,11 +170,11 @@ func (h *TestFolderHandler) GetFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
 		return
 	}
 
-	db, ok := h.requireReadDB(w)
+	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -195,9 +195,9 @@ func (h *TestFolderHandler) GetFolder(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Folder not found", http.StatusNotFound)
+			respondNotFound(w, r, "test_folder")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -210,7 +210,7 @@ func (h *TestFolderHandler) GetFolder(w http.ResponseWriter, r *http.Request) {
 func (h *TestFolderHandler) CreateFolder(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
@@ -219,30 +219,30 @@ func (h *TestFolderHandler) CreateFolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
 		return
 	}
 
 	var folder models.TestFolder
 	if err := json.NewDecoder(r.Body).Decode(&folder); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if folder.Name == "" {
-		http.Error(w, "Folder name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Folder name is required")
 		return
 	}
 
 	folder.WorkspaceID = workspaceID
 
-	readDB, ok := h.requireReadDB(w)
+	readDB, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
 
 	if err := h.validateParentFolder(readDB, workspaceID, folder.ParentID, nil); err != nil {
-		h.writeParentValidationError(w, err)
+		h.writeParentValidationError(w, r, err)
 		return
 	}
 
@@ -250,7 +250,7 @@ func (h *TestFolderHandler) CreateFolder(w http.ResponseWriter, r *http.Request)
 	var maxSortOrder sql.NullInt64
 	err = readDB.QueryRow("SELECT MAX(sort_order) FROM test_folders WHERE workspace_id = ?", workspaceID).Scan(&maxSortOrder)
 	if err != nil && err != sql.ErrNoRows {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -258,7 +258,7 @@ func (h *TestFolderHandler) CreateFolder(w http.ResponseWriter, r *http.Request)
 	folder.CreatedAt = time.Now()
 	folder.UpdatedAt = time.Now()
 
-	writeDB, ok := h.requireWriteDB(w)
+	writeDB, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
@@ -280,7 +280,7 @@ func (h *TestFolderHandler) CreateFolder(w http.ResponseWriter, r *http.Request)
 		folder.UpdatedAt,
 	).Scan(&id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -296,13 +296,13 @@ func (h *TestFolderHandler) CreateFolder(w http.ResponseWriter, r *http.Request)
 func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid folder ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -311,34 +311,34 @@ func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
 		return
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	var folder models.TestFolder
 	if err := json.Unmarshal(body, &folder); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	var rawPayload map[string]json.RawMessage
 	if err := json.Unmarshal(body, &rawPayload); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if folder.Name == "" {
-		http.Error(w, "Folder name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Folder name is required")
 		return
 	}
 
-	readDB, ok := h.requireReadDB(w)
+	readDB, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -347,11 +347,11 @@ func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request)
 	var existingSortOrder int
 	err = readDB.QueryRow("SELECT parent_id, sort_order FROM test_folders WHERE id = ? AND workspace_id = ?", id, workspaceID).Scan(&existingParent, &existingSortOrder)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Folder not found", http.StatusNotFound)
+		respondNotFound(w, r, "test_folder")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -368,14 +368,14 @@ func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request)
 
 	if parentProvided && folder.ParentID != nil {
 		if err := h.validateParentFolder(readDB, workspaceID, folder.ParentID, &id); err != nil {
-			h.writeParentValidationError(w, err)
+			h.writeParentValidationError(w, r, err)
 			return
 		}
 	}
 
 	folder.UpdatedAt = time.Now()
 
-	writeDB, ok := h.requireWriteDB(w)
+	writeDB, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
@@ -397,13 +397,13 @@ func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request)
 		workspaceID,
 	)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Folder not found", http.StatusNotFound)
+		respondNotFound(w, r, "test_folder")
 		return
 	}
 
@@ -417,13 +417,13 @@ func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request)
 func (h *TestFolderHandler) DeleteFolder(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid folder ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -432,11 +432,11 @@ func (h *TestFolderHandler) DeleteFolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
 		return
 	}
 
-	db, ok := h.requireWriteDB(w)
+	db, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
@@ -444,7 +444,7 @@ func (h *TestFolderHandler) DeleteFolder(w http.ResponseWriter, r *http.Request)
 	// Start transaction to move test cases and delete folder
 	tx, err := db.Begin()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
@@ -452,33 +452,33 @@ func (h *TestFolderHandler) DeleteFolder(w http.ResponseWriter, r *http.Request)
 	// Move test cases to no folder (set folder_id to NULL)
 	_, err = tx.Exec("UPDATE test_cases SET folder_id = NULL WHERE folder_id = ? AND workspace_id = ?", id, workspaceID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Promote subfolders to the root level
 	_, err = tx.Exec("UPDATE test_folders SET parent_id = NULL WHERE parent_id = ? AND workspace_id = ?", id, workspaceID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Delete the folder
 	result, err := tx.Exec("DELETE FROM test_folders WHERE id = ? AND workspace_id = ?", id, workspaceID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Folder not found", http.StatusNotFound)
+		respondNotFound(w, r, "test_folder")
 		return
 	}
 
 	// Commit transaction
 	if err := tx.Commit(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -489,7 +489,7 @@ func (h *TestFolderHandler) DeleteFolder(w http.ResponseWriter, r *http.Request)
 func (h *TestFolderHandler) ReorderFolders(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
@@ -498,7 +498,7 @@ func (h *TestFolderHandler) ReorderFolders(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
 		return
 	}
 
@@ -507,11 +507,11 @@ func (h *TestFolderHandler) ReorderFolders(w http.ResponseWriter, r *http.Reques
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&reorderData); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
-	db, ok := h.requireWriteDB(w)
+	db, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
@@ -519,7 +519,7 @@ func (h *TestFolderHandler) ReorderFolders(w http.ResponseWriter, r *http.Reques
 	// Start transaction for atomic reordering
 	tx, err := db.Begin()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
@@ -530,14 +530,14 @@ func (h *TestFolderHandler) ReorderFolders(w http.ResponseWriter, r *http.Reques
 		_, err = tx.Exec("UPDATE test_folders SET sort_order = ?, updated_at = ? WHERE id = ? AND workspace_id = ?",
 			sortOrder, time.Now(), folderID, workspaceID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
 
 	// Commit transaction
 	if err := tx.Commit(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

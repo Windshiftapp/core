@@ -12,6 +12,8 @@ const (
 	ErrCodeInvalidToken           = "INVALID_TOKEN"
 	ErrCodeTokenExpired           = "TOKEN_EXPIRED"
 	ErrCodeInsufficientPermission = "INSUFFICIENT_PERMISSION"
+	ErrCodeForbidden              = "FORBIDDEN"
+	ErrCodeAdminRequired          = "ADMIN_REQUIRED"
 
 	// Validation errors
 	ErrCodeValidationFailed = "VALIDATION_FAILED"
@@ -23,6 +25,14 @@ const (
 	ErrCodeItemNotFound      = "ITEM_NOT_FOUND"
 	ErrCodeWorkspaceNotFound = "WORKSPACE_NOT_FOUND"
 	ErrCodeUserNotFound      = "USER_NOT_FOUND"
+	ErrCodeChannelNotFound   = "CHANNEL_NOT_FOUND"
+	ErrCodeTestCaseNotFound  = "TEST_CASE_NOT_FOUND"
+	ErrCodeTestRunNotFound         = "TEST_RUN_NOT_FOUND"
+	ErrCodeTestRunTemplateNotFound = "TEST_RUN_TEMPLATE_NOT_FOUND"
+	ErrCodeTestFolderNotFound = "TEST_FOLDER_NOT_FOUND"
+	ErrCodeTestSetNotFound   = "TEST_SET_NOT_FOUND"
+	ErrCodePortalNotFound    = "PORTAL_NOT_FOUND"
+	ErrCodeAssetNotFound     = "ASSET_NOT_FOUND"
 	ErrCodeConflict          = "CONFLICT"
 	ErrCodeAlreadyExists     = "ALREADY_EXISTS"
 
@@ -75,10 +85,20 @@ var (
 	ErrInvalidToken           = NewAPIError(http.StatusUnauthorized, ErrCodeInvalidToken, "Invalid or malformed token")
 	ErrTokenExpired           = NewAPIError(http.StatusUnauthorized, ErrCodeTokenExpired, "Token has expired")
 	ErrInsufficientPermission = NewAPIError(http.StatusForbidden, ErrCodeInsufficientPermission, "Insufficient permissions")
+	ErrForbidden              = NewAPIError(http.StatusForbidden, ErrCodeForbidden, "Access denied")
+	ErrAdminRequired          = NewAPIError(http.StatusForbidden, ErrCodeAdminRequired, "Admin access required")
 	ErrNotFound               = NewAPIError(http.StatusNotFound, ErrCodeNotFound, "Resource not found")
 	ErrItemNotFound           = NewAPIError(http.StatusNotFound, ErrCodeItemNotFound, "Item not found")
 	ErrWorkspaceNotFound      = NewAPIError(http.StatusNotFound, ErrCodeWorkspaceNotFound, "Workspace not found")
 	ErrUserNotFound           = NewAPIError(http.StatusNotFound, ErrCodeUserNotFound, "User not found")
+	ErrChannelNotFound        = NewAPIError(http.StatusNotFound, ErrCodeChannelNotFound, "Channel not found")
+	ErrTestCaseNotFound       = NewAPIError(http.StatusNotFound, ErrCodeTestCaseNotFound, "Test case not found")
+	ErrTestRunNotFound         = NewAPIError(http.StatusNotFound, ErrCodeTestRunNotFound, "Test run not found")
+	ErrTestRunTemplateNotFound = NewAPIError(http.StatusNotFound, ErrCodeTestRunTemplateNotFound, "Test run template not found")
+	ErrTestFolderNotFound     = NewAPIError(http.StatusNotFound, ErrCodeTestFolderNotFound, "Test folder not found")
+	ErrTestSetNotFound        = NewAPIError(http.StatusNotFound, ErrCodeTestSetNotFound, "Test set not found")
+	ErrPortalNotFound         = NewAPIError(http.StatusNotFound, ErrCodePortalNotFound, "Portal not found")
+	ErrAssetNotFound          = NewAPIError(http.StatusNotFound, ErrCodeAssetNotFound, "Asset not found")
 	ErrValidationFailed       = NewAPIError(http.StatusBadRequest, ErrCodeValidationFailed, "Validation failed")
 	ErrInvalidInput           = NewAPIError(http.StatusBadRequest, ErrCodeInvalidInput, "Invalid input")
 	ErrRateLimited            = NewAPIError(http.StatusTooManyRequests, ErrCodeRateLimited, "Rate limit exceeded")

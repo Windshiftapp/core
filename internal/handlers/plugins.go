@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"windshift/internal/database"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -9,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"windshift/internal/database"
 	"windshift/internal/plugins"
 )
 
@@ -50,7 +50,7 @@ func (h *PluginHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
 		ORDER BY name
 	`)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to query plugins: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -63,7 +63,7 @@ func (h *PluginHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
 
 		err := rows.Scan(&p.ID, &p.Name, &p.Version, &p.Description, &p.Author, &p.Enabled, &routesJSON, &extensionsJSON, &p.InstalledAt)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to scan plugin: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -127,21 +127,21 @@ func (h *PluginHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
 // UploadPlugin handles plugin upload
 func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
 	if h.pluginsDisabled {
-		http.Error(w, "Plugin system is disabled on this server", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	// Parse multipart form (32MB max)
 	err := r.ParseMultipartForm(32 << 20)
 	if err != nil {
-		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		respondBadRequest(w, r, "Failed to parse form")
 		return
 	}
 
 	// Get the uploaded file
 	file, header, err := r.FormFile("plugin")
 	if err != nil {
-		http.Error(w, "Missing plugin file", http.StatusBadRequest)
+		respondBadRequest(w, r, "Missing plugin file")
 		return
 	}
 	defer file.Close()
@@ -149,7 +149,7 @@ func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
 	// Read file content
 	fileData, err := io.ReadAll(file)
 	if err != nil {
-		http.Error(w, "Failed to read file", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -161,14 +161,14 @@ func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
 		// Handle direct WASM file - need manifest (legacy)
 		manifestFile, _, formErr := r.FormFile("manifest")
 		if formErr != nil {
-			http.Error(w, "Missing manifest.json for WASM upload", http.StatusBadRequest)
+			respondBadRequest(w, r, "Missing manifest.json for WASM upload")
 			return
 		}
 		defer manifestFile.Close()
 
 		manifestData, readErr := io.ReadAll(manifestFile)
 		if readErr != nil {
-			http.Error(w, "Failed to read manifest", http.StatusInternalServerError)
+			respondInternalError(w, r, readErr)
 			return
 		}
 
@@ -176,12 +176,12 @@ func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
 		pluginName := strings.TrimSuffix(header.Filename, ".wasm")
 		err = h.manager.UploadPluginLegacy(pluginName, fileData, manifestData)
 	} else {
-		http.Error(w, "Unsupported file type. Upload .wasm or .zip files", http.StatusBadRequest)
+		respondBadRequest(w, r, "Unsupported file type. Upload .wasm or .zip files")
 		return
 	}
 
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to upload plugin: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -208,7 +208,7 @@ func (h *PluginHandler) GetExtensions(w http.ResponseWriter, r *http.Request) {
 // GetAsset serves a static asset from a plugin
 func (h *PluginHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	if h.manager == nil {
-		http.Error(w, "Plugin system is disabled", http.StatusNotFound)
+		respondNotFound(w, r, "Plugin system")
 		return
 	}
 
@@ -217,7 +217,7 @@ func (h *PluginHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
 
 	data, mimeType, err := h.manager.GetAsset(pluginName, assetPath)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Asset not found: %v", err), http.StatusNotFound)
+		respondNotFound(w, r, "asset")
 		return
 	}
 
@@ -230,7 +230,7 @@ func (h *PluginHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
 // TogglePlugin enables or disables a plugin
 func (h *PluginHandler) TogglePlugin(w http.ResponseWriter, r *http.Request) {
 	if h.pluginsDisabled {
-		http.Error(w, "Plugin system is disabled on this server", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -240,7 +240,7 @@ func (h *PluginHandler) TogglePlugin(w http.ResponseWriter, r *http.Request) {
 		Enabled bool `json:"enabled"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -252,14 +252,14 @@ func (h *PluginHandler) TogglePlugin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to toggle plugin: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Update database
 	_, err = h.db.ExecWrite("UPDATE plugin_registry SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE name = ?", req.Enabled, pluginName)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to update database: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -270,7 +270,7 @@ func (h *PluginHandler) TogglePlugin(w http.ResponseWriter, r *http.Request) {
 // DeletePlugin removes a plugin
 func (h *PluginHandler) DeletePlugin(w http.ResponseWriter, r *http.Request) {
 	if h.pluginsDisabled {
-		http.Error(w, "Plugin system is disabled on this server", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -278,14 +278,14 @@ func (h *PluginHandler) DeletePlugin(w http.ResponseWriter, r *http.Request) {
 
 	// Delete from manager and filesystem
 	if err := h.manager.DeletePlugin(pluginName); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to delete plugin: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Delete from database
 	_, err := h.db.ExecWrite("DELETE FROM plugin_registry WHERE name = ?", pluginName)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to delete from database: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -296,14 +296,14 @@ func (h *PluginHandler) DeletePlugin(w http.ResponseWriter, r *http.Request) {
 // ReloadPlugin reloads a plugin
 func (h *PluginHandler) ReloadPlugin(w http.ResponseWriter, r *http.Request) {
 	if h.pluginsDisabled {
-		http.Error(w, "Plugin system is disabled on this server", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	pluginName := r.PathValue("name")
 
 	if err := h.manager.ReloadPlugin(pluginName); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to reload plugin: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

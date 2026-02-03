@@ -54,7 +54,7 @@ func (h *SecuritySettingsHandler) GetSecuritySettings(w http.ResponseWriter, r *
 func (h *SecuritySettingsHandler) UpdateSecuritySettings(w http.ResponseWriter, r *http.Request) {
 	var settings SecuritySettings
 	if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
 
@@ -70,7 +70,7 @@ func (h *SecuritySettingsHandler) UpdateSecuritySettings(w http.ResponseWriter, 
 		WHERE key = 'calendar_feed_enabled'
 	`, value)
 	if err != nil {
-		http.Error(w, "Failed to update settings", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -86,7 +86,7 @@ func (h *SecuritySettingsHandler) UpdateSecuritySettings(w http.ResponseWriter, 
 		WHERE key = 'plugin_cli_exec_enabled'
 	`, value)
 	if err != nil {
-		http.Error(w, "Failed to update settings", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -98,7 +98,7 @@ func (h *SecuritySettingsHandler) UpdateSecuritySettings(w http.ResponseWriter, 
 			VALUES ('plugin_cli_exec_enabled', ?, 'boolean', 'Allow plugins to execute CLI commands', 'security', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		`, value)
 		if err != nil {
-			http.Error(w, "Failed to create settings", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}

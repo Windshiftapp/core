@@ -21,7 +21,7 @@ func NewWorkspaceFieldRequirementHandler(db database.Database) *WorkspaceFieldRe
 func (h *WorkspaceFieldRequirementHandler) GetByWorkspace(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspace ID")
 		return
 	}
 
@@ -34,10 +34,10 @@ func (h *WorkspaceFieldRequirementHandler) GetByWorkspace(w http.ResponseWriter,
 		WHERE wfr.workspace_id = ?
 		ORDER BY cfd.display_order, cfd.name
 	`
-	
+
 	rows, err := h.db.Query(query, workspaceID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -58,7 +58,7 @@ func (h *WorkspaceFieldRequirementHandler) GetByWorkspace(w http.ResponseWriter,
 		err := rows.Scan(&req.ID, &req.WorkspaceID, &req.CustomFieldID, &req.IsRequired,
 			&req.FieldName, &req.FieldType, &req.WorkspaceName)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		requirements = append(requirements, req)
@@ -76,7 +76,7 @@ func (h *WorkspaceFieldRequirementHandler) GetByWorkspace(w http.ResponseWriter,
 func (h *WorkspaceFieldRequirementHandler) SetRequirement(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspace ID")
 		return
 	}
 
@@ -84,9 +84,9 @@ func (h *WorkspaceFieldRequirementHandler) SetRequirement(w http.ResponseWriter,
 		CustomFieldID int  `json:"custom_field_id"`
 		IsRequired    bool `json:"is_required"`
 	}
-	
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
@@ -94,11 +94,11 @@ func (h *WorkspaceFieldRequirementHandler) SetRequirement(w http.ResponseWriter,
 	var workspaceExists bool
 	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", workspaceID).Scan(&workspaceExists)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !workspaceExists {
-		http.Error(w, "Workspace not found", http.StatusBadRequest)
+		respondNotFound(w, r, "workspace")
 		return
 	}
 
@@ -106,18 +106,18 @@ func (h *WorkspaceFieldRequirementHandler) SetRequirement(w http.ResponseWriter,
 	var fieldExists bool
 	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM custom_field_definitions WHERE id = ?)", req.CustomFieldID).Scan(&fieldExists)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !fieldExists {
-		http.Error(w, "Custom field not found", http.StatusBadRequest)
+		respondNotFound(w, r, "custom_field")
 		return
 	}
 
 	// Insert or update the requirement (upsert using delete then insert for cross-database compatibility)
 	_, err = h.db.ExecWrite(`DELETE FROM workspace_field_requirements WHERE workspace_id = ? AND custom_field_id = ?`, workspaceID, req.CustomFieldID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -125,9 +125,9 @@ func (h *WorkspaceFieldRequirementHandler) SetRequirement(w http.ResponseWriter,
 		INSERT INTO workspace_field_requirements (workspace_id, custom_field_id, is_required)
 		VALUES (?, ?, ?)
 	`, workspaceID, req.CustomFieldID, req.IsRequired)
-	
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -138,23 +138,23 @@ func (h *WorkspaceFieldRequirementHandler) SetRequirement(w http.ResponseWriter,
 func (h *WorkspaceFieldRequirementHandler) RemoveRequirement(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspace ID")
 		return
 	}
-	
+
 	fieldID, err := strconv.Atoi(r.PathValue("fieldId"))
 	if err != nil {
-		http.Error(w, "Invalid field ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "field ID")
 		return
 	}
 
 	_, err = h.db.ExecWrite(`
-		DELETE FROM workspace_field_requirements 
+		DELETE FROM workspace_field_requirements
 		WHERE workspace_id = ? AND custom_field_id = ?
 	`, workspaceID, fieldID)
-	
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -164,22 +164,22 @@ func (h *WorkspaceFieldRequirementHandler) RemoveRequirement(w http.ResponseWrit
 func (h *WorkspaceFieldRequirementHandler) GetAvailableFields(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspace ID")
 		return
 	}
 
 	query := `
-		SELECT cfd.id, cfd.name, cfd.field_type, cfd.description, cfd.required, 
+		SELECT cfd.id, cfd.name, cfd.field_type, cfd.description, cfd.required,
 		       cfd.options, cfd.display_order, cfd.created_at, cfd.updated_at,
 		       COALESCE(wfr.is_required, 0) as is_required
 		FROM custom_field_definitions cfd
 		LEFT JOIN workspace_field_requirements wfr ON cfd.id = wfr.custom_field_id AND wfr.workspace_id = ?
 		ORDER BY cfd.display_order, cfd.name
 	`
-	
+
 	rows, err := h.db.Query(query, workspaceID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -193,12 +193,12 @@ func (h *WorkspaceFieldRequirementHandler) GetAvailableFields(w http.ResponseWri
 	for rows.Next() {
 		var field FieldWithRequirement
 		var optionsJSON sql.NullString
-		
+
 		err := rows.Scan(&field.ID, &field.Name, &field.FieldType, &field.Description,
-			&field.Required, &optionsJSON, &field.DisplayOrder, 
+			&field.Required, &optionsJSON, &field.DisplayOrder,
 			&field.CreatedAt, &field.UpdatedAt, &field.IsRequired)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		

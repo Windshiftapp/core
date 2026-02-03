@@ -35,13 +35,13 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 		// Workspace-level configuration
 		workspaceIDStr := r.URL.Query().Get("workspace_id")
 		if workspaceIDStr == "" {
-			http.Error(w, "workspace_id query parameter required for default configuration", http.StatusBadRequest)
+			respondValidationError(w, r, "workspace_id query parameter required for default configuration")
 			return
 		}
 
 		workspaceID, parseErr := strconv.Atoi(workspaceIDStr)
 		if parseErr != nil {
-			http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+			respondInvalidID(w, r, "workspace_id")
 			return
 		}
 
@@ -73,7 +73,7 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 		// Collection-level configuration
 		collectionID, parseErr := strconv.Atoi(id)
 		if parseErr != nil {
-			http.Error(w, "Invalid collection ID", http.StatusBadRequest)
+			respondInvalidID(w, r, "id")
 			return
 		}
 
@@ -103,18 +103,18 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 	}
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Board configuration not found", http.StatusNotFound)
+		respondNotFound(w, r, "board_configuration")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Get the columns with status mappings
 	columns, err := h.getColumnsWithStatuses(config.ID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	config.Columns = columns
@@ -129,7 +129,7 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 
 	var req models.BoardConfigurationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -138,7 +138,7 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 	// Begin transaction
 	tx, err := h.db.Begin()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
@@ -152,7 +152,7 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 	if len(req.BacklogStatusIDs) > 0 {
 		backlogStatusIDsBytes, err = json.Marshal(req.BacklogStatusIDs)
 		if err != nil {
-			http.Error(w, "Failed to marshal backlog status IDs", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		slog.Info("marshaled backlog status IDs", "json", string(backlogStatusIDsBytes))
@@ -163,13 +163,13 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 		// Workspace-level configuration
 		workspaceIDStr := r.URL.Query().Get("workspace_id")
 		if workspaceIDStr == "" {
-			http.Error(w, "workspace_id query parameter required for default configuration", http.StatusBadRequest)
+			respondValidationError(w, r, "workspace_id query parameter required for default configuration")
 			return
 		}
 
 		wsID, parseErr := strconv.Atoi(workspaceIDStr)
 		if parseErr != nil {
-			http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+			respondInvalidID(w, r, "workspace_id")
 			return
 		}
 		workspaceID = &wsID
@@ -184,7 +184,7 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 		// Collection-level configuration
 		collID, parseErr := strconv.Atoi(id)
 		if parseErr != nil {
-			http.Error(w, "Invalid collection ID", http.StatusBadRequest)
+			respondInvalidID(w, r, "id")
 			return
 		}
 		collectionID = &collID
@@ -197,19 +197,19 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 	}
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Create columns
 	if err := h.createColumns(tx, int(configID), req.Columns); err != nil {
 		slog.Error("failed to create board columns", "error", err, "config_id", configID)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if err := tx.Commit(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -233,13 +233,13 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r *http.Request) {
 	configID, err := strconv.Atoi(r.PathValue("configId"))
 	if err != nil {
-		http.Error(w, "Invalid configuration ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "configId")
 		return
 	}
 
 	var req models.BoardConfigurationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -248,7 +248,7 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 	// Begin transaction
 	tx, err := h.db.Begin()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
@@ -258,7 +258,7 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 	if len(req.BacklogStatusIDs) > 0 {
 		backlogStatusIDsBytes, err = json.Marshal(req.BacklogStatusIDs)
 		if err != nil {
-			http.Error(w, "Failed to marshal backlog status IDs", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		slog.Info("marshaled backlog status IDs", "json", string(backlogStatusIDsBytes))
@@ -272,14 +272,14 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 		backlogStatusIDsBytes, time.Now(), configID,
 	)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Get existing columns
 	existingColumns, err := h.getColumns(configID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -308,7 +308,7 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 			)
 			if err != nil {
 				slog.Error("failed to update column", "error", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 
@@ -317,7 +317,7 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 			_, err = tx.Exec(`DELETE FROM board_column_statuses WHERE board_column_id = ?`, *colReq.ID)
 			if err != nil {
 				slog.Error("failed to delete existing status mappings", "error", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 
@@ -331,9 +331,8 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 					*colReq.ID, statusID, time.Now(),
 				)
 				if err != nil {
-					errMsg := fmt.Sprintf("failed to insert status mapping for status_id=%d, board_column_id=%d: %v", statusID, *colReq.ID, err)
 					slog.Error("FOREIGN KEY ERROR (update path)", "status_id", statusID, "board_column_id", *colReq.ID, "error", err)
-					http.Error(w, errMsg, http.StatusInternalServerError)
+					respondInternalError(w, r, fmt.Errorf("failed to insert status mapping for status_id=%d, board_column_id=%d: %w", statusID, *colReq.ID, err))
 					return
 				}
 			}
@@ -348,7 +347,7 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 			).Scan(&colID)
 			if err != nil {
 				slog.Error("failed to create new column", "error", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 			slog.Info("new column created", "column_id", colID, "name", colReq.Name)
@@ -363,9 +362,8 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 					colID, statusID, time.Now(),
 				)
 				if err != nil {
-					errMsg := fmt.Sprintf("failed to insert status mapping for status_id=%d, board_column_id=%d: %v", statusID, colID, err)
 					slog.Error("FOREIGN KEY ERROR (create path)", "status_id", statusID, "board_column_id", colID, "error", err)
-					http.Error(w, errMsg, http.StatusInternalServerError)
+					respondInternalError(w, r, fmt.Errorf("failed to insert status mapping for status_id=%d, board_column_id=%d: %w", statusID, colID, err))
 					return
 				}
 			}
@@ -378,20 +376,20 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 			// Delete status mappings first (cascade should handle this, but be explicit)
 			_, err = tx.Exec(`DELETE FROM board_column_statuses WHERE board_column_id = ?`, existingID)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 			// Delete the column
 			_, err = tx.Exec(`DELETE FROM board_columns WHERE id = ?`, existingID)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -407,7 +405,7 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 	).Scan(&config.ID, &collID, &wsID, &backlogStatusIDsJSON, &config.CreatedAt, &config.UpdatedAt)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -437,14 +435,14 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 func (h *BoardConfigurationHandler) DeleteForCollection(w http.ResponseWriter, r *http.Request) {
 	configID, err := strconv.Atoi(r.PathValue("configId"))
 	if err != nil {
-		http.Error(w, "Invalid configuration ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "configId")
 		return
 	}
 
 	// Delete the configuration (cascade will handle columns and status mappings)
 	_, err = h.db.ExecWrite(`DELETE FROM board_configurations WHERE id = ?`, configID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

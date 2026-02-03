@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -31,7 +32,7 @@ func (h *ProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -51,18 +52,18 @@ func (h *ProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Use service to list projects
 	results, _, err := h.planningService.ListProjects(params)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Convert service results to models and filter by permission
 	var projects []models.Project
-	for _, r := range results {
+	for _, res := range results {
 		// Check if user has permission to view projects in this workspace
-		if r.WorkspaceID != nil {
-			canView, err := h.canViewProject(user.ID, *r.WorkspaceID)
+		if res.WorkspaceID != nil {
+			canView, err := h.canViewProject(user.ID, *res.WorkspaceID)
 			if err != nil {
-				http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 				return
 			}
 			if !canView {
@@ -71,14 +72,14 @@ func (h *ProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		}
 
 		project := models.Project{
-			ID:            r.ID,
-			Name:          r.Name,
-			Description:   r.Description,
-			Active:        r.Active,
-			WorkspaceID:   r.WorkspaceID,
-			WorkspaceName: r.WorkspaceName,
-			CreatedAt:     r.CreatedAt,
-			UpdatedAt:     r.UpdatedAt,
+			ID:            res.ID,
+			Name:          res.Name,
+			Description:   res.Description,
+			Active:        res.Active,
+			WorkspaceID:   res.WorkspaceID,
+			WorkspaceName: res.WorkspaceName,
+			CreatedAt:     res.CreatedAt,
+			UpdatedAt:     res.UpdatedAt,
 		}
 
 		// Load milestone categories
@@ -107,7 +108,7 @@ func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -115,10 +116,10 @@ func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 	result, err := h.planningService.GetProject(id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			http.Error(w, "Project not found", http.StatusNotFound)
+			respondNotFound(w, r, "project")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -126,11 +127,11 @@ func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if result.WorkspaceID != nil {
 		canView, err := h.canViewProject(user.ID, *result.WorkspaceID)
 		if err != nil {
-			http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 			return
 		}
 		if !canView {
-			http.Error(w, "Insufficient permissions to view this project", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	}
@@ -161,13 +162,13 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	var project models.Project
 	if err := json.NewDecoder(r.Body).Decode(&project); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -175,22 +176,22 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if project.WorkspaceID != nil && *project.WorkspaceID != 0 {
 		exists, err := h.planningService.WorkspaceExists(*project.WorkspaceID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !exists {
-			http.Error(w, "Workspace not found", http.StatusBadRequest)
+			respondValidationError(w, r, "Workspace not found")
 			return
 		}
 
 		// Check if user has permission to create projects in this workspace
 		canCreate, err := h.canCreateProject(user.ID, *project.WorkspaceID)
 		if err != nil {
-			http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 			return
 		}
 		if !canCreate {
-			http.Error(w, "Insufficient permissions to create projects in this workspace", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	}
@@ -203,14 +204,14 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Active:      project.Active,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Save milestone categories if provided
 	if len(project.MilestoneCategories) > 0 {
 		if err := h.planningService.SaveProjectMilestoneCategories(result.ID, project.MilestoneCategories); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
@@ -246,7 +247,7 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -254,10 +255,10 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	existingWorkspaceID, err := h.planningService.GetProjectWorkspaceID(id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			http.Error(w, "Project not found", http.StatusNotFound)
+			respondNotFound(w, r, "project")
 			return
 		}
-		http.Error(w, "Failed to fetch project: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to fetch project: %w", err))
 		return
 	}
 
@@ -265,18 +266,18 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if existingWorkspaceID != nil {
 		canEdit, err := h.canEditProject(user.ID, *existingWorkspaceID)
 		if err != nil {
-			http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 			return
 		}
 		if !canEdit {
-			http.Error(w, "Insufficient permissions to edit this project", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	}
 
 	var project models.Project
 	if err := json.NewDecoder(r.Body).Decode(&project); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -284,11 +285,11 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if project.WorkspaceID != nil && *project.WorkspaceID != 0 {
 		exists, err := h.planningService.WorkspaceExists(*project.WorkspaceID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !exists {
-			http.Error(w, "Workspace not found", http.StatusBadRequest)
+			respondValidationError(w, r, "Workspace not found")
 			return
 		}
 
@@ -296,11 +297,11 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		if existingWorkspaceID == nil || *project.WorkspaceID != *existingWorkspaceID {
 			canEdit, err := h.canEditProject(user.ID, *project.WorkspaceID)
 			if err != nil {
-				http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 				return
 			}
 			if !canEdit {
-				http.Error(w, "Insufficient permissions to move project to this workspace", http.StatusForbidden)
+				respondForbidden(w, r)
 				return
 			}
 		}
@@ -315,13 +316,13 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Active:      project.Active,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Update milestone categories
 	if err := h.planningService.SaveProjectMilestoneCategories(id, project.MilestoneCategories); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -356,7 +357,7 @@ func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -364,10 +365,10 @@ func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := h.planningService.GetProjectWorkspaceID(id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			http.Error(w, "Project not found", http.StatusNotFound)
+			respondNotFound(w, r, "project")
 			return
 		}
-		http.Error(w, "Failed to fetch project: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to fetch project: %w", err))
 		return
 	}
 
@@ -375,18 +376,18 @@ func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if workspaceID != nil {
 		canDelete, permErr := h.canDeleteProject(user.ID, *workspaceID)
 		if permErr != nil {
-			http.Error(w, "Permission check failed: "+permErr.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("permission check failed: %w", permErr))
 			return
 		}
 		if !canDelete {
-			http.Error(w, "Insufficient permissions to delete this project", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	}
 
 	// Use service to delete project
 	if err := h.planningService.DeleteProject(id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

@@ -41,7 +41,7 @@ func (h *MilestoneHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Check workspace permission if workspace_id is specified
 	if workspaceIDStr != "" {
 		if wsID, err := strconv.Atoi(workspaceIDStr); err == nil {
-			if !RequireWorkspacePermission(w, user.ID, wsID, models.PermissionItemView, h.permissionService) {
+			if !RequireWorkspacePermission(w, r, user.ID, wsID, models.PermissionItemView, h.permissionService) {
 				return
 			}
 		}
@@ -49,7 +49,7 @@ func (h *MilestoneHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		// For global-only milestones, check global milestone permission
 		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
 		if err != nil || !hasGlobalPerm {
-			http.Error(w, "Forbidden", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	}
@@ -82,7 +82,7 @@ func (h *MilestoneHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Use service to list milestones
 	results, _, err := h.planningService.ListMilestones(params)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -127,10 +127,10 @@ func (h *MilestoneHandler) Get(w http.ResponseWriter, r *http.Request) {
 	result, err := h.planningService.GetMilestone(id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			http.Error(w, "Milestone not found", http.StatusNotFound)
+			respondNotFound(w, r, "milestone")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -138,11 +138,11 @@ func (h *MilestoneHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if result.IsGlobal {
 		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
 		if err != nil || !hasGlobalPerm {
-			http.Error(w, "Forbidden", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	} else if result.WorkspaceID != nil {
-		if !RequireWorkspacePermission(w, user.ID, *result.WorkspaceID, models.PermissionItemView, h.permissionService) {
+		if !RequireWorkspacePermission(w, r, user.ID, *result.WorkspaceID, models.PermissionItemView, h.permissionService) {
 			return
 		}
 	}
@@ -177,13 +177,13 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	var milestone models.Milestone
 	if err := json.NewDecoder(r.Body).Decode(&milestone); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(milestone.Name) == "" {
-		http.Error(w, "Milestone name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Milestone name is required")
 		return
 	}
 
@@ -207,11 +207,11 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Validate global vs workspace constraints
 	if milestone.IsGlobal && milestone.WorkspaceID != nil {
-		http.Error(w, "Global milestones cannot have a workspace_id", http.StatusBadRequest)
+		respondValidationError(w, r, "Global milestones cannot have a workspace_id")
 		return
 	}
 	if !milestone.IsGlobal && milestone.WorkspaceID == nil {
-		http.Error(w, "Local milestones must have a workspace_id", http.StatusBadRequest)
+		respondValidationError(w, r, "Local milestones must have a workspace_id")
 		return
 	}
 
@@ -219,11 +219,11 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if milestone.IsGlobal {
 		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
 		if err != nil || !hasGlobalPerm {
-			http.Error(w, "Forbidden", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	} else {
-		if !RequireWorkspacePermission(w, user.ID, *milestone.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
+		if !RequireWorkspacePermission(w, r, user.ID, *milestone.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
 			return
 		}
 	}
@@ -232,11 +232,11 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if milestone.CategoryID != nil {
 		exists, err := h.planningService.CategoryExists(*milestone.CategoryID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !exists {
-			http.Error(w, "Invalid category ID", http.StatusBadRequest)
+			respondInvalidID(w, r, "category_id")
 			return
 		}
 	}
@@ -245,11 +245,11 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if milestone.WorkspaceID != nil {
 		exists, err := h.planningService.WorkspaceExists(*milestone.WorkspaceID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !exists {
-			http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+			respondInvalidID(w, r, "workspace_id")
 			return
 		}
 	}
@@ -275,7 +275,7 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 		WorkspaceID: milestone.WorkspaceID,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -314,13 +314,13 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	var milestone models.Milestone
 	if err := json.NewDecoder(r.Body).Decode(&milestone); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(milestone.Name) == "" {
-		http.Error(w, "Milestone name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Milestone name is required")
 		return
 	}
 
@@ -339,17 +339,17 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !statusValid {
-		http.Error(w, "Invalid status", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid status")
 		return
 	}
 
 	// Validate global vs workspace constraints
 	if milestone.IsGlobal && milestone.WorkspaceID != nil {
-		http.Error(w, "Global milestones cannot have a workspace_id", http.StatusBadRequest)
+		respondValidationError(w, r, "Global milestones cannot have a workspace_id")
 		return
 	}
 	if !milestone.IsGlobal && milestone.WorkspaceID == nil {
-		http.Error(w, "Local milestones must have a workspace_id", http.StatusBadRequest)
+		respondValidationError(w, r, "Local milestones must have a workspace_id")
 		return
 	}
 
@@ -357,11 +357,11 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if milestone.IsGlobal {
 		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
 		if err != nil || !hasGlobalPerm {
-			http.Error(w, "Forbidden", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	} else {
-		if !RequireWorkspacePermission(w, user.ID, *milestone.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
+		if !RequireWorkspacePermission(w, r, user.ID, *milestone.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
 			return
 		}
 	}
@@ -370,11 +370,11 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if milestone.CategoryID != nil {
 		exists, err := h.planningService.CategoryExists(*milestone.CategoryID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !exists {
-			http.Error(w, "Invalid category ID", http.StatusBadRequest)
+			respondInvalidID(w, r, "category_id")
 			return
 		}
 	}
@@ -383,11 +383,11 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if milestone.WorkspaceID != nil {
 		exists, err := h.planningService.WorkspaceExists(*milestone.WorkspaceID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !exists {
-			http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+			respondInvalidID(w, r, "workspace_id")
 			return
 		}
 	}
@@ -414,7 +414,7 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 		WorkspaceID: milestone.WorkspaceID,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -455,10 +455,10 @@ func (h *MilestoneHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	isGlobal, workspaceID, err := h.planningService.IsMilestoneGlobal(id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			http.Error(w, "Milestone not found", http.StatusNotFound)
+			respondNotFound(w, r, "milestone")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -466,18 +466,18 @@ func (h *MilestoneHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if isGlobal {
 		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
 		if err != nil || !hasGlobalPerm {
-			http.Error(w, "Forbidden", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	} else if workspaceID != nil {
-		if !RequireWorkspacePermission(w, user.ID, *workspaceID, models.PermissionItemEdit, h.permissionService) {
+		if !RequireWorkspacePermission(w, r, user.ID, *workspaceID, models.PermissionItemEdit, h.permissionService) {
 			return
 		}
 	}
 
 	// Use service to delete milestone
 	if err := h.planningService.DeleteMilestone(id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -499,10 +499,10 @@ func (h *MilestoneHandler) GetTestStatistics(w http.ResponseWriter, r *http.Requ
 	isGlobal, workspaceID, err := h.planningService.IsMilestoneGlobal(milestoneID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			http.Error(w, "Milestone not found", http.StatusNotFound)
+			respondNotFound(w, r, "milestone")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -510,11 +510,11 @@ func (h *MilestoneHandler) GetTestStatistics(w http.ResponseWriter, r *http.Requ
 	if isGlobal {
 		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
 		if err != nil || !hasGlobalPerm {
-			http.Error(w, "Forbidden", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	} else if workspaceID != nil {
-		if !RequireWorkspacePermission(w, user.ID, *workspaceID, models.PermissionItemView, h.permissionService) {
+		if !RequireWorkspacePermission(w, r, user.ID, *workspaceID, models.PermissionItemView, h.permissionService) {
 			return
 		}
 	}
@@ -522,7 +522,7 @@ func (h *MilestoneHandler) GetTestStatistics(w http.ResponseWriter, r *http.Requ
 	// Use service to get test statistics
 	stats, err := h.planningService.GetMilestoneTestStatistics(milestoneID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -545,10 +545,10 @@ func (h *MilestoneHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 	isGlobal, workspaceID, err := h.planningService.IsMilestoneGlobal(milestoneID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			http.Error(w, "Milestone not found", http.StatusNotFound)
+			respondNotFound(w, r, "milestone")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -556,11 +556,11 @@ func (h *MilestoneHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 	if isGlobal {
 		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
 		if err != nil || !hasGlobalPerm {
-			http.Error(w, "Forbidden", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	} else if workspaceID != nil {
-		if !RequireWorkspacePermission(w, user.ID, *workspaceID, models.PermissionItemView, h.permissionService) {
+		if !RequireWorkspacePermission(w, r, user.ID, *workspaceID, models.PermissionItemView, h.permissionService) {
 			return
 		}
 	}
@@ -569,10 +569,10 @@ func (h *MilestoneHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 	report, err := h.planningService.GetMilestoneProgress(milestoneID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			http.Error(w, "Milestone not found", http.StatusNotFound)
+			respondNotFound(w, r, "milestone")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

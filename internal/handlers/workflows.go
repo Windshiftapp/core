@@ -26,7 +26,7 @@ func (h *WorkflowHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	
 	rows, err := h.db.Query(query)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -34,11 +34,11 @@ func (h *WorkflowHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	var workflows []models.Workflow
 	for rows.Next() {
 		var workflow models.Workflow
-		
+
 		err := rows.Scan(&workflow.ID, &workflow.Name, &workflow.Description,
 			&workflow.IsDefault, &workflow.CreatedAt, &workflow.UpdatedAt)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		
@@ -68,18 +68,18 @@ func (h *WorkflowHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&workflow.IsDefault, &workflow.CreatedAt, &workflow.UpdatedAt)
 	
 	if err == sql.ErrNoRows {
-		http.Error(w, "Workflow not found", http.StatusNotFound)
+		respondNotFound(w, r, "workflow")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Load transitions for this workflow
 	transitions, err := h.getWorkflowTransitions(id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	workflow.Transitions = transitions
@@ -90,13 +90,13 @@ func (h *WorkflowHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *WorkflowHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var workflow models.Workflow
 	if err := json.NewDecoder(r.Body).Decode(&workflow); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(workflow.Name) == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 
@@ -104,11 +104,11 @@ func (h *WorkflowHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var exists bool
 	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workflows WHERE name = ?)", workflow.Name).Scan(&exists)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if exists {
-		http.Error(w, "Workflow with this name already exists", http.StatusConflict)
+		respondConflict(w, r, "Workflow with this name already exists")
 		return
 	}
 
@@ -120,10 +120,10 @@ func (h *WorkflowHandler) Create(w http.ResponseWriter, r *http.Request) {
 	`, workflow.Name, workflow.Description, workflow.IsDefault, now, now).Scan(&id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
-	
+
 	// Return the created workflow
 	var createdWorkflow models.Workflow
 	err = h.db.QueryRow(`
@@ -132,16 +132,16 @@ func (h *WorkflowHandler) Create(w http.ResponseWriter, r *http.Request) {
 		WHERE id = ?
 	`, id).Scan(&createdWorkflow.ID, &createdWorkflow.Name, &createdWorkflow.Description,
 		&createdWorkflow.IsDefault, &createdWorkflow.CreatedAt, &createdWorkflow.UpdatedAt)
-	
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Load transitions (will be empty for new workflow)
 	transitions, err := h.getWorkflowTransitions(int(id))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	createdWorkflow.Transitions = transitions
@@ -157,13 +157,13 @@ func (h *WorkflowHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	var workflow models.Workflow
 	if err := json.NewDecoder(r.Body).Decode(&workflow); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(workflow.Name) == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 
@@ -171,23 +171,23 @@ func (h *WorkflowHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var exists bool
 	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workflows WHERE name = ? AND id != ?)", workflow.Name, id).Scan(&exists)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if exists {
-		http.Error(w, "Workflow with this name already exists", http.StatusConflict)
+		respondConflict(w, r, "Workflow with this name already exists")
 		return
 	}
 
 	now := time.Now()
 	_, err = h.db.ExecWrite(`
-		UPDATE workflows 
+		UPDATE workflows
 		SET name = ?, description = ?, is_default = ?, updated_at = ?
 		WHERE id = ?
 	`, workflow.Name, workflow.Description, workflow.IsDefault, now, id)
-	
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -199,16 +199,16 @@ func (h *WorkflowHandler) Update(w http.ResponseWriter, r *http.Request) {
 		WHERE id = ?
 	`, id).Scan(&updatedWorkflow.ID, &updatedWorkflow.Name, &updatedWorkflow.Description,
 		&updatedWorkflow.IsDefault, &updatedWorkflow.CreatedAt, &updatedWorkflow.UpdatedAt)
-	
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Load transitions
 	transitions, err := h.getWorkflowTransitions(id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	updatedWorkflow.Transitions = transitions
@@ -226,19 +226,19 @@ func (h *WorkflowHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	var configCount int
 	err := h.db.QueryRow("SELECT COUNT(*) FROM configuration_sets WHERE workflow_id = ?", id).Scan(&configCount)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
-	
+
 	if configCount > 0 {
-		http.Error(w, "Cannot delete workflow that is in use by configuration sets", http.StatusConflict)
+		respondConflict(w, r, "Cannot delete workflow that is in use by configuration sets")
 		return
 	}
 
 	// Start transaction to ensure atomic deletion
 	tx, err := h.db.Begin()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
@@ -246,20 +246,20 @@ func (h *WorkflowHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Delete workflow transitions first
 	_, err = tx.Exec("DELETE FROM workflow_transitions WHERE workflow_id = ?", id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Delete the workflow
 	_, err = tx.Exec("DELETE FROM workflows WHERE id = ?", id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Commit the transaction
 	if err = tx.Commit(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -275,7 +275,7 @@ func (h *WorkflowHandler) GetTransitions(w http.ResponseWriter, r *http.Request)
 
 	transitions, err := h.getWorkflowTransitions(workflowId)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -290,14 +290,14 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 
 	var transitions []models.WorkflowTransition
 	if err := json.NewDecoder(r.Body).Decode(&transitions); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
 	// Start transaction for atomic updates
 	tx, err := h.db.Begin()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
@@ -305,7 +305,7 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 	// Delete existing transitions for this workflow
 	_, err = tx.Exec("DELETE FROM workflow_transitions WHERE workflow_id = ?", workflowId)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -313,7 +313,7 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 	for _, transition := range transitions {
 		// Validate required fields
 		if transition.ToStatusID <= 0 {
-			http.Error(w, "To status ID is required for all transitions", http.StatusBadRequest)
+			respondValidationError(w, r, "To status ID is required for all transitions")
 			return
 		}
 
@@ -321,11 +321,11 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 		var toStatusExists bool
 		err = tx.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE id = ?)", transition.ToStatusID).Scan(&toStatusExists)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !toStatusExists {
-			http.Error(w, "To status not found", http.StatusBadRequest)
+			respondValidationError(w, r, "To status not found")
 			return
 		}
 
@@ -333,11 +333,11 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 			var fromStatusExists bool
 			err = tx.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE id = ?)", *transition.FromStatusID).Scan(&fromStatusExists)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 			if !fromStatusExists {
-				http.Error(w, "From status not found", http.StatusBadRequest)
+				respondValidationError(w, r, "From status not found")
 				return
 			}
 		}
@@ -346,23 +346,23 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 			INSERT INTO workflow_transitions (workflow_id, from_status_id, to_status_id, display_order, source_handle, target_handle, created_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?)
 		`, workflowId, transition.FromStatusID, transition.ToStatusID, transition.DisplayOrder, transition.SourceHandle, transition.TargetHandle, time.Now())
-		
+
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
 
 	// Commit transaction
 	if err = tx.Commit(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Return updated transitions
 	updatedTransitions, err := h.getWorkflowTransitions(workflowId)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -392,7 +392,7 @@ func (h *WorkflowHandler) GetAvailableTransitions(w http.ResponseWriter, r *http
 	
 	rows, err := h.db.Query(query, workflowId, statusId)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -402,12 +402,12 @@ func (h *WorkflowHandler) GetAvailableTransitions(w http.ResponseWriter, r *http
 		var transition models.WorkflowTransition
 		var fromStatusID sql.NullInt64
 		var fromStatusName sql.NullString
-		
+
 		err := rows.Scan(&transition.ID, &transition.WorkflowID, &fromStatusID, &transition.ToStatusID,
 			&transition.DisplayOrder, &transition.CreatedAt, &fromStatusName,
 			&transition.ToStatusName, &transition.WorkflowName)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 

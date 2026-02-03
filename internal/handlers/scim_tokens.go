@@ -29,7 +29,7 @@ func (h *SCIMTokenHandler) ListTokens(w http.ResponseWriter, r *http.Request) {
 		slog.Error("Failed to list SCIM tokens",
 			slog.String("component", "scim"),
 			slog.Any("error", err))
-		http.Error(w, "Failed to list SCIM tokens", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -40,18 +40,18 @@ func (h *SCIMTokenHandler) ListTokens(w http.ResponseWriter, r *http.Request) {
 func (h *SCIMTokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	var request models.SCIMTokenCreate
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if request.Name == "" {
-		http.Error(w, "Token name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Token name is required")
 		return
 	}
 
@@ -62,7 +62,7 @@ func (h *SCIMTokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) {
 			slog.Int("created_by", currentUser.ID),
 			slog.String("token_name", request.Name),
 			slog.Any("error", err))
-		http.Error(w, "Failed to create SCIM token", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -84,7 +84,7 @@ func (h *SCIMTokenHandler) GetToken(w http.ResponseWriter, r *http.Request) {
 
 	token, err := h.tokenManager.GetTokenByID(id)
 	if err != nil {
-		http.Error(w, "Token not found", http.StatusNotFound)
+		respondNotFound(w, r, "token")
 		return
 	}
 
@@ -107,7 +107,7 @@ func (h *SCIMTokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 	err := h.tokenManager.RevokeToken(id)
 	if err != nil {
 		if err.Error() == "token not found" {
-			http.Error(w, "Token not found", http.StatusNotFound)
+			respondNotFound(w, r, "token")
 			return
 		}
 		slog.Error("Failed to revoke SCIM token",
@@ -115,7 +115,7 @@ func (h *SCIMTokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 			slog.Int("token_id", id),
 			slog.Int("revoked_by", userID),
 			slog.Any("error", err))
-		http.Error(w, "Failed to revoke token", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -134,7 +134,7 @@ func (h *SCIMTokenHandler) GetActiveTokenCount(w http.ResponseWriter, r *http.Re
 		slog.Error("Failed to count SCIM tokens",
 			slog.String("component", "scim"),
 			slog.Any("error", err))
-		http.Error(w, "Failed to count tokens", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

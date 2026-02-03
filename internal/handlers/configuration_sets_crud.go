@@ -70,7 +70,7 @@ func (h *ConfigurationSetHandler) GetAll(w http.ResponseWriter, r *http.Request)
 	// Use repository to fetch configuration sets with all relations
 	configSets, totalCount, err := h.repo.List(page, limit, search)
 	if err != nil {
-		http.Error(w, "Failed to list configuration sets: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -97,11 +97,11 @@ func (h *ConfigurationSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Use repository to fetch configuration set with all relations
 	cs, err := h.repo.FindByID(id)
 	if err == repository.ErrNotFound {
-		http.Error(w, "Configuration set not found", http.StatusNotFound)
+		respondNotFound(w, r, "configuration_set")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -111,13 +111,13 @@ func (h *ConfigurationSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *ConfigurationSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var cs models.ConfigurationSet
 	if err := json.NewDecoder(r.Body).Decode(&cs); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(cs.Name) == "" {
-		http.Error(w, "Configuration set name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Configuration set name is required")
 		return
 	}
 
@@ -125,7 +125,7 @@ func (h *ConfigurationSetHandler) Create(w http.ResponseWriter, r *http.Request)
 	for _, workspaceID := range cs.WorkspaceIDs {
 		exists, err := h.repo.WorkspaceExists(workspaceID)
 		if err != nil || !exists {
-			http.Error(w, "One or more workspaces not found", http.StatusBadRequest)
+			respondValidationError(w, r, "One or more workspaces not found")
 			return
 		}
 	}
@@ -133,7 +133,7 @@ func (h *ConfigurationSetHandler) Create(w http.ResponseWriter, r *http.Request)
 	// Start transaction
 	tx, err := h.db.Begin()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
@@ -141,7 +141,7 @@ func (h *ConfigurationSetHandler) Create(w http.ResponseWriter, r *http.Request)
 	// Create the configuration set
 	id, err := h.repo.Create(tx, &cs)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	configSetID := int(id)
@@ -153,37 +153,37 @@ func (h *ConfigurationSetHandler) Create(w http.ResponseWriter, r *http.Request)
 		notificationSettingID = &nsID
 	}
 	if err := h.repo.SaveNotificationSetting(tx, configSetID, notificationSettingID); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Save workspace assignments
 	if err := h.repo.SaveWorkspaceAssignments(tx, configSetID, cs.WorkspaceIDs); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Save screen assignments
 	if err := h.repo.SaveScreenAssignments(tx, configSetID, cs.CreateScreenID, cs.EditScreenID, cs.ViewScreenID); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Save item type configurations
 	if err := h.repo.SaveItemTypeConfigs(tx, configSetID, cs.ItemTypeConfigs); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Save priority assignments
 	if err := h.repo.SavePriorityAssignments(tx, configSetID, cs.PriorityIDs); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Commit transaction
 	if err = tx.Commit(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -198,7 +198,7 @@ func (h *ConfigurationSetHandler) Create(w http.ResponseWriter, r *http.Request)
 	// Load and return the created configuration set with all relations
 	createdCS, err := h.repo.FindByID(configSetID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -235,21 +235,21 @@ func (h *ConfigurationSetHandler) Delete(w http.ResponseWriter, r *http.Request)
 	// Get the configuration set details for audit logging before deletion
 	cs, err := h.repo.FindByIDBasic(id)
 	if err == repository.ErrNotFound {
-		http.Error(w, "Configuration set not found", http.StatusNotFound)
+		respondNotFound(w, r, "configuration_set")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Delete the configuration set (including all associations)
 	if err := h.repo.Delete(id); err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Configuration set not found", http.StatusNotFound)
+			respondNotFound(w, r, "configuration_set")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

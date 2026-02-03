@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -44,7 +45,7 @@ func (h *ItemLinkHandler) GetLinksForItem(w http.ResponseWriter, r *http.Request
 	itemType := r.PathValue("type") // "items" or "test-cases"
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -57,14 +58,14 @@ func (h *ItemLinkHandler) GetLinksForItem(w http.ResponseWriter, r *http.Request
 	// Get outgoing links (where this item is the source)
 	outgoingLinks, err := h.getLinksWhere("source_type = ? AND source_id = ?", internalType, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Get incoming links (where this item is the target)
 	incomingLinks, err := h.getLinksWhere("target_type = ? AND target_id = ?", internalType, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -81,26 +82,26 @@ func (h *ItemLinkHandler) GetLinksForItem(w http.ResponseWriter, r *http.Request
 func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 	var link models.ItemLink
 	if err := json.NewDecoder(r.Body).Decode(&link); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if link.LinkTypeID == 0 || link.SourceType == "" || link.SourceID == 0 ||
 		link.TargetType == "" || link.TargetID == 0 {
-		http.Error(w, "link_type_id, source_type, source_id, target_type, and target_id are required", http.StatusBadRequest)
+		respondValidationError(w, r, "link_type_id, source_type, source_id, target_type, and target_id are required")
 		return
 	}
 
 	// Validate source and target types
 	if !isValidLinkType(link.SourceType) || !isValidLinkType(link.TargetType) {
-		http.Error(w, "Invalid source_type or target_type. Must be 'item', 'test_case', or 'asset'", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid source_type or target_type. Must be 'item', 'test_case', or 'asset'")
 		return
 	}
 
 	// Prevent self-links
 	if link.SourceType == link.TargetType && link.SourceID == link.TargetID {
-		http.Error(w, "Cannot create link to self", http.StatusBadRequest)
+		respondValidationError(w, r, "Cannot create link to self")
 		return
 	}
 
@@ -108,13 +109,13 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 	// This link type can only link between items and test cases, not between same entity types
 	if link.LinkTypeID == 1 {
 		if link.SourceType == link.TargetType {
-			http.Error(w, "The 'Tests' link type can only link between items and test cases, not between the same entity types", http.StatusBadRequest)
+			respondValidationError(w, r, "The 'Tests' link type can only link between items and test cases, not between the same entity types")
 			return
 		}
 		// Ensure one is test_case and other is item
 		if !((link.SourceType == "test_case" && link.TargetType == "item") ||
 			(link.SourceType == "item" && link.TargetType == "test_case")) {
-			http.Error(w, "The 'Tests' link type requires one entity to be a test case and the other to be an item", http.StatusBadRequest)
+			respondValidationError(w, r, "The 'Tests' link type requires one entity to be a test case and the other to be an item")
 			return
 		}
 	}
@@ -129,18 +130,18 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 		link.TargetType, link.TargetID, link.SourceType, link.SourceID).Scan(&existingID)
 
 	if err == nil {
-		http.Error(w, "A link between these items already exists", http.StatusConflict)
+		respondConflict(w, r, "A link between these items already exists")
 		return
 	}
 	if err != sql.ErrNoRows {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Get created_by from authentication context
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	createdBy := currentUser.ID
@@ -156,11 +157,11 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 		CreatedBy:  &createdBy,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if id == 0 {
-		http.Error(w, "Link already exists", http.StatusConflict)
+		respondConflict(w, r, "Link already exists")
 		return
 	}
 
@@ -170,7 +171,7 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 	// Get the created link with full details
 	createdLink, err := h.getLinkByID(int(id))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -242,7 +243,7 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 func (h *ItemLinkHandler) DeleteLink(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -261,23 +262,23 @@ func (h *ItemLinkHandler) DeleteLink(w http.ResponseWriter, r *http.Request) {
 	`, id).Scan(&sourceType, &sourceID, &targetID, &targetTitle)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Link not found", http.StatusNotFound)
+		respondNotFound(w, r, "link")
 		return
 	}
 	if err != nil {
-		http.Error(w, "Failed to fetch link details: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to fetch link details: %w", err))
 		return
 	}
 
 	result, err := h.db.ExecWrite("DELETE FROM item_links WHERE id = ?", id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Link not found", http.StatusNotFound)
+		respondNotFound(w, r, "link")
 		return
 	}
 
@@ -328,7 +329,7 @@ func (h *ItemLinkHandler) DeleteLink(w http.ResponseWriter, r *http.Request) {
 func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -385,7 +386,7 @@ func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request
 	// Process outgoing links
 	rows, err := h.db.Query(outgoingQuery, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	for rows.Next() {
@@ -395,7 +396,7 @@ func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request
 			&typeName, &categoryName, &asset.LinkID, &asset.LinkTypeName, &linkLabel)
 		if err != nil {
 			rows.Close()
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		asset.Description = description.String
@@ -411,7 +412,7 @@ func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request
 	// Process incoming links
 	rows, err = h.db.Query(incomingQuery, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	for rows.Next() {
@@ -421,7 +422,7 @@ func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request
 			&typeName, &categoryName, &asset.LinkID, &asset.LinkTypeName, &linkLabel)
 		if err != nil {
 			rows.Close()
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		asset.Description = description.String
@@ -456,7 +457,7 @@ func (h *ItemLinkHandler) SearchLinkableItems(w http.ResponseWriter, r *http.Req
 	if itemType == "" || itemType == "item" {
 		workItems, err := h.searchWorkItems(query, limit)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		items = append(items, workItems...)
@@ -466,7 +467,7 @@ func (h *ItemLinkHandler) SearchLinkableItems(w http.ResponseWriter, r *http.Req
 	if itemType == "" || itemType == "test_case" {
 		testCases, err := h.searchTestCases(query, limit)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		items = append(items, testCases...)
@@ -476,7 +477,7 @@ func (h *ItemLinkHandler) SearchLinkableItems(w http.ResponseWriter, r *http.Req
 	if itemType == "" || itemType == "asset" {
 		assets, err := h.searchAssets(query, limit)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		items = append(items, assets...)

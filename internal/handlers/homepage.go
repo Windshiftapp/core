@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -82,20 +83,19 @@ func (h *HomepageHandler) GetHomepage(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	// Get user activity from ActivityTracker
 	if h.activityTracker == nil {
-		http.Error(w, "Activity tracker not available", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("activity tracker not available"))
 		return
 	}
 
 	userActivity, err := h.activityTracker.GetUserActivity(user.ID)
 	if err != nil {
-		slog.Error("error getting user activity", slog.String("component", "homepage"), slog.Int("user_id", user.ID), slog.Any("error", err))
-		http.Error(w, "Failed to load activity data: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

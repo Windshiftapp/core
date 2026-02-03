@@ -17,7 +17,7 @@ func (h *ItemHandler) GetPersonalTasks(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -25,7 +25,7 @@ func (h *ItemHandler) GetPersonalTasks(w http.ResponseWriter, r *http.Request) {
 	var workItemWorkspaceID int
 	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", workItemID).Scan(&workItemWorkspaceID)
 	if err != nil {
-		http.Error(w, "Work item not found or access denied", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -42,7 +42,7 @@ func (h *ItemHandler) GetPersonalTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		http.Error(w, "Failed to get personal workspace: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -74,7 +74,7 @@ func (h *ItemHandler) GetPersonalTasks(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query, workItemID, personalWorkspaceID)
 	if err != nil {
-		http.Error(w, "Failed to query personal tasks: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -100,7 +100,7 @@ func (h *ItemHandler) GetPersonalTasks(w http.ResponseWriter, r *http.Request) {
 			&assigneeName, &assigneeEmail, &assigneeAvatar,
 		)
 		if err != nil {
-			http.Error(w, "Failed to scan personal task: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -143,7 +143,7 @@ func (h *ItemHandler) GetPersonalTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = rows.Err(); err != nil {
-		http.Error(w, "Error iterating personal tasks: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -165,7 +165,7 @@ func (h *ItemHandler) RemoveRelatedWorkItem(w http.ResponseWriter, r *http.Reque
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -181,17 +181,17 @@ func (h *ItemHandler) RemoveRelatedWorkItem(w http.ResponseWriter, r *http.Reque
 	`, itemID).Scan(&workspaceID, &isPersonal, &ownerID)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Item not found", http.StatusNotFound)
+		respondNotFound(w, r, "item")
 		return
 	}
 	if err != nil {
-		http.Error(w, "Failed to verify item: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Verify it's a personal workspace item owned by the current user
 	if !isPersonal || ownerID == nil || *ownerID != user.ID {
-		http.Error(w, "Can only unlink personal tasks from your own personal workspace", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -203,7 +203,7 @@ func (h *ItemHandler) RemoveRelatedWorkItem(w http.ResponseWriter, r *http.Reque
 	`, itemID)
 
 	if err != nil {
-		http.Error(w, "Failed to remove relationship: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

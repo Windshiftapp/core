@@ -10,7 +10,6 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
-
 )
 
 type TestSetHandler struct {
@@ -28,23 +27,23 @@ func NewTestSetHandlerWithPool(db database.Database, permissionService *services
 func (h *TestSetHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
 	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
-	db, ok := h.requireReadDB(w)
+	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -86,7 +85,7 @@ func (h *TestSetHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		ORDER BY ts.id DESC
 	`, workspaceID, workspaceID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -105,7 +104,7 @@ func (h *TestSetHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			&lastRunStatus, &lastRunDateStr,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -131,29 +130,29 @@ func (h *TestSetHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 func (h *TestSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
 	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
-	db, ok := h.requireReadDB(w)
+	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -174,11 +173,11 @@ func (h *TestSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Test set not found", http.StatusNotFound)
+		respondNotFound(w, r, "test_set")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -189,29 +188,29 @@ func (h *TestSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *TestSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestManage)
 	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	var set models.TestSet
 	if err := json.NewDecoder(r.Body).Decode(&set); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
-	db, ok := h.requireWriteDB(w)
+	db, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
@@ -224,7 +223,7 @@ func (h *TestSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 	`, workspaceID, set.Name, set.Description, set.MilestoneID, now, now).Scan(&id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -241,35 +240,35 @@ func (h *TestSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *TestSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestManage)
 	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	var set models.TestSet
 	if err := json.NewDecoder(r.Body).Decode(&set); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
-	db, ok := h.requireWriteDB(w)
+	db, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
@@ -282,7 +281,7 @@ func (h *TestSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	`, set.Name, set.Description, set.MilestoneID, now, id, workspaceID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -297,36 +296,36 @@ func (h *TestSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *TestSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestManage)
 	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
-	db, ok := h.requireWriteDB(w)
+	db, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
 
 	_, err = db.Exec("DELETE FROM test_sets WHERE id = ? AND workspace_id = ?", id, workspaceID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -336,29 +335,29 @@ func (h *TestSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *TestSetHandler) GetTestCases(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	setID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
 	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
-	db, ok := h.requireReadDB(w)
+	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -367,7 +366,7 @@ func (h *TestSetHandler) GetTestCases(w http.ResponseWriter, r *http.Request) {
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
-		http.Error(w, "Test set not found", http.StatusNotFound)
+		respondNotFound(w, r, "test_set")
 		return
 	}
 
@@ -380,7 +379,7 @@ func (h *TestSetHandler) GetTestCases(w http.ResponseWriter, r *http.Request) {
 	`, setID, workspaceID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -391,7 +390,7 @@ func (h *TestSetHandler) GetTestCases(w http.ResponseWriter, r *http.Request) {
 		var tc models.TestCase
 		err := rows.Scan(&tc.ID, &tc.WorkspaceID, &tc.Title, &tc.Preconditions, &tc.CreatedAt, &tc.UpdatedAt)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		testCases = append(testCases, tc)
@@ -404,25 +403,25 @@ func (h *TestSetHandler) GetTestCases(w http.ResponseWriter, r *http.Request) {
 func (h *TestSetHandler) AddTestCase(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	setID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestManage)
 	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -430,11 +429,11 @@ func (h *TestSetHandler) AddTestCase(w http.ResponseWriter, r *http.Request) {
 		TestCaseID int `json:"test_case_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
-	readDB, ok := h.requireReadDB(w)
+	readDB, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -443,18 +442,18 @@ func (h *TestSetHandler) AddTestCase(w http.ResponseWriter, r *http.Request) {
 	var count int
 	err = readDB.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
-		http.Error(w, "Test set not found", http.StatusNotFound)
+		respondNotFound(w, r, "test_set")
 		return
 	}
 
 	// Verify test case belongs to same workspace
 	err = readDB.QueryRow("SELECT COUNT(*) FROM test_cases WHERE id = ? AND workspace_id = ?", request.TestCaseID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
-		http.Error(w, "Test case not found in workspace", http.StatusNotFound)
+		respondNotFound(w, r, "test_case")
 		return
 	}
 
-	writeDB, ok := h.requireWriteDB(w)
+	writeDB, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
@@ -465,7 +464,7 @@ func (h *TestSetHandler) AddTestCase(w http.ResponseWriter, r *http.Request) {
 	`, setID, request.TestCaseID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -475,35 +474,35 @@ func (h *TestSetHandler) AddTestCase(w http.ResponseWriter, r *http.Request) {
 func (h *TestSetHandler) RemoveTestCase(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	setID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	testCaseID, err := strconv.Atoi(r.PathValue("testCaseId"))
 	if err != nil {
-		http.Error(w, "Invalid test case ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "testCaseId")
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestManage)
 	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
-	readDB, ok := h.requireReadDB(w)
+	readDB, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -512,11 +511,11 @@ func (h *TestSetHandler) RemoveTestCase(w http.ResponseWriter, r *http.Request) 
 	var count int
 	err = readDB.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
-		http.Error(w, "Test set not found", http.StatusNotFound)
+		respondNotFound(w, r, "test_set")
 		return
 	}
 
-	writeDB, ok := h.requireWriteDB(w)
+	writeDB, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
@@ -527,7 +526,7 @@ func (h *TestSetHandler) RemoveTestCase(w http.ResponseWriter, r *http.Request) 
 	`, setID, testCaseID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -537,29 +536,29 @@ func (h *TestSetHandler) RemoveTestCase(w http.ResponseWriter, r *http.Request) 
 func (h *TestSetHandler) GetRuns(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	setID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
 	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
-	db, ok := h.requireReadDB(w)
+	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -568,7 +567,7 @@ func (h *TestSetHandler) GetRuns(w http.ResponseWriter, r *http.Request) {
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
-		http.Error(w, "Test set not found", http.StatusNotFound)
+		respondNotFound(w, r, "test_set")
 		return
 	}
 
@@ -580,7 +579,7 @@ func (h *TestSetHandler) GetRuns(w http.ResponseWriter, r *http.Request) {
 	`, setID, workspaceID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -591,7 +590,7 @@ func (h *TestSetHandler) GetRuns(w http.ResponseWriter, r *http.Request) {
 		var run models.TestRun
 		err := rows.Scan(&run.ID, &run.WorkspaceID, &run.SetID, &run.Name, &run.StartedAt, &run.EndedAt, &run.CreatedAt)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		runs = append(runs, run)

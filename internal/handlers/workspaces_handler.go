@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -68,12 +69,12 @@ func (h *WorkspaceHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Get user from context
 	user := r.Context().Value(middleware.ContextKeyUser)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	currentUser, ok := user.(*models.User)
 	if !ok {
-		http.Error(w, "Invalid user context", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("invalid user context"))
 		return
 	}
 
@@ -115,7 +116,7 @@ func (h *WorkspaceHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		rows, err = h.db.Query(query, currentUser.ID)
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -128,7 +129,7 @@ func (h *WorkspaceHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID, &icon, &color, &workspace.AvatarURL, &defaultView, &displayMode, &workspace.CreatedAt, &workspace.UpdatedAt,
 			&workspace.ProjectCount, &timeProjectName)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -143,7 +144,7 @@ func (h *WorkspaceHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Filter workspaces by permission
 	filteredWorkspaces, err := h.filterWorkspacesByPermissions(currentUser.ID, workspaces)
 	if err != nil {
-		http.Error(w, "Error filtering workspaces: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -176,12 +177,12 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Get user from context
 	user := r.Context().Value(middleware.ContextKeyUser)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	currentUser, ok := user.(*models.User)
 	if !ok {
-		http.Error(w, "Invalid user context", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("invalid user context"))
 		return
 	}
 
@@ -218,11 +219,11 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Workspace not found", http.StatusNotFound)
+		respondNotFound(w, r, "workspace")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -231,22 +232,22 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 		// For inactive workspaces, check if user has admin access
 		canAccess, err := h.canAccessInactiveWorkspace(currentUser, workspace.ID)
 		if err != nil {
-			http.Error(w, "Error checking permissions: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !canAccess {
-			http.Error(w, "This workspace is inactive and you don't have permission to access it", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	} else {
 		// For active workspaces, check if user has view permission
 		canView, err := h.canViewWorkspace(currentUser.ID, workspace.ID)
 		if err != nil {
-			http.Error(w, "Error checking permissions: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !canView {
-			http.Error(w, "Insufficient permissions to view this workspace", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	}
@@ -276,31 +277,31 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	// Check if user has permission to create workspaces
 	canCreate, err := h.canCreateWorkspace(user.ID)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canCreate {
-		http.Error(w, "Insufficient permissions to create workspaces", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	// Parse request
 	var req CreateWorkspaceRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate input using validator
 	if err := utils.Validate(req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, err.Error())
 		return
 	}
 
@@ -311,11 +312,11 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Post-sanitization validation: ensure name and key are not empty after sanitization
 	if req.Name == "" {
-		http.Error(w, "Workspace name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Workspace name is required")
 		return
 	}
 	if req.Key == "" {
-		http.Error(w, "Workspace key is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Workspace key is required")
 		return
 	}
 
@@ -346,7 +347,7 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	`, req.Name, req.Key, req.Description, isActive, req.TimeProjectID, req.IsPersonal, req.OwnerID, req.Icon, req.Color, req.AvatarURL, defaultView, displayMode, now, now).Scan(&id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -386,7 +387,7 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	workspace.TimeProjectName = timeProjectName.String
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -424,18 +425,18 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	// Check if user has permission to administer this workspace
 	canAdmin, permErr := h.canAdminWorkspace(user.ID, id)
 	if permErr != nil {
-		http.Error(w, "Permission check failed: "+permErr.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, permErr)
 		return
 	}
 	if !canAdmin {
-		http.Error(w, "Insufficient permissions to update this workspace", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -449,11 +450,11 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 	`, id).Scan(&oldWorkspace.ID, &oldWorkspace.Name, &oldWorkspace.Key, &oldWorkspace.Description, &oldWorkspace.Active, &oldWorkspace.IsPersonal, &oldIcon, &oldColor)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Workspace not found", http.StatusNotFound)
+		respondNotFound(w, r, "workspace")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -463,13 +464,13 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Parse request
 	var req UpdateWorkspaceRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate input using validator
 	if err := utils.Validate(req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, err.Error())
 		return
 	}
 
@@ -493,7 +494,7 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 	`, req.Name, keyToUse, req.Description, req.Active, req.TimeProjectID, req.IsPersonal, req.OwnerID, req.Icon, req.Color, req.AvatarURL, req.DefaultView, displayModeToUse, now, id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -527,7 +528,7 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 	workspace.TimeProjectName = timeProjectName.String
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -616,18 +617,18 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	// Check if user has permission to administer this workspace
 	canAdmin, permErr := h.canAdminWorkspace(user.ID, id)
 	if permErr != nil {
-		http.Error(w, "Permission check failed: "+permErr.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, permErr)
 		return
 	}
 	if !canAdmin {
-		http.Error(w, "Insufficient permissions to delete this workspace", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -641,11 +642,11 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	`, id).Scan(&workspaceName, &workspaceKey, &description, &active, &isPersonal)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Workspace not found", http.StatusNotFound)
+		respondNotFound(w, r, "workspace")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -656,7 +657,7 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	_, err = h.db.ExecWrite("DELETE FROM workspaces WHERE id = ?", id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

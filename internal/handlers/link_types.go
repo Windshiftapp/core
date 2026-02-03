@@ -32,7 +32,7 @@ func (h *LinkTypeHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -40,10 +40,10 @@ func (h *LinkTypeHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	var linkTypes []models.LinkType
 	for rows.Next() {
 		var lt models.LinkType
-		err := rows.Scan(&lt.ID, &lt.Name, &lt.Description, &lt.ForwardLabel, &lt.ReverseLabel, 
+		err := rows.Scan(&lt.ID, &lt.Name, &lt.Description, &lt.ForwardLabel, &lt.ReverseLabel,
 			&lt.Color, &lt.IsSystem, &lt.Active, &lt.CreatedAt, &lt.UpdatedAt)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		linkTypes = append(linkTypes, lt)
@@ -63,15 +63,15 @@ func (h *LinkTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 		SELECT id, name, description, forward_label, reverse_label, color, is_system, active, created_at, updated_at
 		FROM link_types 
 		WHERE id = ?
-	`, id).Scan(&lt.ID, &lt.Name, &lt.Description, &lt.ForwardLabel, &lt.ReverseLabel, 
+	`, id).Scan(&lt.ID, &lt.Name, &lt.Description, &lt.ForwardLabel, &lt.ReverseLabel,
 		&lt.Color, &lt.IsSystem, &lt.Active, &lt.CreatedAt, &lt.UpdatedAt)
-	
+
 	if err == sql.ErrNoRows {
-		http.Error(w, "Link type not found", http.StatusNotFound)
+		respondNotFound(w, r, "link_type")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -81,13 +81,13 @@ func (h *LinkTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *LinkTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var lt models.LinkType
 	if err := json.NewDecoder(r.Body).Decode(&lt); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
 	// Validate required fields
 	if lt.Name == "" || lt.ForwardLabel == "" || lt.ReverseLabel == "" {
-		http.Error(w, "Name, forward_label, and reverse_label are required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name, forward_label, and reverse_label are required")
 		return
 	}
 
@@ -104,7 +104,7 @@ func (h *LinkTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	`, lt.Name, lt.Description, lt.ForwardLabel, lt.ReverseLabel, lt.Color, false, true, now, now).Scan(&id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -125,13 +125,13 @@ func (h *LinkTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	var lt models.LinkType
 	if err := json.NewDecoder(r.Body).Decode(&lt); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
 	// Validate required fields
 	if lt.Name == "" || lt.ForwardLabel == "" || lt.ReverseLabel == "" {
-		http.Error(w, "Name, forward_label, and reverse_label are required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name, forward_label, and reverse_label are required")
 		return
 	}
 
@@ -141,9 +141,9 @@ func (h *LinkTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		SET name = ?, description = ?, forward_label = ?, reverse_label = ?, color = ?, active = ?, updated_at = ?
 		WHERE id = ?
 	`, lt.Name, lt.Description, lt.ForwardLabel, lt.ReverseLabel, lt.Color, lt.Active, now, id)
-	
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -163,22 +163,22 @@ func (h *LinkTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	var isSystem bool
 	err := h.db.QueryRow("SELECT is_system FROM link_types WHERE id = ?", id).Scan(&isSystem)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Link type not found", http.StatusNotFound)
+		respondNotFound(w, r, "link_type")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if isSystem {
-		http.Error(w, "Cannot delete system link types", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	_, err = h.db.ExecWrite("DELETE FROM link_types WHERE id = ?", id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

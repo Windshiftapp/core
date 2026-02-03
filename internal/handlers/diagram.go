@@ -28,7 +28,7 @@ func (h *DiagramHandler) Create(w http.ResponseWriter, r *http.Request) {
 	itemIDStr := r.PathValue("itemId")
 	itemID, err := strconv.Atoi(itemIDStr)
 	if err != nil {
-		http.Error(w, "Invalid item ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "itemId")
 		return
 	}
 
@@ -38,17 +38,17 @@ func (h *DiagramHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if req.Name == "" {
-		http.Error(w, "Diagram name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Diagram name is required")
 		return
 	}
 
 	if req.DiagramData == "" {
-		http.Error(w, "Diagram data is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Diagram data is required")
 		return
 	}
 
@@ -69,14 +69,14 @@ func (h *DiagramHandler) Create(w http.ResponseWriter, r *http.Request) {
 	result, err := h.db.ExecWrite(query, itemID, req.Name, req.DiagramData, createdBy, now, now)
 	if err != nil {
 		slog.Error("failed to create diagram", slog.String("component", "diagrams"), slog.Any("error", err))
-		http.Error(w, "Failed to create diagram", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		slog.Error("failed to get last insert ID", slog.String("component", "diagrams"), slog.Any("error", err))
-		http.Error(w, "Failed to create diagram", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -105,7 +105,7 @@ func (h *DiagramHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 	itemIDStr := r.PathValue("itemId")
 	itemID, err := strconv.Atoi(itemIDStr)
 	if err != nil {
-		http.Error(w, "Invalid item ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "itemId")
 		return
 	}
 
@@ -124,7 +124,7 @@ func (h *DiagramHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(query, itemID)
 	if err != nil {
 		slog.Error("failed to query diagrams", slog.String("component", "diagrams"), slog.Any("error", err))
-		http.Error(w, "Failed to retrieve diagrams", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -169,7 +169,7 @@ func (h *DiagramHandler) Get(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid diagram ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -194,12 +194,12 @@ func (h *DiagramHandler) Get(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Diagram not found", http.StatusNotFound)
+		respondNotFound(w, r, "diagram")
 		return
 	}
 	if err != nil {
 		slog.Error("failed to query diagram", slog.String("component", "diagrams"), slog.Any("error", err))
-		http.Error(w, "Failed to retrieve diagram", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -225,7 +225,7 @@ func (h *DiagramHandler) Update(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid diagram ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -235,17 +235,17 @@ func (h *DiagramHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if req.Name == "" {
-		http.Error(w, "Diagram name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Diagram name is required")
 		return
 	}
 
 	if req.DiagramData == "" {
-		http.Error(w, "Diagram data is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Diagram data is required")
 		return
 	}
 
@@ -262,12 +262,12 @@ func (h *DiagramHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var itemID int
 	err = h.db.QueryRow("SELECT name, item_id FROM item_diagrams WHERE id = ?", id).Scan(&oldName, &itemID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Diagram not found", http.StatusNotFound)
+		respondNotFound(w, r, "diagram")
 		return
 	}
 	if err != nil {
 		slog.Error("failed to get diagram details", slog.String("component", "diagrams"), slog.Any("error", err))
-		http.Error(w, "Failed to get diagram details", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -281,19 +281,19 @@ func (h *DiagramHandler) Update(w http.ResponseWriter, r *http.Request) {
 	result, err := h.db.ExecWrite(query, req.Name, req.DiagramData, now, userID, id)
 	if err != nil {
 		slog.Error("failed to update diagram", slog.String("component", "diagrams"), slog.Any("error", err))
-		http.Error(w, "Failed to update diagram", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		slog.Error("failed to get rows affected", slog.String("component", "diagrams"), slog.Any("error", err))
-		http.Error(w, "Failed to update diagram", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if rowsAffected == 0 {
-		http.Error(w, "Diagram not found", http.StatusNotFound)
+		respondNotFound(w, r, "diagram")
 		return
 	}
 
@@ -333,7 +333,7 @@ func (h *DiagramHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		slog.Error("failed to retrieve updated diagram", slog.String("component", "diagrams"), slog.Any("error", err))
-		http.Error(w, "Failed to retrieve updated diagram", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -359,7 +359,7 @@ func (h *DiagramHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid diagram ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -376,12 +376,12 @@ func (h *DiagramHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	var itemID int
 	err = h.db.QueryRow("SELECT name, item_id FROM item_diagrams WHERE id = ?", id).Scan(&diagramName, &itemID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Diagram not found", http.StatusNotFound)
+		respondNotFound(w, r, "diagram")
 		return
 	}
 	if err != nil {
 		slog.Error("failed to get diagram details", slog.String("component", "diagrams"), slog.Any("error", err))
-		http.Error(w, "Failed to get diagram details", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -397,19 +397,19 @@ func (h *DiagramHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	result, err := h.db.ExecWrite(query, id)
 	if err != nil {
 		slog.Error("failed to delete diagram", slog.String("component", "diagrams"), slog.Any("error", err))
-		http.Error(w, "Failed to delete diagram", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		slog.Error("failed to get rows affected", slog.String("component", "diagrams"), slog.Any("error", err))
-		http.Error(w, "Failed to delete diagram", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if rowsAffected == 0 {
-		http.Error(w, "Diagram not found", http.StatusNotFound)
+		respondNotFound(w, r, "diagram")
 		return
 	}
 

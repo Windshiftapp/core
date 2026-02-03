@@ -40,7 +40,7 @@ func (h *EmailProviderHandler) GetEmailProviders(w http.ResponseWriter, r *http.
 	// Check admin permission
 	userID := r.Context().Value("user_id")
 	if userID == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -53,7 +53,7 @@ func (h *EmailProviderHandler) GetEmailProviders(w http.ResponseWriter, r *http.
 		ORDER BY name ASC
 	`)
 	if err != nil {
-		http.Error(w, "Failed to query providers", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -82,7 +82,7 @@ func (h *EmailProviderHandler) GetEmailProvider(w http.ResponseWriter, r *http.R
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid provider ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -100,11 +100,11 @@ func (h *EmailProviderHandler) GetEmailProvider(w http.ResponseWriter, r *http.R
 		&p.CreatedAt, &p.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Provider not found", http.StatusNotFound)
+		respondNotFound(w, r, "provider")
 		return
 	}
 	if err != nil {
-		http.Error(w, "Failed to get provider", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -135,13 +135,13 @@ type CreateEmailProviderRequest struct {
 func (h *EmailProviderHandler) CreateEmailProvider(w http.ResponseWriter, r *http.Request) {
 	var req CreateEmailProviderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if req.Name == "" || req.Slug == "" || req.Type == "" {
-		http.Error(w, "Name, slug, and type are required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name, slug, and type are required")
 		return
 	}
 
@@ -149,7 +149,7 @@ func (h *EmailProviderHandler) CreateEmailProvider(w http.ResponseWriter, r *htt
 	if req.Type != models.EmailProviderTypeMicrosoft &&
 		req.Type != models.EmailProviderTypeGoogle &&
 		req.Type != models.EmailProviderTypeGeneric {
-		http.Error(w, "Invalid provider type", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid provider type")
 		return
 	}
 
@@ -158,7 +158,7 @@ func (h *EmailProviderHandler) CreateEmailProvider(w http.ResponseWriter, r *htt
 	if req.OAuthClientSecret != "" && h.encryption != nil {
 		encrypted, err := h.encryption.Encrypt(req.OAuthClientSecret)
 		if err != nil {
-			http.Error(w, "Failed to encrypt client secret", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		clientSecretEnc = &encrypted
@@ -184,10 +184,10 @@ func (h *EmailProviderHandler) CreateEmailProvider(w http.ResponseWriter, r *htt
 	)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
-			http.Error(w, "A provider with this slug already exists", http.StatusConflict)
+			respondConflict(w, r, "A provider with this slug already exists")
 			return
 		}
-		http.Error(w, "Failed to create provider", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -206,13 +206,13 @@ func (h *EmailProviderHandler) UpdateEmailProvider(w http.ResponseWriter, r *htt
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid provider ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	var req CreateEmailProviderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -221,7 +221,7 @@ func (h *EmailProviderHandler) UpdateEmailProvider(w http.ResponseWriter, r *htt
 	if req.OAuthClientSecret != "" && h.encryption != nil {
 		encrypted, err := h.encryption.Encrypt(req.OAuthClientSecret)
 		if err != nil {
-			http.Error(w, "Failed to encrypt client secret", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		clientSecretEnc = &encrypted
@@ -249,7 +249,7 @@ func (h *EmailProviderHandler) UpdateEmailProvider(w http.ResponseWriter, r *htt
 
 	_, err = h.db.Exec(query, args...)
 	if err != nil {
-		http.Error(w, "Failed to update provider", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -262,13 +262,13 @@ func (h *EmailProviderHandler) DeleteEmailProvider(w http.ResponseWriter, r *htt
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid provider ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	_, err = h.db.Exec(`DELETE FROM email_providers WHERE id = ?`, id)
 	if err != nil {
-		http.Error(w, "Failed to delete provider", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -279,7 +279,7 @@ func (h *EmailProviderHandler) DeleteEmailProvider(w http.ResponseWriter, r *htt
 func (h *EmailProviderHandler) StartEmailOAuth(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	if slug == "" {
-		http.Error(w, "Provider slug required", http.StatusBadRequest)
+		respondValidationError(w, r, "Provider slug required")
 		return
 	}
 
@@ -287,14 +287,14 @@ func (h *EmailProviderHandler) StartEmailOAuth(w http.ResponseWriter, r *http.Re
 	channelIDStr := r.URL.Query().Get("channel_id")
 	channelID, err := strconv.Atoi(channelIDStr)
 	if err != nil {
-		http.Error(w, "channel_id query parameter required", http.StatusBadRequest)
+		respondValidationError(w, r, "channel_id query parameter required")
 		return
 	}
 
 	// Get user ID
 	userID := r.Context().Value("user_id")
 	if userID == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -309,16 +309,16 @@ func (h *EmailProviderHandler) StartEmailOAuth(w http.ResponseWriter, r *http.Re
 		&provider.OAuthClientID, &clientSecretEnc, &provider.OAuthScopes, &provider.OAuthTenantID,
 	)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Provider not found", http.StatusNotFound)
+		respondNotFound(w, r, "provider")
 		return
 	}
 	if err != nil {
-		http.Error(w, "Failed to get provider", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if provider.Type == models.EmailProviderTypeGeneric {
-		http.Error(w, "OAuth not supported for generic IMAP provider", http.StatusBadRequest)
+		respondBadRequest(w, r, "OAuth not supported for generic IMAP provider")
 		return
 	}
 
@@ -335,7 +335,7 @@ func (h *EmailProviderHandler) StartEmailOAuth(w http.ResponseWriter, r *http.Re
 	// Generate state token
 	stateBytes := make([]byte, 32)
 	if _, err := rand.Read(stateBytes); err != nil {
-		http.Error(w, "Failed to generate state", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	state := hex.EncodeToString(stateBytes)
@@ -347,7 +347,7 @@ func (h *EmailProviderHandler) StartEmailOAuth(w http.ResponseWriter, r *http.Re
 		VALUES (?, ?, ?, ?, ?)
 	`, provider.ID, channelID, state, userID, expiresAt)
 	if err != nil {
-		http.Error(w, "Failed to store OAuth state", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -366,7 +366,7 @@ func (h *EmailProviderHandler) StartEmailOAuth(w http.ResponseWriter, r *http.Re
 		p := email.NewGoogleProvider(provider.OAuthClientID, clientSecret, scopes)
 		authURL = p.GetOAuthURL(state, redirectURI)
 	default:
-		http.Error(w, "OAuth not supported for this provider type", http.StatusBadRequest)
+		respondBadRequest(w, r, "OAuth not supported for this provider type")
 		return
 	}
 
@@ -392,7 +392,7 @@ func (h *EmailProviderHandler) EmailOAuthCallback(w http.ResponseWriter, r *http
 	}
 
 	if code == "" || state == "" {
-		http.Error(w, "Missing code or state parameter", http.StatusBadRequest)
+		respondValidationError(w, r, "Missing code or state parameter")
 		return
 	}
 
@@ -404,11 +404,11 @@ func (h *EmailProviderHandler) EmailOAuthCallback(w http.ResponseWriter, r *http
 		WHERE state = ? AND expires_at > CURRENT_TIMESTAMP
 	`, state).Scan(&providerID, &channelID, &userID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Invalid or expired state", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid or expired state")
 		return
 	}
 	if err != nil {
-		http.Error(w, "Failed to validate state", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -426,7 +426,7 @@ func (h *EmailProviderHandler) EmailOAuthCallback(w http.ResponseWriter, r *http
 		&provider.OAuthClientID, &clientSecretEnc, &provider.OAuthScopes, &provider.OAuthTenantID,
 	)
 	if err != nil {
-		http.Error(w, "Provider not found", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -525,7 +525,7 @@ func (h *EmailProviderHandler) TestEmailChannel(w http.ResponseWriter, r *http.R
 	idStr := r.PathValue("id")
 	channelID, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid channel ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 

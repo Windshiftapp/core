@@ -37,13 +37,13 @@ func (h *WebhookHandler) TriggerWebhook(w http.ResponseWriter, r *http.Request) 
 	// Get current user for permission check
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	webhookID, err := strconv.Atoi(r.PathValue("webhookId"))
 	if err != nil {
-		http.Error(w, "Invalid webhook ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "webhook ID")
 		return
 	}
 
@@ -51,12 +51,12 @@ func (h *WebhookHandler) TriggerWebhook(w http.ResponseWriter, r *http.Request) 
 		ItemID int `json:"item_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
 
 	if request.ItemID == 0 {
-		http.Error(w, "item_id is required", http.StatusBadRequest)
+		respondValidationError(w, r, "item_id is required")
 		return
 	}
 
@@ -69,12 +69,12 @@ func (h *WebhookHandler) TriggerWebhook(w http.ResponseWriter, r *http.Request) 
 	checkQuery := "SELECT type, status FROM channels WHERE id = ?"
 	err = h.db.QueryRowContext(ctx, checkQuery, webhookID).Scan(&channelType, &status)
 	if err != nil {
-		http.Error(w, "Webhook not found", http.StatusNotFound)
+		respondNotFound(w, r, "webhook")
 		return
 	}
 
 	if channelType != "webhook" {
-		http.Error(w, "Channel is not a webhook", http.StatusBadRequest)
+		respondBadRequest(w, r, "Channel is not a webhook")
 		return
 	}
 
@@ -83,21 +83,21 @@ func (h *WebhookHandler) TriggerWebhook(w http.ResponseWriter, r *http.Request) 
 	itemQuery := "SELECT workspace_id FROM items WHERE id = ?"
 	err = h.db.QueryRowContext(ctx, itemQuery, request.ItemID).Scan(&itemWorkspaceID)
 	if err != nil {
-		http.Error(w, "Item not found", http.StatusNotFound)
+		respondNotFound(w, r, "item")
 		return
 	}
 
 	// Check user has permission to the item's workspace
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, itemWorkspaceID, "read")
 	if err != nil || !hasPermission {
-		http.Error(w, "Permission denied", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	// Trigger the webhook
 	err = h.webhookSender.TriggerManually(ctx, webhookID, request.ItemID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
@@ -114,13 +114,13 @@ func (h *WebhookHandler) GetWebhooksForItem(w http.ResponseWriter, r *http.Reque
 	// Get current user for permission check
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	itemID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid item ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "item ID")
 		return
 	}
 
@@ -132,14 +132,14 @@ func (h *WebhookHandler) GetWebhooksForItem(w http.ResponseWriter, r *http.Reque
 	itemQuery := "SELECT workspace_id FROM items WHERE id = ?"
 	err = h.db.QueryRowContext(ctx, itemQuery, itemID).Scan(&itemWorkspaceID)
 	if err != nil {
-		http.Error(w, "Item not found", http.StatusNotFound)
+		respondNotFound(w, r, "item")
 		return
 	}
 
 	// Check user has permission to the item's workspace
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, itemWorkspaceID, "read")
 	if err != nil || !hasPermission {
-		http.Error(w, "Permission denied", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -152,7 +152,7 @@ func (h *WebhookHandler) GetWebhooksForItem(w http.ResponseWriter, r *http.Reque
 
 	rows, err := h.db.QueryContext(ctx, query)
 	if err != nil {
-		http.Error(w, "Failed to query webhooks", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()

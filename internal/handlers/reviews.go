@@ -26,7 +26,7 @@ func NewReviewHandler(db database.Database) *ReviewHandler {
 func (h *ReviewHandler) GetReviews(w http.ResponseWriter, r *http.Request) {
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	userID := user.ID
@@ -74,7 +74,7 @@ func (h *ReviewHandler) GetReviews(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query, args...)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -87,7 +87,7 @@ func (h *ReviewHandler) GetReviews(w http.ResponseWriter, r *http.Request) {
 		err := rows.Scan(&review.ID, &review.UserID, &review.ReviewDate, &review.ReviewType,
 			&review.ReviewData, &review.CreatedAt, &review.UpdatedAt, &userName, &userEmail)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Row scan error: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -102,7 +102,7 @@ func (h *ReviewHandler) GetReviews(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = rows.Err(); err != nil {
-		http.Error(w, fmt.Sprintf("Rows iteration error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -114,14 +114,14 @@ func (h *ReviewHandler) GetReviews(w http.ResponseWriter, r *http.Request) {
 func (h *ReviewHandler) GetReview(w http.ResponseWriter, r *http.Request) {
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	userID := user.ID
 
 	reviewID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid review ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -129,7 +129,7 @@ func (h *ReviewHandler) GetReview(w http.ResponseWriter, r *http.Request) {
 	var userName, userEmail sql.NullString
 
 	err = h.db.QueryRow(`
-		SELECT r.id, r.user_id, r.review_date, r.review_type, r.review_data, 
+		SELECT r.id, r.user_id, r.review_date, r.review_type, r.review_data,
 		       r.created_at, r.updated_at,
 		       u.first_name || ' ' || u.last_name as user_name, u.email as user_email
 		FROM reviews r
@@ -139,11 +139,11 @@ func (h *ReviewHandler) GetReview(w http.ResponseWriter, r *http.Request) {
 		&review.ReviewData, &review.CreatedAt, &review.UpdatedAt, &userName, &userEmail)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Review not found", http.StatusNotFound)
+		respondNotFound(w, r, "review")
 		return
 	}
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -162,32 +162,32 @@ func (h *ReviewHandler) GetReview(w http.ResponseWriter, r *http.Request) {
 func (h *ReviewHandler) CreateReview(w http.ResponseWriter, r *http.Request) {
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	userID := user.ID
 
 	var req models.ReviewCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
 
 	// Validate required fields
 	if req.ReviewDate == "" || req.ReviewType == "" || req.ReviewData == "" {
-		http.Error(w, "Missing required fields: review_date, review_type, review_data", http.StatusBadRequest)
+		respondValidationError(w, r, "Missing required fields: review_date, review_type, review_data")
 		return
 	}
 
 	// Validate review type
 	if req.ReviewType != "daily" && req.ReviewType != "weekly" {
-		http.Error(w, "Review type must be 'daily' or 'weekly'", http.StatusBadRequest)
+		respondValidationError(w, r, "Review type must be 'daily' or 'weekly'")
 		return
 	}
 
 	// Validate date format
 	if _, err := time.Parse("2006-01-02", req.ReviewDate); err != nil {
-		http.Error(w, "Invalid date format. Use YYYY-MM-DD", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid date format. Use YYYY-MM-DD")
 		return
 	}
 
@@ -200,9 +200,9 @@ func (h *ReviewHandler) CreateReview(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if err.Error() == "UNIQUE constraint failed: reviews.user_id, reviews.review_date, reviews.review_type" {
-			http.Error(w, "Review already exists for this date and type", http.StatusConflict)
+			respondConflict(w, r, "Review already exists for this date and type")
 		} else {
-			http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -222,7 +222,7 @@ func (h *ReviewHandler) CreateReview(w http.ResponseWriter, r *http.Request) {
 		&review.ReviewData, &review.CreatedAt, &review.UpdatedAt, &userName, &userEmail)
 
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to retrieve created review: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to retrieve created review: %w", err))
 		return
 	}
 
@@ -242,49 +242,49 @@ func (h *ReviewHandler) CreateReview(w http.ResponseWriter, r *http.Request) {
 func (h *ReviewHandler) UpdateReview(w http.ResponseWriter, r *http.Request) {
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	userID := user.ID
 
 	reviewID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid review ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	var req models.ReviewUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
 
 	// Validate required fields
 	if req.ReviewData == "" {
-		http.Error(w, "Missing required field: review_data", http.StatusBadRequest)
+		respondValidationError(w, r, "Missing required field: review_data")
 		return
 	}
 
 	// Update review
 	result, err := h.db.ExecWrite(`
-		UPDATE reviews 
+		UPDATE reviews
 		SET review_data = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ? AND user_id = ?
 	`, req.ReviewData, reviewID, userID)
 
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to check rows affected: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to check rows affected: %w", err))
 		return
 	}
 
 	if rowsAffected == 0 {
-		http.Error(w, "Review not found or access denied", http.StatusNotFound)
+		respondNotFound(w, r, "review")
 		return
 	}
 
@@ -303,7 +303,7 @@ func (h *ReviewHandler) UpdateReview(w http.ResponseWriter, r *http.Request) {
 		&review.ReviewData, &review.CreatedAt, &review.UpdatedAt, &userName, &userEmail)
 
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to retrieve updated review: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to retrieve updated review: %w", err))
 		return
 	}
 
@@ -322,31 +322,31 @@ func (h *ReviewHandler) UpdateReview(w http.ResponseWriter, r *http.Request) {
 func (h *ReviewHandler) DeleteReview(w http.ResponseWriter, r *http.Request) {
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	userID := user.ID
 
 	reviewID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid review ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	result, err := h.db.ExecWrite("DELETE FROM reviews WHERE id = ? AND user_id = ?", reviewID, userID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to check rows affected: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to check rows affected: %w", err))
 		return
 	}
 
 	if rowsAffected == 0 {
-		http.Error(w, "Review not found or access denied", http.StatusNotFound)
+		respondNotFound(w, r, "review")
 		return
 	}
 
@@ -357,7 +357,7 @@ func (h *ReviewHandler) DeleteReview(w http.ResponseWriter, r *http.Request) {
 func (h *ReviewHandler) GetCompletedItems(w http.ResponseWriter, r *http.Request) {
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	userID := user.ID
@@ -367,17 +367,17 @@ func (h *ReviewHandler) GetCompletedItems(w http.ResponseWriter, r *http.Request
 	endDate := r.URL.Query().Get("end_date")     // YYYY-MM-DD
 
 	if startDate == "" || endDate == "" {
-		http.Error(w, "Missing required parameters: start_date, end_date", http.StatusBadRequest)
+		respondValidationError(w, r, "Missing required parameters: start_date, end_date")
 		return
 	}
 
 	// Validate date formats
 	if _, err := time.Parse("2006-01-02", startDate); err != nil {
-		http.Error(w, "Invalid start_date format. Use YYYY-MM-DD", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid start_date format. Use YYYY-MM-DD")
 		return
 	}
 	if _, err := time.Parse("2006-01-02", endDate); err != nil {
-		http.Error(w, "Invalid end_date format. Use YYYY-MM-DD", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid end_date format. Use YYYY-MM-DD")
 		return
 	}
 
@@ -413,7 +413,7 @@ func (h *ReviewHandler) GetCompletedItems(w http.ResponseWriter, r *http.Request
 
 	rows, err := h.db.Query(query, userID, startDate, endDate)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -428,7 +428,7 @@ func (h *ReviewHandler) GetCompletedItems(w http.ResponseWriter, r *http.Request
 			&item.WorkspaceItemNumber, &item.ItemTypeID,
 			&completedAtStr)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Row scan error: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -444,7 +444,7 @@ func (h *ReviewHandler) GetCompletedItems(w http.ResponseWriter, r *http.Request
 	}
 
 	if err = rows.Err(); err != nil {
-		http.Error(w, fmt.Sprintf("Rows iteration error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

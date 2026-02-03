@@ -13,7 +13,7 @@ import (
 func (h *AssetHandler) GetAssetRoles(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -23,7 +23,7 @@ func (h *AssetHandler) GetAssetRoles(w http.ResponseWriter, r *http.Request) {
 		ORDER BY display_order
 	`)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -33,7 +33,7 @@ func (h *AssetHandler) GetAssetRoles(w http.ResponseWriter, r *http.Request) {
 		var role models.AssetRole
 		err := rows.Scan(&role.ID, &role.Name, &role.Description, &role.IsSystem, &role.DisplayOrder, &role.CreatedAt, &role.UpdatedAt)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		roles = append(roles, role)
@@ -47,13 +47,13 @@ func (h *AssetHandler) GetAssetRoles(w http.ResponseWriter, r *http.Request) {
 func (h *AssetHandler) GetAssetRole(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	roleID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid role ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "role ID")
 		return
 	}
 
@@ -63,11 +63,11 @@ func (h *AssetHandler) GetAssetRole(w http.ResponseWriter, r *http.Request) {
 		FROM asset_roles WHERE id = ?
 	`, roleID).Scan(&role.ID, &role.Name, &role.Description, &role.IsSystem, &role.DisplayOrder, &role.CreatedAt, &role.UpdatedAt)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Role not found", http.StatusNotFound)
+		respondNotFound(w, r, "Role")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -79,7 +79,7 @@ func (h *AssetHandler) GetAssetRole(w http.ResponseWriter, r *http.Request) {
 		WHERE arp.role_id = ?
 	`, roleID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer permRows.Close()
@@ -88,7 +88,7 @@ func (h *AssetHandler) GetAssetRole(w http.ResponseWriter, r *http.Request) {
 		var perm models.AssetPermission
 		err := permRows.Scan(&perm.ID, &perm.PermissionKey, &perm.PermissionName, &perm.Description, &perm.CreatedAt)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		role.Permissions = append(role.Permissions, perm)

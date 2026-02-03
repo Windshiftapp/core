@@ -30,14 +30,14 @@ func (h *ItemHandler) ScheduleItem(w http.ResponseWriter, r *http.Request) {
 
 	var req ScheduleCalendarRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -46,18 +46,18 @@ func (h *ItemHandler) ScheduleItem(w http.ResponseWriter, r *http.Request) {
 	var workspaceID int
 	err := h.db.QueryRow("SELECT calendar_data, workspace_id FROM items WHERE id = ?", id).Scan(&calendarDataJSON, &workspaceID)
 	if err != nil {
-		http.Error(w, "Item not found", http.StatusNotFound)
+		respondNotFound(w, r, "item")
 		return
 	}
 
 	// Check if user has permission to edit items in this workspace
 	canEdit, permErr := h.canEditItem(user.ID, workspaceID)
 	if permErr != nil {
-		http.Error(w, "Permission check failed: "+permErr.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, permErr)
 		return
 	}
 	if !canEdit {
-		http.Error(w, "Insufficient permissions to schedule items in this workspace", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -92,7 +92,7 @@ func (h *ItemHandler) ScheduleItem(w http.ResponseWriter, r *http.Request) {
 	// Marshal back to JSON
 	updatedJSON, err := json.Marshal(filteredData)
 	if err != nil {
-		http.Error(w, "Failed to update calendar data", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to update calendar data: %w", err))
 		return
 	}
 
@@ -100,7 +100,7 @@ func (h *ItemHandler) ScheduleItem(w http.ResponseWriter, r *http.Request) {
 	_, err = h.db.ExecWrite("UPDATE items SET calendar_data = ?, updated_at = ? WHERE id = ?",
 		string(updatedJSON), time.Now().UTC(), id)
 	if err != nil {
-		http.Error(w, "Failed to schedule item", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -120,20 +120,20 @@ func (h *ItemHandler) UnscheduleItem(w http.ResponseWriter, r *http.Request) {
 
 	userIDStr := r.URL.Query().Get("user_id")
 	if userIDStr == "" {
-		http.Error(w, "user_id parameter is required", http.StatusBadRequest)
+		respondValidationError(w, r, "user_id parameter is required")
 		return
 	}
 
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
-		http.Error(w, "Invalid user_id", http.StatusBadRequest)
+		respondInvalidID(w, r, "user_id")
 		return
 	}
 
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -142,24 +142,24 @@ func (h *ItemHandler) UnscheduleItem(w http.ResponseWriter, r *http.Request) {
 	var workspaceID int
 	err = h.db.QueryRow("SELECT calendar_data, workspace_id FROM items WHERE id = ?", id).Scan(&calendarDataJSON, &workspaceID)
 	if err != nil {
-		http.Error(w, "Item not found", http.StatusNotFound)
+		respondNotFound(w, r, "item")
 		return
 	}
 
 	// Check if user has permission to edit items in this workspace
 	canEdit, err := h.canEditItem(user.ID, workspaceID)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canEdit {
-		http.Error(w, "Insufficient permissions to unschedule items in this workspace", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	// Verify the requesting user is the schedule owner (security fix)
 	if user.ID != userID {
-		http.Error(w, "Can only unschedule your own schedules", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -167,7 +167,7 @@ func (h *ItemHandler) UnscheduleItem(w http.ResponseWriter, r *http.Request) {
 	var calendarData []models.CalendarScheduleEntry
 	if calendarDataJSON.Valid && calendarDataJSON.String != "" {
 		if err := json.Unmarshal([]byte(calendarDataJSON.String), &calendarData); err != nil {
-			http.Error(w, "Failed to parse calendar data", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
@@ -184,14 +184,14 @@ func (h *ItemHandler) UnscheduleItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found {
-		http.Error(w, "Item not scheduled for this user", http.StatusNotFound)
+		respondNotFound(w, r, "schedule")
 		return
 	}
 
 	// Marshal back to JSON
 	updatedJSON, err := json.Marshal(filteredData)
 	if err != nil {
-		http.Error(w, "Failed to update calendar data", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -199,7 +199,7 @@ func (h *ItemHandler) UnscheduleItem(w http.ResponseWriter, r *http.Request) {
 	_, err = h.db.ExecWrite("UPDATE items SET calendar_data = ?, updated_at = ? WHERE id = ?",
 		string(updatedJSON), time.Now().UTC(), id)
 	if err != nil {
-		http.Error(w, "Failed to unschedule item", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -214,7 +214,7 @@ func (h *ItemHandler) GetScheduledItems(w http.ResponseWriter, r *http.Request) 
 	// Require authentication - use authenticated user's ID only
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -224,7 +224,7 @@ func (h *ItemHandler) GetScheduledItems(w http.ResponseWriter, r *http.Request) 
 	// Get accessible workspace IDs (includes active workspaces and inactive ones where user has admin access)
 	accessibleWorkspaceIDs, err := h.getAccessibleWorkspaceIDs(user)
 	if err != nil {
-		http.Error(w, "Failed to get accessible workspaces: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -257,7 +257,7 @@ func (h *ItemHandler) GetScheduledItems(w http.ResponseWriter, r *http.Request) 
 
 	rows, err := h.db.Query(query, args...)
 	if err != nil {
-		http.Error(w, "Failed to query scheduled items", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -315,7 +315,7 @@ func (h *ItemHandler) GetScheduledItems(w http.ResponseWriter, r *http.Request) 
 	// Apply permission filtering
 	filteredItems, err := h.filterItemsByPermissions(user.ID, allItems)
 	if err != nil {
-		http.Error(w, "Permission check failed: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

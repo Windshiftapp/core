@@ -29,21 +29,21 @@ func (h *ActiveTimerHandler) StartTimer(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validation
 	if req.WorkspaceID == 0 {
-		http.Error(w, "workspace_id is required", http.StatusBadRequest)
+		respondValidationError(w, r, "workspace_id is required")
 		return
 	}
 	if req.ProjectID == 0 {
-		http.Error(w, "project_id is required", http.StatusBadRequest)
+		respondValidationError(w, r, "project_id is required")
 		return
 	}
 	if req.Description == "" {
-		http.Error(w, "description is required", http.StatusBadRequest)
+		respondValidationError(w, r, "description is required")
 		return
 	}
 
@@ -51,15 +51,15 @@ func (h *ActiveTimerHandler) StartTimer(w http.ResponseWriter, r *http.Request) 
 	var projectStatus string
 	err := h.db.QueryRow("SELECT status FROM time_projects WHERE id = ?", req.ProjectID).Scan(&projectStatus)
 	if err == sql.ErrNoRows {
-		http.Error(w, "project not found", http.StatusBadRequest)
+		respondNotFound(w, r, "project")
 		return
 	}
 	if err != nil {
-		http.Error(w, "Database error checking project", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if projectStatus != "Active" {
-		http.Error(w, "cannot start timer on a project that is not active", http.StatusBadRequest)
+		respondValidationError(w, r, "cannot start timer on a project that is not active")
 		return
 	}
 
@@ -68,11 +68,11 @@ func (h *ActiveTimerHandler) StartTimer(w http.ResponseWriter, r *http.Request) 
 	err = h.db.QueryRow("SELECT id FROM active_timers LIMIT 1").Scan(&existingID)
 	if err != sql.ErrNoRows {
 		if err != nil {
-			http.Error(w, "Database error checking existing timer", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		// Timer exists
-		http.Error(w, "An active timer is already running. Stop it before starting a new one.", http.StatusConflict)
+		respondConflict(w, r, "An active timer is already running. Stop it before starting a new one.")
 		return
 	}
 
@@ -85,14 +85,14 @@ func (h *ActiveTimerHandler) StartTimer(w http.ResponseWriter, r *http.Request) 
 		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
 	`, req.WorkspaceID, req.ItemID, req.ProjectID, req.Description, now, now).Scan(&id)
 	if err != nil {
-		http.Error(w, "Failed to start timer", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Get the created timer with joined data
 	timer, err := h.getActiveTimerByID(int(id))
 	if err != nil {
-		http.Error(w, "Failed to retrieve started timer", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -145,7 +145,7 @@ func (h *ActiveTimerHandler) GetActiveTimer(w http.ResponseWriter, r *http.Reque
 		json.NewEncoder(w).Encode(nil)
 		return
 	} else if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -158,7 +158,7 @@ func (h *ActiveTimerHandler) StopTimer(w http.ResponseWriter, r *http.Request) {
 	timerIDStr := r.PathValue("id")
 	timerID, err := strconv.Atoi(timerIDStr)
 	if err != nil {
-		http.Error(w, "Invalid timer ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "timer ID")
 		return
 	}
 
@@ -166,9 +166,9 @@ func (h *ActiveTimerHandler) StopTimer(w http.ResponseWriter, r *http.Request) {
 	timer, err := h.getActiveTimerByID(timerID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Timer not found", http.StatusNotFound)
+			respondNotFound(w, r, "timer")
 		} else {
-			http.Error(w, "Database error", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -181,7 +181,7 @@ func (h *ActiveTimerHandler) StopTimer(w http.ResponseWriter, r *http.Request) {
 	var customerID int
 	err = h.db.QueryRow("SELECT customer_id FROM time_projects WHERE id = ?", timer.ProjectID).Scan(&customerID)
 	if err != nil {
-		http.Error(w, "Failed to get project customer", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -202,14 +202,14 @@ func (h *ActiveTimerHandler) StopTimer(w http.ResponseWriter, r *http.Request) {
 		dateInt, int(timer.StartTimeUTC), int(endTimeUTC),
 		durationMinutes, nowUnix, nowUnix)
 	if err != nil {
-		http.Error(w, "Failed to create worklog entry", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Delete the active timer
 	_, err = h.db.ExecWrite("DELETE FROM active_timers WHERE id = ?", timerID)
 	if err != nil {
-		http.Error(w, "Failed to stop timer", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

@@ -22,7 +22,7 @@ func NewAttachmentSettingsHandler(settingsService *services.AttachmentSettingsSe
 func (h *AttachmentSettingsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	settings, err := h.settingsService.Get()
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -34,13 +34,13 @@ func (h *AttachmentSettingsHandler) Get(w http.ResponseWriter, r *http.Request) 
 func (h *AttachmentSettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
 	settingsID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid settings ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "settings ID")
 		return
 	}
 
 	var req models.AttachmentSettingsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -48,10 +48,10 @@ func (h *AttachmentSettingsHandler) Update(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		// Check if it's a validation error
 		if err.Error() == "max file size must be greater than 0" {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			respondValidationError(w, r, err.Error())
 			return
 		}
-		http.Error(w, "Failed to save settings", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -63,7 +63,7 @@ func (h *AttachmentSettingsHandler) Update(w http.ResponseWriter, r *http.Reques
 func (h *AttachmentSettingsHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 	status, err := h.settingsService.GetStatus()
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

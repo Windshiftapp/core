@@ -14,24 +14,24 @@ import (
 func (h *AssetHandler) GetEveryoneRole(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	setID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "set ID")
 		return
 	}
 
 	// Check admin permission
 	canAdmin, err := h.canAdminSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canAdmin {
-		http.Error(w, "Admin permission required", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -57,7 +57,7 @@ func (h *AssetHandler) GetEveryoneRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -79,30 +79,30 @@ type SetEveryoneRoleRequest struct {
 func (h *AssetHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	setID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "set ID")
 		return
 	}
 
 	// Check admin permission
 	canAdmin, err := h.canAdminSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canAdmin {
-		http.Error(w, "Admin permission required", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	var req SetEveryoneRoleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -116,7 +116,7 @@ func (h *AssetHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Request) {
 		var roleExists bool
 		err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM asset_roles WHERE id = ?)", *req.RoleID).Scan(&roleExists)
 		if err != nil || !roleExists {
-			http.Error(w, "Invalid role ID", http.StatusBadRequest)
+			respondInvalidID(w, r, "role ID")
 			return
 		}
 
@@ -129,7 +129,7 @@ func (h *AssetHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

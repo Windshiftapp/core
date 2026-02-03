@@ -43,7 +43,7 @@ func (h *PriorityHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query, args...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -54,7 +54,7 @@ func (h *PriorityHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.IsDefault,
 			&p.Icon, &p.Color, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -68,7 +68,7 @@ func (h *PriorityHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 		configSetRows, err := h.db.Query(configSetQuery, p.ID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -79,7 +79,7 @@ func (h *PriorityHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			var configSetName string
 			if err := configSetRows.Scan(&configSetID, &configSetName); err != nil {
 				configSetRows.Close()
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 			configSetIDs = append(configSetIDs, configSetID)
@@ -116,11 +116,11 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&p.Icon, &p.Color, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Priority not found", http.StatusNotFound)
+		respondNotFound(w, r, "priority")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -134,7 +134,7 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	configSetRows, err := h.db.Query(configSetQuery, p.ID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer configSetRows.Close()
@@ -145,7 +145,7 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 		var configSetID int
 		var configSetName string
 		if err := configSetRows.Scan(&configSetID, &configSetName); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		configSetIDs = append(configSetIDs, configSetID)
@@ -161,13 +161,13 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *PriorityHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var p models.Priority
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(p.Name) == "" {
-		http.Error(w, "Priority name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Priority name is required")
 		return
 	}
 
@@ -179,7 +179,7 @@ func (h *PriorityHandler) Create(w http.ResponseWriter, r *http.Request) {
 			var configSetExists bool
 			err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", csID).Scan(&configSetExists)
 			if err != nil || !configSetExists {
-				http.Error(w, fmt.Sprintf("Configuration set %d not found", csID), http.StatusBadRequest)
+				respondBadRequest(w, r, fmt.Sprintf("Configuration set %d not found", csID))
 				return
 			}
 		}
@@ -189,7 +189,7 @@ func (h *PriorityHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if p.IsDefault {
 		_, err := h.db.ExecWrite("UPDATE priorities SET is_default = false WHERE is_default = true")
 		if err != nil {
-			http.Error(w, "Failed to clear existing default: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("Failed to clear existing default: %w", err))
 			return
 		}
 	}
@@ -203,9 +203,9 @@ func (h *PriorityHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
-			http.Error(w, "Priority with this name already exists", http.StatusConflict)
+			respondConflict(w, r, "Priority with this name already exists")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -218,7 +218,7 @@ func (h *PriorityHandler) Create(w http.ResponseWriter, r *http.Request) {
 				VALUES (?, ?, ?)
 			`, csID, id, now)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("Failed to associate with configuration set %d: %v", csID, err), http.StatusInternalServerError)
+				respondInternalError(w, r, fmt.Errorf("Failed to associate with configuration set %d: %w", csID, err))
 				return
 			}
 		}
@@ -234,7 +234,7 @@ func (h *PriorityHandler) Create(w http.ResponseWriter, r *http.Request) {
 		&p.Icon, &p.Color, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -285,13 +285,13 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	var p models.Priority
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(p.Name) == "" {
-		http.Error(w, "Priority name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Priority name is required")
 		return
 	}
 
@@ -303,7 +303,7 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 			var configSetExists bool
 			err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", csID).Scan(&configSetExists)
 			if err != nil || !configSetExists {
-				http.Error(w, fmt.Sprintf("Configuration set %d not found", csID), http.StatusBadRequest)
+				respondBadRequest(w, r, fmt.Sprintf("Configuration set %d not found", csID))
 				return
 			}
 		}
@@ -313,7 +313,7 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if p.IsDefault {
 		_, err := h.db.ExecWrite("UPDATE priorities SET is_default = false WHERE is_default = true AND id != ?", id)
 		if err != nil {
-			http.Error(w, "Failed to clear existing default: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("Failed to clear existing default: %w", err))
 			return
 		}
 	}
@@ -328,9 +328,9 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
-			http.Error(w, "Priority with this name already exists", http.StatusConflict)
+			respondConflict(w, r, "Priority with this name already exists")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -340,7 +340,7 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 		// Delete existing associations
 		_, err = h.db.ExecWrite("DELETE FROM configuration_set_priorities WHERE priority_id = ?", id)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to update configuration set associations: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("Failed to update configuration set associations: %w", err))
 			return
 		}
 
@@ -351,7 +351,7 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 				VALUES (?, ?, ?)
 			`, csID, id, now)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("Failed to associate with configuration set %d: %v", csID, err), http.StatusInternalServerError)
+				respondInternalError(w, r, fmt.Errorf("Failed to associate with configuration set %d: %w", csID, err))
 				return
 			}
 		}
@@ -359,7 +359,7 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 		// If no config sets provided, delete all existing associations
 		_, err = h.db.ExecWrite("DELETE FROM configuration_set_priorities WHERE priority_id = ?", id)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to clear configuration set associations: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("Failed to clear configuration set associations: %w", err))
 			return
 		}
 	}
@@ -374,7 +374,7 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 		&p.Icon, &p.Color, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -427,11 +427,11 @@ func (h *PriorityHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	var priorityName string
 	err := h.db.QueryRow("SELECT name FROM priorities WHERE id = ?", id).Scan(&priorityName)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Priority not found", http.StatusNotFound)
+		respondNotFound(w, r, "priority")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -439,19 +439,19 @@ func (h *PriorityHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	var itemCount int
 	err = h.db.QueryRow("SELECT COUNT(*) FROM items WHERE priority_id = ?", id).Scan(&itemCount)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if itemCount > 0 {
-		http.Error(w, fmt.Sprintf("Cannot delete priority: it is used by %d item(s)", itemCount), http.StatusConflict)
+		respondConflict(w, r, fmt.Sprintf("Cannot delete priority: it is used by %d item(s)", itemCount))
 		return
 	}
 
 	// Delete priority (cascade will handle junction table)
 	_, err = h.db.ExecWrite("DELETE FROM priorities WHERE id = ?", id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

@@ -50,7 +50,7 @@ func (h *PersonalLabelHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	
 	rows, err := h.db.Query(query, args...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -60,10 +60,10 @@ func (h *PersonalLabelHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		var label models.PersonalLabel
 		var userID sql.NullInt64
 		
-		err := rows.Scan(&label.ID, &label.Name, &label.Color, &userID, 
+		err := rows.Scan(&label.ID, &label.Name, &label.Color, &userID,
 			&label.CreatedAt, &label.UpdatedAt)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		
@@ -87,26 +87,26 @@ func (h *PersonalLabelHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 func (h *PersonalLabelHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	var label models.PersonalLabel
 	var userID sql.NullInt64
-	
+
 	err = h.db.QueryRow(`
 		SELECT id, name, color, user_id, created_at, updated_at
 		FROM personal_labels
 		WHERE id = ?
-	`, id).Scan(&label.ID, &label.Name, &label.Color, &userID, 
+	`, id).Scan(&label.ID, &label.Name, &label.Color, &userID,
 		&label.CreatedAt, &label.UpdatedAt)
-	
+
 	if err == sql.ErrNoRows {
-		http.Error(w, "Personal label not found", http.StatusNotFound)
+		respondNotFound(w, r, "Personal label")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -122,13 +122,13 @@ func (h *PersonalLabelHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *PersonalLabelHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var label models.PersonalLabel
 	if err := json.NewDecoder(r.Body).Decode(&label); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(label.Name) == "" {
-		http.Error(w, "Label name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Label name is required")
 		return
 	}
 
@@ -138,23 +138,23 @@ func (h *PersonalLabelHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Check for duplicate name within the same scope (global or user-specific)
 	var existingCount int
 	if label.UserID != nil {
-		err := h.db.QueryRow("SELECT COUNT(*) FROM personal_labels WHERE name = ? AND user_id = ?", 
+		err := h.db.QueryRow("SELECT COUNT(*) FROM personal_labels WHERE name = ? AND user_id = ?",
 			label.Name, *label.UserID).Scan(&existingCount)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	} else {
-		err := h.db.QueryRow("SELECT COUNT(*) FROM personal_labels WHERE name = ? AND user_id IS NULL", 
+		err := h.db.QueryRow("SELECT COUNT(*) FROM personal_labels WHERE name = ? AND user_id IS NULL",
 			label.Name).Scan(&existingCount)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
-	
+
 	if existingCount > 0 {
-		http.Error(w, "A label with this name already exists", http.StatusBadRequest)
+		respondConflict(w, r, "A label with this name already exists")
 		return
 	}
 
@@ -166,23 +166,23 @@ func (h *PersonalLabelHandler) Create(w http.ResponseWriter, r *http.Request) {
 	`, label.Name, label.Color, label.UserID, now, now).Scan(&id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
-	
+
 	// Return the created label
 	var createdLabel models.PersonalLabel
 	var userID sql.NullInt64
-	
+
 	err = h.db.QueryRow(`
 		SELECT id, name, color, user_id, created_at, updated_at
 		FROM personal_labels
 		WHERE id = ?
-	`, id).Scan(&createdLabel.ID, &createdLabel.Name, &createdLabel.Color, &userID, 
+	`, id).Scan(&createdLabel.ID, &createdLabel.Name, &createdLabel.Color, &userID,
 		&createdLabel.CreatedAt, &createdLabel.UpdatedAt)
-	
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -199,19 +199,19 @@ func (h *PersonalLabelHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *PersonalLabelHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	var label models.PersonalLabel
 	if err := json.NewDecoder(r.Body).Decode(&label); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(label.Name) == "" {
-		http.Error(w, "Label name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Label name is required")
 		return
 	}
 
@@ -221,51 +221,51 @@ func (h *PersonalLabelHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Check for duplicate name within the same scope (excluding current record)
 	var existingCount int
 	if label.UserID != nil {
-		err := h.db.QueryRow("SELECT COUNT(*) FROM personal_labels WHERE name = ? AND user_id = ? AND id != ?", 
+		err := h.db.QueryRow("SELECT COUNT(*) FROM personal_labels WHERE name = ? AND user_id = ? AND id != ?",
 			label.Name, *label.UserID, id).Scan(&existingCount)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	} else {
-		err := h.db.QueryRow("SELECT COUNT(*) FROM personal_labels WHERE name = ? AND user_id IS NULL AND id != ?", 
+		err := h.db.QueryRow("SELECT COUNT(*) FROM personal_labels WHERE name = ? AND user_id IS NULL AND id != ?",
 			label.Name, id).Scan(&existingCount)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
-	
+
 	if existingCount > 0 {
-		http.Error(w, "A label with this name already exists", http.StatusBadRequest)
+		respondConflict(w, r, "A label with this name already exists")
 		return
 	}
 
 	now := time.Now()
 	_, err = h.db.ExecWrite(`
-		UPDATE personal_labels 
+		UPDATE personal_labels
 		SET name = ?, color = ?, user_id = ?, updated_at = ?
 		WHERE id = ?
 	`, label.Name, label.Color, label.UserID, now, id)
-	
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Return the updated label
 	var updatedLabel models.PersonalLabel
 	var userID sql.NullInt64
-	
+
 	err = h.db.QueryRow(`
 		SELECT id, name, color, user_id, created_at, updated_at
 		FROM personal_labels
 		WHERE id = ?
-	`, id).Scan(&updatedLabel.ID, &updatedLabel.Name, &updatedLabel.Color, &userID, 
+	`, id).Scan(&updatedLabel.ID, &updatedLabel.Name, &updatedLabel.Color, &userID,
 		&updatedLabel.CreatedAt, &updatedLabel.UpdatedAt)
-	
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -281,13 +281,13 @@ func (h *PersonalLabelHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *PersonalLabelHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	_, err = h.db.ExecWrite("DELETE FROM personal_labels WHERE id = ?", id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

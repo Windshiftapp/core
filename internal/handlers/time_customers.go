@@ -25,7 +25,7 @@ func (h *TimeCustomerHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		ORDER BY name ASC
 	`)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -37,7 +37,7 @@ func (h *TimeCustomerHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		var avatarURL sql.NullString
 		err := rows.Scan(&c.ID, &c.Name, &c.Email, &c.Description, &c.Active, &avatarURL, &customFieldValuesStr, &c.CreatedAt, &c.UpdatedAt)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -76,11 +76,11 @@ func (h *TimeCustomerHandler) Get(w http.ResponseWriter, r *http.Request) {
 	`, id).Scan(&c.ID, &c.Name, &c.Email, &c.Description, &c.Active, &avatarURL, &customFieldValuesStr, &c.CreatedAt, &c.UpdatedAt)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Customer not found", http.StatusNotFound)
+		respondNotFound(w, r, "customer")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -92,7 +92,7 @@ func (h *TimeCustomerHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Parse custom field values
 	if customFieldValuesStr.Valid && customFieldValuesStr.String != "" {
 		if err := json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
-			http.Error(w, "Failed to parse custom field values", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
@@ -103,7 +103,7 @@ func (h *TimeCustomerHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *TimeCustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var c models.CustomerOrganisation
 	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
@@ -118,7 +118,7 @@ func (h *TimeCustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 		var err error
 		customFieldValuesJSON, err = json.Marshal(c.CustomFieldValues)
 		if err != nil {
-			http.Error(w, "Invalid custom field values", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid custom field values")
 			return
 		}
 	}
@@ -131,7 +131,7 @@ func (h *TimeCustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 	`, c.Name, c.Email, c.Description, c.Active, c.AvatarURL, customFieldValuesJSON, now, now).Scan(&id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -150,7 +150,7 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	var c models.CustomerOrganisation
 	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
@@ -162,7 +162,7 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 		var err error
 		customFieldValuesJSON, err = json.Marshal(c.CustomFieldValues)
 		if err != nil {
-			http.Error(w, "Invalid custom field values", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid custom field values")
 			return
 		}
 	}
@@ -175,7 +175,7 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Printf("[DEBUG] Update customer %d - ERROR: %v", id, err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -195,7 +195,7 @@ func (h *TimeCustomerHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	_, err := h.db.ExecWrite("DELETE FROM customer_organisations WHERE id = ?", id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

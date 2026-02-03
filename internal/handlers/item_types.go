@@ -43,7 +43,7 @@ func (h *ItemTypeHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query, args...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -54,7 +54,7 @@ func (h *ItemTypeHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		err := rows.Scan(&it.ID, &it.Name, &it.Description, &it.IsDefault,
 			&it.Icon, &it.Color, &it.HierarchyLevel, &it.SortOrder, &it.CreatedAt, &it.UpdatedAt)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -68,7 +68,7 @@ func (h *ItemTypeHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 		configSetRows, err := h.db.Query(configSetQuery, it.ID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -79,7 +79,7 @@ func (h *ItemTypeHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			var configSetName string
 			if err := configSetRows.Scan(&configSetID, &configSetName); err != nil {
 				configSetRows.Close()
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 			configSetIDs = append(configSetIDs, configSetID)
@@ -122,11 +122,11 @@ func (h *ItemTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&it.Icon, &it.Color, &it.HierarchyLevel, &it.SortOrder, &it.CreatedAt, &it.UpdatedAt)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Item type not found", http.StatusNotFound)
+		respondNotFound(w, r, "item_type")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -140,7 +140,7 @@ func (h *ItemTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	configSetRows, err := h.db.Query(configSetQuery, it.ID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer configSetRows.Close()
@@ -151,7 +151,7 @@ func (h *ItemTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 		var configSetID int
 		var configSetName string
 		if err := configSetRows.Scan(&configSetID, &configSetName); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		configSetIDs = append(configSetIDs, configSetID)
@@ -173,13 +173,13 @@ func (h *ItemTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *ItemTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var it models.ItemType
 	if err := json.NewDecoder(r.Body).Decode(&it); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(it.Name) == "" {
-		http.Error(w, "Item type name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Item type name is required")
 		return
 	}
 
@@ -196,7 +196,7 @@ func (h *ItemTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 			var configSetExists bool
 			err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", csID).Scan(&configSetExists)
 			if err != nil || !configSetExists {
-				http.Error(w, fmt.Sprintf("Configuration set %d not found", csID), http.StatusBadRequest)
+				respondValidationError(w, r, fmt.Sprintf("Configuration set %d not found", csID))
 				return
 			}
 		}
@@ -211,9 +211,9 @@ func (h *ItemTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
-			http.Error(w, "Item type with this name already exists", http.StatusConflict)
+			respondConflict(w, r, "Item type with this name already exists")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -226,7 +226,7 @@ func (h *ItemTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 				VALUES (?, ?, ?)
 			`, csID, id, now)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("Failed to associate with configuration set %d: %v", csID, err), http.StatusInternalServerError)
+				respondInternalError(w, r, fmt.Errorf("failed to associate with configuration set %d: %v", csID, err))
 				return
 			}
 		}
@@ -245,7 +245,7 @@ func (h *ItemTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 		&it.Icon, &it.Color, &it.HierarchyLevel, &it.SortOrder, &it.CreatedAt, &it.UpdatedAt)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -259,7 +259,7 @@ func (h *ItemTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	configSetRows, err := h.db.Query(configSetQuery, it.ID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer configSetRows.Close()
@@ -270,7 +270,7 @@ func (h *ItemTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 		var configSetID int
 		var configSetName string
 		if err := configSetRows.Scan(&configSetID, &configSetName); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		configSetIDsResult = append(configSetIDsResult, configSetID)
@@ -322,23 +322,23 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		&oldIT.Icon, &oldIT.Color, &oldIT.HierarchyLevel, &oldIT.SortOrder, &oldIT.CreatedAt, &oldIT.UpdatedAt)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Item type not found", http.StatusNotFound)
+		respondNotFound(w, r, "item_type")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	var it models.ItemType
 	if err := json.NewDecoder(r.Body).Decode(&it); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(it.Name) == "" {
-		http.Error(w, "Item type name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Item type name is required")
 		return
 	}
 
@@ -351,9 +351,9 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
-			http.Error(w, "Item type with this name already exists", http.StatusConflict)
+			respondConflict(w, r, "Item type with this name already exists")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -365,7 +365,7 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 			var configSetExists bool
 			err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", csID).Scan(&configSetExists)
 			if err != nil || !configSetExists {
-				http.Error(w, fmt.Sprintf("Configuration set %d not found", csID), http.StatusBadRequest)
+				respondValidationError(w, r, fmt.Sprintf("Configuration set %d not found", csID))
 				return
 			}
 		}
@@ -373,7 +373,7 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		// Delete existing associations
 		_, err = h.db.ExecWrite("DELETE FROM configuration_set_item_types WHERE item_type_id = ?", id)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to update configuration set associations: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to update configuration set associations: %v", err))
 			return
 		}
 
@@ -384,7 +384,7 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 				VALUES (?, ?, ?)
 			`, csID, id, now)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("Failed to associate with configuration set %d: %v", csID, err), http.StatusInternalServerError)
+				respondInternalError(w, r, fmt.Errorf("failed to associate with configuration set %d: %v", csID, err))
 				return
 			}
 		}
@@ -399,7 +399,7 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		&it.Icon, &it.Color, &it.HierarchyLevel, &it.SortOrder, &it.CreatedAt, &it.UpdatedAt)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -413,7 +413,7 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	configSetRows, err := h.db.Query(configSetQuery, it.ID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer configSetRows.Close()
@@ -424,7 +424,7 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		var configSetID int
 		var configSetName string
 		if err := configSetRows.Scan(&configSetID, &configSetName); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		configSetIDsResult = append(configSetIDsResult, configSetID)
@@ -508,17 +508,17 @@ func (h *ItemTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	`, id).Scan(&itemTypeName, &icon, &color)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Item type not found", http.StatusNotFound)
+		respondNotFound(w, r, "item_type")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	_, err = h.db.ExecWrite("DELETE FROM item_types WHERE id = ?", id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

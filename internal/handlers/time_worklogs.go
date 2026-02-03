@@ -183,7 +183,7 @@ func (h *TimeWorklogHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query, args...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -198,7 +198,7 @@ func (h *TimeWorklogHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			&worklog.EndTime, &worklog.DurationMins, &worklog.CreatedAt, &worklog.UpdatedAt, &worklog.CustomerName, &worklog.ProjectName, &itemTitle,
 			&workspaceID, &workspaceKey, &workspaceItemNumber, &projectSettings, &projectTotalHours)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		worklog.ItemTitle = itemTitle.String
@@ -267,11 +267,11 @@ func (h *TimeWorklogHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Worklog not found", http.StatusNotFound)
+		respondNotFound(w, r, "worklog")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -365,7 +365,7 @@ func (h *TimeWorklogHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req WorklogRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		slog.Debug("JSON decode error", slog.String("component", "time_tracking"), slog.Any("error", err))
-		http.Error(w, fmt.Sprintf("JSON decode error: %v", err), http.StatusBadRequest)
+		respondBadRequest(w, r, fmt.Sprintf("JSON decode error: %v", err))
 		return
 	}
 
@@ -374,7 +374,7 @@ func (h *TimeWorklogHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	customerID, date, startTime, endTime, durationMins, err := h.validateAndParseWorklog(req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, err.Error())
 		return
 	}
 
@@ -399,7 +399,7 @@ func (h *TimeWorklogHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		slog.Error("database insert error", slog.String("component", "time_tracking"), slog.Any("error", err))
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -442,7 +442,7 @@ func (h *TimeWorklogHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -458,7 +458,7 @@ func (h *TimeWorklogHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var req WorklogRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		slog.Debug("JSON decode error", slog.String("component", "time_tracking"), slog.Any("error", err))
-		http.Error(w, fmt.Sprintf("JSON decode error: %v", err), http.StatusBadRequest)
+		respondBadRequest(w, r, fmt.Sprintf("JSON decode error: %v", err))
 		return
 	}
 
@@ -466,7 +466,7 @@ func (h *TimeWorklogHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	customerID, date, startTime, endTime, durationMins, err := h.validateAndParseWorklog(req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, err.Error())
 		return
 	}
 
@@ -485,7 +485,7 @@ func (h *TimeWorklogHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		slog.Error("database update error", slog.String("component", "time_tracking"), slog.Any("error", err))
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -528,7 +528,7 @@ func (h *TimeWorklogHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -543,7 +543,7 @@ func (h *TimeWorklogHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	_, err := h.db.ExecWrite("DELETE FROM time_worklogs WHERE id = ?", id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -571,7 +571,7 @@ func (h *TimeWorklogHandler) GetByProject(w http.ResponseWriter, r *http.Request
 		ORDER BY w.date DESC, w.start_time DESC
 	`, projectID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -587,7 +587,7 @@ func (h *TimeWorklogHandler) GetByProject(w http.ResponseWriter, r *http.Request
 			&worklog.CreatedAt, &worklog.UpdatedAt, &worklog.CustomerName, &worklog.ProjectName, &itemTitle,
 			&workspaceID, &workspaceKey, &workspaceItemNumber, &projectSettings, &projectTotalHours)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		worklog.ItemTitle = itemTitle.String
@@ -637,7 +637,7 @@ func (h *TimeWorklogHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 		ORDER BY w.date DESC, w.start_time DESC
 	`, itemID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -653,7 +653,7 @@ func (h *TimeWorklogHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 			&worklog.CreatedAt, &worklog.UpdatedAt, &worklog.CustomerName, &worklog.ProjectName, &itemTitle,
 			&workspaceID, &workspaceKey, &workspaceItemNumber, &projectSettings, &projectTotalHours)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		worklog.ItemTitle = itemTitle.String

@@ -20,6 +20,8 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
+	"windshift/internal/repository"
+	"windshift/internal/restapi"
 	"windshift/internal/scheduler"
 	"windshift/internal/services"
 	windshiftsmtp "windshift/internal/smtp"
@@ -35,6 +37,7 @@ type ChannelHandler struct {
 	encryption        email.Encryptor
 	baseURL           string
 	smtpSender        *windshiftsmtp.NotificationSMTPSender
+	service           *services.ChannelService
 }
 
 // NewChannelHandler creates a new channel handler
@@ -43,6 +46,7 @@ func NewChannelHandler(db database.Database, permissionService *services.Permiss
 		db:                db,
 		permissionService: permissionService,
 		webhookSender:     webhookSender,
+		service:           services.NewChannelService(db, permissionService),
 	}
 }
 
@@ -71,7 +75,7 @@ func (h *ChannelHandler) GetChannels(w http.ResponseWriter, r *http.Request) {
 	// Get current user
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -81,97 +85,19 @@ func (h *ChannelHandler) GetChannels(w http.ResponseWriter, r *http.Request) {
 	// Parse category_id filter from query params
 	categoryFilter := r.URL.Query().Get("category_id")
 
-	var query string
-	var args []interface{}
-
-	// Check if user is a system admin
-	isSystemAdmin, err := h.permissionService.IsSystemAdmin(user.ID)
-	if err == nil && isSystemAdmin {
-		// System admins see all channels
-		query = `
-			SELECT c.id, c.name, c.type, c.direction, c.description, c.status, c.is_default, c.config,
-				   c.plugin_name, c.plugin_webhook_id, c.category_id, c.created_at, c.updated_at, c.last_activity,
-				   cc.name, cc.color
-			FROM channels c
-			LEFT JOIN channel_categories cc ON c.category_id = cc.id
-		`
-
-		// Add category filter if specified
-		if categoryFilter != "" {
-			if categoryFilter == "null" {
-				query += " WHERE c.category_id IS NULL"
-			} else {
-				query += " WHERE c.category_id = ?"
-				args = append(args, categoryFilter)
-			}
+	var filters services.ChannelListFilters
+	if categoryFilter != "" {
+		if categoryFilter == "null" {
+			val := -1
+			filters.CategoryID = &val
+		} else if catID, err := strconv.Atoi(categoryFilter); err == nil {
+			filters.CategoryID = &catID
 		}
-
-		query += " ORDER BY c.is_default DESC, c.created_at ASC"
-	} else {
-		// Non-admins only see channels they manage
-		query = `
-			SELECT DISTINCT c.id, c.name, c.type, c.direction, c.description, c.status,
-				   c.is_default, c.config, c.plugin_name, c.plugin_webhook_id, c.category_id,
-				   c.created_at, c.updated_at, c.last_activity,
-				   cc.name, cc.color
-			FROM channels c
-			LEFT JOIN channel_categories cc ON c.category_id = cc.id
-			INNER JOIN channel_managers cm ON c.id = cm.channel_id
-			WHERE ((cm.manager_type = 'user' AND cm.manager_id = ?)
-			   OR (cm.manager_type = 'group' AND cm.manager_id IN (
-				   SELECT group_id FROM group_members WHERE user_id = ?
-			   )))
-		`
-		args = []interface{}{user.ID, user.ID}
-
-		// Add category filter if specified
-		if categoryFilter != "" {
-			if categoryFilter == "null" {
-				query += " AND c.category_id IS NULL"
-			} else {
-				query += " AND c.category_id = ?"
-				args = append(args, categoryFilter)
-			}
-		}
-
-		query += " ORDER BY c.is_default DESC, c.created_at ASC"
 	}
 
-	rows, err := h.db.QueryContext(ctx, query, args...)
+	channels, err := h.service.List(ctx, user.ID, filters)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get channels: %v", err), http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
-	var channels []models.Channel
-	for rows.Next() {
-		var channel models.Channel
-		var categoryName, categoryColor sql.NullString
-		err := rows.Scan(
-			&channel.ID, &channel.Name, &channel.Type, &channel.Direction,
-			&channel.Description, &channel.Status, &channel.IsDefault, &channel.Config,
-			&channel.PluginName, &channel.PluginWebhookID, &channel.CategoryID,
-			&channel.CreatedAt, &channel.UpdatedAt, &channel.LastActivity,
-			&categoryName, &categoryColor,
-		)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to scan channel: %v", err), http.StatusInternalServerError)
-			return
-		}
-		if categoryName.Valid {
-			channel.CategoryName = categoryName.String
-		}
-		if categoryColor.Valid {
-			channel.CategoryColor = categoryColor.String
-		}
-		// Scrub sensitive data from config
-		channel.Config = scrubChannelConfig(channel.Config)
-		channels = append(channels, channel)
-	}
-
-	if err = rows.Err(); err != nil {
-		http.Error(w, fmt.Sprintf("Error reading channels: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -184,43 +110,39 @@ func (h *ChannelHandler) CreateChannel(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	var channel models.Channel
-	if err := json.NewDecoder(r.Body).Decode(&channel); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	var req struct {
+		Name        string `json:"name"`
+		Type        string `json:"type"`
+		Direction   string `json:"direction"`
+		Description string `json:"description"`
+		Status      string `json:"status"`
+		IsDefault   bool   `json:"is_default"`
+		Config      string `json:"config"`
+		CategoryID  *int   `json:"category_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
 
-	// Validate required fields
-	if channel.Name == "" || channel.Type == "" || channel.Direction == "" {
-		http.Error(w, "Name, type, and direction are required", http.StatusBadRequest)
-		return
-	}
-
-	// Set default status if not provided
-	if channel.Status == "" {
-		channel.Status = "disabled"
-	}
-
-	now := time.Now()
-	channel.CreatedAt = now
-	channel.UpdatedAt = now
-
-	var id int64
-	err := h.db.QueryRowContext(ctx, `
-		INSERT INTO channels (name, type, direction, description, status, is_default, config, category_id, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-		channel.Name, channel.Type, channel.Direction, channel.Description,
-		channel.Status, channel.IsDefault, channel.Config, channel.CategoryID, channel.CreatedAt, channel.UpdatedAt,
-	).Scan(&id)
+	channel, err := h.service.Create(ctx, services.ChannelCreateRequest{
+		Name:        req.Name,
+		Type:        req.Type,
+		Direction:   req.Direction,
+		Description: req.Description,
+		Status:      req.Status,
+		IsDefault:   req.IsDefault,
+		Config:      req.Config,
+		CategoryID:  req.CategoryID,
+	})
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create channel: %v", err), http.StatusInternalServerError)
+		if err.Error() == "name, type, and direction are required" {
+			respondValidationError(w, r, err.Error())
+			return
+		}
+		respondInternalError(w, r, err)
 		return
 	}
-
-	channel.ID = int(id)
-
-	// Scrub sensitive data from config before returning
-	channel.Config = scrubChannelConfig(channel.Config)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -231,87 +153,39 @@ func (h *ChannelHandler) CreateChannel(w http.ResponseWriter, r *http.Request) {
 func (h *ChannelHandler) GetChannel(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid channel ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "channel ID")
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	query := `
-		SELECT c.id, c.name, c.type, c.direction, c.description, c.status, c.is_default, c.config,
-			   c.plugin_name, c.plugin_webhook_id, c.category_id, c.created_at, c.updated_at, c.last_activity,
-			   cc.name, cc.color
-		FROM channels c
-		LEFT JOIN channel_categories cc ON c.category_id = cc.id
-		WHERE c.id = ?
-	`
-
-	var channel models.Channel
-	var categoryName, categoryColor sql.NullString
-	err = h.db.QueryRowContext(ctx, query, id).Scan(
-		&channel.ID, &channel.Name, &channel.Type, &channel.Direction,
-		&channel.Description, &channel.Status, &channel.IsDefault, &channel.Config,
-		&channel.PluginName, &channel.PluginWebhookID, &channel.CategoryID,
-		&channel.CreatedAt, &channel.UpdatedAt, &channel.LastActivity,
-		&categoryName, &categoryColor,
-	)
-	if categoryName.Valid {
-		channel.CategoryName = categoryName.String
-	}
-	if categoryColor.Valid {
-		channel.CategoryColor = categoryColor.String
-	}
-	if err == sql.ErrNoRows {
-		http.Error(w, "Channel not found", http.StatusNotFound)
-		return
-	} else if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get channel: %v", err), http.StatusInternalServerError)
+	channel, err := h.service.GetByID(ctx, id)
+	if err != nil {
+		if err == repository.ErrNotFound {
+			respondNotFound(w, r, "channel")
+			return
+		}
+		respondInternalError(w, r, err)
 		return
 	}
-
-	// Scrub sensitive data from config
-	channel.Config = scrubChannelConfig(channel.Config)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(channel)
 }
 
-// scrubChannelConfig removes sensitive fields from the configuration JSON
-func scrubChannelConfig(configJSON string) string {
-	if configJSON == "" {
-		return ""
-	}
-
-	var config map[string]interface{}
-	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
-		return configJSON // Return as is if invalid JSON
-	}
-
-	// Remove sensitive fields
-	delete(config, "smtp_password")
-	delete(config, "imap_password")
-	delete(config, "webhook_secret")
-
-	// Re-marshal
-	scrubbed, err := json.Marshal(config)
-	if err != nil {
-		return configJSON
-	}
-	return string(scrubbed)
-}
 
 // UpdateChannel updates an existing channel
 func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid channel ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "channel ID")
 		return
 	}
 
 	var updates models.Channel
 	if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
 
@@ -325,15 +199,15 @@ func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 	checkQuery := "SELECT EXISTS(SELECT 1 FROM channels WHERE id = ?), (SELECT plugin_name FROM channels WHERE id = ?), (SELECT config FROM channels WHERE id = ?)"
 	err = h.db.QueryRowContext(ctx, checkQuery, id, id, id).Scan(&exists, &pluginName, &existingConfig)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !exists {
-		http.Error(w, "Channel not found", http.StatusNotFound)
+		respondNotFound(w, r, "channel")
 		return
 	}
 	if pluginName != nil && *pluginName != "" {
-		http.Error(w, "Cannot modify plugin-managed channel", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -357,7 +231,7 @@ func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		updates.Status, updates.IsDefault, updates.Config, updates.CategoryID, updates.UpdatedAt, id,
 	)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to update channel: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -369,7 +243,7 @@ func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 func (h *ChannelHandler) DeleteChannel(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid channel ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "channel ID")
 		return
 	}
 
@@ -388,26 +262,29 @@ func (h *ChannelHandler) DeleteChannel(w http.ResponseWriter, r *http.Request) {
 	`
 	err = h.db.QueryRowContext(ctx, checkQuery, id, id, id).Scan(&exists, &isDefault, &pluginName)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !exists {
-		http.Error(w, "Channel not found", http.StatusNotFound)
+		respondNotFound(w, r, "channel")
 		return
 	}
 	if isDefault {
-		http.Error(w, "Cannot delete default channel", http.StatusBadRequest)
+		respondValidationError(w, r, "Cannot delete default channel")
 		return
 	}
 	if pluginName != nil && *pluginName != "" {
-		http.Error(w, "Cannot delete plugin-managed channel", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
-	query := "DELETE FROM channels WHERE id = ?"
-	_, err = h.db.ExecWriteContext(ctx, query, id)
+	err = h.service.Delete(ctx, id)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to delete channel: %v", err), http.StatusInternalServerError)
+		if err == repository.ErrNotFound {
+			respondNotFound(w, r, "channel")
+			return
+		}
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -418,7 +295,7 @@ func (h *ChannelHandler) DeleteChannel(w http.ResponseWriter, r *http.Request) {
 func (h *ChannelHandler) TestChannel(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid channel ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "channel ID")
 		return
 	}
 
@@ -427,12 +304,12 @@ func (h *ChannelHandler) TestChannel(w http.ResponseWriter, r *http.Request) {
 		TestEmail string `json:"test_email"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&testRequest); err != nil {
-		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
 
 	if testRequest.TestEmail == "" {
-		http.Error(w, "test_email is required", http.StatusBadRequest)
+		respondValidationError(w, r, "test_email is required")
 		return
 	}
 
@@ -455,10 +332,10 @@ func (h *ChannelHandler) TestChannel(w http.ResponseWriter, r *http.Request) {
 		&channel.CreatedAt, &channel.UpdatedAt, &channel.LastActivity,
 	)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Channel not found", http.StatusNotFound)
+		respondNotFound(w, r, "channel")
 		return
 	} else if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get channel: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -491,7 +368,7 @@ func (h *ChannelHandler) TestChannel(w http.ResponseWriter, r *http.Request) {
 func (h *ChannelHandler) TestChannelConfig(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid channel ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "channel ID")
 		return
 	}
 
@@ -499,7 +376,7 @@ func (h *ChannelHandler) TestChannelConfig(w http.ResponseWriter, r *http.Reques
 		Config models.ChannelConfig `json:"config"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&testData); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
 
@@ -511,10 +388,10 @@ func (h *ChannelHandler) TestChannelConfig(w http.ResponseWriter, r *http.Reques
 	query := "SELECT type FROM channels WHERE id = ?"
 	err = h.db.QueryRowContext(ctx, query, id).Scan(&channelType)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Channel not found", http.StatusNotFound)
+		respondNotFound(w, r, "channel")
 		return
 	} else if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get channel: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -690,13 +567,13 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 	// Get current user
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid channel ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "channel ID")
 		return
 	}
 
@@ -704,7 +581,7 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 		Config models.ChannelConfig `json:"config"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&configUpdate); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
 
@@ -719,16 +596,16 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 	checkQuery := "SELECT status, name, config, plugin_name FROM channels WHERE id = ?"
 	err = h.db.QueryRowContext(ctx, checkQuery, id).Scan(&oldStatus, &channelName, &existingConfigJSON, &pluginName)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Channel not found", http.StatusNotFound)
+		respondNotFound(w, r, "channel")
 		return
 	} else if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Prevent modification of plugin-managed channels
 	if pluginName != nil && *pluginName != "" {
-		http.Error(w, "Cannot modify plugin-managed channel configuration", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -748,13 +625,13 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 	// Unmarshal incoming config into map
 	incomingConfigBytes, err := json.Marshal(configUpdate.Config)
 	if err != nil {
-		http.Error(w, "Failed to serialize incoming config", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	var incomingConfig map[string]interface{}
 	if err := json.Unmarshal(incomingConfigBytes, &incomingConfig); err != nil {
-		http.Error(w, "Failed to parse incoming config", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -766,14 +643,14 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 	// Convert merged config back to JSON
 	configJSON, err := json.Marshal(mergedConfig)
 	if err != nil {
-		http.Error(w, "Failed to serialize merged config", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Unmarshal merged config into ChannelConfig struct for validation
 	var finalConfig models.ChannelConfig
 	if err := json.Unmarshal(configJSON, &finalConfig); err != nil {
-		http.Error(w, "Failed to parse merged config", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -799,7 +676,7 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 
 	_, err = h.db.ExecWriteContext(ctx, query, string(configJSON), newStatus, time.Now(), id)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to update channel config: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -845,7 +722,7 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 func (h *ChannelHandler) GetChannelManagers(w http.ResponseWriter, r *http.Request) {
 	channelID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid channel ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "channel ID")
 		return
 	}
 
@@ -853,15 +730,13 @@ func (h *ChannelHandler) GetChannelManagers(w http.ResponseWriter, r *http.Reque
 	defer cancel()
 
 	// Verify channel exists
-	var exists bool
-	checkQuery := "SELECT EXISTS(SELECT 1 FROM channels WHERE id = ?)"
-	err = h.db.QueryRowContext(ctx, checkQuery, channelID).Scan(&exists)
+	exists, err := h.service.Exists(ctx, channelID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !exists {
-		http.Error(w, "Channel not found", http.StatusNotFound)
+		respondNotFound(w, r, "channel")
 		return
 	}
 
@@ -890,7 +765,7 @@ func (h *ChannelHandler) GetChannelManagers(w http.ResponseWriter, r *http.Reque
 
 	rows, err := h.db.QueryContext(ctx, query, channelID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get managers: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -909,7 +784,7 @@ func (h *ChannelHandler) GetChannelManagers(w http.ResponseWriter, r *http.Reque
 			&managerName, &managerEmail, &addedByName,
 		)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to scan manager: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -931,7 +806,7 @@ func (h *ChannelHandler) GetChannelManagers(w http.ResponseWriter, r *http.Reque
 	}
 
 	if err = rows.Err(); err != nil {
-		http.Error(w, fmt.Sprintf("Error reading managers: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -944,29 +819,29 @@ func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Reques
 	// Get current user
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	channelID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid channel ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "channel ID")
 		return
 	}
 
 	var request models.ChannelManagerRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
 
 	// Validate request
 	if request.ManagerType != "user" && request.ManagerType != "group" {
-		http.Error(w, "manager_type must be 'user' or 'group'", http.StatusBadRequest)
+		respondValidationError(w, r, "manager_type must be 'user' or 'group'")
 		return
 	}
 	if len(request.ManagerIDs) == 0 {
-		http.Error(w, "manager_ids must contain at least one ID", http.StatusBadRequest)
+		respondValidationError(w, r, "manager_ids must contain at least one ID")
 		return
 	}
 
@@ -978,10 +853,10 @@ func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Reques
 	nameQuery := "SELECT name FROM channels WHERE id = ?"
 	err = h.db.QueryRowContext(ctx, nameQuery, channelID).Scan(&channelName)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Channel not found", http.StatusNotFound)
+		respondNotFound(w, r, "channel")
 		return
 	} else if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1002,10 +877,10 @@ func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Reques
 		if err != nil {
 			// Check if it's a foreign key violation (user/group doesn't exist)
 			if strings.Contains(err.Error(), "FOREIGN KEY") || strings.Contains(err.Error(), "foreign key") {
-				http.Error(w, fmt.Sprintf("Invalid %s ID: %d does not exist", request.ManagerType, managerID), http.StatusBadRequest)
+				respondValidationError(w, r, fmt.Sprintf("Invalid %s ID: %d does not exist", request.ManagerType, managerID))
 				return
 			}
-			http.Error(w, fmt.Sprintf("Failed to add manager: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -1055,19 +930,19 @@ func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Req
 	// Get current user
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	channelID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid channel ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "channel ID")
 		return
 	}
 
 	managerID, err := strconv.Atoi(r.PathValue("managerId"))
 	if err != nil {
-		http.Error(w, "Invalid manager ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "manager ID")
 		return
 	}
 
@@ -1079,10 +954,10 @@ func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Req
 	nameQuery := "SELECT name FROM channels WHERE id = ?"
 	err = h.db.QueryRowContext(ctx, nameQuery, channelID).Scan(&channelName)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Channel not found", http.StatusNotFound)
+		respondNotFound(w, r, "channel")
 		return
 	} else if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1092,10 +967,10 @@ func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Req
 	managerInfoQuery := "SELECT manager_type, manager_id FROM channel_managers WHERE id = ? AND channel_id = ?"
 	err = h.db.QueryRowContext(ctx, managerInfoQuery, managerID, channelID).Scan(&managerType, &actualManagerID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Manager not found", http.StatusNotFound)
+		respondNotFound(w, r, "manager")
 		return
 	} else if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get manager info: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1117,18 +992,18 @@ func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Req
 	deleteQuery := "DELETE FROM channel_managers WHERE id = ? AND channel_id = ?"
 	result, err := h.db.ExecWriteContext(ctx, deleteQuery, managerID, channelID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to remove manager: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to verify deletion: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if rowsAffected == 0 {
-		http.Error(w, "Manager not found", http.StatusNotFound)
+		respondNotFound(w, r, "manager")
 		return
 	}
 
@@ -1160,14 +1035,14 @@ func (h *ChannelHandler) ProcessEmailsNow(w http.ResponseWriter, r *http.Request
 	// Get current user
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	// Check if user is a system admin
 	isSystemAdmin, err := h.permissionService.IsSystemAdmin(user.ID)
 	if err != nil || !isSystemAdmin {
-		http.Error(w, "Admin access required", http.StatusForbidden)
+		respondAdminRequired(w, r)
 		return
 	}
 
@@ -1175,7 +1050,7 @@ func (h *ChannelHandler) ProcessEmailsNow(w http.ResponseWriter, r *http.Request
 	channelIDStr := r.PathValue("id")
 	channelID, err := strconv.Atoi(channelIDStr)
 	if err != nil {
-		http.Error(w, "Invalid channel ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "channel ID")
 		return
 	}
 
@@ -1188,29 +1063,33 @@ func (h *ChannelHandler) ProcessEmailsNow(w http.ResponseWriter, r *http.Request
 		SELECT type, direction FROM channels WHERE id = ?
 	`, channelID).Scan(&channelType, &direction)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Channel not found", http.StatusNotFound)
+		respondNotFound(w, r, "channel")
 		return
 	}
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to query channel: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if channelType != "email" || direction != "inbound" {
-		http.Error(w, "Channel is not an inbound email channel", http.StatusBadRequest)
+		respondValidationError(w, r, "Channel is not an inbound email channel")
 		return
 	}
 
 	// Check if email scheduler is available
 	if h.emailScheduler == nil {
-		http.Error(w, "Email scheduler not available", http.StatusServiceUnavailable)
+		respondError(w, r, &restapi.APIError{
+			StatusCode: http.StatusServiceUnavailable,
+			Code:       "SERVICE_UNAVAILABLE",
+			Message:    "Email scheduler not available",
+		})
 		return
 	}
 
 	// Trigger processing
 	err = h.emailScheduler.ProcessChannelNow(channelID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to process channel: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1246,7 +1125,7 @@ func (h *ChannelHandler) StartChannelEmailOAuth(w http.ResponseWriter, r *http.R
 	// Get user ID
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -1254,7 +1133,7 @@ func (h *ChannelHandler) StartChannelEmailOAuth(w http.ResponseWriter, r *http.R
 	channelIDStr := r.PathValue("id")
 	channelID, err := strconv.Atoi(channelIDStr)
 	if err != nil {
-		http.Error(w, "Invalid channel ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "channel ID")
 		return
 	}
 
@@ -1268,16 +1147,16 @@ func (h *ChannelHandler) StartChannelEmailOAuth(w http.ResponseWriter, r *http.R
 		SELECT config, type FROM channels WHERE id = ?
 	`, channelID).Scan(&configJSON, &channelType)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Channel not found", http.StatusNotFound)
+		respondNotFound(w, r, "channel")
 		return
 	}
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get channel: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if channelType != "email" {
-		http.Error(w, "Channel is not an email channel", http.StatusBadRequest)
+		respondValidationError(w, r, "Channel is not an email channel")
 		return
 	}
 
@@ -1285,22 +1164,22 @@ func (h *ChannelHandler) StartChannelEmailOAuth(w http.ResponseWriter, r *http.R
 	var config models.ChannelConfig
 	if configJSON != "" {
 		if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
-			http.Error(w, "Failed to parse channel config", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
 
 	// Validate inline OAuth credentials
 	if config.EmailOAuthProviderType == "" {
-		http.Error(w, "OAuth provider type not configured", http.StatusBadRequest)
+		respondValidationError(w, r, "OAuth provider type not configured")
 		return
 	}
 	if config.EmailOAuthClientID == "" {
-		http.Error(w, "OAuth client ID not configured", http.StatusBadRequest)
+		respondValidationError(w, r, "OAuth client ID not configured")
 		return
 	}
 	if config.EmailOAuthClientSecret == "" {
-		http.Error(w, "OAuth client secret not configured", http.StatusBadRequest)
+		respondValidationError(w, r, "OAuth client secret not configured")
 		return
 	}
 
@@ -1309,7 +1188,7 @@ func (h *ChannelHandler) StartChannelEmailOAuth(w http.ResponseWriter, r *http.R
 	if h.encryption != nil {
 		clientSecret, err = h.encryption.Decrypt(config.EmailOAuthClientSecret)
 		if err != nil {
-			http.Error(w, "Failed to decrypt client secret", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	} else {
@@ -1319,7 +1198,7 @@ func (h *ChannelHandler) StartChannelEmailOAuth(w http.ResponseWriter, r *http.R
 	// Generate state token
 	stateBytes := make([]byte, 32)
 	if _, err := rand.Read(stateBytes); err != nil {
-		http.Error(w, "Failed to generate state", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	state := hex.EncodeToString(stateBytes)
@@ -1332,7 +1211,7 @@ func (h *ChannelHandler) StartChannelEmailOAuth(w http.ResponseWriter, r *http.R
 		VALUES (0, ?, ?, ?, ?)
 	`, channelID, state, user.ID, expiresAt)
 	if err != nil {
-		http.Error(w, "Failed to store OAuth state", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1355,7 +1234,7 @@ func (h *ChannelHandler) StartChannelEmailOAuth(w http.ResponseWriter, r *http.R
 		p := email.NewGoogleProvider(config.EmailOAuthClientID, clientSecret, scopes)
 		authURL = p.GetOAuthURL(state, redirectURI)
 	default:
-		http.Error(w, "Unsupported OAuth provider type", http.StatusBadRequest)
+		respondValidationError(w, r, "Unsupported OAuth provider type")
 		return
 	}
 
@@ -1387,7 +1266,7 @@ func (h *ChannelHandler) ChannelEmailOAuthCallback(w http.ResponseWriter, r *htt
 	}
 
 	if code == "" || state == "" {
-		http.Error(w, "Missing code or state parameter", http.StatusBadRequest)
+		respondValidationError(w, r, "Missing code or state parameter")
 		return
 	}
 
@@ -1402,11 +1281,11 @@ func (h *ChannelHandler) ChannelEmailOAuthCallback(w http.ResponseWriter, r *htt
 		WHERE state = ? AND expires_at > CURRENT_TIMESTAMP
 	`, state).Scan(&providerID, &channelID, &userID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Invalid or expired state", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid or expired state")
 		return
 	}
 	if err != nil {
-		http.Error(w, "Failed to validate state", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

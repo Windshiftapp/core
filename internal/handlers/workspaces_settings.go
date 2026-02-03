@@ -74,19 +74,19 @@ func (h *WorkspaceHandler) GetHomepageLayout(w http.ResponseWriter, r *http.Requ
 	// Get user from context
 	user := r.Context().Value(middleware.ContextKeyUser)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	currentUser, ok := user.(*models.User)
 	if !ok {
-		http.Error(w, "Invalid user context", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("invalid user context"))
 		return
 	}
 
 	// Check if user has access to this workspace
 	hasAccess, permErr := h.permissionService.HasWorkspacePermission(currentUser.ID, workspaceID, models.PermissionItemView)
 	if permErr != nil || !hasAccess {
-		http.Error(w, "Unauthorized access to workspace", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -100,11 +100,11 @@ func (h *WorkspaceHandler) GetHomepageLayout(w http.ResponseWriter, r *http.Requ
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Workspace not found", http.StatusNotFound)
+			respondNotFound(w, r, "workspace")
 			return
 		}
 		slog.Error("failed to get homepage layout", slog.String("component", "workspaces"), slog.Int("workspace_id", workspaceID), slog.Any("error", err))
-		http.Error(w, "Failed to get homepage layout", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -113,7 +113,7 @@ func (h *WorkspaceHandler) GetHomepageLayout(w http.ResponseWriter, r *http.Requ
 	if homepageLayout.Valid && homepageLayout.String != "" {
 		if err := json.Unmarshal([]byte(homepageLayout.String), &layout); err != nil {
 			slog.Error("failed to parse homepage layout JSON", slog.String("component", "workspaces"), slog.Int("workspace_id", workspaceID), slog.Any("error", err))
-			http.Error(w, "Failed to parse homepage layout", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	} else {
@@ -137,26 +137,26 @@ func (h *WorkspaceHandler) UpdateHomepageLayout(w http.ResponseWriter, r *http.R
 	// Get user from context
 	user := r.Context().Value(middleware.ContextKeyUser)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	currentUser, ok := user.(*models.User)
 	if !ok {
-		http.Error(w, "Invalid user context", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("invalid user context"))
 		return
 	}
 
 	// Check if user has admin access to this workspace
 	hasAccess, permErr := h.permissionService.HasWorkspacePermission(currentUser.ID, workspaceID, models.PermissionWorkspaceAdmin)
 	if permErr != nil || !hasAccess {
-		http.Error(w, "Unauthorized: admin access required", http.StatusForbidden)
+		respondAdminRequired(w, r)
 		return
 	}
 
 	// Parse request body
 	var layout models.WorkspaceHomepageLayout
 	if err := json.NewDecoder(r.Body).Decode(&layout); err != nil {
-		http.Error(w, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -178,11 +178,11 @@ func (h *WorkspaceHandler) UpdateHomepageLayout(w http.ResponseWriter, r *http.R
 
 	for _, widget := range layout.Widgets {
 		if !validTypes[widget.Type] {
-			http.Error(w, fmt.Sprintf("Invalid widget type: %s", widget.Type), http.StatusBadRequest)
+			respondValidationError(w, r, fmt.Sprintf("Invalid widget type: %s", widget.Type))
 			return
 		}
 		if widget.Width < 1 || widget.Width > 3 {
-			http.Error(w, fmt.Sprintf("Invalid widget width: %d (must be 1-3)", widget.Width), http.StatusBadRequest)
+			respondValidationError(w, r, fmt.Sprintf("Invalid widget width: %d (must be 1-3)", widget.Width))
 			return
 		}
 	}
@@ -191,7 +191,7 @@ func (h *WorkspaceHandler) UpdateHomepageLayout(w http.ResponseWriter, r *http.R
 	layoutJSON, err := json.Marshal(layout)
 	if err != nil {
 		slog.Error("failed to marshal homepage layout", slog.String("component", "workspaces"), slog.Int("workspace_id", workspaceID), slog.Any("error", err))
-		http.Error(w, "Failed to encode homepage layout", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -204,7 +204,7 @@ func (h *WorkspaceHandler) UpdateHomepageLayout(w http.ResponseWriter, r *http.R
 
 	if err != nil {
 		slog.Error("failed to update homepage layout", slog.String("component", "workspaces"), slog.Int("workspace_id", workspaceID), slog.Any("error", err))
-		http.Error(w, "Failed to update homepage layout", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -222,23 +222,23 @@ func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
 	// Get user from context for permission check
 	user := r.Context().Value(middleware.ContextKeyUser)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	currentUser, ok := user.(*models.User)
 	if !ok {
-		http.Error(w, "Invalid user context", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("invalid user context"))
 		return
 	}
 
 	// Check if user has permission to view this workspace
 	canView, permErr := h.canViewWorkspace(currentUser.ID, workspaceID)
 	if permErr != nil {
-		http.Error(w, "Error checking permissions: "+permErr.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, permErr)
 		return
 	}
 	if !canView {
-		http.Error(w, "Insufficient permissions to view this workspace", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -253,7 +253,7 @@ func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
 	`, workspaceID).Scan(&workflowID)
 
 	if err != nil && err != sql.ErrNoRows {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -280,7 +280,7 @@ func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
 		ORDER BY s.id
 	`, *workflowID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -296,7 +296,7 @@ func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
 			&categoryName, &categoryColor, &isCompleted,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 

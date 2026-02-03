@@ -31,11 +31,11 @@ func NewTestSummaryHandlerWithPool(db database.Database, permissionService *serv
 func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.Request) {
 	runID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid run ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "run ID")
 		return
 	}
 
-	db, ok := h.requireReadDB(w)
+	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -51,7 +51,7 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 	`, runID).Scan(&runName, &startedAt, &endedAt, &setName)
 
 	if err != nil {
-		http.Error(w, "Run not found", http.StatusNotFound)
+		respondNotFound(w, r, "test_run")
 		return
 	}
 
@@ -65,7 +65,7 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 	`, runID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -218,19 +218,19 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspace ID")
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
 	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -242,7 +242,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 	if milestoneIDStr != "" {
 		mid, err := strconv.Atoi(milestoneIDStr)
 		if err != nil {
-			http.Error(w, "Invalid milestone_id", http.StatusBadRequest)
+			respondInvalidID(w, r, "milestone_id")
 			return
 		}
 		milestoneID = &mid
@@ -252,13 +252,13 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 	if daysStr != "" {
 		d, err := strconv.Atoi(daysStr)
 		if err != nil || d < 1 || d > 365 {
-			http.Error(w, "Invalid days parameter (must be 1-365)", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid days parameter (must be 1-365)")
 			return
 		}
 		days = d
 	}
 
-	db, ok := h.requireReadDB(w)
+	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -303,7 +303,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 		&totalRuns, &totalTests, &passed, &failed, &blocked, &skipped, &notRun,
 	)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -327,7 +327,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 
 	trendRows, err := db.Query(trendQuery, baseArgs...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer trendRows.Close()
@@ -378,7 +378,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 
 	failureRows, err := db.Query(failuresQuery, baseArgs...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer failureRows.Close()
@@ -424,7 +424,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 
 	blockedRows, err := db.Query(blockedQuery, baseArgs...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer blockedRows.Close()

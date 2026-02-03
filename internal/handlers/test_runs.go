@@ -7,29 +7,31 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
-	"windshift/internal/utils"
-
 )
 
 type TestRunHandler struct {
 	*BaseHandler
 	permissionService *services.PermissionService
+	service           *services.TestRunService
 }
 
 func NewTestRunHandlerWithPool(db database.Database, permissionService *services.PermissionService) *TestRunHandler {
 	return &TestRunHandler{
 		BaseHandler:       NewBaseHandler(db),
 		permissionService: permissionService,
+		service:           services.NewTestRunService(db),
 	}
 }
 
 func (h *TestRunHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
@@ -38,86 +40,27 @@ func (h *TestRunHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
 		return
 	}
 
-	// Support filtering by assignee_id
+	// Build filters from query params
+	filters := services.TestRunListFilters{
+		IncludeEnded: true, // By default show all runs
+	}
+
 	assigneeFilter := r.URL.Query().Get("assignee_id")
-
-	db, ok := h.requireReadDB(w)
-	if !ok {
-		return
+	if assigneeFilter == "unassigned" {
+		filters.Unassigned = true
+	} else if assigneeFilter != "" {
+		assigneeID, _ := strconv.Atoi(assigneeFilter)
+		filters.AssigneeID = &assigneeID
 	}
 
-	var rows *sql.Rows
-	if assigneeFilter != "" {
-		if assigneeFilter == "unassigned" {
-			rows, err = db.Query(`
-				SELECT tr.id, tr.workspace_id, tr.template_id, tr.set_id, tr.name, tr.assignee_id,
-				       tr.started_at, tr.ended_at, tr.created_at,
-				       COALESCE(u.first_name || ' ' || u.last_name, '') as assignee_name,
-				       COALESCE(u.email, '') as assignee_email,
-				       COALESCE(u.avatar_url, '') as assignee_avatar
-				FROM test_runs tr
-				LEFT JOIN users u ON tr.assignee_id = u.id
-				WHERE tr.workspace_id = ? AND tr.assignee_id IS NULL
-				ORDER BY tr.id DESC
-			`, workspaceID)
-		} else {
-			assigneeID, _ := strconv.Atoi(assigneeFilter)
-			rows, err = db.Query(`
-				SELECT tr.id, tr.workspace_id, tr.template_id, tr.set_id, tr.name, tr.assignee_id,
-				       tr.started_at, tr.ended_at, tr.created_at,
-				       COALESCE(u.first_name || ' ' || u.last_name, '') as assignee_name,
-				       COALESCE(u.email, '') as assignee_email,
-				       COALESCE(u.avatar_url, '') as assignee_avatar
-				FROM test_runs tr
-				LEFT JOIN users u ON tr.assignee_id = u.id
-				WHERE tr.workspace_id = ? AND tr.assignee_id = ?
-				ORDER BY tr.id DESC
-			`, workspaceID, assigneeID)
-		}
-	} else {
-		rows, err = db.Query(`
-			SELECT tr.id, tr.workspace_id, tr.template_id, tr.set_id, tr.name, tr.assignee_id,
-			       tr.started_at, tr.ended_at, tr.created_at,
-			       COALESCE(u.first_name || ' ' || u.last_name, '') as assignee_name,
-			       COALESCE(u.email, '') as assignee_email,
-			       COALESCE(u.avatar_url, '') as assignee_avatar
-			FROM test_runs tr
-			LEFT JOIN users u ON tr.assignee_id = u.id
-			WHERE tr.workspace_id = ?
-			ORDER BY tr.id DESC
-		`, workspaceID)
-	}
+	runs, err := h.service.List(workspaceID, filters)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
-	}
-	defer rows.Close()
-
-	// Initialize as empty array instead of nil so JSON encoding returns [] instead of null
-	runs := make([]models.TestRun, 0)
-	for rows.Next() {
-		var run models.TestRun
-		var templateID, assigneeID sql.NullInt64
-		var assigneeName, assigneeEmail, assigneeAvatar string
-		err := rows.Scan(&run.ID, &run.WorkspaceID, &templateID, &run.SetID, &run.Name, &assigneeID,
-			&run.StartedAt, &run.EndedAt, &run.CreatedAt,
-			&assigneeName, &assigneeEmail, &assigneeAvatar)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		run.TemplateID = utils.NullInt64ToInt(templateID, 0)
-		run.AssigneeID = utils.NullInt64ToPtr(assigneeID)
-		if run.AssigneeID != nil {
-			run.AssigneeName = assigneeName
-			run.AssigneeEmail = assigneeEmail
-			run.AssigneeAvatar = assigneeAvatar
-		}
-		runs = append(runs, run)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -127,13 +70,13 @@ func (h *TestRunHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 func (h *TestRunHandler) Get(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -142,45 +85,17 @@ func (h *TestRunHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
 		return
 	}
 
-	db, ok := h.requireReadDB(w)
-	if !ok {
-		return
-	}
-
-	var run models.TestRun
-	var templateID, assigneeID sql.NullInt64
-	var assigneeName, assigneeEmail, assigneeAvatar string
-	err = db.QueryRow(`
-		SELECT tr.id, tr.workspace_id, tr.template_id, tr.set_id, tr.name, tr.assignee_id,
-		       tr.started_at, tr.ended_at, tr.created_at,
-		       COALESCE(u.first_name || ' ' || u.last_name, '') as assignee_name,
-		       COALESCE(u.email, '') as assignee_email,
-		       COALESCE(u.avatar_url, '') as assignee_avatar
-		FROM test_runs tr
-		LEFT JOIN users u ON tr.assignee_id = u.id
-		WHERE tr.id = ? AND tr.workspace_id = ?
-	`, id, workspaceID).Scan(&run.ID, &run.WorkspaceID, &templateID, &run.SetID, &run.Name, &assigneeID,
-		&run.StartedAt, &run.EndedAt, &run.CreatedAt,
-		&assigneeName, &assigneeEmail, &assigneeAvatar)
-
-	run.TemplateID = utils.NullInt64ToInt(templateID, 0)
-	run.AssigneeID = utils.NullInt64ToPtr(assigneeID)
-	if run.AssigneeID != nil {
-		run.AssigneeName = assigneeName
-		run.AssigneeEmail = assigneeEmail
-		run.AssigneeAvatar = assigneeAvatar
-	}
-
-	if err == sql.ErrNoRows {
-		http.Error(w, "Test run not found", http.StatusNotFound)
-		return
-	}
+	run, err := h.service.GetByID(id, workspaceID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		if err == repository.ErrNotFound {
+			respondNotFound(w, r, "test_run")
+		} else {
+			respondInternalError(w, r, err)
+		}
 		return
 	}
 
@@ -191,7 +106,7 @@ func (h *TestRunHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *TestRunHandler) Create(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
@@ -200,105 +115,31 @@ func (h *TestRunHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
 		return
 	}
 
-	var run models.TestRun
-	if err := json.NewDecoder(r.Body).Decode(&run); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	var input struct {
+		Name       string `json:"name"`
+		TemplateID int    `json:"template_id"`
+		SetID      int    `json:"set_id"`
+		AssigneeID *int   `json:"assignee_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
 
-	db, ok := h.requireReadDB(w)
-	if !ok {
-		return
-	}
-
-	// Verify test set belongs to workspace
-	if run.SetID > 0 {
-		var count int
-		err = db.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", run.SetID, workspaceID).Scan(&count)
-		if err != nil || count == 0 {
-			http.Error(w, "Test set not found in workspace", http.StatusNotFound)
-			return
-		}
-	}
-
-	// Validate assignee belongs to workspace if provided
-	if run.AssigneeID != nil && *run.AssigneeID > 0 {
-		var count int
-		err = db.QueryRow(`
-			SELECT COUNT(*) FROM user_workspace_roles WHERE user_id = ? AND workspace_id = ?
-		`, *run.AssigneeID, workspaceID).Scan(&count)
-		if err != nil || count == 0 {
-			http.Error(w, "Assignee is not a member of this workspace", http.StatusBadRequest)
-			return
-		}
-	}
-
-	tx, err := h.db.Begin()
+	run, err := h.service.Create(workspaceID, services.TestRunCreateRequest{
+		Name:       input.Name,
+		TemplateID: input.TemplateID,
+		SetID:      input.SetID,
+		AssigneeID: input.AssigneeID,
+	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondValidationError(w, r, err.Error())
 		return
 	}
-	defer tx.Rollback()
-
-	now := time.Now()
-	var runID int64
-
-	// Support optional template_id
-	var templateIDPtr *int
-	if run.TemplateID > 0 {
-		templateIDPtr = &run.TemplateID
-	}
-
-	err = tx.QueryRow(`
-		INSERT INTO test_runs (workspace_id, template_id, set_id, name, assignee_id, started_at, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
-	`, workspaceID, templateIDPtr, run.SetID, run.Name, run.AssigneeID, now, now).Scan(&runID)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	rows, err := tx.Query(`
-		SELECT test_case_id FROM set_test_cases WHERE set_id = ?
-	`, run.SetID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var testCaseID int
-		if err := rows.Scan(&testCaseID); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		_, err = tx.Exec(`
-			INSERT INTO test_results (run_id, test_case_id, status, created_at, updated_at)
-			VALUES (?, ?, 'not_run', ?, ?)
-		`, runID, testCaseID, time.Now(), time.Now())
-
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	run.ID = int(runID)
-	run.WorkspaceID = workspaceID
-	run.StartedAt = time.Now()
-	run.CreatedAt = time.Now()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -308,13 +149,13 @@ func (h *TestRunHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *TestRunHandler) End(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -323,24 +164,16 @@ func (h *TestRunHandler) End(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
 		return
 	}
 
-	db, ok := h.requireWriteDB(w)
-	if !ok {
-		return
-	}
-
-	now := time.Now()
-	_, err = db.Exec(`
-		UPDATE test_runs
-		SET ended_at = ?
-		WHERE id = ? AND workspace_id = ?
-	`, now, id, workspaceID)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err := h.service.Complete(id, workspaceID); err != nil {
+		if err == repository.ErrNotFound {
+			respondNotFound(w, r, "test_run")
+		} else {
+			respondInternalError(w, r, err)
+		}
 		return
 	}
 
@@ -351,13 +184,13 @@ func (h *TestRunHandler) End(w http.ResponseWriter, r *http.Request) {
 func (h *TestRunHandler) Update(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -366,47 +199,29 @@ func (h *TestRunHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
 		return
 	}
 
-	var update struct {
+	var input struct {
 		Name       string `json:"name"`
 		AssigneeID *int   `json:"assignee_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
 
-	// Validate assignee belongs to workspace if provided
-	if update.AssigneeID != nil && *update.AssigneeID > 0 {
-		readDB, ok := h.requireReadDB(w)
-		if !ok {
-			return
-		}
-		var count int
-		err = readDB.QueryRow(`
-			SELECT COUNT(*) FROM user_workspace_roles WHERE user_id = ? AND workspace_id = ?
-		`, *update.AssigneeID, workspaceID).Scan(&count)
-		if err != nil || count == 0 {
-			http.Error(w, "Assignee is not a member of this workspace", http.StatusBadRequest)
-			return
-		}
-	}
-
-	writeDB, ok := h.requireWriteDB(w)
-	if !ok {
-		return
-	}
-	_, err = writeDB.Exec(`
-		UPDATE test_runs
-		SET name = COALESCE(NULLIF(?, ''), name), assignee_id = ?
-		WHERE id = ? AND workspace_id = ?
-	`, update.Name, update.AssigneeID, id, workspaceID)
-
+	_, err = h.service.Update(id, workspaceID, services.TestRunUpdateRequest{
+		Name:       input.Name,
+		AssigneeID: input.AssigneeID,
+	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		if err == repository.ErrNotFound {
+			respondNotFound(w, r, "test_run")
+		} else {
+			respondValidationError(w, r, err.Error())
+		}
 		return
 	}
 
@@ -417,13 +232,13 @@ func (h *TestRunHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *TestRunHandler) GetResults(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	runID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid run ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -432,20 +247,23 @@ func (h *TestRunHandler) GetResults(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
-		return
-	}
-
-	db, ok := h.requireReadDB(w)
-	if !ok {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
 		return
 	}
 
 	// Verify test run belongs to workspace
-	var count int
-	err = db.QueryRow("SELECT COUNT(*) FROM test_runs WHERE id = ? AND workspace_id = ?", runID, workspaceID).Scan(&count)
-	if err != nil || count == 0 {
-		http.Error(w, "Test run not found", http.StatusNotFound)
+	exists, err := h.service.Exists(runID, workspaceID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !exists {
+		respondNotFound(w, r, "test_run")
+		return
+	}
+
+	db, ok := h.requireReadDB(w, r)
+	if !ok {
 		return
 	}
 
@@ -460,7 +278,7 @@ func (h *TestRunHandler) GetResults(w http.ResponseWriter, r *http.Request) {
 	`, runID, workspaceID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -470,32 +288,30 @@ func (h *TestRunHandler) GetResults(w http.ResponseWriter, r *http.Request) {
 		TestCaseTitle string `json:"test_case_title"`
 	}
 
-	// Initialize as empty array instead of nil so JSON encoding returns [] instead of null
 	results := make([]ResultWithTestCase, 0)
 	for rows.Next() {
-		var r ResultWithTestCase
+		var res ResultWithTestCase
 		var actualResult, notes sql.NullString
 		var executedAt sql.NullTime
 
-		err := rows.Scan(&r.ID, &r.RunID, &r.TestCaseID, &r.Status, &actualResult, &notes, &executedAt,
-			&r.CreatedAt, &r.UpdatedAt, &r.TestCaseTitle)
+		err := rows.Scan(&res.ID, &res.RunID, &res.TestCaseID, &res.Status, &actualResult, &notes, &executedAt,
+			&res.CreatedAt, &res.UpdatedAt, &res.TestCaseTitle)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
-		// Handle NULL values
 		if actualResult.Valid {
-			r.ActualResult = actualResult.String
+			res.ActualResult = actualResult.String
 		}
 		if notes.Valid {
-			r.Notes = notes.String
+			res.Notes = notes.String
 		}
 		if executedAt.Valid {
-			r.ExecutedAt = &executedAt.Time
+			res.ExecutedAt = &executedAt.Time
 		}
 
-		results = append(results, r)
+		results = append(results, res)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -505,19 +321,19 @@ func (h *TestRunHandler) GetResults(w http.ResponseWriter, r *http.Request) {
 func (h *TestRunHandler) UpdateResult(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	runID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid run ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	resultID, err := strconv.Atoi(r.PathValue("resultId"))
 	if err != nil {
-		http.Error(w, "Invalid result ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "resultId")
 		return
 	}
 
@@ -526,46 +342,37 @@ func (h *TestRunHandler) UpdateResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
-		return
-	}
-
-	readDB, ok := h.requireReadDB(w)
-	if !ok {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
 		return
 	}
 
 	// Verify test run belongs to workspace
-	var count int
-	err = readDB.QueryRow("SELECT COUNT(*) FROM test_runs WHERE id = ? AND workspace_id = ?", runID, workspaceID).Scan(&count)
-	if err != nil || count == 0 {
-		http.Error(w, "Test run not found", http.StatusNotFound)
+	exists, err := h.service.Exists(runID, workspaceID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !exists {
+		respondNotFound(w, r, "test_run")
 		return
 	}
 
-	var update struct {
+	var input struct {
 		Status       string `json:"status"`
 		ActualResult string `json:"actual_result"`
 		Notes        string `json:"notes"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
 
-	writeDB, ok := h.requireWriteDB(w)
-	if !ok {
-		return
-	}
-	now := time.Now()
-	_, err = writeDB.Exec(`
-		UPDATE test_results
-		SET status = ?, actual_result = ?, notes = ?, executed_at = ?, updated_at = ?
-		WHERE id = ? AND run_id = ?
-	`, update.Status, update.ActualResult, update.Notes, now, now, resultID, runID)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err := h.service.UpdateResult(resultID, services.TestResultUpdateRequest{
+		Status:       input.Status,
+		ActualResult: input.ActualResult,
+		Notes:        input.Notes,
+	}); err != nil {
+		respondValidationError(w, r, err.Error())
 		return
 	}
 
@@ -575,13 +382,13 @@ func (h *TestRunHandler) UpdateResult(w http.ResponseWriter, r *http.Request) {
 func (h *TestRunHandler) GetBySet(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	setID, err := strconv.Atoi(r.PathValue("setId"))
 	if err != nil {
-		http.Error(w, "Invalid set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "setId")
 		return
 	}
 
@@ -590,62 +397,18 @@ func (h *TestRunHandler) GetBySet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
 		return
 	}
 
-	db, ok := h.requireReadDB(w)
-	if !ok {
-		return
-	}
-
-	// Verify test set belongs to workspace
-	var count int
-	err = db.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
-	if err != nil || count == 0 {
-		http.Error(w, "Test set not found", http.StatusNotFound)
-		return
-	}
-
-	rows, err := db.Query(`
-		SELECT tr.id, tr.workspace_id, tr.template_id, tr.set_id, tr.name, tr.assignee_id,
-		       tr.started_at, tr.ended_at, tr.created_at,
-		       COALESCE(u.first_name || ' ' || u.last_name, '') as assignee_name,
-		       COALESCE(u.email, '') as assignee_email,
-		       COALESCE(u.avatar_url, '') as assignee_avatar
-		FROM test_runs tr
-		LEFT JOIN users u ON tr.assignee_id = u.id
-		WHERE tr.set_id = ? AND tr.workspace_id = ?
-		ORDER BY tr.id DESC
-	`, setID, workspaceID)
-
+	// Use service to filter by set
+	runs, err := h.service.List(workspaceID, services.TestRunListFilters{
+		SetID:        &setID,
+		IncludeEnded: true,
+	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
-	}
-	defer rows.Close()
-
-	// Initialize as empty array instead of nil so JSON encoding returns [] instead of null
-	runs := make([]models.TestRun, 0)
-	for rows.Next() {
-		var run models.TestRun
-		var templateID, assigneeID sql.NullInt64
-		var assigneeName, assigneeEmail, assigneeAvatar string
-		err := rows.Scan(&run.ID, &run.WorkspaceID, &templateID, &run.SetID, &run.Name, &assigneeID,
-			&run.StartedAt, &run.EndedAt, &run.CreatedAt,
-			&assigneeName, &assigneeEmail, &assigneeAvatar)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		run.TemplateID = utils.NullInt64ToInt(templateID, 0)
-		run.AssigneeID = utils.NullInt64ToPtr(assigneeID)
-		if run.AssigneeID != nil {
-			run.AssigneeName = assigneeName
-			run.AssigneeEmail = assigneeEmail
-			run.AssigneeAvatar = assigneeAvatar
-		}
-		runs = append(runs, run)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -656,19 +419,19 @@ func (h *TestRunHandler) GetBySet(w http.ResponseWriter, r *http.Request) {
 func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	runID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid run ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	stepID, err := strconv.Atoi(r.PathValue("stepId"))
 	if err != nil {
-		http.Error(w, "Invalid step ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "stepId")
 		return
 	}
 
@@ -677,7 +440,7 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
 		return
 	}
 
@@ -688,11 +451,11 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 		ItemID       *int   `json:"item_id,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
 
-	readDB, ok := h.requireReadDB(w)
+	readDB, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -702,13 +465,12 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 		var count int
 		err = readDB.QueryRow("SELECT COUNT(*) FROM items WHERE id = ? AND workspace_id = ?", *update.ItemID, workspaceID).Scan(&count)
 		if err != nil || count == 0 {
-			http.Error(w, "Item not found in workspace", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 			return
 		}
 	}
 
-	// First, get the test result ID for this run and step
-	// Make sure we get the correct test case that actually owns this step
+	// Get the test result ID for this run and step
 	var testResultID int
 	err = readDB.QueryRow(`
 		SELECT tr.id
@@ -721,7 +483,7 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 	`, runID, stepID, workspaceID).Scan(&testResultID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -732,7 +494,7 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 		WHERE test_result_id = ? AND test_step_id = ?
 	`, testResultID, stepID).Scan(&existingID)
 
-	writeDB, ok := h.requireWriteDB(w)
+	writeDB, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
@@ -754,14 +516,13 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 	}
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Update the parent test case status based on step results
 	err = h.updateTestCaseStatus(testResultID)
 	if err != nil {
-		// Log error but don't fail the request
 		fmt.Printf("Warning: Failed to update test case status: %v\n", err)
 	}
 
@@ -773,13 +534,13 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 func (h *TestRunHandler) GetStepResults(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	runID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid run ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -788,20 +549,23 @@ func (h *TestRunHandler) GetStepResults(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
-		return
-	}
-
-	db, ok := h.requireReadDB(w)
-	if !ok {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
 		return
 	}
 
 	// Verify test run belongs to workspace
-	var count int
-	err = db.QueryRow("SELECT COUNT(*) FROM test_runs WHERE id = ? AND workspace_id = ?", runID, workspaceID).Scan(&count)
-	if err != nil || count == 0 {
-		http.Error(w, "Test run not found", http.StatusNotFound)
+	exists, err := h.service.Exists(runID, workspaceID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !exists {
+		respondNotFound(w, r, "test_run")
+		return
+	}
+
+	db, ok := h.requireReadDB(w, r)
+	if !ok {
 		return
 	}
 
@@ -816,7 +580,7 @@ func (h *TestRunHandler) GetStepResults(w http.ResponseWriter, r *http.Request) 
 	`, runID, workspaceID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -830,11 +594,10 @@ func (h *TestRunHandler) GetStepResults(w http.ResponseWriter, r *http.Request) 
 
 		err := rows.Scan(&stepID, &status, &actualResult, &notes, &itemID, &executedAt, &testCaseID, &testCaseTitle)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
-		// Use a composite key to avoid conflicts between test cases
 		compositeKey := fmt.Sprintf("%d_%d", testCaseID, stepID)
 		stepResults[compositeKey] = map[string]interface{}{
 			"step_id":       stepID,
@@ -936,13 +699,13 @@ func (h *TestRunHandler) updateTestCaseStatus(testResultID int) error {
 func (h *TestRunHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -951,17 +714,16 @@ func (h *TestRunHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
 		return
 	}
 
-	db, ok := h.requireWriteDB(w)
-	if !ok {
-		return
-	}
-	_, err = db.Exec("DELETE FROM test_runs WHERE id = ? AND workspace_id = ?", id, workspaceID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err := h.service.Delete(id, workspaceID); err != nil {
+		if err == repository.ErrNotFound {
+			respondNotFound(w, r, "test_run")
+		} else {
+			respondInternalError(w, r, err)
+		}
 		return
 	}
 
@@ -972,13 +734,13 @@ func (h *TestRunHandler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *TestRunHandler) LinkItemToTestResult(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	resultID, err := strconv.Atoi(r.PathValue("resultId"))
 	if err != nil {
-		http.Error(w, "Invalid result ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "resultId")
 		return
 	}
 
@@ -987,7 +749,7 @@ func (h *TestRunHandler) LinkItemToTestResult(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
 		return
 	}
 
@@ -995,11 +757,11 @@ func (h *TestRunHandler) LinkItemToTestResult(w http.ResponseWriter, r *http.Req
 		ItemID int `json:"item_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
 
-	readDB, ok := h.requireReadDB(w)
+	readDB, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -1008,7 +770,7 @@ func (h *TestRunHandler) LinkItemToTestResult(w http.ResponseWriter, r *http.Req
 	var count int
 	err = readDB.QueryRow("SELECT COUNT(*) FROM items WHERE id = ? AND workspace_id = ?", data.ItemID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
-		http.Error(w, "Item not found in workspace", http.StatusNotFound)
+		respondNotFound(w, r, "item")
 		return
 	}
 
@@ -1019,22 +781,22 @@ func (h *TestRunHandler) LinkItemToTestResult(w http.ResponseWriter, r *http.Req
 		WHERE tr.id = ? AND run.workspace_id = ?
 	`, resultID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
-		http.Error(w, "Test result not found", http.StatusNotFound)
+		respondNotFound(w, r, "test_result")
 		return
 	}
 
-	writeDB, ok := h.requireWriteDB(w)
+	writeDB, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
-	// Insert into test_result_items
+
 	_, err = writeDB.Exec(`
 		INSERT INTO test_result_items (test_result_id, item_id, created_at)
 		VALUES (?, ?, ?)
 	`, resultID, data.ItemID, time.Now())
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1046,19 +808,19 @@ func (h *TestRunHandler) LinkItemToTestResult(w http.ResponseWriter, r *http.Req
 func (h *TestRunHandler) UnlinkItemFromTestResult(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	resultID, err := strconv.Atoi(r.PathValue("resultId"))
 	if err != nil {
-		http.Error(w, "Invalid result ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "resultId")
 		return
 	}
 
 	itemID, err := strconv.Atoi(r.PathValue("itemId"))
 	if err != nil {
-		http.Error(w, "Invalid item ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "itemId")
 		return
 	}
 
@@ -1067,11 +829,11 @@ func (h *TestRunHandler) UnlinkItemFromTestResult(w http.ResponseWriter, r *http
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
 		return
 	}
 
-	readDB, ok := h.requireReadDB(w)
+	readDB, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -1084,21 +846,22 @@ func (h *TestRunHandler) UnlinkItemFromTestResult(w http.ResponseWriter, r *http
 		WHERE tr.id = ? AND run.workspace_id = ?
 	`, resultID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
-		http.Error(w, "Test result not found", http.StatusNotFound)
+		respondNotFound(w, r, "test_result")
 		return
 	}
 
-	writeDB, ok := h.requireWriteDB(w)
+	writeDB, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
+
 	_, err = writeDB.Exec(`
 		DELETE FROM test_result_items
 		WHERE test_result_id = ? AND item_id = ?
 	`, resultID, itemID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1109,13 +872,13 @@ func (h *TestRunHandler) UnlinkItemFromTestResult(w http.ResponseWriter, r *http
 func (h *TestRunHandler) GetTestResultItems(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	resultID, err := strconv.Atoi(r.PathValue("resultId"))
 	if err != nil {
-		http.Error(w, "Invalid result ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "resultId")
 		return
 	}
 
@@ -1124,11 +887,11 @@ func (h *TestRunHandler) GetTestResultItems(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
 		return
 	}
 
-	db, ok := h.requireReadDB(w)
+	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
@@ -1145,17 +908,17 @@ func (h *TestRunHandler) GetTestResultItems(w http.ResponseWriter, r *http.Reque
 
 	rows, err := db.Query(query, resultID, workspaceID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
 
-	var items []models.Item
+	items := make([]models.Item, 0)
 	for rows.Next() {
 		var item models.Item
 		err := rows.Scan(&item.ID, &item.WorkspaceItemNumber, &item.Title, &item.ItemTypeID, &item.StatusID, &item.CreatedAt)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		items = append(items, item)

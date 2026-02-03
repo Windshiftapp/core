@@ -40,7 +40,7 @@ func (h *ThemeHandler) GetThemes(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.DB.Query(query)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to query themes: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to query themes: %w", err))
 		return
 	}
 	defer rows.Close()
@@ -56,14 +56,14 @@ func (h *ThemeHandler) GetThemes(w http.ResponseWriter, r *http.Request) {
 			&theme.CreatedAt, &theme.UpdatedAt,
 		)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to scan theme: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to scan theme: %w", err))
 			return
 		}
 		themes = append(themes, theme)
 	}
 
 	if err = rows.Err(); err != nil {
-		http.Error(w, fmt.Sprintf("Error iterating themes: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("error iterating themes: %w", err))
 		return
 	}
 
@@ -99,7 +99,7 @@ func (h *ThemeHandler) GetActiveTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get active theme: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to get active theme: %w", err))
 		return
 	}
 
@@ -111,29 +111,29 @@ func (h *ThemeHandler) GetActiveTheme(w http.ResponseWriter, r *http.Request) {
 func (h *ThemeHandler) CreateTheme(w http.ResponseWriter, r *http.Request) {
 	var req models.ThemeCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if req.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 	if req.NavBackgroundColorLight == "" {
-		http.Error(w, "Navigation background color (light) is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Navigation background color (light) is required")
 		return
 	}
 	if req.NavTextColorLight == "" {
-		http.Error(w, "Navigation text color (light) is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Navigation text color (light) is required")
 		return
 	}
 	if req.NavBackgroundColorDark == "" {
-		http.Error(w, "Navigation background color (dark) is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Navigation background color (dark) is required")
 		return
 	}
 	if req.NavTextColorDark == "" {
-		http.Error(w, "Navigation text color (dark) is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Navigation text color (dark) is required")
 		return
 	}
 
@@ -146,7 +146,7 @@ func (h *ThemeHandler) CreateTheme(w http.ResponseWriter, r *http.Request) {
 	var themeID int64
 	err := h.DB.QueryRow(query, req.Name, req.Description, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark, now, now).Scan(&themeID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create theme: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to create theme: %w", err))
 		return
 	}
 
@@ -169,7 +169,7 @@ func (h *ThemeHandler) CreateTheme(w http.ResponseWriter, r *http.Request) {
 		&theme.CreatedAt, &theme.UpdatedAt,
 	)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get created theme: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to get created theme: %w", err))
 		return
 	}
 
@@ -182,35 +182,35 @@ func (h *ThemeHandler) CreateTheme(w http.ResponseWriter, r *http.Request) {
 func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 	themeID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid theme ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	var req models.ThemeUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if req.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 	if req.NavBackgroundColorLight == "" {
-		http.Error(w, "Navigation background color (light) is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Navigation background color (light) is required")
 		return
 	}
 	if req.NavTextColorLight == "" {
-		http.Error(w, "Navigation text color (light) is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Navigation text color (light) is required")
 		return
 	}
 	if req.NavBackgroundColorDark == "" {
-		http.Error(w, "Navigation background color (dark) is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Navigation background color (dark) is required")
 		return
 	}
 	if req.NavTextColorDark == "" {
-		http.Error(w, "Navigation text color (dark) is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Navigation text color (dark) is required")
 		return
 	}
 
@@ -218,7 +218,7 @@ func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 	if req.IsActive {
 		_, err = h.DB.Exec("UPDATE themes SET is_active = false WHERE id != ?", themeID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to deactivate other themes: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to deactivate other themes: %w", err))
 			return
 		}
 	}
@@ -233,7 +233,7 @@ func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	_, err = h.DB.Exec(query, req.Name, req.Description, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark, req.IsActive, now, themeID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to update theme: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to update theme: %w", err))
 		return
 	}
 
@@ -256,7 +256,7 @@ func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 		&theme.CreatedAt, &theme.UpdatedAt,
 	)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get updated theme: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to get updated theme: %w", err))
 		return
 	}
 
@@ -268,7 +268,7 @@ func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 func (h *ThemeHandler) DeleteTheme(w http.ResponseWriter, r *http.Request) {
 	themeID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid theme ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -276,22 +276,22 @@ func (h *ThemeHandler) DeleteTheme(w http.ResponseWriter, r *http.Request) {
 	var isDefault bool
 	err = h.DB.QueryRow("SELECT is_default FROM themes WHERE id = ?", themeID).Scan(&isDefault)
 	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
-			http.Error(w, "Theme not found", http.StatusNotFound)
+		if err == sql.ErrNoRows {
+			respondNotFound(w, r, "theme")
 			return
 		}
-		http.Error(w, fmt.Sprintf("Failed to check theme: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to check theme: %w", err))
 		return
 	}
 
 	if isDefault {
-		http.Error(w, "Cannot delete default theme", http.StatusBadRequest)
+		respondValidationError(w, r, "Cannot delete default theme")
 		return
 	}
 
 	_, err = h.DB.Exec("DELETE FROM themes WHERE id = ?", themeID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to delete theme: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to delete theme: %w", err))
 		return
 	}
 
@@ -302,7 +302,7 @@ func (h *ThemeHandler) DeleteTheme(w http.ResponseWriter, r *http.Request) {
 func (h *ThemeHandler) ActivateTheme(w http.ResponseWriter, r *http.Request) {
 	themeID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid theme ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -310,25 +310,25 @@ func (h *ThemeHandler) ActivateTheme(w http.ResponseWriter, r *http.Request) {
 	var exists bool
 	err = h.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM themes WHERE id = ?)", themeID).Scan(&exists)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to check theme: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to check theme: %w", err))
 		return
 	}
 
 	if !exists {
-		http.Error(w, "Theme not found", http.StatusNotFound)
+		respondNotFound(w, r, "theme")
 		return
 	}
 
 	// Deactivate all themes and activate the selected one
 	_, err = h.DB.Exec("UPDATE themes SET is_active = false")
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to deactivate themes: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to deactivate themes: %w", err))
 		return
 	}
 
 	_, err = h.DB.Exec("UPDATE themes SET is_active = true, updated_at = ? WHERE id = ?", time.Now(), themeID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to activate theme: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to activate theme: %w", err))
 		return
 	}
 

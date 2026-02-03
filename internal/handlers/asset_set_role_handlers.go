@@ -14,24 +14,24 @@ import (
 func (h *AssetHandler) GetSetRoles(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	setID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "set ID")
 		return
 	}
 
 	// Check admin permission
 	canAdmin, err := h.canAdminSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canAdmin {
-		http.Error(w, "Admin permission required", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -50,7 +50,7 @@ func (h *AssetHandler) GetSetRoles(w http.ResponseWriter, r *http.Request) {
 		ORDER BY uasr.granted_at DESC
 	`, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer userRoleRows.Close()
@@ -65,7 +65,7 @@ func (h *AssetHandler) GetSetRoles(w http.ResponseWriter, r *http.Request) {
 			&userName, &userEmail, &roleName, &grantedByName,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -91,7 +91,7 @@ func (h *AssetHandler) GetSetRoles(w http.ResponseWriter, r *http.Request) {
 		ORDER BY gasr.granted_at DESC
 	`, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer groupRoleRows.Close()
@@ -106,7 +106,7 @@ func (h *AssetHandler) GetSetRoles(w http.ResponseWriter, r *http.Request) {
 			&groupName, &roleName, &grantedByName,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -144,7 +144,7 @@ func (h *AssetHandler) GetSetRoles(w http.ResponseWriter, r *http.Request) {
 			GrantedByName: grantedByName.String,
 		}
 	} else if err != sql.ErrNoRows {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -169,30 +169,30 @@ type AssignRoleRequest struct {
 func (h *AssetHandler) AssignSetRole(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	setID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "set ID")
 		return
 	}
 
 	// Check admin permission
 	canAdmin, err := h.canAdminSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canAdmin {
-		http.Error(w, "Admin permission required", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	var req AssignRoleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -200,13 +200,13 @@ func (h *AssetHandler) AssignSetRole(w http.ResponseWriter, r *http.Request) {
 	var roleExists bool
 	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM asset_roles WHERE id = ?)", req.RoleID).Scan(&roleExists)
 	if err != nil || !roleExists {
-		http.Error(w, "Invalid role ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "role ID")
 		return
 	}
 
 	// Must specify either user_id or group_id
 	if req.UserID == nil && req.GroupID == nil {
-		http.Error(w, "Must specify user_id or group_id", http.StatusBadRequest)
+		respondValidationError(w, r, "Must specify user_id or group_id")
 		return
 	}
 
@@ -229,7 +229,7 @@ func (h *AssetHandler) AssignSetRole(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -241,30 +241,30 @@ func (h *AssetHandler) AssignSetRole(w http.ResponseWriter, r *http.Request) {
 func (h *AssetHandler) RevokeSetRole(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	setID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "set ID")
 		return
 	}
 
 	roleAssignmentID, err := strconv.Atoi(r.PathValue("assignmentId"))
 	if err != nil {
-		http.Error(w, "Invalid assignment ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "assignment ID")
 		return
 	}
 
 	// Check admin permission
 	canAdmin, err := h.canAdminSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canAdmin {
-		http.Error(w, "Admin permission required", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -279,13 +279,13 @@ func (h *AssetHandler) RevokeSetRole(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Role assignment not found", http.StatusNotFound)
+		respondNotFound(w, r, "Role assignment")
 		return
 	}
 

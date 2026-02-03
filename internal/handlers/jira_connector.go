@@ -44,13 +44,13 @@ func NewJiraImportHandler(db database.Database) *JiraImportHandler {
 func (h *JiraImportHandler) Connect(w http.ResponseWriter, r *http.Request) {
 	var req JiraConnectRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if req.InstanceURL == "" || req.Email == "" || req.APIToken == "" {
-		http.Error(w, "instance_url, email, and api_token are required", http.StatusBadRequest)
+		respondValidationError(w, r, "instance_url, email, and api_token are required")
 		return
 	}
 
@@ -68,21 +68,21 @@ func (h *JiraImportHandler) Connect(w http.ResponseWriter, r *http.Request) {
 		DeploymentType: deploymentType,
 	})
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create Jira client: %v", err), http.StatusBadRequest)
+		respondBadRequest(w, r, fmt.Sprintf("Failed to create Jira client: %v", err))
 		return
 	}
 
 	ctx := r.Context()
 	instanceInfo, err := client.TestConnection(ctx)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to connect to Jira: %v", err), http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	// Encrypt the API token
 	encryptedToken, err := h.encryption.Encrypt(req.APIToken)
 	if err != nil {
-		http.Error(w, "Failed to encrypt credentials", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to encrypt credentials: %w", err))
 		return
 	}
 
@@ -97,7 +97,7 @@ func (h *JiraImportHandler) Connect(w http.ResponseWriter, r *http.Request) {
 		VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`, connectionID, req.InstanceURL, req.Email, encryptedToken, instanceInfo.DisplayName, string(deploymentType), userID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to store connection: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to store connection: %w", err))
 		return
 	}
 
@@ -116,7 +116,7 @@ func (h *JiraImportHandler) GetConnections(w http.ResponseWriter, r *http.Reques
 		ORDER BY created_at DESC
 	`)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to list connections: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to list connections: %w", err))
 		return
 	}
 	defer rows.Close()
@@ -158,13 +158,13 @@ func (h *JiraImportHandler) DeleteConnection(w http.ResponseWriter, r *http.Requ
 		DELETE FROM jira_import_connections WHERE id = ?
 	`, connectionID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to delete connection: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to delete connection: %w", err))
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Connection not found", http.StatusNotFound)
+		respondNotFound(w, r, "connection")
 		return
 	}
 

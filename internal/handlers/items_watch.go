@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 )
@@ -17,7 +18,7 @@ func (h *ItemHandler) AddWatch(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -26,21 +27,21 @@ func (h *ItemHandler) AddWatch(w http.ResponseWriter, r *http.Request) {
 	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 			return
 		}
-		http.Error(w, "Failed to fetch item: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check if user has permission to view this item
 	canView, permErr := h.canViewItem(user.ID, workspaceID)
 	if permErr != nil {
-		http.Error(w, "Permission check failed: "+permErr.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, permErr)
 		return
 	}
 	if !canView {
-		http.Error(w, "Insufficient permissions to watch this item", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -59,11 +60,11 @@ func (h *ItemHandler) AddWatch(w http.ResponseWriter, r *http.Request) {
 	if h.activityTracker != nil {
 		if err := h.activityTracker.AddWatch(user.ID, itemID, reqBody.Reason); err != nil {
 			slog.Error("error adding watch", slog.String("component", "items_watch"), slog.Int("user_id", user.ID), slog.Int("item_id", itemID), slog.Any("error", err))
-			http.Error(w, "Failed to add watch: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	} else {
-		http.Error(w, "Activity tracker not available", http.StatusInternalServerError)
+		respondInternalError(w, r, errors.New("activity tracker not available"))
 		return
 	}
 
@@ -84,7 +85,7 @@ func (h *ItemHandler) RemoveWatch(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -92,11 +93,11 @@ func (h *ItemHandler) RemoveWatch(w http.ResponseWriter, r *http.Request) {
 	if h.activityTracker != nil {
 		if err := h.activityTracker.RemoveWatch(user.ID, itemID); err != nil {
 			slog.Error("error removing watch", slog.String("component", "items_watch"), slog.Int("user_id", user.ID), slog.Int("item_id", itemID), slog.Any("error", err))
-			http.Error(w, "Failed to remove watch: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	} else {
-		http.Error(w, "Activity tracker not available", http.StatusInternalServerError)
+		respondInternalError(w, r, errors.New("activity tracker not available"))
 		return
 	}
 
@@ -117,7 +118,7 @@ func (h *ItemHandler) GetWatchStatus(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -128,11 +129,11 @@ func (h *ItemHandler) GetWatchStatus(w http.ResponseWriter, r *http.Request) {
 		isWatching, err = h.activityTracker.IsWatching(user.ID, itemID)
 		if err != nil {
 			slog.Error("error checking watch status", slog.String("component", "items_watch"), slog.Int("user_id", user.ID), slog.Int("item_id", itemID), slog.Any("error", err))
-			http.Error(w, "Failed to check watch status: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	} else {
-		http.Error(w, "Activity tracker not available", http.StatusInternalServerError)
+		respondInternalError(w, r, errors.New("activity tracker not available"))
 		return
 	}
 

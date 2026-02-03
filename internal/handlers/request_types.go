@@ -52,7 +52,7 @@ func NewRequestTypeHandler(db database.Database) *RequestTypeHandler {
 func (h *RequestTypeHandler) GetAllForChannel(w http.ResponseWriter, r *http.Request) {
 	channelID, err := strconv.Atoi(r.PathValue("channel_id"))
 	if err != nil {
-		http.Error(w, "Invalid channel ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "channel_id")
 		return
 	}
 
@@ -70,7 +70,7 @@ func (h *RequestTypeHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 
 	rows, err := h.db.Query(query, channelID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -85,7 +85,7 @@ func (h *RequestTypeHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 			&rt.CreatedAt, &rt.UpdatedAt,
 			&rt.ChannelName, &rt.ItemTypeName)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		rt.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
@@ -105,7 +105,7 @@ func (h *RequestTypeHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 func (h *RequestTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -128,11 +128,11 @@ func (h *RequestTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&rt.ChannelName, &rt.ItemTypeName)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Request type not found", http.StatusNotFound)
+		respondNotFound(w, r, "request_type")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -147,13 +147,13 @@ func (h *RequestTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	channelID, err := strconv.Atoi(r.PathValue("channel_id"))
 	if err != nil {
-		http.Error(w, "Invalid channel ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "channel_id")
 		return
 	}
 
 	var rt models.RequestType
 	if err := json.NewDecoder(r.Body).Decode(&rt); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -162,11 +162,11 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	if strings.TrimSpace(rt.Name) == "" {
-		http.Error(w, "Request type name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Request type name is required")
 		return
 	}
 	if rt.ItemTypeID == 0 {
-		http.Error(w, "Item type ID is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Item type ID is required")
 		return
 	}
 
@@ -174,7 +174,7 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var channelExists bool
 	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM channels WHERE id = ?)", rt.ChannelID).Scan(&channelExists)
 	if err != nil || !channelExists {
-		http.Error(w, "Channel not found", http.StatusBadRequest)
+		respondValidationError(w, r, "Channel not found")
 		return
 	}
 
@@ -182,7 +182,7 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var itemTypeExists bool
 	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM item_types WHERE id = ?)", rt.ItemTypeID).Scan(&itemTypeExists)
 	if err != nil || !itemTypeExists {
-		http.Error(w, "Item type not found", http.StatusBadRequest)
+		respondValidationError(w, r, "Item type not found")
 		return
 	}
 
@@ -210,9 +210,9 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
-			http.Error(w, "Request type with this name already exists for this channel", http.StatusConflict)
+			respondConflict(w, r, "Request type with this name already exists for this channel")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -238,7 +238,7 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	rt.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -273,7 +273,7 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -299,27 +299,27 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	oldRT.VisibilityOrgIDs = deserializeIntArray(oldVisibilityOrgIDs)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Request type not found", http.StatusNotFound)
+		respondNotFound(w, r, "request_type")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	var rt models.RequestType
 	if err := json.NewDecoder(r.Body).Decode(&rt); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(rt.Name) == "" {
-		http.Error(w, "Request type name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Request type name is required")
 		return
 	}
 	if rt.ItemTypeID == 0 {
-		http.Error(w, "Item type ID is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Item type ID is required")
 		return
 	}
 
@@ -327,7 +327,7 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var itemTypeExists bool
 	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM item_types WHERE id = ?)", rt.ItemTypeID).Scan(&itemTypeExists)
 	if err != nil || !itemTypeExists {
-		http.Error(w, "Item type not found", http.StatusBadRequest)
+		respondValidationError(w, r, "Item type not found")
 		return
 	}
 
@@ -342,9 +342,9 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
-			http.Error(w, "Request type with this name already exists for this channel", http.StatusConflict)
+			respondConflict(w, r, "Request type with this name already exists for this channel")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -370,7 +370,7 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	rt.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -427,7 +427,7 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *RequestTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -441,11 +441,11 @@ func (h *RequestTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	`, id).Scan(&requestTypeName, &channelID)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Request type not found", http.StatusNotFound)
+		respondNotFound(w, r, "request_type")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -483,14 +483,14 @@ func (h *RequestTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Delete related fields first (cascade)
 	_, err = h.db.ExecWrite("DELETE FROM request_type_fields WHERE request_type_id = ?", id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Delete the request type
 	_, err = h.db.ExecWrite("DELETE FROM request_types WHERE id = ?", id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -520,7 +520,7 @@ func (h *RequestTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *RequestTypeHandler) GetFields(w http.ResponseWriter, r *http.Request) {
 	requestTypeID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid request type ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -546,7 +546,7 @@ func (h *RequestTypeHandler) GetFields(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query, requestTypeID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -560,7 +560,7 @@ func (h *RequestTypeHandler) GetFields(w http.ResponseWriter, r *http.Request) {
 			&field.CreatedAt, &field.UpdatedAt,
 			&field.FieldName, &field.FieldLabel)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		fields = append(fields, field)
@@ -578,7 +578,7 @@ func (h *RequestTypeHandler) GetFields(w http.ResponseWriter, r *http.Request) {
 func (h *RequestTypeHandler) UpdateFields(w http.ResponseWriter, r *http.Request) {
 	requestTypeID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid request type ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -586,20 +586,20 @@ func (h *RequestTypeHandler) UpdateFields(w http.ResponseWriter, r *http.Request
 	var requestTypeExists bool
 	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM request_types WHERE id = ?)", requestTypeID).Scan(&requestTypeExists)
 	if err != nil || !requestTypeExists {
-		http.Error(w, "Request type not found", http.StatusNotFound)
+		respondNotFound(w, r, "request_type")
 		return
 	}
 
 	var fields []models.RequestTypeField
 	if err := json.NewDecoder(r.Body).Decode(&fields); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Delete existing fields
 	_, err = h.db.ExecWrite("DELETE FROM request_type_fields WHERE request_type_id = ?", requestTypeID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -622,7 +622,7 @@ func (h *RequestTypeHandler) UpdateFields(w http.ResponseWriter, r *http.Request
 			now, now)
 
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
@@ -654,7 +654,7 @@ func (h *RequestTypeHandler) UpdateFields(w http.ResponseWriter, r *http.Request
 func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.Request) {
 	requestTypeID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid request type ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -662,11 +662,11 @@ func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.R
 	var itemTypeID int
 	err = h.db.QueryRow("SELECT item_type_id FROM request_types WHERE id = ?", requestTypeID).Scan(&itemTypeID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Request type not found", http.StatusNotFound)
+		respondNotFound(w, r, "request_type")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -703,7 +703,7 @@ func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.R
 
 	rows, err := h.db.Query(customFieldsQuery, itemTypeID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -712,7 +712,7 @@ func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.R
 		var id int
 		var name, fieldType string
 		if err := rows.Scan(&id, &name, &fieldType); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		fields = append(fields, AvailableField{
@@ -731,7 +731,7 @@ func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.R
 func (h *RequestTypeHandler) UpdateVisibility(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -739,7 +739,7 @@ func (h *RequestTypeHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 	var exists bool
 	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM request_types WHERE id = ?)", id).Scan(&exists)
 	if err != nil || !exists {
-		http.Error(w, "Request type not found", http.StatusNotFound)
+		respondNotFound(w, r, "request_type")
 		return
 	}
 
@@ -749,7 +749,7 @@ func (h *RequestTypeHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 		OrgIDs   []int `json:"org_ids"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -762,7 +762,7 @@ func (h *RequestTypeHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 	`, serializeIntArray(req.GroupIDs), serializeIntArray(req.OrgIDs), now, id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -786,7 +786,7 @@ func (h *RequestTypeHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 		&rt.ChannelName, &rt.ItemTypeName)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

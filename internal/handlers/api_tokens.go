@@ -32,19 +32,19 @@ func (ath *ApiTokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) 
 	// Get user from context (set by auth middleware)
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok || user == nil {
-		http.Error(w, "User not found in context", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	var request models.ApiTokenCreate
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
 
 	// Validate required fields
 	if request.Name == "" {
-		http.Error(w, "Token name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Token name is required")
 		return
 	}
 
@@ -59,7 +59,7 @@ func (ath *ApiTokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) 
 		// Admin wants to create token for another user - verify admin status
 		isSystemAdmin, err := ath.permissionService.IsSystemAdmin(user.ID)
 		if err != nil || !isSystemAdmin {
-			http.Error(w, "Only system administrators can create tokens for other users", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 
@@ -67,11 +67,11 @@ func (ath *ApiTokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) 
 		var userExists bool
 		err = ath.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", *request.UserID).Scan(&userExists)
 		if err != nil {
-			http.Error(w, "Failed to verify target user: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !userExists {
-			http.Error(w, "Target user not found", http.StatusNotFound)
+			respondNotFound(w, r, "user")
 			return
 		}
 
@@ -81,7 +81,7 @@ func (ath *ApiTokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) 
 	// Create token
 	tokenResponse, err := ath.tokenManager.CreateToken(targetUserID, request)
 	if err != nil {
-		http.Error(w, "Failed to create token: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -94,13 +94,13 @@ func (ath *ApiTokenHandler) GetUserTokens(w http.ResponseWriter, r *http.Request
 	// Get user from context (set by auth middleware)
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok || user == nil {
-		http.Error(w, "User not found in context", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	tokens, err := ath.tokenManager.GetUserTokens(user.ID)
 	if err != nil {
-		http.Error(w, "Failed to get tokens: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -114,26 +114,26 @@ func (ath *ApiTokenHandler) GetToken(w http.ResponseWriter, r *http.Request) {
 
 	tokenID, err := strconv.Atoi(tokenIDStr)
 	if err != nil {
-		http.Error(w, "Invalid token ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "token ID")
 		return
 	}
 
 	// Get user from context (set by auth middleware)
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok || user == nil {
-		http.Error(w, "User not found in context", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	token, err := ath.tokenManager.GetTokenByID(tokenID)
 	if err != nil {
-		http.Error(w, "Token not found", http.StatusNotFound)
+		respondNotFound(w, r, "token")
 		return
 	}
 
 	// Verify token belongs to current user
 	if token.UserID != user.ID {
-		http.Error(w, "Access denied", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -147,24 +147,24 @@ func (ath *ApiTokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) 
 
 	tokenID, err := strconv.Atoi(tokenIDStr)
 	if err != nil {
-		http.Error(w, "Invalid token ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "token ID")
 		return
 	}
 
 	// Get user from context (set by auth middleware)
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok || user == nil {
-		http.Error(w, "User not found in context", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	err = ath.tokenManager.RevokeToken(tokenID, user.ID)
 	if err != nil {
 		if err.Error() == "token not found or not owned by user" {
-			http.Error(w, "Token not found", http.StatusNotFound)
+			respondNotFound(w, r, "token")
 			return
 		}
-		http.Error(w, "Failed to revoke token: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -179,7 +179,7 @@ func (ath *ApiTokenHandler) ValidateToken(w http.ResponseWriter, r *http.Request
 	// Get user and token info from context (set by auth middleware)
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok || user == nil {
-		http.Error(w, "Token validation failed", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -211,7 +211,7 @@ func (ath *ApiTokenHandler) CleanupExpiredTokens(w http.ResponseWriter, r *http.
 	// This should be protected by admin middleware
 	count, err := ath.tokenManager.CleanupExpiredTokens()
 	if err != nil {
-		http.Error(w, "Failed to cleanup expired tokens: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

@@ -17,7 +17,7 @@ func (h *ItemHandler) GetItemHistory(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user := h.getUserFromContext(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -26,21 +26,21 @@ func (h *ItemHandler) GetItemHistory(w http.ResponseWriter, r *http.Request) {
 	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", id).Scan(&workspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Item not found", http.StatusNotFound)
+			respondNotFound(w, r, "item")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check if user has permission to view items in this workspace
 	canView, permErr := h.canViewItem(user.ID, workspaceID)
 	if permErr != nil {
-		http.Error(w, "Permission check failed: "+permErr.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, permErr)
 		return
 	}
 	if !canView {
-		http.Error(w, "Insufficient permissions to view items in this workspace", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -58,24 +58,24 @@ func (h *ItemHandler) GetItemHistory(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
 
 	history := []models.ItemHistory{}
 	for rows.Next() {
-		var h models.ItemHistory
-		err := rows.Scan(&h.ID, &h.ItemID, &h.UserID, &h.ChangedAt, &h.FieldName, &h.OldValue, &h.NewValue, &h.UserName, &h.UserEmail)
+		var entry models.ItemHistory
+		err := rows.Scan(&entry.ID, &entry.ItemID, &entry.UserID, &entry.ChangedAt, &entry.FieldName, &entry.OldValue, &entry.NewValue, &entry.UserName, &entry.UserEmail)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
-		history = append(history, h)
+		history = append(history, entry)
 	}
 
 	if err = rows.Err(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

@@ -23,7 +23,7 @@ func (h *ScreenHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	
 	rows, err := h.db.Query(query)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -33,7 +33,7 @@ func (h *ScreenHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		var screen models.Screen
 		err := rows.Scan(&screen.ID, &screen.Name, &screen.Description, &screen.CreatedAt, &screen.UpdatedAt)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		screens = append(screens, screen)
@@ -59,18 +59,18 @@ func (h *ScreenHandler) Get(w http.ResponseWriter, r *http.Request) {
 	`, id).Scan(&screen.ID, &screen.Name, &screen.Description, &screen.CreatedAt, &screen.UpdatedAt)
 	
 	if err == sql.ErrNoRows {
-		http.Error(w, "Screen not found", http.StatusNotFound)
+		respondNotFound(w, r, "screen")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Load screen fields
 	fields, err := h.getScreenFields(id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	screen.Fields = fields
@@ -78,7 +78,7 @@ func (h *ScreenHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Load system fields
 	systemFields, err := h.getSystemFields(id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	screen.SystemFields = systemFields
@@ -89,13 +89,13 @@ func (h *ScreenHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *ScreenHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var screen models.Screen
 	if err := json.NewDecoder(r.Body).Decode(&screen); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(screen.Name) == "" {
-		http.Error(w, "Screen name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Screen name is required")
 		return
 	}
 
@@ -107,7 +107,7 @@ func (h *ScreenHandler) Create(w http.ResponseWriter, r *http.Request) {
 	`, screen.Name, screen.Description, now, now).Scan(&id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -117,7 +117,7 @@ func (h *ScreenHandler) Create(w http.ResponseWriter, r *http.Request) {
 		VALUES (?, 'system', 'title', 0, true, 'full')
 	`, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -126,7 +126,7 @@ func (h *ScreenHandler) Create(w http.ResponseWriter, r *http.Request) {
 		VALUES (?, 'system', 'status', 1, false, 'half')
 	`, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -135,9 +135,9 @@ func (h *ScreenHandler) Create(w http.ResponseWriter, r *http.Request) {
 		SELECT id, name, description, created_at, updated_at
 		FROM screens WHERE id = ?
 	`, id).Scan(&screen.ID, &screen.Name, &screen.Description, &screen.CreatedAt, &screen.UpdatedAt)
-	
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -152,19 +152,19 @@ func (h *ScreenHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	var screen models.Screen
 	if err := json.NewDecoder(r.Body).Decode(&screen); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	now := time.Now()
 	_, err := h.db.ExecWrite(`
-		UPDATE screens 
+		UPDATE screens
 		SET name = ?, description = ?, updated_at = ?
 		WHERE id = ?
 	`, screen.Name, screen.Description, now, id)
-	
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -173,9 +173,9 @@ func (h *ScreenHandler) Update(w http.ResponseWriter, r *http.Request) {
 		SELECT id, name, description, created_at, updated_at
 		FROM screens WHERE id = ?
 	`, id).Scan(&screen.ID, &screen.Name, &screen.Description, &screen.CreatedAt, &screen.UpdatedAt)
-	
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -190,13 +190,13 @@ func (h *ScreenHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	// Prevent deletion of default screen (ID 1)
 	if id == 1 {
-		http.Error(w, "Cannot delete default screen", http.StatusBadRequest)
+		respondValidationError(w, r, "Cannot delete default screen")
 		return
 	}
 
 	_, err := h.db.ExecWrite("DELETE FROM screens WHERE id = ?", id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -212,7 +212,7 @@ func (h *ScreenHandler) GetFields(w http.ResponseWriter, r *http.Request) {
 
 	fields, err := h.getScreenFields(screenID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -227,14 +227,14 @@ func (h *ScreenHandler) UpdateFields(w http.ResponseWriter, r *http.Request) {
 
 	var fields []models.ScreenField
 	if err := json.NewDecoder(r.Body).Decode(&fields); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Start transaction
 	tx, err := h.db.Begin()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
@@ -242,7 +242,7 @@ func (h *ScreenHandler) UpdateFields(w http.ResponseWriter, r *http.Request) {
 	// Delete existing screen fields
 	_, err = tx.Exec("DELETE FROM screen_fields WHERE screen_id = ?", screenID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -253,20 +253,20 @@ func (h *ScreenHandler) UpdateFields(w http.ResponseWriter, r *http.Request) {
 			VALUES (?, ?, ?, ?, ?, ?)
 		`, screenID, field.FieldType, field.FieldIdentifier, field.DisplayOrder, field.IsRequired, field.FieldWidth)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
 
 	if err = tx.Commit(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Return updated fields
 	updatedFields, err := h.getScreenFields(screenID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -281,14 +281,14 @@ func (h *ScreenHandler) UpdateSystemFields(w http.ResponseWriter, r *http.Reques
 
 	var systemFields []string
 	if err := json.NewDecoder(r.Body).Decode(&systemFields); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Start transaction
 	tx, err := h.db.Begin()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
@@ -296,7 +296,7 @@ func (h *ScreenHandler) UpdateSystemFields(w http.ResponseWriter, r *http.Reques
 	// Delete existing system fields
 	_, err = tx.Exec("DELETE FROM screen_system_fields WHERE screen_id = ?", screenID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -307,20 +307,20 @@ func (h *ScreenHandler) UpdateSystemFields(w http.ResponseWriter, r *http.Reques
 			VALUES (?, ?)
 		`, screenID, fieldName)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
 
 	if err = tx.Commit(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Return updated system fields
 	updatedSystemFields, err := h.getSystemFields(screenID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

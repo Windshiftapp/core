@@ -40,7 +40,7 @@ func (h *IterationHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Check workspace permission if workspace_id is specified
 	if workspaceIDStr != "" {
 		if wsID, err := strconv.Atoi(workspaceIDStr); err == nil {
-			if !RequireWorkspacePermission(w, user.ID, wsID, models.PermissionItemView, h.permissionService) {
+			if !RequireWorkspacePermission(w, r, user.ID, wsID, models.PermissionItemView, h.permissionService) {
 				return
 			}
 		}
@@ -48,7 +48,7 @@ func (h *IterationHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		// For global-only iterations, check global iteration permission
 		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
 		if err != nil || !hasGlobalPerm {
-			http.Error(w, "Forbidden", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	}
@@ -81,7 +81,7 @@ func (h *IterationHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Use service to list iterations
 	results, _, err := h.planningService.ListIterations(params)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -125,10 +125,10 @@ func (h *IterationHandler) Get(w http.ResponseWriter, r *http.Request) {
 	result, err := h.planningService.GetIteration(id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			http.Error(w, "Iteration not found", http.StatusNotFound)
+			respondNotFound(w, r, "iteration")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -136,11 +136,11 @@ func (h *IterationHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if result.IsGlobal {
 		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
 		if err != nil || !hasGlobalPerm {
-			http.Error(w, "Forbidden", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	} else if result.WorkspaceID != nil {
-		if !RequireWorkspacePermission(w, user.ID, *result.WorkspaceID, models.PermissionItemView, h.permissionService) {
+		if !RequireWorkspacePermission(w, r, user.ID, *result.WorkspaceID, models.PermissionItemView, h.permissionService) {
 			return
 		}
 	}
@@ -174,23 +174,23 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	var iteration models.Iteration
 	if err := json.NewDecoder(r.Body).Decode(&iteration); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(iteration.Name) == "" {
-		http.Error(w, "Iteration name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Iteration name is required")
 		return
 	}
 
 	if strings.TrimSpace(iteration.StartDate) == "" {
-		http.Error(w, "Start date is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Start date is required")
 		return
 	}
 
 	if strings.TrimSpace(iteration.EndDate) == "" {
-		http.Error(w, "End date is required", http.StatusBadRequest)
+		respondValidationError(w, r, "End date is required")
 		return
 	}
 
@@ -209,11 +209,11 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Validate global vs workspace constraints
 	if iteration.IsGlobal && iteration.WorkspaceID != nil {
-		http.Error(w, "Global iterations cannot have a workspace_id", http.StatusBadRequest)
+		respondValidationError(w, r, "Global iterations cannot have a workspace_id")
 		return
 	}
 	if !iteration.IsGlobal && iteration.WorkspaceID == nil {
-		http.Error(w, "Local iterations must have a workspace_id", http.StatusBadRequest)
+		respondValidationError(w, r, "Local iterations must have a workspace_id")
 		return
 	}
 
@@ -221,11 +221,11 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if iteration.IsGlobal {
 		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
 		if err != nil || !hasGlobalPerm {
-			http.Error(w, "Forbidden", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	} else {
-		if !RequireWorkspacePermission(w, user.ID, *iteration.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
+		if !RequireWorkspacePermission(w, r, user.ID, *iteration.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
 			return
 		}
 	}
@@ -234,11 +234,11 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if iteration.TypeID != nil {
 		exists, err := h.planningService.IterationTypeExists(*iteration.TypeID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !exists {
-			http.Error(w, "Invalid iteration type ID", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid iteration type ID")
 			return
 		}
 	}
@@ -247,11 +247,11 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if iteration.WorkspaceID != nil {
 		exists, err := h.planningService.WorkspaceExists(*iteration.WorkspaceID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !exists {
-			http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid workspace ID")
 			return
 		}
 	}
@@ -268,7 +268,7 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		WorkspaceID: iteration.WorkspaceID,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -306,23 +306,23 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	var iteration models.Iteration
 	if err := json.NewDecoder(r.Body).Decode(&iteration); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(iteration.Name) == "" {
-		http.Error(w, "Iteration name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Iteration name is required")
 		return
 	}
 
 	if strings.TrimSpace(iteration.StartDate) == "" {
-		http.Error(w, "Start date is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Start date is required")
 		return
 	}
 
 	if strings.TrimSpace(iteration.EndDate) == "" {
-		http.Error(w, "End date is required", http.StatusBadRequest)
+		respondValidationError(w, r, "End date is required")
 		return
 	}
 
@@ -336,17 +336,17 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !statusValid {
-		http.Error(w, "Invalid status", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid status")
 		return
 	}
 
 	// Validate global vs workspace constraints
 	if iteration.IsGlobal && iteration.WorkspaceID != nil {
-		http.Error(w, "Global iterations cannot have a workspace_id", http.StatusBadRequest)
+		respondValidationError(w, r, "Global iterations cannot have a workspace_id")
 		return
 	}
 	if !iteration.IsGlobal && iteration.WorkspaceID == nil {
-		http.Error(w, "Local iterations must have a workspace_id", http.StatusBadRequest)
+		respondValidationError(w, r, "Local iterations must have a workspace_id")
 		return
 	}
 
@@ -354,11 +354,11 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if iteration.IsGlobal {
 		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
 		if err != nil || !hasGlobalPerm {
-			http.Error(w, "Forbidden", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	} else {
-		if !RequireWorkspacePermission(w, user.ID, *iteration.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
+		if !RequireWorkspacePermission(w, r, user.ID, *iteration.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
 			return
 		}
 	}
@@ -367,11 +367,11 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if iteration.TypeID != nil {
 		exists, err := h.planningService.IterationTypeExists(*iteration.TypeID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !exists {
-			http.Error(w, "Invalid iteration type ID", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid iteration type ID")
 			return
 		}
 	}
@@ -380,11 +380,11 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if iteration.WorkspaceID != nil {
 		exists, err := h.planningService.WorkspaceExists(*iteration.WorkspaceID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !exists {
-			http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid workspace ID")
 			return
 		}
 	}
@@ -402,7 +402,7 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		WorkspaceID: iteration.WorkspaceID,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -442,10 +442,10 @@ func (h *IterationHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	isGlobal, wsID, err := h.planningService.IsIterationGlobal(id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			http.Error(w, "Iteration not found", http.StatusNotFound)
+			respondNotFound(w, r, "iteration")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -453,18 +453,18 @@ func (h *IterationHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if isGlobal {
 		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
 		if err != nil || !hasGlobalPerm {
-			http.Error(w, "Forbidden", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	} else if wsID != nil {
-		if !RequireWorkspacePermission(w, user.ID, *wsID, models.PermissionItemEdit, h.permissionService) {
+		if !RequireWorkspacePermission(w, r, user.ID, *wsID, models.PermissionItemEdit, h.permissionService) {
 			return
 		}
 	}
 
 	// Use service to delete iteration
 	if err := h.planningService.DeleteIteration(id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -487,10 +487,10 @@ func (h *IterationHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 	isGlobal, wsID, err := h.planningService.IsIterationGlobal(iterationID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			http.Error(w, "Iteration not found", http.StatusNotFound)
+			respondNotFound(w, r, "iteration")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -498,11 +498,11 @@ func (h *IterationHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 	if isGlobal {
 		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
 		if err != nil || !hasGlobalPerm {
-			http.Error(w, "Forbidden", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	} else if wsID != nil {
-		if !RequireWorkspacePermission(w, user.ID, *wsID, models.PermissionItemView, h.permissionService) {
+		if !RequireWorkspacePermission(w, r, user.ID, *wsID, models.PermissionItemView, h.permissionService) {
 			return
 		}
 	}
@@ -511,10 +511,10 @@ func (h *IterationHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 	report, err := h.planningService.GetIterationProgress(iterationID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			http.Error(w, "Iteration not found", http.StatusNotFound)
+			respondNotFound(w, r, "iteration")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

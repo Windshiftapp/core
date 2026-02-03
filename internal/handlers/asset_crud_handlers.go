@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -15,24 +16,24 @@ import (
 func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	setID, err := strconv.Atoi(r.PathValue("setId"))
 	if err != nil {
-		http.Error(w, "Invalid set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "setId")
 		return
 	}
 
 	// Check view permission
 	canView, err := h.canViewSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canView {
-		http.Error(w, "Access denied", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -97,14 +98,14 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 		// Build set mapping for CQL evaluation
 		setMap, err := h.buildSetMap()
 		if err != nil {
-			http.Error(w, "Failed to load set mapping: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to load set mapping: %w", err))
 			return
 		}
 
 		// Build workspace mapping for linkedOf() queries
 		workspaceMap, err := h.buildWorkspaceMap()
 		if err != nil {
-			http.Error(w, "Failed to load workspace mapping: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to load workspace mapping: %w", err))
 			return
 		}
 
@@ -112,7 +113,7 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 		evaluator := cql.NewAssetEvaluator(setMap, workspaceMap)
 		cqlSQL, cqlArgs, err := evaluator.EvaluateToSQL(cqlQuery)
 		if err != nil {
-			http.Error(w, "CQL query error: "+err.Error(), http.StatusBadRequest)
+			respondValidationError(w, r, "CQL query error: "+err.Error())
 			return
 		}
 
@@ -132,7 +133,7 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 		` + whereClause
 	var total int
 	if err := h.db.QueryRow(countQuery, args...).Scan(&total); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -163,7 +164,7 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query, queryArgs...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -186,7 +187,7 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 			&creatorName, &creatorEmail, &asset.LinkedItemCount,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -240,13 +241,13 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 func (h *AssetHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	assetID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid asset ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -254,22 +255,22 @@ func (h *AssetHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	var setID int
 	err = h.db.QueryRow("SELECT set_id FROM assets WHERE id = ?", assetID).Scan(&setID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Asset not found", http.StatusNotFound)
+		respondNotFound(w, r, "asset")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check view permission
 	canView, err := h.canViewSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canView {
-		http.Error(w, "Access denied", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -308,7 +309,7 @@ func (h *AssetHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -359,40 +360,40 @@ type CreateAssetRequest struct {
 func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	setID, err := strconv.Atoi(r.PathValue("setId"))
 	if err != nil {
-		http.Error(w, "Invalid set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "setId")
 		return
 	}
 
 	// Check edit permission
 	canEdit, err := h.canEditSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canEdit {
-		http.Error(w, "Edit permission required", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	var req CreateAssetRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if req.Title == "" {
-		http.Error(w, "Title is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Title is required")
 		return
 	}
 
 	if req.AssetTypeID == 0 {
-		http.Error(w, "Asset type is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Asset type is required")
 		return
 	}
 
@@ -400,15 +401,15 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 	var typeSetID int
 	err = h.db.QueryRow("SELECT set_id FROM asset_types WHERE id = ?", req.AssetTypeID).Scan(&typeSetID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Asset type not found", http.StatusBadRequest)
+		respondValidationError(w, r, "Asset type not found")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if typeSetID != setID {
-		http.Error(w, "Asset type does not belong to this set", http.StatusBadRequest)
+		respondValidationError(w, r, "Asset type does not belong to this set")
 		return
 	}
 
@@ -421,15 +422,15 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 		var catSetID int
 		err = h.db.QueryRow("SELECT set_id FROM asset_categories WHERE id = ?", *req.CategoryID).Scan(&catSetID)
 		if err == sql.ErrNoRows {
-			http.Error(w, "Category not found", http.StatusBadRequest)
+			respondValidationError(w, r, "Category not found")
 			return
 		}
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if catSetID != setID {
-			http.Error(w, "Category does not belong to this set", http.StatusBadRequest)
+			respondValidationError(w, r, "Category does not belong to this set")
 			return
 		}
 	}
@@ -441,15 +442,15 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 		var statusSetID int
 		err = h.db.QueryRow("SELECT set_id FROM asset_statuses WHERE id = ?", *req.StatusID).Scan(&statusSetID)
 		if err == sql.ErrNoRows {
-			http.Error(w, "Status not found", http.StatusBadRequest)
+			respondValidationError(w, r, "Status not found")
 			return
 		}
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if statusSetID != setID {
-			http.Error(w, "Status does not belong to this set", http.StatusBadRequest)
+			respondValidationError(w, r, "Status does not belong to this set")
 			return
 		}
 		statusID = req.StatusID
@@ -468,7 +469,7 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 	// Normalize user-type custom field values to store just the ID
 	if req.CustomFieldValues != nil {
 		if err := h.normalizeUserFieldValues(req.CustomFieldValues, req.AssetTypeID); err != nil {
-			http.Error(w, "Failed to process custom field values", http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to process custom field values: %w", err))
 			return
 		}
 	}
@@ -478,7 +479,7 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 	if req.CustomFieldValues != nil {
 		customFieldValuesBytes, err := json.Marshal(req.CustomFieldValues)
 		if err != nil {
-			http.Error(w, "Invalid custom field values", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid custom field values")
 			return
 		}
 		customFieldValuesJSON = string(customFieldValuesBytes)
@@ -491,7 +492,7 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 	`, setID, req.AssetTypeID, req.CategoryID, statusID, req.Title, req.Description, req.AssetTag, customFieldValuesJSON, currentUser.ID, now, now).Scan(&assetID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -531,13 +532,13 @@ type UpdateAssetRequest struct {
 func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	assetID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid asset ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -545,33 +546,33 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 	var setID int
 	err = h.db.QueryRow("SELECT set_id FROM assets WHERE id = ?", assetID).Scan(&setID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Asset not found", http.StatusNotFound)
+		respondNotFound(w, r, "asset")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check edit permission
 	canEdit, err := h.canEditSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canEdit {
-		http.Error(w, "Edit permission required", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	var req UpdateAssetRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if req.Title == "" {
-		http.Error(w, "Title is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Title is required")
 		return
 	}
 
@@ -584,15 +585,15 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 		var typeSetID int
 		err = h.db.QueryRow("SELECT set_id FROM asset_types WHERE id = ?", req.AssetTypeID).Scan(&typeSetID)
 		if err == sql.ErrNoRows {
-			http.Error(w, "Asset type not found", http.StatusBadRequest)
+			respondValidationError(w, r, "Asset type not found")
 			return
 		}
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if typeSetID != setID {
-			http.Error(w, "Asset type does not belong to this set", http.StatusBadRequest)
+			respondValidationError(w, r, "Asset type does not belong to this set")
 			return
 		}
 	}
@@ -602,15 +603,15 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 		var catSetID int
 		err = h.db.QueryRow("SELECT set_id FROM asset_categories WHERE id = ?", *req.CategoryID).Scan(&catSetID)
 		if err == sql.ErrNoRows {
-			http.Error(w, "Category not found", http.StatusBadRequest)
+			respondValidationError(w, r, "Category not found")
 			return
 		}
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if catSetID != setID {
-			http.Error(w, "Category does not belong to this set", http.StatusBadRequest)
+			respondValidationError(w, r, "Category does not belong to this set")
 			return
 		}
 	}
@@ -620,15 +621,15 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 		var statusSetID int
 		err = h.db.QueryRow("SELECT set_id FROM asset_statuses WHERE id = ?", *req.StatusID).Scan(&statusSetID)
 		if err == sql.ErrNoRows {
-			http.Error(w, "Status not found", http.StatusBadRequest)
+			respondValidationError(w, r, "Status not found")
 			return
 		}
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if statusSetID != setID {
-			http.Error(w, "Status does not belong to this set", http.StatusBadRequest)
+			respondValidationError(w, r, "Status does not belong to this set")
 			return
 		}
 	}
@@ -638,7 +639,7 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 	// Normalize user-type custom field values to store just the ID
 	if req.CustomFieldValues != nil {
 		if err := h.normalizeUserFieldValues(req.CustomFieldValues, req.AssetTypeID); err != nil {
-			http.Error(w, "Failed to process custom field values", http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to process custom field values: %w", err))
 			return
 		}
 	}
@@ -648,7 +649,7 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 	if req.CustomFieldValues != nil {
 		customFieldValuesBytes, err := json.Marshal(req.CustomFieldValues)
 		if err != nil {
-			http.Error(w, "Invalid custom field values", http.StatusBadRequest)
+			respondValidationError(w, r, "Invalid custom field values")
 			return
 		}
 		customFieldValuesJSON = string(customFieldValuesBytes)
@@ -662,13 +663,13 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 	`, req.AssetTypeID, req.CategoryID, req.StatusID, req.Title, req.Description, req.AssetTag, customFieldValuesJSON, now, assetID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Asset not found", http.StatusNotFound)
+		respondNotFound(w, r, "asset")
 		return
 	}
 
@@ -694,13 +695,13 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 func (h *AssetHandler) DeleteAsset(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	assetID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid asset ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -708,41 +709,41 @@ func (h *AssetHandler) DeleteAsset(w http.ResponseWriter, r *http.Request) {
 	var setID int
 	err = h.db.QueryRow("SELECT set_id FROM assets WHERE id = ?", assetID).Scan(&setID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Asset not found", http.StatusNotFound)
+		respondNotFound(w, r, "asset")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check edit permission (edit permission allows delete)
 	canEdit, err := h.canEditSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canEdit {
-		http.Error(w, "Edit permission required", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	// Delete related links first
 	_, err = h.db.ExecWrite("DELETE FROM item_links WHERE (source_type = 'asset' AND source_id = ?) OR (target_type = 'asset' AND target_id = ?)", assetID, assetID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	result, err := h.db.ExecWrite("DELETE FROM assets WHERE id = ?", assetID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Asset not found", http.StatusNotFound)
+		respondNotFound(w, r, "asset")
 		return
 	}
 

@@ -2,14 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
-
 )
 
 type ConfigurationSetNotificationHandler struct {
@@ -25,12 +23,12 @@ func (h *ConfigurationSetNotificationHandler) GetConfigurationSetNotifications(w
 	configSetIDStr := r.PathValue("config_set_id")
 	configSetID, err := strconv.Atoi(configSetIDStr)
 	if err != nil {
-		http.Error(w, "Invalid configuration set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "config_set_id")
 		return
 	}
 
 	query := `
-		SELECT 
+		SELECT
 			csns.id, csns.configuration_set_id, csns.notification_setting_id, csns.created_at,
 			cs.name as configuration_set_name,
 			ns.name as notification_setting_name, ns.description, ns.is_active
@@ -43,7 +41,7 @@ func (h *ConfigurationSetNotificationHandler) GetConfigurationSetNotifications(w
 
 	rows, err := h.db.GetDB().Query(query, configSetID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Database query error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -60,7 +58,7 @@ func (h *ConfigurationSetNotificationHandler) GetConfigurationSetNotifications(w
 			&a.ConfigurationSetName, &a.NotificationSettingName, &description, &isActive,
 		)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Error scanning row: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -81,7 +79,7 @@ func (h *ConfigurationSetNotificationHandler) AssignNotificationToConfigurationS
 	configSetIDStr := r.PathValue("config_set_id")
 	configSetID, err := strconv.Atoi(configSetIDStr)
 	if err != nil {
-		http.Error(w, "Invalid configuration set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "config_set_id")
 		return
 	}
 
@@ -89,12 +87,12 @@ func (h *ConfigurationSetNotificationHandler) AssignNotificationToConfigurationS
 		NotificationSettingID int `json:"notification_setting_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
 
 	if req.NotificationSettingID == 0 {
-		http.Error(w, "notification_setting_id is required", http.StatusBadRequest)
+		respondValidationError(w, r, "notification_setting_id is required")
 		return
 	}
 
@@ -102,7 +100,7 @@ func (h *ConfigurationSetNotificationHandler) AssignNotificationToConfigurationS
 	var csName string
 	err = h.db.GetDB().QueryRow("SELECT name FROM configuration_sets WHERE id = ?", configSetID).Scan(&csName)
 	if err != nil {
-		http.Error(w, "Configuration set not found", http.StatusNotFound)
+		respondNotFound(w, r, "Configuration set")
 		return
 	}
 
@@ -111,12 +109,12 @@ func (h *ConfigurationSetNotificationHandler) AssignNotificationToConfigurationS
 	var isActive bool
 	err = h.db.GetDB().QueryRow("SELECT name, is_active FROM notification_settings WHERE id = ?", req.NotificationSettingID).Scan(&nsName, &isActive)
 	if err != nil {
-		http.Error(w, "Notification setting not found", http.StatusNotFound)
+		respondNotFound(w, r, "Notification setting")
 		return
 	}
 
 	if !isActive {
-		http.Error(w, "Cannot assign inactive notification setting", http.StatusBadRequest)
+		respondBadRequest(w, r, "Cannot assign inactive notification setting")
 		return
 	}
 
@@ -129,9 +127,9 @@ func (h *ConfigurationSetNotificationHandler) AssignNotificationToConfigurationS
 	`, configSetID, req.NotificationSettingID).Scan(&id)
 	if err != nil {
 		if database.IsUniqueConstraintError(err) {
-			http.Error(w, "Notification setting is already assigned to this configuration set", http.StatusConflict)
+			respondConflict(w, r, "Notification setting is already assigned to this configuration set")
 		} else {
-			http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -158,34 +156,34 @@ func (h *ConfigurationSetNotificationHandler) UnassignNotificationFromConfigurat
 
 	configSetID, err := strconv.Atoi(configSetIDStr)
 	if err != nil {
-		http.Error(w, "Invalid configuration set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "config_set_id")
 		return
 	}
 
 	assignmentID, err := strconv.Atoi(assignmentIDStr)
 	if err != nil {
-		http.Error(w, "Invalid assignment ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "assignment_id")
 		return
 	}
 
 	// Delete the assignment
 	result, err := h.db.GetDB().Exec(`
-		DELETE FROM configuration_set_notification_settings 
+		DELETE FROM configuration_set_notification_settings
 		WHERE id = ? AND configuration_set_id = ?
 	`, assignmentID, configSetID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error checking result: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if rowsAffected == 0 {
-		http.Error(w, "Assignment not found", http.StatusNotFound)
+		respondNotFound(w, r, "Assignment")
 		return
 	}
 
@@ -197,7 +195,7 @@ func (h *ConfigurationSetNotificationHandler) GetAvailableNotificationSettings(w
 	configSetIDStr := r.PathValue("config_set_id")
 	configSetID, err := strconv.Atoi(configSetIDStr)
 	if err != nil {
-		http.Error(w, "Invalid configuration set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "config_set_id")
 		return
 	}
 
@@ -218,7 +216,7 @@ func (h *ConfigurationSetNotificationHandler) GetAvailableNotificationSettings(w
 
 	rows, err := h.db.GetDB().Query(query, configSetID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Database query error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -233,7 +231,7 @@ func (h *ConfigurationSetNotificationHandler) GetAvailableNotificationSettings(w
 			&s.CreatedByName,
 		)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Error scanning row: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 

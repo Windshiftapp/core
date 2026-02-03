@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -14,7 +15,7 @@ import (
 func (h *AssetHandler) GetAssetSets(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -51,7 +52,7 @@ func (h *AssetHandler) GetAssetSets(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query, args...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -68,7 +69,7 @@ func (h *AssetHandler) GetAssetSets(w http.ResponseWriter, r *http.Request) {
 			&creatorName, &set.AssetTypeCount, &set.AssetCount,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -93,24 +94,24 @@ func (h *AssetHandler) GetAssetSets(w http.ResponseWriter, r *http.Request) {
 func (h *AssetHandler) GetAssetSet(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	setID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	// Check permission
 	canView, err := h.canViewSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canView {
-		http.Error(w, "Access denied", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -133,11 +134,11 @@ func (h *AssetHandler) GetAssetSet(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Set not found", http.StatusNotFound)
+		respondNotFound(w, r, "set")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -161,36 +162,36 @@ type CreateAssetSetRequest struct {
 func (h *AssetHandler) CreateAssetSet(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	// Check if user has asset.manage permission or is system admin
 	hasPermission, err := h.permissionService.HasGlobalPermission(currentUser.ID, "system.admin")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !hasPermission {
 		hasPermission, err = h.permissionService.HasGlobalPermission(currentUser.ID, "asset.manage")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
 	if !hasPermission {
-		http.Error(w, "Permission denied. Requires asset.manage or system.admin permission.", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	var req CreateAssetSetRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if req.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 
@@ -200,7 +201,7 @@ func (h *AssetHandler) CreateAssetSet(w http.ResponseWriter, r *http.Request) {
 	if req.IsDefault {
 		_, err := h.db.ExecWrite("UPDATE asset_management_sets SET is_default = false WHERE is_default = true")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
@@ -212,7 +213,7 @@ func (h *AssetHandler) CreateAssetSet(w http.ResponseWriter, r *http.Request) {
 	`, req.Name, req.Description, req.IsDefault, currentUser.ID, now, now).Scan(&setID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -220,7 +221,7 @@ func (h *AssetHandler) CreateAssetSet(w http.ResponseWriter, r *http.Request) {
 	var adminRoleID int
 	err = h.db.QueryRow(`SELECT id FROM asset_roles WHERE name = 'Administrator'`).Scan(&adminRoleID)
 	if err != nil {
-		http.Error(w, "Failed to find Administrator role", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to find Administrator role: %w", err))
 		return
 	}
 	_, err = h.db.ExecWrite(`
@@ -229,13 +230,13 @@ func (h *AssetHandler) CreateAssetSet(w http.ResponseWriter, r *http.Request) {
 	`, setID, currentUser.ID, adminRoleID, currentUser.ID, now)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Create default statuses for the new set
 	if err := h.createDefaultStatuses(int(setID)); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -267,35 +268,35 @@ type UpdateAssetSetRequest struct {
 func (h *AssetHandler) UpdateAssetSet(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	setID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	// Check admin permission
 	canAdmin, err := h.canAdminSet(currentUser.ID, setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !canAdmin {
-		http.Error(w, "Admin permission required", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	var req UpdateAssetSetRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if req.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 
@@ -305,7 +306,7 @@ func (h *AssetHandler) UpdateAssetSet(w http.ResponseWriter, r *http.Request) {
 	if req.IsDefault {
 		_, err := h.db.ExecWrite("UPDATE asset_management_sets SET is_default = false WHERE is_default = true AND id != ?", setID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
@@ -317,13 +318,13 @@ func (h *AssetHandler) UpdateAssetSet(w http.ResponseWriter, r *http.Request) {
 	`, req.Name, req.Description, req.IsDefault, now, setID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Set not found", http.StatusNotFound)
+		respondNotFound(w, r, "set")
 		return
 	}
 
@@ -344,36 +345,36 @@ func (h *AssetHandler) UpdateAssetSet(w http.ResponseWriter, r *http.Request) {
 func (h *AssetHandler) DeleteAssetSet(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	setID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Invalid set ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	// Only system admins can delete sets
 	isAdmin, err := h.permissionService.HasGlobalPermission(currentUser.ID, "system.admin")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !isAdmin {
-		http.Error(w, "System admin permission required to delete sets", http.StatusForbidden)
+		respondAdminRequired(w, r)
 		return
 	}
 
 	result, err := h.db.ExecWrite("DELETE FROM asset_management_sets WHERE id = ?", setID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Set not found", http.StatusNotFound)
+		respondNotFound(w, r, "set")
 		return
 	}
 

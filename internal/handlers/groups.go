@@ -42,7 +42,7 @@ func (h *GroupHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -62,7 +62,7 @@ func (h *GroupHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			&createdByName, &group.MemberCount,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -113,11 +113,11 @@ func (h *GroupHandler) Get(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Group not found", http.StatusNotFound)
+		respondNotFound(w, r, "group")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -144,7 +144,7 @@ func (h *GroupHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	memberRows, err := h.db.Query(membersQuery, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer memberRows.Close()
@@ -162,7 +162,7 @@ func (h *GroupHandler) Get(w http.ResponseWriter, r *http.Request) {
 			&member.UserEmail, &member.UserName, &member.UserUsername, &addedByName,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -184,20 +184,20 @@ func (h *GroupHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *GroupHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req models.TeamGroupCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(req.Name) == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 
 	// Get current user ID from session/token
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	createdBy := &currentUser.ID
@@ -211,10 +211,10 @@ func (h *GroupHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
-			http.Error(w, "Group name already exists", http.StatusConflict)
+			respondConflict(w, r, "Group name already exists")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -270,29 +270,29 @@ func (h *GroupHandler) Update(w http.ResponseWriter, r *http.Request) {
 	`, id).Scan(&oldGroup.ID, &oldGroup.Name, &oldGroup.Description, &oldGroup.IsActive, &oldGroup.SCIMManaged)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Group not found", http.StatusNotFound)
+		respondNotFound(w, r, "group")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check if group is SCIM-managed
 	if oldGroup.SCIMManaged {
-		http.Error(w, "Cannot modify SCIM-managed group. Changes must be made in the identity provider.", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	var req models.TeamGroupUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if strings.TrimSpace(req.Name) == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 
@@ -305,10 +305,10 @@ func (h *GroupHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
-			http.Error(w, "Group name already exists", http.StatusConflict)
+			respondConflict(w, r, "Group name already exists")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -365,7 +365,7 @@ func (h *GroupHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Ensure authenticated user context exists (required for auditing)
 	auditUser := utils.GetCurrentUser(r)
 	if auditUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -379,28 +379,28 @@ func (h *GroupHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	`, id).Scan(&groupName, &description, &isSystemGroup, &isActive, &scimManaged)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Group not found", http.StatusNotFound)
+		respondNotFound(w, r, "group")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if isSystemGroup {
-		http.Error(w, "Cannot delete system groups", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	// Check if group is SCIM-managed
 	if scimManaged {
-		http.Error(w, "Cannot delete SCIM-managed group. Deletion must be done in the identity provider.", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	_, err = h.db.ExecWrite("DELETE FROM groups WHERE id = ?", id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -433,12 +433,12 @@ func (h *GroupHandler) AddMembers(w http.ResponseWriter, r *http.Request) {
 
 	var req models.TeamGroupMemberRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if len(req.UserIDs) == 0 {
-		http.Error(w, "At least one user ID is required", http.StatusBadRequest)
+		respondValidationError(w, r, "At least one user ID is required")
 		return
 	}
 
@@ -446,11 +446,11 @@ func (h *GroupHandler) AddMembers(w http.ResponseWriter, r *http.Request) {
 	var exists bool
 	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM groups WHERE id = ?)", groupID).Scan(&exists)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !exists {
-		http.Error(w, "Group not found", http.StatusNotFound)
+		respondNotFound(w, r, "group")
 		return
 	}
 
@@ -458,14 +458,14 @@ func (h *GroupHandler) AddMembers(w http.ResponseWriter, r *http.Request) {
 	var groupName string
 	err = h.db.QueryRow("SELECT name FROM groups WHERE id = ?", groupID).Scan(&groupName)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Get current user ID from session/token
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	addedBy := &currentUser.ID
@@ -479,11 +479,11 @@ func (h *GroupHandler) AddMembers(w http.ResponseWriter, r *http.Request) {
 		var userExists bool
 		err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", userID).Scan(&userExists)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !userExists {
-			http.Error(w, "User ID "+strconv.Itoa(userID)+" not found", http.StatusBadRequest)
+			respondValidationError(w, r, "User ID "+strconv.Itoa(userID)+" not found")
 			return
 		}
 
@@ -491,7 +491,7 @@ func (h *GroupHandler) AddMembers(w http.ResponseWriter, r *http.Request) {
 		var membershipExists bool
 		err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?)", groupID, userID).Scan(&membershipExists)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if membershipExists {
@@ -506,7 +506,7 @@ func (h *GroupHandler) AddMembers(w http.ResponseWriter, r *http.Request) {
 		`, groupID, userID, addedBy, now, now, now).Scan(&membershipID)
 
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -514,7 +514,7 @@ func (h *GroupHandler) AddMembers(w http.ResponseWriter, r *http.Request) {
 		var userEmail, userName, userUsername string
 		err = h.db.QueryRow("SELECT email, first_name || ' ' || last_name, username FROM users WHERE id = ?", userID).Scan(&userEmail, &userName, &userUsername)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -569,12 +569,12 @@ func (h *GroupHandler) RemoveMembers(w http.ResponseWriter, r *http.Request) {
 
 	var req models.TeamGroupMemberRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if len(req.UserIDs) == 0 {
-		http.Error(w, "At least one user ID is required", http.StatusBadRequest)
+		respondValidationError(w, r, "At least one user ID is required")
 		return
 	}
 
@@ -582,11 +582,11 @@ func (h *GroupHandler) RemoveMembers(w http.ResponseWriter, r *http.Request) {
 	var groupName string
 	err := h.db.QueryRow("SELECT name FROM groups WHERE id = ?", groupID).Scan(&groupName)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Group not found", http.StatusNotFound)
+		respondNotFound(w, r, "group")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -603,7 +603,7 @@ func (h *GroupHandler) RemoveMembers(w http.ResponseWriter, r *http.Request) {
 		// Remove membership
 		result, err := h.db.ExecWrite("DELETE FROM group_members WHERE group_id = ? AND user_id = ?", groupID, userID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -652,11 +652,11 @@ func (h *GroupHandler) GetUserMemberships(w http.ResponseWriter, r *http.Request
 	var userExists bool
 	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", userID).Scan(&userExists)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !userExists {
-		http.Error(w, "User not found", http.StatusNotFound)
+		respondNotFound(w, r, "user")
 		return
 	}
 
@@ -676,7 +676,7 @@ func (h *GroupHandler) GetUserMemberships(w http.ResponseWriter, r *http.Request
 
 	rows, err := h.db.Query(query, userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -697,7 +697,7 @@ func (h *GroupHandler) GetUserMemberships(w http.ResponseWriter, r *http.Request
 			&group.CreatedAt, &memberLdapSync, // Reusing CreatedAt field for member added_at
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 

@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -36,13 +37,13 @@ func (h *TestCoverageHandler) GetConfig(w http.ResponseWriter, r *http.Request) 
 		// Workspace-level configuration
 		workspaceIDStr := r.URL.Query().Get("workspace_id")
 		if workspaceIDStr == "" {
-			http.Error(w, "workspace_id query parameter required for default configuration", http.StatusBadRequest)
+			respondValidationError(w, r, "workspace_id query parameter required for default configuration")
 			return
 		}
 
 		workspaceID, err := strconv.Atoi(workspaceIDStr)
 		if err != nil {
-			http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+			respondInvalidID(w, r, "workspace_id")
 			return
 		}
 
@@ -72,7 +73,7 @@ func (h *TestCoverageHandler) GetConfig(w http.ResponseWriter, r *http.Request) 
 		// Collection-level configuration
 		collectionID, err := strconv.Atoi(id)
 		if err != nil {
-			http.Error(w, "Invalid collection ID", http.StatusBadRequest)
+			respondInvalidID(w, r, "collectionId")
 			return
 		}
 
@@ -101,11 +102,11 @@ func (h *TestCoverageHandler) GetConfig(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Test coverage configuration not found", http.StatusNotFound)
+		respondNotFound(w, r, "test_coverage_configuration")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -119,13 +120,13 @@ func (h *TestCoverageHandler) CreateConfig(w http.ResponseWriter, r *http.Reques
 
 	var req models.TestCoverageConfigRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	typeIDsBytes, err := json.Marshal(req.RequirementItemTypeIDs)
 	if err != nil {
-		http.Error(w, "Failed to marshal item type IDs", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("Failed to marshal item type IDs"))
 		return
 	}
 
@@ -136,13 +137,13 @@ func (h *TestCoverageHandler) CreateConfig(w http.ResponseWriter, r *http.Reques
 	if id == "default" {
 		workspaceIDStr := r.URL.Query().Get("workspace_id")
 		if workspaceIDStr == "" {
-			http.Error(w, "workspace_id query parameter required for default configuration", http.StatusBadRequest)
+			respondValidationError(w, r, "workspace_id query parameter required for default configuration")
 			return
 		}
 
 		wsID, parseErr := strconv.Atoi(workspaceIDStr)
 		if parseErr != nil {
-			http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+			respondInvalidID(w, r, "workspace_id")
 			return
 		}
 		workspaceID = &wsID
@@ -155,7 +156,7 @@ func (h *TestCoverageHandler) CreateConfig(w http.ResponseWriter, r *http.Reques
 	} else {
 		collID, parseErr := strconv.Atoi(id)
 		if parseErr != nil {
-			http.Error(w, "Invalid collection ID", http.StatusBadRequest)
+			respondInvalidID(w, r, "collectionId")
 			return
 		}
 		collectionID = &collID
@@ -168,7 +169,7 @@ func (h *TestCoverageHandler) CreateConfig(w http.ResponseWriter, r *http.Reques
 	}
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -190,19 +191,19 @@ func (h *TestCoverageHandler) CreateConfig(w http.ResponseWriter, r *http.Reques
 func (h *TestCoverageHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	configID, err := strconv.Atoi(r.PathValue("configId"))
 	if err != nil {
-		http.Error(w, "Invalid configuration ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "configId")
 		return
 	}
 
 	var req models.TestCoverageConfigRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	typeIDsBytes, err := json.Marshal(req.RequirementItemTypeIDs)
 	if err != nil {
-		http.Error(w, "Failed to marshal item type IDs", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("Failed to marshal item type IDs"))
 		return
 	}
 
@@ -213,7 +214,7 @@ func (h *TestCoverageHandler) UpdateConfig(w http.ResponseWriter, r *http.Reques
 		typeIDsBytes, time.Now(), configID,
 	)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -229,7 +230,7 @@ func (h *TestCoverageHandler) UpdateConfig(w http.ResponseWriter, r *http.Reques
 	).Scan(&config.ID, &collID, &wsID, &typeIDsJSON, &config.CreatedAt, &config.UpdatedAt)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -253,13 +254,13 @@ func (h *TestCoverageHandler) UpdateConfig(w http.ResponseWriter, r *http.Reques
 func (h *TestCoverageHandler) DeleteConfig(w http.ResponseWriter, r *http.Request) {
 	configID, err := strconv.Atoi(r.PathValue("configId"))
 	if err != nil {
-		http.Error(w, "Invalid configuration ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "configId")
 		return
 	}
 
 	_, err = h.db.ExecWrite(`DELETE FROM test_coverage_configurations WHERE id = ?`, configID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -279,7 +280,7 @@ func (h *TestCoverageHandler) GetSummary(w http.ResponseWriter, r *http.Request)
 			json.NewEncoder(w).Encode(models.TestCoverageSummary{})
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -322,7 +323,7 @@ func (h *TestCoverageHandler) GetSummary(w http.ResponseWriter, r *http.Request)
 	var total, covered int
 	err = h.db.QueryRow(query, args...).Scan(&total, &covered)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -376,7 +377,7 @@ func (h *TestCoverageHandler) GetRequirements(w http.ResponseWriter, r *http.Req
 			})
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -455,7 +456,7 @@ func (h *TestCoverageHandler) GetRequirements(w http.ResponseWriter, r *http.Req
 	var total int
 	err = h.db.QueryRow(countQuery, args...).Scan(&total)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -494,7 +495,7 @@ func (h *TestCoverageHandler) GetRequirements(w http.ResponseWriter, r *http.Req
 	dataArgs := append(args, limit, offset)
 	rows, err := h.db.Query(dataQuery, dataArgs...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -517,7 +518,7 @@ func (h *TestCoverageHandler) GetRequirements(w http.ResponseWriter, r *http.Req
 			&item.LinkedTestCount,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if statusID.Valid {

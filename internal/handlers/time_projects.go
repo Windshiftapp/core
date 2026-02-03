@@ -31,7 +31,7 @@ func (h *TimeProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		ORDER BY p.name ASC
 	`)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -45,7 +45,7 @@ func (h *TimeProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		err := rows.Scan(&p.ID, &p.CustomerID, &p.CategoryID, &p.Name, &p.Description, &status, &color,
 			&p.HourlyRate, &settingsStr, &p.CreatedAt, &p.UpdatedAt, &customerName, &categoryName, &categoryColor, &totalHours)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -89,11 +89,11 @@ func (h *TimeProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&p.HourlyRate, &settingsStr, &p.CreatedAt, &p.UpdatedAt, &totalHours)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Project not found", http.StatusNotFound)
+		respondNotFound(w, r, "project")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -114,7 +114,7 @@ func (h *TimeProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *TimeProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var p models.TimeProject
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
@@ -128,11 +128,11 @@ func (h *TimeProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 		var customerExists bool
 		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM customer_organisations WHERE id = ?)", *p.CustomerID).Scan(&customerExists)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !customerExists {
-			http.Error(w, "Customer not found", http.StatusBadRequest)
+			respondValidationError(w, r, "Customer not found")
 			return
 		}
 	}
@@ -142,11 +142,11 @@ func (h *TimeProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 		var categoryExists bool
 		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM time_project_categories WHERE id = ?)", *p.CategoryID).Scan(&categoryExists)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !categoryExists {
-			http.Error(w, "Category not found", http.StatusBadRequest)
+			respondValidationError(w, r, "Category not found")
 			return
 		}
 	}
@@ -168,13 +168,13 @@ func (h *TimeProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	`, p.CustomerID, p.CategoryID, p.Name, p.Description, p.Status, p.Color, p.HourlyRate, settingsJSON, now, now)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -193,7 +193,7 @@ func (h *TimeProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	var p models.TimeProject
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
@@ -202,11 +202,11 @@ func (h *TimeProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		var customerExists bool
 		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM customer_organisations WHERE id = ?)", *p.CustomerID).Scan(&customerExists)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !customerExists {
-			http.Error(w, "Customer not found", http.StatusBadRequest)
+			respondValidationError(w, r, "Customer not found")
 			return
 		}
 	}
@@ -216,11 +216,11 @@ func (h *TimeProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		var categoryExists bool
 		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM time_project_categories WHERE id = ?)", *p.CategoryID).Scan(&categoryExists)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		if !categoryExists {
-			http.Error(w, "Category not found", http.StatusBadRequest)
+			respondValidationError(w, r, "Category not found")
 			return
 		}
 	}
@@ -244,7 +244,7 @@ func (h *TimeProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	`, p.CustomerID, p.CategoryID, p.Name, p.Description, p.Status, p.Color, p.HourlyRate, settingsJSON, now, id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -262,7 +262,7 @@ func (h *TimeProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	_, err := h.db.Exec("DELETE FROM time_projects WHERE id = ?", id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -287,7 +287,7 @@ func (h *TimeProjectHandler) GetByCustomer(w http.ResponseWriter, r *http.Reques
 		ORDER BY p.name ASC
 	`, customerID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -301,7 +301,7 @@ func (h *TimeProjectHandler) GetByCustomer(w http.ResponseWriter, r *http.Reques
 		err := rows.Scan(&p.ID, &p.CustomerID, &p.CategoryID, &p.Name, &p.Description, &status, &color,
 			&p.HourlyRate, &settingsStr, &p.CreatedAt, &p.UpdatedAt, &customerName, &categoryName, &categoryColor, &totalHours)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -342,7 +342,7 @@ func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Reque
 		WHERE workspace_id = ?
 	`, workspaceID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -351,7 +351,7 @@ func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Reque
 		var categoryID int
 		if err := categoryRows.Scan(&categoryID); err != nil {
 			categoryRows.Close()
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		allowedCategories = append(allowedCategories, categoryID)
@@ -397,7 +397,7 @@ func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Reque
 
 	rows, err := h.db.Query(query, args...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -411,7 +411,7 @@ func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Reque
 		err := rows.Scan(&p.ID, &p.CustomerID, &p.CategoryID, &p.Name, &p.Description, &status, &color,
 			&p.HourlyRate, &settingsStr, &p.CreatedAt, &p.UpdatedAt, &customerName, &categoryName, &categoryColor, &totalHours)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 

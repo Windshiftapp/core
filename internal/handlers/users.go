@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"net/http"
 	"strings"
@@ -58,7 +59,7 @@ func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Authorization check
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -77,7 +78,7 @@ func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -92,7 +93,7 @@ func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		err := rows.Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName,
 			&user.IsActive, &avatarURL, &requiresPasswordReset, &timezone, &language, &user.CreatedAt, &user.UpdatedAt)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -129,7 +130,7 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Authorization check
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -140,7 +141,7 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	// Must have permission: own profile, system admin, or user.list permission
 	if !isOwnProfile && !isAdmin && !hasListPerm {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -156,17 +157,17 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&user.IsActive, &avatarURL, &requiresPasswordReset, &timezone, &language, &user.CreatedAt, &user.UpdatedAt)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "User not found", http.StatusNotFound)
+		respondNotFound(w, r, "user")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Non-admin users with user.list can only see active users (not their own profile)
 	if !isOwnProfile && !isAdmin && !user.IsActive {
-		http.Error(w, "User not found", http.StatusNotFound)
+		respondNotFound(w, r, "user")
 		return
 	}
 
@@ -200,13 +201,13 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Parse request
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate input using validator
 	if err := utils.Validate(req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, err.Error())
 		return
 	}
 
@@ -215,7 +216,7 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if req.Password != "" {
 		hashedBytes, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
-			http.Error(w, "Failed to hash password", http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to hash password: %w", err))
 			return
 		}
 		passwordHash = sql.NullString{String: string(hashedBytes), Valid: true}
@@ -231,17 +232,17 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed: users.email") {
-			http.Error(w, "Email already exists", http.StatusConflict)
+			respondConflict(w, r, "Email already exists")
 			return
 		}
 		if strings.Contains(err.Error(), "UNIQUE constraint failed: users.username") {
-			http.Error(w, "Username already exists", http.StatusConflict)
+			respondConflict(w, r, "Username already exists")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
-	
+
 	// Return the created user
 	var user models.User
 	var avatarURL sql.NullString
@@ -253,10 +254,10 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		&user.IsActive, &avatarURL, &requiresPasswordReset, &user.CreatedAt, &user.UpdatedAt)
 	
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
-	
+
 	user.AvatarURL = avatarURL.String
 
 	// Set full name for display
@@ -297,13 +298,13 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Parse request
 	var req UpdateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate input using validator
 	if err := utils.Validate(req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, err.Error())
 		return
 	}
 
@@ -328,17 +329,17 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		&oldUser.LastName, &oldUser.IsActive, &oldUser.AvatarURL, &oldUser.Timezone, &oldUser.Language,
 		&oldUser.SCIMManaged)
 	if err == sql.ErrNoRows {
-		http.Error(w, "User not found", http.StatusNotFound)
+		respondNotFound(w, r, "user")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check if user is SCIM-managed
 	if oldUser.SCIMManaged {
-		http.Error(w, "Cannot modify SCIM-managed user. Changes must be made in the identity provider.", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -369,14 +370,14 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 	
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed: users.email") {
-			http.Error(w, "Email already exists", http.StatusConflict)
+			respondConflict(w, r, "Email already exists")
 			return
 		}
 		if strings.Contains(err.Error(), "UNIQUE constraint failed: users.username") {
-			http.Error(w, "Username already exists", http.StatusConflict)
+			respondConflict(w, r, "Username already exists")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -395,7 +396,7 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 	user.IsActive = oldUser.IsActive
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -487,13 +488,13 @@ func (h *UserHandler) UpdateAvatar(w http.ResponseWriter, r *http.Request) {
 	// Authorization check: user can only update their own avatar, or be a system admin
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	if currentUser.ID != id {
 		isAdmin, err := h.permissionService.IsSystemAdmin(currentUser.ID)
 		if err != nil || !isAdmin {
-			http.Error(w, "Forbidden", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	}
@@ -502,7 +503,7 @@ func (h *UserHandler) UpdateAvatar(w http.ResponseWriter, r *http.Request) {
 		AvatarURL *string `json:"avatar_url"` // Use pointer to distinguish between null and empty string
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -515,7 +516,7 @@ func (h *UserHandler) UpdateAvatar(w http.ResponseWriter, r *http.Request) {
 	_, err := h.db.ExecWrite(`UPDATE users SET avatar_url = ?, updated_at = ? WHERE id = ?`,
 		avatarURL, time.Now(), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -525,12 +526,12 @@ func (h *UserHandler) UpdateAvatar(w http.ResponseWriter, r *http.Request) {
 		SELECT id, email, username, first_name, last_name, is_active, avatar_url, created_at, updated_at
 		FROM users WHERE id = ?
 	`, id).Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName, &user.IsActive, &user.AvatarURL, &user.CreatedAt, &user.UpdatedAt)
-	
+
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "User not found", http.StatusNotFound)
+			respondNotFound(w, r, "user")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -551,20 +552,20 @@ func (h *UserHandler) UpdateRegionalSettings(w http.ResponseWriter, r *http.Requ
 	// Authorization check: user can only update their own regional settings, or be a system admin
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	if currentUser.ID != id {
 		isAdmin, err := h.permissionService.IsSystemAdmin(currentUser.ID)
 		if err != nil || !isAdmin {
-			http.Error(w, "Forbidden", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	}
 
 	var req UpdateRegionalSettingsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -579,11 +580,11 @@ func (h *UserHandler) UpdateRegionalSettings(w http.ResponseWriter, r *http.Requ
 		FROM users WHERE id = ?`, id).Scan(
 		&oldSettings.Username, &oldSettings.Timezone, &oldSettings.Language)
 	if err == sql.ErrNoRows {
-		http.Error(w, "User not found", http.StatusNotFound)
+		respondNotFound(w, r, "user")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -606,7 +607,7 @@ func (h *UserHandler) UpdateRegionalSettings(w http.ResponseWriter, r *http.Requ
 	`, timezone, language, time.Now(), id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -623,7 +624,7 @@ func (h *UserHandler) UpdateRegionalSettings(w http.ResponseWriter, r *http.Requ
 		&user.IsActive, &avatarURL, &requiresPasswordReset, &tz, &lang, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -700,7 +701,7 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Get current user for self-deletion check
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil && currentUser.ID == id {
-		http.Error(w, "Cannot delete your own account", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -719,21 +720,21 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		&deletedUser.FirstName, &deletedUser.LastName, &deletedUser.SCIMManaged)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "User not found", http.StatusNotFound)
+			respondNotFound(w, r, "user")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
 
 	// Check if user is SCIM-managed
 	if deletedUser.SCIMManaged {
-		http.Error(w, "Cannot delete SCIM-managed user. Deletion must be done in the identity provider.", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	if _, execErr := h.db.ExecWrite("DELETE FROM users WHERE id = ?", id); execErr != nil {
-		http.Error(w, execErr.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, execErr)
 		return
 	}
 
@@ -777,7 +778,7 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	var req ResetPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -804,7 +805,7 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	// Hash the password
 	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		http.Error(w, "Failed to hash password", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to hash password: %w", err))
 		return
 	}
 
@@ -817,9 +818,9 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		&targetUser.Username, &targetUser.Email)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "User not found", http.StatusNotFound)
+			respondNotFound(w, r, "user")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -832,7 +833,7 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	`, string(hashedBytes), requiresReset, time.Now(), id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -877,16 +878,16 @@ func (h *UserHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
 		&targetUser.Username, &targetUser.Email, &targetUser.IsActive)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "User not found", http.StatusNotFound)
+			respondNotFound(w, r, "user")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
 
 	// Check if already active
 	if targetUser.IsActive {
-		http.Error(w, "User is already active", http.StatusBadRequest)
+		respondValidationError(w, r, "User is already active")
 		return
 	}
 
@@ -898,7 +899,7 @@ func (h *UserHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
 	`, time.Now(), id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -936,7 +937,7 @@ func (h *UserHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 	// Get current user for self-deactivation check
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil && currentUser.ID == id {
-		http.Error(w, "Cannot deactivate your own account", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -950,16 +951,16 @@ func (h *UserHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 		&targetUser.Username, &targetUser.Email, &targetUser.IsActive)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "User not found", http.StatusNotFound)
+			respondNotFound(w, r, "user")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
 
 	// Check if already inactive
 	if !targetUser.IsActive {
-		http.Error(w, "User is already inactive", http.StatusBadRequest)
+		respondValidationError(w, r, "User is already inactive")
 		return
 	}
 
@@ -971,7 +972,7 @@ func (h *UserHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 	`, time.Now(), id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

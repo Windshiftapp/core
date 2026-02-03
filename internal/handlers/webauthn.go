@@ -57,7 +57,7 @@ type FIDOCompleteRegistrationRequest struct {
 func (h *WebAuthnHandler) StartFIDORegistrationNew(w http.ResponseWriter, r *http.Request) {
 	userID, err := strconv.Atoi(r.PathValue("userId"))
 	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "userId")
 		return
 	}
 
@@ -67,12 +67,12 @@ func (h *WebAuthnHandler) StartFIDORegistrationNew(w http.ResponseWriter, r *htt
 
 	var req FIDORegistrationRequestNew
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if strings.TrimSpace(req.CredentialName) == "" {
-		http.Error(w, "Credential name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Credential name is required")
 		return
 	}
 
@@ -85,11 +85,11 @@ func (h *WebAuthnHandler) StartFIDORegistrationNew(w http.ResponseWriter, r *htt
 	`, userID).Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName, &avatarURL)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "User not found", http.StatusNotFound)
+		respondNotFound(w, r, "user")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -106,7 +106,7 @@ func (h *WebAuthnHandler) StartFIDORegistrationNew(w http.ResponseWriter, r *htt
 	// Get existing credentials to exclude duplicates
 	existingCreds, err := h.credentialStore.GetUserCredentials(userID)
 	if err != nil {
-		http.Error(w, "Failed to get existing credentials", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	webAuthnUser.SetCredentials(existingCreds)
@@ -114,14 +114,14 @@ func (h *WebAuthnHandler) StartFIDORegistrationNew(w http.ResponseWriter, r *htt
 	// Begin registration with go-webauthn
 	options, sessionData, err := h.config.WebAuthn().BeginRegistration(webAuthnUser)
 	if err != nil {
-		http.Error(w, "Failed to begin registration: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Save session data
 	sessionID, err := h.sessionStore.SaveRegistrationSession(userID, sessionData)
 	if err != nil {
-		http.Error(w, "Failed to save session", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -140,7 +140,7 @@ func (h *WebAuthnHandler) StartFIDORegistrationNew(w http.ResponseWriter, r *htt
 func (h *WebAuthnHandler) CompleteFIDORegistrationNew(w http.ResponseWriter, r *http.Request) {
 	userID, err := strconv.Atoi(r.PathValue("userId"))
 	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "userId")
 		return
 	}
 
@@ -150,7 +150,7 @@ func (h *WebAuthnHandler) CompleteFIDORegistrationNew(w http.ResponseWriter, r *
 
 	var req FIDOCompleteRegistrationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -163,7 +163,7 @@ func (h *WebAuthnHandler) CompleteFIDORegistrationNew(w http.ResponseWriter, r *
 	`, userID).Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName, &avatarURL)
 
 	if err != nil {
-		http.Error(w, "User not found", http.StatusNotFound)
+		respondNotFound(w, r, "user")
 		return
 	}
 
@@ -180,7 +180,7 @@ func (h *WebAuthnHandler) CompleteFIDORegistrationNew(w http.ResponseWriter, r *
 	// Get session data
 	sessionData, err := h.sessionStore.GetRegistrationSession(req.SessionID)
 	if err != nil {
-		http.Error(w, "Invalid or expired session", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid or expired session")
 		return
 	}
 
@@ -188,7 +188,7 @@ func (h *WebAuthnHandler) CompleteFIDORegistrationNew(w http.ResponseWriter, r *
 	// The library expects to read the credential directly from r.Body
 	credentialJSON, err := json.Marshal(req.Response)
 	if err != nil {
-		http.Error(w, "Failed to marshal credential response", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	r.Body = io.NopCloser(bytes.NewReader(credentialJSON))
@@ -196,25 +196,25 @@ func (h *WebAuthnHandler) CompleteFIDORegistrationNew(w http.ResponseWriter, r *
 	// Finish registration with go-webauthn (performs all verification)
 	credential, err := h.config.WebAuthn().FinishRegistration(webAuthnUser, *sessionData, r)
 	if err != nil {
-		http.Error(w, "Registration verification failed: "+err.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, "Registration verification failed: "+err.Error())
 		return
 	}
 
 	// Check if credential already exists
 	exists, err := h.credentialStore.CheckCredentialExists(credential.ID)
 	if err != nil {
-		http.Error(w, "Failed to check credential", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if exists {
-		http.Error(w, "Credential already registered", http.StatusConflict)
+		respondConflict(w, r, "Credential already registered")
 		return
 	}
 
 	// Save credential to database
 	err = h.credentialStore.SaveCredential(userID, req.CredentialName, credential)
 	if err != nil {
-		http.Error(w, "Failed to save credential", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -245,7 +245,7 @@ func (h *WebAuthnHandler) CompleteFIDORegistrationNew(w http.ResponseWriter, r *
 func (h *WebAuthnHandler) GetWebAuthnCredentials(w http.ResponseWriter, r *http.Request) {
 	userID, err := strconv.Atoi(r.PathValue("userId"))
 	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "userId")
 		return
 	}
 
@@ -256,7 +256,7 @@ func (h *WebAuthnHandler) GetWebAuthnCredentials(w http.ResponseWriter, r *http.
 	// Get credentials list (without sensitive data)
 	credentials, err := h.credentialStore.GetUserCredentialsList(userID)
 	if err != nil {
-		http.Error(w, "Failed to get credentials", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -272,13 +272,13 @@ func (h *WebAuthnHandler) GetWebAuthnCredentials(w http.ResponseWriter, r *http.
 func (h *WebAuthnHandler) RemoveWebAuthnCredential(w http.ResponseWriter, r *http.Request) {
 	userID, err := strconv.Atoi(r.PathValue("userId"))
 	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "userId")
 		return
 	}
 
 	credentialID := r.PathValue("credentialId")
 	if credentialID == "" {
-		http.Error(w, "Credential ID is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Credential ID is required")
 		return
 	}
 
@@ -293,23 +293,23 @@ func (h *WebAuthnHandler) RemoveWebAuthnCredential(w http.ResponseWriter, r *htt
 	`, credentialID).Scan(&ownerID)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Credential not found", http.StatusNotFound)
+		respondNotFound(w, r, "credential")
 		return
 	}
 	if err != nil {
-		http.Error(w, "Failed to verify credential ownership", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if ownerID != userID {
-		http.Error(w, "Unauthorized", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	// Delete the credential
 	err = h.credentialStore.DeleteCredential(credentialID)
 	if err != nil {
-		http.Error(w, "Failed to delete credential", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -338,12 +338,12 @@ type FIDOCompleteLoginRequest struct {
 func (h *WebAuthnHandler) StartFIDOLoginNew(w http.ResponseWriter, r *http.Request) {
 	var req FIDOLoginRequestNew
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if strings.TrimSpace(req.EmailOrUsername) == "" {
-		http.Error(w, "Email or username is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Email or username is required")
 		return
 	}
 
@@ -361,11 +361,11 @@ func (h *WebAuthnHandler) StartFIDOLoginNew(w http.ResponseWriter, r *http.Reque
 
 	if err == sql.ErrNoRows {
 		// Don't reveal that user doesn't exist
-		http.Error(w, "No FIDO credentials found", http.StatusNotFound)
+		respondNotFound(w, r, "credential")
 		return
 	}
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -377,7 +377,7 @@ func (h *WebAuthnHandler) StartFIDOLoginNew(w http.ResponseWriter, r *http.Reque
 	}
 
 	if !user.IsActive {
-		http.Error(w, "Account is disabled", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -387,12 +387,12 @@ func (h *WebAuthnHandler) StartFIDOLoginNew(w http.ResponseWriter, r *http.Reque
 	// Get user's credentials
 	credentials, err := h.credentialStore.GetUserCredentials(user.ID)
 	if err != nil {
-		http.Error(w, "Failed to get credentials", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if len(credentials) == 0 {
-		http.Error(w, "No FIDO credentials found", http.StatusNotFound)
+		respondNotFound(w, r, "credential")
 		return
 	}
 
@@ -401,14 +401,14 @@ func (h *WebAuthnHandler) StartFIDOLoginNew(w http.ResponseWriter, r *http.Reque
 	// Begin authentication with go-webauthn
 	options, sessionData, err := h.config.WebAuthn().BeginLogin(webAuthnUser)
 	if err != nil {
-		http.Error(w, "Failed to begin authentication: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Save session data
 	sessionID, err := h.sessionStore.SaveAuthenticationSession(&user.ID, sessionData)
 	if err != nil {
-		http.Error(w, "Failed to save session", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -427,27 +427,27 @@ func (h *WebAuthnHandler) StartFIDOLoginNew(w http.ResponseWriter, r *http.Reque
 func (h *WebAuthnHandler) CompleteFIDOLoginNew(w http.ResponseWriter, r *http.Request) {
 	var req FIDOCompleteLoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Get session data
 	sessionData, err := h.sessionStore.GetAuthenticationSession(req.SessionID)
 	if err != nil {
-		http.Error(w, "Invalid or expired session", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid or expired session")
 		return
 	}
 
 	// Get user ID from session
 	userIDBytes := sessionData.UserID
 	if len(userIDBytes) == 0 {
-		http.Error(w, "Session missing user ID", http.StatusBadRequest)
+		respondValidationError(w, r, "Session missing user ID")
 		return
 	}
 
 	userID, err := strconv.Atoi(string(userIDBytes))
 	if err != nil {
-		http.Error(w, "Invalid user ID in session", http.StatusBadRequest)
+		respondValidationError(w, r, "Invalid user ID in session")
 		return
 	}
 
@@ -463,7 +463,7 @@ func (h *WebAuthnHandler) CompleteFIDOLoginNew(w http.ResponseWriter, r *http.Re
 	)
 
 	if err != nil {
-		http.Error(w, "User not found or inactive", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -480,7 +480,7 @@ func (h *WebAuthnHandler) CompleteFIDOLoginNew(w http.ResponseWriter, r *http.Re
 	// Get user's credentials
 	credentials, err := h.credentialStore.GetUserCredentials(user.ID)
 	if err != nil {
-		http.Error(w, "Failed to get credentials", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -490,7 +490,7 @@ func (h *WebAuthnHandler) CompleteFIDOLoginNew(w http.ResponseWriter, r *http.Re
 	// The library expects to read the credential directly from r.Body
 	credentialJSON, err := json.Marshal(req.Response)
 	if err != nil {
-		http.Error(w, "Failed to marshal credential response", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	r.Body = io.NopCloser(bytes.NewReader(credentialJSON))
@@ -498,7 +498,7 @@ func (h *WebAuthnHandler) CompleteFIDOLoginNew(w http.ResponseWriter, r *http.Re
 	// Finish authentication with go-webauthn (performs all verification)
 	credential, err := h.config.WebAuthn().FinishLogin(webAuthnUser, *sessionData, r)
 	if err != nil {
-		http.Error(w, "Authentication verification failed: "+err.Error(), http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -518,13 +518,13 @@ func (h *WebAuthnHandler) CompleteFIDOLoginNew(w http.ResponseWriter, r *http.Re
 	clientIP := h.ipExtractor.GetClientIP(r)
 	session, err := h.sessionManager.CreateSession(user.ID, clientIP, r.UserAgent(), false)
 	if err != nil {
-		http.Error(w, "Failed to create session", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Set session cookie
 	if err := h.sessionManager.SetSessionCookie(w, r, session.Token, false); err != nil {
-		http.Error(w, "Failed to set session cookie", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

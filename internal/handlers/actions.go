@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -33,13 +34,13 @@ func (h *ActionsHandler) ListActions(w http.ResponseWriter, r *http.Request) {
 	workspaceIDStr := r.PathValue("workspaceId")
 	workspaceID, err := strconv.Atoi(workspaceIDStr)
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	actions, err := h.repo.ListByWorkspace(workspaceID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -56,17 +57,17 @@ func (h *ActionsHandler) GetAction(w http.ResponseWriter, r *http.Request) {
 	actionIDStr := r.PathValue("id")
 	actionID, err := strconv.Atoi(actionIDStr)
 	if err != nil {
-		http.Error(w, "Invalid action ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	action, err := h.repo.GetByID(actionID)
 	if err == repository.ErrNotFound {
-		http.Error(w, "Action not found", http.StatusNotFound)
+		respondNotFound(w, r, "action")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -79,31 +80,31 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 	workspaceIDStr := r.PathValue("workspaceId")
 	workspaceID, err := strconv.Atoi(workspaceIDStr)
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
 	// Parse request body
 	var req models.CreateActionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate required fields
 	if req.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 	if req.TriggerType == "" {
-		http.Error(w, "Trigger type is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Trigger type is required")
 		return
 	}
 
 	// Get current user
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -120,7 +121,7 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 
 	actionID, err := h.repo.Create(action)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	action.ID = actionID
@@ -134,7 +135,7 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				// Rollback by deleting the action
 				h.repo.Delete(actionID)
-				http.Error(w, "Failed to create nodes: "+err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, fmt.Errorf("failed to create nodes: %w", err))
 				return
 			}
 			nodeIDMap[node.ID] = newID
@@ -153,7 +154,7 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				// Rollback by deleting the action
 				h.repo.Delete(actionID)
-				http.Error(w, "Failed to create edges: "+err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, fmt.Errorf("failed to create edges: %w", err))
 				return
 			}
 		}
@@ -167,7 +168,7 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 	// Fetch the created action with nodes and edges
 	createdAction, err := h.repo.GetByID(actionID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -181,25 +182,25 @@ func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 	actionIDStr := r.PathValue("id")
 	actionID, err := strconv.Atoi(actionIDStr)
 	if err != nil {
-		http.Error(w, "Invalid action ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	// Get existing action
 	action, err := h.repo.GetByID(actionID)
 	if err == repository.ErrNotFound {
-		http.Error(w, "Action not found", http.StatusNotFound)
+		respondNotFound(w, r, "action")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Parse request body
 	var req models.UpdateActionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
@@ -224,14 +225,14 @@ func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 	if req.Nodes != nil {
 		err = h.repo.SaveActionWithNodesAndEdges(action, req.Nodes, req.Edges)
 		if err != nil {
-			http.Error(w, "Failed to save action: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to save action: %w", err))
 			return
 		}
 	} else {
 		// Just update the action metadata
 		err = h.repo.Update(action)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 	}
@@ -244,7 +245,7 @@ func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 	// Fetch updated action
 	updatedAction, err := h.repo.GetByID(actionID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -257,18 +258,18 @@ func (h *ActionsHandler) DeleteAction(w http.ResponseWriter, r *http.Request) {
 	actionIDStr := r.PathValue("id")
 	actionID, err := strconv.Atoi(actionIDStr)
 	if err != nil {
-		http.Error(w, "Invalid action ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	// Get the action to get workspace ID for cache invalidation
 	action, err := h.repo.GetByID(actionID)
 	if err == repository.ErrNotFound {
-		http.Error(w, "Action not found", http.StatusNotFound)
+		respondNotFound(w, r, "action")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -276,11 +277,11 @@ func (h *ActionsHandler) DeleteAction(w http.ResponseWriter, r *http.Request) {
 
 	err = h.repo.Delete(actionID)
 	if err == repository.ErrNotFound {
-		http.Error(w, "Action not found", http.StatusNotFound)
+		respondNotFound(w, r, "action")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -297,18 +298,18 @@ func (h *ActionsHandler) ToggleAction(w http.ResponseWriter, r *http.Request) {
 	actionIDStr := r.PathValue("id")
 	actionID, err := strconv.Atoi(actionIDStr)
 	if err != nil {
-		http.Error(w, "Invalid action ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	// Get existing action
 	action, err := h.repo.GetByID(actionID)
 	if err == repository.ErrNotFound {
-		http.Error(w, "Action not found", http.StatusNotFound)
+		respondNotFound(w, r, "action")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -323,7 +324,7 @@ func (h *ActionsHandler) ToggleAction(w http.ResponseWriter, r *http.Request) {
 
 	err = h.repo.SetEnabled(actionID, req.IsEnabled)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -335,7 +336,7 @@ func (h *ActionsHandler) ToggleAction(w http.ResponseWriter, r *http.Request) {
 	// Return updated action
 	updatedAction, err := h.repo.GetByID(actionID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -348,7 +349,7 @@ func (h *ActionsHandler) GetActionLogs(w http.ResponseWriter, r *http.Request) {
 	actionIDStr := r.PathValue("id")
 	actionID, err := strconv.Atoi(actionIDStr)
 	if err != nil {
-		http.Error(w, "Invalid action ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -368,7 +369,7 @@ func (h *ActionsHandler) GetActionLogs(w http.ResponseWriter, r *http.Request) {
 
 	logs, err := h.repo.GetExecutionLogsByActionID(actionID, limit, offset)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -385,7 +386,7 @@ func (h *ActionsHandler) GetWorkspaceLogs(w http.ResponseWriter, r *http.Request
 	workspaceIDStr := r.PathValue("workspaceId")
 	workspaceID, err := strconv.Atoi(workspaceIDStr)
 	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "workspaceId")
 		return
 	}
 
@@ -405,7 +406,7 @@ func (h *ActionsHandler) GetWorkspaceLogs(w http.ResponseWriter, r *http.Request
 
 	logs, err := h.repo.GetExecutionLogsByWorkspaceID(workspaceID, limit, offset)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -427,50 +428,50 @@ func (h *ActionsHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 	actionIDStr := r.PathValue("id")
 	actionID, err := strconv.Atoi(actionIDStr)
 	if err != nil {
-		http.Error(w, "Invalid action ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	// Parse request body
 	var req ExecuteActionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if req.ItemID == 0 {
-		http.Error(w, "item_id is required", http.StatusBadRequest)
+		respondValidationError(w, r, "item_id is required")
 		return
 	}
 
 	// Get action
 	action, err := h.repo.GetByID(actionID)
 	if err == repository.ErrNotFound {
-		http.Error(w, "Action not found", http.StatusNotFound)
+		respondNotFound(w, r, "action")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Get current user
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	// Execute action manually
 	if h.actionService == nil {
-		http.Error(w, "Action service not available", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("action service not available"))
 		return
 	}
 
 	// Execute the action (this is synchronous for immediate feedback)
 	err = h.actionService.ExecuteActionManually(action, req.ItemID, currentUser.ID)
 	if err != nil {
-		http.Error(w, "Failed to execute action: "+err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("failed to execute action: %w", err))
 		return
 	}
 

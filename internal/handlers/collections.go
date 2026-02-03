@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -40,7 +41,7 @@ func (h *CollectionHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	var args []interface{}
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	args = append(args, currentUser.ID)
@@ -50,7 +51,7 @@ func (h *CollectionHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		query += " AND c.workspace_id = ?"
 		workspaceID, err := strconv.Atoi(workspaceIDParam)
 		if err != nil {
-			http.Error(w, "Invalid workspace_id parameter", http.StatusBadRequest)
+			respondInvalidID(w, r, "workspace_id")
 			return
 		}
 		args = append(args, workspaceID)
@@ -61,7 +62,7 @@ func (h *CollectionHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		query += " AND c.category_id = ?"
 		categoryID, err := strconv.Atoi(categoryIDParam)
 		if err != nil {
-			http.Error(w, "Invalid category_id parameter", http.StatusBadRequest)
+			respondInvalidID(w, r, "category_id")
 			return
 		}
 		args = append(args, categoryID)
@@ -71,7 +72,7 @@ func (h *CollectionHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query, args...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -91,7 +92,7 @@ func (h *CollectionHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			&collection.CategoryName, &collection.CategoryColor,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -137,7 +138,7 @@ func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -155,11 +156,11 @@ func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Collection not found", http.StatusNotFound)
+		respondNotFound(w, r, "collection")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -185,20 +186,20 @@ func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *CollectionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var collection models.Collection
 	if err := json.NewDecoder(r.Body).Decode(&collection); err != nil {
-		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid JSON: "+err.Error())
 		return
 	}
 
 	// Validate required fields
 	if collection.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 	// CQL query is now optional for initial creation - can be empty for partial creation
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -207,11 +208,11 @@ func (h *CollectionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		var exists bool
 		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", *collection.WorkspaceID).Scan(&exists)
 		if err != nil {
-			http.Error(w, "Failed to validate workspace: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to validate workspace: %w", err))
 			return
 		}
 		if !exists {
-			http.Error(w, "Workspace not found", http.StatusBadRequest)
+			respondValidationError(w, r, "Workspace not found")
 			return
 		}
 	}
@@ -219,17 +220,17 @@ func (h *CollectionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Validate category_id if provided (only for global collections)
 	if collection.CategoryID != nil {
 		if collection.WorkspaceID != nil {
-			http.Error(w, "Categories can only be applied to global collections (workspace_id must be null)", http.StatusBadRequest)
+			respondValidationError(w, r, "Categories can only be applied to global collections (workspace_id must be null)")
 			return
 		}
 		var exists bool
 		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM collection_categories WHERE id = ?)", *collection.CategoryID).Scan(&exists)
 		if err != nil {
-			http.Error(w, "Failed to validate category: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to validate category: %w", err))
 			return
 		}
 		if !exists {
-			http.Error(w, "Category not found", http.StatusBadRequest)
+			respondValidationError(w, r, "Category not found")
 			return
 		}
 	}
@@ -242,7 +243,7 @@ func (h *CollectionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	`, collection.Name, collection.Description, collection.QLQuery, collection.IsPublic, collection.WorkspaceID, collection.CategoryID, currentUser.ID).Scan(&id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -262,19 +263,19 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Failed to read request body: "+err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Failed to read request body: "+err.Error())
 		return
 	}
 
 	var payload map[string]json.RawMessage
 	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
-		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid JSON: "+err.Error())
 		return
 	}
 
 	var collection models.Collection
 	if err := json.Unmarshal(bodyBytes, &collection); err != nil {
-		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid JSON: "+err.Error())
 		return
 	}
 
@@ -283,14 +284,14 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	if collection.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 	// CQL query validation removed - allow updating collections without CQL query set
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -300,17 +301,17 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var existingCategoryID sql.NullInt64
 	err = h.db.QueryRow("SELECT created_by, workspace_id, category_id FROM collections WHERE id = ?", id).Scan(&existingCreatedBy, &existingWorkspaceID, &existingCategoryID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Collection not found", http.StatusNotFound)
+		respondNotFound(w, r, "collection")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Only allow the creator to update their collection
 	if !existingCreatedBy.Valid || int(existingCreatedBy.Int64) != currentUser.ID {
-		http.Error(w, "Permission denied", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
@@ -339,11 +340,11 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 		var exists bool
 		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", *collection.WorkspaceID).Scan(&exists)
 		if err != nil {
-			http.Error(w, "Failed to validate workspace: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to validate workspace: %w", err))
 			return
 		}
 		if !exists {
-			http.Error(w, "Workspace not found", http.StatusBadRequest)
+			respondValidationError(w, r, "Workspace not found")
 			return
 		}
 	}
@@ -351,17 +352,17 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Validate category_id if provided (only for global collections)
 	if categoryProvided && collection.CategoryID != nil {
 		if collection.WorkspaceID != nil {
-			http.Error(w, "Categories can only be applied to global collections (workspace_id must be null)", http.StatusBadRequest)
+			respondValidationError(w, r, "Categories can only be applied to global collections (workspace_id must be null)")
 			return
 		}
 		var exists bool
 		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM collection_categories WHERE id = ?)", *collection.CategoryID).Scan(&exists)
 		if err != nil {
-			http.Error(w, "Failed to validate category: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to validate category: %w", err))
 			return
 		}
 		if !exists {
-			http.Error(w, "Category not found", http.StatusBadRequest)
+			respondValidationError(w, r, "Category not found")
 			return
 		}
 	}
@@ -374,7 +375,7 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	`, collection.Name, collection.Description, collection.QLQuery, collection.IsPublic, collection.WorkspaceID, collection.CategoryID, id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -392,7 +393,7 @@ func (h *CollectionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Get actual user ID from context/session
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	userID := currentUser.ID
@@ -401,24 +402,24 @@ func (h *CollectionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	var existingCreatedBy sql.NullInt64
 	err := h.db.QueryRow("SELECT created_by FROM collections WHERE id = ?", id).Scan(&existingCreatedBy)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Collection not found", http.StatusNotFound)
+		respondNotFound(w, r, "collection")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Only allow the creator to delete their collection
 	if !existingCreatedBy.Valid || int(existingCreatedBy.Int64) != userID {
-		http.Error(w, "Permission denied", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	// Delete the collection
 	_, err = h.db.ExecWrite("DELETE FROM collections WHERE id = ?", id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

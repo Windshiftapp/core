@@ -17,6 +17,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
+	"windshift/internal/restapi"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
@@ -487,7 +488,7 @@ func (h *PortalHandler) GetPortal(w http.ResponseWriter, r *http.Request) {
 	// Find channel by portal slug
 	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
 	if err != nil {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+		respondNotFound(w, r, "portal")
 		return
 	}
 	channel := portalResult.channel
@@ -505,7 +506,7 @@ func (h *PortalHandler) GetPortal(w http.ResponseWriter, r *http.Request) {
 			&workspace.ID, &workspace.Name, &workspace.Key,
 		)
 		if err != nil {
-			http.Error(w, "Portal workspace not found", http.StatusNotFound)
+			respondNotFound(w, r, "workspace")
 			return
 		}
 	}
@@ -561,7 +562,7 @@ func (h *PortalHandler) GetRequestTypes(w http.ResponseWriter, r *http.Request) 
 	// Find channel by portal slug
 	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
 	if err != nil {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+		respondNotFound(w, r, "portal")
 		return
 	}
 	channel := portalResult.channel
@@ -580,7 +581,7 @@ func (h *PortalHandler) GetRequestTypes(w http.ResponseWriter, r *http.Request) 
 
 	rows, err := h.db.QueryContext(ctx, query, channel.ID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -671,7 +672,7 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 	// Find channel by portal slug
 	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
 	if err != nil {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+		respondNotFound(w, r, "portal")
 		return
 	}
 	channel := portalResult.channel
@@ -686,7 +687,7 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&submission); err != nil {
-		http.Error(w, "Invalid submission", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid submission")
 		return
 	}
 
@@ -707,13 +708,13 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 	if submission.RequestTypeID != nil {
 		requestType, err := h.getRequestTypeWithVisibility(ctx, *submission.RequestTypeID)
 		if err != nil {
-			http.Error(w, "Request type not found or inactive", http.StatusBadRequest)
+			respondBadRequest(w, r, "Request type not found or inactive")
 			return
 		}
 
 		// Verify the request type belongs to this channel
 		if requestType.ChannelID != channel.ID {
-			http.Error(w, "Request type does not belong to this portal", http.StatusBadRequest)
+			respondBadRequest(w, r, "Request type does not belong to this portal")
 			return
 		}
 
@@ -726,7 +727,7 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 
 		// Check visibility
 		if !requestType.IsVisibleTo(userGroupIDs, customerOrgID) {
-			http.Error(w, "You don't have access to this request type", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	}
@@ -734,13 +735,13 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 	// Validate and separate fields
 	validationResult, err := h.validateAndSeparateFields(ctx, submission.RequestTypeID, submission.Title, submission.Description, submission.CustomFields)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, err.Error())
 		return
 	}
 
 	// Get target workspace (use first workspace for submission)
 	if len(config.PortalWorkspaceIDs) == 0 {
-		http.Error(w, "Portal has no configured workspaces", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("portal has no configured workspaces"))
 		return
 	}
 	targetWorkspaceID := config.PortalWorkspaceIDs[0]
@@ -770,7 +771,7 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 		RequestTypeID:           submission.RequestTypeID,
 	})
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create item: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -811,7 +812,7 @@ func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Reque
 
 	rows, err := h.db.QueryContext(ctx, query)
 	if err != nil {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+		respondNotFound(w, r, "portal")
 		return
 	}
 	defer rows.Close()
@@ -837,13 +838,13 @@ func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Reque
 	}
 
 	if !found {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+		respondNotFound(w, r, "portal")
 		return
 	}
 
 	// Check if knowledge base is configured
 	if config.KnowledgeBaseURL == "" || config.KnowledgeBaseShareID == "" {
-		http.Error(w, "Knowledge base not configured for this portal", http.StatusNotFound)
+		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Knowledge base not configured for this portal"))
 		return
 	}
 
@@ -853,12 +854,12 @@ func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Reque
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&searchRequest); err != nil {
-		http.Error(w, "Invalid search request", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid search request")
 		return
 	}
 
 	if searchRequest.Query == "" {
-		http.Error(w, "Search query is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Search query is required")
 		return
 	}
 
@@ -869,14 +870,14 @@ func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Reque
 		"shareId": config.KnowledgeBaseShareID,
 	})
 	if err != nil {
-		http.Error(w, "Failed to prepare search request", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Make request to Docmost
 	req, err := http.NewRequestWithContext(ctx, "POST", docmostURL, bytes.NewBuffer(requestBody))
 	if err != nil {
-		http.Error(w, "Failed to create search request", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -884,7 +885,7 @@ func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Reque
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to search knowledge base: %v", err), http.StatusBadGateway)
+		respondError(w, r, restapi.NewAPIError(http.StatusBadGateway, "BAD_GATEWAY", fmt.Sprintf("Failed to search knowledge base: %v", err)))
 		return
 	}
 	defer resp.Body.Close()
@@ -892,13 +893,13 @@ func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Reque
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		http.Error(w, "Failed to read search results", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check response status
 	if resp.StatusCode != http.StatusOK {
-		http.Error(w, fmt.Sprintf("Knowledge base search failed: %s", string(body)), http.StatusBadGateway)
+		respondError(w, r, restapi.NewAPIError(http.StatusBadGateway, "BAD_GATEWAY", fmt.Sprintf("Knowledge base search failed: %s", string(body))))
 		return
 	}
 
@@ -926,7 +927,7 @@ func (h *PortalHandler) GetMyRequests(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.QueryContext(ctx, query)
 	if err != nil {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+		respondNotFound(w, r, "portal")
 		return
 	}
 	defer rows.Close()
@@ -952,7 +953,7 @@ func (h *PortalHandler) GetMyRequests(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+		respondNotFound(w, r, "portal")
 		return
 	}
 
@@ -968,7 +969,7 @@ func (h *PortalHandler) GetMyRequests(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to fetch requests: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -982,7 +983,7 @@ func (h *PortalHandler) GetRequestDetail(w http.ResponseWriter, r *http.Request)
 	itemIDStr := r.PathValue("itemId")
 	itemID, err := strconv.Atoi(itemIDStr)
 	if err != nil {
-		http.Error(w, "Invalid item ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "itemId")
 		return
 	}
 
@@ -1000,7 +1001,7 @@ func (h *PortalHandler) GetRequestDetail(w http.ResponseWriter, r *http.Request)
 
 	rows, err := h.db.QueryContext(ctx, query)
 	if err != nil {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+		respondNotFound(w, r, "portal")
 		return
 	}
 	defer rows.Close()
@@ -1026,7 +1027,7 @@ func (h *PortalHandler) GetRequestDetail(w http.ResponseWriter, r *http.Request)
 	}
 
 	if !found {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+		respondNotFound(w, r, "portal")
 		return
 	}
 
@@ -1036,22 +1037,22 @@ func (h *PortalHandler) GetRequestDetail(w http.ResponseWriter, r *http.Request)
 	// Use service to verify ownership
 	isOwner, err := h.portalService.VerifyRequestOwnership(ctx, itemID, channel.ID, internalUserID, portalCustomerID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to fetch request: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !isOwner {
-		http.Error(w, "Request not found", http.StatusNotFound)
+		respondNotFound(w, r, "item")
 		return
 	}
 
 	// Get the request details
 	detail, err := h.portalService.GetRequestDetail(ctx, itemID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to fetch request: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if detail == nil {
-		http.Error(w, "Request not found", http.StatusNotFound)
+		respondNotFound(w, r, "item")
 		return
 	}
 
@@ -1065,7 +1066,7 @@ func (h *PortalHandler) GetRequestComments(w http.ResponseWriter, r *http.Reques
 	itemIDStr := r.PathValue("itemId")
 	itemID, err := strconv.Atoi(itemIDStr)
 	if err != nil {
-		http.Error(w, "Invalid item ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "itemId")
 		return
 	}
 
@@ -1075,7 +1076,7 @@ func (h *PortalHandler) GetRequestComments(w http.ResponseWriter, r *http.Reques
 	// Find channel by portal slug
 	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
 	if err != nil {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+		respondNotFound(w, r, "portal")
 		return
 	}
 	channel := portalResult.channel
@@ -1086,18 +1087,18 @@ func (h *PortalHandler) GetRequestComments(w http.ResponseWriter, r *http.Reques
 	// Use service to verify ownership
 	isOwner, err := h.portalService.VerifyRequestOwnership(ctx, itemID, channel.ID, internalUserID, portalCustomerID)
 	if err != nil {
-		http.Error(w, "Failed to verify request", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !isOwner {
-		http.Error(w, "Request not found", http.StatusNotFound)
+		respondNotFound(w, r, "item")
 		return
 	}
 
 	// Use service to get comments
 	comments, err := h.portalService.GetRequestComments(ctx, itemID)
 	if err != nil {
-		http.Error(w, "Failed to fetch comments", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1111,7 +1112,7 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 	itemIDStr := r.PathValue("itemId")
 	itemID, err := strconv.Atoi(itemIDStr)
 	if err != nil {
-		http.Error(w, "Invalid item ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "itemId")
 		return
 	}
 
@@ -1121,7 +1122,7 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 	// Find channel by portal slug
 	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
 	if err != nil {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+		respondNotFound(w, r, "portal")
 		return
 	}
 	channel := portalResult.channel
@@ -1132,11 +1133,11 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 	// Use service to verify ownership
 	isOwner, err := h.portalService.VerifyRequestOwnership(ctx, itemID, channel.ID, internalUserID, portalCustomerID)
 	if err != nil {
-		http.Error(w, "Failed to verify request", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !isOwner {
-		http.Error(w, "Request not found", http.StatusNotFound)
+		respondNotFound(w, r, "item")
 		return
 	}
 
@@ -1145,12 +1146,12 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 		Content string `json:"content"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&commentData); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if strings.TrimSpace(commentData.Content) == "" {
-		http.Error(w, "Comment content is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Comment content is required")
 		return
 	}
 
@@ -1172,7 +1173,7 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 		`
 		result, err = h.db.ExecWriteContext(ctx, insertQuery, itemID, *internalUserID, sanitizedContent, now, now)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to add comment: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -1191,7 +1192,7 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 		`
 		result, err = h.db.ExecWriteContext(ctx, insertQuery, itemID, *portalCustomerID, sanitizedContent, now, now)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to add comment: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -1206,7 +1207,7 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 
 	commentID, err := result.LastInsertId()
 	if err != nil {
-		http.Error(w, "Failed to get comment ID", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1238,7 +1239,7 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 	reportIDStr := r.PathValue("id")
 	reportID, err := strconv.Atoi(reportIDStr)
 	if err != nil {
-		http.Error(w, "Invalid report ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -1248,7 +1249,7 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 	// Find channel by portal slug
 	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
 	if err != nil {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+		respondNotFound(w, r, "portal")
 		return
 	}
 	channel := portalResult.channel
@@ -1268,23 +1269,23 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 	`, reportID).Scan(&report.ID, &report.ChannelID, &report.AssetSetID, &report.CQLQuery, &report.IsActive, &report.ColumnConfig)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Asset report not found", http.StatusNotFound)
+		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Asset report not found"))
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Verify report belongs to this channel
 	if report.ChannelID != channel.ID {
-		http.Error(w, "Asset report not found", http.StatusNotFound)
+		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Asset report not found"))
 		return
 	}
 
 	// Verify report is active
 	if !report.IsActive {
-		http.Error(w, "Asset report is inactive", http.StatusBadRequest)
+		respondBadRequest(w, r, "Asset report is inactive")
 		return
 	}
 
@@ -1365,7 +1366,7 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 
 	rows, err := h.db.QueryContext(ctx, query, report.AssetSetID, perPage, offset)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -1454,7 +1455,7 @@ func (h *PortalHandler) DownloadPortalAttachment(w http.ResponseWriter, r *http.
 	attachmentIDStr := r.PathValue("id")
 	attachmentID, err := strconv.Atoi(attachmentIDStr)
 	if err != nil {
-		http.Error(w, "Invalid attachment ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -1470,12 +1471,12 @@ func (h *PortalHandler) DownloadPortalAttachment(w http.ResponseWriter, r *http.
 	`, attachmentID).Scan(&filePath, &mimeType, &originalFilename, &fileSize, &category)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Attachment not found", http.StatusNotFound)
+		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Attachment not found"))
 		return
 	}
 	if err != nil {
 		slog.Error("failed to query attachment", slog.String("component", "portal"), slog.Any("error", err))
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1488,7 +1489,7 @@ func (h *PortalHandler) DownloadPortalAttachment(w http.ResponseWriter, r *http.
 
 	if !allowedCategories[category] {
 		// Return 404 to prevent enumeration of non-portal attachments
-		http.Error(w, "Attachment not found", http.StatusNotFound)
+		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Attachment not found"))
 		return
 	}
 
@@ -1496,7 +1497,7 @@ func (h *PortalHandler) DownloadPortalAttachment(w http.ResponseWriter, r *http.
 	file, err := os.Open(filePath)
 	if err != nil {
 		slog.Error("failed to open attachment file", slog.String("component", "portal"), slog.String("path", filePath), slog.Any("error", err))
-		http.Error(w, "File not found", http.StatusNotFound)
+		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "File not found"))
 		return
 	}
 	defer file.Close()
@@ -1522,7 +1523,7 @@ func (h *PortalHandler) GetAssetReports(w http.ResponseWriter, r *http.Request) 
 	// Find channel by portal slug
 	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
 	if err != nil {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+		respondNotFound(w, r, "portal")
 		return
 	}
 	channel := portalResult.channel
@@ -1541,7 +1542,7 @@ func (h *PortalHandler) GetAssetReports(w http.ResponseWriter, r *http.Request) 
 
 	rows, err := h.db.QueryContext(ctx, query, channel.ID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -1634,7 +1635,7 @@ func (h *PortalHandler) GetRequestTypeFields(w http.ResponseWriter, r *http.Requ
 	requestTypeIDStr := r.PathValue("id")
 	requestTypeID, err := strconv.Atoi(requestTypeIDStr)
 	if err != nil {
-		http.Error(w, "Invalid request type ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -1644,18 +1645,18 @@ func (h *PortalHandler) GetRequestTypeFields(w http.ResponseWriter, r *http.Requ
 	// Find channel by portal slug
 	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
 	if err != nil {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+		respondNotFound(w, r, "portal")
 		return
 	}
 
 	// Verify request type belongs to this channel
 	valid, err := h.portalService.ValidateRequestTypeBelongsToChannel(ctx, requestTypeID, portalResult.channel.ID)
 	if err != nil {
-		http.Error(w, "Failed to validate request type", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !valid {
-		http.Error(w, "Request type not found", http.StatusNotFound)
+		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Request type not found"))
 		return
 	}
 
@@ -1663,7 +1664,7 @@ func (h *PortalHandler) GetRequestTypeFields(w http.ResponseWriter, r *http.Requ
 	fields, err := h.portalService.GetRequestTypeFields(ctx, requestTypeID)
 	if err != nil {
 		slog.Error("failed to get request type fields", slog.String("component", "portal"), slog.Int("request_type_id", requestTypeID), slog.Any("error", err))
-		http.Error(w, "Failed to get request type fields", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1682,7 +1683,7 @@ func (h *PortalHandler) GetCustomFields(w http.ResponseWriter, r *http.Request) 
 	// Find channel by portal slug
 	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
 	if err != nil {
-		http.Error(w, "Portal not found", http.StatusNotFound)
+		respondNotFound(w, r, "portal")
 		return
 	}
 
@@ -1690,7 +1691,7 @@ func (h *PortalHandler) GetCustomFields(w http.ResponseWriter, r *http.Request) 
 	fields, err := h.portalService.GetCustomFieldsForChannel(ctx, portalResult.channel.ID)
 	if err != nil {
 		slog.Error("failed to get custom fields for channel", slog.String("component", "portal"), slog.Int("channel_id", portalResult.channel.ID), slog.Any("error", err))
-		http.Error(w, "Failed to get custom fields", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

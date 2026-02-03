@@ -79,21 +79,21 @@ func (h *PermissionHandler) GetAllPermissions(w http.ResponseWriter, r *http.Req
 	
 	rows, err := h.db.Query(query)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
-	
+
 	var permissions []models.Permission
 	for rows.Next() {
 		var p models.Permission
 		err := rows.Scan(
-			&p.ID, &p.PermissionKey, &p.PermissionName, 
+			&p.ID, &p.PermissionKey, &p.PermissionName,
 			&p.Description, &p.Scope, &p.IsSystem,
 			&p.CreatedAt, &p.UpdatedAt,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		permissions = append(permissions, p)
@@ -107,20 +107,20 @@ func (h *PermissionHandler) GetAllPermissions(w http.ResponseWriter, r *http.Req
 func (h *PermissionHandler) GetUserPermissions(w http.ResponseWriter, r *http.Request) {
 	userID, err := strconv.Atoi(r.PathValue("userId"))
 	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "userId")
 		return
 	}
-	
+
 	// Get current user from context
 	currentUser := r.Context().Value(middleware.ContextKeyUser)
 	if currentUser == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	user, ok := currentUser.(*models.User)
 	if !ok {
-		http.Error(w, "Invalid user context", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("invalid user context"))
 		return
 	}
 
@@ -128,14 +128,14 @@ func (h *PermissionHandler) GetUserPermissions(w http.ResponseWriter, r *http.Re
 	if user.ID != userID {
 		isSystemAdmin, err := h.permissionService.IsSystemAdmin(user.ID)
 		if err != nil || !isSystemAdmin {
-			http.Error(w, "Forbidden: You can only access your own permissions", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	}
-	
+
 	summary, err := h.getUserPermissionSummary(userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	
@@ -147,19 +147,19 @@ func (h *PermissionHandler) GetUserPermissions(w http.ResponseWriter, r *http.Re
 func (h *PermissionHandler) GrantGlobalPermission(w http.ResponseWriter, r *http.Request) {
 	var req models.PermissionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	if req.WorkspaceID != nil {
-		http.Error(w, "Workspace ID should not be provided for global permissions", http.StatusBadRequest)
+		respondValidationError(w, r, "Workspace ID should not be provided for global permissions")
 		return
 	}
 
 	// Get the granter from session context
 	granterID := h.getSessionUserID(r)
 	if granterID == 0 {
-		http.Error(w, "Unable to identify granter", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -167,16 +167,16 @@ func (h *PermissionHandler) GrantGlobalPermission(w http.ResponseWriter, r *http
 	var permissionScope string
 	err := h.db.QueryRow("SELECT scope FROM permissions WHERE id = ?", req.PermissionID).Scan(&permissionScope)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Permission not found", http.StatusNotFound)
+		respondNotFound(w, r, "permission")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if permissionScope != models.PermissionScopeGlobal {
-		http.Error(w, "Permission is not a global permission", http.StatusBadRequest)
+		respondValidationError(w, r, "Permission is not a global permission")
 		return
 	}
 
@@ -191,7 +191,7 @@ func (h *PermissionHandler) GrantGlobalPermission(w http.ResponseWriter, r *http
 	`, req.UserID, req.PermissionID, granterID, time.Now(), req.UserID, req.PermissionID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -238,24 +238,24 @@ func (h *PermissionHandler) GrantGlobalPermission(w http.ResponseWriter, r *http
 func (h *PermissionHandler) RevokeGlobalPermission(w http.ResponseWriter, r *http.Request) {
 	userID, err := strconv.Atoi(r.PathValue("userId"))
 	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "userId")
 		return
 	}
-	
+
 	permissionID, err := strconv.Atoi(r.PathValue("permissionId"))
 	if err != nil {
-		http.Error(w, "Invalid permission ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "permissionId")
 		return
 	}
-	
+
 	// Don't allow revoking system admin from the last admin
 	var permissionKey string
 	err = h.db.QueryRow("SELECT permission_key FROM permissions WHERE id = ?", permissionID).Scan(&permissionKey)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
-	
+
 	if permissionKey == models.PermissionSystemAdmin {
 		var adminCount int
 		err = h.db.QueryRow(`
@@ -264,30 +264,30 @@ func (h *PermissionHandler) RevokeGlobalPermission(w http.ResponseWriter, r *htt
 			WHERE p.permission_key = 'system.admin'
 		`).Scan(&adminCount)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
-		
+
 		if adminCount <= 1 {
-			http.Error(w, "Cannot revoke system admin from the last administrator", http.StatusForbidden)
+			respondForbidden(w, r)
 			return
 		}
 	}
-	
+
 	// Revoke the permission
 	result, err := h.db.ExecWrite(`
 		DELETE FROM user_global_permissions
 		WHERE user_id = ? AND permission_id = ?
 	`, userID, permissionID)
-	
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
-	
+
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Permission not found or already revoked", http.StatusNotFound)
+		respondNotFound(w, r, "permission")
 		return
 	}
 
@@ -337,14 +337,14 @@ func (h *PermissionHandler) GrantGlobalPermissionToGroup(w http.ResponseWriter, 
 		PermissionID int `json:"permission_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Get the granter from session context
 	granterID := h.getSessionUserID(r)
 	if granterID == 0 {
-		http.Error(w, "Unable to identify granter", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -352,16 +352,16 @@ func (h *PermissionHandler) GrantGlobalPermissionToGroup(w http.ResponseWriter, 
 	var permissionScope string
 	err := h.db.QueryRow("SELECT scope FROM permissions WHERE id = ?", req.PermissionID).Scan(&permissionScope)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Permission not found", http.StatusNotFound)
+		respondNotFound(w, r, "permission")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if permissionScope != models.PermissionScopeGlobal {
-		http.Error(w, "Permission is not a global permission", http.StatusBadRequest)
+		respondValidationError(w, r, "Permission is not a global permission")
 		return
 	}
 
@@ -369,11 +369,11 @@ func (h *PermissionHandler) GrantGlobalPermissionToGroup(w http.ResponseWriter, 
 	var groupExists bool
 	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM groups WHERE id = ?)", req.GroupID).Scan(&groupExists)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	if !groupExists {
-		http.Error(w, "Group not found", http.StatusNotFound)
+		respondNotFound(w, r, "group")
 		return
 	}
 
@@ -388,7 +388,7 @@ func (h *PermissionHandler) GrantGlobalPermissionToGroup(w http.ResponseWriter, 
 	`, req.GroupID, req.PermissionID, granterID, time.Now(), req.GroupID, req.PermissionID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -449,13 +449,13 @@ func (h *PermissionHandler) GrantGlobalPermissionToGroup(w http.ResponseWriter, 
 func (h *PermissionHandler) RevokeGlobalPermissionFromGroup(w http.ResponseWriter, r *http.Request) {
 	groupID, err := strconv.Atoi(r.PathValue("groupId"))
 	if err != nil {
-		http.Error(w, "Invalid group ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "groupId")
 		return
 	}
 
 	permissionID, err := strconv.Atoi(r.PathValue("permissionId"))
 	if err != nil {
-		http.Error(w, "Invalid permission ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "permissionId")
 		return
 	}
 
@@ -466,13 +466,13 @@ func (h *PermissionHandler) RevokeGlobalPermissionFromGroup(w http.ResponseWrite
 	`, groupID, permissionID)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Permission not found or already revoked", http.StatusNotFound)
+		respondNotFound(w, r, "permission")
 		return
 	}
 
@@ -689,7 +689,7 @@ func (h *PermissionHandler) GetAllGroupPermissions(w http.ResponseWriter, r *htt
 
 	rows, err := h.db.Query(query)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()

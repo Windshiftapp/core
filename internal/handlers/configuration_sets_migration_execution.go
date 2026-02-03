@@ -15,7 +15,7 @@ import (
 func (h *ConfigurationSetHandler) ExecuteMigration(w http.ResponseWriter, r *http.Request) {
 	var migrationReq models.WorkflowMigrationRequest
 	if err := json.NewDecoder(r.Body).Decode(&migrationReq); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
@@ -23,13 +23,13 @@ func (h *ConfigurationSetHandler) ExecuteMigration(w http.ResponseWriter, r *htt
 	var configSetExists bool
 	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", migrationReq.ConfigurationSetID).Scan(&configSetExists)
 	if err != nil || !configSetExists {
-		http.Error(w, "Configuration set not found", http.StatusBadRequest)
+		respondBadRequest(w, r, "Configuration set not found")
 		return
 	}
 
 	// Validate workspace IDs provided
 	if len(migrationReq.WorkspaceIDs) == 0 {
-		http.Error(w, "At least one workspace ID is required", http.StatusBadRequest)
+		respondValidationError(w, r, "At least one workspace ID is required")
 		return
 	}
 
@@ -38,7 +38,7 @@ func (h *ConfigurationSetHandler) ExecuteMigration(w http.ResponseWriter, r *htt
 		var statusExists bool
 		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE id = ?)", mapping.ToStatusID).Scan(&statusExists)
 		if err != nil || !statusExists {
-			http.Error(w, fmt.Sprintf("Target status ID %d not found", mapping.ToStatusID), http.StatusBadRequest)
+			respondBadRequest(w, r, fmt.Sprintf("Target status ID %d not found", mapping.ToStatusID))
 			return
 		}
 	}
@@ -46,7 +46,7 @@ func (h *ConfigurationSetHandler) ExecuteMigration(w http.ResponseWriter, r *htt
 	// Start transaction for atomic migration
 	tx, err := h.db.Begin()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
@@ -86,7 +86,7 @@ func (h *ConfigurationSetHandler) ExecuteMigration(w http.ResponseWriter, r *htt
 
 		result, err := tx.Exec(updateQuery, updateArgs...)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -96,7 +96,7 @@ func (h *ConfigurationSetHandler) ExecuteMigration(w http.ResponseWriter, r *htt
 
 	// Commit the transaction
 	if err = tx.Commit(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -113,7 +113,7 @@ func (h *ConfigurationSetHandler) ExecuteMigration(w http.ResponseWriter, r *htt
 func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseWriter, r *http.Request) {
 	var req models.ComprehensiveMigrationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 
@@ -123,17 +123,17 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 	h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", req.NewConfigurationSetID).Scan(&newConfigSetExists)
 
 	if !oldConfigSetExists {
-		http.Error(w, "Old configuration set not found", http.StatusBadRequest)
+		respondBadRequest(w, r, "Old configuration set not found")
 		return
 	}
 	if !newConfigSetExists {
-		http.Error(w, "New configuration set not found", http.StatusBadRequest)
+		respondBadRequest(w, r, "New configuration set not found")
 		return
 	}
 
 	// Validate workspace IDs provided
 	if len(req.WorkspaceIDs) == 0 {
-		http.Error(w, "At least one workspace ID is required", http.StatusBadRequest)
+		respondValidationError(w, r, "At least one workspace ID is required")
 		return
 	}
 
@@ -142,7 +142,7 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 		var exists bool
 		h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM item_types WHERE id = ?)", mapping.ToItemTypeID).Scan(&exists)
 		if !exists {
-			http.Error(w, fmt.Sprintf("Target item type ID %d not found", mapping.ToItemTypeID), http.StatusBadRequest)
+			respondBadRequest(w, r, fmt.Sprintf("Target item type ID %d not found", mapping.ToItemTypeID))
 			return
 		}
 	}
@@ -151,7 +151,7 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 		var exists bool
 		h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE id = ?)", mapping.ToStatusID).Scan(&exists)
 		if !exists {
-			http.Error(w, fmt.Sprintf("Target status ID %d not found", mapping.ToStatusID), http.StatusBadRequest)
+			respondBadRequest(w, r, fmt.Sprintf("Target status ID %d not found", mapping.ToStatusID))
 			return
 		}
 	}
@@ -160,7 +160,7 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 		var exists bool
 		h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM priorities WHERE id = ?)", mapping.ToPriorityID).Scan(&exists)
 		if !exists {
-			http.Error(w, fmt.Sprintf("Target priority ID %d not found", mapping.ToPriorityID), http.StatusBadRequest)
+			respondBadRequest(w, r, fmt.Sprintf("Target priority ID %d not found", mapping.ToPriorityID))
 			return
 		}
 	}
@@ -168,7 +168,7 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 	// Start transaction for atomic migration
 	tx, err := h.db.Begin()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
@@ -209,7 +209,7 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 
 		result, err := tx.Exec(updateQuery, updateArgs...)
 		if err != nil {
-			http.Error(w, "Failed to migrate item types: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to migrate item types: %w", err))
 			return
 		}
 		rowsAffected, _ := result.RowsAffected()
@@ -221,7 +221,7 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 		if mapping.Action == "add_default" && mapping.DefaultValue != nil {
 			count, err := h.addDefaultFieldValue(tx, req.WorkspaceIDs, mapping.FieldID, mapping.DefaultValue)
 			if err != nil {
-				http.Error(w, "Failed to add default field values: "+err.Error(), http.StatusInternalServerError)
+				respondInternalError(w, r, fmt.Errorf("failed to add default field values: %w", err))
 				return
 			}
 			stats.CustomFieldsUpdated += count
@@ -255,7 +255,7 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 
 		result, err := tx.Exec(updateQuery, updateArgs...)
 		if err != nil {
-			http.Error(w, "Failed to migrate statuses: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to migrate statuses: %w", err))
 			return
 		}
 		rowsAffected, _ := result.RowsAffected()
@@ -287,7 +287,7 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 
 		result, err := tx.Exec(updateQuery, updateArgs...)
 		if err != nil {
-			http.Error(w, "Failed to migrate priorities: "+err.Error(), http.StatusInternalServerError)
+			respondInternalError(w, r, fmt.Errorf("failed to migrate priorities: %w", err))
 			return
 		}
 		rowsAffected, _ := result.RowsAffected()
@@ -296,7 +296,7 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 
 	// Commit the transaction
 	if err = tx.Commit(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

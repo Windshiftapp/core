@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -77,7 +76,7 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	// Get user from context for permission check
 	user := r.Context().Value(middleware.ContextKeyUser)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -92,7 +91,7 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 		if collectionParam := queryParams.Get("collection_id"); collectionParam != "" {
 			collectionID, err := strconv.Atoi(collectionParam)
 			if err != nil {
-				http.Error(w, "Invalid collection_id", http.StatusBadRequest)
+				respondInvalidID(w, r, "collection_id")
 				return
 			}
 
@@ -101,16 +100,16 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 			err = h.db.QueryRow(`SELECT workspace_id, ql_query FROM collections WHERE id = ?`, collectionID).
 				Scan(&collectionWorkspaceID, &collectionQuery)
 			if err == sql.ErrNoRows {
-				http.Error(w, "Collection not found", http.StatusNotFound)
+				respondNotFound(w, r, "collection")
 				return
 			}
 			if err != nil {
-				http.Error(w, fmt.Sprintf("Failed to load collection: %v", err), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 
 			if collectionWorkspaceID.Valid && collectionWorkspaceID.Int64 != int64(workspaceID) {
-				http.Error(w, "Collection does not belong to this workspace", http.StatusBadRequest)
+				respondBadRequest(w, r, "Collection does not belong to this workspace")
 				return
 			}
 
@@ -125,13 +124,13 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(vqlQuery) != "" {
 		workspaceMap, err := h.buildWorkspaceMap()
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to load workspace mapping: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		evaluator := cql.NewEvaluator(workspaceMap)
 		filterSQL, filterArgs, err = evaluator.EvaluateToSQL(vqlQuery)
 		if err != nil {
-			http.Error(w, "VQL query error: "+err.Error(), http.StatusBadRequest)
+			respondBadRequest(w, r, "VQL query error: "+err.Error())
 			return
 		}
 	}

@@ -105,19 +105,19 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	providerStore := sso.NewProviderStore(h.db)
 	defaultProvider, err := providerStore.GetDefault()
 	if err == nil && defaultProvider != nil && defaultProvider.Enabled && !defaultProvider.AllowPasswordLogin {
-		http.Error(w, "Password login is disabled. Please use SSO to sign in.", http.StatusForbidden)
+		respondForbidden(w, r)
 		return
 	}
 
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate input using validator
 	if err := utils.Validate(req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, err.Error())
 		return
 	}
 
@@ -126,7 +126,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Check if IP is locked out due to failed attempts
 	if locked, duration := h.rateLimiter.IsLockedOut(ipAddress); locked {
-		http.Error(w, fmt.Sprintf("Too many failed login attempts. Please try again in %s", middleware.FormatLockoutDuration(duration)), http.StatusTooManyRequests)
+		respondTooManyRequests(w, r, fmt.Sprintf("Too many failed login attempts. Please try again in %s", middleware.FormatLockoutDuration(duration)))
 		return
 	}
 
@@ -138,16 +138,16 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			h.rateLimiter.RecordFailedLogin(ipAddress)
 			// Always perform bcrypt comparison to prevent timing attacks
 			bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(req.Password))
-			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+			respondUnauthorized(w, r)
 			return
 		}
-		http.Error(w, "Authentication error", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Check if user is active
 	if !user.IsActive {
-		http.Error(w, "Account is disabled", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -155,7 +155,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		// Record failed attempt
 		h.rateLimiter.RecordFailedLogin(ipAddress)
-		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -185,7 +185,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 					} else {
 						msg = "Admin fallback rate limit exceeded. Try again later."
 					}
-					http.Error(w, msg, http.StatusTooManyRequests)
+					respondTooManyRequests(w, r, msg)
 					return
 				}
 				h.adminRateLimiter.RecordAttempt(user.ID, ipAddress)
@@ -218,7 +218,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 					} else {
 						msg = "Admin fallback rate limit exceeded. Try again later."
 					}
-					http.Error(w, msg, http.StatusTooManyRequests)
+					respondTooManyRequests(w, r, msg)
 					return
 				}
 				if !hasPasskey {
@@ -242,7 +242,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// Create session with enrollment flag if needed
 	session, err := h.sessionManager.CreateSession(user.ID, ipAddress, r.UserAgent(), req.RememberMe)
 	if err != nil {
-		http.Error(w, "Failed to create session", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -255,7 +255,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Set session cookie
 	if err := h.sessionManager.SetSessionCookie(w, r, session.Token, req.RememberMe); err != nil {
-		http.Error(w, "Failed to set session", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -295,7 +295,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	// Invalidate session
 	if err := h.sessionManager.DeleteSession(token); err != nil {
-		http.Error(w, "Failed to logout", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -314,7 +314,7 @@ func (h *AuthHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	// Get session token from request (since auth middleware skips /api/auth/ paths)
 	token, err := h.sessionManager.GetSessionFromRequest(r)
 	if err != nil {
-		http.Error(w, "Not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -324,7 +324,7 @@ func (h *AuthHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	// Validate session
 	session, err := h.sessionManager.ValidateSession(token, clientIP)
 	if err != nil {
-		http.Error(w, "Not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -355,7 +355,7 @@ func (h *AuthHandler) RefreshSession(w http.ResponseWriter, r *http.Request) {
 	// Get session token
 	token, err := h.sessionManager.GetSessionFromRequest(r)
 	if err != nil {
-		http.Error(w, "No session found", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -367,13 +367,13 @@ func (h *AuthHandler) RefreshSession(w http.ResponseWriter, r *http.Request) {
 
 	// Refresh session
 	if err := h.sessionManager.RefreshSession(token, req.RememberMe); err != nil {
-		http.Error(w, "Failed to refresh session", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Update cookie with new expiration
 	if err := h.sessionManager.SetSessionCookie(w, r, token, req.RememberMe); err != nil {
-		http.Error(w, "Failed to update session cookie", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -389,13 +389,13 @@ func (h *AuthHandler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 	// Get session from context
 	session, ok := r.Context().Value(middleware.ContextKeySession).(*auth.Session)
 	if !ok || session == nil {
-		http.Error(w, "Not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	// Invalidate all user sessions
 	if err := h.sessionManager.DeleteAllUserSessions(session.UserID); err != nil {
-		http.Error(w, "Failed to logout all sessions", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -459,39 +459,39 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	// Get session from context
 	session, ok := r.Context().Value(middleware.ContextKeySession).(*auth.Session)
 	if !ok || session == nil {
-		http.Error(w, "Not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	var req ChangePasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate input using validator
 	if err := utils.Validate(req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondValidationError(w, r, err.Error())
 		return
 	}
 
 	// Get current user data to verify current password
 	user, err := h.findUserByEmailOrUsername(session.User.Email)
 	if err != nil {
-		http.Error(w, "User not found", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Verify current password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.CurrentPassword)); err != nil {
-		http.Error(w, "Current password is incorrect", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	// Hash new password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
-		http.Error(w, "Failed to hash new password", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -499,7 +499,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	query := `UPDATE users SET password_hash = ?, requires_password_reset = 0, updated_at = ? WHERE id = ?`
 	_, err = h.db.ExecWrite(query, string(hashedPassword), time.Now(), session.UserID)
 	if err != nil {
-		http.Error(w, "Failed to update password", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -531,12 +531,12 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if token == "" {
-		http.Error(w, "Verification token is required", http.StatusBadRequest)
+		respondBadRequest(w, r, "Verification token is required")
 		return
 	}
 
 	if h.emailVerificationService == nil {
-		http.Error(w, "Email verification is not configured", http.StatusServiceUnavailable)
+		respondServiceUnavailable(w, r, "Email verification is not configured")
 		return
 	}
 
@@ -544,9 +544,9 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch err {
 		case services.ErrTokenExpired:
-			http.Error(w, "Verification link has expired. Please request a new one.", http.StatusGone)
+			respondGone(w, r, "Verification link has expired. Please request a new one.")
 		case services.ErrTokenInvalid:
-			http.Error(w, "Invalid verification link", http.StatusBadRequest)
+			respondBadRequest(w, r, "Invalid verification link")
 		case services.ErrAlreadyVerified:
 			// Not an error - just let them know
 			w.Header().Set("Content-Type", "application/json")
@@ -557,7 +557,7 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 			return
 		default:
 			slog.Error("email verification error", slog.String("component", "auth"), slog.Any("error", err))
-			http.Error(w, "Failed to verify email", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -576,12 +576,12 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 	// Get session from context
 	session, ok := r.Context().Value(middleware.ContextKeySession).(*auth.Session)
 	if !ok || session == nil {
-		http.Error(w, "Not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 
 	if h.emailVerificationService == nil {
-		http.Error(w, "Email verification is not configured", http.StatusServiceUnavailable)
+		respondServiceUnavailable(w, r, "Email verification is not configured")
 		return
 	}
 
@@ -596,12 +596,12 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 			})
 			return
 		case services.ErrUserNotFound:
-			http.Error(w, "User not found", http.StatusNotFound)
+			respondNotFound(w, r, "user")
 		case services.ErrSMTPNotConfigured:
-			http.Error(w, "Email service is not available", http.StatusServiceUnavailable)
+			respondServiceUnavailable(w, r, "Email service is not available")
 		default:
 			slog.Error("failed to resend verification", slog.String("component", "auth"), slog.Any("error", err))
-			http.Error(w, "Failed to send verification email", http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 		}
 		return
 	}
@@ -618,7 +618,7 @@ func (h *AuthHandler) GetVerificationStatus(w http.ResponseWriter, r *http.Reque
 	// Get session from context
 	session, ok := r.Context().Value(middleware.ContextKeySession).(*auth.Session)
 	if !ok || session == nil {
-		http.Error(w, "Not authenticated", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 

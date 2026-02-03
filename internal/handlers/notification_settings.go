@@ -3,14 +3,12 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
-
 )
 
 type NotificationSettingsHandler struct {
@@ -34,7 +32,7 @@ func (h *NotificationSettingsHandler) GetNotificationSettings(w http.ResponseWri
 
 	rows, err := h.db.GetDB().Query(query)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Database query error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer rows.Close()
@@ -51,7 +49,7 @@ func (h *NotificationSettingsHandler) GetNotificationSettings(w http.ResponseWri
 			&createdByName,
 		)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Error scanning row: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 
@@ -73,7 +71,7 @@ func (h *NotificationSettingsHandler) GetNotificationSettings(w http.ResponseWri
 		// Load event rules for this setting
 		eventRules, err := h.getEventRulesForSetting(s.ID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Error loading event rules: %v", err), http.StatusInternalServerError)
+			respondInternalError(w, r, err)
 			return
 		}
 		s.EventRules = eventRules
@@ -90,7 +88,7 @@ func (h *NotificationSettingsHandler) GetNotificationSetting(w http.ResponseWrit
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid notification setting ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -113,7 +111,7 @@ func (h *NotificationSettingsHandler) GetNotificationSetting(w http.ResponseWrit
 		&createdByName,
 	)
 	if err != nil {
-		http.Error(w, "Notification setting not found", http.StatusNotFound)
+		respondNotFound(w, r, "notification_setting")
 		return
 	}
 
@@ -135,7 +133,7 @@ func (h *NotificationSettingsHandler) GetNotificationSetting(w http.ResponseWrit
 	// Load event rules for this setting
 	eventRules, err := h.getEventRulesForSetting(s.ID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error loading event rules: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	s.EventRules = eventRules
@@ -148,17 +146,17 @@ func (h *NotificationSettingsHandler) GetNotificationSetting(w http.ResponseWrit
 func (h *NotificationSettingsHandler) CreateNotificationSetting(w http.ResponseWriter, r *http.Request) {
 	var req models.NotificationSetting
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
 
 	// Validate required fields
 	if req.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 	if req.CreatedBy == 0 {
-		http.Error(w, "CreatedBy is required", http.StatusBadRequest)
+		respondValidationError(w, r, "CreatedBy is required")
 		return
 	}
 
@@ -169,7 +167,7 @@ func (h *NotificationSettingsHandler) CreateNotificationSetting(w http.ResponseW
 		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
 	`, req.Name, req.Description, req.IsActive, req.CreatedBy).Scan(&id)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -185,7 +183,7 @@ func (h *NotificationSettingsHandler) CreateNotificationSetting(w http.ResponseW
 			`, id, rule.EventType, rule.IsEnabled, rule.NotifyAssignee, rule.NotifyCreator,
 				rule.NotifyWatchers, rule.NotifyWorkspaceAdmins, rule.CustomRecipients, rule.MessageTemplate)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("Error inserting event rule: %v", err), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 		}
@@ -203,45 +201,45 @@ func (h *NotificationSettingsHandler) UpdateNotificationSetting(w http.ResponseW
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid notification setting ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	var req models.NotificationSetting
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
 
 	// Validate required fields
 	if req.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		respondValidationError(w, r, "Name is required")
 		return
 	}
 
 	// Start transaction for updating setting and its rules
 	tx, err := h.db.GetDB().Begin()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Transaction error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 	defer tx.Rollback()
 
 	// Update notification setting
 	_, err = tx.Exec(`
-		UPDATE notification_settings 
+		UPDATE notification_settings
 		SET name = ?, description = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`, req.Name, req.Description, req.IsActive, id)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	// Delete existing event rules
 	_, err = tx.Exec(`DELETE FROM notification_event_rules WHERE notification_setting_id = ?`, id)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error deleting existing rules: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -257,7 +255,7 @@ func (h *NotificationSettingsHandler) UpdateNotificationSetting(w http.ResponseW
 			`, id, rule.EventType, rule.IsEnabled, rule.NotifyAssignee, rule.NotifyCreator,
 				rule.NotifyWatchers, rule.NotifyWorkspaceAdmins, rule.CustomRecipients, rule.MessageTemplate)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("Error inserting event rule: %v", err), http.StatusInternalServerError)
+				respondInternalError(w, r, err)
 				return
 			}
 		}
@@ -265,7 +263,7 @@ func (h *NotificationSettingsHandler) UpdateNotificationSetting(w http.ResponseW
 
 	// Commit transaction
 	if err := tx.Commit(); err != nil {
-		http.Error(w, fmt.Sprintf("Transaction commit error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -280,41 +278,41 @@ func (h *NotificationSettingsHandler) DeleteNotificationSetting(w http.ResponseW
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid notification setting ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "id")
 		return
 	}
 
 	// Check if this setting is assigned to any configuration sets
 	var count int
 	err = h.db.GetDB().QueryRow(`
-		SELECT COUNT(*) FROM configuration_set_notification_settings 
+		SELECT COUNT(*) FROM configuration_set_notification_settings
 		WHERE notification_setting_id = ?
 	`, id).Scan(&count)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if count > 0 {
-		http.Error(w, "Cannot delete notification setting: it is assigned to one or more configuration sets", http.StatusConflict)
+		respondConflict(w, r, "Cannot delete notification setting: it is assigned to one or more configuration sets")
 		return
 	}
 
 	// Delete the notification setting (event rules will be cascade deleted)
 	result, err := h.db.GetDB().Exec(`DELETE FROM notification_settings WHERE id = ?`, id)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error checking result: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
 	if rowsAffected == 0 {
-		http.Error(w, "Notification setting not found", http.StatusNotFound)
+		respondNotFound(w, r, "notification_setting")
 		return
 	}
 

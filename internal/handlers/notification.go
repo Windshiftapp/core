@@ -394,7 +394,7 @@ func (nh *NotificationHandler) GetNotifications(w http.ResponseWriter, r *http.R
 	user := nh.getUserFromContext(r)
 	if user == nil {
 		slog.Debug("no authenticated user in context", slog.String("component", "notifications"))
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	userID := user.ID
@@ -422,7 +422,7 @@ func (nh *NotificationHandler) GetNotifications(w http.ResponseWriter, r *http.R
 	notifications, err := nh.manager.GetUserNotifications(userID, limit, offset)
 	if err != nil {
 		slog.Error("failed to get notifications", slog.String("component", "notifications"), slog.Int("user_id", userID), slog.Any("error", err))
-		http.Error(w, fmt.Sprintf("Failed to get notifications: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -435,7 +435,7 @@ func (nh *NotificationHandler) GetNotifications(w http.ResponseWriter, r *http.R
 func (nh *NotificationHandler) CreateNotification(w http.ResponseWriter, r *http.Request) {
 	var notification models.Notification
 	if err := json.NewDecoder(r.Body).Decode(&notification); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
 
@@ -445,7 +445,7 @@ func (nh *NotificationHandler) CreateNotification(w http.ResponseWriter, r *http
 	}
 
 	if err := nh.manager.AddNotification(notification); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create notification: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -460,7 +460,7 @@ func (nh *NotificationHandler) MarkNotificationAsRead(w http.ResponseWriter, r *
 	user := nh.getUserFromContext(r)
 	if user == nil {
 		slog.Debug("no authenticated user in context", slog.String("component", "notifications"))
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return
 	}
 	userID := user.ID
@@ -469,7 +469,7 @@ func (nh *NotificationHandler) MarkNotificationAsRead(w http.ResponseWriter, r *
 
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid notification ID", http.StatusBadRequest)
+		respondInvalidID(w, r, "notification ID")
 		return
 	}
 
@@ -477,7 +477,7 @@ func (nh *NotificationHandler) MarkNotificationAsRead(w http.ResponseWriter, r *
 
 	if err := nh.manager.MarkAsRead(userID, id); err != nil {
 		slog.Error("failed to mark notification as read", slog.String("component", "notifications"), slog.Int("notification_id", id), slog.Int("user_id", userID), slog.Any("error", err))
-		http.Error(w, fmt.Sprintf("Failed to mark notification as read: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -491,13 +491,13 @@ func (nh *NotificationHandler) RefreshCache(w http.ResponseWriter, r *http.Reque
 
 	if nh.service == nil {
 		slog.Warn("notification service not available", slog.String("component", "notifications"))
-		http.Error(w, "Notification service not available", http.StatusInternalServerError)
+		respondInternalError(w, r, fmt.Errorf("notification service not available"))
 		return
 	}
 
 	if err := nh.service.ForceRefreshCache(); err != nil {
 		slog.Error("failed to refresh cache", slog.String("component", "notifications"), slog.Any("error", err))
-		http.Error(w, fmt.Sprintf("Failed to refresh cache: %v", err), http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return
 	}
 

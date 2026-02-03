@@ -44,10 +44,10 @@ func (h *BaseHandler) getWriteDB() (*sql.DB, error) {
 // requireReadDB returns the database connection and writes an HTTP error if unavailable.
 // Returns nil and false if the database is unavailable (error already written to response).
 // Returns db and true if the database is available.
-func (h *BaseHandler) requireReadDB(w http.ResponseWriter) (*sql.DB, bool) {
+func (h *BaseHandler) requireReadDB(w http.ResponseWriter, r *http.Request) (*sql.DB, bool) {
 	db, err := h.getReadDB()
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return nil, false
 	}
 	return db, true
@@ -56,10 +56,10 @@ func (h *BaseHandler) requireReadDB(w http.ResponseWriter) (*sql.DB, bool) {
 // requireWriteDB returns the database connection and writes an HTTP error if unavailable.
 // Returns nil and false if the database is unavailable (error already written to response).
 // Returns db and true if the database is available.
-func (h *BaseHandler) requireWriteDB(w http.ResponseWriter) (*sql.DB, bool) {
+func (h *BaseHandler) requireWriteDB(w http.ResponseWriter, r *http.Request) (*sql.DB, bool) {
 	db, err := h.getWriteDB()
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		respondInternalError(w, r, err)
 		return nil, false
 	}
 	return db, true
@@ -103,7 +103,7 @@ func (h *BaseHandler) executeInTransaction(fn func(*sql.Tx) error) error {
 func RequireAuth(w http.ResponseWriter, r *http.Request) (*models.User, bool) {
 	user := utils.GetCurrentUser(r)
 	if user == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		respondUnauthorized(w, r)
 		return nil, false
 	}
 	return user, true
@@ -114,13 +114,13 @@ func RequireAuth(w http.ResponseWriter, r *http.Request) (*models.User, bool) {
 // Returns true if permitted, false otherwise (error already written to response).
 // Usage:
 //
-//	if !RequireWorkspacePermission(w, user.ID, workspaceID, models.PermissionItemView, h.permissionService) {
+//	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionItemView, h.permissionService) {
 //	    return
 //	}
-func RequireWorkspacePermission(w http.ResponseWriter, userID, workspaceID int, permission string, permService *services.PermissionService) bool {
+func RequireWorkspacePermission(w http.ResponseWriter, r *http.Request, userID, workspaceID int, permission string, permService *services.PermissionService) bool {
 	hasPermission, err := permService.HasWorkspacePermission(userID, workspaceID, permission)
 	if err != nil || !hasPermission {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		respondForbidden(w, r)
 		return false
 	}
 	return true
@@ -131,13 +131,13 @@ func RequireWorkspacePermission(w http.ResponseWriter, userID, workspaceID int, 
 // Returns true if admin, false otherwise (error already written to response).
 // Usage:
 //
-//	if !RequireSystemAdmin(w, user.ID, h.permissionService) {
+//	if !RequireSystemAdmin(w, r, user.ID, h.permissionService) {
 //	    return
 //	}
-func RequireSystemAdmin(w http.ResponseWriter, userID int, permService *services.PermissionService) bool {
+func RequireSystemAdmin(w http.ResponseWriter, r *http.Request, userID int, permService *services.PermissionService) bool {
 	isAdmin, err := permService.IsSystemAdmin(userID)
 	if err != nil || !isAdmin {
-		http.Error(w, "Admin access required", http.StatusForbidden)
+		respondAdminRequired(w, r)
 		return false
 	}
 	return true
@@ -157,7 +157,7 @@ func AuthorizeUserRequest(w http.ResponseWriter, r *http.Request, targetUserID i
 	// Check if user is system admin or accessing their own resources
 	if currentUser.ID != targetUserID {
 		// Check for system.admin permission
-		if !RequireSystemAdmin(w, currentUser.ID, permissionService) {
+		if !RequireSystemAdmin(w, r, currentUser.ID, permissionService) {
 			return nil
 		}
 	}
