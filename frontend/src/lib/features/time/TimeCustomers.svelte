@@ -43,7 +43,7 @@
 
   async function loadCustomers() {
     try {
-      const result = await api.time.customers.getAll();
+      const result = await api.customerOrganisations.getAll();
       customers = result || [];
     } catch (error) {
       console.error('Failed to load customers:', error);
@@ -91,9 +91,9 @@
     try {
       console.log(formData)
       if (editingCustomer) {
-        await api.time.customers.update(editingCustomer.id, formData);
+        await api.customerOrganisations.update(editingCustomer.id, formData);
       } else {
-        await api.time.customers.create(formData);
+        await api.customerOrganisations.create(formData);
       }
       await loadCustomers();
       cancelForm();
@@ -114,7 +114,7 @@
 
     if (confirmed) {
       try {
-        await api.time.customers.delete(customer.id);
+        await api.customerOrganisations.delete(customer.id);
         await loadCustomers();
       } catch (error) {
         console.error('Failed to delete customer:', error);
@@ -204,7 +204,7 @@
           rounded="md"
         />
         <div>
-          <Text weight="semibold">{customer.name}</Text>
+          <Text size="sm" weight="semibold">{customer.name}</Text>
           {#if customer.description}
             <Text as="div" size="sm" variant="subtle" class="mt-1">{customer.description}</Text>
           {/if}

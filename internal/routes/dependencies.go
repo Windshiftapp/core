@@ -147,11 +147,12 @@ type PlanningHandlers struct {
 
 // TimeTrackingHandlers groups time tracking handlers.
 type TimeTrackingHandlers struct {
-	Customer        *handlers.TimeCustomerHandler
-	ProjectCategory *handlers.TimeProjectCategoryHandler
-	Project         *handlers.TimeProjectHandler
-	Worklog         *handlers.TimeWorklogHandler
-	ActiveTimer     *handlers.ActiveTimerHandler
+	Customer          *handlers.TimeCustomerHandler
+	ProjectCategory   *handlers.TimeProjectCategoryHandler
+	Project           *handlers.TimeProjectHandler
+	Worklog           *handlers.TimeWorklogHandler
+	ActiveTimer       *handlers.ActiveTimerHandler
+	ProjectPermission *handlers.TimeProjectPermissionHandler
 }
 
 // TestManagementHandlers groups test management handlers.

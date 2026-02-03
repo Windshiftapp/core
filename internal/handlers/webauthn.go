@@ -377,7 +377,8 @@ func (h *WebAuthnHandler) StartFIDOLoginNew(w http.ResponseWriter, r *http.Reque
 	}
 
 	if !user.IsActive {
-		respondUnauthorized(w, r)
+		// Return same response as non-existent user to prevent enumeration
+		respondNotFound(w, r, "credential")
 		return
 	}
 

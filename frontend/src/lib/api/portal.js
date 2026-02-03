@@ -99,6 +99,11 @@ export const contactRoles = {
 
 // Customer Organisations (requires customers.manage permission)
 export const customerOrganisations = {
-  getAll: () => fetchAPI('/time/customers'),
+  getAll: () => fetchAPI('/customer-organisations'),
+  get: (id) => fetchAPI(`/customer-organisations/${id}`),
+  create: (data) => fetchAPI('/customer-organisations', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id, data) => fetchAPI(`/customer-organisations/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id) => fetchAPI(`/customer-organisations/${id}`, { method: 'DELETE' }),
   getContacts: (id) => fetchAPI(`/customer-organisations/${id}/contacts`),
+  getProjects: (id) => fetchAPI(`/customer-organisations/${id}/projects`),
 };

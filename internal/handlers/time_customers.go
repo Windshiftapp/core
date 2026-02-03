@@ -7,18 +7,52 @@ import (
 	"net/http"
 	"time"
 	"windshift/internal/database"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
+	"windshift/internal/services"
 )
 
 type TimeCustomerHandler struct {
-	db database.Database
+	db                    database.Database
+	timePermissionService *services.TimePermissionService
 }
 
-func NewTimeCustomerHandler(db database.Database) *TimeCustomerHandler {
-	return &TimeCustomerHandler{db: db}
+func NewTimeCustomerHandler(db database.Database, timePermissionService *services.TimePermissionService) *TimeCustomerHandler {
+	return &TimeCustomerHandler{
+		db:                    db,
+		timePermissionService: timePermissionService,
+	}
+}
+
+// checkCustomerPermission is a helper that checks if the user has customers.manage or project.manage permission
+func (h *TimeCustomerHandler) checkCustomerPermission(w http.ResponseWriter, r *http.Request) (*models.User, bool) {
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	if !ok || user == nil {
+		respondUnauthorized(w, r)
+		return nil, false
+	}
+
+	if h.timePermissionService != nil {
+		hasPermission, err := h.timePermissionService.HasCustomersManagePermission(user.ID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return nil, false
+		}
+		if !hasPermission {
+			respondForbidden(w, r)
+			return nil, false
+		}
+	}
+
+	return user, true
 }
 
 func (h *TimeCustomerHandler) GetAll(w http.ResponseWriter, r *http.Request) {
+	// Check permission
+	if _, ok := h.checkCustomerPermission(w, r); !ok {
+		return
+	}
+
 	rows, err := h.db.Query(`
 		SELECT id, name, email, description, active, avatar_url, custom_field_values, created_at, updated_at
 		FROM customer_organisations
@@ -61,6 +95,11 @@ func (h *TimeCustomerHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TimeCustomerHandler) Get(w http.ResponseWriter, r *http.Request) {
+	// Check permission
+	if _, ok := h.checkCustomerPermission(w, r); !ok {
+		return
+	}
+
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
@@ -101,6 +140,11 @@ func (h *TimeCustomerHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TimeCustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
+	// Check permission
+	if _, ok := h.checkCustomerPermission(w, r); !ok {
+		return
+	}
+
 	var c models.CustomerOrganisation
 	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
 		respondBadRequest(w, r, err.Error())
@@ -143,6 +187,11 @@ func (h *TimeCustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
+	// Check permission
+	if _, ok := h.checkCustomerPermission(w, r); !ok {
+		return
+	}
+
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
@@ -188,6 +237,11 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TimeCustomerHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	// Check permission
+	if _, ok := h.checkCustomerPermission(w, r); !ok {
+		return
+	}
+
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return

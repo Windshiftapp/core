@@ -269,7 +269,8 @@ type Worklog struct {
 	ID           int    `json:"id"`
 	ProjectID    int    `json:"project_id"`
 	CustomerID   int    `json:"customer_id"`
-	ItemID       *int   `json:"item_id,omitempty"` // Optional link to work item
+	UserID       *int   `json:"user_id,omitempty"`  // User who created the worklog
+	ItemID       *int   `json:"item_id,omitempty"`  // Optional link to work item
 	Description  string `json:"description"`
 	Date         int64  `json:"date"`       // Unix timestamp
 	StartTime    int64  `json:"start_time"` // Unix timestamp
@@ -280,6 +281,7 @@ type Worklog struct {
 	// Joined fields for API responses
 	CustomerName        string   `json:"customer_name,omitempty"`
 	ProjectName         string   `json:"project_name,omitempty"`
+	UserName            string   `json:"user_name,omitempty"`             // Name of user who created the worklog
 	ItemTitle           string   `json:"item_title,omitempty"`            // Title of linked work item
 	WorkspaceID         *int     `json:"workspace_id,omitempty"`          // Workspace ID of linked item
 	WorkspaceKey        string   `json:"workspace_key,omitempty"`         // Workspace key for navigation (e.g., "TEST")

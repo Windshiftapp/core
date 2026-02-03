@@ -52,7 +52,7 @@ export default {
       themes: { title: 'Designs', description: 'Anwendungsdesigns und Erscheinungsbild verwalten' },
       users: { title: 'Benutzer', description: 'Benutzerkonten und Profile verwalten' },
       groups: { title: 'Gruppen', description: 'Benutzergruppen und Mitgliedschaften verwalten' },
-      permissions: { title: 'Berechtigungen & Sets', description: 'Berechtigungen und Berechtigungssets verwalten' },
+      permissions: { title: 'Globale Berechtigungen', description: 'Globale Berechtigungsdefinitionen verwalten' },
       workspaceRoles: { title: 'Arbeitsbereich-Rollen', description: 'Arbeitsbereich-Rollen und deren Berechtigungen anzeigen' },
       sso: { title: 'Single Sign-On', description: 'OIDC-Identitätsanbieter für SSO konfigurieren' },
       security: { title: 'Sicherheit', description: 'Sicherheitseinstellungen und Funktionssteuerungen verwalten' },
@@ -548,6 +548,11 @@ export default {
       by: 'Von',
       settingsSavedSuccess: 'Moduleinstellungen erfolgreich gespeichert!',
       failedToSave: 'Moduleinstellungen konnten nicht gespeichert werden. Bitte versuchen Sie es erneut.'
+    },
+
+    // Workspace Roles
+    workspaceRoles: {
+      readOnlyNote: 'Arbeitsbereich-Rollen sind systemdefiniert und können nicht bearbeitet werden. Sie dienen als Referenz für die verfügbaren Berechtigungen jeder Rolle.'
     },
 
     // Board Configuration

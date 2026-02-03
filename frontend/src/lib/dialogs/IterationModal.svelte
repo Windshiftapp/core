@@ -219,15 +219,15 @@
       </div>
 
     </form>
-
-    <DialogFooter
-      onCancel={handleCancel}
-      onConfirm={handleSave}
-      confirmLabel={iteration ? t('sprints.updateIteration') : t('sprints.createIteration')}
-      disabled={saving}
-      loading={saving}
-      showKeyboardHint={true}
-      confirmKeyboardHint={submitHint}
-    />
   </div>
+
+  <DialogFooter
+    onCancel={handleCancel}
+    onConfirm={handleSave}
+    confirmLabel={iteration ? t('sprints.updateIteration') : t('sprints.createIteration')}
+    disabled={saving}
+    loading={saving}
+    showKeyboardHint={true}
+    confirmKeyboardHint={submitHint}
+  />
 </Modal>

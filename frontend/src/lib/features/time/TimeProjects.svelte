@@ -4,11 +4,12 @@
   import Button from '../../components/Button.svelte';
   import TimeProjectCategories from './TimeProjectCategories.svelte';
   import TimeProjectModal from '../../dialogs/TimeProjectModal.svelte';
+  import TimeProjectPermissionsModal from '../../dialogs/TimeProjectPermissionsModal.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
-  import { Plus, X, Briefcase, Edit, Trash2 } from 'lucide-svelte';
+  import { Plus, X, Briefcase, Edit, Trash2, Shield } from 'lucide-svelte';
   import SearchInput from '../../components/SearchInput.svelte';
   import ColorDot from '../../components/ColorDot.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
@@ -21,6 +22,8 @@
   let categories = $state([]);
   let showCreateForm = $state(false);
   let editingProject = $state(null);
+  let showPermissionsModal = $state(false);
+  let permissionsProject = $state(null);
 
   // Filter state
   let selectedCategoryId = $state(null);
@@ -55,7 +58,7 @@
 
   async function loadCustomers() {
     try {
-      const result = await api.time.customers.getAll();
+      const result = await api.customerOrganisations.getAll();
       customers = result || [];
     } catch (error) {
       console.error('Failed to load customers:', error);
@@ -170,6 +173,16 @@
     return customer ? customer.name : t('time.projects.unknownCustomer');
   }
 
+  function openPermissions(project) {
+    permissionsProject = project;
+    showPermissionsModal = true;
+  }
+
+  function closePermissionsModal() {
+    showPermissionsModal = false;
+    permissionsProject = null;
+  }
+
   // Build dropdown items for filters
   const categoryDropdownItems = $derived([
     {
@@ -261,6 +274,14 @@
         title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: () => startEdit(project)
+      },
+      {
+        id: 'permissions',
+        type: 'regular',
+        icon: Shield,
+        title: t('time.permissions.managePermissions'),
+        hoverClass: 'hover-bg',
+        onClick: () => openPermissions(project)
       },
       {
         id: 'delete',
@@ -433,5 +454,12 @@
   isEditing={!!editingProject}
   onsave={saveProject}
   oncancel={cancelForm}
+/>
+
+<!-- Time Project Permissions Modal -->
+<TimeProjectPermissionsModal
+  isOpen={showPermissionsModal}
+  project={permissionsProject}
+  onClose={closePermissionsModal}
 />
 

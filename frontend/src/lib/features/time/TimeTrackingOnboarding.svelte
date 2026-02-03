@@ -44,7 +44,7 @@
       error = '';
 
       // Create the customer organisation
-      createdCustomer = await api.time.customers.create(customerData);
+      createdCustomer = await api.customerOrganisations.create(customerData);
       projectData.customer_id = createdCustomer.id;
 
       // Create a portal customer (contact) for this organisation

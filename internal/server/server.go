@@ -365,11 +365,13 @@ func (s *Server) initialize() error {
 	workspaceRoleHandler := handlers.NewWorkspaceRoleHandlerWithPool(s.db, permService)
 
 	// Time tracking handlers
-	timeCustomerHandler := handlers.NewTimeCustomerHandler(s.db)
-	timeProjectHandler := handlers.NewTimeProjectHandler(s.db)
+	timePermissionService := services.NewTimePermissionService(s.db, permService)
+	timeCustomerHandler := handlers.NewTimeCustomerHandler(s.db, timePermissionService)
+	timeProjectHandler := handlers.NewTimeProjectHandler(s.db, timePermissionService)
 	timeProjectCategoryHandler := handlers.NewTimeProjectCategoryHandler(s.db)
-	timeWorklogHandler := handlers.NewTimeWorklogHandler(s.db, permService)
+	timeWorklogHandler := handlers.NewTimeWorklogHandler(s.db, permService, timePermissionService)
 	activeTimerHandler := handlers.NewActiveTimerHandler(s.db)
+	timeProjectPermissionHandler := handlers.NewTimeProjectPermissionHandler(timePermissionService)
 
 	// Test management handlers
 	testFolderHandler := handlers.NewTestFolderHandlerWithPool(s.db, permService)
@@ -711,11 +713,12 @@ func (s *Server) initialize() error {
 			PersonalLabel:     personalLabelHandler,
 		},
 		TimeTracking: routes.TimeTrackingHandlers{
-			Customer:        timeCustomerHandler,
-			ProjectCategory: timeProjectCategoryHandler,
-			Project:         timeProjectHandler,
-			Worklog:         timeWorklogHandler,
-			ActiveTimer:     activeTimerHandler,
+			Customer:          timeCustomerHandler,
+			ProjectCategory:   timeProjectCategoryHandler,
+			Project:           timeProjectHandler,
+			Worklog:           timeWorklogHandler,
+			ActiveTimer:       activeTimerHandler,
+			ProjectPermission: timeProjectPermissionHandler,
 		},
 		TestMgmt: routes.TestManagementHandlers{
 			Folder:      testFolderHandler,

@@ -21,6 +21,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 
 	"golang.org/x/image/draw"
@@ -30,6 +31,7 @@ type AttachmentHandler struct {
 	db                database.Database
 	attachmentPath    string
 	permissionService *services.PermissionService
+	attachmentService *services.AttachmentService
 }
 
 func NewAttachmentHandler(db database.Database, attachmentPath string, permissionService *services.PermissionService) *AttachmentHandler {
@@ -37,6 +39,7 @@ func NewAttachmentHandler(db database.Database, attachmentPath string, permissio
 		db:                db,
 		attachmentPath:    attachmentPath,
 		permissionService: permissionService,
+		attachmentService: services.NewAttachmentServiceWithPermissions(db, permissionService),
 	}
 }
 
@@ -48,6 +51,25 @@ func (h *AttachmentHandler) getUserFromContext(r *http.Request) *models.User {
 		}
 	}
 	return nil
+}
+
+// checkItemAttachmentPermission checks if the user can modify attachments on an item
+// Internal users need item.edit permission in the workspace
+// Portal customers can only modify attachments on items they created
+func (h *AttachmentHandler) checkItemAttachmentPermission(r *http.Request, itemID int) (bool, error) {
+	// Get user ID if internal user
+	var userID *int
+	if user := h.getUserFromContext(r); user != nil {
+		userID = &user.ID
+	}
+
+	// Get portal customer ID if portal customer
+	var portalCustomerID *int
+	if pcID, ok := r.Context().Value(middleware.ContextKeyPortalCustomerID).(int); ok {
+		portalCustomerID = &pcID
+	}
+
+	return h.attachmentService.CanModifyItemAttachment(userID, portalCustomerID, itemID)
 }
 
 // IsEnabled checks if attachments are enabled (attachment path is set)
@@ -163,6 +185,21 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		slog.Debug("entity exists", slog.String("component", "attachments"), slog.String("entity_type", entityType), slog.Int("entity_id", entityID))
+
+		// Check permission for item attachments
+		if entityType == "item" {
+			canModify, err := h.checkItemAttachmentPermission(r, entityID)
+			if err != nil {
+				slog.Error("failed to check attachment permission", slog.String("component", "attachments"), slog.Any("error", err))
+				respondInternalError(w, r, err)
+				return
+			}
+			if !canModify {
+				slog.Debug("user lacks permission to upload attachment to item", slog.String("component", "attachments"), slog.Int("entity_id", entityID))
+				respondForbidden(w, r)
+				return
+			}
+		}
 	} else {
 		slog.Debug("skipping entity existence check for avatar upload", slog.String("component", "attachments"))
 	}
@@ -725,38 +762,44 @@ func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Get attachment details before deletion (for history tracking)
-	var filePath string
-	var itemID sql.NullInt64
-	var originalFilename string
-	err = h.db.QueryRow("SELECT file_path, item_id, original_filename FROM attachments WHERE id = ?", attachmentID).Scan(&filePath, &itemID, &originalFilename)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "attachment")
-		return
-	}
+	// Get attachment details before deletion (for history tracking and permission check)
+	details, err := h.attachmentService.GetAttachmentDetails(attachmentID)
 	if err != nil {
+		if err == repository.ErrNotFound {
+			respondNotFound(w, r, "attachment")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
 	}
 
+	// Check permission for item attachments
+	if details.EntityType == "item" && details.ItemID != nil {
+		canModify, err := h.checkItemAttachmentPermission(r, *details.ItemID)
+		if err != nil {
+			slog.Error("failed to check attachment permission", slog.String("component", "attachments"), slog.Any("error", err))
+			respondInternalError(w, r, err)
+			return
+		}
+		if !canModify {
+			slog.Debug("user lacks permission to delete attachment from item", slog.String("component", "attachments"), slog.Int("item_id", *details.ItemID))
+			respondForbidden(w, r)
+			return
+		}
+	}
+
 	// Record history if attachment is associated with an item
-	if itemID.Valid && userID != nil {
-		if err := h.recordAttachmentHistory(int(itemID.Int64), userID, "attachment_deleted", &originalFilename, 0, originalFilename); err != nil {
+	if details.ItemID != nil && userID != nil {
+		if err := h.recordAttachmentHistory(*details.ItemID, userID, "attachment_deleted", &details.OriginalFilename, 0, details.OriginalFilename); err != nil {
 			slog.Warn("failed to record attachment deletion history", slog.String("component", "attachments"), slog.Any("error", err))
 			// Don't fail the whole operation if history recording fails
 		}
 	}
 
 	// Delete from database
-	result, err := h.db.ExecWrite("DELETE FROM attachments WHERE id = ?", attachmentID)
+	rowsAffected, err := h.attachmentService.DeleteRecord(attachmentID)
 	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to delete attachment record: %w", err))
-		return
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to verify deletion: %w", err))
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -766,9 +809,9 @@ func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Delete physical file
-	if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(details.FilePath); err != nil && !os.IsNotExist(err) {
 		// Log warning but don't fail the request if file removal fails
-		slog.Warn("failed to delete attachment file", slog.String("component", "attachments"), slog.String("file_path", filePath), slog.Any("error", err))
+		slog.Warn("failed to delete attachment file", slog.String("component", "attachments"), slog.String("file_path", details.FilePath), slog.Any("error", err))
 	}
 
 	w.WriteHeader(http.StatusNoContent)

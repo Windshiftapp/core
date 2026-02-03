@@ -946,7 +946,7 @@ async function createTimeCustomers(baseURL, token, customersData = timeCustomers
         active: customer.active
       };
 
-      const response = await makeAuthRequest(baseURL, 'POST', '/api/time/customers', customerData, token);
+      const response = await makeAuthRequest(baseURL, 'POST', '/api/customer-organisations', customerData, token);
 
       if (response.status === 200 || response.status === 201) {
         createdCustomers[customer.name] = response.data.id;

@@ -111,7 +111,7 @@ class TimeEntryStore {
 
   async loadCustomers() {
     try {
-      this.customers = await api.time.customers.getAll() || [];
+      this.customers = await api.customerOrganisations.getAll() || [];
     } catch (err) {
       console.error('Failed to load customers:', err);
       this.customers = [];

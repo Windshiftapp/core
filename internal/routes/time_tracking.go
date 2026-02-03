@@ -7,13 +7,6 @@ func RegisterTimeTrackingRoutes(deps *Deps) {
 	api := deps.API
 	auth := deps.AuthMiddleware.RequireAuth
 
-	// Time customers
-	api.HandleH("GET /time/customers", auth(http.HandlerFunc(deps.TimeTracking.Customer.GetAll)))
-	api.HandleH("POST /time/customers", auth(http.HandlerFunc(deps.TimeTracking.Customer.Create)))
-	api.HandleH("GET /time/customers/{id}", auth(http.HandlerFunc(deps.TimeTracking.Customer.Get)))
-	api.HandleH("PUT /time/customers/{id}", auth(http.HandlerFunc(deps.TimeTracking.Customer.Update)))
-	api.HandleH("DELETE /time/customers/{id}", auth(http.HandlerFunc(deps.TimeTracking.Customer.Delete)))
-	api.HandleH("GET /time/customers/{id}/projects", auth(http.HandlerFunc(deps.TimeTracking.Project.GetByCustomer)))
 
 	// Time project categories
 	api.HandleH("GET /time/project-categories", auth(http.HandlerFunc(deps.TimeTracking.ProjectCategory.GetCategories)))
@@ -30,6 +23,14 @@ func RegisterTimeTrackingRoutes(deps *Deps) {
 	api.HandleH("PUT /time/projects/{id}", auth(http.HandlerFunc(deps.TimeTracking.Project.Update)))
 	api.HandleH("DELETE /time/projects/{id}", auth(http.HandlerFunc(deps.TimeTracking.Project.Delete)))
 	api.HandleH("GET /time/projects/{id}/worklogs", auth(http.HandlerFunc(deps.TimeTracking.Worklog.GetByProject)))
+
+	// Time project permissions (managers and members)
+	api.HandleH("GET /time/projects/{id}/managers", auth(http.HandlerFunc(deps.TimeTracking.ProjectPermission.GetManagers)))
+	api.HandleH("POST /time/projects/{id}/managers", auth(http.HandlerFunc(deps.TimeTracking.ProjectPermission.AddManager)))
+	api.HandleH("DELETE /time/projects/{id}/managers/{managerId}", auth(http.HandlerFunc(deps.TimeTracking.ProjectPermission.RemoveManager)))
+	api.HandleH("GET /time/projects/{id}/members", auth(http.HandlerFunc(deps.TimeTracking.ProjectPermission.GetMembers)))
+	api.HandleH("POST /time/projects/{id}/members", auth(http.HandlerFunc(deps.TimeTracking.ProjectPermission.AddMember)))
+	api.HandleH("DELETE /time/projects/{id}/members/{memberId}", auth(http.HandlerFunc(deps.TimeTracking.ProjectPermission.RemoveMember)))
 
 	// Time worklogs
 	api.HandleH("GET /time/worklogs", auth(http.HandlerFunc(deps.TimeTracking.Worklog.GetAll)))

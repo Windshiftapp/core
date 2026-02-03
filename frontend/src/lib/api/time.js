@@ -1,23 +1,6 @@
 import { fetchAPI } from './core.js';
 
 export const time = {
-  customers: {
-    getAll: () => fetchAPI('/time/customers'),
-    get: (id) => fetchAPI(`/time/customers/${id}`),
-    create: (data) => fetchAPI('/time/customers', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-    update: (id, data) => fetchAPI(`/time/customers/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-    delete: (id) => fetchAPI(`/time/customers/${id}`, {
-      method: 'DELETE',
-    }),
-    getProjects: (id) => fetchAPI(`/time/customers/${id}/projects`),
-  },
-
   projectCategories: {
     getAll: () => fetchAPI('/time/project-categories'),
     get: (id) => fetchAPI(`/time/project-categories/${id}`),
@@ -54,6 +37,26 @@ export const time = {
       method: 'DELETE',
     }),
     getWorklogs: (id) => fetchAPI(`/time/projects/${id}/worklogs`),
+
+    // Project Managers
+    getManagers: (id) => fetchAPI(`/time/projects/${id}/managers`),
+    addManager: (id, managerType, managerId) => fetchAPI(`/time/projects/${id}/managers`, {
+      method: 'POST',
+      body: JSON.stringify({ manager_type: managerType, manager_id: managerId }),
+    }),
+    removeManager: (id, managerId) => fetchAPI(`/time/projects/${id}/managers/${managerId}`, {
+      method: 'DELETE',
+    }),
+
+    // Project Members
+    getMembers: (id) => fetchAPI(`/time/projects/${id}/members`),
+    addMember: (id, memberType, memberId) => fetchAPI(`/time/projects/${id}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ member_type: memberType, member_id: memberId }),
+    }),
+    removeMember: (id, memberId) => fetchAPI(`/time/projects/${id}/members/${memberId}`, {
+      method: 'DELETE',
+    }),
   },
 
   worklogs: {

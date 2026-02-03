@@ -5,6 +5,8 @@
   import DataTable from '../components/DataTable.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import AlertBox from '../components/AlertBox.svelte';
+  import Modal from '../dialogs/Modal.svelte';
+  import ModalHeader from '../dialogs/ModalHeader.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   let roles = $state([]);
@@ -61,9 +63,9 @@
     return [
       {
         id: 'view',
-        label: t('common.view'),
+        title: t('common.view'),
         icon: Eye,
-        action: () => viewRoleDetails(role)
+        onClick: () => viewRoleDetails(role)
       }
     ];
   }
@@ -76,41 +78,33 @@
     icon={BadgeCheck}
   />
 
-  {#if selectedRole}
-    <div class="border rounded p-6 shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-      <div class="flex justify-between items-start mb-4">
-        <div>
-          <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{selectedRole.name}</h3>
-          <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">{selectedRole.description}</p>
-        </div>
-        <button
-          onclick={closeDetails}
-          class="close-btn"
-          style="color: var(--ds-icon-subtle);"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      <div class="border-t pt-4" style="border-color: var(--ds-border);">
-        <h4 class="font-medium mb-3" style="color: var(--ds-text);">{t('roles.permissions')}</h4>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {#each rolePermissions as permission}
-            <div class="flex items-start space-x-2 p-3 rounded-md" style="background-color: var(--ds-interactive-subtle);">
-              <CheckCircle class="w-5 h-5 mt-0.5" style="color: var(--ds-text-success);" />
-              <div>
-                <div class="font-medium text-sm" style="color: var(--ds-text);">{permission.permission_name}</div>
-                <div class="text-xs" style="color: var(--ds-text-subtle);">{permission.description}</div>
-                <div class="text-xs mt-0.5" style="color: var(--ds-text-subtlest);">{permission.permission_key}</div>
-              </div>
+  <Modal
+    isOpen={selectedRole !== null}
+    onclose={closeDetails}
+    maxWidth="max-w-2xl"
+  >
+    <ModalHeader
+      title={selectedRole?.name}
+      subtitle={selectedRole?.description}
+      icon={BadgeCheck}
+      onClose={closeDetails}
+    />
+    <div class="px-6 py-4">
+      <h4 class="font-medium mb-3" style="color: var(--ds-text);">{t('roles.permissions')}</h4>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+        {#each rolePermissions as permission}
+          <div class="flex items-start space-x-2 p-3 rounded-md" style="background-color: var(--ds-interactive-subtle);">
+            <CheckCircle class="w-5 h-5 mt-0.5 flex-shrink-0" style="color: var(--ds-text-success);" />
+            <div>
+              <div class="font-medium text-sm" style="color: var(--ds-text);">{permission.permission_name}</div>
+              <div class="text-xs" style="color: var(--ds-text-subtle);">{permission.description}</div>
+              <div class="text-xs mt-0.5" style="color: var(--ds-text-subtlest);">{permission.permission_key}</div>
             </div>
-          {/each}
-        </div>
+          </div>
+        {/each}
       </div>
     </div>
-  {/if}
+  </Modal>
 
   <DataTable
     data={roles}
@@ -120,16 +114,9 @@
     emptyMessage={t('roles.noRoles')}
   />
 
-  <AlertBox type="info">
-    <h4 class="font-semibold mb-2">{t('roles.title')}</h4>
-    <p class="text-sm mb-2">
-      {t('roles.subtitle')}
+  <AlertBox variant="info">
+    <p class="text-sm">
+      {t('settings.workspaceRoles.readOnlyNote')}
     </p>
   </AlertBox>
 </div>
-
-<style>
-  .close-btn:hover {
-    color: var(--ds-icon);
-  }
-</style>

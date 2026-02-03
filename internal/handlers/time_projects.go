@@ -8,28 +8,71 @@ import (
 	"strings"
 	"time"
 	"windshift/internal/database"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
+	"windshift/internal/services"
 )
 
 type TimeProjectHandler struct {
-	db database.Database
+	db                    database.Database
+	timePermissionService *services.TimePermissionService
 }
 
-func NewTimeProjectHandler(db database.Database) *TimeProjectHandler {
-	return &TimeProjectHandler{db: db}
+func NewTimeProjectHandler(db database.Database, timePermissionService *services.TimePermissionService) *TimeProjectHandler {
+	return &TimeProjectHandler{
+		db:                    db,
+		timePermissionService: timePermissionService,
+	}
 }
 
 func (h *TimeProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.db.Query(`
+	// Get user from context
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	if !ok || user == nil {
+		respondUnauthorized(w, r)
+		return
+	}
+
+	// Get accessible project IDs (nil means all accessible)
+	var accessibleIDs []int
+	if h.timePermissionService != nil {
+		var err error
+		accessibleIDs, err = h.timePermissionService.GetAccessibleProjects(user.ID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+	}
+
+	// Build query based on accessible projects
+	query := `
 		SELECT p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color,
 		       p.hourly_rate, p.settings, p.created_at, p.updated_at,
 		       c.name as customer_name, cat.name as category_name, cat.color as category_color,
 		       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = p.id) as total_hours
 		FROM time_projects p
 		LEFT JOIN customer_organisations c ON p.customer_id = c.id
-		LEFT JOIN time_project_categories cat ON p.category_id = cat.id
-		ORDER BY p.name ASC
-	`)
+		LEFT JOIN time_project_categories cat ON p.category_id = cat.id`
+
+	var args []interface{}
+	if accessibleIDs != nil && len(accessibleIDs) > 0 {
+		// Filter to only accessible projects
+		placeholders := make([]string, len(accessibleIDs))
+		for i, id := range accessibleIDs {
+			placeholders[i] = "?"
+			args = append(args, id)
+		}
+		query += " WHERE p.id IN (" + strings.Join(placeholders, ",") + ")"
+	} else if accessibleIDs != nil && len(accessibleIDs) == 0 {
+		// User has no access to any projects
+		respondJSONOK(w, []models.TimeProject{})
+		return
+	}
+	// If accessibleIDs is nil, user has full access - no WHERE clause needed
+
+	query += " ORDER BY p.name ASC"
+
+	rows, err := h.db.Query(query, args...)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -75,6 +118,26 @@ func (h *TimeProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get user from context
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	if !ok || user == nil {
+		respondUnauthorized(w, r)
+		return
+	}
+
+	// Check view permission
+	if h.timePermissionService != nil {
+		canView, err := h.timePermissionService.CanViewProject(user.ID, id)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if !canView {
+			respondForbidden(w, r)
+			return
+		}
+	}
+
 	var p models.TimeProject
 	var status, color, settingsStr sql.NullString
 	var totalHours sql.NullFloat64
@@ -112,6 +175,26 @@ func (h *TimeProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TimeProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
+	// Get user from context
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	if !ok || user == nil {
+		respondUnauthorized(w, r)
+		return
+	}
+
+	// Check project.manage permission (required to create new projects)
+	if h.timePermissionService != nil {
+		hasPermission, err := h.timePermissionService.HasProjectManagePermission(user.ID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if !hasPermission {
+			respondForbidden(w, r)
+			return
+		}
+	}
+
 	var p models.TimeProject
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 		respondBadRequest(w, r, err.Error())
@@ -191,6 +274,26 @@ func (h *TimeProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get user from context
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	if !ok || user == nil {
+		respondUnauthorized(w, r)
+		return
+	}
+
+	// Check manager permission (required to update project)
+	if h.timePermissionService != nil {
+		isManager, err := h.timePermissionService.IsTimeProjectManager(user.ID, id)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if !isManager {
+			respondForbidden(w, r)
+			return
+		}
+	}
+
 	var p models.TimeProject
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 		respondBadRequest(w, r, err.Error())
@@ -258,6 +361,26 @@ func (h *TimeProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
+	}
+
+	// Get user from context
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	if !ok || user == nil {
+		respondUnauthorized(w, r)
+		return
+	}
+
+	// Check project.manage permission (only global permission can delete projects)
+	if h.timePermissionService != nil {
+		hasPermission, err := h.timePermissionService.HasProjectManagePermission(user.ID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if !hasPermission {
+			respondForbidden(w, r)
+			return
+		}
 	}
 
 	_, err := h.db.Exec("DELETE FROM time_projects WHERE id = ?", id)

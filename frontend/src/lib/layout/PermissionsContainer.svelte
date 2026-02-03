@@ -12,8 +12,9 @@
   }
 
   $: tabs = [
-    { id: 'permissions', label: t('permissions.title') },
-    { id: 'permission-sets', label: t('permissions.permissionSet') + 's' }
+    { id: 'permissions', label: t('permissions.title') }
+    // Permission sets hidden for now - using role-based permissions instead
+    // { id: 'permission-sets', label: t('permissions.permissionSet') + 's' }
   ];
 </script>
 
@@ -41,8 +42,10 @@
   <div>
     {#if subtab === 'permissions'}
       <PermissionManager />
-    {:else if subtab === 'permission-sets'}
-      <PermissionSetManager />
     {/if}
+    <!-- Permission sets hidden for now - using role-based permissions instead -->
+    <!-- {:else if subtab === 'permission-sets'}
+      <PermissionSetManager />
+    -->
   </div>
 </div>

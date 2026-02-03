@@ -36,7 +36,7 @@
       // Load groups and organisations in parallel
       const [groupsData, orgsData] = await Promise.all([
         api.groups.getAll(),
-        api.time.customers.getAll()
+        api.customerOrganisations.getAll()
       ]);
       groups = groupsData || [];
       organisations = orgsData || [];

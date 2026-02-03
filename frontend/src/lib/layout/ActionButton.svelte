@@ -9,12 +9,13 @@
    * <ActionButton icon={Edit} label="Edit" onclick={handleEdit} />
    * <ActionButton icon={Trash2} variant="subtle" onclick={handleDelete} />
    * <ActionButton icon={Copy} size="xs" />
+   * <ActionButton icon={X} variant="ghost-danger" onclick={handleRemove} />
    */
   let {
     icon,
     label = '',
     showLabel = true,     // Can hide label on mobile
-    variant = 'ghost',    // 'ghost' | 'subtle' | 'danger'
+    variant = 'ghost',    // 'ghost' | 'subtle' | 'danger' | 'ghost-danger'
     size = 'sm',          // 'xs' | 'sm'
     disabled = false,
     loading = false,
@@ -45,13 +46,18 @@
     danger: `
       background-color: transparent;
       color: var(--ds-text-danger);
+    `,
+    'ghost-danger': `
+      background-color: transparent;
+      color: var(--ds-text-subtle);
     `
   }[variant] || 'background-color: transparent; color: var(--ds-text-subtle);');
 
   const hoverClass = $derived({
     ghost: 'hover:bg-[var(--ds-background-neutral-hovered)]',
     subtle: 'hover:bg-[var(--ds-background-neutral-hovered)]',
-    danger: 'hover:bg-[var(--ds-accent-red-subtle)]'
+    danger: 'hover:bg-[var(--ds-accent-red-subtle)]',
+    'ghost-danger': 'hover:bg-[var(--ds-accent-red-subtle)] hover:text-[var(--ds-text-danger)]'
   }[variant] || 'hover:bg-[var(--ds-background-neutral-hovered)]');
 
   const buttonTitle = $derived(titleProp || label || '');

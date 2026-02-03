@@ -60,8 +60,14 @@ func RegisterPortalRoutes(deps *Deps) {
 	api.HandleH("PUT /contact-roles/{id}", customersPerm(http.HandlerFunc(deps.Portal.ContactRole.Update)))
 	api.HandleH("DELETE /contact-roles/{id}", customersPerm(http.HandlerFunc(deps.Portal.ContactRole.Delete)))
 
-	// Customer Organisation Contacts
+	// Customer Organisations Management
+	api.HandleH("GET /customer-organisations", customersPerm(http.HandlerFunc(deps.TimeTracking.Customer.GetAll)))
+	api.HandleH("POST /customer-organisations", customersPerm(http.HandlerFunc(deps.TimeTracking.Customer.Create)))
+	api.HandleH("GET /customer-organisations/{id}", customersPerm(http.HandlerFunc(deps.TimeTracking.Customer.Get)))
+	api.HandleH("PUT /customer-organisations/{id}", customersPerm(http.HandlerFunc(deps.TimeTracking.Customer.Update)))
+	api.HandleH("DELETE /customer-organisations/{id}", customersPerm(http.HandlerFunc(deps.TimeTracking.Customer.Delete)))
 	api.HandleH("GET /customer-organisations/{id}/contacts", customersPerm(http.HandlerFunc(deps.Portal.PortalCustomer.GetOrganisationContacts)))
+	api.HandleH("GET /customer-organisations/{id}/projects", customersPerm(http.HandlerFunc(deps.TimeTracking.Project.GetByCustomer)))
 
 	// Portal Hub endpoints (for internal users)
 	auth := deps.AuthMiddleware.RequireAuth

@@ -200,6 +200,8 @@ INSERT INTO permissions (permission_key, permission_name, description, scope, is
 	('iteration.manage', 'Manage Global Iterations', 'Can create and manage global iterations visible across all workspaces', 'global', false),
 	('user.list', 'List Users', 'Can view the user directory', 'global', false),
 	('asset.manage', 'Manage Asset Sets', 'Can create and manage asset management sets', 'global', false),
+	('customers.manage', 'Manage Customers', 'Can manage customer organisations and portal customers', 'global', false),
+	('project.manage', 'Manage Time Projects', 'Can manage all time projects and worklogs', 'global', false),
 	('workspace.admin', 'Manage Workspace', 'Full administration access to a workspace including settings and configuration', 'workspace', false),
 	('item.view', 'View Workspace & Items', 'Can view workspace and work items', 'workspace', false),
 	('item.create', 'Create Items', 'Can create work items in a workspace', 'workspace', false),

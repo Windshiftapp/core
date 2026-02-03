@@ -346,8 +346,8 @@
           ctx.get(listenerCtx).markdownUpdated((ctx, markdown) => {
             content = markdown;
           });
-          ctx.update(editorViewOptionsCtx, (prev) => ({
-            ...prev,
+          // Use set instead of update to handle case where context may not be initialized
+          ctx.set(editorViewOptionsCtx, {
             editable: () => !readonly,
             attributes: {
               class: 'milkdown-editor-content',
@@ -369,7 +369,7 @@
                 return false;
               }
             }
-          }));
+          });
 
           // Configure upload plugin following official docs pattern (only if attachments enabled)
           if (!readonly && attachmentsEnabled) {

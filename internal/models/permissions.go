@@ -58,6 +58,8 @@ const (
 	PermissionMilestoneCreate = "milestone.create"
 	PermissionIterationManage = "iteration.manage"
 	PermissionUserList        = "user.list"
+	PermissionProjectManage   = "project.manage"
+	PermissionCustomersManage = "customers.manage"
 
 	// Workspace permissions
 	PermissionWorkspaceAdmin = "workspace.admin" // Manage workspace (administer workspace)

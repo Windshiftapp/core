@@ -174,6 +174,30 @@ export default {
       failedToSave: 'Failed to save organization',
       deleteOrganization: 'Delete Organization',
       confirmDelete: 'Are you sure you want to delete "{name}"?'
+    },
+
+    // Permissions
+    permissions: {
+      title: 'Project Permissions',
+      managePermissions: 'Manage Permissions',
+      managers: 'Managers',
+      members: 'Members',
+      addManager: 'Add Manager',
+      addMember: 'Add Member',
+      removeManager: 'Remove Manager',
+      removeMember: 'Remove Member',
+      noManagers: 'No managers assigned',
+      noManagersHint: 'When no managers are assigned, anyone can manage this project',
+      noMembers: 'No members assigned',
+      noMembersHint: 'When no members are assigned, anyone can book time on this project',
+      grantedAt: 'Added',
+      confirmRemove: 'Are you sure you want to remove {name}?',
+      failedToAdd: 'Failed to add',
+      failedToRemove: 'Failed to remove',
+      managersNote: 'Managers:',
+      managersNoteText: 'Can edit project settings, manage members, and view all time entries for this project.',
+      membersNote: 'Members:',
+      membersNoteText: 'Can book time on this project and view their own time entries.'
     }
   },
 

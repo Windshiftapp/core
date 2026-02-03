@@ -149,7 +149,7 @@
 
   async function loadOrganisations() {
     try {
-      const result = await api.time.customers.getAll();
+      const result = await api.customerOrganisations.getAll();
       customerOrganisations = result || [];
     } catch (err) {
       console.error('Failed to load customer organisations:', err);

@@ -108,7 +108,10 @@
   }
 
   function getGlobalPermissions() {
-    return permissions.filter(p => p.scope === 'global');
+    // Hide user.list - any authenticated user can list users (needed for mentions/assignments)
+    // The permission is kept in backend but hidden from management UI
+    const hiddenPermissions = ['user.list'];
+    return permissions.filter(p => p.scope === 'global' && !hiddenPermissions.includes(p.permission_key));
   }
 
   function getUsersWithPermission(permissionId) {

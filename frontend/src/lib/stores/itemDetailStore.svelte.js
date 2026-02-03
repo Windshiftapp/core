@@ -155,7 +155,7 @@ class ItemDetailStore {
         api.iterations.getAll({ workspace_id: workspaceId, include_global: true }),
         api.time.projects.getByWorkspace(workspaceId),
         api.time.worklogs.getByItem(itemId),
-        api.time.customers.getAll(),
+        api.customerOrganisations.getAll(),
         api.items.getAll({ limit: 100 }),
         api.workspaces.getAll()
       ]);

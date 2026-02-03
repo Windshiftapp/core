@@ -173,6 +173,30 @@ export default {
       failedToSave: 'Organisation konnte nicht gespeichert werden',
       deleteOrganization: 'Organisation löschen',
       confirmDelete: 'Sind Sie sicher, dass Sie "{name}" löschen möchten?'
+    },
+
+    // Permissions
+    permissions: {
+      title: 'Projektberechtigungen',
+      managePermissions: 'Berechtigungen verwalten',
+      managers: 'Manager',
+      members: 'Mitglieder',
+      addManager: 'Manager hinzufügen',
+      addMember: 'Mitglied hinzufügen',
+      removeManager: 'Manager entfernen',
+      removeMember: 'Mitglied entfernen',
+      noManagers: 'Keine Manager zugewiesen',
+      noManagersHint: 'Wenn keine Manager zugewiesen sind, kann jeder dieses Projekt verwalten',
+      noMembers: 'Keine Mitglieder zugewiesen',
+      noMembersHint: 'Wenn keine Mitglieder zugewiesen sind, kann jeder Zeit auf dieses Projekt buchen',
+      grantedAt: 'Hinzugefügt',
+      confirmRemove: 'Sind Sie sicher, dass Sie {name} entfernen möchten?',
+      failedToAdd: 'Hinzufügen fehlgeschlagen',
+      failedToRemove: 'Entfernen fehlgeschlagen',
+      managersNote: 'Manager:',
+      managersNoteText: 'Können Projekteinstellungen bearbeiten, Mitglieder verwalten und alle Zeiteinträge für dieses Projekt einsehen.',
+      membersNote: 'Mitglieder:',
+      membersNoteText: 'Können Zeit auf dieses Projekt buchen und ihre eigenen Zeiteinträge einsehen.'
     }
   },
 

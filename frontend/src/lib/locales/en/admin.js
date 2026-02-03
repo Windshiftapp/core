@@ -56,7 +56,7 @@ export default {
       themes: { title: 'Themes', description: 'Manage application themes and appearance' },
       users: { title: 'Users', description: 'Manage user accounts and profiles' },
       groups: { title: 'Groups', description: 'Manage user groups and memberships' },
-      permissions: { title: 'Permissions & Sets', description: 'Manage permissions and permission sets' },
+      permissions: { title: 'Global Permissions', description: 'Manage global permission definitions' },
       workspaceRoles: { title: 'Workspace Roles', description: 'View workspace roles and their permissions' },
       sso: { title: 'Single Sign-On', description: 'Configure OIDC identity providers for SSO' },
       security: { title: 'Security', description: 'Manage security settings and feature controls' },
@@ -585,6 +585,11 @@ export default {
       by: 'By',
       settingsSavedSuccess: 'Module settings saved successfully!',
       failedToSave: 'Failed to save module settings. Please try again.'
+    },
+
+    // Workspace Roles
+    workspaceRoles: {
+      readOnlyNote: 'Workspace roles are system-defined and cannot be edited. They serve as reference for understanding the permissions available in each role.'
     },
 
     // Board Configuration

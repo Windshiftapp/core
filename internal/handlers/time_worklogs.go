@@ -11,20 +11,23 @@ import (
 	"strings"
 	"time"
 	"windshift/internal/database"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
 
 type TimeWorklogHandler struct {
-	db                database.Database
-	permissionService *services.PermissionService
+	db                    database.Database
+	permissionService     *services.PermissionService
+	timePermissionService *services.TimePermissionService
 }
 
-func NewTimeWorklogHandler(db database.Database, permissionService *services.PermissionService) *TimeWorklogHandler {
+func NewTimeWorklogHandler(db database.Database, permissionService *services.PermissionService, timePermissionService *services.TimePermissionService) *TimeWorklogHandler {
 	return &TimeWorklogHandler{
-		db:                db,
-		permissionService: permissionService,
+		db:                    db,
+		permissionService:     permissionService,
+		timePermissionService: timePermissionService,
 	}
 }
 
@@ -362,11 +365,31 @@ func (h *TimeWorklogHandler) validateAndParseWorklog(req WorklogRequest) (custom
 }
 
 func (h *TimeWorklogHandler) Create(w http.ResponseWriter, r *http.Request) {
+	// Get user from context
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	if !ok || user == nil {
+		respondUnauthorized(w, r)
+		return
+	}
+
 	var req WorklogRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		slog.Debug("JSON decode error", slog.String("component", "time_tracking"), slog.Any("error", err))
 		respondBadRequest(w, r, fmt.Sprintf("JSON decode error: %v", err))
 		return
+	}
+
+	// Check booking permission on project
+	if h.timePermissionService != nil {
+		canBook, err := h.timePermissionService.CanBookTimeOnProject(user.ID, req.ProjectID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if !canBook {
+			respondForbidden(w, r)
+			return
+		}
 	}
 
 	// Debug: Log the received request
@@ -393,9 +416,9 @@ func (h *TimeWorklogHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	var id int64
 	err = h.db.QueryRow(`
-		INSERT INTO time_worklogs (project_id, customer_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-	`, req.ProjectID, customerID, req.ItemID, req.Description, dateUnix, startTimeUnix, endTimeUnix, durationMins, nowUnix, nowUnix).Scan(&id)
+		INSERT INTO time_worklogs (project_id, customer_id, user_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+	`, req.ProjectID, customerID, user.ID, req.ItemID, req.Description, dateUnix, startTimeUnix, endTimeUnix, durationMins, nowUnix, nowUnix).Scan(&id)
 
 	if err != nil {
 		slog.Error("database insert error", slog.String("component", "time_tracking"), slog.Any("error", err))
@@ -453,6 +476,26 @@ func (h *TimeWorklogHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
+	}
+
+	// Get user from context
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	if !ok || user == nil {
+		respondUnauthorized(w, r)
+		return
+	}
+
+	// Check edit permission (own worklog or manager)
+	if h.timePermissionService != nil {
+		canEdit, err := h.timePermissionService.CanEditWorklog(user.ID, id)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if !canEdit {
+			respondForbidden(w, r)
+			return
+		}
 	}
 
 	var req WorklogRequest
@@ -539,6 +582,26 @@ func (h *TimeWorklogHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
+	}
+
+	// Get user from context
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	if !ok || user == nil {
+		respondUnauthorized(w, r)
+		return
+	}
+
+	// Check edit permission (own worklog or manager)
+	if h.timePermissionService != nil {
+		canEdit, err := h.timePermissionService.CanEditWorklog(user.ID, id)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if !canEdit {
+			respondForbidden(w, r)
+			return
+		}
 	}
 
 	_, err := h.db.ExecWrite("DELETE FROM time_worklogs WHERE id = ?", id)

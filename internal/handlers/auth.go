@@ -596,7 +596,15 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 			})
 			return
 		case services.ErrUserNotFound:
-			respondNotFound(w, r, "user")
+			// Session exists but user was deleted - return generic success to prevent enumeration
+			slog.Warn("resend verification for non-existent user",
+				slog.String("component", "auth"),
+				slog.Int("session_user_id", session.UserID))
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": true,
+				"message": "If your account exists, a verification email will be sent",
+			})
 		case services.ErrSMTPNotConfigured:
 			respondServiceUnavailable(w, r, "Email service is not available")
 		default:
