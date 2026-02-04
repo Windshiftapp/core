@@ -97,6 +97,9 @@ var emailSchema string
 //go:embed schema/asset_reports.sql
 var assetReportsSchema string
 
+//go:embed schema/labels.sql
+var labelsSchema string
+
 // DB wraps a sql.DB connection with a dedicated write connection
 type DB struct {
 	*sql.DB
@@ -226,11 +229,16 @@ func (db *DB) Initialize() error {
 			}
 		}
 
+		// Create labels tables if they don't exist (for existing databases)
+		if _, err := db.Exec(labelsSchema); err != nil {
+			slog.Warn("labels migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
 		return nil
 	}
 
 	// Database needs full initialization
-	schema := coreSchema + itemsSchema + requestTypeSchema + usersSchema + testsSchema + workspaceSchema + configWorkflowsSchema + timeTrackingSchema + channelsSchema + portalSchema + portalAuthSchema + milestonesSchema + iterationsSchema + contentSchema + mentionsSchema + notificationsSchema + permissionsSchema + systemSchema + userPreferencesSchema + webauthnSchema + ssoSchema + scmSchema + assetsSchema + recurringTasksSchema + jiraImportSchema + actionsSchema + emailSchema + assetReportsSchema
+	schema := coreSchema + itemsSchema + requestTypeSchema + usersSchema + testsSchema + workspaceSchema + configWorkflowsSchema + timeTrackingSchema + channelsSchema + portalSchema + portalAuthSchema + milestonesSchema + iterationsSchema + contentSchema + mentionsSchema + notificationsSchema + permissionsSchema + systemSchema + userPreferencesSchema + webauthnSchema + ssoSchema + scmSchema + assetsSchema + recurringTasksSchema + jiraImportSchema + actionsSchema + emailSchema + assetReportsSchema + labelsSchema
 
 	if _, err := db.Exec(schema); err != nil {
 		return fmt.Errorf("failed to initialize database schema: %w", err)
@@ -413,37 +421,7 @@ func (db *DB) initializeDefaultData() error {
 		}
 	}
 
-	// 9. Create some basic custom field definitions (only truly custom ones, no duplicates of system fields)
-	customFields := []struct {
-		name          string
-		fieldType     string
-		description   string
-		options       string
-		systemDefault bool
-	}{
-		// Default personal task fields - system defaults that cannot be deleted
-		{"Label", "text", "Descriptive label or tag for categorization", "", true},
-		{"Date", "date", "General date field for task scheduling", "", true},
-		// Regular custom fields
-		{"Milestone", "milestone", "Project milestone for tracking major deliverables", "", false},
-		{"Story Points", "number", "Effort estimation for development work", "", false},
-		{"Epic Link", "text", "Link to parent epic or initiative", "", false},
-		{"Sprint", "text", "Sprint or iteration assignment", "", false},
-		{"Environment", "select", "Target environment for deployment", `["Development","Staging","Production"]`, false},
-		{"Team", "text", "Team responsible for this work", "", false},
-	}
-
-	for i, field := range customFields {
-		_, err := tx.Exec(
-			"INSERT INTO custom_field_definitions (name, field_type, description, options, display_order, system_default) VALUES (?, ?, ?, ?, ?, ?)",
-			field.name, field.fieldType, field.description, field.options, i+1, field.systemDefault,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to create custom field %s: %w", field.name, err)
-		}
-	}
-
-	// 10. Create default link types
+	// 9. Create default link types
 	linkTypes := []struct {
 		name         string
 		description  string

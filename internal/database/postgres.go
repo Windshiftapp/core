@@ -98,6 +98,9 @@ var jiraImportSchemaPostgres string
 //go:embed schema/actions_postgres.sql
 var actionsSchemaPostgres string
 
+//go:embed schema/labels_postgres.sql
+var labelsSchemaPostgres string
+
 // PostgresDB implements the Database interface for PostgreSQL
 type PostgresDB struct {
 	db  *sql.DB
@@ -272,6 +275,14 @@ func (p *PostgresDB) Initialize() error {
 			}
 		}
 
+		// Create labels tables if they don't exist (for existing databases)
+		labelsContent := strings.TrimSpace(labelsSchemaPostgres)
+		if labelsContent != "" {
+			if _, err := p.db.Exec(labelsContent); err != nil {
+				slog.Warn("labels postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
 		return nil
 	}
 
@@ -355,6 +366,7 @@ func (p *PostgresDB) getPostgresSchemaFiles() []schemaFile {
 		{"recurring_tasks_postgres.sql", recurringTasksSchemaPostgres},
 		{"jira_import_postgres.sql", jiraImportSchemaPostgres},
 		{"actions_postgres.sql", actionsSchemaPostgres},
+		{"labels_postgres.sql", labelsSchemaPostgres},
 	}
 }
 
@@ -537,37 +549,7 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 		}
 	}
 
-	// 9. Create some basic custom field definitions (only truly custom ones, no duplicates of system fields)
-	customFields := []struct {
-		name          string
-		fieldType     string
-		description   string
-		options       string
-		systemDefault bool
-	}{
-		// Default personal task fields - system defaults that cannot be deleted
-		{"Label", "text", "Descriptive label or tag for categorization", "", true},
-		{"Date", "date", "General date field for task scheduling", "", true},
-		// Regular custom fields
-		{"Milestone", "milestone", "Project milestone for tracking major deliverables", "", false},
-		{"Story Points", "number", "Effort estimation for development work", "", false},
-		{"Epic Link", "text", "Link to parent epic or initiative", "", false},
-		{"Sprint", "text", "Sprint or iteration assignment", "", false},
-		{"Environment", "select", "Target environment for deployment", `["Development","Staging","Production"]`, false},
-		{"Team", "text", "Team responsible for this work", "", false},
-	}
-
-	for i, field := range customFields {
-		_, err := tx.Exec(
-			"INSERT INTO custom_field_definitions (name, field_type, description, options, display_order, system_default) VALUES ($1, $2, $3, $4, $5, $6)",
-			field.name, field.fieldType, field.description, field.options, i+1, field.systemDefault,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to create custom field %s: %w", field.name, err)
-		}
-	}
-
-	// 10. Create default link types
+	// 9. Create default link types
 	linkTypes := []struct {
 		name         string
 		description  string
