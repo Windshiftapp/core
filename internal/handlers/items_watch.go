@@ -41,7 +41,7 @@ func (h *ItemHandler) AddWatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canView {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "item")
 		return
 	}
 
@@ -86,6 +86,29 @@ func (h *ItemHandler) RemoveWatch(w http.ResponseWriter, r *http.Request) {
 	user := h.getUserFromContext(r)
 	if user == nil {
 		respondUnauthorized(w, r)
+		return
+	}
+
+	// Get item's workspace_id for permission check
+	var workspaceID int
+	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			respondNotFound(w, r, "item")
+			return
+		}
+		respondInternalError(w, r, err)
+		return
+	}
+
+	// Check if user has permission to view this item
+	canView, permErr := h.canViewItem(user.ID, workspaceID)
+	if permErr != nil {
+		respondInternalError(w, r, permErr)
+		return
+	}
+	if !canView {
+		respondNotFound(w, r, "item")
 		return
 	}
 

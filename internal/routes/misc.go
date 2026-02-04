@@ -47,5 +47,5 @@ func RegisterMiscRoutes(deps *Deps) {
 	api.HandleH("PUT /setup/modules", admin(http.HandlerFunc(deps.Admin.Setup.UpdateModuleSettings)))
 
 	// System endpoints
-	api.HandleH("POST /shutdown", auth(http.HandlerFunc(deps.Admin.System.Shutdown)))
+	api.HandleH("POST /shutdown", admin(http.HandlerFunc(deps.Admin.System.Shutdown)))
 }

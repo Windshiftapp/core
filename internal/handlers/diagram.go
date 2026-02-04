@@ -11,16 +11,24 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
+	"windshift/internal/services"
 )
 
 type DiagramHandler struct {
-	db database.Database
+	db                database.Database
+	permissionService *services.PermissionService
 }
 
-func NewDiagramHandler(db database.Database) *DiagramHandler {
+func NewDiagramHandler(db database.Database, permissionService *services.PermissionService) *DiagramHandler {
 	return &DiagramHandler{
-		db: db,
+		db:                db,
+		permissionService: permissionService,
 	}
+}
+
+// checkItemEditPermission checks if the current user can edit the given item
+func (h *DiagramHandler) checkItemEditPermission(w http.ResponseWriter, r *http.Request, itemID int) bool {
+	return CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit)
 }
 
 // Create creates a new diagram for an item
@@ -29,6 +37,10 @@ func (h *DiagramHandler) Create(w http.ResponseWriter, r *http.Request) {
 	itemID, err := strconv.Atoi(itemIDStr)
 	if err != nil {
 		respondInvalidID(w, r, "itemId")
+		return
+	}
+
+	if !h.checkItemEditPermission(w, r, itemID) {
 		return
 	}
 
@@ -271,6 +283,10 @@ func (h *DiagramHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !h.checkItemEditPermission(w, r, itemID) {
+		return
+	}
+
 	query := `
 		UPDATE item_diagrams
 		SET name = ?, diagram_data = ?, updated_at = ?, updated_by = ?
@@ -382,6 +398,10 @@ func (h *DiagramHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("failed to get diagram details", slog.String("component", "diagrams"), slog.Any("error", err))
 		respondInternalError(w, r, err)
+		return
+	}
+
+	if !h.checkItemEditPermission(w, r, itemID) {
 		return
 	}
 

@@ -383,13 +383,13 @@ func (s *Server) initialize() error {
 
 	// Link management handlers
 	linkTypeHandler := handlers.NewLinkTypeHandler(s.db)
-	itemLinkHandler := handlers.NewItemLinkHandler(s.db, s.notificationService)
+	itemLinkHandler := handlers.NewItemLinkHandler(s.db, s.notificationService, permService)
 
 	// Label handler
-	labelHandler := handlers.NewLabelHandler(s.db)
+	labelHandler := handlers.NewLabelHandler(s.db, permService)
 
 	// Recurrence handler
-	recurrenceHandler := handlers.NewRecurrenceHandler(s.db, s.recurrenceScheduler)
+	recurrenceHandler := handlers.NewRecurrenceHandler(s.db, s.recurrenceScheduler, permService)
 
 	// Actions handler
 	actionsHandler := handlers.NewActionsHandler(s.db, s.actionService)
@@ -546,7 +546,7 @@ func (s *Server) initialize() error {
 	}
 
 	// Diagram handler
-	diagramHandler := handlers.NewDiagramHandler(s.db)
+	diagramHandler := handlers.NewDiagramHandler(s.db, permService)
 
 	// Plugin system
 	var pluginRouter *plugins.Router

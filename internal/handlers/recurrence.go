@@ -11,25 +11,33 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/scheduler"
+	"windshift/internal/services"
 	"windshift/internal/utils"
 )
 
 // RecurrenceHandler handles recurrence rule API endpoints
 type RecurrenceHandler struct {
-	db             database.Database
-	recurrenceRepo *repository.RecurrenceRepository
-	itemRepo       *repository.ItemRepository
-	scheduler      *scheduler.RecurrenceScheduler
+	db                database.Database
+	recurrenceRepo    *repository.RecurrenceRepository
+	itemRepo          *repository.ItemRepository
+	scheduler         *scheduler.RecurrenceScheduler
+	permissionService *services.PermissionService
 }
 
 // NewRecurrenceHandler creates a new recurrence handler
-func NewRecurrenceHandler(db database.Database, sched *scheduler.RecurrenceScheduler) *RecurrenceHandler {
+func NewRecurrenceHandler(db database.Database, sched *scheduler.RecurrenceScheduler, permissionService *services.PermissionService) *RecurrenceHandler {
 	return &RecurrenceHandler{
-		db:             db,
-		recurrenceRepo: repository.NewRecurrenceRepository(db),
-		itemRepo:       repository.NewItemRepository(db),
-		scheduler:      sched,
+		db:                db,
+		recurrenceRepo:    repository.NewRecurrenceRepository(db),
+		itemRepo:          repository.NewItemRepository(db),
+		scheduler:         sched,
+		permissionService: permissionService,
 	}
+}
+
+// checkItemEditPermission checks if the current user can edit the given item
+func (h *RecurrenceHandler) checkItemEditPermission(w http.ResponseWriter, r *http.Request, itemID int) bool {
+	return CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit)
 }
 
 // GetRecurrence gets the recurrence rule for an item
@@ -61,6 +69,10 @@ func (h *RecurrenceHandler) CreateRecurrence(w http.ResponseWriter, r *http.Requ
 	itemID, err := strconv.Atoi(itemIDStr)
 	if err != nil {
 		respondInvalidID(w, r, "id")
+		return
+	}
+
+	if !h.checkItemEditPermission(w, r, itemID) {
 		return
 	}
 
@@ -214,6 +226,10 @@ func (h *RecurrenceHandler) UpdateRecurrence(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	if !h.checkItemEditPermission(w, r, itemID) {
+		return
+	}
+
 	// Get existing rule
 	rule, err := h.recurrenceRepo.GetByTemplateItemID(itemID)
 	if err == repository.ErrNotFound {
@@ -320,6 +336,10 @@ func (h *RecurrenceHandler) DeleteRecurrence(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	if !h.checkItemEditPermission(w, r, itemID) {
+		return
+	}
+
 	// Get the rule first
 	rule, err := h.recurrenceRepo.GetByTemplateItemID(itemID)
 	if err == repository.ErrNotFound {
@@ -410,6 +430,10 @@ func (h *RecurrenceHandler) ForceGenerate(w http.ResponseWriter, r *http.Request
 	itemID, err := strconv.Atoi(itemIDStr)
 	if err != nil {
 		respondInvalidID(w, r, "id")
+		return
+	}
+
+	if !h.checkItemEditPermission(w, r, itemID) {
 		return
 	}
 

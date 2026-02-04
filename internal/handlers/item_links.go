@@ -16,6 +16,7 @@ import (
 
 type ItemLinkHandler struct {
 	db                  database.Database
+	permissionService   *services.PermissionService
 	notificationService interface {
 		EmitEvent(event *services.NotificationEvent)
 	} // Notification service for async notification processing (optional, can be nil)
@@ -26,11 +27,17 @@ type ItemLinkHandler struct {
 
 func NewItemLinkHandler(db database.Database, notificationService interface {
 	EmitEvent(event *services.NotificationEvent)
-}) *ItemLinkHandler {
+}, permissionService *services.PermissionService) *ItemLinkHandler {
 	return &ItemLinkHandler{
 		db:                  db,
 		notificationService: notificationService,
+		permissionService:   permissionService,
 	}
+}
+
+// checkItemEditPermission checks if the current user can edit the given item
+func (h *ItemLinkHandler) checkItemEditPermission(w http.ResponseWriter, r *http.Request, itemID int) bool {
+	return CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit)
 }
 
 // SetActionService sets the action service for automation workflows
@@ -47,6 +54,23 @@ func (h *ItemLinkHandler) GetLinksForItem(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		respondInvalidID(w, r, "id")
 		return
+	}
+
+	user := h.getUserFromContext(r)
+	if user == nil {
+		respondUnauthorized(w, r)
+		return
+	}
+
+	// Check item.view permission if it's a work item
+	var workspaceID int
+	isWorkItem := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", id).Scan(&workspaceID) == nil
+	if isWorkItem {
+		hasView, _ := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionItemView)
+		if !hasView {
+			respondNotFound(w, r, "item")
+			return
+		}
 	}
 
 	// Convert URL path to internal type
@@ -69,6 +93,11 @@ func (h *ItemLinkHandler) GetLinksForItem(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Filter linked items by accessible workspaces
+	accessibleKeys, _ := GetAccessibleWorkspaceKeys(user, h.db, h.permissionService)
+	outgoingLinks = filterLinksByAccessibleWorkspaces(outgoingLinks, accessibleKeys)
+	incomingLinks = filterLinksByAccessibleWorkspaces(incomingLinks, accessibleKeys)
+
 	response := map[string]interface{}{
 		"outgoing": outgoingLinks,
 		"incoming": incomingLinks,
@@ -76,6 +105,21 @@ func (h *ItemLinkHandler) GetLinksForItem(w http.ResponseWriter, r *http.Request
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+// filterLinksByAccessibleWorkspaces removes links pointing to items in inaccessible workspaces
+func filterLinksByAccessibleWorkspaces(links []models.ItemLink, accessibleKeys map[string]bool) []models.ItemLink {
+	filtered := make([]models.ItemLink, 0, len(links))
+	for _, link := range links {
+		if link.SourceType == "item" && link.SourceWorkspaceKey != "" && !accessibleKeys[link.SourceWorkspaceKey] {
+			continue
+		}
+		if link.TargetType == "item" && link.TargetWorkspaceKey != "" && !accessibleKeys[link.TargetWorkspaceKey] {
+			continue
+		}
+		filtered = append(filtered, link)
+	}
+	return filtered
 }
 
 // CreateLink creates a new link between items
@@ -145,6 +189,19 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	createdBy := currentUser.ID
+
+	// Check item.edit on source (authorizes modifying the source by adding a link)
+	if link.SourceType == "item" {
+		if !CheckItemPermission(w, r, h.db, h.permissionService, link.SourceID, models.PermissionItemEdit) {
+			return
+		}
+	}
+	// Check item.view on target (verifies user can see it — prevents existence leakage)
+	if link.TargetType == "item" {
+		if !CheckItemPermission(w, r, h.db, h.permissionService, link.TargetID, models.PermissionItemView) {
+			return
+		}
+	}
 
 	// Create link via service (handles link type validation + insert)
 	linkSvc := services.NewItemLinkService(h.db)
@@ -270,6 +327,13 @@ func (h *ItemLinkHandler) DeleteLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check item.edit permission for item-type source
+	if sourceType == "item" {
+		if !h.checkItemEditPermission(w, r, sourceID) {
+			return
+		}
+	}
+
 	result, err := h.db.ExecWrite("DELETE FROM item_links WHERE id = ?", id)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -330,6 +394,10 @@ func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
+		return
+	}
+
+	if !CheckItemPermission(w, r, h.db, h.permissionService, id, models.PermissionItemView) {
 		return
 	}
 
@@ -441,6 +509,18 @@ func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request
 
 // SearchLinkableItems searches for items that can be linked
 func (h *ItemLinkHandler) SearchLinkableItems(w http.ResponseWriter, r *http.Request) {
+	user := h.getUserFromContext(r)
+	if user == nil {
+		respondUnauthorized(w, r)
+		return
+	}
+
+	accessibleWorkspaceIDs, err := GetAccessibleWorkspaceIDs(user, h.db, h.permissionService)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
 	query := r.URL.Query().Get("q")
 	itemType := r.URL.Query().Get("type") // "item", "test_case", "asset", or empty for all
 	limit := 20
@@ -455,7 +535,7 @@ func (h *ItemLinkHandler) SearchLinkableItems(w http.ResponseWriter, r *http.Req
 
 	// Search work items
 	if itemType == "" || itemType == "item" {
-		workItems, err := h.searchWorkItems(query, limit)
+		workItems, err := h.searchWorkItems(query, limit, accessibleWorkspaceIDs)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -569,11 +649,16 @@ func (h *ItemLinkHandler) getLinkByID(id int) (*models.ItemLink, error) {
 	return &links[0], nil
 }
 
-func (h *ItemLinkHandler) searchWorkItems(query string, limit int) ([]models.LinkableItem, error) {
-	sqlQuery := `
-		SELECT 
-			i.id, 
-			i.title, 
+func (h *ItemLinkHandler) searchWorkItems(query string, limit int, accessibleWorkspaceIDs []int) ([]models.LinkableItem, error) {
+	if len(accessibleWorkspaceIDs) == 0 {
+		return []models.LinkableItem{}, nil
+	}
+
+	placeholders, wsArgs := BuildWorkspaceIDPlaceholders(accessibleWorkspaceIDs)
+	sqlQuery := fmt.Sprintf(`
+		SELECT
+			i.id,
+			i.title,
 			COALESCE(i.description, '') AS description,
 			i.workspace_id,
 			w.name AS workspace_name,
@@ -583,13 +668,17 @@ func (h *ItemLinkHandler) searchWorkItems(query string, limit int) ([]models.Lin
 		LEFT JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN statuses s ON i.status_id = s.id
 		LEFT JOIN priorities p ON i.priority_id = p.id
-		WHERE i.title LIKE ? OR i.description LIKE ?
+		WHERE (i.title LIKE ? OR i.description LIKE ?)
+		  AND i.workspace_id IN (%s)
 		ORDER BY i.title
 		LIMIT ?
-	`
+	`, placeholders)
 
 	searchTerm := "%" + query + "%"
-	rows, err := h.db.Query(sqlQuery, searchTerm, searchTerm, limit)
+	args := []interface{}{searchTerm, searchTerm}
+	args = append(args, wsArgs...)
+	args = append(args, limit)
+	rows, err := h.db.Query(sqlQuery, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -3,8 +3,12 @@ package handlers
 import (
 	"database/sql"
 	"errors"
+	"fmt"
+	"log/slog"
 	"net/http"
+	"strings"
 	"windshift/internal/database"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
@@ -163,4 +167,96 @@ func AuthorizeUserRequest(w http.ResponseWriter, r *http.Request, targetUserID i
 	}
 
 	return currentUser
+}
+
+// CheckItemPermission verifies the user has the given permission on the item's workspace.
+// Returns 404 on both not-found and no-permission to prevent item existence leakage.
+func CheckItemPermission(w http.ResponseWriter, r *http.Request, db database.Database,
+	permService *services.PermissionService, itemID int, permission string) bool {
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	if !ok {
+		respondUnauthorized(w, r)
+		return false
+	}
+	var workspaceID int
+	err := db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
+	if err != nil {
+		respondNotFound(w, r, "Item")
+		return false
+	}
+	hasPermission, err := permService.HasWorkspacePermission(user.ID, workspaceID, permission)
+	if err != nil || !hasPermission {
+		respondNotFound(w, r, "Item") // 404, not 403 — prevents existence leakage
+		return false
+	}
+	return true
+}
+
+// GetAccessibleWorkspaceIDs returns IDs of active workspaces the user can view.
+func GetAccessibleWorkspaceIDs(user *models.User, db database.Database,
+	permService *services.PermissionService) ([]int, error) {
+	if user == nil || permService == nil {
+		return []int{}, nil
+	}
+	rows, err := db.Query("SELECT id FROM workspaces WHERE active = 1")
+	if err != nil {
+		return nil, fmt.Errorf("failed to query workspaces: %w", err)
+	}
+	defer rows.Close()
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			continue
+		}
+		hasView, err := permService.HasWorkspacePermission(user.ID, id, models.PermissionItemView)
+		if err != nil {
+			slog.Error("error checking view permission", slog.Int("workspace_id", id), slog.Any("error", err))
+			continue
+		}
+		if hasView {
+			ids = append(ids, id)
+		}
+	}
+	return ids, rows.Err()
+}
+
+// GetAccessibleWorkspaceKeys returns a set of workspace keys the user can view.
+func GetAccessibleWorkspaceKeys(user *models.User, db database.Database,
+	permService *services.PermissionService) (map[string]bool, error) {
+	if user == nil || permService == nil {
+		return map[string]bool{}, nil
+	}
+	rows, err := db.Query("SELECT id, key FROM workspaces WHERE active = 1")
+	if err != nil {
+		return nil, fmt.Errorf("failed to query workspaces: %w", err)
+	}
+	defer rows.Close()
+	keys := make(map[string]bool)
+	for rows.Next() {
+		var id int
+		var key string
+		if err := rows.Scan(&id, &key); err != nil {
+			continue
+		}
+		hasView, err := permService.HasWorkspacePermission(user.ID, id, models.PermissionItemView)
+		if err != nil {
+			continue
+		}
+		if hasView {
+			keys[key] = true
+		}
+	}
+	return keys, rows.Err()
+}
+
+// BuildWorkspaceIDPlaceholders builds a parameterized IN clause for workspace IDs.
+func BuildWorkspaceIDPlaceholders(ids []int) (string, []interface{}) {
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	return strings.Join(placeholders, ", "), args
 }

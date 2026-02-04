@@ -10,16 +10,18 @@ import (
 	"time"
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/services"
 )
 
 // LabelHandler handles label CRUD and item-label management endpoints
 type LabelHandler struct {
-	db database.Database
+	db                database.Database
+	permissionService *services.PermissionService
 }
 
 // NewLabelHandler creates a new LabelHandler
-func NewLabelHandler(db database.Database) *LabelHandler {
-	return &LabelHandler{db: db}
+func NewLabelHandler(db database.Database, permissionService *services.PermissionService) *LabelHandler {
+	return &LabelHandler{db: db, permissionService: permissionService}
 }
 
 // GetAll lists labels for a workspace
@@ -279,11 +281,20 @@ func (h *LabelHandler) GetItemLabels(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, labels)
 }
 
+// checkItemEditPermission checks if the current user can edit the given item
+func (h *LabelHandler) checkItemEditPermission(w http.ResponseWriter, r *http.Request, itemID int) bool {
+	return CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit)
+}
+
 // SetItemLabels replaces all labels on an item
 func (h *LabelHandler) SetItemLabels(w http.ResponseWriter, r *http.Request) {
 	itemID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
+		return
+	}
+
+	if !h.checkItemEditPermission(w, r, itemID) {
 		return
 	}
 
@@ -337,6 +348,10 @@ func (h *LabelHandler) AddItemLabel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !h.checkItemEditPermission(w, r, itemID) {
+		return
+	}
+
 	var input struct {
 		LabelID int `json:"label_id"`
 	}
@@ -369,6 +384,10 @@ func (h *LabelHandler) RemoveItemLabel(w http.ResponseWriter, r *http.Request) {
 	itemID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
+		return
+	}
+
+	if !h.checkItemEditPermission(w, r, itemID) {
 		return
 	}
 

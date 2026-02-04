@@ -106,57 +106,6 @@ func (h *ItemHandler) canAccessInactiveWorkspace(user *models.User, workspaceID 
 }
 
 // getAccessibleWorkspaceIDs returns all workspace IDs the user can access
-// This includes active workspaces and inactive workspaces where user has admin access
 func (h *ItemHandler) getAccessibleWorkspaceIDs(user *models.User) ([]int, error) {
-	if user == nil {
-		return []int{}, nil
-	}
-
-	// Get all workspaces
-	rows, err := h.db.Query(`SELECT id, active FROM workspaces`)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query workspaces: %w", err)
-	}
-	defer rows.Close()
-
-	accessibleIDs := []int{}
-	for rows.Next() {
-		var id int
-		var active bool
-		if err := rows.Scan(&id, &active); err != nil {
-			return nil, fmt.Errorf("failed to scan workspace: %w", err)
-		}
-
-		allowed := false
-
-		if active {
-			// Active workspaces: rely on permission service (Everyone fast path) when available
-			if h.permissionService != nil {
-				hasView, err := h.permissionService.HasWorkspacePermission(user.ID, id, models.PermissionItemView)
-				if err != nil {
-					slog.Error("error checking view permission for workspace", slog.String("component", "items_permissions"), slog.Int("workspace_id", id), slog.Any("error", err))
-				} else if hasView {
-					allowed = true
-				}
-			} else {
-				// Fail closed: deny access if permission service is unavailable
-				slog.Error("permission service unavailable, denying workspace access", slog.String("component", "items_permissions"), slog.Int("workspace_id", id))
-				allowed = false
-			}
-		} else {
-			// Inactive workspaces still require admin or workspace admin access
-			canAccess, err := h.canAccessInactiveWorkspace(user, id)
-			if err != nil {
-				slog.Error("error checking access to inactive workspace", slog.String("component", "items_permissions"), slog.Int("workspace_id", id), slog.Any("error", err))
-			} else if canAccess {
-				allowed = true
-			}
-		}
-
-		if allowed {
-			accessibleIDs = append(accessibleIDs, id)
-		}
-	}
-
-	return accessibleIDs, rows.Err()
+	return GetAccessibleWorkspaceIDs(user, h.db, h.permissionService)
 }

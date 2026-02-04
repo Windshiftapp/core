@@ -6,6 +6,7 @@ import "net/http"
 func RegisterItemRoutes(deps *Deps) {
 	api := deps.API
 	auth := deps.AuthMiddleware.RequireAuth
+	admin := deps.PermissionMiddleware.RequireSystemAdmin()
 
 	// Item endpoints
 	api.HandleH("GET /items", auth(http.HandlerFunc(deps.Items.Item.GetAll)))
@@ -75,7 +76,7 @@ func RegisterItemRoutes(deps *Deps) {
 	// Attachment settings endpoints
 	if deps.Items.AttachmentSettings != nil {
 		api.HandleH("GET /attachment-settings", auth(http.HandlerFunc(deps.Items.AttachmentSettings.Get)))
-		api.HandleH("PUT /attachment-settings/{id}", auth(http.HandlerFunc(deps.Items.AttachmentSettings.Update)))
+		api.HandleH("PUT /attachment-settings/{id}", admin(http.HandlerFunc(deps.Items.AttachmentSettings.Update)))
 		api.HandleH("GET /attachment-settings/status", auth(http.HandlerFunc(deps.Items.AttachmentSettings.GetStatus)))
 	}
 
@@ -98,10 +99,10 @@ func RegisterItemRoutes(deps *Deps) {
 
 	// Label definition CRUD
 	api.HandleH("GET /labels", auth(http.HandlerFunc(deps.Items.Label.GetAll)))
-	api.HandleH("POST /labels", auth(http.HandlerFunc(deps.Items.Label.Create)))
+	api.HandleH("POST /labels", admin(http.HandlerFunc(deps.Items.Label.Create)))
 	api.HandleH("GET /labels/{id}", auth(http.HandlerFunc(deps.Items.Label.Get)))
-	api.HandleH("PUT /labels/{id}", auth(http.HandlerFunc(deps.Items.Label.Update)))
-	api.HandleH("DELETE /labels/{id}", auth(http.HandlerFunc(deps.Items.Label.Delete)))
+	api.HandleH("PUT /labels/{id}", admin(http.HandlerFunc(deps.Items.Label.Update)))
+	api.HandleH("DELETE /labels/{id}", admin(http.HandlerFunc(deps.Items.Label.Delete)))
 
 	// Item-label management
 	api.HandleH("GET /items/{id}/labels", auth(http.HandlerFunc(deps.Items.Label.GetItemLabels)))
