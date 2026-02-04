@@ -45,6 +45,12 @@ export const channels = {
     fetchAPI(`/channels/${id}/managers/${managerId}`, {
       method: 'DELETE',
     }),
+  // Email processing log
+  getEmailLog: (id, page = 1, pageSize = 50, search = '') => {
+    let url = `/channels/${id}/email-log?page=${page}&page_size=${pageSize}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    return fetchAPI(url);
+  },
   // Email OAuth (inline per-channel OAuth credentials)
   startEmailOAuth: (channelId) =>
     fetchAPI(`/channels/${channelId}/inline-oauth/start`, {

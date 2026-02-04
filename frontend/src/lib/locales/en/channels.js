@@ -118,6 +118,11 @@ export default {
     portalIsActive: 'Portal is active and accepting submissions',
     portalIsInactive: 'Portal is currently disabled',
 
+    // Email toggle
+    enableEmail: 'Enable Email Channel',
+    emailIsActive: 'Email channel is active and processing emails',
+    emailIsInactive: 'Email channel is currently disabled',
+
     // Webhook Configuration
     webhookConfiguration: 'Webhook Configuration',
     webhookUrl: 'Webhook URL',
@@ -238,6 +243,26 @@ export default {
     sendingTestEmail: 'Sending test email...',
     testEmailSent: 'Test email sent successfully! Configuration has been saved.',
     testEmailFailed: 'Test email failed',
+
+    // Processing Log
+    processingLog: 'Processing Log',
+    emailLog: {
+      syncStatus: 'Sync Status',
+      lastChecked: 'Last checked',
+      never: 'Never',
+      errors: 'Errors',
+      noErrors: 'No errors',
+      from: 'From',
+      subject: 'Subject',
+      result: 'Result',
+      processedAt: 'Processed',
+      newItem: 'New item {key}',
+      commentOn: 'Comment on {key}',
+      noEmails: 'No emails processed yet',
+      previous: 'Previous',
+      next: 'Next',
+      page: 'Page {page} of {total}',
+    },
   },
 
   portal: {

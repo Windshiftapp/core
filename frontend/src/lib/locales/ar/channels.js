@@ -58,7 +58,29 @@ export default {
   },
 
   channel: {
-    // Channel configuration section - falls back to English for missing keys
+    enableEmail: 'تفعيل قناة البريد الإلكتروني',
+    emailIsActive: 'قناة البريد الإلكتروني نشطة وتعالج الرسائل',
+    emailIsInactive: 'قناة البريد الإلكتروني معطلة حاليًا',
+
+    // Processing Log
+    processingLog: 'سجل المعالجة',
+    emailLog: {
+      syncStatus: 'حالة المزامنة',
+      lastChecked: 'آخر فحص',
+      never: 'أبداً',
+      errors: 'أخطاء',
+      noErrors: 'لا أخطاء',
+      from: 'من',
+      subject: 'الموضوع',
+      result: 'النتيجة',
+      processedAt: 'تمت المعالجة',
+      newItem: 'عنصر جديد {key}',
+      commentOn: 'تعليق على {key}',
+      noEmails: 'لم تتم معالجة أي رسائل بعد',
+      previous: 'السابق',
+      next: 'التالي',
+      page: 'صفحة {page} من {total}',
+    },
   },
 
   portal: {

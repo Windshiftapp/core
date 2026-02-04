@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
-  import { LifeBuoy, Plus, Webhook, Globe, Trash2, Settings, Search, Mail, Layers, Tag, Send } from 'lucide-svelte';
+  import { LifeBuoy, Plus, Webhook, Globe, Trash2, Settings, Search, Mail, Layers, Tag, Send, Power, FileText } from 'lucide-svelte';
   import { api } from '../../api.js';
   import { currentRoute, navigate } from '../../router.js';
   import { channelCategoriesStore } from '../../stores/channelCategories.js';
@@ -20,6 +20,7 @@
   import ChannelNavigation from './ChannelNavigation.svelte';
   import CategoryModal from '../../dialogs/CategoryModal.svelte';
   import ChannelConfigModal from '../../dialogs/ChannelConfigModal.svelte';
+  import EmailLogModal from '../../dialogs/EmailLogModal.svelte';
   import Label from '../../components/Label.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
 
@@ -103,6 +104,8 @@
   let selectedChannel = $state(null);
   let showDeleteConfirmation = $state(false);
   let channelToDelete = $state(null);
+  let showEmailLog = $state(false);
+  let emailLogChannel = $state(null);
 
 
   // Form data for new channel
@@ -123,10 +126,44 @@
     { key: 'actions', label: '', width: 'w-16' }
   ];
 
+  async function toggleChannelEnabled(channel) {
+    try {
+      const configKey = channel.type === 'email' ? 'email_enabled' : 'portal_enabled';
+      const newValue = channel.status !== 'enabled';
+      await api.channels.updateConfig(channel.id, { [configKey]: newValue });
+      await loadChannels();
+      successToast(`Channel ${newValue ? 'enabled' : 'disabled'} successfully`);
+    } catch (err) {
+      console.error('Failed to toggle channel:', err);
+      errorToast('Failed to toggle channel: ' + (err.message || err));
+    }
+  }
+
+  function openEmailLog(channel) {
+    emailLogChannel = channel;
+    showEmailLog = true;
+  }
+
   function getChannelActionItems(channel) {
     const items = [
       { title: 'Configure', icon: Settings, onClick: () => openConfigModal(channel) }
     ];
+
+    if (channel.type === 'email') {
+      items.push({
+        title: t('channel.processingLog', 'Processing Log'),
+        icon: FileText,
+        onClick: () => openEmailLog(channel)
+      });
+    }
+
+    if ((channel.type === 'email' || channel.type === 'portal') && !isPluginOwned(channel)) {
+      items.push({
+        title: channel.status === 'enabled' ? 'Disable' : 'Enable',
+        icon: Power,
+        onClick: () => toggleChannelEnabled(channel)
+      });
+    }
 
     if (!channel.is_default && !isPluginOwned(channel)) {
       items.push({ title: 'Delete', icon: Trash2, onClick: () => deleteChannel(channel), color: 'var(--ds-text-danger)' });
@@ -621,6 +658,13 @@
   channel={selectedChannel}
   onClose={closeConfigModal}
   onSave={handleConfigSave}
+/>
+
+<!-- Email Processing Log Modal -->
+<EmailLogModal
+  isOpen={showEmailLog}
+  channel={emailLogChannel}
+  onClose={() => { showEmailLog = false; emailLogChannel = null; }}
 />
 
 <!-- Delete Confirmation Dialog -->

@@ -79,7 +79,8 @@
     item_type_id: null,
     mailbox: 'INBOX',
     mark_as_read: true,
-    delete_after_process: false
+    delete_after_process: false,
+    enabled: false
   });
 
   // SMTP configuration form data
@@ -171,7 +172,8 @@
           item_type_id: config.email_item_type_id || null,
           mailbox: config.email_mailbox || 'INBOX',
           mark_as_read: config.email_mark_as_read !== false,
-          delete_after_process: config.email_delete_after_process || false
+          delete_after_process: config.email_delete_after_process || false,
+          enabled: config.email_enabled || false
         };
         loadWorkspacesAndItemTypes();
       } else if (channel.type === 'smtp') {
@@ -192,7 +194,7 @@
 
   async function loadWorkspacesAndItemTypes() {
     try {
-      workspaces = await api.workspaces.getAll();
+      workspaces = (await api.workspaces.getAll()).filter(w => !w.is_personal);
       if (emailFormData.workspace_id) {
         await loadItemTypesForWorkspace(emailFormData.workspace_id);
       }
@@ -207,7 +209,7 @@
       return;
     }
     try {
-      itemTypes = await api.itemTypes.getForWorkspace(workspaceId);
+      itemTypes = await api.itemTypes.getAll();
     } catch (error) {
       console.error('Failed to load item types:', error);
       itemTypes = [];

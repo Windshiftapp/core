@@ -577,11 +577,21 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	var configUpdate struct {
-		Config models.ChannelConfig `json:"config"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&configUpdate); err != nil {
+	var rawRequest map[string]json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&rawRequest); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
+		return
+	}
+
+	rawConfig, ok := rawRequest["config"]
+	if !ok {
+		respondValidationError(w, r, "Missing config field")
+		return
+	}
+
+	var incomingConfig map[string]interface{}
+	if err := json.Unmarshal(rawConfig, &incomingConfig); err != nil {
+		respondValidationError(w, r, "Invalid config JSON")
 		return
 	}
 
@@ -622,19 +632,6 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 		mergedConfig = make(map[string]interface{})
 	}
 
-	// Unmarshal incoming config into map
-	incomingConfigBytes, err := json.Marshal(configUpdate.Config)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	var incomingConfig map[string]interface{}
-	if err := json.Unmarshal(incomingConfigBytes, &incomingConfig); err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
 	// Merge: incoming config overwrites existing config for keys that are present
 	for key, value := range incomingConfig {
 		mergedConfig[key] = value
@@ -660,6 +657,11 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 
 	// Check if portal is enabled
 	if finalConfig.PortalEnabled {
+		newStatus = "enabled"
+	}
+
+	// Check if email channel is enabled
+	if finalConfig.EmailEnabled {
 		newStatus = "enabled"
 	}
 
@@ -1099,6 +1101,209 @@ func (h *ChannelHandler) ProcessEmailsNow(w http.ResponseWriter, r *http.Request
 		"channel_id": channelID,
 		"message":    "Email processing triggered",
 	})
+}
+
+// GetEmailLog returns the email processing log for a channel
+// GET /channels/{id}/email-log?page=1&page_size=50
+func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		respondInvalidID(w, r, "channel ID")
+		return
+	}
+
+	// Parse pagination params
+	page := 1
+	pageSize := 50
+	if p := r.URL.Query().Get("page"); p != "" {
+		if v, err := strconv.Atoi(p); err == nil && v > 0 {
+			page = v
+		}
+	}
+	if ps := r.URL.Query().Get("page_size"); ps != "" {
+		if v, err := strconv.Atoi(ps); err == nil && v > 0 && v <= 100 {
+			pageSize = v
+		}
+	}
+	search := r.URL.Query().Get("search")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Verify channel exists and is an email channel
+	var channelType string
+	err = h.db.QueryRowContext(ctx, "SELECT type FROM channels WHERE id = ?", id).Scan(&channelType)
+	if err == sql.ErrNoRows {
+		respondNotFound(w, r, "channel")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if channelType != "email" {
+		respondValidationError(w, r, "Channel is not an email channel")
+		return
+	}
+
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	if !ok {
+		respondUnauthorized(w, r)
+		return
+	}
+
+	// Get channel state
+	type emailChannelState struct {
+		LastCheckedAt *time.Time `json:"last_checked_at"`
+		LastUID       int        `json:"last_uid"`
+		ErrorCount    int        `json:"error_count"`
+		LastError     string     `json:"last_error"`
+	}
+
+	var state emailChannelState
+	var lastCheckedAt sql.NullTime
+	var lastError sql.NullString
+	err = h.db.QueryRowContext(ctx,
+		"SELECT last_uid, last_checked_at, error_count, last_error FROM email_channel_state WHERE channel_id = ?",
+		id,
+	).Scan(&state.LastUID, &lastCheckedAt, &state.ErrorCount, &lastError)
+	if err != nil && err != sql.ErrNoRows {
+		respondInternalError(w, r, err)
+		return
+	}
+	if lastCheckedAt.Valid {
+		state.LastCheckedAt = &lastCheckedAt.Time
+	}
+	if lastError.Valid {
+		state.LastError = lastError.String
+	}
+
+	// Build WHERE clause with optional search filter
+	whereClause := "WHERE emt.channel_id = ?"
+	args := []interface{}{id}
+	if search != "" {
+		searchPattern := "%" + search + "%"
+		whereClause += " AND (emt.from_email LIKE ? OR emt.from_name LIKE ? OR emt.subject LIKE ?)"
+		args = append(args, searchPattern, searchPattern, searchPattern)
+	}
+
+	// Get total count
+	var total int
+	err = h.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM email_message_tracking emt "+whereClause,
+		args...,
+	).Scan(&total)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	// Get paginated messages
+	offset := (page - 1) * pageSize
+	queryArgs := append(args, pageSize, offset)
+	rows, err := h.db.QueryContext(ctx,
+		"SELECT emt.id, emt.from_email, emt.from_name, emt.subject, emt.item_id, emt.comment_id, emt.processed_at, i.workspace_item_number, i.workspace_id, w.key as workspace_key FROM email_message_tracking emt LEFT JOIN items i ON emt.item_id = i.id LEFT JOIN workspaces w ON i.workspace_id = w.id "+whereClause+" ORDER BY emt.processed_at DESC LIMIT ? OFFSET ?",
+		queryArgs...,
+	)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	defer rows.Close()
+
+	type emailMessage struct {
+		ID                  int       `json:"id"`
+		FromEmail           string    `json:"from_email"`
+		FromName            string    `json:"from_name"`
+		Subject             string    `json:"subject"`
+		ItemID              *int      `json:"item_id"`
+		CommentID           *int      `json:"comment_id"`
+		ProcessedAt         time.Time `json:"processed_at"`
+		WorkspaceKey        string    `json:"workspace_key,omitempty"`
+		WorkspaceItemNumber int       `json:"workspace_item_number,omitempty"`
+	}
+
+	type scannedMessage struct {
+		msg         emailMessage
+		workspaceID sql.NullInt64
+	}
+
+	var scannedMessages []scannedMessage
+	workspaceIDs := map[int]bool{}
+	for rows.Next() {
+		var sm scannedMessage
+		var itemID, commentID sql.NullInt64
+		var fromName sql.NullString
+		var workspaceItemNumber sql.NullInt64
+		var workspaceKey sql.NullString
+		err := rows.Scan(&sm.msg.ID, &sm.msg.FromEmail, &fromName, &sm.msg.Subject, &itemID, &commentID, &sm.msg.ProcessedAt, &workspaceItemNumber, &sm.workspaceID, &workspaceKey)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if fromName.Valid {
+			sm.msg.FromName = fromName.String
+		}
+		if itemID.Valid {
+			v := int(itemID.Int64)
+			sm.msg.ItemID = &v
+		}
+		if commentID.Valid {
+			v := int(commentID.Int64)
+			sm.msg.CommentID = &v
+		}
+		if workspaceItemNumber.Valid {
+			sm.msg.WorkspaceItemNumber = int(workspaceItemNumber.Int64)
+		}
+		if workspaceKey.Valid {
+			sm.msg.WorkspaceKey = workspaceKey.String
+		}
+		if sm.workspaceID.Valid {
+			workspaceIDs[int(sm.workspaceID.Int64)] = true
+		}
+		scannedMessages = append(scannedMessages, sm)
+	}
+	if err = rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	// Check workspace permissions for all unique workspaces
+	allowedWS := map[int]bool{}
+	for wsID := range workspaceIDs {
+		allowed, err := h.permissionService.HasWorkspacePermission(user.ID, wsID, models.PermissionItemView)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		allowedWS[wsID] = allowed
+	}
+
+	// Build final messages, only including workspace key if user has permission
+	var messages []emailMessage
+	for _, sm := range scannedMessages {
+		msg := sm.msg
+		if sm.workspaceID.Valid && !allowedWS[int(sm.workspaceID.Int64)] {
+			msg.WorkspaceKey = ""
+			msg.WorkspaceItemNumber = 0
+		}
+		messages = append(messages, msg)
+	}
+
+	if messages == nil {
+		messages = []emailMessage{}
+	}
+
+	response := map[string]interface{}{
+		"state":     state,
+		"messages":  messages,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 // Default OAuth scopes for email providers

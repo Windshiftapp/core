@@ -86,6 +86,7 @@ type ChannelConfig struct {
 	EmailMarkAsRead         bool       `json:"email_mark_as_read,omitempty"`         // Mark processed emails as read
 	EmailDeleteAfterProcess bool       `json:"email_delete_after_process,omitempty"` // Delete emails after processing
 	EmailConnectedPortalID  *int       `json:"email_connected_portal_id,omitempty"`  // Portal for "My Requests" visibility
+	EmailEnabled            bool       `json:"email_enabled,omitempty"`              // Enable/disable email channel
 
 	// Portal Configuration
 	PortalSlug         string `json:"portal_slug,omitempty"`        // URL-friendly identifier (e.g., "support-portal")

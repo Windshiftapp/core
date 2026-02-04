@@ -50,7 +50,31 @@ export default {
     webhookFailed: 'Prueba de webhook fallida',
   },
 
-  channel: {},
+  channel: {
+    enableEmail: 'Activar canal de correo electrónico',
+    emailIsActive: 'El canal de correo electrónico está activo y procesando correos',
+    emailIsInactive: 'El canal de correo electrónico está desactivado',
+
+    // Processing Log
+    processingLog: 'Registro de procesamiento',
+    emailLog: {
+      syncStatus: 'Estado de sincronización',
+      lastChecked: 'Última verificación',
+      never: 'Nunca',
+      errors: 'Errores',
+      noErrors: 'Sin errores',
+      from: 'De',
+      subject: 'Asunto',
+      result: 'Resultado',
+      processedAt: 'Procesado',
+      newItem: 'Nuevo elemento {key}',
+      commentOn: 'Comentario en {key}',
+      noEmails: 'No se han procesado correos aún',
+      previous: 'Anterior',
+      next: 'Siguiente',
+      page: 'Página {page} de {total}',
+    },
+  },
 
   portal: {
     title: 'Portal',

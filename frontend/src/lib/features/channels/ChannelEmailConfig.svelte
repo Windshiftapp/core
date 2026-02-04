@@ -7,6 +7,7 @@
   import Button from '../../components/Button.svelte';
   import Label from '../../components/Label.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
+  import WorkspaceSelector from '../../workspaces/WorkspaceSelector.svelte';
 
   let {
     channelId,
@@ -27,7 +28,8 @@
       item_type_id: null,
       mailbox: 'INBOX',
       mark_as_read: true,
-      delete_after_process: false
+      delete_after_process: false,
+      enabled: false
     }),
     workspaces = [],
     itemTypes = [],
@@ -92,7 +94,8 @@
       email_item_type_id: formData.item_type_id,
       email_mailbox: formData.mailbox,
       email_mark_as_read: formData.mark_as_read,
-      email_delete_after_process: formData.delete_after_process
+      email_delete_after_process: formData.delete_after_process,
+      email_enabled: formData.enabled
     };
 
     if (formData.auth_method === 'oauth') {
@@ -303,20 +306,15 @@
       <div class="grid grid-cols-2 gap-4">
         <div>
           <Label color="default" required class="mb-2">{t('channel.targetWorkspace')}</Label>
-          <Select
+          <WorkspaceSelector
             bind:value={formData.workspace_id}
-            onchange={(e) => {
-              const newWorkspaceId = e.target.value ? parseInt(e.target.value) : null;
-              formData.workspace_id = newWorkspaceId;
+            {workspaces}
+            placeholder={t('channel.selectWorkspace')}
+            onSelect={(workspace) => {
               formData.item_type_id = null;
-              onLoadItemTypes(newWorkspaceId);
+              onLoadItemTypes(formData.workspace_id);
             }}
-          >
-            <option value={null}>{t('channel.selectWorkspace')}</option>
-            {#each workspaces as ws}
-              <option value={ws.id}>{ws.name}</option>
-            {/each}
-          </Select>
+          />
         </div>
         <div>
           <Label color="default" required class="mb-2">{t('channel.itemType')}</Label>
@@ -361,6 +359,42 @@
             size="small"
           />
         </div>
+      </div>
+    </div>
+
+    <!-- Enable Email Channel Toggle - Prominent -->
+    <div
+      class="flex items-center justify-between p-4 rounded-lg border-2 transition-colors cursor-pointer"
+      style="background-color: {formData.enabled ? 'var(--ds-background-success)' : 'var(--ds-surface-raised)'}; border-color: {formData.enabled ? 'var(--ds-border-success)' : 'var(--ds-border)'};"
+      onclick={() => formData.enabled = !formData.enabled}
+      role="button"
+      tabindex="0"
+      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); formData.enabled = !formData.enabled; }}}
+    >
+      <div class="flex items-center gap-3">
+        <div
+          class="w-10 h-6 rounded-full relative transition-colors"
+          style="background-color: {formData.enabled ? 'var(--ds-background-success-bold)' : 'var(--ds-background-neutral)'};"
+        >
+          <div
+            class="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform"
+            style="transform: translateX({formData.enabled ? '22px' : '4px'});"
+          ></div>
+        </div>
+        <div>
+          <div class="text-sm font-semibold" style="color: var(--ds-text);">
+            {t('channel.enableEmail', 'Enable Email Channel')}
+          </div>
+          <div class="text-xs" style="color: var(--ds-text-subtle);">
+            {formData.enabled ? t('channel.emailIsActive', 'Email channel is active and processing emails') : t('channel.emailIsInactive', 'Email channel is currently disabled')}
+          </div>
+        </div>
+      </div>
+      <div
+        class="px-3 py-1 rounded-full text-xs font-semibold"
+        style="background-color: {formData.enabled ? 'var(--ds-background-success-bold)' : 'var(--ds-background-neutral)'}; color: {formData.enabled ? 'white' : 'var(--ds-text-subtle)'};"
+      >
+        {formData.enabled ? t('common.enabled', 'Enabled') : t('common.disabled', 'Disabled')}
       </div>
     </div>
   </div>
