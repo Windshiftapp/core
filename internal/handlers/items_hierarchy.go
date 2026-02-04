@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"windshift/internal/models"
@@ -59,6 +60,11 @@ func (h *ItemHandler) GetChildren(w http.ResponseWriter, r *http.Request) {
 		result[i] = *child
 	}
 
+	// Load labels
+	if err := LoadLabelsForItems(h.db, result); err != nil {
+		slog.Warn("failed to load labels for children", slog.Any("error", err))
+	}
+
 	respondJSONOK(w, result)
 }
 
@@ -110,6 +116,11 @@ func (h *ItemHandler) GetAncestors(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 		return
+	}
+
+	// Load labels
+	if err := LoadLabelsForItems(h.db, filteredAncestors); err != nil {
+		slog.Warn("failed to load labels for ancestors", slog.Any("error", err))
 	}
 
 	respondJSONOK(w, filteredAncestors)
@@ -175,6 +186,11 @@ func (h *ItemHandler) GetDescendantsNew(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Load labels
+	if err := LoadLabelsForItems(h.db, filteredDescendants); err != nil {
+		slog.Warn("failed to load labels for descendants", slog.Any("error", err))
+	}
+
 	respondJSONOK(w, filteredDescendants)
 }
 
@@ -228,6 +244,14 @@ func (h *ItemHandler) GetTree(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 		return
 	}
+
+	// Load labels for root item and descendants
+	allItems := append([]models.Item{*rootItem}, filteredDescendants...)
+	if err := LoadLabelsForItems(h.db, allItems); err != nil {
+		slog.Warn("failed to load labels for tree", slog.Any("error", err))
+	}
+	*rootItem = allItems[0]
+	copy(filteredDescendants, allItems[1:])
 
 	// Build tree structure
 	tree := h.buildItemTree(rootItem, filteredDescendants)
@@ -322,6 +346,11 @@ func (h *ItemHandler) GetChildrenNew(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 		return
+	}
+
+	// Load labels
+	if err := LoadLabelsForItems(h.db, filteredChildren); err != nil {
+		slog.Warn("failed to load labels for children", slog.Any("error", err))
 	}
 
 	respondJSONOK(w, filteredChildren)

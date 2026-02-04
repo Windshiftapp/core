@@ -145,8 +145,60 @@ func (g *SQLGenerator) getNameFieldForIdField(fieldName string) (string, bool) {
 	}
 }
 
+// generateLabelComparison generates SQL for label field comparisons using EXISTS subqueries
+func (g *SQLGenerator) generateLabelComparison(node *ASTNode) (string, []interface{}, error) {
+	prefix := g.aliasPrefix
+
+	// Get the value from the right side
+	rightValue := node.Right.Value
+
+	switch node.Operator {
+	case "=":
+		sql := fmt.Sprintf(`EXISTS (SELECT 1 FROM item_labels lbl_il JOIN labels lbl_l ON lbl_il.label_id = lbl_l.id WHERE lbl_il.item_id = %si.id AND LOWER(lbl_l.name) = LOWER(?))`, prefix)
+		return sql, []interface{}{rightValue}, nil
+	case "!=", "<>":
+		sql := fmt.Sprintf(`NOT EXISTS (SELECT 1 FROM item_labels lbl_il JOIN labels lbl_l ON lbl_il.label_id = lbl_l.id WHERE lbl_il.item_id = %si.id AND LOWER(lbl_l.name) = LOWER(?))`, prefix)
+		return sql, []interface{}{rightValue}, nil
+	case "~":
+		sql := fmt.Sprintf(`EXISTS (SELECT 1 FROM item_labels lbl_il JOIN labels lbl_l ON lbl_il.label_id = lbl_l.id WHERE lbl_il.item_id = %si.id AND LOWER(lbl_l.name) LIKE '%%' || LOWER(?) || '%%')`, prefix)
+		return sql, []interface{}{rightValue}, nil
+	default:
+		return "", nil, fmt.Errorf("unsupported operator for label field: %s", node.Operator)
+	}
+}
+
+// generateLabelInExpression generates SQL for label IN/NOT IN expressions using EXISTS subqueries
+func (g *SQLGenerator) generateLabelInExpression(node *ASTNode) (string, []interface{}, error) {
+	prefix := g.aliasPrefix
+
+	if node.Values.Type != NodeList {
+		return "", nil, errors.New("IN expression requires a list of values")
+	}
+
+	var placeholders []string
+	var args []interface{}
+	for _, valueNode := range node.Values.Arguments {
+		placeholders = append(placeholders, "LOWER(?)")
+		args = append(args, g.convertLiteral(valueNode))
+	}
+	placeholderList := strings.Join(placeholders, ", ")
+
+	if strings.ToUpper(node.Operator) == "NOT IN" {
+		sql := fmt.Sprintf(`NOT EXISTS (SELECT 1 FROM item_labels lbl_il JOIN labels lbl_l ON lbl_il.label_id = lbl_l.id WHERE lbl_il.item_id = %si.id AND LOWER(lbl_l.name) IN (%s))`, prefix, placeholderList)
+		return sql, args, nil
+	}
+
+	sql := fmt.Sprintf(`EXISTS (SELECT 1 FROM item_labels lbl_il JOIN labels lbl_l ON lbl_il.label_id = lbl_l.id WHERE lbl_il.item_id = %si.id AND LOWER(lbl_l.name) IN (%s))`, prefix, placeholderList)
+	return sql, args, nil
+}
+
 // generateComparison generates SQL for comparison operations
 func (g *SQLGenerator) generateComparison(node *ASTNode) (string, []interface{}, error) {
+	// Special handling for label field - uses EXISTS subqueries for many-to-many
+	if node.Left.Type == NodeIdentifier && strings.ToLower(node.Left.Value) == "label" {
+		return g.generateLabelComparison(node)
+	}
+
 	leftSQL, leftArgs, err := g.generateNode(node.Left)
 	if err != nil {
 		return "", nil, err
@@ -244,6 +296,11 @@ func (g *SQLGenerator) generateComparison(node *ASTNode) (string, []interface{},
 
 // generateInExpression generates SQL for IN expressions
 func (g *SQLGenerator) generateInExpression(node *ASTNode) (string, []interface{}, error) {
+	// Special handling for label field - uses EXISTS subqueries for many-to-many
+	if node.Field.Type == NodeIdentifier && strings.ToLower(node.Field.Value) == "label" {
+		return g.generateLabelInExpression(node)
+	}
+
 	fieldSQL, fieldArgs, err := g.generateNode(node.Field)
 	if err != nil {
 		return "", nil, err

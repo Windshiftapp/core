@@ -379,6 +379,11 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 	items = filteredItems
 
+	// Load labels for items
+	if err := LoadLabelsForItems(h.db, items); err != nil {
+		slog.Warn("failed to load labels for items", slog.Any("error", err))
+	}
+
 	// Create paginated response
 	response := models.PaginatedItemsResponse{
 		Items: items,
@@ -454,6 +459,13 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 			item.EffectiveProjectName = epName.String
 		}
 	}
+
+	// Load labels for item
+	singleItems := []models.Item{*item}
+	if err := LoadLabelsForItems(h.db, singleItems); err != nil {
+		slog.Warn("failed to load labels for item", slog.Any("error", err))
+	}
+	*item = singleItems[0]
 
 	// Track item view activity
 	if h.activityTracker != nil {
