@@ -2,10 +2,10 @@ package services
 
 import (
 	"fmt"
-	"path/filepath"
 	"testing"
 
 	"windshift/internal/database"
+	"windshift/internal/testutils"
 )
 
 // planningTestEnv contains test data for planning service tests
@@ -19,16 +19,9 @@ type planningTestEnv struct {
 // createPlanningTestDB creates a test database for planning service tests
 func createPlanningTestDB(t *testing.T) database.Database {
 	t.Helper()
-	dir := t.TempDir()
-	dbPath := filepath.Join(dir, "planning_test.db")
-	db, err := database.NewSQLiteDB(dbPath)
-	if err != nil {
-		t.Fatalf("failed to create test database: %v", err)
-	}
-	if err := db.Initialize(); err != nil {
-		t.Fatalf("failed to initialize test database: %v", err)
-	}
-	return db
+	tdb := testutils.CreateTestDB(t, true)
+	t.Cleanup(func() { tdb.Close() })
+	return tdb.GetDatabase()
 }
 
 // setupPlanningTestEnv creates test data for planning service tests

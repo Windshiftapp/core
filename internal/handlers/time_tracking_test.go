@@ -50,7 +50,7 @@ func TestTimeWorklogHandler_Create_Success(t *testing.T) {
 	var createdItem models.Item
 	createRR.AssertJSONResponse(&createdItem)
 
-	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil, nil)
 
 	worklogReq := WorklogRequest{
 		ProjectID:     1,
@@ -106,7 +106,7 @@ func TestTimeWorklogHandler_Create_DurationOnly(t *testing.T) {
 		t.Fatalf("Failed to create test project: %v", err)
 	}
 
-	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil, nil)
 
 	worklogReq := WorklogRequest{
 		ProjectID:     1,
@@ -218,7 +218,7 @@ func TestTimeWorklogHandler_GetAll_Success(t *testing.T) {
 		}
 	}
 
-	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil, nil)
 
 	req := testutils.CreateJSONRequest(t, "GET", "/api/worklogs", nil)
 	rr := testutils.ExecuteAuthenticatedRequest(t, handler.GetAll, req, nil)
@@ -293,7 +293,7 @@ func TestTimeWorklogHandler_GetAll_WithFilters(t *testing.T) {
 		}
 	}
 
-	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil, nil)
 
 	// Test project filter
 	req := testutils.CreateJSONRequest(t, "GET", "/api/worklogs?project_id=1", nil)
@@ -358,7 +358,7 @@ func TestTimeWorklogHandler_Get_Success(t *testing.T) {
 	}
 	worklogID, _ := result.LastInsertId()
 
-	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil, nil)
 
 	req := testutils.CreateJSONRequest(t, "GET", "/api/worklogs/"+testutils.IntToString(int(worklogID)), nil)
 	req.SetPathValue("id", testutils.IntToString(int(worklogID)))
@@ -402,7 +402,7 @@ func TestTimeWorklogHandler_ValidationErrors(t *testing.T) {
 		t.Fatalf("Failed to create test project: %v", err)
 	}
 
-	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil, nil)
 
 	tests := []struct {
 		name        string
@@ -473,7 +473,7 @@ func TestTimeWorklogHandler_Update_Success(t *testing.T) {
 	}
 	worklogID, _ := result.LastInsertId()
 
-	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil, nil)
 
 	updateReq := WorklogRequest{
 		ProjectID:     1,
@@ -522,7 +522,7 @@ func TestTimeWorklogHandler_Update_InvalidID(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil, nil)
 
 	updateReq := WorklogRequest{
 		ProjectID:     1,
@@ -575,7 +575,7 @@ func TestTimeWorklogHandler_Delete_Success(t *testing.T) {
 	}
 	worklogID, _ := result.LastInsertId()
 
-	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil, nil)
 
 	req := testutils.CreateJSONRequest(t, "DELETE", "/api/worklogs/"+testutils.IntToString(int(worklogID)), nil)
 	req.SetPathValue("id", testutils.IntToString(int(worklogID)))
@@ -598,7 +598,7 @@ func TestTimeWorklogHandler_Delete_InvalidID(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil, nil)
 
 	req := testutils.CreateJSONRequest(t, "DELETE", "/api/worklogs/invalid", nil)
 	req.SetPathValue("id", "invalid")
@@ -611,7 +611,7 @@ func TestTimeWorklogHandler_Delete_NotFound(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil)
+	handler := NewTimeWorklogHandler(tdb.GetDatabase(), nil, nil)
 
 	req := testutils.CreateJSONRequest(t, "DELETE", "/api/worklogs/99999", nil)
 	req.SetPathValue("id", "99999")
