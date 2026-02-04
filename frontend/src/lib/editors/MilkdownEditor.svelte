@@ -91,7 +91,7 @@
     const textBefore = $from.parent.textContent.slice(0, $from.parentOffset);
 
     // Look for @ trigger pattern: @ followed by optional word characters
-    const mentionMatch = textBefore.match(/@([a-zA-Z0-9_.-]*)$/);
+    const mentionMatch = textBefore.match(/(?<![a-zA-Z0-9.])@([a-zA-Z0-9_.-]*)$/);
 
     if (mentionMatch) {
       // Calculate positions

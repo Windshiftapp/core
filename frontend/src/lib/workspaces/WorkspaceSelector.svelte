@@ -1,10 +1,7 @@
 <script>
   import { BasePicker } from '../pickers';
-  import { createEventDispatcher } from 'svelte';
   import { Package } from 'lucide-svelte';
   import { workspaceIconMap } from '../utils/icons.js';
-
-  const dispatch = createEventDispatcher();
 
   let {
     value = $bindable(null),
@@ -13,16 +10,10 @@
     disabled = false,
     allowClear = false,
     loading = false,
-    class: className = ''
+    class: className = '',
+    onSelect = () => {},
+    onCancel = () => {}
   } = $props();
-
-  function handleSelect(event) {
-    dispatch('select', event.detail);
-  }
-
-  function handleCancel() {
-    dispatch('cancel');
-  }
 </script>
 
 <BasePicker
@@ -36,8 +27,8 @@
   searchFields={['name', 'key', 'description']}
   getValue={(workspace) => workspace?.id}
   getLabel={(workspace) => workspace?.name ?? ''}
-  on:select={handleSelect}
-  on:cancel={handleCancel}
+  {onSelect}
+  {onCancel}
 >
   {#snippet itemSnippet({ item: workspace, isSelected })}
     <div class="flex items-start gap-3 flex-1 min-w-0">

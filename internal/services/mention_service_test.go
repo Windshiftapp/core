@@ -596,13 +596,53 @@ func TestMentionPattern(t *testing.T) {
 	})
 
 	t.Run("DoesNotMatchEmail", func(t *testing.T) {
-		// The pattern will match after @ in email, but context matters
 		content := "contact me at email@example.com"
 		matches := MentionPattern.FindAllStringSubmatch(content, -1)
-		// It will match "example.com" - this is expected behavior as the pattern
-		// doesn't distinguish emails from mentions contextually
+		if len(matches) != 0 {
+			t.Fatalf("Expected 0 matches for email address, got %d", len(matches))
+		}
+	})
+
+	t.Run("DoesNotMatchEmailWithDottedLocalPart", func(t *testing.T) {
+		content := "contact user.name@example.com"
+		matches := MentionPattern.FindAllStringSubmatch(content, -1)
+		if len(matches) != 0 {
+			t.Fatalf("Expected 0 matches for email address, got %d", len(matches))
+		}
+	})
+
+	t.Run("DoesNotMatchEmailWithPlusTag", func(t *testing.T) {
+		// user+tag@example.com — the + is not in [a-zA-Z0-9.] so @example.com
+		// would start after a non-alnum char, but the local part "user+tag" means
+		// the char before @ is 'g' which IS alphanumeric → should not match.
+		// Actually '+' is not in [a-zA-Z0-9.], so the char before @ is 'g'
+		// Wait: "user+tag@example.com" → char before @ is 'g' → alphanumeric → no match
+		content := "contact user+tag@example.com"
+		matches := MentionPattern.FindAllStringSubmatch(content, -1)
+		if len(matches) != 0 {
+			t.Fatalf("Expected 0 matches for email with plus tag, got %d", len(matches))
+		}
+	})
+
+	t.Run("MatchesMentionInParentheses", func(t *testing.T) {
+		content := "(@johndoe)"
+		matches := MentionPattern.FindAllStringSubmatch(content, -1)
 		if len(matches) != 1 {
 			t.Fatalf("Expected 1 match, got %d", len(matches))
+		}
+		if matches[0][1] != "johndoe" {
+			t.Errorf("Expected 'johndoe', got '%s'", matches[0][1])
+		}
+	})
+
+	t.Run("MatchesMentionAfterNewline", func(t *testing.T) {
+		content := "hello\n@johndoe"
+		matches := MentionPattern.FindAllStringSubmatch(content, -1)
+		if len(matches) != 1 {
+			t.Fatalf("Expected 1 match, got %d", len(matches))
+		}
+		if matches[0][1] != "johndoe" {
+			t.Errorf("Expected 'johndoe', got '%s'", matches[0][1])
 		}
 	})
 }

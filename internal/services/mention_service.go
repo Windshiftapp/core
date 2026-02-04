@@ -14,7 +14,7 @@ import (
 
 // MentionPattern matches @username or @"Display Name" patterns
 // Supports: @username, @"John Doe"
-var MentionPattern = regexp.MustCompile(`@([a-zA-Z0-9_.-]+)|@"([^"]+)"`)
+var MentionPattern = regexp.MustCompile(`(?:^|[^a-zA-Z0-9.])@([a-zA-Z0-9_.-]+)|(?:^|[^a-zA-Z0-9.])@"([^"]+)"`)
 
 // ProcessMentionsParams contains parameters for processing mentions
 type ProcessMentionsParams struct {

@@ -5,7 +5,7 @@ import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 import { $prose } from '@milkdown/kit/utils';
 
 // Regex to find mentions in text: @username or @"Display Name"
-const MENTION_REGEX = /@([a-zA-Z0-9_.-]+)|@"([^"]+)"/g;
+const MENTION_REGEX = /(?<![a-zA-Z0-9.])@([a-zA-Z0-9_.-]+)|(?<![a-zA-Z0-9.])@"([^"]+)"/g;
 
 /**
  * Creates decorations for all mentions found in the document

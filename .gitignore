@@ -127,3 +127,4 @@ docs
 # Old build artifacts
 ws
 ws.toml
+ethereal
