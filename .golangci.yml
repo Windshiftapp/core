@@ -56,9 +56,6 @@ linters:
   exclusions:
     generated: lax
     presets: []
-    max-issues-per-linter: 50
-    max-same-issues: 10
-
     rules:
       # Ignore long lines in generated files
       - path: _gen\.go
@@ -88,13 +85,11 @@ formatters:
 
   settings:
     goimports:
-      local-prefixes: windshift
+      local-prefixes: [windshift]
 
 output:
   formats:
     text:
-      colors: true
-      print-issued-lines: true
-      print-linter-name: true
+      path: stdout
   sort-order:
     - file
