@@ -1,10 +1,11 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import Button from '../components/Button.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import {
     X
   } from 'lucide-svelte';
+  import { useEventListener } from 'runed';
 
   let {
     workspaceCount = 0,
@@ -34,15 +35,9 @@
     // Check if user has dismissed the onboarding
     const dismissed = localStorage.getItem(STORAGE_KEY);
     isDismissed = dismissed === 'true';
-
-    // Add keyboard listener for W and I keys
-    document.addEventListener('keydown', handleKeydown);
   });
 
-  onDestroy(() => {
-    // Clean up keyboard listener
-    document.removeEventListener('keydown', handleKeydown);
-  });
+  useEventListener(() => document, 'keydown', handleKeydown);
 
   // Auto-dismiss when both workspace and item exist
   $effect(() => {

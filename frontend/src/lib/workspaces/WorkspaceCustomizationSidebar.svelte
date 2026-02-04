@@ -1,16 +1,15 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { useEventListener } from 'runed';
   import { X, BarChart3, Package, GripVertical } from 'lucide-svelte';
   import { widgetRegistry, widgetCategories, getWidgetsByCategory } from '../services/widgetRegistry.js';
   import { workspaceIconMap } from '../utils/icons.js';
 
-  export let isOpen = false;
-  export let activeCategory = 'built-in';
+  let { isOpen = $bindable(false), activeCategory = $bindable('built-in') } = $props();
 
   // Get widgets by category
-  $: builtInWidgets = getWidgetsByCategory(widgetCategories.BUILT_IN);
-  $: additionalWidgets = getWidgetsByCategory(widgetCategories.ADDITIONAL);
-  $: currentWidgets = activeCategory === 'built-in' ? builtInWidgets : additionalWidgets;
+  let builtInWidgets = $derived(getWidgetsByCategory(widgetCategories.BUILT_IN));
+  let additionalWidgets = $derived(getWidgetsByCategory(widgetCategories.ADDITIONAL));
+  let currentWidgets = $derived(activeCategory === 'built-in' ? builtInWidgets : additionalWidgets);
 
   // Navigation categories
   const categories = [
@@ -35,13 +34,7 @@
     }
   }
 
-  onMount(() => {
-    document.addEventListener('keydown', handleKeydown);
-  });
-
-  onDestroy(() => {
-    document.removeEventListener('keydown', handleKeydown);
-  });
+  useEventListener(() => document, 'keydown', handleKeydown);
 
   // Get Lucide icon component by name
   function getIconComponent(iconName) {

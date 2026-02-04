@@ -172,8 +172,8 @@
             placeholder="Enter title..."
             required={true}
             className="font-medium"
-            on:item-updated
-            on:update-error
+            onitemUpdated={(detail) => dispatch('item-updated', detail)}
+            onupdateError={(detail) => dispatch('update-error', detail)}
           />
         {:else}
           <span class="font-medium truncate" style="color: var(--ds-text);">{item.title}</span>

@@ -93,6 +93,7 @@
       workflows = [...workflows, created];
       creating = false;
       newWorkflow = { name: '', description: '', is_default: false };
+      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to create workflow:', error);
       alert(t('dialogs.alerts.failedToCreate', { error: error.message || error }));
@@ -122,6 +123,7 @@
       const updated = await api.put(`/workflows/${editingId}`, editWorkflow);
       workflows = workflows.map(w => w.id === editingId ? updated : w);
       editingId = null;
+      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to update workflow:', error);
       alert(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
@@ -137,6 +139,7 @@
       await api.delete(`/workflows/${workflow.id}`);
       workflows = workflows.filter(wf => wf.id !== workflow.id);
       await loadWorkflows();
+      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to delete workflow:', error);
       alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));

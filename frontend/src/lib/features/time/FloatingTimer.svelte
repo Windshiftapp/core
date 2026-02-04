@@ -1,5 +1,6 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onDestroy } from 'svelte';
+  import { useEventListener } from 'runed';
   import { timerStore } from '../../stores/timerStore.svelte.js';
   import { Clock, Square, Maximize2, Minimize2, ExternalLink } from 'lucide-svelte';
   import { navigate } from '../../router.js';
@@ -12,68 +13,72 @@
   let collapsed = $state(false);
   let animationFrameId = $state(null);
   let pendingPosition = $state(null);
+  let initialized = $state(false);
 
   // Initialize timer on mount
-  onMount(async () => {
-    await timerStore.initialize();
-    
-    // Load saved position and collapsed state from localStorage
-    const savedPosition = localStorage.getItem('windshift-timer-position');
-    const savedCollapsed = localStorage.getItem('windshift-timer-collapsed');
-    
-    if (savedPosition) {
-      try {
-        const savedPos = JSON.parse(savedPosition);
-        // Ensure saved position is within current viewport
-        position = {
-          x: Math.max(0, Math.min(savedPos.x, window.innerWidth - 300)), // Leave room for timer width
-          y: Math.max(0, Math.min(savedPos.y, window.innerHeight - 150))  // Leave room for timer height
-        };
-      } catch (e) {
-        console.warn('Failed to parse saved timer position:', e);
-        // Fallback to default position
-        position = {
-          x: Math.max(20, window.innerWidth - 320),
-          y: Math.max(20, window.innerHeight - 200)
-        };
-      }
-    } else {
-      // Default to bottom-right corner
-      position = {
-        x: Math.max(20, window.innerWidth - 320),
-        y: Math.max(20, window.innerHeight - 200)
-      };
-    }
-    
-    if (savedCollapsed !== null) {
-      collapsed = savedCollapsed === 'true';
+  $effect(() => {
+    if (!initialized) {
+      initialized = true;
+      (async () => {
+        await timerStore.initialize();
+
+        // Load saved position and collapsed state from localStorage
+        const savedPosition = localStorage.getItem('windshift-timer-position');
+        const savedCollapsed = localStorage.getItem('windshift-timer-collapsed');
+
+        if (savedPosition) {
+          try {
+            const savedPos = JSON.parse(savedPosition);
+            // Ensure saved position is within current viewport
+            position = {
+              x: Math.max(0, Math.min(savedPos.x, window.innerWidth - 300)), // Leave room for timer width
+              y: Math.max(0, Math.min(savedPos.y, window.innerHeight - 150))  // Leave room for timer height
+            };
+          } catch (e) {
+            console.warn('Failed to parse saved timer position:', e);
+            // Fallback to default position
+            position = {
+              x: Math.max(20, window.innerWidth - 320),
+              y: Math.max(20, window.innerHeight - 200)
+            };
+          }
+        } else {
+          // Default to bottom-right corner
+          position = {
+            x: Math.max(20, window.innerWidth - 320),
+            y: Math.max(20, window.innerHeight - 200)
+          };
+        }
+
+        if (savedCollapsed !== null) {
+          collapsed = savedCollapsed === 'true';
+        }
+      })();
     }
   });
 
   function handleMouseDown(e) {
     if (e.target.closest('button')) return; // Don't drag when clicking buttons
-    
+
     dragging = true;
     const rect = timerElement.getBoundingClientRect();
     dragOffset = {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top
     };
-    
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+
     e.preventDefault();
   }
 
   function handleMouseMove(e) {
     if (!dragging) return;
-    
+
     const newX = e.clientX - dragOffset.x;
     const newY = e.clientY - dragOffset.y;
-    
+
     // Store pending position to avoid multiple calculations per frame
     pendingPosition = { x: newX, y: newY };
-    
+
     // Use requestAnimationFrame to throttle updates
     if (!animationFrameId) {
       animationFrameId = requestAnimationFrame(updatePosition);
@@ -85,39 +90,41 @@
       animationFrameId = null;
       return;
     }
-    
+
     // Keep within viewport bounds
     const maxX = window.innerWidth - timerElement.offsetWidth;
     const maxY = window.innerHeight - timerElement.offsetHeight;
-    
+
     position = {
       x: Math.max(0, Math.min(pendingPosition.x, maxX)),
       y: Math.max(0, Math.min(pendingPosition.y, maxY))
     };
-    
+
     pendingPosition = null;
     animationFrameId = null;
   }
 
   function handleMouseUp() {
     dragging = false;
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
-    
+
     // Cancel any pending animation frame
     if (animationFrameId) {
       cancelAnimationFrame(animationFrameId);
       animationFrameId = null;
     }
-    
+
     // Apply any final pending position update
     if (pendingPosition) {
       updatePosition();
     }
-    
+
     // Save position to localStorage
     localStorage.setItem('windshift-timer-position', JSON.stringify(position));
   }
+
+  // Runed event listeners for drag - conditionally active when dragging
+  useEventListener(() => dragging ? document : undefined, 'mousemove', handleMouseMove);
+  useEventListener(() => dragging ? document : undefined, 'mouseup', handleMouseUp);
 
   async function handleStopTimer() {
     try {
@@ -148,11 +155,8 @@
     return null;
   }
 
-  // Cleanup event listeners on destroy
+  // Cleanup on destroy
   onDestroy(() => {
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
-
     // Cancel any pending animation frame
     if (animationFrameId) {
       cancelAnimationFrame(animationFrameId);
@@ -181,14 +185,14 @@
       }
     }}
   >
-    <div 
+    <div
       class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl border-2 border-blue-400 shadow-xl overflow-hidden transition-all duration-200 backdrop-blur-sm"
       class:collapsed
     >
       <!-- Timer header (always visible) -->
       <div class="flex items-center gap-2 px-3 py-2 min-w-0">
         <Clock class="w-4 h-4 flex-shrink-0 text-white" />
-        
+
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span class="font-mono text-sm font-bold text-white">
@@ -198,7 +202,7 @@
               <div class="w-2 h-2 bg-white rounded-full animate-pulse opacity-75"></div>
             {/if}
           </div>
-          
+
           {#if !collapsed && getWorkItemKey()}
             <button
               onclick={(e) => { e.stopPropagation(); navigateToItem(); }}
@@ -269,12 +273,12 @@
   .collapsed {
     /* Collapsed state styling */
   }
-  
+
   /* Ensure the timer stays on top */
   .z-50 {
     z-index: 50;
   }
-  
+
   /* Prevent text selection when dragging */
   .select-none {
     -webkit-user-select: none;

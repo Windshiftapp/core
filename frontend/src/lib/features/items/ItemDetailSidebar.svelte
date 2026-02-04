@@ -11,7 +11,6 @@
   import AddSCMLinkModal from '../../dialogs/AddSCMLinkModal.svelte';
   import CreateBranchModal from '../../dialogs/CreateBranchModal.svelte';
   import CreatePRFromBranchModal from '../../dialogs/CreatePRFromBranchModal.svelte';
-  import { createEventDispatcher } from 'svelte';
   import { isGrayColor, lightenColor } from '../../utils/colorUtils.js';
   import { getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import { workspacePermissions } from '../../stores';
@@ -36,8 +35,6 @@
     };
   }
   
-  const dispatch = createEventDispatcher();
-
   // Helper: Get status color for iterations
   function getIterationStatusColor(status) {
     switch (status) {
@@ -155,7 +152,17 @@
     priorities = [],
     timeProjects = [],
     moduleSettings = {},
-    dropdownItems = []
+    dropdownItems = [],
+    onsaveField = null,
+    oncancelEdit = null,
+    onstartEditingCustomField = null,
+    onstartEditingAssignee = null,
+    onstartEditingMilestone = null,
+    onstartEditingPriority = null,
+    onstartEditingDueDate = null,
+    onstartEditingStatus = null,
+    onstartEditingProject = null,
+    onstartEditingIteration = null,
   } = $props();
 
   // State for SCM Link modals
@@ -184,24 +191,24 @@
 
   function startEditingCustomField(fieldId) {
     if (!canEdit) return;
-    dispatch('start-editing-custom-field', { fieldId });
+    onstartEditingCustomField?.({ fieldId });
   }
 
   function startEditingAssignee() {
     if (!canEdit) return;
-    dispatch('start-editing-assignee');
+    onstartEditingAssignee?.();
   }
 
   // Milestone helpers
   function startEditingMilestone() {
     if (!canEdit) return;
-    dispatch('start-editing-milestone');
+    onstartEditingMilestone?.();
   }
 
   // Priority helpers
   function startEditingPriority() {
     if (!canEdit) return;
-    dispatch('start-editing-priority');
+    onstartEditingPriority?.();
   }
 
   let selectedPriority = $derived(
@@ -213,7 +220,7 @@
   // Due Date helpers
   function startEditingDueDate() {
     if (!canEdit) return;
-    dispatch('start-editing-due-date');
+    onstartEditingDueDate?.();
   }
 
   // Svelte action to focus and show date picker
@@ -242,7 +249,7 @@
   // Status helpers
   function startEditingStatus() {
     if (!canEdit) return;
-    dispatch('start-editing-status');
+    onstartEditingStatus?.();
   }
 
   let selectedStatus = $derived(
@@ -254,7 +261,7 @@
   // Project helpers
   function startEditingProject() {
     if (!canEdit) return;
-    dispatch('start-editing-project');
+    onstartEditingProject?.();
   }
 
   // Create merged project items array with special items
@@ -310,7 +317,7 @@
   // Iteration helpers
   function startEditingIteration() {
     if (!canEdit) return;
-    dispatch('start-editing-iteration');
+    onstartEditingIteration?.();
   }
 
   let selectedIteration = $derived(
@@ -346,7 +353,7 @@
     // Cancel all custom field editing if any are active
     Object.keys(editingCustomFields).forEach(fieldId => {
       if (editingCustomFields[fieldId]) {
-        dispatch('cancel-edit', { field: `custom_field_${fieldId}` });
+        oncancelEdit?.({ field: `custom_field_${fieldId}` });
       }
     });
   }
@@ -388,13 +395,13 @@
         class="w-full"
         on:select={(e) => {
           const selectedStatus = e.detail;
-          dispatch('save-field', {
+          onsaveField?.({
             field: 'status_id',
             value: selectedStatus?.id || null
           });
         }}
         on:cancel={() => {
-          dispatch('cancel-edit', { field: 'status_id' });
+          oncancelEdit?.({ field: 'status_id' });
         }}
       >
         {#snippet children()}
@@ -434,7 +441,7 @@
         class="w-full"
         on:select={(e) => {
           const selectedPriority = e.detail;
-          dispatch('save-field', {
+          onsaveField?.({
             field: 'priority_id',
             value: selectedPriority?.id || null
           });
@@ -467,13 +474,13 @@
     <div class="mb-3">
       {#if editingDueDate}
         <div class="w-full py-1.5" use:clickOutside onclickOutside={() => {
-          dispatch('cancel-edit', { field: 'due_date' });
+          oncancelEdit?.({ field: 'due_date' });
         }}>
           <input
             type="date"
             value={item?.due_date ? item.due_date.split('T')[0] : ''}
             onchange={(e) => {
-              dispatch('save-field', {
+              onsaveField?.({
                 field: 'due_date',
                 value: e.target.value || null
               });
@@ -520,18 +527,18 @@
 
             // Handle special items
             if (selectedProject?.specialType === 'none') {
-              dispatch('save-field', {
+              onsaveField?.({
                 field: 'project',
                 value: { project_id: null, inherit_project: false }
               });
             } else if (selectedProject?.specialType === 'inherit') {
-              dispatch('save-field', {
+              onsaveField?.({
                 field: 'project',
                 value: { project_id: null, inherit_project: true }
               });
             } else if (selectedProject) {
               // Regular project
-              dispatch('save-field', {
+              onsaveField?.({
                 field: 'project',
                 value: { project_id: selectedProject.id, inherit_project: false }
               });
@@ -569,7 +576,7 @@
         disabled={!canEdit}
         class="w-full"
         onSelect={(selectedUser) => {
-          dispatch('save-field', {
+          onsaveField?.({
             field: 'assignee',
             value: selectedUser?.id || null,
             assigneeName: selectedUser ? `${selectedUser.first_name} ${selectedUser.last_name}`.trim() : null
@@ -616,7 +623,7 @@
         disabled={!canEdit}
         class="w-full"
         on:select={(e) => {
-          dispatch('save-field', {
+          onsaveField?.({
             field: 'milestone',
             value: e.detail?.id || null
           });
@@ -652,7 +659,7 @@
         class="w-full"
         on:select={(e) => {
           const selectedIteration = e.detail;
-          dispatch('save-field', {
+          onsaveField?.({
             field: 'iteration',
             value: selectedIteration?.id || null,
             iterationName: selectedIteration?.name || null
@@ -716,10 +723,10 @@
                     required={screenField.is_required}
                     onChange={(val) => {
                       editCustomFieldValues[screenField.field_identifier] = val;
-                      dispatch('save-field', { field: `custom_field_${screenField.field_identifier}` });
+                      onsaveField?.({ field: `custom_field_${screenField.field_identifier}` });
                     }}
                     onStartEdit={() => startEditingCustomField(screenField.field_identifier)}
-                    onCancel={() => dispatch('cancel-edit', { field: `custom_field_${screenField.field_identifier}` })}
+                    onCancel={() => oncancelEdit?.({ field: `custom_field_${screenField.field_identifier}` })}
                   />
                 {:else}
                   <button

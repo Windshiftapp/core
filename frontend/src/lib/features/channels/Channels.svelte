@@ -1,5 +1,6 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
+  import { useEventListener } from 'runed';
   import { t } from '../../stores/i18n.svelte.js';
   import { LifeBuoy, Plus, Webhook, Globe, Trash2, Settings, Search, Mail, Layers, Tag, Send, Power, FileText } from 'lucide-svelte';
   import { api } from '../../api.js';
@@ -176,12 +177,11 @@
     await loadChannels();
     await channelCategoriesStore.init();
 
-    // Listen for manage-channel-categories event
-    document.addEventListener('manage-channel-categories', handleManageCategories);
-
     // Handle OAuth callback parameters (after channels are loaded)
     handleOAuthCallback();
   });
+
+  useEventListener(() => document, 'manage-channel-categories', handleManageCategories);
 
   function handleOAuthCallback() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -214,10 +214,6 @@
       window.history.replaceState({}, '', window.location.pathname);
     }
   }
-
-  onDestroy(() => {
-    document.removeEventListener('manage-channel-categories', handleManageCategories);
-  });
 
   function handleManageCategories() {
     showCategoryModal = true;

@@ -113,6 +113,7 @@
       await loadPriorities();
       cancelEdit();
       error = null;
+      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (err) {
       error = err.message;
     }
@@ -127,6 +128,7 @@
       await api.priorities.delete(id);
       await loadPriorities();
       error = null;
+      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (err) {
       error = err.message;
     }

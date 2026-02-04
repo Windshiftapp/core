@@ -1,5 +1,6 @@
 <script>
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { onMount } from 'svelte';
+  import { useEventListener } from 'runed';
   import { AlertCircle } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import ItemDetailBreadcrumbs from '../items/ItemDetailBreadcrumbs.svelte';
@@ -9,9 +10,97 @@
   import ItemDetailTabs from '../items/ItemDetailTabs.svelte';
   import ItemDetailSidebar from '../items/ItemDetailSidebar.svelte';
 
+  // All the props that the content needs
+  let {
+    loading = false,
+    error = null,
+    item = null,
+    workspace = null,
+    parentHierarchy = [],
+    currentItemType = null,
+    currentHierarchyLevel = null,
+    iconMap = {},
+    workspaceId = null,
+    editingTitle = $bindable(false),
+    editTitle = $bindable(''),
+    saving = false,
+    dropdownItems = [],
+    statusOptions = [],
+    editingDescription = false,
+    editDescription = '',
+    itemLinks = [],
+    loadingLinks = false,
+    availableSubIssueTypes = [],
+    childItems = [],
+    loadingChildItems = false,
+    itemTypes = [],
+    tab = 'comments',
+    moduleSettings = {},
+    isModal = false,
+    timeWorklogs = [],
+    showTimeEntry = false,
+    timeFormData = {},
+    savingTimeEntry = false,
+    timeProjects = [],
+    activeTimer = null,
+    editingStatus = false,
+    editingDueDate = false,
+    editingCustomFields = {},
+    editCustomFieldValues = {},
+    editingPriority = false,
+    editingProject = false,
+    editingAssignee = false,
+    editingMilestone = false,
+    editingIteration = false,
+    workspaceScreenFields = [],
+    workspaceScreenSystemFields = [],
+    customFieldDefinitions = [],
+    milestones = [],
+    iterations = [],
+    priorities = [],
+    attachments = [],
+    attachmentPagination = null,
+    diagrams = [],
+    loadingDiagrams = false,
+    manualActions = [],
+    // Callback props
+    onnavigate = null,
+    ongoBack = null,
+    oncopyKey = null,
+    onsaveField = null,
+    oncancelEdit = null,
+    onswitchTab = null,
+    oncreateSubIssue = null,
+    onremoveLink = null,
+    onviewTestCase = null,
+    onshowLinkModal = null,
+    onstartEditingAssignee = null,
+    onstartEditingMilestone = null,
+    onstartEditingIteration = null,
+    onstartEditingPriority = null,
+    onstartEditingDueDate = null,
+    onstartEditingStatus = null,
+    onstartEditingProject = null,
+    onstartEditingDescription = null,
+    onstartEditingCustomField = null,
+    onstartTimer = null,
+    onlogTime = null,
+    oneditWorklog = null,
+    ondeleteWorklog = null,
+    onparentChanged = null,
+    onattachmentUpload = null,
+    onattachmentUploadFiles = null,
+    onattachmentDelete = null,
+    onattachmentPageChange = null,
+    onattachmentPageSizeChange = null,
+    ondiagramSaved = null,
+    onexecuteAction = null,
+    onclose = null,
+  } = $props();
+
   // Lazy-load DiagramModal with background preload (Excalidraw is ~1.2MB)
-  let DiagramModal = null;
-  let diagramPromise = null;
+  let DiagramModal = $state(null);
+  let diagramPromise = $state(null);
 
   onMount(() => {
     // Preload in background after component mounts
@@ -29,186 +118,134 @@
     }
   });
 
-  const dispatch = createEventDispatcher();
-
-  // All the props that the content needs
-  export let loading = false;
-  export let error = null;
-  export let item = null;
-  export let workspace = null;
-  export let parentHierarchy = [];
-  export let currentItemType = null;
-  export let currentHierarchyLevel = null;
-  export let iconMap = {};
-  export let workspaceId = null;
-  export let editingTitle = false;
-  export let editTitle = '';
-  export let saving = false;
-  export let dropdownItems = [];
-  export let statusOptions = [];
-  export let editingDescription = false;
-  export let editDescription = '';
-  export let itemLinks = [];
-  export let loadingLinks = false;
-  export let availableSubIssueTypes = [];
-  export let childItems = [];
-  export let loadingChildItems = false;
-  export let itemTypes = [];
-  export let tab = 'comments';
-  export let moduleSettings = {};
-  export let isModal = false;
-  export let timeWorklogs = [];
-  export let showTimeEntry = false;
-  export let timeFormData = {};
-  export let savingTimeEntry = false;
-  export let timeProjects = [];
-  export let activeTimer = null;
-  export let editingStatus = false;
-  export let editingDueDate = false;
-  export let editingCustomFields = {};
-  export let editCustomFieldValues = {};
-  export let workspaceScreenFields = [];
-  export let workspaceScreenSystemFields = [];
-  export let customFieldDefinitions = [];
-  export let milestones = [];
-  export let iterations = [];
-  export let priorities = [];
-  export let attachments = [];
-  export let diagrams = [];
-  export let manualActions = [];
-
   // Component references
-  let diagramListComponent;
-  let descriptionComponent;
+  let diagramListComponent = $state(null);
+  let descriptionComponent = $state(null);
 
   // Diagram modal state
-  let showDiagramModal = false;
-  let editingDiagram = null;
+  let showDiagramModal = $state(false);
+  let editingDiagram = $state(null);
 
   // Panel resizing state
-  let panelWidth = 320; // Default width
-  let isResizing = false;
-  
+  let panelWidth = $state(320);
+  let isResizing = $state(false);
+  let resizeStartX = $state(0);
+  let resizeStartWidth = $state(0);
+
   function startResize(event) {
     isResizing = true;
-    const startX = event.clientX;
-    const startWidth = panelWidth;
-    
-    function handleMouseMove(event) {
-      if (!isResizing) return;
-      
-      const deltaX = startX - event.clientX;
-      const newWidth = Math.max(280, Math.min(600, startWidth + deltaX));
-      panelWidth = newWidth;
-      
-      // Update CSS custom property for panel width
-      document.documentElement.style.setProperty('--panel-width', `${newWidth}px`);
-    }
-    
-    function handleMouseUp() {
-      isResizing = false;
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    }
-    
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    resizeStartX = event.clientX;
+    resizeStartWidth = panelWidth;
     event.preventDefault();
   }
-  
-  // Forward all events
+
+  function handleResizeMove(event) {
+    const deltaX = resizeStartX - event.clientX;
+    const newWidth = Math.max(280, Math.min(600, resizeStartWidth + deltaX));
+    panelWidth = newWidth;
+    document.documentElement.style.setProperty('--panel-width', `${newWidth}px`);
+  }
+
+  function handleResizeUp() {
+    isResizing = false;
+  }
+
+  useEventListener(() => isResizing ? document : undefined, 'mousemove', handleResizeMove);
+  useEventListener(() => isResizing ? document : undefined, 'mouseup', handleResizeUp);
+
+  // Forward events from Svelte 4 children (still using on:event with event.detail)
   function handleNavigate(event) {
-    dispatch('navigate', event.detail);
+    onnavigate?.(event.detail);
   }
-  
+
   function handleGoBack() {
-    dispatch('go-back');
+    ongoBack?.();
   }
-  
+
   function handleCopyKey() {
-    dispatch('copy-key');
+    oncopyKey?.();
   }
-  
+
   function handleSaveField(event) {
-    dispatch('save-field', event.detail);
+    onsaveField?.(event.detail);
   }
-  
+
   function handleCancelEdit(event) {
-    dispatch('cancel-edit', event.detail);
+    oncancelEdit?.(event.detail);
   }
-  
+
   function handleSwitchTab(event) {
-    dispatch('switch-tab', event.detail);
+    onswitchTab?.(event.detail);
   }
-  
+
   function handleCreateSubIssue() {
-    dispatch('create-sub-issue');
+    oncreateSubIssue?.();
   }
 
   function handleRemoveLink(event) {
-    dispatch('remove-link', event.detail);
+    onremoveLink?.(event.detail);
   }
 
   function handleViewTestCase(event) {
-    dispatch('view-test-case', event.detail);
+    onviewTestCase?.(event.detail);
   }
 
   function handleShowLinkModal() {
-    dispatch('show-link-modal');
+    onshowLinkModal?.();
   }
 
   function handleStartEditingAssignee() {
-    dispatch('start-editing-assignee');
+    onstartEditingAssignee?.();
   }
 
   function handleStartEditingMilestone() {
-    dispatch('start-editing-milestone');
+    onstartEditingMilestone?.();
   }
 
   function handleStartEditingIteration() {
-    dispatch('start-editing-iteration');
+    onstartEditingIteration?.();
   }
 
   function handleStartEditingDueDate() {
-    dispatch('start-editing-due-date');
+    onstartEditingDueDate?.();
   }
 
   function handleStartEditingPriority() {
-    dispatch('start-editing-priority');
+    onstartEditingPriority?.();
   }
 
   function handleStartEditingStatus() {
-    dispatch('start-editing-status');
+    onstartEditingStatus?.();
   }
 
   function handleStartEditingProject() {
-    dispatch('start-editing-project');
+    onstartEditingProject?.();
   }
 
   function handleStartTimer() {
-    dispatch('start-timer');
+    onstartTimer?.();
   }
 
   function handleLogTime() {
-    dispatch('log-time');
+    onlogTime?.();
   }
 
   function handleEditWorklog(event) {
-    dispatch('edit-worklog', event.detail);
+    oneditWorklog?.(event.detail);
   }
 
   function handleDeleteWorklog(event) {
-    dispatch('delete-worklog', event.detail);
+    ondeleteWorklog?.(event.detail);
   }
 
   function handleParentChanged() {
-    dispatch('parent-changed');
+    onparentChanged?.();
   }
 
   // Handle image uploaded via editor drag/paste
   function handleImageUploaded(event) {
     // Refresh attachments list
-    dispatch('attachment-upload', event.detail);
+    onattachmentUpload?.(event.detail);
   }
 
   // Handle insert image from attachment list
@@ -247,7 +284,7 @@
     if (diagramListComponent) {
       diagramListComponent.refresh();
     }
-    dispatch('diagram-saved');
+    ondiagramSaved?.();
   }
 
   function handleDeleteDiagram() {
@@ -258,7 +295,7 @@
   }
 
   function handleExecuteAction(event) {
-    dispatch('execute-action', event.detail);
+    onexecuteAction?.(event.detail);
   }
 </script>
 
@@ -285,7 +322,7 @@
     <h1 class="text-xl font-semibold mb-2" style="color: var(--ds-text);">{t('items.errorLoadingWorkItem')}</h1>
     <p class="mb-6" style="color: var(--ds-text-subtle);">{error}</p>
     <button
-      onclick={() => dispatch('close')}
+      onclick={() => onclose?.()}
       class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
     >
       {t('common.close')}
@@ -335,13 +372,13 @@
             {manualActions}
             on:save-field={handleSaveField}
             on:cancel-edit={handleCancelEdit}
-            on:start-editing-description={() => dispatch('start-editing-description')}
+            on:start-editing-description={() => onstartEditingDescription?.()}
             on:show-add-link={handleShowLinkModal}
             on:create-sub-issue={handleCreateSubIssue}
             on:image-uploaded={handleImageUploaded}
-            on:attachment-upload={(e) => dispatch('attachment-upload', e.detail)}
-            on:attachment-upload-files={(e) => dispatch('attachment-upload-files', e.detail)}
-            on:attachment-delete={(e) => dispatch('attachment-delete', e.detail)}
+            on:attachment-upload={(e) => onattachmentUpload?.(e.detail)}
+            on:attachment-upload-files={(e) => onattachmentUploadFiles?.(e.detail)}
+            on:attachment-delete={(e) => onattachmentDelete?.(e.detail)}
             on:new-diagram={handleNewDiagram}
             on:edit-diagram={(e) => handleEditDiagram(e.detail)}
             on:delete-diagram={(e) => handleDeleteDiagram(e.detail)}
@@ -407,6 +444,11 @@
             {editingDueDate}
             {editingCustomFields}
             {editCustomFieldValues}
+            {editingPriority}
+            {editingProject}
+            {editingAssignee}
+            {editingMilestone}
+            {editingIteration}
             {workspaceScreenFields}
             {workspaceScreenSystemFields}
             {customFieldDefinitions}
@@ -416,16 +458,16 @@
             {timeProjects}
             {moduleSettings}
             {dropdownItems}
-            on:save-field={handleSaveField}
-            on:cancel-edit={handleCancelEdit}
-            on:start-editing-assignee={handleStartEditingAssignee}
-            on:start-editing-milestone={handleStartEditingMilestone}
-            on:start-editing-iteration={handleStartEditingIteration}
-            on:start-editing-due-date={handleStartEditingDueDate}
-            on:start-editing-priority={handleStartEditingPriority}
-            on:start-editing-status={handleStartEditingStatus}
-            on:start-editing-project={handleStartEditingProject}
-            on:start-editing-custom-field={(e) => dispatch('start-editing-custom-field', e.detail)}
+            onsaveField={onsaveField}
+            oncancelEdit={oncancelEdit}
+            onstartEditingAssignee={onstartEditingAssignee}
+            onstartEditingMilestone={onstartEditingMilestone}
+            onstartEditingIteration={onstartEditingIteration}
+            onstartEditingDueDate={onstartEditingDueDate}
+            onstartEditingPriority={onstartEditingPriority}
+            onstartEditingStatus={onstartEditingStatus}
+            onstartEditingProject={onstartEditingProject}
+            onstartEditingCustomField={(detail) => onstartEditingCustomField?.(detail)}
           />
         </div>
       </div>
@@ -436,7 +478,7 @@
   <div class="p-8 text-center" style="background-color: var(--ds-surface);">
     <h1 class="text-xl font-semibold mb-4" style="color: var(--ds-text);">{t('items.workItemNotFound')}</h1>
     <button
-      onclick={() => dispatch('close')}
+      onclick={() => onclose?.()}
       class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
     >
       {t('common.close')}

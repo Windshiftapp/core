@@ -142,6 +142,7 @@
       }
       
       cancelForm();
+      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to save status:', error);
       alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
@@ -169,6 +170,7 @@
     try {
       await api.delete(`/statuses/${status.id}`);
       statuses = statuses.filter(s => s.id !== status.id);
+      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to delete status:', error);
       alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));

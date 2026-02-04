@@ -1,21 +1,22 @@
 <script>
-  import { onMount } from 'svelte';
+  import { useResizeObserver } from 'runed';
   import { t } from '../stores/i18n.svelte.js';
 
-  export let chartData = [];
-  export let color = '#10b981';
-  export let emptyMessage = t('widgets.chart.noDataAvailable');
-  export let gradientPrefix = 'chart';
-  export let minHeight = 110;
-  export let maxHeight = 220;
-  export let valueFormat = null; // Function to format tooltip value, e.g., (v) => `${v.toFixed(1)}%`
-  export let valueSuffix = t('widgets.chart.items'); // Suffix for tooltip value (used if valueFormat is null)
-  export let showYAxis = false; // Show Y-axis labels
-  export let yAxisFormat = null; // Function to format Y-axis labels, e.g., (v) => `${v}%`
-  export let minValue = null; // Optional minimum value for Y-axis (e.g., 0 for percentages)
-  export let maxValue = null; // Optional maximum value for Y-axis (e.g., 100 for percentages)
+  let {
+    chartData = [],
+    color = '#10b981',
+    emptyMessage = t('widgets.chart.noDataAvailable'),
+    gradientPrefix = 'chart',
+    minHeight = 110,
+    maxHeight = 220,
+    valueFormat = null,
+    valueSuffix = t('widgets.chart.items'),
+    showYAxis = false,
+    yAxisFormat = null,
+    minValue = null,
+    maxValue = null
+  } = $props();
 
-  const padding = { top: 24, right: showYAxis ? 16 : 32, bottom: 24, left: showYAxis ? 48 : 32 };
   const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
   function formatDate(date) {
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -24,23 +25,12 @@
   }
   const gradientId = `${gradientPrefix}-${Math.random().toString(36).slice(2, 9)}`;
 
-  let container;
-  let width = 360; // fallback before the ResizeObserver runs
+  let container = $state(null);
+  let width = $state(360);
 
-  onMount(() => {
-    if (!container) return;
-
-    width = container.clientWidth || width;
-
-    const observer = new ResizeObserver(entries => {
-      const entry = entries[0];
-      if (entry) {
-        width = entry.contentRect.width;
-      }
-    });
-
-    observer.observe(container);
-    return () => observer.disconnect();
+  useResizeObserver(() => container, (entries) => {
+    const entry = entries[0];
+    if (entry) { width = entry.contentRect.width; }
   });
 
   const normalizeDate = value => {
@@ -67,17 +57,17 @@
     return path;
   }
 
-  $: effectivePadding = { top: 24, right: showYAxis ? 16 : 32, bottom: 24, left: showYAxis ? 48 : 32 };
-  $: chartWidth = Math.max(width - (effectivePadding.left + effectivePadding.right), 0);
-  $: normalizedMinHeight = Math.min(minHeight, maxHeight);
-  $: normalizedMaxHeight = Math.max(minHeight, maxHeight);
-  $: chartHeight = clamp(chartWidth * 0.35, normalizedMinHeight, normalizedMaxHeight);
-  $: svgWidth = chartWidth + effectivePadding.left + effectivePadding.right;
-  $: svgHeight = chartHeight + effectivePadding.top + effectivePadding.bottom;
-  $: dataMin = minValue !== null ? minValue : 0;
-  $: dataMax = maxValue !== null ? maxValue : Math.max(...chartData.map(d => d.count ?? 0), 1);
-  $: valueRange = dataMax - dataMin || 1;
-  $: points = chartData.map((d, index) => {
+  let effectivePadding = $derived({ top: 24, right: showYAxis ? 16 : 32, bottom: 24, left: showYAxis ? 48 : 32 });
+  let chartWidth = $derived(Math.max(width - (effectivePadding.left + effectivePadding.right), 0));
+  let normalizedMinHeight = $derived(Math.min(minHeight, maxHeight));
+  let normalizedMaxHeight = $derived(Math.max(minHeight, maxHeight));
+  let chartHeight = $derived(clamp(chartWidth * 0.35, normalizedMinHeight, normalizedMaxHeight));
+  let svgWidth = $derived(chartWidth + effectivePadding.left + effectivePadding.right);
+  let svgHeight = $derived(chartHeight + effectivePadding.top + effectivePadding.bottom);
+  let dataMin = $derived(minValue !== null ? minValue : 0);
+  let dataMax = $derived(maxValue !== null ? maxValue : Math.max(...chartData.map(d => d.count ?? 0), 1));
+  let valueRange = $derived(dataMax - dataMin || 1);
+  let points = $derived(chartData.map((d, index) => {
     const ratio = getRatio(index, chartData.length);
     const value = d.count ?? 0;
     const normalizedValue = (value - dataMin) / valueRange;
@@ -85,17 +75,17 @@
       x: effectivePadding.left + chartWidth * ratio,
       y: effectivePadding.top + (chartHeight - normalizedValue * chartHeight)
     };
-  });
-  $: smoothPath = points.length > 1 ? buildSmoothPath(points) : '';
-  $: areaPath = smoothPath
+  }));
+  let smoothPath = $derived(points.length > 1 ? buildSmoothPath(points) : '');
+  let areaPath = $derived(smoothPath
     ? `${smoothPath} L ${effectivePadding.left + chartWidth} ${effectivePadding.top + chartHeight} L ${effectivePadding.left} ${effectivePadding.top + chartHeight} Z`
-    : '';
-  $: gridLines = Array.from({ length: 4 }, (_, i) => effectivePadding.top + (i / 3) * chartHeight);
-  $: yAxisValues = Array.from({ length: 4 }, (_, i) => dataMax - (i / 3) * valueRange);
-  $: labels = chartData.map(point => formatDate(normalizeDate(point.date)));
+    : '');
+  let gridLines = $derived(Array.from({ length: 4 }, (_, i) => effectivePadding.top + (i / 3) * chartHeight));
+  let yAxisValues = $derived(Array.from({ length: 4 }, (_, i) => dataMax - (i / 3) * valueRange));
+  let labels = $derived(chartData.map(point => formatDate(normalizeDate(point.date))));
 
-  let tooltip = null;
-  let hoveredPointIndex = null;
+  let tooltip = $state(null);
+  let hoveredPointIndex = $state(null);
 
   function showTooltip(point, index) {
     const baseWidth = svgWidth || width || 1;
@@ -121,7 +111,7 @@
 
 {#if chartData && chartData.length > 0}
   <div class="responsive-chart">
-    <div class="chart-wrapper" bind:this={container} on:mouseleave={hideTooltip}>
+    <div class="chart-wrapper" bind:this={container} onmouseleave={hideTooltip}>
       <svg
         class="chart-svg"
         viewBox={`0 0 ${svgWidth} ${svgHeight}`}
@@ -177,10 +167,10 @@
             class:chart-point--active={hoveredPointIndex === index}
             tabindex="0"
             aria-label={`${labels[index]}: ${chartData[index]?.count ?? 0} items`}
-            on:mouseenter={() => showTooltip(point, index)}
-            on:focus={() => showTooltip(point, index)}
-            on:mouseleave={hideTooltip}
-            on:blur={hideTooltip}
+            onmouseenter={() => showTooltip(point, index)}
+            onfocus={() => showTooltip(point, index)}
+            onmouseleave={hideTooltip}
+            onblur={hideTooltip}
           />
         {/each}
       </svg>

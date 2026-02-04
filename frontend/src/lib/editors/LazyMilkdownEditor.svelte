@@ -2,20 +2,15 @@
   import { onMount } from 'svelte';
 
   // All props that MilkdownEditor accepts
-  export let content = '';
-  export let placeholder = '';
-  export let readonly = false;
-  export let showToolbar = false;
-  export let itemId = null;
-  export let entityType = null;
-  export let entityId = null;
-  export let onImageInsert = null;
-  export let isPersonalWorkspace = false;
-  export let compact = false;
+  let {
+    content = $bindable(''), placeholder = '', readonly = false,
+    showToolbar = false, itemId = null, entityType = null,
+    entityId = null, onImageInsert = null, isPersonalWorkspace = false, compact = false
+  } = $props();
 
-  let MilkdownEditor = null;
-  let editorInstance = null;
-  let loading = true;
+  let MilkdownEditor = $state(null);
+  let editorInstance = $state(null);
+  let loading = $state(true);
 
   // Start preloading immediately on mount (background, non-blocking)
   onMount(() => {
@@ -86,8 +81,7 @@
 </script>
 
 {#if MilkdownEditor}
-  <svelte:component
-    this={MilkdownEditor}
+  <MilkdownEditor
     bind:this={editorInstance}
     bind:content
     {placeholder}

@@ -1,22 +1,16 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  export let title = "";
-  export let widgetId = "";
-  export let isEditing = false;
-  export let width = 3; // Column span: 1, 2, or 3
-
-  const dispatch = createEventDispatcher();
+  let { title = "", widgetId = "", isEditing = false, width = $bindable(3), onremove = null, children } = $props();
 
   function handleRemove(event) {
     event.stopPropagation();
     event.preventDefault();
-    dispatch('remove', { id: widgetId });
+    onremove?.();
   }
 
   // Get grid column span class
-  $: gridColClass = `col-span-${width}`;
+  const gridColClass = $derived(`col-span-${width}`);
 </script>
 
 <div
@@ -113,7 +107,7 @@
 
   <!-- Widget content -->
   <div class="widget-content p-4">
-    <slot />
+    {@render children?.()}
   </div>
 </div>
 

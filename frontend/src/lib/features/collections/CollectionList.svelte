@@ -1,11 +1,14 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
+  import { useEventListener } from 'runed';
   import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { getCollection } from '../collections/collectionService.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
+  import { workspaceDataStore } from '../../stores/index.js';
+  import { useWorkItemPoller } from '../../composables/useWorkItemPoller.svelte.js';
   import { MoreHorizontal, Trash2, Eye } from 'lucide-svelte';
   import SearchInput from '../../components/SearchInput.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
@@ -17,19 +20,22 @@
 
   let { workspaceId, collectionId = null } = $props();
 
-  let workspace = $state(null);
+  // Reference data from shared workspace store
+  let workspace = $derived(workspaceDataStore.workspace);
+  let itemTypes = $derived(workspaceDataStore.itemTypes);
+  let statuses = $derived(workspaceDataStore.statuses);
+  let statusCategories = $derived(workspaceDataStore.statusCategories);
+  let users = $derived(workspaceDataStore.users);
+  let milestones = $derived(workspaceDataStore.milestones);
+  let iterations = $derived(workspaceDataStore.iterations);
+  let priorities = $derived(workspaceDataStore.priorities);
+  let projects = $derived(workspaceDataStore.projects);
+  let customFieldDefinitions = $derived(workspaceDataStore.customFieldDefinitions);
+
+  // Dynamic view-specific state
   let workItems = $state([]);
   let allItems = $state([]); // Store all items for search filtering
-  let itemTypes = $state([]);
   let itemsPagination = $state(null);
-  let statuses = $state([]);
-  let statusCategories = $state([]);
-  let users = $state([]);
-  let milestones = $state([]);
-  let iterations = $state([]);
-  let priorities = $state([]);
-  let projects = $state([]);
-  let customFieldDefinitions = $state([]);
 
   // Board configuration for list columns
   let boardConfig = $state(null);
@@ -71,66 +77,21 @@
     listColumns.map(col => `${col.width}fr`).join(' ') + ' auto'
   );
 
+  // Adaptive polling replaces handleWindowFocus
+  const poller = useWorkItemPoller(() => loadWorkItems());
+
   onMount(async () => {
     if (workspaceId) {
       await loadWorkspaceGradient(workspaceId);
-      await loadWorkspace();
+      // Reference data comes from the shared workspaceDataStore
+      await workspaceDataStore.initialize(workspaceId);
       await loadBoardConfiguration();
       await loadWorkItems();
     }
     loading = false;
-
-    // Listen for refresh events
-    window.addEventListener('focus', handleWindowFocus);
-    window.addEventListener('refresh-work-items', loadWorkItems);
   });
 
-  onDestroy(() => {
-    window.removeEventListener('focus', handleWindowFocus);
-    window.removeEventListener('refresh-work-items', loadWorkItems);
-  });
-
-  // Refresh when window gains focus (user returns from another tab/window)
-  function handleWindowFocus() {
-    if (!loadingItems) {
-      loadWorkItems();
-    }
-  }
-
-  async function loadWorkspace() {
-    try {
-      const [workspaceData, itemTypesData, statusesData, statusCategoriesData, usersData, milestonesData, iterationsData, prioritiesData, projectsData] = await Promise.all([
-        api.workspaces.get(workspaceId),
-        api.itemTypes.getAll(),
-        api.workspaces.getStatuses(workspaceId),
-        api.statusCategories.getAll(),
-        api.getUsers(),
-        api.milestones.getAll(),
-        api.iterations.getAll(),
-        api.priorities.getAll(),
-        api.workspaces.getProjects ? api.workspaces.getProjects(workspaceId) : Promise.resolve([])
-      ]);
-      workspace = workspaceData;
-      itemTypes = itemTypesData || [];
-      statuses = statusesData || [];
-      statusCategories = statusCategoriesData || [];
-      users = usersData || [];
-      milestones = milestonesData || [];
-      iterations = iterationsData || [];
-      priorities = prioritiesData || [];
-      projects = projectsData || [];
-
-      // Load custom field definitions
-      try {
-        customFieldDefinitions = await api.customFields.getAll() || [];
-      } catch (e) {
-        console.warn('Failed to load custom field definitions:', e);
-        customFieldDefinitions = [];
-      }
-    } catch (error) {
-      console.error('Failed to load workspace:', error);
-    }
-  }
+  useEventListener(() => window, 'refresh-work-items', loadWorkItems);
 
   async function loadBoardConfiguration() {
     try {

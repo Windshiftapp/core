@@ -1,31 +1,24 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { itemUpdateService } from '../services/itemUpdateService.js';
   import InlineTextEditor from './InlineTextEditor.svelte';
   import InlineSelectEditor from './InlineSelectEditor.svelte';
   import InlineDateEditor from './InlineDateEditor.svelte';
-  
-  const dispatch = createEventDispatcher();
-  
-  export let item;
-  export let field;
-  export let fieldType = 'text'; // 'text' | 'select' | 'date'
-  export let options = []; // For select type
-  export let placeholder = '';
-  export let required = false;
-  export let disabled = false;
-  export let className = '';
-  export let enableSingleClick = false; // For navigation on single click
-  export let enableDoubleClick = false; // For editing on double click
-  
-  let editorComponent;
-  
+
+  let {
+    item, field, fieldType = 'text', options = [], placeholder = '',
+    required = false, disabled = false, className = '',
+    enableSingleClick = false, enableDoubleClick = false,
+    onitemUpdated = null, onupdateError = null, onclick: onclickProp = null
+  } = $props();
+
+  let editorComponent = $state(null);
+
   // Get current field value
-  $: fieldValue = getFieldValue(item, field);
-  
+  const fieldValue = $derived(getFieldValue(item, field));
+
   function getFieldValue(item, field) {
     if (!item) return null;
-    
+
     switch (field) {
       case 'title':
         return item.title || '';
@@ -47,10 +40,10 @@
         return item[field] || null;
     }
   }
-  
-  async function handleSave(event) {
-    const { value } = event.detail;
-    
+
+  async function handleSave(detail) {
+    const { value } = detail;
+
     try {
       // Use ItemUpdateService to update the field
       const updatedItem = await itemUpdateService.updateField(
@@ -62,43 +55,43 @@
           if (editorComponent?.confirmSave) {
             editorComponent.confirmSave(value);
           }
-          
-          // Dispatch update event to parent
-          dispatch('item-updated', { 
-            item: updatedItem, 
-            field, 
-            value 
+
+          // Call update callback to parent
+          onitemUpdated?.({
+            item: updatedItem,
+            field,
+            value
           });
         },
         (error, field, value) => {
           // Error callback
           const errorMessage = error.message || 'Failed to save changes';
-          
+
           if (editorComponent?.rejectSave) {
             editorComponent.rejectSave(errorMessage);
           }
-          
-          // Dispatch error event
-          dispatch('update-error', { 
-            error: errorMessage, 
-            field, 
-            value 
+
+          // Call error callback
+          onupdateError?.({
+            error: errorMessage,
+            field,
+            value
           });
         }
       );
-      
+
     } catch (error) {
       console.error('Update failed:', error);
-      
+
       if (editorComponent?.rejectSave) {
         editorComponent.rejectSave(error.message || 'Failed to save changes');
       }
     }
   }
-  
+
   function handleClick() {
     if (enableSingleClick) {
-      dispatch('click');
+      onclickProp?.();
     }
   }
 </script>
@@ -112,7 +105,7 @@
     {required}
     {disabled}
     {className}
-    on:save={handleSave}
+    onsave={handleSave}
   />
 {:else if fieldType === 'date'}
   <InlineDateEditor
@@ -124,8 +117,8 @@
     {className}
     {enableSingleClick}
     {enableDoubleClick}
-    on:save={handleSave}
-    on:click={handleClick}
+    onsave={handleSave}
+    onclick={handleClick}
   />
 {:else}
   <InlineTextEditor
@@ -137,7 +130,7 @@
     {className}
     {enableSingleClick}
     {enableDoubleClick}
-    on:save={handleSave}
-    on:click={handleClick}
+    onsave={handleSave}
+    onclick={handleClick}
   />
 {/if}

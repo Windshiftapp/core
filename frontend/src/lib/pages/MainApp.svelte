@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { fade, slide } from 'svelte/transition';
   import { currentRoute, navigate, isWorkspaceRoute } from '../router.js';
-  import { testingStore, authStore, permissionStore, uiStore, currentWorkspace, workspacesStore, workspacePermissions, ssoStore } from '../stores';
+  import { testingStore, authStore, permissionStore, uiStore, currentWorkspace, workspacesStore, workspacePermissions, ssoStore, workspaceDataStore, activityStore } from '../stores';
   import EmailVerificationBanner from '../features/notifications/EmailVerificationBanner.svelte';
   import { moduleSettings } from '../stores/moduleSettings.js';
   import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
@@ -389,6 +389,9 @@
   });
   
   onMount(async () => {
+    // Initialize activity tracking for adaptive polling
+    activityStore.init();
+
     // Load full app data for authenticated users
     // (MainApp only renders when user is authenticated, App.svelte handles auth/setup)
     await workspacesStore.load();
@@ -492,11 +495,17 @@
       workspacesStore.reload();
     }
 
+    function handleRefreshWorkspaceData() {
+      workspaceDataStore.refresh();
+    }
+
     window.addEventListener('refresh-workspaces', handleRefreshWorkspaces);
+    window.addEventListener('refresh-workspace-data', handleRefreshWorkspaceData);
 
     return () => {
       window.removeEventListener('show-create-modal', handleShowCreateModal);
       window.removeEventListener('refresh-workspaces', handleRefreshWorkspaces);
+      window.removeEventListener('refresh-workspace-data', handleRefreshWorkspaceData);
     };
   });
 
@@ -509,6 +518,7 @@
       const personalWorkspaceId = $workspacesStore.personalWorkspace?.id;
       if (personalWorkspaceId) {
         currentWorkspace.load(personalWorkspaceId);
+        workspaceDataStore.initialize(personalWorkspaceId);
       } else {
         // Personal workspace not loaded yet - trigger loading
         // The effect will re-run when personalWorkspace is set in the store
@@ -518,8 +528,10 @@
     // Handle regular workspace routes
     else if ($currentRoute.params?.id && ($currentRoute.view?.startsWith('workspace-') || $currentRoute.view === 'workspace' || $currentRoute.view === 'item-detail' || $currentRoute.view === 'item' || testViews.has($currentRoute.view))) {
       currentWorkspace.load($currentRoute.params.id);
+      workspaceDataStore.initialize($currentRoute.params.id);
     } else {
       currentWorkspace.clear();
+      workspaceDataStore.reset();
     }
   });
 

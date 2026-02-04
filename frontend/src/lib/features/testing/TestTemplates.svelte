@@ -16,6 +16,7 @@
   import Label from '../../components/Label.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { useEventListener } from 'runed';
 
   let { workspaceId = null } = $props();
 
@@ -82,27 +83,11 @@
     if (milestoneParam) {
       selectedMilestoneFilter = parseInt(milestoneParam);
     }
+  });
 
-    // Add keyboard shortcuts
-    const handleKeyDown = (e) => {
-      // Only handle shortcuts when not typing in inputs or textareas
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
-        return;
-      }
-
-      // 'a' key to add test template
-      if (e.key === 'a' || e.key === 'A') {
-        e.preventDefault();
-        showAddForm();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-
-    // Cleanup
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
+  useEventListener(() => document, 'keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    if (e.key === 'a' || e.key === 'A') { e.preventDefault(); showAddForm(); }
   });
 
   async function loadData() {

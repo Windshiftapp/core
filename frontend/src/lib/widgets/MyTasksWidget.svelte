@@ -6,27 +6,28 @@
   import WidgetState from './WidgetState.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  export let workspaceId = null;
-  export let maxItems = 8;
+  let { workspaceId = null, maxItems = 8 } = $props();
 
-  let tasks = [];
-  let loading = false;
-  let error = null;
-  let fetchVersion = 0;
-  let lastFetchKey = null;
+  let tasks = $state([]);
+  let loading = $state(false);
+  let error = $state(null);
+  let fetchVersion = $state(0);
+  let lastFetchKey = $state(null);
 
-  $: currentUserId = $authStore?.currentUser?.id ?? null;
-  $: fetchKey = currentUserId ? `${currentUserId}` : null;
+  const currentUserId = $derived($authStore?.currentUser?.id ?? null);
+  const fetchKey = $derived(currentUserId ? `${currentUserId}` : null);
 
-  $: if (fetchKey && fetchKey !== lastFetchKey) {
-    lastFetchKey = fetchKey;
-    loadAssignedTasks(currentUserId);
-  } else if (!fetchKey && lastFetchKey !== null) {
-    lastFetchKey = null;
-    tasks = [];
-    loading = false;
-    error = null;
-  }
+  $effect(() => {
+    if (fetchKey && fetchKey !== lastFetchKey) {
+      lastFetchKey = fetchKey;
+      loadAssignedTasks(currentUserId);
+    } else if (!fetchKey && lastFetchKey !== null) {
+      lastFetchKey = null;
+      tasks = [];
+      loading = false;
+      error = null;
+    }
+  });
 
   async function loadAssignedTasks(userId) {
     const currentVersion = ++fetchVersion;

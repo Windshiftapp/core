@@ -1,5 +1,6 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
+  import { useEventListener } from 'runed';
   import { api } from '../../api.js';
   import { navigate, currentRoute } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -15,25 +16,23 @@
   import WorkspaceSelector from '../../workspaces/WorkspaceSelector.svelte';
   import ColorDot from '../../components/ColorDot.svelte';
 
-  let collections = [];
-  let loading = true;
-  let selectedWorkspaceFilter = null;
-  let workspaceOptions = [];
-  let workspaceMap = new Map();
+  let collections = $state([]);
+  let loading = $state(true);
+  let selectedWorkspaceFilter = $state(null);
 
   // Category management modal
-  let showCategoryModal = false;
+  let showCategoryModal = $state(false);
 
   // Determine view based on URL
-  $: activeCategoryId = $currentRoute.params?.categoryId || null;
-  $: isWorkspaceView = $currentRoute.path?.includes('/workspace');
+  let activeCategoryId = $derived($currentRoute.params?.categoryId || null);
+  let isWorkspaceView = $derived($currentRoute.path?.includes('/workspace'));
 
   // Separate collections by type
-  $: workspaceCollections = collections.filter(c => c.workspace_id);
-  $: globalCollections = collections.filter(c => !c.workspace_id);
+  let workspaceCollections = $derived(collections.filter(c => c.workspace_id));
+  let globalCollections = $derived(collections.filter(c => !c.workspace_id));
 
   // Filter based on current view
-  $: filteredCollections = (() => {
+  let filteredCollections = $derived.by(() => {
     if (isWorkspaceView) {
       return workspaceCollections.filter(c =>
         !selectedWorkspaceFilter || c.workspace_id === getWorkspaceId(selectedWorkspaceFilter)
@@ -45,10 +44,10 @@
       }
       return globalCollections;
     }
-  })();
+  });
 
   // Dynamic page title
-  $: pageTitle = (() => {
+  let pageTitle = $derived.by(() => {
     if (isWorkspaceView) {
       return t('collections.workspaceCollectionsTitle');
     } else if (activeCategoryId) {
@@ -56,13 +55,13 @@
       return category ? t('collections.categoryCollections', { category: category.name }) : t('collections.categoryCollections', { category: '' });
     }
     return t('collections.allGlobalCollections');
-  })();
+  });
 
   const getWorkspaceId = (workspaceId) =>
     typeof workspaceId === 'string' ? parseInt(workspaceId, 10) : workspaceId;
 
   // Column definitions for DataTable
-  $: baseCollectionColumns = [
+  let baseCollectionColumns = $derived([
     {
       key: 'name',
       label: t('collections.collection'),
@@ -83,28 +82,28 @@
       key: 'actions',
       label: t('collections.actions')
     }
-  ];
+  ]);
 
-  $: workspaceColumn = {
+  let workspaceColumn = $derived({
     key: 'workspace',
     label: t('workspaces.workspace'),
     render: (collection) => getWorkspaceName(collection.workspace_id) || '—'
-  };
+  });
 
-  $: categoryColumn = {
+  let categoryColumn = $derived({
     key: 'category',
     label: t('common.category'),
     slot: 'category'
-  };
+  });
 
-  $: collectionColumns = isWorkspaceView
+  let collectionColumns = $derived(isWorkspaceView
     ? [baseCollectionColumns[0], workspaceColumn, ...baseCollectionColumns.slice(1)]
     : (!activeCategoryId
       ? [baseCollectionColumns[0], categoryColumn, ...baseCollectionColumns.slice(1)]
-      : baseCollectionColumns);
+      : baseCollectionColumns));
 
-  $: workspaceOptions = ($workspacesStore?.allWorkspaces || []).filter(ws => !ws.is_personal);
-  $: workspaceMap = new Map(workspaceOptions.map(ws => [ws.id, ws]));
+  let workspaceOptions = $derived(($workspacesStore?.allWorkspaces || []).filter(ws => !ws.is_personal));
+  let workspaceMap = $derived(new Map(workspaceOptions.map(ws => [ws.id, ws])));
 
   function getWorkspaceName(workspaceId) {
     if (!workspaceId) return '';
@@ -118,13 +117,9 @@
       loadCollections(),
       collectionCategoriesStore.init()
     ]);
-
-    document.addEventListener('manage-collection-categories', handleManageCategoriesEvent);
   });
 
-  onDestroy(() => {
-    document.removeEventListener('manage-collection-categories', handleManageCategoriesEvent);
-  });
+  useEventListener(() => document, 'manage-collection-categories', handleManageCategoriesEvent);
 
   function handleManageCategoriesEvent() {
     showCategoryModal = true;

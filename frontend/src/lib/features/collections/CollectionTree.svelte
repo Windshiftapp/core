@@ -15,6 +15,7 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import { formatDate } from '../../utils/dateFormatter.js';
   import { moduleSettings } from '../../stores/moduleSettings.js';
+  import { itemTestCaseLinksStore } from '../../stores/index.js';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -34,7 +35,6 @@
 
   // Test case toggle state
   let showTestCases = $state(false);
-  let testCaseLinks = $state(new Map()); // Cache: itemId -> array of test cases
   let loadingTestCases = $state(false);
 
   // Test case modal state
@@ -74,6 +74,8 @@
   async function loadData() {
     loading = true;
     if (workspaceId) {
+      itemTestCaseLinksStore.initialize(workspaceId);
+
       await Promise.all([
         loadWorkspace(),
         loadAllItems(),
@@ -235,50 +237,9 @@
   // Load test cases linked to items
   async function loadTestCasesForItems(itemIds) {
     if (!itemIds || itemIds.length === 0) return;
-
     loadingTestCases = true;
     try {
-      // Fetch links for all items in parallel
-      const linkPromises = itemIds.map(itemId =>
-        api.links.getForItem('items', itemId).catch(err => {
-          console.error(`Failed to load links for item ${itemId}:`, err);
-          return { outgoing: [], incoming: [] };
-        })
-      );
-
-      const linkResults = await Promise.all(linkPromises);
-
-      // Process results and extract test cases
-      itemIds.forEach((itemId, index) => {
-        const links = linkResults[index];
-        const allLinks = [...(links.outgoing || []), ...(links.incoming || [])];
-
-        // Filter for "Tests" link type (ID = 1) and extract test cases
-        const testCases = allLinks
-          .filter(link => link.link_type_id === 1)
-          .map(link => {
-            // Determine if this item is source or target
-            const isSource = link.source_type === 'item' && link.source_id === itemId;
-            const testCaseData = isSource ? {
-              id: link.target_id,
-              title: link.target_title,
-              type: link.target_type
-            } : {
-              id: link.source_id,
-              title: link.source_title,
-              type: link.source_type
-            };
-
-            // Only include if it's actually a test case
-            return testCaseData.type === 'test_case' ? testCaseData : null;
-          })
-          .filter(tc => tc !== null);
-
-        testCaseLinks.set(itemId, testCases);
-      });
-
-      // Trigger reactivity
-      testCaseLinks = new Map(testCaseLinks);
+      await itemTestCaseLinksStore.loadForItems(itemIds);
     } catch (error) {
       console.error('Failed to load test cases:', error);
     } finally {
@@ -299,17 +260,11 @@
   }
 
   async function loadPendingTestCases() {
-    if (!showTestCases || allItems.length === 0) {
-      return;
-    }
-    if (loadingTestCases) {
-      return;
-    }
+    if (!showTestCases || allItems.length === 0) return;
+    if (loadingTestCases) return;
     const visibleItemIds = allItems.map(item => item.id);
-    const missingItemIds = visibleItemIds.filter(id => !testCaseLinks.has(id));
-    if (missingItemIds.length === 0) {
-      return;
-    }
+    const missingItemIds = visibleItemIds.filter(id => itemTestCaseLinksStore.get(id) === null);
+    if (missingItemIds.length === 0) return;
     await loadTestCasesForItems(missingItemIds);
   }
 
@@ -392,8 +347,8 @@
       });
 
       // If showTestCases is enabled, add test cases after this item
-      if (showTestCases && testCaseLinks.has(item.id)) {
-        const testCases = testCaseLinks.get(item.id);
+      if (showTestCases && itemTestCaseLinksStore.get(item.id) !== null) {
+        const testCases = itemTestCaseLinksStore.get(item.id);
         testCases.forEach(testCase => {
           result.push({
             id: testCase.id,
@@ -591,7 +546,7 @@
               {@const selectedStatus = statuses.find(s => s.id === item.status_id)}
               {@const statusCategory = selectedStatus ? statusCategories.find(sc => sc.id === selectedStatus.category_id) : null}
               {@const selectedPriority = priorities.find(p => p.id === item.priority_id)}
-              {@const testCaseCount = showTestCases && testCaseLinks.has(item.id) ? testCaseLinks.get(item.id).length : 0}
+              {@const testCaseCount = (showTestCases && itemTestCaseLinksStore.get(item.id)) ? itemTestCaseLinksStore.get(item.id).length : 0}
               <div
                 class="flex items-center gap-4 px-4 py-3 transition-colors group tree-row"
                 style="{styles.hasGradient ? '' : 'border-top: 1px solid var(--ds-border);'}{idx === 0 ? 'border-top: none;' : ''}"

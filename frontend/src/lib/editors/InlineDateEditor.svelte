@@ -1,32 +1,27 @@
 <script>
-  import { createEventDispatcher, tick } from 'svelte';
+  import { tick } from 'svelte';
   import { Check, X, Loader2, Calendar } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  const dispatch = createEventDispatcher();
+  let {
+    value = '', placeholder = '', disabled = false, required = false,
+    className = '', editingClass = 'border-blue-500 ring-1 ring-blue-500',
+    displayClass = 'hover-bg cursor-text', enableSingleClick = false,
+    enableDoubleClick = false, onsave = null, onclick: onclickProp = null
+  } = $props();
 
-  export let value = '';
-  export let placeholder = '';
-  export let disabled = false;
-  export let required = false;
+  const effectivePlaceholder = $derived(placeholder || t('editors.selectDate'));
 
-  $: effectivePlaceholder = placeholder || t('editors.selectDate');
-  export let className = '';
-  export let editingClass = 'border-blue-500 ring-1 ring-blue-500';
-  export let displayClass = 'hover-bg cursor-text';
-  export let enableSingleClick = false;
-  export let enableDoubleClick = false;
-  
-  let editing = false;
-  let editValue = '';
-  let inputElement;
-  let saving = false;
-  let error = '';
-  let clickTimeout = null;
-  
+  let editing = $state(false);
+  let editValue = $state('');
+  let inputElement = $state(null);
+  let saving = $state(false);
+  let error = $state('');
+  let clickTimeout = $state(null);
+
   // Format date for display
-  $: displayValue = value ? formatDisplayDate(value) : '';
-  
+  const displayValue = $derived(value ? formatDisplayDate(value) : '');
+
   function formatDisplayDate(dateStr) {
     if (!dateStr) return '';
     try {
@@ -40,7 +35,7 @@
       return dateStr;
     }
   }
-  
+
   function formatInputDate(dateStr) {
     if (!dateStr) return '';
     try {
@@ -50,14 +45,14 @@
       return '';
     }
   }
-  
+
   function startEditing() {
     if (disabled) return;
-    
+
     editing = true;
     editValue = formatInputDate(value);
     error = '';
-    
+
     // Focus input after DOM update
     tick().then(() => {
       if (inputElement) {
@@ -65,44 +60,44 @@
       }
     });
   }
-  
+
   function cancelEditing() {
     editing = false;
     editValue = '';
     error = '';
   }
-  
+
   async function saveValue() {
     if (saving) return;
-    
+
     // Validation
     if (required && !editValue) {
       error = t('validation.required');
       return;
     }
-    
+
     // Check if value actually changed
     if (editValue === formatInputDate(value)) {
       cancelEditing();
       return;
     }
-    
+
     try {
       saving = true;
       error = '';
-      
+
       // Convert to ISO string for storage
       const dateValue = editValue ? new Date(editValue).toISOString() : '';
-      
-      // Dispatch save event
-      dispatch('save', { value: dateValue });
-      
+
+      // Call save callback
+      onsave?.({ value: dateValue });
+
     } catch (err) {
       error = err.message || 'Failed to save';
       saving = false;
     }
   }
-  
+
   // External methods that parent can call
   export function confirmSave(newValue) {
     value = newValue;
@@ -111,12 +106,12 @@
     saving = false;
     error = '';
   }
-  
+
   export function rejectSave(errorMessage) {
     error = errorMessage || 'Failed to save';
     saving = false;
   }
-  
+
   function handleKeydown(event) {
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -126,7 +121,7 @@
       cancelEditing();
     }
   }
-  
+
   function handleBlur() {
     // Small delay to allow clicking save/cancel buttons
     setTimeout(() => {
@@ -135,7 +130,7 @@
       }
     }, 100);
   }
-  
+
   function handleClick() {
     if (enableDoubleClick && enableSingleClick) {
       // When both are enabled, delay single click to check for double click
@@ -148,12 +143,12 @@
         // This might be a single click - wait to see if it becomes a double click
         clickTimeout = setTimeout(() => {
           clickTimeout = null;
-          dispatch('click');
+          onclickProp?.();
         }, 200);
       }
     } else if (enableSingleClick) {
       // Only single click enabled - dispatch immediately
-      dispatch('click');
+      onclickProp?.();
     } else if (enableDoubleClick) {
       // Only double click enabled - do nothing on single click
       return;
@@ -162,7 +157,7 @@
       startEditing();
     }
   }
-  
+
   function handleDoubleClick() {
     if (enableDoubleClick && !enableSingleClick) {
       // Only double click enabled
@@ -191,7 +186,7 @@
         </div>
       {/if}
     </div>
-    
+
     <div class="flex items-center gap-1">
       {#if saving}
         <Loader2 class="w-4 h-4 animate-spin" style="color: var(--ds-text-subtle);" />

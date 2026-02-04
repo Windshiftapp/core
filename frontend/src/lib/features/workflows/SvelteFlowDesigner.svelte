@@ -22,19 +22,17 @@
     DEFAULT_WORKFLOW_POSITIONS
   } from '../../utils/dataTransformers.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { useEventListener } from 'runed';
 
-  export let workflow;
-  export let statuses = [];
-  export let onSave;
-  export let onCancel;
+  let { workflow, statuses = [], onSave, onCancel } = $props();
 
-  // Local state - using regular Svelte variables
-  let nodes = [];
-  let edges = [];
-  let workflowStatuses = [];
-  let workingTransitions = [];
-  let savingTransitions = false;
-  let initialStatusId = null;
+  // Local state
+  let nodes = $state([]);
+  let edges = $state([]);
+  let workflowStatuses = $state([]);
+  let workingTransitions = $state([]);
+  let savingTransitions = $state(false);
+  let initialStatusId = $state(null);
 
   // Node and edge types configuration
   const nodeTypes = {
@@ -61,26 +59,14 @@
     if (workflow && statuses.length > 0) {
       loadWorkflowData();
     }
-
-    const swapListener = (event) => {
-      handleEdgeSwap(event);
-    };
-    const initialListener = (event) => {
-      handleSetInitial(event.detail?.statusId);
-    };
-
-    window.addEventListener('workflow-edge-swap', swapListener);
-    window.addEventListener('workflow-set-initial', initialListener);
-
-    return () => {
-      window.removeEventListener('workflow-edge-swap', swapListener);
-      window.removeEventListener('workflow-set-initial', initialListener);
-    };
   });
 
-  $: if (workflow && statuses.length > 0) {
-    loadWorkflowData();
-  }
+  useEventListener(() => window, 'workflow-edge-swap', (event) => handleEdgeSwap(event));
+  useEventListener(() => window, 'workflow-set-initial', (event) => handleSetInitial(event.detail?.statusId));
+
+  $effect(() => {
+    if (workflow && statuses.length > 0) loadWorkflowData();
+  });
 
   function loadWorkflowData() {
     // Build list of statuses currently in workflow
@@ -350,20 +336,21 @@
   }
 
   // Filter statuses not already in workflow
-  $: availableStatuses = statuses.filter(status => 
+  let availableStatuses = $derived(statuses.filter(status =>
     !nodes.some(node => node.data.statusId === status.id)
-  );
+  ));
 
   // Watch for position changes and save to localStorage
-  $: if (nodes.length > 0 && workflow?.id) {
-    // Debounce position saving
-    clearTimeout(positionSaveTimeout);
-    positionSaveTimeout = setTimeout(() => {
-      positionPersistence.save(workflow.id, nodes);
-    }, 100);
-  }
-
   let positionSaveTimeout;
+
+  $effect(() => {
+    if (nodes.length > 0 && workflow?.id) {
+      clearTimeout(positionSaveTimeout);
+      positionSaveTimeout = setTimeout(() => {
+        positionPersistence.save(workflow.id, nodes);
+      }, 100);
+    }
+  });
 
   function markInitialNode(nodeList, statusId) {
     return nodeList.map((node) => ({

@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { useEventListener } from 'runed';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -54,33 +55,27 @@
   // Centralized gradient styling
   const styles = useGradientStyles();
 
+  // Listen for browser back/forward navigation
+  function handlePopState() {
+    loadStoryMapDataFromURL();
+  }
+
+  // Close dropdowns when clicking outside
+  function handleClickOutside(event) {
+    const dropdowns = document.querySelectorAll('[id^="workspace-dropdown-"], [id^="itemtype-dropdown-"]');
+    dropdowns.forEach(dropdown => {
+      if (!dropdown.classList.contains('hidden') && !dropdown.contains(event.target) && !event.target.closest('button')) {
+        dropdown.classList.add('hidden');
+      }
+    });
+  }
+
+  useEventListener(() => window, 'popstate', handlePopState);
+  useEventListener(() => document, 'click', handleClickOutside);
+
   onMount(async () => {
     await loadWorkspaceGradient(workspaceId);
     await loadAllData();
-
-    // Listen for browser back/forward navigation
-    const handlePopState = () => {
-      loadStoryMapDataFromURL();
-    };
-
-    // Close dropdowns when clicking outside
-    const handleClickOutside = (event) => {
-      const dropdowns = document.querySelectorAll('[id^="workspace-dropdown-"], [id^="itemtype-dropdown-"]');
-      dropdowns.forEach(dropdown => {
-        if (!dropdown.classList.contains('hidden') && !dropdown.contains(event.target) && !event.target.closest('button')) {
-          dropdown.classList.add('hidden');
-        }
-      });
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    document.addEventListener('click', handleClickOutside);
-
-    // Cleanup listener on component destroy
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-      document.removeEventListener('click', handleClickOutside);
-    };
   });
 
   // Reload when workspaceId or collectionId changes
@@ -660,7 +655,7 @@ async function loadStatuses() {
     selectedItemId = null;
 
     // If changes were made in the modal, reload data
-    if (event?.detail?.hasChanges) {
+    if (event?.hasChanges) {
       await loadStoryMapDataFromURL();
     }
   }

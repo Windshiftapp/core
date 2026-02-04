@@ -5,17 +5,20 @@
   import WidgetState from './WidgetState.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  export let workspaceId = null;
-  export let maxItems = 10;
+  let { workspaceId = null, maxItems = 10 } = $props();
 
-  let items = [];
-  let loading = false;
-  let error = null;
-  let fetchVersion = 0;
+  let items = $state([]);
+  let loading = $state(false);
+  let error = $state(null);
+  let fetchVersion = $state(0);
+  let lastWorkspaceId = $state(undefined);
 
-  $: if (workspaceId !== undefined) {
-    loadRecentActivity();
-  }
+  $effect(() => {
+    if (workspaceId !== lastWorkspaceId) {
+      lastWorkspaceId = workspaceId;
+      loadRecentActivity();
+    }
+  });
 
   async function loadRecentActivity() {
     const currentVersion = ++fetchVersion;

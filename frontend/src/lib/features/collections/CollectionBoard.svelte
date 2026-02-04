@@ -1,5 +1,6 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
+  import { useEventListener } from 'runed';
   import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
@@ -14,16 +15,19 @@
   import ViewHeader from '../../layout/ViewHeader.svelte';
   import ItemKey from '../items/ItemKey.svelte';
   import CollectionViewSwitcher from './CollectionViewSwitcher.svelte';
-  import { backlogStore } from '../../stores/index.js';
+  import { backlogStore, workspaceDataStore, statusTransitionStore } from '../../stores/index.js';
+  import { useWorkItemPoller } from '../../composables/useWorkItemPoller.svelte.js';
 
   // Props
   let { workspaceId, collectionId = null } = $props();
 
-  // State
-  let workspace = $state(null);
+  // Reference data from shared workspace store
+  let workspace = $derived(workspaceDataStore.workspace);
+  let itemTypes = $derived(workspaceDataStore.itemTypes);
+  let statuses = $derived(workspaceDataStore.statuses);
+
+  // Dynamic view-specific state
   let items = $state([]);
-  let itemTypes = $state([]);
-  let statuses = $state([]);
   let transitions = $state([]);
   let boardConfig = $state(null);
 
@@ -41,59 +45,44 @@
   // Edge-based drag state
   let dragState = $state(new Map()); // Track drag state for each item: { isDragging: boolean, closestEdge: 'top'|'bottom'|null }
 
-  // Status transition caching for lazy loading
-  let itemTransitions = new Map(); // Cache transitions per item ID
-  let loadingTransitions = new Set(); // Track which items are currently loading transitions
-
-  // Event handler for refresh-work-items event
-  let handleRefreshWorkItems = null;
-
   // Centralized gradient styling
   const styles = useGradientStyles();
+
+  // Listen for newly created items
+  async function handleRefreshWorkItems(event) {
+    if (event.detail?.itemId) {
+      try {
+        const newItem = await api.items.get(event.detail.itemId);
+        // Add the new item if it belongs to this workspace
+        if (Number(newItem.workspace_id) === Number(workspaceId)) {
+          if (newItem.status_id) {
+            // Item has a status, add it to the board (at the end, since board is ordered by rank)
+            items = [...items, newItem];
+          } else {
+            // Item has no status, add it to backlog (at the end)
+            backlogItems = [...backlogItems, newItem];
+          }
+          // Preload transitions for the new item before setting up drag and drop
+          await statusTransitionStore.preloadForItems([newItem]);
+          // Re-setup drag and drop for the new item
+          setTimeout(() => {
+            setupDragAndDrop();
+          }, 100);
+        }
+      } catch (error) {
+        console.error('Failed to load new item:', error);
+      }
+    }
+  }
+
+  useEventListener(() => window, 'refresh-work-items', handleRefreshWorkItems);
 
   onMount(async () => {
     if (workspaceId) {
       await loadWorkspaceGradient(workspaceId);
       await loadData();
-
-      // Listen for newly created items
-      handleRefreshWorkItems = async (event) => {
-        if (event.detail?.itemId) {
-          try {
-            const newItem = await api.items.get(event.detail.itemId);
-            // Add the new item if it belongs to this workspace
-            if (Number(newItem.workspace_id) === Number(workspaceId)) {
-              if (newItem.status_id) {
-                // Item has a status, add it to the board (at the end, since board is ordered by rank)
-                items = [...items, newItem];
-              } else {
-                // Item has no status, add it to backlog (at the end)
-                backlogItems = [...backlogItems, newItem];
-              }
-              // Preload transitions for the new item before setting up drag and drop
-              await loadStatusTransitions(newItem.id);
-              // Re-setup drag and drop for the new item
-              setTimeout(() => {
-                setupDragAndDrop();
-              }, 100);
-            }
-          } catch (error) {
-            console.error('Failed to load new item:', error);
-          }
-        }
-      };
-
-      window.addEventListener('refresh-work-items', handleRefreshWorkItems);
     }
     loading = false;
-  });
-
-  onDestroy(() => {
-    // Clean up event listener
-    if (handleRefreshWorkItems) {
-      window.removeEventListener('refresh-work-items', handleRefreshWorkItems);
-      handleRefreshWorkItems = null;
-    }
   });
 
   // Effect to reload when workspaceId or collectionId changes
@@ -108,6 +97,9 @@
 
   async function loadData() {
     try {
+      // Ensure workspace reference data is available
+      await workspaceDataStore.initialize(workspaceId);
+
       // Build filters based on collection
       const filters = { workspace_id: workspaceId, limit: 100 };
 
@@ -123,30 +115,21 @@
         currentCollectionName = 'Default';
       }
 
-      // First load workspace, items, backlog count, and item types
-      const [workspaceData, itemsData, backlogData, itemTypesData] = await Promise.all([
-        api.workspaces.get(workspaceId),
+      // Only fetch dynamic data — reference data comes from workspaceDataStore
+      const [itemsData, backlogData] = await Promise.all([
         api.items.getAll(filters),
         api.items.getBacklog(workspaceId, filters.cql || null),
-        api.itemTypes.getAll()
       ]);
 
-      workspace = workspaceData;
       // Handle paginated response from items API
       if (itemsData && itemsData.items) {
         items = itemsData.items;
       } else {
-        // Backward compatibility for non-paginated response
         items = itemsData || [];
       }
 
-      // Set backlog items and item types from backend
       backlogItems = backlogData || [];
       backlogStore.setCount(workspaceId, backlogItems.length);
-      itemTypes = itemTypesData || [];
-
-      // Get statuses for this workspace (uses workflow from config set or default workflow)
-      statuses = await api.workspaces.getStatuses(workspaceId) || [];
 
       // Load board configuration if exists
       try {
@@ -159,18 +142,16 @@
       }
 
       // Preload transitions for all items so drag validation works correctly
-      await preloadAllTransitions();
+      statusTransitionStore.initialize(workspaceId);
+      await statusTransitionStore.preloadForItems([...items, ...backlogItems]);
 
     } catch (error) {
       console.error('Failed to load data:', error);
     }
   }
 
-  // Preload status transitions for all items
-  async function preloadAllTransitions() {
-    const allItems = [...items, ...backlogItems];
-    await Promise.all(allItems.map(item => loadStatusTransitions(item.id)));
-  }
+  // Adaptive polling for board items
+  const poller = useWorkItemPoller(() => loadData());
 
   function getItemsByStatus(statusId) {
     // Filter items by status_id
@@ -262,7 +243,7 @@
     selectedItemId = null;
 
     // If changes were made in the modal, reload data
-    if (event?.detail?.hasChanges) {
+    if (event?.hasChanges) {
       await loadData();
       // Re-setup drag and drop after data reload
       setTimeout(() => {
@@ -468,60 +449,13 @@
     return statuses.find(s => s.id === item.status_id);
   }
 
-  // Lazy load status transitions for an item
-  async function loadStatusTransitions(itemId) {
-    // Return cached result if available
-    if (itemTransitions.has(itemId)) {
-      return itemTransitions.get(itemId);
-    }
-
-    // Don't load if already loading
-    if (loadingTransitions.has(itemId)) {
-      return null;
-    }
-
-    try {
-      loadingTransitions.add(itemId);
-      const result = await api.items.getAvailableStatusTransitions(itemId);
-
-      // Cache the result
-      itemTransitions.set(itemId, result.available_transitions || []);
-      return result.available_transitions || [];
-    } catch (error) {
-      console.error('Failed to load status transitions:', error);
-      return [];
-    } finally {
-      loadingTransitions.delete(itemId);
-    }
-  }
-
-  // Check if a status transition is valid for an item (synchronous, uses cached data)
+  // Check if a status transition is valid for an item (synchronous, uses cached store data)
   function isValidTransition(itemId, fromStatusId, toStatusId) {
     if (!fromStatusId || !toStatusId) return false;
-    if (fromStatusId === toStatusId) return true; // Allow staying in same status
-
-    // Get cached transitions for this item
-    const availableTransitions = itemTransitions.get(itemId);
-    if (!availableTransitions) {
-      // If no cached data, be restrictive - don't allow until we know it's valid
-      return false;
-    }
-
-    // Check if target status ID is in the available transitions (compare by ID for reliability)
-    return availableTransitions.some(transition => transition.id === toStatusId);
-  }
-
-  // Async function to check if a status transition is valid for an item
-  async function isValidTransitionAsync(itemId, fromStatusId, toStatusId) {
-    if (!fromStatusId || !toStatusId) return false;
-    if (fromStatusId === toStatusId) return true; // Allow staying in same status
-
-    // Get available transitions for this item
-    const availableTransitions = await loadStatusTransitions(itemId);
-    if (!availableTransitions) return false;
-
-    // Check if target status ID is in the available transitions (compare by ID for reliability)
-    return availableTransitions.some(transition => transition.id === toStatusId);
+    if (fromStatusId === toStatusId) return true;
+    const item = items.find(i => i.id === itemId)
+      || backlogItems.find(i => i.id === itemId);
+    return statusTransitionStore.isValidTransition(item?.item_type_id ?? null, fromStatusId, toStatusId);
   }
 
   async function updateItemStatus(itemId, newStatus) {

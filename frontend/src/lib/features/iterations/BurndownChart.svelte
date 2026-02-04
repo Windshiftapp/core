@@ -1,6 +1,6 @@
 <script>
-  import { onMount } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { useResizeObserver } from 'runed';
 
   let { burndownData = null } = $props();
 
@@ -21,19 +21,9 @@
   let container = $state(null);
   let width = $state(600);
 
-  onMount(() => {
-    if (!container) return;
-    width = container.clientWidth || width;
-
-    const observer = new ResizeObserver(entries => {
-      const entry = entries[0];
-      if (entry) {
-        width = entry.contentRect.width;
-      }
-    });
-
-    observer.observe(container);
-    return () => observer.disconnect();
+  useResizeObserver(() => container, (entries) => {
+    const entry = entries[0];
+    if (entry) { width = entry.contentRect.width; }
   });
 
   const dataPoints = $derived(burndownData?.data_points || []);

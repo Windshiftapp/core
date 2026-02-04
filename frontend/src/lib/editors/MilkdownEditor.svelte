@@ -1,5 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
+  import { useEventListener } from 'runed';
   import { Editor, rootCtx, defaultValueCtx, editorViewOptionsCtx, editorViewCtx } from '@milkdown/kit/core';
   import { commonmark, toggleStrongCommand, toggleEmphasisCommand, wrapInBulletListCommand, wrapInOrderedListCommand, toggleInlineCodeCommand } from '@milkdown/kit/preset/commonmark';
   import { gfm, toggleStrikethroughCommand } from '@milkdown/kit/preset/gfm';
@@ -17,43 +18,39 @@
   import { t } from '../stores/i18n.svelte.js';
   import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
 
-  export let content = '';
-  export let placeholder = '';
-  $: effectivePlaceholder = placeholder || t('editors.enterText');
-  export let readonly = false;
-  export let showToolbar = false; // Show formatting toolbar
-  export let itemId = null; // Item ID for attachment uploads (backwards compatibility)
-  export let entityType = null; // Entity type: 'item', 'test_case', etc.
-  export let entityId = null; // Entity ID for attachment uploads
-  export let onImageInsert = null; // Callback when image is inserted
-  export let isPersonalWorkspace = false; // Flag to show warning in mention picker
-  export let compact = false; // Use smaller height for compact layouts
+  let {
+    content = $bindable(''), placeholder = '', readonly = false,
+    showToolbar = false, itemId = null, entityType = null,
+    entityId = null, onImageInsert = null, isPersonalWorkspace = false, compact = false
+  } = $props();
+
+  const effectivePlaceholder = $derived(placeholder || t('editors.enterText'));
 
   // Derive attachments enabled from store (falls back to true if not yet loaded to avoid flash)
-  $: attachmentsEnabled = attachmentStatus.loaded ? attachmentStatus.enabled : true;
+  const attachmentsEnabled = $derived(attachmentStatus.loaded ? attachmentStatus.enabled : true);
 
   // Compute effective entity info (supports both old itemId and new entityType/entityId)
-  $: effectiveEntityType = entityType || (itemId ? 'item' : null);
-  $: effectiveEntityId = entityId || itemId;
+  const effectiveEntityType = $derived(entityType || (itemId ? 'item' : null));
+  const effectiveEntityId = $derived(entityId || itemId);
 
-  let editorElement;
-  let fileInput;
-  let editor;
+  let editorElement = $state(null);
+  let fileInput = $state(null);
+  let editor = $state(null);
   let initialContent = content;
 
   // Mention picker state
-  let mentionPickerOpen = false;
-  let mentionQuery = '';
-  let mentionPosition = { x: 0, y: 0 };
-  let mentionRange = null; // { from, to } positions in the document
+  let mentionPickerOpen = $state(false);
+  let mentionQuery = $state('');
+  let mentionPosition = $state({ x: 0, y: 0 });
+  let mentionRange = $state(null); // { from, to } positions in the document
 
   // User hover card state
-  let hoverCardVisible = false;
-  let hoverCardPosition = { x: 0, y: 0 };
-  let hoverCardUser = null;
-  let hoverCardLoading = false;
-  let hoverCardTimeout = null;
-  let hideCardTimeout = null;
+  let hoverCardVisible = $state(false);
+  let hoverCardPosition = $state({ x: 0, y: 0 });
+  let hoverCardUser = $state(null);
+  let hoverCardLoading = $state(false);
+  let hoverCardTimeout = $state(null);
+  let hideCardTimeout = $state(null);
   let userCache = new Map();
 
   // Toolbar actions
@@ -85,18 +82,18 @@
   function checkForMentionTrigger(view) {
     const { state } = view;
     const { selection } = state;
-    const { $from } = selection;
+    const fromPos = selection.$from;
 
     // Get text before cursor in current text block
-    const textBefore = $from.parent.textContent.slice(0, $from.parentOffset);
+    const textBefore = fromPos.parent.textContent.slice(0, fromPos.parentOffset);
 
     // Look for @ trigger pattern: @ followed by optional word characters
     const mentionMatch = textBefore.match(/(?<![a-zA-Z0-9.])@([a-zA-Z0-9_.-]*)$/);
 
     if (mentionMatch) {
       // Calculate positions
-      const matchStart = $from.pos - mentionMatch[0].length;
-      const matchEnd = $from.pos;
+      const matchStart = fromPos.pos - mentionMatch[0].length;
+      const matchEnd = fromPos.pos;
 
       // Get cursor coordinates for positioning the picker
       const coords = view.coordsAtPos(matchStart);
@@ -122,8 +119,7 @@
     mentionRange = null;
   }
 
-  function handleMentionSelect(event) {
-    const user = event.detail;
+  function handleMentionSelect(user) {
     if (!editor || !mentionRange) return;
 
     // Format the mention text based on whether display name has spaces
@@ -248,6 +244,10 @@
       }
     }
   }
+
+  // Runed event listeners for mention hover (more efficient than MutationObserver)
+  useEventListener(() => editorElement, 'mouseover', handleMentionMouseOver);
+  useEventListener(() => editorElement, 'mouseout', handleMentionMouseOut);
 
   // Shared uploader logic for drag/drop/paste and the toolbar button
   async function uploadImages(files, schema, shouldInsertMarkdown = false) {
@@ -390,21 +390,12 @@
         .create();
 
       console.log('[MilkdownEditor] Editor created successfully');
-
-      // Use event delegation for mention hover (much more efficient than MutationObserver)
-      editorElement.addEventListener('mouseover', handleMentionMouseOver);
-      editorElement.addEventListener('mouseout', handleMentionMouseOut);
     } catch (error) {
       console.error('Failed to initialize Milkdown editor:', error);
     }
   });
 
   onDestroy(async () => {
-    // Clean up event delegation listeners
-    if (editorElement) {
-      editorElement.removeEventListener('mouseover', handleMentionMouseOver);
-      editorElement.removeEventListener('mouseout', handleMentionMouseOut);
-    }
     if (hoverCardTimeout) {
       clearTimeout(hoverCardTimeout);
     }
@@ -519,9 +510,7 @@
   }
 
   // Keep readonly renders in sync when underlying markdown changes
-  $: if (editor && readonly) {
-    editor.action(replaceAll(content || ''));
-  }
+  $effect(() => { if (editor && readonly) { editor.action(replaceAll(content || '')); } });
 </script>
 
 <div class="milkdown-wrapper" class:has-toolbar={showToolbar && !readonly}>

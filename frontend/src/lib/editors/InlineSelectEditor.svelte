@@ -1,34 +1,29 @@
 <script>
-  import { createEventDispatcher, tick } from 'svelte';
+  import { tick } from 'svelte';
   import { ChevronDown, Check, X, Loader2 } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  const dispatch = createEventDispatcher();
+  let {
+    value = null, options = [], placeholder = '', disabled = false,
+    required = false, className = '', displayClass = 'hover-bg cursor-pointer',
+    allowClear = false, onsave = null
+  } = $props();
 
-  export let value = null;
-  export let options = []; // Array of {value, label, color?, icon?}
-  export let placeholder = '';
-  export let disabled = false;
-  export let required = false;
+  const effectivePlaceholder = $derived(placeholder || t('common.select') + '...');
 
-  $: effectivePlaceholder = placeholder || t('common.select') + '...';
-  export let className = '';
-  export let displayClass = 'hover-bg cursor-pointer';
-  export let allowClear = false;
-  
-  let editing = false;
-  let selectElement;
-  let saving = false;
-  let error = '';
-  let selectedValue = value;
-  
+  let editing = $state(false);
+  let selectElement = $state(null);
+  let saving = $state(false);
+  let error = $state('');
+  let selectedValue = $state(value);
+
   function startEditing() {
     if (disabled) return;
-    
+
     editing = true;
     selectedValue = value;
     error = '';
-    
+
     // Focus select after DOM update
     tick().then(() => {
       if (selectElement) {
@@ -36,43 +31,43 @@
       }
     });
   }
-  
+
   function cancelEditing() {
     editing = false;
     selectedValue = value;
     error = '';
   }
-  
+
   async function saveValue() {
     if (saving) return;
-    
+
     // Validation
     if (required && (selectedValue === null || selectedValue === undefined || selectedValue === '')) {
       error = t('validation.required');
       return;
     }
-    
+
     // Check if value actually changed
     if (selectedValue === value) {
       cancelEditing();
       return;
     }
-    
+
     try {
       saving = true;
       error = '';
-      
-      // Dispatch save event
-      dispatch('save', { value: selectedValue });
-      
+
+      // Call save callback
+      onsave?.({ value: selectedValue });
+
       // Wait for parent to confirm save
-      
+
     } catch (err) {
       error = err.message || 'Failed to save';
       saving = false;
     }
   }
-  
+
   // External methods that parent can call
   export function confirmSave(newValue) {
     value = newValue;
@@ -81,12 +76,12 @@
     saving = false;
     error = '';
   }
-  
+
   export function rejectSave(errorMessage) {
     error = errorMessage || 'Failed to save';
     saving = false;
   }
-  
+
   function handleKeydown(event) {
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -96,12 +91,12 @@
       cancelEditing();
     }
   }
-  
+
   function handleChange() {
     // Auto-save on change for dropdowns
     saveValue();
   }
-  
+
   function handleBlur() {
     // Small delay to allow clicking save/cancel buttons
     setTimeout(() => {
@@ -110,11 +105,11 @@
       }
     }, 100);
   }
-  
+
   // Get display info for current value
-  $: currentOption = options.find(opt => opt.value === value);
-  $: displayText = currentOption?.label || effectivePlaceholder;
-  $: displayColor = currentOption?.color;
+  const currentOption = $derived(options.find(opt => opt.value === value));
+  const displayText = $derived(currentOption?.label || effectivePlaceholder);
+  const displayColor = $derived(currentOption?.color);
 </script>
 
 {#if editing}
@@ -141,14 +136,14 @@
           </option>
         {/each}
       </select>
-      
+
       {#if error}
         <div class="absolute top-full left-0 mt-1 text-xs text-red-600 bg-white px-2 py-1 border border-red-200 rounded shadow-sm z-10">
           {error}
         </div>
       {/if}
     </div>
-    
+
     <div class="flex items-center gap-1">
       {#if saving}
         <Loader2 class="w-4 h-4 animate-spin" style="color: var(--ds-text-subtle);" />
@@ -186,8 +181,8 @@
       style={!currentOption ? 'color: var(--ds-text-subtle);' : ''}
     >
       {#if currentOption && displayColor}
-        <span 
-          class="w-2 h-2 rounded-full" 
+        <span
+          class="w-2 h-2 rounded-full"
           style="background-color: {displayColor};"
         ></span>
       {/if}

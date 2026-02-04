@@ -25,6 +25,7 @@
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import EmptyState from '../../components/EmptyState.svelte';
+  import { useEventListener } from 'runed';
 
   // Props for workspace-scoped view (optional)
   let { workspaceId = null } = $props();
@@ -67,13 +68,9 @@
     if ($moduleSettings.test_management_enabled) {
       await loadTestStatistics();
     }
-
-    // Listen for manage categories event from navigation
-    document.addEventListener('manage-categories', () => {
-      showCategoryForm = true;
-    });
-
   });
+
+  useEventListener(() => document, 'manage-categories', () => { showCategoryForm = true; });
 
   async function loadData() {
     try {

@@ -3,12 +3,11 @@
   import { ShieldCheck, ShieldX, Settings } from 'lucide-svelte';
   import { api } from '../api.js';
 
-  export let workspaceId;
-  export let collectionId = null;
+  let { workspaceId, collectionId = null } = $props();
 
-  let loading = true;
-  let error = null;
-  let coverageData = null;
+  let loading = $state(true);
+  let error = $state(null);
+  let coverageData = $state(null);
 
   // Pie chart configuration
   const radius = 48;
@@ -70,8 +69,8 @@
     return segments;
   }
 
-  $: segments = coverageData ? buildPieSegments(coverageData.covered, coverageData.not_covered, coverageData.total) : [];
-  $: coverageRate = coverageData?.coverage_rate ?? 0;
+  const segments = $derived(coverageData ? buildPieSegments(coverageData.covered, coverageData.not_covered, coverageData.total) : []);
+  const coverageRate = $derived(coverageData?.coverage_rate ?? 0);
 </script>
 
 <div class="coverage-widget">
@@ -83,7 +82,7 @@
   {:else if error}
     <div class="error-state">
       <p>{error}</p>
-      <button class="retry-btn" on:click={loadCoverageData}>Retry</button>
+      <button class="retry-btn" onclick={loadCoverageData}>Retry</button>
     </div>
   {:else if !coverageData || coverageData.total === 0}
     <div class="empty-state">

@@ -76,6 +76,26 @@ export { workItemFormStore } from './workItemFormStore.svelte.js';
 // workspacePermissions.canDelete(wsId), workspacePermissions.canViewTests(wsId), etc.
 // Provides workspace-scoped permission checking for UI element visibility
 export { workspacePermissions } from './workspacePermissions.svelte.js';
+// Workspace data store
+// Access via: workspaceDataStore.workspace, workspaceDataStore.statuses, workspaceDataStore.itemTypes, etc.
+// Methods: workspaceDataStore.initialize(wsId), workspaceDataStore.refresh(), workspaceDataStore.reset(), workspaceDataStore.invalidate(field?)
+// Shared cache for workspace reference data — initialized once, refreshed every 5 minutes
+export { workspaceDataStore } from './workspaceDataStore.svelte.js';
+// Status transition store
+// Access via: statusTransitionStore.get(itemTypeId, statusId), statusTransitionStore.isValidTransition(...)
+// Methods: statusTransitionStore.initialize(wsId), preloadForItems(items), invalidateAll(), reset()
+// Caches status transitions by (itemTypeId, statusId) to avoid per-item API calls
+export { statusTransitionStore } from './statusTransitionStore.svelte.js';
+// Item test case links store
+// Access via: itemTestCaseLinksStore.get(itemId)
+// Methods: itemTestCaseLinksStore.initialize(wsId), loadForItems(itemIds), invalidateAll(), reset()
+// Caches test case links per item to avoid re-fetching on view switches
+export { itemTestCaseLinksStore } from './itemTestCaseLinksStore.svelte.js';
+// Activity store
+// Access via: activityStore.isIdle, activityStore.lastActive
+// Methods: activityStore.init()
+// Tracks user idle state for adaptive polling
+export { activityStore } from './activityStore.svelte.js';
 // Workspace stores
 // Access currentWorkspace.workspace and workspacesStore properties:
 // workspacesStore.allWorkspaces, workspacesStore.regularWorkspaces,

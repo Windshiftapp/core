@@ -19,10 +19,9 @@
       : optionsStr.split(',').map(opt => opt.trim());
   }
 
-  // Local state for user lookup (Svelte 4 compatible)
-  let users = [];
-  let usersLoading = false;
-  let usersLoaded = false;
+  let users = $state([]);
+  let usersLoading = $state(false);
+  let usersLoaded = $state(false);
 
   async function loadUsers() {
     if (usersLoading || usersLoaded) return;
@@ -55,29 +54,13 @@
     };
   }
 
-  export let field;
-  export let value = '';
-  export let onChange = () => {};
-  export let milestones = [];
-  export let iterations = [];
-  export let isDarkMode = false;
-  export let required = false;
+  let {
+    field, value = '', onChange = () => {}, milestones = [], iterations = [],
+    isDarkMode = false, required = false, readonly = true, disabled = false,
+    onStartEdit = null, onCancel = null, showSelectedInTrigger = true, autoOpenPickers = true
+  } = $props();
 
-  // Mode control
-  export let readonly = true;      // Default to read-only (display mode)
-  export let disabled = false;     // Disable interaction
-
-  // Callbacks
-  export let onStartEdit = null;   // Called when user clicks to edit in read mode
-  export let onCancel = null;      // Called when edit is cancelled
-
-  // Picker display control
-  export let showSelectedInTrigger = true;
-
-  // Control auto-open behavior for ItemPicker/UserPicker/AssetPicker
-  export let autoOpenPickers = true;
-
-  $: isRequired = required || field.required || field.is_required;
+  const isRequired = $derived(required || field.required || field.is_required);
 
   // Milestone config for ItemPicker
   const milestoneConfig = {
@@ -219,17 +202,21 @@
   }
 
   // Get iteration data for icon rendering
-  $: iterationData = field.field_type === 'iteration' && value && iterations
-    ? iterations.find(i => i.id === parseInt(value))
-    : null;
+  const iterationData = $derived(
+    field.field_type === 'iteration' && value && iterations
+      ? iterations.find(i => i.id === parseInt(value))
+      : null
+  );
 
   // Load users when we need to look up a user by ID
-  $: if (readonly && field.field_type === 'user' && value && typeof value !== 'object') {
-    loadUsers();
-  }
+  $effect(() => {
+    if (readonly && field.field_type === 'user' && value && typeof value !== 'object') {
+      loadUsers();
+    }
+  });
 
-  // Reactive user data computation - Svelte tracks `users` dependency for re-render
-  $: userData = (() => {
+  // Reactive user data computation
+  const userData = $derived((() => {
     if (field.field_type !== 'user' || !value) return null;
     // If it's already an object with name, use it
     if (typeof value === 'object' && value.name) return value;
@@ -243,14 +230,14 @@
       };
     }
     return null;
-  })();
+  })());
 
   // Reactive milestone data computation
-  $: milestoneData = (() => {
+  const milestoneData = $derived((() => {
     if (field.field_type !== 'milestone' || !value) return null;
     const milestone = milestones.find(m => m.id === parseInt(value));
     return milestone || null;
-  })();
+  })());
 
   // Get combobox labels array
   function getComboboxLabels(val) {

@@ -77,10 +77,10 @@ export function useItemAttachments(getItemId, showError = console.error) {
   }
 
   /**
-   * Handle attachment upload event from AttachmentList component
-   * @param {CustomEvent} event - Upload event with detail { attachment, message }
+   * Handle attachment upload event
+   * Called when an attachment is uploaded
    */
-  async function handleUpload(_event) {
+  async function handleUpload() {
     // Reload attachments to get updated pagination info
     if (isEnabled()) {
       await load(1, pageSize); // Go to first page to see new upload
@@ -88,12 +88,10 @@ export function useItemAttachments(getItemId, showError = console.error) {
   }
 
   /**
-   * Handle attachment delete event from AttachmentList component
-   * @param {CustomEvent} event - Delete event with attachment detail
+   * Handle attachment delete
+   * @param {Object} attachment - The attachment to delete
    */
-  async function handleDelete(event) {
-    const attachment = event.detail;
-
+  async function handleDelete(attachment) {
     try {
       await api.attachments.delete(attachment.id);
 
@@ -108,31 +106,30 @@ export function useItemAttachments(getItemId, showError = console.error) {
   }
 
   /**
-   * Handle page change event
-   * @param {CustomEvent} event - Event with detail { page, itemsPerPage }
+   * Handle page change
+   * @param {Object} detail - { page, itemsPerPage }
    */
-  async function handlePageChange(event) {
+  async function handlePageChange({ page, itemsPerPage }) {
     if (isEnabled()) {
-      await load(event.detail.page, event.detail.itemsPerPage);
+      await load(page, itemsPerPage);
     }
   }
 
   /**
-   * Handle page size change event
-   * @param {CustomEvent} event - Event with detail { page, itemsPerPage }
+   * Handle page size change
+   * @param {Object} detail - { page, itemsPerPage }
    */
-  async function handlePageSizeChange(event) {
+  async function handlePageSizeChange({ page, itemsPerPage }) {
     if (isEnabled()) {
-      await load(event.detail.page, event.detail.itemsPerPage);
+      await load(page, itemsPerPage);
     }
   }
 
   /**
    * Upload files directly (from Attach button)
-   * @param {CustomEvent} event - Event with detail { files }
+   * @param {Object} detail - { files }
    */
-  async function uploadFiles(event) {
-    const { files } = event.detail;
+  async function uploadFiles({ files }) {
     if (!files || files.length === 0) return;
 
     const itemId = getItemId();

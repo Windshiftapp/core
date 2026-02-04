@@ -1,5 +1,6 @@
 <script>
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { createEventDispatcher } from 'svelte';
+  import { useEventListener } from 'runed';
   import { fade } from 'svelte/transition';
   import { navigate, currentRoute } from '../router.js';
   import { milestonesStore } from '../stores/milestones.js';
@@ -329,19 +330,10 @@
     }
   }
 
-  onMount(() => {
-    window.addEventListener('open-create-modal', handleOpenCreateModal);
-    window.addEventListener('set-create-type', handleSetCreateType);
-    window.addEventListener('set-create-workspace', handleSetCreateWorkspace);
-    window.addEventListener('set-create-parent', handleSetCreateParent);
-
-    return () => {
-      window.removeEventListener('open-create-modal', handleOpenCreateModal);
-      window.removeEventListener('set-create-type', handleSetCreateType);
-      window.removeEventListener('set-create-workspace', handleSetCreateWorkspace);
-      window.removeEventListener('set-create-parent', handleSetCreateParent);
-    };
-  });
+  useEventListener(() => window, 'open-create-modal', handleOpenCreateModal);
+  useEventListener(() => window, 'set-create-type', handleSetCreateType);
+  useEventListener(() => window, 'set-create-workspace', handleSetCreateWorkspace);
+  useEventListener(() => window, 'set-create-parent', handleSetCreateParent);
 </script>
 
 {#if isOpen}

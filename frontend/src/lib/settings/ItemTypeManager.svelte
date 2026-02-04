@@ -136,6 +136,7 @@
       await loadItemTypes();
       cancelEdit();
       error = null;
+      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (err) {
       error = t('settings.itemTypes.failedToSave') + ' ' + err.message;
     }
@@ -150,6 +151,7 @@
       await api.itemTypes.delete(id);
       await loadItemTypes();
       error = null;
+      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (err) {
       error = err.message;
     }

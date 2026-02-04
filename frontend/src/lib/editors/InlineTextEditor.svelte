@@ -1,37 +1,31 @@
 <script>
-  import { createEventDispatcher, tick } from 'svelte';
+  import { tick } from 'svelte';
   import { Check, X, Loader2 } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  const dispatch = createEventDispatcher();
+  let {
+    value = '', placeholder = '', disabled = false, required = false,
+    maxLength = 255, className = '', editingClass = 'editing-input',
+    displayClass = 'display-text cursor-text', enableSingleClick = false,
+    enableDoubleClick = false, onsave = null, onclick: onclickProp = null
+  } = $props();
 
-  export let value = '';
-  export let placeholder = '';
-  export let disabled = false;
-  export let required = false;
-  export let maxLength = 255;
+  const effectivePlaceholder = $derived(placeholder || t('editors.enterText'));
 
-  $: effectivePlaceholder = placeholder || t('editors.enterText');
-  export let className = '';
-  export let editingClass = 'editing-input';
-  export let displayClass = 'display-text cursor-text';
-  export let enableSingleClick = false; // When true, single click triggers custom action
-  export let enableDoubleClick = false; // When true, double click triggers edit
-  
-  let editing = false;
-  let editValue = '';
-  let inputElement;
-  let saving = false;
-  let error = '';
-  let clickTimeout = null;
-  
+  let editing = $state(false);
+  let editValue = $state('');
+  let inputElement = $state(null);
+  let saving = $state(false);
+  let error = $state('');
+  let clickTimeout = $state(null);
+
   function startEditing() {
     if (disabled) return;
-    
+
     editing = true;
     editValue = value || '';
     error = '';
-    
+
     // Focus input after DOM update
     tick().then(() => {
       if (inputElement) {
@@ -40,18 +34,18 @@
       }
     });
   }
-  
+
   function cancelEditing() {
     editing = false;
     editValue = '';
     error = '';
   }
-  
+
   async function saveValue() {
     if (saving) return;
-    
+
     const trimmedValue = editValue.trim();
-    
+
     // Validation
     if (required && !trimmedValue) {
       error = t('validation.required');
@@ -62,28 +56,28 @@
       error = t('validation.maxLength', { max: maxLength });
       return;
     }
-    
+
     // Check if value actually changed
     if (trimmedValue === (value || '')) {
       cancelEditing();
       return;
     }
-    
+
     try {
       saving = true;
       error = '';
-      
-      // Dispatch save event
-      dispatch('save', { value: trimmedValue });
-      
+
+      // Call save callback
+      onsave?.({ value: trimmedValue });
+
       // Wait for parent to confirm save (parent should call confirmSave or rejectSave)
-      
+
     } catch (err) {
       error = err.message || 'Failed to save';
       saving = false;
     }
   }
-  
+
   // External methods that parent can call
   export function confirmSave(newValue) {
     value = newValue;
@@ -92,12 +86,12 @@
     saving = false;
     error = '';
   }
-  
+
   export function rejectSave(errorMessage) {
     error = errorMessage || 'Failed to save';
     saving = false;
   }
-  
+
   function handleKeydown(event) {
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -107,7 +101,7 @@
       cancelEditing();
     }
   }
-  
+
   function handleBlur() {
     // Small delay to allow clicking save/cancel buttons
     setTimeout(() => {
@@ -116,7 +110,7 @@
       }
     }, 100);
   }
-  
+
   function handleClick() {
     if (enableDoubleClick && enableSingleClick) {
       // When both are enabled, delay single click to check for double click
@@ -129,12 +123,12 @@
         // This might be a single click - wait to see if it becomes a double click
         clickTimeout = setTimeout(() => {
           clickTimeout = null;
-          dispatch('click');
+          onclickProp?.();
         }, 200); // 200ms delay to detect double click
       }
     } else if (enableSingleClick) {
       // Only single click enabled - dispatch immediately
-      dispatch('click');
+      onclickProp?.();
     } else if (enableDoubleClick) {
       // Only double click enabled - do nothing on single click
       return;
@@ -143,7 +137,7 @@
       startEditing();
     }
   }
-  
+
   function handleDoubleClick() {
     if (enableDoubleClick && !enableSingleClick) {
       // Only double click enabled

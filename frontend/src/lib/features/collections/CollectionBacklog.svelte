@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { useEventListener } from 'runed';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -14,15 +15,18 @@
   import DropIndicator from '../../layout/DropIndicator.svelte';
   import ViewHeader from '../../layout/ViewHeader.svelte';
   import CollectionViewSwitcher from './CollectionViewSwitcher.svelte';
-  import { backlogStore } from '../../stores/index.js';
+  import { backlogStore, workspaceDataStore } from '../../stores/index.js';
+  import { useWorkItemPoller } from '../../composables/useWorkItemPoller.svelte.js';
 
   let { workspaceId, collectionId = null } = $props();
 
-  let workspace = $state(null);
+  // Reference data from shared workspace store
+  let workspace = $derived(workspaceDataStore.workspace);
+  let itemTypes = $derived(workspaceDataStore.itemTypes);
+  let statuses = $derived(workspaceDataStore.statuses);
+  let statusCategories = $derived(workspaceDataStore.statusCategories);
+
   let items = $state([]);
-  let itemTypes = $state([]);
-  let statuses = $state([]);
-  let statusCategories = $state([]);
 
   let backlogItems = $derived(items);
   let loading = $state(true);
@@ -40,33 +44,29 @@
   // Centralized gradient styling
   const styles = useGradientStyles();
 
+  // Listen for newly created items
+  async function handleRefreshWorkItems(event) {
+    if (event.detail?.itemId) {
+      try {
+        const newItem = await api.items.get(event.detail.itemId);
+        // Add the new item to the end of the items array if it belongs to this workspace
+        if (Number(newItem.workspace_id) === Number(workspaceId)) {
+          items = [...items, newItem];
+        }
+      } catch (error) {
+        console.error('Failed to load new item:', error);
+      }
+    }
+  }
+
+  useEventListener(() => window, 'refresh-work-items', handleRefreshWorkItems);
+
   onMount(async () => {
     if (workspaceId) {
       await loadWorkspaceGradient(workspaceId);
       await loadData();
     }
     loading = false;
-
-    // Listen for newly created items
-    const handleRefreshWorkItems = async (event) => {
-      if (event.detail?.itemId) {
-        try {
-          const newItem = await api.items.get(event.detail.itemId);
-          // Add the new item to the end of the items array if it belongs to this workspace
-          if (Number(newItem.workspace_id) === Number(workspaceId)) {
-            items = [...items, newItem];
-          }
-        } catch (error) {
-          console.error('Failed to load new item:', error);
-        }
-      }
-    };
-
-    window.addEventListener('refresh-work-items', handleRefreshWorkItems);
-
-    return () => {
-      window.removeEventListener('refresh-work-items', handleRefreshWorkItems);
-    };
   });
 
   // Reactive statement to reload when workspaceId or collectionId changes
@@ -79,6 +79,9 @@
   async function loadData() {
     loading = true;
     try {
+      // Ensure workspace reference data is available
+      await workspaceDataStore.initialize(workspaceId);
+
       // Get collection data once if needed
       let cqlQuery = null;
       if (collectionId) {
@@ -92,29 +95,21 @@
       } else {
         currentCollectionName = 'Default';
       }
-      
-      // Load workspace, backlog items, item types, and status data
-      const [workspaceData, backlogItemsData, itemTypesData, statusesData, statusCategoriesData] = await Promise.all([
-        api.workspaces.get(workspaceId),
-        api.items.getBacklog(workspaceId, cqlQuery),
-        api.itemTypes.getAll(),
-        api.workspaces.getStatuses(workspaceId),
-        api.statusCategories.getAll()
-      ]);
 
-      workspace = workspaceData;
+      // Only fetch dynamic data — reference data comes from workspaceDataStore
+      const backlogItemsData = await api.items.getBacklog(workspaceId, cqlQuery);
       items = backlogItemsData || [];
       backlogStore.setCount(workspaceId, items.length);
-      itemTypes = itemTypesData || [];
-      statuses = statusesData || [];
-      statusCategories = statusCategoriesData || [];
-      
+
     } catch (error) {
       console.error('Failed to load backlog data:', error);
     } finally {
       loading = false;
     }
   }
+
+  // Adaptive polling for backlog items
+  const poller = useWorkItemPoller(() => loadData());
 
   function openItem(itemId, event) {
     // Don't open item if we're dragging
@@ -132,7 +127,7 @@
     selectedItemId = null;
     
     // If changes were made in the modal, reload data
-    if (event?.detail?.hasChanges) {
+    if (event?.hasChanges) {
       await loadData();
       // Re-setup drag and drop after data reload
       setTimeout(() => {

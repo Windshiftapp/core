@@ -15,8 +15,7 @@
   import { addToast, successToast, errorToast } from '../../stores/toasts.svelte.js';
   import { timerStore } from '../../stores/timerStore.svelte.js';
   import { useItemAttachments } from '../../composables/useItemAttachments.svelte.js';
-  import { createEventDispatcher } from 'svelte';
-import {
+  import {
     registerContextCommands,
     unregisterContextCommands,
     createContextCommand,
@@ -25,8 +24,6 @@ import {
 import Modal from '../../dialogs/Modal.svelte';
 import DeleteItemDialog from '../../dialogs/DeleteItemDialog.svelte';
 import LinkItemModal from '../../dialogs/LinkItemModal.svelte';
-
-  const dispatch = createEventDispatcher();
 
   // Import the shared content component
   import ItemDetailContent from '../items/ItemDetailContent.svelte';
@@ -280,8 +277,8 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   }
 
   // Event handlers
-  function handleNavigate(event) {
-    const path = event.detail?.path;
+  function handleNavigate(detail) {
+    const path = detail?.path;
     if (!path) return;
 
     if (tryHandleModalItemNavigation(path)) {
@@ -336,13 +333,13 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     errorToast(t('items.failedToCopyToClipboard'), t('items.copyError'));
   }
   
-  async function handleSaveField(event) {
-    const { field, value, assigneeName, iterationName } = event.detail;
+  async function handleSaveField(detail) {
+    const { field, value, assigneeName, iterationName } = detail;
     await saveField(field, value, assigneeName, iterationName);
   }
-  
-  function handleCancelEdit(event) {
-    const { field } = event.detail;
+
+  function handleCancelEdit(detail) {
+    const { field } = detail;
     cancelEdit(field);
   }
 
@@ -365,15 +362,15 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     itemDetailStore.cancelEditing(storeField);
   }
   
-  function handleStartEditingCustomField(event) {
-    const fieldId = event.detail.fieldId;
+  function handleStartEditingCustomField(detail) {
+    const fieldId = detail.fieldId;
     // Cancel assignee editing when starting to edit a custom field
     itemDetailStore.cancelEditing('assignee');
     itemDetailStore.startEditing(`custom_field_${fieldId}`);
   }
   
-  function handleSwitchTab(event) {
-    tab = event.detail.tab;
+  function handleSwitchTab(detail) {
+    tab = detail.tab;
     const url = `/workspaces/${workspaceId}/items/${itemId}${tab !== 'comments' ? `?tab=${tab}` : ''}`;
     navigate(url);
   }
@@ -401,8 +398,8 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     }
   }
 
-  function handleViewTestCase(event) {
-    const { testCaseId } = event.detail || {};
+  function handleViewTestCase(detail) {
+    const { testCaseId } = detail || {};
     if (!testCaseId) return;
     const normalizedId = Number(testCaseId);
     if (!Number.isFinite(normalizedId)) {
@@ -416,8 +413,8 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     itemDetailStore.closeTestCaseModal();
   }
 
-  async function handleRemoveLink(event) {
-    const { linkId } = event.detail;
+  async function handleRemoveLink(detail) {
+    const { linkId } = detail;
 
     try {
       await itemDetailStore.removeLink(linkId);
@@ -535,12 +532,12 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     itemDetailStore.openTimeLogModal();
   }
 
-  function handleEditWorklog(event) {
-    itemDetailStore.openTimeLogModal(event.detail);
+  function handleEditWorklog(detail) {
+    itemDetailStore.openTimeLogModal(detail);
   }
 
-  async function handleDeleteWorklog(event) {
-    const worklog = event.detail;
+  async function handleDeleteWorklog(detail) {
+    const worklog = detail;
     try {
       await api.time.worklogs.delete(worklog.id);
       // Reload worklogs
@@ -711,8 +708,8 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   });
 
   // Handler for executing a manual action
-  async function handleExecuteAction(event) {
-    const action = event.detail;
+  async function handleExecuteAction(detail) {
+    const action = detail;
     try {
       await itemDetailStore.executeAction(action.id);
       successToast(t('actions.test.executionQueued'));
@@ -996,38 +993,38 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     diagrams={itemDetailStore.diagrams}
     loadingDiagrams={itemDetailStore.loadingDiagrams}
     manualActions={itemDetailStore.manualActions}
-    on:navigate={handleNavigate}
-    on:go-back={handleGoBack}
-    on:copy-key={handleCopyKey}
-    on:save-field={handleSaveField}
-    on:cancel-edit={handleCancelEdit}
-    on:switch-tab={handleSwitchTab}
-    on:create-sub-issue={handleCreateSubIssue}
-    on:remove-link={handleRemoveLink}
-    on:view-test-case={handleViewTestCase}
-    on:show-link-modal={handleShowLinkModal}
-    on:start-editing-assignee={handleStartEditingAssignee}
-    on:start-editing-milestone={handleStartEditingMilestone}
-    on:start-editing-iteration={handleStartEditingIteration}
-    on:start-editing-priority={handleStartEditingPriority}
-    on:start-editing-due-date={handleStartEditingDueDate}
-    on:start-editing-status={handleStartEditingStatus}
-    on:start-editing-project={handleStartEditingProject}
-    on:start-editing-description={handleStartEditingDescription}
-    on:start-editing-custom-field={handleStartEditingCustomField}
-    on:start-timer={handleStartTimer}
-    on:log-time={handleLogTime}
-    on:edit-worklog={handleEditWorklog}
-    on:delete-worklog={handleDeleteWorklog}
-    on:parent-changed={handleParentChanged}
-    on:attachment-upload={attachmentManager.handleUpload}
-    on:attachment-upload-files={attachmentManager.uploadFiles}
-    on:attachment-delete={attachmentManager.handleDelete}
-    on:attachment-page-change={attachmentManager.handlePageChange}
-    on:attachment-page-size-change={attachmentManager.handlePageSizeChange}
-    on:diagram-saved={handleDiagramSaved}
-    on:execute-action={handleExecuteAction}
-    on:close={closeModal}
+    onnavigate={handleNavigate}
+    ongoBack={handleGoBack}
+    oncopyKey={handleCopyKey}
+    onsaveField={handleSaveField}
+    oncancelEdit={handleCancelEdit}
+    onswitchTab={handleSwitchTab}
+    oncreateSubIssue={handleCreateSubIssue}
+    onremoveLink={handleRemoveLink}
+    onviewTestCase={handleViewTestCase}
+    onshowLinkModal={handleShowLinkModal}
+    onstartEditingAssignee={handleStartEditingAssignee}
+    onstartEditingMilestone={handleStartEditingMilestone}
+    onstartEditingIteration={handleStartEditingIteration}
+    onstartEditingPriority={handleStartEditingPriority}
+    onstartEditingDueDate={handleStartEditingDueDate}
+    onstartEditingStatus={handleStartEditingStatus}
+    onstartEditingProject={handleStartEditingProject}
+    onstartEditingDescription={handleStartEditingDescription}
+    onstartEditingCustomField={handleStartEditingCustomField}
+    onstartTimer={handleStartTimer}
+    onlogTime={handleLogTime}
+    oneditWorklog={handleEditWorklog}
+    ondeleteWorklog={handleDeleteWorklog}
+    onparentChanged={handleParentChanged}
+    onattachmentUpload={attachmentManager.handleUpload}
+    onattachmentUploadFiles={attachmentManager.uploadFiles}
+    onattachmentDelete={attachmentManager.handleDelete}
+    onattachmentPageChange={attachmentManager.handlePageChange}
+    onattachmentPageSizeChange={attachmentManager.handlePageSizeChange}
+    ondiagramSaved={handleDiagramSaved}
+    onexecuteAction={handleExecuteAction}
+    onclose={closeModal}
   />
 {/snippet}
 

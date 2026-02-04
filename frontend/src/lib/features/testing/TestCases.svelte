@@ -19,6 +19,7 @@
   import { toHotkeyString, getShortcutDisplay, matchesShortcut, isTypingInField } from '../../utils/keyboardShortcuts.js';
   import { currentRoute, navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { useEventListener } from 'runed';
 
   let { workspaceId = null } = $props();
 
@@ -134,24 +135,13 @@
     await loadTestCases(selectedFolder);
     await loadLabels();
 
-    document.addEventListener('keydown', handleStepsKeyboard);
-
-    // Add command palette trigger listener
-    const handleCommandPaletteTrigger = (e) => {
-      if (e.type === 'trigger-test-case-form') {
-        showAddCaseForm();
-      }
-    };
-
-    window.addEventListener('trigger-test-case-form', handleCommandPaletteTrigger);
-
-    // Cleanup
     return () => {
-      document.removeEventListener('keydown', handleStepsKeyboard);
-      window.removeEventListener('trigger-test-case-form', handleCommandPaletteTrigger);
       clearTimeout(stepsShortcutTimeout);
     };
   });
+
+  useEventListener(() => document, 'keydown', handleStepsKeyboard);
+  useEventListener(() => window, 'trigger-test-case-form', () => showAddCaseForm());
 
   async function loadFolders() {
     try {

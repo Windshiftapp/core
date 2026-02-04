@@ -103,6 +103,7 @@
       }
       
       cancelForm();
+      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to save status category:', error);
       alert(t('settings.statusCategories.failedToSave') + ' ' + (error.message || error));
@@ -117,6 +118,7 @@
     try {
       await api.delete(`/status-categories/${category.id}`);
       statusCategories = statusCategories.filter(cat => cat.id !== category.id);
+      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to delete status category:', error);
       

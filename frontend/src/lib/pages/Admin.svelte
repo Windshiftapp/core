@@ -39,6 +39,7 @@
     Network, FileText, Shield, Bell, Search, X,
     Layers, Cog, LinkIcon, UserCheck, MessageSquare, Folder, UsersRound, Palette, Notebook, Grip, ScrollText, AlertCircle, KeyRound, BadgeCheck, GitMerge, CloudDownload, LifeBuoy
   } from 'lucide-svelte';
+  import { useEventListener } from 'runed';
 
   // Check if we're on a nested detail route (not a tab)
   const isNestedRoute = $derived(
@@ -292,23 +293,12 @@
     if (!$currentRoute.params?.tab && !isNested && !isChannelsRoute) {
       navigate('/admin/custom-fields');
     }
-
-    // Listen for admin tab switch events from command palette
-    function handleAdminTabSwitch(event) {
-      if (event.detail && event.detail.tab) {
-        navigate(`/admin/${event.detail.tab}`);
-      }
-    }
-
-    window.addEventListener('admin-tab-switch', handleAdminTabSwitch);
-    window.addEventListener('keydown', handleGlobalKeydown);
-
-    // Cleanup event listeners
-    return () => {
-      window.removeEventListener('admin-tab-switch', handleAdminTabSwitch);
-      window.removeEventListener('keydown', handleGlobalKeydown);
-    };
   });
+
+  useEventListener(() => window, 'admin-tab-switch', (event) => {
+    if (event.detail?.tab) navigate(`/admin/${event.detail.tab}`);
+  });
+  useEventListener(() => window, 'keydown', handleGlobalKeydown);
 
   // Calculate button indices for arrow navigation
   const buttonIndices = $derived.by(() => {

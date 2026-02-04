@@ -1,21 +1,18 @@
 <script>
-  import { onMount } from 'svelte';
+  import { useEventListener } from 'runed';
   import ExcalidrawEditor from './ExcalidrawEditor.svelte';
   import Button from './Button.svelte';
   import { api } from '../api.js';
   import { themeStore } from '../stores/theme.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
 
-  export let itemId;
-  export let diagram = null; // null for new diagram, object for editing
-  export let onClose = () => {};
-  export let onSave = () => {};
+  let { itemId, diagram = null, onClose = () => {}, onSave = () => {} } = $props();
 
-  let editorComponent;
-  let diagramName = diagram ? diagram.name : t('components.diagram.untitled');
+  let editorComponent = $state(null);
+  let diagramName = $state(diagram ? diagram.name : t('components.diagram.untitled'));
   let initialData = null;
-  let saving = false;
-  let hasChanges = false;
+  let saving = $state(false);
+  let hasChanges = $state(false);
 
   if (diagram && diagram.diagram_data) {
     try {
@@ -73,12 +70,7 @@
     }
   }
 
-  onMount(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  });
+  useEventListener(() => window, 'keydown', handleKeyDown);
 </script>
 
 <!-- Modal overlay -->

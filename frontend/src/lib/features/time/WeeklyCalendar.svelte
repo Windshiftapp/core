@@ -1,8 +1,8 @@
 <script>
   import { onMount } from 'svelte';
-  import { ChevronLeft, ChevronRight, Plus, Calendar, CheckSquare, X, ChevronDown, Download, ExternalLink, MoreHorizontal } from 'lucide-svelte';
+  import { useEventListener } from 'runed';
+  import { ChevronLeft, ChevronRight, Calendar, CheckSquare, X, ChevronDown, Download, ExternalLink, MoreHorizontal } from 'lucide-svelte';
   import { api } from '../../api.js';
-  import ItemPicker from '../../pickers/ItemPicker.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
   import PersonalTaskDetail from '../personal/PersonalTaskDetail.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
@@ -13,18 +13,18 @@
   import Checkbox from '../../components/Checkbox.svelte';
 
   // Get current date and week
-  let currentDate = new Date();
-  let currentWeekStart = new Date();
-  let weekDays = [];
-  let workItems = {}; // Store scheduled work items for each day
-  let showTasksSidebar = false;
-  let assignedWorkItems = []; // Real work items assigned to user
-  let availableStatuses = []; // Status options for work items
+  let currentDate = $state(new Date());
+  let currentWeekStart = $state(new Date());
+  let weekDays = $state([]);
+  let workItems = $state({}); // Store scheduled work items for each day
+  let showTasksSidebar = $state(false);
+  let assignedWorkItems = $state([]); // Real work items assigned to user
+  let availableStatuses = $state([]); // Status options for work items
 
   // Item detail modal state
-  let showItemModal = false;
-  let selectedItemId = null;
-  let selectedWorkspaceId = null;
+  let showItemModal = $state(false);
+  let selectedItemId = $state(null);
+  let selectedWorkspaceId = $state(null);
 
   // Time grid configuration
   const DAY_START_HOUR = 6;   // 6 AM
@@ -35,19 +35,19 @@
   const DEFAULT_DURATION = 60; // Default 1 hour for new items
 
   // Drag state for resizing
-  let resizingItem = null;
-  let resizeEdge = null; // 'top' or 'bottom'
-  let resizeStartY = 0;
-  let resizeStartTime = '';
-  let resizeStartDuration = 0;
+  let resizingItem = $state(null);
+  let resizeEdge = $state(null); // 'top' or 'bottom'
+  let resizeStartY = $state(0);
+  let resizeStartTime = $state('');
+  let resizeStartDuration = $state(0);
 
   // Inline task creation state
-  let creatingTaskAt = null; // { dateKey, time, top }
-  let newTaskTitle = '';
+  let creatingTaskAt = $state(null); // { dateKey, time, top }
+  let newTaskTitle = $state('');
 
   // Drag vs click distinction
-  let isDragging = false;
-  let lastDragOrResizeEnd = 0;
+  let isDragging = $state(false);
+  let lastDragOrResizeEnd = $state(0);
 
   // Status configuration for ItemPicker
   const statusConfig = {
@@ -576,7 +576,10 @@
     }
   }
 
-  // Resize handlers
+  // Resize handlers - useEventListener auto-attaches/detaches based on resizingItem
+  useEventListener(() => resizingItem ? document : undefined, 'mousemove', handleResize);
+  useEventListener(() => resizingItem ? document : undefined, 'mouseup', stopResize);
+
   function startResize(e, item, dateKey, edge) {
     e.preventDefault();
     e.stopPropagation();
@@ -586,9 +589,6 @@
     resizeStartY = e.clientY;
     resizeStartTime = item.scheduledTime || minutesToTime(DAY_START_HOUR * 60);
     resizeStartDuration = item.durationMinutes || DEFAULT_DURATION;
-
-    document.addEventListener('mousemove', handleResize);
-    document.addEventListener('mouseup', stopResize);
   }
 
   function handleResize(e) {
@@ -653,8 +653,6 @@
 
     resizingItem = null;
     resizeEdge = null;
-    document.removeEventListener('mousemove', handleResize);
-    document.removeEventListener('mouseup', stopResize);
   }
 
   // Handle click on time grid to create task at that time

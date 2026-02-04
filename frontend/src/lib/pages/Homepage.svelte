@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { authStore, homepageStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
   import DashboardOnboarding from './DashboardOnboarding.svelte';
@@ -9,6 +9,7 @@
   import Text from '../components/Text.svelte';
   import { Clock, Eye, Edit, MessageSquare, Bookmark, Bell, Briefcase, Calendar, Target, Search, Grip, Info, CheckCircle, AlertCircle, XCircle } from 'lucide-svelte';
   import { workspaceIconMap } from '../utils/icons.js';
+  import { useEventListener } from 'runed';
 
   // Use store values with aliases for easier template access
   let greeting = $derived(homepageStore.greeting);
@@ -37,15 +38,6 @@
   onMount(async () => {
     const userTimeZone = authStore.currentUser?.timezone || 'UTC';
     await homepageStore.init(userTimeZone);
-
-    // Listen for workspace refresh events
-    window.addEventListener('refresh-workspaces', handleRefreshWorkspaces);
-    window.addEventListener('refresh-work-items', handleRefreshWorkItems);
-  });
-
-  onDestroy(() => {
-    window.removeEventListener('refresh-workspaces', handleRefreshWorkspaces);
-    window.removeEventListener('refresh-work-items', handleRefreshWorkItems);
   });
 
   function handleRefreshWorkspaces() {
@@ -55,6 +47,10 @@
   function handleRefreshWorkItems() {
     homepageStore.refresh();
   }
+
+  // Listen for workspace/work-item refresh events using runed
+  useEventListener(() => window, 'refresh-workspaces', handleRefreshWorkspaces);
+  useEventListener(() => window, 'refresh-work-items', handleRefreshWorkItems);
 
   function getNotificationIcon(type) {
     switch(type) {

@@ -239,6 +239,7 @@
 
       await loadCustomFields();
       cancelForm();
+      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to save custom field:', error);
       alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
@@ -250,6 +251,7 @@
       try {
         await api.customFields.delete(field.id);
         await loadCustomFields();
+        window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
       } catch (error) {
         console.error('Failed to delete custom field:', error);
         alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));

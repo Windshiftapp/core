@@ -1,6 +1,6 @@
 <script>
   import { Link2, Plus, Paperclip, PenTool, Zap, ChevronDown } from 'lucide-svelte';
-  import { tick, onMount, onDestroy } from 'svelte';
+  import { tick, onMount } from 'svelte';
   import Button from '../../components/Button.svelte';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import AttachmentDiagramList from '../assets/AttachmentDiagramList.svelte';
@@ -8,6 +8,7 @@
   import { getShortcut, matchesShortcut, getDisplayString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { attachmentStatus } from '../../stores';
+  import { onClickOutside } from 'runed';
 
   const dispatch = createEventDispatcher();
 
@@ -116,24 +117,16 @@
     dispatch('delete-diagram', diagram);
   }
 
-  function handleClickOutside(event) {
-    if (actionsMenuRef && !actionsMenuRef.contains(event.target)) {
-      showActionsMenu = false;
-    }
-  }
+  // Handle click outside using runed
+  onClickOutside(
+    () => actionsMenuRef,
+    () => { showActionsMenu = false; }
+  );
 
   function handleExecuteAction(action) {
     dispatch('execute-action', action);
     showActionsMenu = false;
   }
-
-  onMount(() => {
-    document.addEventListener('click', handleClickOutside);
-  });
-
-  onDestroy(() => {
-    document.removeEventListener('click', handleClickOutside);
-  });
 </script>
 
 <div class="pt-2">

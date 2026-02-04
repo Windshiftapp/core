@@ -5,19 +5,18 @@
   import WidgetState from './WidgetState.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  export let workspaceId = null;
-  export let collectionFilter = null;
+  let { workspaceId = null, collectionFilter = null } = $props();
 
   const MAX_ITEMS = 8;
 
-  let overdueItems = [];
-  let loading = false;
-  let error = null;
-  let currentWorkspaceId = null;
-  let refreshInFlight = false;
+  let overdueItems = $state([]);
+  let loading = $state(false);
+  let error = $state(null);
+  let currentWorkspaceId = $state(null);
+  let refreshInFlight = $state(false);
   let statusesPromise;
-  let activeFetchId = 0;
-  let currentCollectionFilter = null;
+  let activeFetchId = $state(0);
+  let currentCollectionFilter = $state(null);
 
   function normalizeDate(dateString) {
     if (!dateString) return null;
@@ -122,15 +121,17 @@
     }
   }
 
-  $: if (workspaceId !== currentWorkspaceId || collectionFilter !== currentCollectionFilter) {
-    currentWorkspaceId = workspaceId;
-    currentCollectionFilter = collectionFilter;
-    if (workspaceId) {
-      loadOverdueItems();
-    } else {
-      overdueItems = [];
+  $effect(() => {
+    if (workspaceId !== currentWorkspaceId || collectionFilter !== currentCollectionFilter) {
+      currentWorkspaceId = workspaceId;
+      currentCollectionFilter = collectionFilter;
+      if (workspaceId) {
+        loadOverdueItems();
+      } else {
+        overdueItems = [];
+      }
     }
-  }
+  });
 </script>
 
 <div class="overdue-items-widget">
