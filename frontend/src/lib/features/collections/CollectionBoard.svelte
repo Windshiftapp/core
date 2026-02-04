@@ -603,7 +603,7 @@
     <div class="animate-pulse">{t('common.loading')}</div>
   </div>
 {:else if workspace}
-  <div class="min-h-screen" style="{styles.backgroundStyle}">
+  <div class="min-h-screen min-w-fit" style="{styles.backgroundStyle} background-attachment: scroll;">
     <!-- Content Container -->
     <div class="p-6">
       <!-- Header with view tabs -->

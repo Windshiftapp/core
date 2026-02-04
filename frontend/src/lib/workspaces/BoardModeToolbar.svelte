@@ -5,7 +5,7 @@
   import { api } from '../api.js';
   import { workspaceIconMap } from '../utils/icons.js';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
-  import { Package, List, MapPin, Calendar, Milestone, Settings, Palette } from 'lucide-svelte';
+  import { Package, List, MapPin, Calendar, Milestone, Settings, Palette, SquareKanban } from 'lucide-svelte';
   import Rows_3 from 'lucide-svelte/icons/rows-3';
   import ListTree from 'lucide-svelte/icons/list-tree';
   import { t } from '../stores/i18n.svelte.js';
@@ -102,6 +102,7 @@
   // Build navigation dropdown menu items
   const navMenuItems = $derived.by(() => {
     return [
+      { title: 'Board', icon: SquareKanban, onClick: () => navigateToView('board') },
       { title: 'Backlog', icon: Rows_3, onClick: () => navigateToView('backlog') },
       { title: 'List', icon: List, onClick: () => navigateToView('list') },
       { title: 'Tree', icon: ListTree, onClick: () => navigateToView('tree') },
