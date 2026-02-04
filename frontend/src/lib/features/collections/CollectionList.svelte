@@ -4,22 +4,16 @@
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { getCollection } from '../collections/collectionService.js';
-  import { getStatusCategory as getStatusCategoryUtil, getStatusColor as getStatusColorUtil, getStatusInlineStyle, getTextColorForBackground } from '../../utils/statusColors.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
-  import { Plus, Filter, MoreHorizontal, Calendar, User, AlertCircle, Trash2, Eye } from 'lucide-svelte';
-  import { itemTypeIconMap } from '../../utils/icons.js';
+  import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
+  import { MoreHorizontal, Trash2, Eye } from 'lucide-svelte';
   import SearchInput from '../../components/SearchInput.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import ViewHeader from '../../layout/ViewHeader.svelte';
-  import InlineFieldEditor from '../../editors/InlineFieldEditor.svelte';
-  import ItemPicker from '../../pickers/ItemPicker.svelte';
-  import ItemKey from '../items/ItemKey.svelte';
-  import ColorDot from '../../components/ColorDot.svelte';
-  import Lozenge from '../../components/Lozenge.svelte';
-  import Checkbox from '../../components/Checkbox.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
-  import { formatDate } from '../../utils/dateFormatter.js';
+  import ListCellRenderer from './ListCellRenderer.svelte';
+  import ColumnSelector from './ColumnSelector.svelte';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -32,7 +26,14 @@
   let statusCategories = $state([]);
   let users = $state([]);
   let milestones = $state([]);
+  let iterations = $state([]);
   let priorities = $state([]);
+  let projects = $state([]);
+  let customFieldDefinitions = $state([]);
+
+  // Board configuration for list columns
+  let boardConfig = $state(null);
+  let listColumns = $state([]);
 
   let loading = $state(true);
   let loadingItems = $state(false);
@@ -42,24 +43,43 @@
   let currentPage = $state(1);
   let itemsPerPage = $state(50);
 
-  // Status transition caching for lazy loading
-  let itemTransitions = $state(new Map()); // Cache transitions per item ID
-  let loadingTransitions = $state(new Set()); // Track which items are currently loading transitions
-  let requestQueue = $state(new Set()); // Queue for pending requests
-  const MAX_CONCURRENT_REQUESTS = 3; // Limit concurrent API calls
-  let activeRequests = $state(0);
+  // Default column configuration
+  const defaultColumns = [
+    { field_identifier: 'key', field_type: 'system', display_order: 0, width: 1 },
+    { field_identifier: 'title', field_type: 'system', display_order: 1, width: 4 },
+    { field_identifier: 'status', field_type: 'system', display_order: 2, width: 2 },
+    { field_identifier: 'priority', field_type: 'system', display_order: 3, width: 2 },
+    { field_identifier: 'created_at', field_type: 'system', display_order: 4, width: 2 }
+  ];
 
   // Centralized gradient styling
   const styles = useGradientStyles();
+
+  // Computed: Check if user can edit items
+  let canEdit = $derived(workspacePermissions.canEdit(workspaceId));
+
+  // Computed: Check if user can configure columns (workspace admin)
+  let canConfigureColumns = $derived(workspacePermissions.canAdminWorkspace(workspaceId));
+
+  // Computed: Calculate total grid columns (sum of widths + 1 for actions)
+  let totalGridColumns = $derived(
+    listColumns.reduce((sum, col) => sum + col.width, 0) + 1
+  );
+
+  // Computed: Generate grid-template-columns CSS
+  let gridTemplateColumns = $derived(
+    listColumns.map(col => `${col.width}fr`).join(' ') + ' auto'
+  );
 
   onMount(async () => {
     if (workspaceId) {
       await loadWorkspaceGradient(workspaceId);
       await loadWorkspace();
+      await loadBoardConfiguration();
       await loadWorkItems();
     }
     loading = false;
-    
+
     // Listen for refresh events
     window.addEventListener('focus', handleWindowFocus);
     window.addEventListener('refresh-work-items', loadWorkItems);
@@ -79,14 +99,16 @@
 
   async function loadWorkspace() {
     try {
-      const [workspaceData, itemTypesData, statusesData, statusCategoriesData, usersData, milestonesData, prioritiesData] = await Promise.all([
+      const [workspaceData, itemTypesData, statusesData, statusCategoriesData, usersData, milestonesData, iterationsData, prioritiesData, projectsData] = await Promise.all([
         api.workspaces.get(workspaceId),
         api.itemTypes.getAll(),
         api.workspaces.getStatuses(workspaceId),
         api.statusCategories.getAll(),
         api.getUsers(),
         api.milestones.getAll(),
-        api.priorities.getAll()
+        api.iterations.getAll(),
+        api.priorities.getAll(),
+        api.workspaces.getProjects ? api.workspaces.getProjects(workspaceId) : Promise.resolve([])
       ]);
       workspace = workspaceData;
       itemTypes = itemTypesData || [];
@@ -94,23 +116,94 @@
       statusCategories = statusCategoriesData || [];
       users = usersData || [];
       milestones = milestonesData || [];
+      iterations = iterationsData || [];
       priorities = prioritiesData || [];
+      projects = projectsData || [];
+
+      // Load custom field definitions for the workspace
+      if (workspaceData.configuration_set_id) {
+        try {
+          const configSet = await api.configurationSets?.get(workspaceData.configuration_set_id);
+          customFieldDefinitions = configSet?.custom_fields || [];
+        } catch (e) {
+          console.warn('Failed to load custom field definitions:', e);
+          customFieldDefinitions = [];
+        }
+      }
     } catch (error) {
       console.error('Failed to load workspace:', error);
     }
   }
 
+  async function loadBoardConfiguration() {
+    try {
+      // Try to load collection-specific config, or workspace default
+      const config = await api.collections.getBoardConfiguration(collectionId, workspaceId);
+      boardConfig = config;
+      listColumns = config.list_columns && config.list_columns.length > 0
+        ? [...config.list_columns].sort((a, b) => a.display_order - b.display_order)
+        : [...defaultColumns];
+    } catch (error) {
+      // If no config exists, use defaults
+      console.log('No board configuration found, using defaults');
+      boardConfig = null;
+      listColumns = [...defaultColumns];
+    }
+  }
+
+  async function saveBoardConfiguration(newColumns) {
+    try {
+      const configData = {
+        columns: boardConfig?.columns || [],
+        backlog_status_ids: boardConfig?.backlog_status_ids || [],
+        list_columns: newColumns
+      };
+
+      if (boardConfig?.id) {
+        // Update existing config
+        const updated = await api.collections.updateBoardConfiguration(
+          collectionId,
+          boardConfig.id,
+          configData
+        );
+        boardConfig = updated;
+        listColumns = updated.list_columns && updated.list_columns.length > 0
+          ? [...updated.list_columns].sort((a, b) => a.display_order - b.display_order)
+          : [...defaultColumns];
+      } else {
+        // Create new config - pass raw collectionId so API can detect workspace-level config
+        const created = await api.collections.createBoardConfiguration(
+          collectionId,
+          workspaceId,
+          configData
+        );
+        boardConfig = created;
+        listColumns = created.list_columns && created.list_columns.length > 0
+          ? [...created.list_columns].sort((a, b) => a.display_order - b.display_order)
+          : [...defaultColumns];
+      }
+    } catch (error) {
+      console.error('Failed to save board configuration:', error);
+      alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
+    }
+  }
+
+  function handleColumnChange(event) {
+    const { columns: newColumns } = event.detail;
+    saveBoardConfiguration(newColumns);
+  }
+
   async function loadWorkItems(page = 1, limit = itemsPerPage) {
     try {
       loadingItems = true;
-      
+
       // Build base filters
-      const filters = { 
+      const filters = {
         workspace_id: workspaceId,
         page: page,
         limit: limit
       };
-      
+
       // Apply collection filter if specified
       if (collectionId) {
         const collection = await getCollection(collectionId);
@@ -123,7 +216,7 @@
       } else {
         currentCollectionName = 'Default';
       }
-      
+
       if (searchQuery.trim()) {
         // When searching, load ALL items and filter locally
         await loadAllItemsForSearch();
@@ -133,7 +226,7 @@
       } else {
         // Normal paginated loading
         const response = await api.items.getAll(filters);
-        
+
         if (response && response.items) {
           // Handle paginated response
           workItems = response.items;
@@ -156,12 +249,12 @@
   }
 
   async function loadAllItemsForSearch() {
-    const filters = { 
+    const filters = {
       workspace_id: workspaceId,
       page: 1,
       limit: 1000 // Load a large number to get all items
     };
-    
+
     // Apply collection filter if specified
     if (collectionId) {
       const collection = await getCollection(collectionId);
@@ -169,7 +262,7 @@
         filters.vql = collection.cql_query;
       }
     }
-    
+
     const response = await api.items.getAll(filters);
     if (response && response.items) {
       allItems = response.items;
@@ -182,7 +275,7 @@
     // Filter the items based on search query
     const filteredItems = allItems.filter(item => {
       const query = searchQuery.toLowerCase();
-      return item.title.toLowerCase().includes(query) || 
+      return item.title.toLowerCase().includes(query) ||
              (item.description && item.description.toLowerCase().includes(query));
     });
 
@@ -190,9 +283,9 @@
     const totalFiltered = filteredItems.length;
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    
+
     workItems = filteredItems.slice(startIndex, endIndex);
-    
+
     // Create custom pagination object for filtered results
     itemsPagination = {
       page: currentPage,
@@ -206,11 +299,10 @@
   async function handlePageChange(event) {
     await loadWorkItems(event.detail.page, event.detail.itemsPerPage);
   }
-  
+
   async function handlePageSizeChange(event) {
     await loadWorkItems(event.detail.page, event.detail.itemsPerPage);
   }
-  
 
   // For display purposes, we now use workItems directly (no additional client-side filtering needed)
   let filteredItems = $derived(workItems);
@@ -226,7 +318,7 @@
   });
 
   function viewItem(item) {
-    const url = collectionId 
+    const url = collectionId
       ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
       : `/workspaces/${workspaceId}/items/${item.id}`;
     navigate(url);
@@ -244,48 +336,6 @@
     } catch (error) {
       console.error('Failed to delete item:', error);
       alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
-    }
-  }
-
-  async function toggleTaskStatus(item, isCompleted) {
-    const newStatus = isCompleted ? 'completed' : 'open';
-
-    try {
-      await api.items.update(item.id, { status: newStatus });
-      // Update local state
-      item.status = newStatus;
-      // Trigger reactivity
-      workItems = [...workItems];
-    } catch (error) {
-      console.error('Failed to update task status:', error);
-      alert(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
-    }
-  }
-
-  async function handleStatusChange(item, newStatus) {
-    if (newStatus === item.status) return;
-
-    try {
-      await api.items.update(item.id, { status: newStatus });
-
-      // Update the item in the local workItems array
-      const index = workItems.findIndex(workItem => workItem.id === item.id);
-      if (index !== -1) {
-        workItems[index].status = newStatus;
-        workItems = [...workItems]; // Trigger reactivity
-      }
-
-      // Also update in allItems if we're in search mode
-      if (searchQuery.trim() && allItems.length > 0) {
-        const allIndex = allItems.findIndex(workItem => workItem.id === item.id);
-        if (allIndex !== -1) {
-          allItems[allIndex].status = newStatus;
-          allItems = [...allItems]; // Trigger reactivity
-        }
-      }
-    } catch (error) {
-      console.error('Failed to update status:', error);
-      alert(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
     }
   }
 
@@ -314,18 +364,18 @@
   // Handle inline editing events
   function handleItemUpdated(event) {
     const { item: updatedItem, field, value } = event.detail;
-    
+
     // Update the item in the local workItems array
     const index = workItems.findIndex(item => item.id === updatedItem.id);
-      if (index !== -1) {
-        workItems[index] = {
-          ...updatedItem,
-          item_type_id: updatedItem.item_type_id ?? workItems[index].item_type_id,
-          item_type: itemTypes.find(type => type.id === (updatedItem.item_type_id ?? workItems[index].item_type_id))
-        };
-        workItems = [...workItems]; // Trigger reactivity
-      }
-    
+    if (index !== -1) {
+      workItems[index] = {
+        ...updatedItem,
+        item_type_id: updatedItem.item_type_id ?? workItems[index].item_type_id,
+        item_type: itemTypes.find(type => type.id === (updatedItem.item_type_id ?? workItems[index].item_type_id))
+      };
+      workItems = [...workItems]; // Trigger reactivity
+    }
+
     // Also update in allItems if we're in search mode
     if (searchQuery.trim() && allItems.length > 0) {
       const allIndex = allItems.findIndex(item => item.id === updatedItem.id);
@@ -335,70 +385,11 @@
       }
     }
   }
-  
+
   function handleUpdateError(event) {
     const { error, field, value } = event.detail;
     console.error(`Failed to update ${field}:`, error);
-    // You could show a toast notification here
     alert(t('dialogs.alerts.failedToUpdate', { error: `${field}: ${error}` }));
-  }
-
-  // Throttled status transition loader
-  async function loadStatusTransitions(itemId) {
-    // Return cached result if available
-    if (itemTransitions.has(itemId)) {
-      return itemTransitions.get(itemId);
-    }
-    
-    // Don't load if already loading
-    if (loadingTransitions.has(itemId)) {
-      return null;
-    }
-    
-    // If too many requests are active, queue this one
-    if (activeRequests >= MAX_CONCURRENT_REQUESTS) {
-      requestQueue.add(itemId);
-      return null;
-    }
-    
-    return await executeStatusTransitionRequest(itemId);
-  }
-  
-  // Execute the actual API request
-  async function executeStatusTransitionRequest(itemId) {
-    try {
-      activeRequests++;
-      loadingTransitions.add(itemId);
-      
-      const result = await api.items.getAvailableStatusTransitions(itemId);
-      
-      // Cache the result
-      itemTransitions.set(itemId, result.available_transitions || []);
-      return result.available_transitions || [];
-    } catch (error) {
-      console.error('Failed to load status transitions:', error);
-      // Cache empty result to prevent repeated failures
-      itemTransitions.set(itemId, []);
-      return [];
-    } finally {
-      activeRequests--;
-      loadingTransitions.delete(itemId);
-      
-      // Trigger reactivity update
-      itemTransitions = itemTransitions;
-      
-      // Process next item in queue
-      processQueue();
-    }
-  }
-  
-  // Process queued requests
-  function processQueue() {
-    if (requestQueue.size > 0 && activeRequests < MAX_CONCURRENT_REQUESTS) {
-      const nextItemId = requestQueue.values().next().value;
-      requestQueue.delete(nextItemId);
-      executeStatusTransitionRequest(nextItemId);
-    }
   }
 
   // Reload data when workspaceId or collectionId changes
@@ -409,10 +400,34 @@
       if (workspaceId !== lastWorkspaceId || collectionId !== lastCollectionId) {
         lastWorkspaceId = workspaceId;
         lastCollectionId = collectionId;
+        loadBoardConfiguration();
         loadWorkItems();
       }
     }
   });
+
+  // Get column header name
+  function getColumnHeaderName(column) {
+    const systemFieldNames = {
+      key: t('common.key'),
+      title: t('common.title'),
+      status: t('common.status'),
+      priority: t('common.priority'),
+      assignee: t('common.assignee'),
+      milestone: t('common.milestone'),
+      iteration: t('common.iteration'),
+      due_date: t('common.dueDate'),
+      created_at: t('common.created'),
+      project: t('common.project')
+    };
+
+    if (column.field_type === 'system') {
+      return systemFieldNames[column.field_identifier] || column.field_identifier;
+    } else {
+      const customField = customFieldDefinitions.find(f => f.identifier === column.field_identifier);
+      return customField?.name || column.field_identifier;
+    }
+  }
 
 </script>
 
@@ -445,9 +460,17 @@
             placeholder={t('common.search')}
             hasGradient={styles.hasCustomBackground}
           />
-
         </div>
 
+        <div class="flex items-center gap-2">
+          <!-- Column Selector -->
+          <ColumnSelector
+            columns={listColumns}
+            {customFieldDefinitions}
+            canConfigure={canConfigureColumns}
+            on:change={handleColumnChange}
+          />
+        </div>
       </div>
 
       <!-- Work Items Table -->
@@ -473,189 +496,50 @@
         <div class="rounded-xl border shadow-sm overflow-hidden" style="{styles.tableStyle(12)} {styles.hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
           <!-- Table Header -->
           <div class="px-4 py-3 border-b" style="{styles.tableHeaderStyle} {styles.hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
-            <div class="grid grid-cols-12 gap-4 text-xs font-semibold uppercase tracking-wider" style="{styles.glassSubtleTextStyle}">
-              <div class="col-span-6">{t('common.title')}</div>
-              <div class="col-span-2">{t('common.status')}</div>
-              <div class="col-span-2">{t('common.priority')}</div>
-              <div class="col-span-1">{t('common.created')}</div>
-              <div class="col-span-1">{t('common.actions')}</div>
+            <div
+              class="grid gap-4 text-xs font-semibold uppercase tracking-wider"
+              style="grid-template-columns: {gridTemplateColumns}; {styles.glassSubtleTextStyle}"
+            >
+              {#each listColumns as column (column.field_identifier)}
+                <div>{getColumnHeaderName(column)}</div>
+              {/each}
+              <div>{t('common.actions')}</div>
             </div>
           </div>
 
           <!-- Table Body -->
           <div>
-            {#each filteredItems as item}
+            {#each filteredItems as item (item.id)}
               <div class="px-4 py-3 list-row transition-colors" style="border-top: 1px solid var(--ds-border);">
-                <div class="grid grid-cols-12 gap-4 items-center">
-                  <!-- Title -->
-                  <div class="col-span-6">
-                    <div class="flex items-center gap-2 min-w-0">
-                      <!-- Issue Key -->
-                      <ItemKey
+                <div
+                  class="grid gap-4 items-center"
+                  style="grid-template-columns: {gridTemplateColumns};"
+                >
+                  {#each listColumns as column (column.field_identifier)}
+                    <div class="min-w-0">
+                      <ListCellRenderer
                         {item}
+                        {column}
                         {workspace}
-                        href={collectionId
-                          ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
-                          : `/workspaces/${workspaceId}/items/${item.id}`}
-                        className="text-xs font-mono px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0 transition-colors cursor-pointer item-key"
-                        style="background-color: var(--ds-interactive-subtle); color: var(--ds-text-subtle);"
+                        {collectionId}
+                        {canEdit}
+                        {statuses}
+                        {statusCategories}
+                        {priorities}
+                        {milestones}
+                        {iterations}
+                        {users}
+                        {projects}
+                        {itemTypes}
+                        {customFieldDefinitions}
+                        on:item-updated={handleItemUpdated}
+                        on:update-error={handleUpdateError}
                       />
-                      <!-- Item Type Icon -->
-                      {#if item.item_type_id && itemTypes.length > 0}
-                        {@const itemType = itemTypes.find(type => type.id === item.item_type_id)}
-                        {#if itemType}
-                          <div 
-                            class="w-4 h-4 rounded flex items-center justify-center text-white text-xs flex-shrink-0"
-                            style="background-color: {itemType.color};"
-                            title={itemType.name}
-                          >
-                            <svelte:component this={itemTypeIconMap[itemType.icon] || itemTypeIconMap.FileText} class="w-3 h-3" />
-                          </div>
-                        {/if}
-                      {/if}
-                      <!-- Task Icon (fallback for task items without type) -->
-                      {#if item.is_task && (!item.item_type_id || !itemTypes.find(type => type.id === item.item_type_id))}
-                        <CheckSquare class="w-4 h-4 text-blue-500 flex-shrink-0" />
-                      {/if}
-                      <!-- Inline Title Editor -->
-                      <div class="flex-1 min-w-0">
-                        <InlineFieldEditor
-                          {item}
-                          field="title"
-                          fieldType="text"
-                          placeholder="Enter title..."
-                          required={true}
-                          className="font-medium"
-                          on:item-updated={handleItemUpdated}
-                          on:update-error={handleUpdateError}
-                        />
-                      </div>
                     </div>
-                  </div>
-
-                  <!-- Status / Task Checkbox -->
-                  <div class="col-span-2">
-                    {#if item.is_task}
-                      <!-- Task checkbox -->
-                      <Checkbox
-                        checked={item.status === 'completed'}
-                        onchange={(checked) => toggleTaskStatus(item, checked)}
-                        label={item.status === 'completed' ? 'Done' : 'Todo'}
-                        size="small"
-                      />
-                    {:else}
-                      <!-- Status Picker -->
-                      {@const selectedStatus = statuses.find(s => s.id === item.status_id)}
-                      {@const statusCategory = selectedStatus ? statusCategories.find(sc => sc.id === selectedStatus.category_id) : null}
-                      <ItemPicker
-                        value={item.status_id}
-                        items={statuses}
-                        config={{
-                          icon: {
-                            type: 'color-dot',
-                            source: (status) => {
-                              const category = statusCategories.find(sc => sc.id === status.category_id);
-                              return category?.color || '#6b7280';
-                            },
-                            size: 'w-2 h-2'
-                          },
-                          primary: { text: (status) => status.name },
-                          getValue: (status) => status.id,
-                          getLabel: (status) => status.name,
-                          searchFields: ['name']
-                        }}
-                        placeholder="Set status"
-                        showUnassigned={false}
-                        allowClear={false}
-                        on:select={async (e) => {
-                          const statusId = e.detail?.id;
-                          if (statusId && statusId !== item.status_id) {
-                            try {
-                              const updatedItem = await api.items.update(item.id, { status_id: statusId });
-                              handleItemUpdated({ detail: { item: updatedItem, field: 'status_id', value: statusId } });
-                            } catch (error) {
-                              handleUpdateError({ detail: { error: error.message, field: 'status_id', value: statusId } });
-                            }
-                          }
-                        }}
-                      >
-                        {#snippet children()}
-                          <span class="cursor-pointer">
-                            <Lozenge
-                              text={selectedStatus ? selectedStatus.name : 'Set status'}
-                              customBg={statusCategory?.color || '#6b7280'}
-                            />
-                          </span>
-                        {/snippet}
-                      </ItemPicker>
-                    {/if}
-                  </div>
-
-                  <!-- Priority -->
-                  <div class="col-span-2">
-                  <!-- Priority -->
-                  <ItemPicker
-                    value={item.priority_id}
-                    items={priorities}
-                    config={{
-                      icon: {
-                        type: 'color-dot',
-                        source: (priority) => priority.color || '#6b7280',
-                        size: 'w-2 h-2'
-                      },
-                      primary: { text: (priority) => priority.name },
-                      getValue: (priority) => priority.id,
-                      getLabel: (priority) => priority.name,
-                      searchFields: ['name']
-                    }}
-                    placeholder="Select priority"
-                    showUnassigned={true}
-                    unassignedLabel="No priority"
-                    allowClear={true}
-                    on:select={async (e) => {
-                      const priorityId = e.detail?.id || null;
-                      try {
-                        const updatedItem = await api.items.update(item.id, { priority_id: priorityId });
-                        handleItemUpdated({ detail: { item: updatedItem, field: 'priority_id', value: priorityId } });
-                      } catch (error) {
-                        handleUpdateError({ detail: { error: error.message, field: 'priority_id', value: priorityId } });
-                      }
-                    }}
-                  >
-                    {#snippet children()}
-                      {#if item.priority_id}
-                        {@const selectedPriority = priorities.find(p => p.id === item.priority_id)}
-                        <span
-                          class="w-full flex items-center justify-start gap-2 text-sm text-left cursor-pointer"
-                          style={selectedPriority && selectedPriority.color ? `color: ${selectedPriority.color};` : 'color: var(--ds-text-subtle);'}
-                        >
-                          {#if selectedPriority}
-                            <ColorDot color={selectedPriority.color} />
-                            {selectedPriority.name}
-                          {/if}
-                        </span>
-                      {:else}
-                        <span
-                          class="w-full flex items-center justify-start gap-2 text-sm text-left cursor-pointer"
-                          style="color: var(--ds-text-subtle);"
-                        >
-                          {t('pickers.selectPriority')}
-                        </span>
-                      {/if}
-                    {/snippet}
-                  </ItemPicker>
-                  </div>
-
-                  <!-- Created Date -->
-                  <div class="col-span-1">
-                    <div class="flex items-center gap-1 text-sm" style="color: var(--ds-text-subtle);">
-                      <Calendar class="w-4 h-4" />
-                      {formatDate(item.created_at) || '-'}
-                    </div>
-                  </div>
+                  {/each}
 
                   <!-- Actions -->
-                  <div class="col-span-1">
+                  <div>
                     <DropdownMenu
                       triggerText=""
                       triggerIcon={MoreHorizontal}

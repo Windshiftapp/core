@@ -26,6 +26,7 @@ export default {
     noUsersAvailable: 'Keine Benutzer verfügbar',
     assignTo: 'Zuweisen an',
     unassigned: 'Nicht zugewiesen',
+    assignee: 'Bearbeiter',
     user: 'Benutzer',
     group: 'Gruppe',
     searchUser: 'Benutzer suchen...',
@@ -155,6 +156,9 @@ export default {
     noPriority: 'Keine Priorität',
     loadingPriorities: 'Prioritäten werden geladen...',
     noPrioritiesConfigured: 'Keine Prioritäten konfiguriert',
+
+    // Project Picker
+    selectProject: 'Projekt auswählen',
 
     // Repository Selector
     linkRepositories: 'Repositories verknüpfen',

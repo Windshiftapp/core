@@ -155,14 +155,23 @@ type Iteration struct {
 
 // BoardConfiguration represents a board layout configuration for a collection
 type BoardConfiguration struct {
-	ID               int       `json:"id"`
-	CollectionID     *int      `json:"collection_id,omitempty"`
-	WorkspaceID      *int      `json:"workspace_id,omitempty"`
-	BacklogStatusIDs []int     `json:"backlog_status_ids,omitempty"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID               int          `json:"id"`
+	CollectionID     *int         `json:"collection_id,omitempty"`
+	WorkspaceID      *int         `json:"workspace_id,omitempty"`
+	BacklogStatusIDs []int        `json:"backlog_status_ids,omitempty"`
+	ListColumns      []ListColumn `json:"list_columns,omitempty"`
+	CreatedAt        time.Time    `json:"created_at"`
+	UpdatedAt        time.Time    `json:"updated_at"`
 	// Joined fields
 	Columns []BoardColumn `json:"columns,omitempty"`
+}
+
+// ListColumn represents a column configuration for list view
+type ListColumn struct {
+	FieldIdentifier string `json:"field_identifier"` // 'key', 'title', 'status', 'custom_field_123'
+	FieldType       string `json:"field_type"`       // 'system' or 'custom'
+	DisplayOrder    int    `json:"display_order"`
+	Width           int    `json:"width"` // grid column span (1-4)
 }
 
 // BoardColumn represents a column in a board configuration
@@ -191,6 +200,7 @@ type BoardColumnStatus struct {
 type BoardConfigurationRequest struct {
 	Columns          []BoardColumnRequest `json:"columns"`
 	BacklogStatusIDs []int                `json:"backlog_status_ids,omitempty"`
+	ListColumns      []ListColumn         `json:"list_columns,omitempty"`
 }
 
 // BoardColumnRequest represents the payload for a column in the board configuration
