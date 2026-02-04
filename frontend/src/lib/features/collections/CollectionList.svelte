@@ -120,15 +120,12 @@
       priorities = prioritiesData || [];
       projects = projectsData || [];
 
-      // Load custom field definitions for the workspace
-      if (workspaceData.configuration_set_id) {
-        try {
-          const configSet = await api.configurationSets?.get(workspaceData.configuration_set_id);
-          customFieldDefinitions = configSet?.custom_fields || [];
-        } catch (e) {
-          console.warn('Failed to load custom field definitions:', e);
-          customFieldDefinitions = [];
-        }
+      // Load custom field definitions
+      try {
+        customFieldDefinitions = await api.customFields.getAll() || [];
+      } catch (e) {
+        console.warn('Failed to load custom field definitions:', e);
+        customFieldDefinitions = [];
       }
     } catch (error) {
       console.error('Failed to load workspace:', error);
@@ -424,7 +421,7 @@
     if (column.field_type === 'system') {
       return systemFieldNames[column.field_identifier] || column.field_identifier;
     } else {
-      const customField = customFieldDefinitions.find(f => f.identifier === column.field_identifier);
+      const customField = customFieldDefinitions.find(f => String(f.id) === column.field_identifier);
       return customField?.name || column.field_identifier;
     }
   }

@@ -2,8 +2,11 @@
   import { createEventDispatcher } from 'svelte';
   import { createPopover, melt } from '@melt-ui/svelte';
   import { t } from '../../stores/i18n.svelte.js';
-  import { Columns3, GripVertical, Check, ChevronDown, X, Plus, Lock } from 'lucide-svelte';
+  import { Columns3, GripVertical, Check, ChevronDown, X, Plus, Lock, MoreHorizontal } from 'lucide-svelte';
   import Checkbox from '../../components/Checkbox.svelte';
+  import Modal from '../../dialogs/Modal.svelte';
+  import ModalHeader from '../../dialogs/ModalHeader.svelte';
+  import SearchInput from '../../components/SearchInput.svelte';
 
   const dispatch = createEventDispatcher();
 
@@ -47,9 +50,16 @@
     portal: 'body'
   });
 
+  const MAX_VISIBLE_CUSTOM_FIELDS = 5;
+
   // Drag state
   let draggedIndex = $state(null);
   let dragOverIndex = $state(null);
+
+  // Custom field modal state
+  let showCustomFieldModal = $state(false);
+  let customFieldSearchQuery = $state('');
+  let modalDirty = $state(false);
 
   // Local copy of columns for editing
   let editableColumns = $state([...columns]);
@@ -68,7 +78,23 @@
   );
 
   let availableCustomFields = $derived(
-    customFieldDefinitions.filter(f => !visibleColumnIds.has(f.identifier))
+    customFieldDefinitions.filter(f => !visibleColumnIds.has(String(f.id)))
+  );
+
+  let displayedCustomFields = $derived(
+    availableCustomFields.slice(0, MAX_VISIBLE_CUSTOM_FIELDS)
+  );
+
+  let hasMoreCustomFields = $derived(
+    availableCustomFields.length > MAX_VISIBLE_CUSTOM_FIELDS
+  );
+
+  let filteredModalCustomFields = $derived(
+    customFieldSearchQuery.trim() === ''
+      ? availableCustomFields
+      : availableCustomFields.filter(f =>
+          f.name.toLowerCase().includes(customFieldSearchQuery.trim().toLowerCase())
+        )
   );
 
   // Handle drag start
@@ -131,7 +157,7 @@
   // Add column
   function addColumn(field, fieldType) {
     const newColumn = {
-      field_identifier: field.identifier,
+      field_identifier: fieldType === 'custom' ? String(field.id) : field.identifier,
       field_type: fieldType,
       display_order: editableColumns.length,
       width: 2 // Default to medium
@@ -166,7 +192,7 @@
       const field = systemFields.find(f => f.identifier === column.field_identifier);
       return field?.name || column.field_identifier;
     } else {
-      const field = customFieldDefinitions.find(f => f.identifier === column.field_identifier);
+      const field = customFieldDefinitions.find(f => String(f.id) === column.field_identifier);
       return field?.name || column.field_identifier;
     }
   }
@@ -174,6 +200,25 @@
   // Check if field is required
   function isRequired(fieldIdentifier) {
     return fieldIdentifier === 'key' || fieldIdentifier === 'title';
+  }
+
+  function openCustomFieldModal() {
+    customFieldSearchQuery = '';
+    showCustomFieldModal = true;
+  }
+
+  function closeCustomFieldModal() {
+    showCustomFieldModal = false;
+    customFieldSearchQuery = '';
+    if (modalDirty) {
+      dispatch('change', { columns: editableColumns });
+      modalDirty = false;
+    }
+  }
+
+  function addCustomFieldFromModal(field) {
+    addColumn(field, 'custom');
+    modalDirty = true;
   }
 </script>
 
@@ -300,7 +345,7 @@
             <div class="px-2">
               <div class="text-xs px-1 py-0.5 mb-1" style="color: var(--ds-text-subtlest);">Custom Fields</div>
               <div class="flex flex-wrap gap-1">
-                {#each availableCustomFields as field}
+                {#each displayedCustomFields as field}
                   <button
                     onclick={() => addColumn(field, 'custom')}
                     class="flex items-center gap-1 px-2 py-1 text-xs rounded-full border transition-colors hover:bg-[var(--ds-surface-hovered)]"
@@ -310,6 +355,16 @@
                     {field.name}
                   </button>
                 {/each}
+                {#if hasMoreCustomFields}
+                  <button
+                    onclick={openCustomFieldModal}
+                    class="flex items-center gap-1 px-2 py-1 text-xs rounded-full border transition-colors hover:bg-[var(--ds-surface-hovered)]"
+                    style="border-color: var(--ds-border); color: var(--ds-text-subtle);"
+                    title="Browse all custom fields"
+                  >
+                    <MoreHorizontal class="w-3 h-3" />
+                  </button>
+                {/if}
               </div>
             </div>
           {/if}
@@ -335,3 +390,32 @@
     </div>
   </div>
 {/if}
+
+<Modal isOpen={showCustomFieldModal} onclose={closeCustomFieldModal} maxWidth="max-w-md">
+  <ModalHeader
+    title="Add Custom Field Column"
+    subtitle="{availableCustomFields.length} fields available"
+    onClose={closeCustomFieldModal}
+  />
+  <div class="px-4 py-3 border-b" style="border-color: var(--ds-border);">
+    <SearchInput bind:value={customFieldSearchQuery} placeholder="Search custom fields..." size="small" />
+  </div>
+  <div class="max-h-80 overflow-y-auto">
+    {#if filteredModalCustomFields.length === 0}
+      <div class="px-4 py-8 text-center text-sm" style="color: var(--ds-text-subtle);">
+        No custom fields match "{customFieldSearchQuery}"
+      </div>
+    {:else}
+      {#each filteredModalCustomFields as field}
+        <button
+          onclick={() => addCustomFieldFromModal(field)}
+          class="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left transition-colors hover:bg-[var(--ds-surface-hovered)]"
+          style="color: var(--ds-text);"
+        >
+          <Plus class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+          <span class="truncate">{field.name}</span>
+        </button>
+      {/each}
+    {/if}
+  </div>
+</Modal>

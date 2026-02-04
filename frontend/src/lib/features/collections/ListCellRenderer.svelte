@@ -9,7 +9,7 @@
   import ColorDot from '../../components/ColorDot.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
-  import CustomFieldRenderer from '../items/CustomFieldRenderer.svelte';
+  import ListCustomFieldCell from './ListCustomFieldCell.svelte';
   import { Calendar, User, Target, Globe, Building2, FolderKanban } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { formatDate } from '../../utils/dateFormatter.js';
@@ -36,7 +36,7 @@
   // Get the field definition for custom fields
   let fieldDefinition = $derived(
     column.field_type === 'custom'
-      ? customFieldDefinitions.find(f => f.identifier === column.field_identifier)
+      ? customFieldDefinitions.find(f => String(f.id) === column.field_identifier)
       : null
   );
 
@@ -486,13 +486,13 @@
 {:else if column.field_type === 'custom' && fieldDefinition}
   <!-- Custom Field -->
   {@const customValue = getCustomFieldValue(item, column.field_identifier)}
-  <CustomFieldRenderer
+  <ListCustomFieldCell
     field={fieldDefinition}
     value={customValue}
-    readonly={!canEdit}
-    disabled={!canEdit}
+    {canEdit}
     {milestones}
     {iterations}
+    {users}
     onChange={(newValue) => handleCustomFieldUpdate(column.field_identifier, newValue)}
   />
 {:else}
