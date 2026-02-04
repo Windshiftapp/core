@@ -385,6 +385,9 @@ func (s *Server) initialize() error {
 	linkTypeHandler := handlers.NewLinkTypeHandler(s.db)
 	itemLinkHandler := handlers.NewItemLinkHandler(s.db, s.notificationService)
 
+	// Label handler
+	labelHandler := handlers.NewLabelHandler(s.db)
+
 	// Recurrence handler
 	recurrenceHandler := handlers.NewRecurrenceHandler(s.db, s.recurrenceScheduler)
 
@@ -667,6 +670,7 @@ func (s *Server) initialize() error {
 			Diagram:            diagramHandler,
 			ItemLink:           itemLinkHandler,
 			LinkType:           linkTypeHandler,
+			Label:              labelHandler,
 		},
 		Workspaces: routes.WorkspaceHandlers{
 			Workspace:             workspaceHandler,

@@ -95,4 +95,17 @@ func RegisterItemRoutes(deps *Deps) {
 
 	// Get worklogs by item
 	api.HandleH("GET /items/{id}/worklogs", auth(http.HandlerFunc(deps.TimeTracking.Worklog.GetByItem)))
+
+	// Label definition CRUD
+	api.HandleH("GET /labels", auth(http.HandlerFunc(deps.Items.Label.GetAll)))
+	api.HandleH("POST /labels", auth(http.HandlerFunc(deps.Items.Label.Create)))
+	api.HandleH("GET /labels/{id}", auth(http.HandlerFunc(deps.Items.Label.Get)))
+	api.HandleH("PUT /labels/{id}", auth(http.HandlerFunc(deps.Items.Label.Update)))
+	api.HandleH("DELETE /labels/{id}", auth(http.HandlerFunc(deps.Items.Label.Delete)))
+
+	// Item-label management
+	api.HandleH("GET /items/{id}/labels", auth(http.HandlerFunc(deps.Items.Label.GetItemLabels)))
+	api.HandleH("PUT /items/{id}/labels", auth(http.HandlerFunc(deps.Items.Label.SetItemLabels)))
+	api.HandleH("POST /items/{id}/labels", auth(http.HandlerFunc(deps.Items.Label.AddItemLabel)))
+	api.HandleH("DELETE /items/{id}/labels/{labelId}", auth(http.HandlerFunc(deps.Items.Label.RemoveItemLabel)))
 }

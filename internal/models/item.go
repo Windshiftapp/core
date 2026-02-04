@@ -77,7 +77,8 @@ type Item struct {
 	RelatedWorkItemWorkspaceKey string `json:"related_work_item_workspace_key,omitempty"`
 	RelatedWorkItemWorkspaceID  int    `json:"related_work_item_workspace_id,omitempty"`
 	RelatedWorkItemNumber       int    `json:"related_work_item_number,omitempty"`
-	Children                    []Item `json:"children,omitempty"` // For tree representations
+	Children                    []Item  `json:"children,omitempty"` // For tree representations
+	Labels                      []Label `json:"labels,omitempty"`   // Workspace-scoped labels
 }
 
 // ItemHistory represents a single change to an item field

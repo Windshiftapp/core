@@ -91,6 +91,7 @@ type ItemHandlers struct {
 	Diagram    *handlers.DiagramHandler
 	ItemLink   *handlers.ItemLinkHandler
 	LinkType   *handlers.LinkTypeHandler
+	Label      *handlers.LabelHandler
 }
 
 // WorkspaceHandlers groups workspace-related handlers.
