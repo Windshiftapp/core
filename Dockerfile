@@ -1,7 +1,7 @@
 # Multi-stage build for Windshift server
 
 # Stage 1: Build frontend
-FROM node:22-alpine AS frontend-builder
+FROM node:25-alpine AS frontend-builder
 
 WORKDIR /build
 
