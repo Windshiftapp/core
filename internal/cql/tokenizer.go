@@ -111,7 +111,10 @@ func (t *Tokenizer) isDatePattern() bool {
 		return false
 	}
 	pattern := t.input[t.position : t.position+10]
-	matched, _ := regexp.MatchString(`\d{4}-\d{2}-\d{2}`, pattern)
+	matched, err := regexp.MatchString(`\d{4}-\d{2}-\d{2}`, pattern)
+	if err != nil {
+		return false
+	}
 	return matched
 }
 

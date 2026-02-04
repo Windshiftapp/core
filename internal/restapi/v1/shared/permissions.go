@@ -65,7 +65,7 @@ func (p *PermissionHelper) CanEditWorkspace(userID, workspaceID int) (bool, erro
 		LIMIT 1
 	`, workspaceID, userID, workspaceID, userID).Scan(&hasPermission)
 	if err != nil {
-		return false, nil // No edit permission found
+		return false, err
 	}
 	return hasPermission == 1, nil
 }

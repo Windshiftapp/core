@@ -58,7 +58,7 @@ func (c *dataCenterClient) setHeaders(req *http.Request) {
 
 // handleErrorResponse handles non-2xx responses
 func (c *dataCenterClient) handleErrorResponse(resp *http.Response) error {
-	body, _ := io.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body) //nolint:errcheck // best-effort read for error message
 
 	switch resp.StatusCode {
 	case http.StatusUnauthorized:
@@ -474,7 +474,7 @@ func (c *dataCenterClient) SearchIssuesJQL(ctx context.Context, req JQLSearchReq
 	// Data Center doesn't support nextPageToken, parse it as startAt if provided
 	startAt := 0
 	if req.NextPageToken != "" {
-		fmt.Sscanf(req.NextPageToken, "%d", &startAt)
+		_, _ = fmt.Sscanf(req.NextPageToken, "%d", &startAt)
 	}
 	params.Set("startAt", fmt.Sprintf("%d", startAt))
 

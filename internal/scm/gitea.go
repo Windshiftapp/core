@@ -83,7 +83,7 @@ func (g *GiteaProvider) setAuthHeader(req *http.Request) {
 
 // handleErrorResponse handles non-success HTTP responses
 func (g *GiteaProvider) handleErrorResponse(resp *http.Response) error {
-	body, _ := io.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body) //nolint:errcheck // best-effort read for error message
 	bodyStr := string(body)
 
 	switch resp.StatusCode {
@@ -354,7 +354,10 @@ func (g *GiteaProvider) CreateBranch(ctx context.Context, owner, repo, branchNam
 		"new_branch_name": branchName,
 		"old_branch_name": baseBranch,
 	}
-	bodyJSON, _ := json.Marshal(body)
+	bodyJSON, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request body: %w", err)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)))
 	if err != nil {
@@ -386,7 +389,10 @@ func (g *GiteaProvider) CreatePullRequest(ctx context.Context, owner, repo strin
 		"head":  opts.HeadBranch,
 		"base":  opts.BaseBranch,
 	}
-	bodyJSON, _ := json.Marshal(body)
+	bodyJSON, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request body: %w", err)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)))
 	if err != nil {
@@ -438,7 +444,10 @@ func (g *GiteaProvider) RegisterWebhook(ctx context.Context, owner, repo string,
 			"secret":       opts.Secret,
 		},
 	}
-	bodyJSON, _ := json.Marshal(body)
+	bodyJSON, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request body: %w", err)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)))
 	if err != nil {

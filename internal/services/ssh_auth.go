@@ -146,7 +146,7 @@ func (s *SSHAuthService) findByFingerprint(fingerprint, normalizedKey string) (*
 	// Verify the full key matches (fingerprint collision check)
 	var credData SSHCredentialData
 	if err := json.Unmarshal([]byte(cred.CredentialData), &credData); err != nil {
-		return nil, nil
+		return nil, err
 	}
 	storedKey := normalizeSSHPublicKey(credData.PublicKey)
 	if storedKey != normalizedKey {

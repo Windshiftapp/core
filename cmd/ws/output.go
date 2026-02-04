@@ -32,22 +32,26 @@ func (o *Output) Print(data interface{}) {
 func (o *Output) PrintError(err error) {
 	if o.format == "json" {
 		output := map[string]string{"error": err.Error()}
-		jsonBytes, _ := json.Marshal(output)
-		fmt.Fprintln(os.Stderr, string(jsonBytes))
+		jsonBytes, err := json.Marshal(output)
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
+			return
+		}
+		_, _ = fmt.Fprintln(os.Stderr, string(jsonBytes))
 	} else {
-		fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
+		_, _ = fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
 	}
 }
 
 func (o *Output) printJSON(data interface{}) {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
-	encoder.Encode(data)
+	_ = encoder.Encode(data)
 }
 
 func (o *Output) printTable(data interface{}) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	defer w.Flush()
+	defer func() { _ = w.Flush() }()
 
 	switch v := data.(type) {
 	case *User:
@@ -95,15 +99,15 @@ func (o *Output) printTable(data interface{}) {
 }
 
 func (o *Output) printUserTable(w *tabwriter.Writer, u *User) {
-	fmt.Fprintf(w, "ID:\t%d\n", u.ID)
-	fmt.Fprintf(w, "Name:\t%s\n", u.FullName)
-	fmt.Fprintf(w, "Email:\t%s\n", u.Email)
-	fmt.Fprintf(w, "Username:\t%s\n", u.Username)
+	_, _ = fmt.Fprintf(w, "ID:\t%d\n", u.ID)
+	_, _ = fmt.Fprintf(w, "Name:\t%s\n", u.FullName)
+	_, _ = fmt.Fprintf(w, "Email:\t%s\n", u.Email)
+	_, _ = fmt.Fprintf(w, "Username:\t%s\n", u.Username)
 }
 
 func (o *Output) printItemsTable(w *tabwriter.Writer, items []Item) {
-	fmt.Fprintln(w, "KEY\tTITLE\tSTATUS\tASSIGNEE\tTYPE")
-	fmt.Fprintln(w, "---\t-----\t------\t--------\t----")
+	_, _ = fmt.Fprintln(w, "KEY\tTITLE\tSTATUS\tASSIGNEE\tTYPE")
+	_, _ = fmt.Fprintln(w, "---\t-----\t------\t--------\t----")
 	for _, item := range items {
 		key := item.Key
 		if key == "" {
@@ -126,7 +130,7 @@ func (o *Output) printItemsTable(w *tabwriter.Writer, items []Item) {
 		if len(title) > 50 {
 			title = title[:47] + "..."
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", key, title, status, assignee, itemType)
+		_, _ = fmt.Fprintf(w,"%s\t%s\t%s\t%s\t%s\n", key, title, status, assignee, itemType)
 	}
 }
 
@@ -135,68 +139,68 @@ func (o *Output) printItemDetailTable(w *tabwriter.Writer, item *Item) {
 	if key == "" {
 		key = fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
 	}
-	fmt.Fprintf(w, "Key:\t%s\n", key)
-	fmt.Fprintf(w, "Title:\t%s\n", item.Title)
+	_, _ = fmt.Fprintf(w,"Key:\t%s\n", key)
+	_, _ = fmt.Fprintf(w,"Title:\t%s\n", item.Title)
 	if item.Status != nil {
-		fmt.Fprintf(w, "Status:\t%s\n", item.Status.Name)
+		_, _ = fmt.Fprintf(w,"Status:\t%s\n", item.Status.Name)
 	}
 	if item.ItemType != nil {
-		fmt.Fprintf(w, "Type:\t%s\n", item.ItemType.Name)
+		_, _ = fmt.Fprintf(w,"Type:\t%s\n", item.ItemType.Name)
 	}
 	if item.Priority != nil {
-		fmt.Fprintf(w, "Priority:\t%s\n", item.Priority.Name)
+		_, _ = fmt.Fprintf(w,"Priority:\t%s\n", item.Priority.Name)
 	}
 	if item.Assignee != nil {
-		fmt.Fprintf(w, "Assignee:\t%s\n", item.Assignee.Name)
+		_, _ = fmt.Fprintf(w,"Assignee:\t%s\n", item.Assignee.Name)
 	}
 	if item.Creator != nil {
-		fmt.Fprintf(w, "Creator:\t%s\n", item.Creator.Name)
+		_, _ = fmt.Fprintf(w,"Creator:\t%s\n", item.Creator.Name)
 	}
 	if item.Description != "" {
-		fmt.Fprintf(w, "Description:\t%s\n", truncateString(item.Description, 100))
+		_, _ = fmt.Fprintf(w,"Description:\t%s\n", truncateString(item.Description, 100))
 	}
-	fmt.Fprintf(w, "Created:\t%s\n", item.CreatedAt.Format(time.RFC3339))
-	fmt.Fprintf(w, "Updated:\t%s\n", item.UpdatedAt.Format(time.RFC3339))
+	_, _ = fmt.Fprintf(w,"Created:\t%s\n", item.CreatedAt.Format(time.RFC3339))
+	_, _ = fmt.Fprintf(w,"Updated:\t%s\n", item.UpdatedAt.Format(time.RFC3339))
 
 	if len(item.Transitions) > 0 {
-		fmt.Fprintln(w, "\nAvailable Transitions:")
+		_, _ = fmt.Fprintln(w, "\nAvailable Transitions:")
 		for _, t := range item.Transitions {
 			if t.ToStatus != nil {
-				fmt.Fprintf(w, "  - %s (ID: %d)\n", t.ToStatus.Name, t.ToStatusID)
+				_, _ = fmt.Fprintf(w,"  - %s (ID: %d)\n", t.ToStatus.Name, t.ToStatusID)
 			}
 		}
 	}
 }
 
 func (o *Output) printWorkspacesTable(w *tabwriter.Writer, workspaces []Workspace) {
-	fmt.Fprintln(w, "KEY\tNAME\tACTIVE\tID")
-	fmt.Fprintln(w, "---\t----\t------\t--")
+	_, _ = fmt.Fprintln(w,"KEY\tNAME\tACTIVE\tID")
+	_, _ = fmt.Fprintln(w,"---\t----\t------\t--")
 	for _, ws := range workspaces {
 		active := "yes"
 		if !ws.Active {
 			active = "no"
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%d\n", ws.Key, ws.Name, active, ws.ID)
+		_, _ = fmt.Fprintf(w,"%s\t%s\t%s\t%d\n", ws.Key, ws.Name, active, ws.ID)
 	}
 }
 
 func (o *Output) printWorkspaceDetailTable(w *tabwriter.Writer, ws *Workspace) {
-	fmt.Fprintf(w, "ID:\t%d\n", ws.ID)
-	fmt.Fprintf(w, "Key:\t%s\n", ws.Key)
-	fmt.Fprintf(w, "Name:\t%s\n", ws.Name)
+	_, _ = fmt.Fprintf(w,"ID:\t%d\n", ws.ID)
+	_, _ = fmt.Fprintf(w,"Key:\t%s\n", ws.Key)
+	_, _ = fmt.Fprintf(w,"Name:\t%s\n", ws.Name)
 	if ws.Description != "" {
-		fmt.Fprintf(w, "Description:\t%s\n", ws.Description)
+		_, _ = fmt.Fprintf(w,"Description:\t%s\n", ws.Description)
 	}
 	active := "yes"
 	if !ws.Active {
 		active = "no"
 	}
-	fmt.Fprintf(w, "Active:\t%s\n", active)
+	_, _ = fmt.Fprintf(w,"Active:\t%s\n", active)
 }
 
 func (o *Output) printStatusesTable(w *tabwriter.Writer, statuses []Status) {
-	fmt.Fprintln(w, "ID\tNAME\tCATEGORY\tDEFAULT\tCOMPLETED")
-	fmt.Fprintln(w, "--\t----\t--------\t-------\t---------")
+	_, _ = fmt.Fprintln(w,"ID\tNAME\tCATEGORY\tDEFAULT\tCOMPLETED")
+	_, _ = fmt.Fprintln(w,"--\t----\t--------\t-------\t---------")
 	for _, s := range statuses {
 		isDefault := ""
 		if s.IsDefault {
@@ -206,50 +210,50 @@ func (o *Output) printStatusesTable(w *tabwriter.Writer, statuses []Status) {
 		if s.IsCompleted {
 			isCompleted = "yes"
 		}
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", s.ID, s.Name, s.CategoryName, isDefault, isCompleted)
+		_, _ = fmt.Fprintf(w,"%d\t%s\t%s\t%s\t%s\n", s.ID, s.Name, s.CategoryName, isDefault, isCompleted)
 	}
 }
 
 func (o *Output) printItemTypesTable(w *tabwriter.Writer, types []ItemType) {
-	fmt.Fprintln(w, "ID\tNAME\tICON")
-	fmt.Fprintln(w, "--\t----\t----")
+	_, _ = fmt.Fprintln(w,"ID\tNAME\tICON")
+	_, _ = fmt.Fprintln(w,"--\t----\t----")
 	for _, t := range types {
-		fmt.Fprintf(w, "%d\t%s\t%s\n", t.ID, t.Name, t.Icon)
+		_, _ = fmt.Fprintf(w,"%d\t%s\t%s\n", t.ID, t.Name, t.Icon)
 	}
 }
 
 func (o *Output) printTestCasesTable(w *tabwriter.Writer, cases []TestCase) {
-	fmt.Fprintln(w, "ID\tTITLE\tPRIORITY\tSTATUS\tFOLDER")
-	fmt.Fprintln(w, "--\t-----\t--------\t------\t------")
+	_, _ = fmt.Fprintln(w,"ID\tTITLE\tPRIORITY\tSTATUS\tFOLDER")
+	_, _ = fmt.Fprintln(w,"--\t-----\t--------\t------\t------")
 	for _, tc := range cases {
 		title := truncateString(tc.Title, 40)
 		folder := tc.FolderName
 		if folder == "" {
 			folder = "(root)"
 		}
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", tc.ID, title, tc.Priority, tc.Status, folder)
+		_, _ = fmt.Fprintf(w,"%d\t%s\t%s\t%s\t%s\n", tc.ID, title, tc.Priority, tc.Status, folder)
 	}
 }
 
 func (o *Output) printTestCaseDetailTable(w *tabwriter.Writer, tc *TestCase) {
-	fmt.Fprintf(w, "ID:\t%d\n", tc.ID)
-	fmt.Fprintf(w, "Title:\t%s\n", tc.Title)
-	fmt.Fprintf(w, "Priority:\t%s\n", tc.Priority)
-	fmt.Fprintf(w, "Status:\t%s\n", tc.Status)
+	_, _ = fmt.Fprintf(w,"ID:\t%d\n", tc.ID)
+	_, _ = fmt.Fprintf(w,"Title:\t%s\n", tc.Title)
+	_, _ = fmt.Fprintf(w,"Priority:\t%s\n", tc.Priority)
+	_, _ = fmt.Fprintf(w,"Status:\t%s\n", tc.Status)
 	if tc.FolderName != "" {
-		fmt.Fprintf(w, "Folder:\t%s\n", tc.FolderName)
+		_, _ = fmt.Fprintf(w,"Folder:\t%s\n", tc.FolderName)
 	}
 	if tc.Preconditions != "" {
-		fmt.Fprintf(w, "Preconditions:\t%s\n", truncateString(tc.Preconditions, 100))
+		_, _ = fmt.Fprintf(w,"Preconditions:\t%s\n", truncateString(tc.Preconditions, 100))
 	}
 	if tc.EstimatedDuration > 0 {
-		fmt.Fprintf(w, "Estimated Duration:\t%d min\n", tc.EstimatedDuration)
+		_, _ = fmt.Fprintf(w,"Estimated Duration:\t%d min\n", tc.EstimatedDuration)
 	}
 }
 
 func (o *Output) printTestRunsTable(w *tabwriter.Writer, runs []TestRun) {
-	fmt.Fprintln(w, "ID\tNAME\tASSIGNEE\tSTARTED\tENDED")
-	fmt.Fprintln(w, "--\t----\t--------\t-------\t-----")
+	_, _ = fmt.Fprintln(w,"ID\tNAME\tASSIGNEE\tSTARTED\tENDED")
+	_, _ = fmt.Fprintln(w,"--\t----\t--------\t-------\t-----")
 	for _, run := range runs {
 		name := truncateString(run.Name, 30)
 		assignee := run.AssigneeName
@@ -261,79 +265,79 @@ func (o *Output) printTestRunsTable(w *tabwriter.Writer, runs []TestRun) {
 		if run.EndedAt != nil {
 			ended = run.EndedAt.Format("2006-01-02 15:04")
 		}
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", run.ID, name, assignee, started, ended)
+		_, _ = fmt.Fprintf(w,"%d\t%s\t%s\t%s\t%s\n", run.ID, name, assignee, started, ended)
 	}
 }
 
 func (o *Output) printTestRunDetailTable(w *tabwriter.Writer, run *TestRun) {
-	fmt.Fprintf(w, "ID:\t%d\n", run.ID)
-	fmt.Fprintf(w, "Name:\t%s\n", run.Name)
-	fmt.Fprintf(w, "Set ID:\t%d\n", run.SetID)
+	_, _ = fmt.Fprintf(w,"ID:\t%d\n", run.ID)
+	_, _ = fmt.Fprintf(w,"Name:\t%s\n", run.Name)
+	_, _ = fmt.Fprintf(w,"Set ID:\t%d\n", run.SetID)
 	if run.AssigneeName != "" {
-		fmt.Fprintf(w, "Assignee:\t%s\n", run.AssigneeName)
+		_, _ = fmt.Fprintf(w,"Assignee:\t%s\n", run.AssigneeName)
 	}
-	fmt.Fprintf(w, "Started:\t%s\n", run.StartedAt.Format(time.RFC3339))
+	_, _ = fmt.Fprintf(w,"Started:\t%s\n", run.StartedAt.Format(time.RFC3339))
 	if run.EndedAt != nil {
-		fmt.Fprintf(w, "Ended:\t%s\n", run.EndedAt.Format(time.RFC3339))
+		_, _ = fmt.Fprintf(w,"Ended:\t%s\n", run.EndedAt.Format(time.RFC3339))
 	} else {
-		fmt.Fprintf(w, "Status:\tin progress\n")
+		_, _ = fmt.Fprintf(w,"Status:\tin progress\n")
 	}
 }
 
 func (o *Output) printTestResultsTable(w *tabwriter.Writer, results []TestResult) {
-	fmt.Fprintln(w, "CASE_ID\tTITLE\tSTATUS\tEXECUTED")
-	fmt.Fprintln(w, "-------\t-----\t------\t--------")
+	_, _ = fmt.Fprintln(w,"CASE_ID\tTITLE\tSTATUS\tEXECUTED")
+	_, _ = fmt.Fprintln(w,"-------\t-----\t------\t--------")
 	for _, r := range results {
 		title := truncateString(r.TestCaseTitle, 40)
 		executed := "-"
 		if r.ExecutedAt != nil {
 			executed = r.ExecutedAt.Format("2006-01-02 15:04")
 		}
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", r.TestCaseID, title, r.Status, executed)
+		_, _ = fmt.Fprintf(w,"%d\t%s\t%s\t%s\n", r.TestCaseID, title, r.Status, executed)
 	}
 }
 
 func (o *Output) printTestSetsTable(w *tabwriter.Writer, sets []TestSet) {
-	fmt.Fprintln(w, "ID\tNAME\tCASES\tRUNS\tLAST_STATUS")
-	fmt.Fprintln(w, "--\t----\t-----\t----\t-----------")
+	_, _ = fmt.Fprintln(w,"ID\tNAME\tCASES\tRUNS\tLAST_STATUS")
+	_, _ = fmt.Fprintln(w,"--\t----\t-----\t----\t-----------")
 	for _, s := range sets {
 		name := truncateString(s.Name, 30)
 		lastStatus := s.LastRunStatus
 		if lastStatus == "" {
 			lastStatus = "-"
 		}
-		fmt.Fprintf(w, "%d\t%s\t%d\t%d\t%s\n", s.ID, name, s.TestCaseCount, s.TotalRuns, lastStatus)
+		_, _ = fmt.Fprintf(w,"%d\t%s\t%d\t%d\t%s\n", s.ID, name, s.TestCaseCount, s.TotalRuns, lastStatus)
 	}
 }
 
 func (o *Output) printTestSetDetailTable(w *tabwriter.Writer, set *TestSet) {
-	fmt.Fprintf(w, "ID:\t%d\n", set.ID)
-	fmt.Fprintf(w, "Name:\t%s\n", set.Name)
+	_, _ = fmt.Fprintf(w,"ID:\t%d\n", set.ID)
+	_, _ = fmt.Fprintf(w,"Name:\t%s\n", set.Name)
 	if set.Description != "" {
-		fmt.Fprintf(w, "Description:\t%s\n", truncateString(set.Description, 100))
+		_, _ = fmt.Fprintf(w,"Description:\t%s\n", truncateString(set.Description, 100))
 	}
-	fmt.Fprintf(w, "Test Cases:\t%d\n", set.TestCaseCount)
-	fmt.Fprintf(w, "Total Runs:\t%d\n", set.TotalRuns)
+	_, _ = fmt.Fprintf(w,"Test Cases:\t%d\n", set.TestCaseCount)
+	_, _ = fmt.Fprintf(w,"Total Runs:\t%d\n", set.TotalRuns)
 	if set.LastRunStatus != "" {
-		fmt.Fprintf(w, "Last Run Status:\t%s\n", set.LastRunStatus)
+		_, _ = fmt.Fprintf(w,"Last Run Status:\t%s\n", set.LastRunStatus)
 	}
 }
 
 func (o *Output) printTransitionsTable(w *tabwriter.Writer, transitions []Transition) {
-	fmt.Fprintln(w, "STATUS_ID\tSTATUS_NAME")
-	fmt.Fprintln(w, "---------\t-----------")
+	_, _ = fmt.Fprintln(w,"STATUS_ID\tSTATUS_NAME")
+	_, _ = fmt.Fprintln(w,"---------\t-----------")
 	for _, t := range transitions {
 		name := ""
 		if t.ToStatus != nil {
 			name = t.ToStatus.Name
 		}
-		fmt.Fprintf(w, "%d\t%s\n", t.ToStatusID, name)
+		_, _ = fmt.Fprintf(w,"%d\t%s\n", t.ToStatusID, name)
 	}
 }
 
 func (o *Output) printCommentsTable(w *tabwriter.Writer, comments []Comment) {
-	fmt.Fprintln(w, "ID\tAUTHOR\tCREATED\tCONTENT")
-	fmt.Fprintln(w, "--\t------\t-------\t-------")
+	_, _ = fmt.Fprintln(w,"ID\tAUTHOR\tCREATED\tCONTENT")
+	_, _ = fmt.Fprintln(w,"--\t------\t-------\t-------")
 	for _, c := range comments {
 		author := ""
 		if c.Author != nil {
@@ -341,19 +345,19 @@ func (o *Output) printCommentsTable(w *tabwriter.Writer, comments []Comment) {
 		}
 		created := c.CreatedAt.Format("2006-01-02 15:04")
 		content := truncateString(c.Content, 50)
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", c.ID, author, created, content)
+		_, _ = fmt.Fprintf(w,"%d\t%s\t%s\t%s\n", c.ID, author, created, content)
 	}
 }
 
 func (o *Output) printCommentDetailTable(w *tabwriter.Writer, c *Comment) {
-	fmt.Fprintf(w, "ID:\t%d\n", c.ID)
-	fmt.Fprintf(w, "Item ID:\t%d\n", c.ItemID)
+	_, _ = fmt.Fprintf(w,"ID:\t%d\n", c.ID)
+	_, _ = fmt.Fprintf(w,"Item ID:\t%d\n", c.ItemID)
 	if c.Author != nil {
-		fmt.Fprintf(w, "Author:\t%s\n", c.Author.Name)
+		_, _ = fmt.Fprintf(w,"Author:\t%s\n", c.Author.Name)
 	}
-	fmt.Fprintf(w, "Created:\t%s\n", c.CreatedAt.Format("2006-01-02 15:04:05"))
-	fmt.Fprintf(w, "Updated:\t%s\n", c.UpdatedAt.Format("2006-01-02 15:04:05"))
-	fmt.Fprintf(w, "Content:\n%s\n", c.Content)
+	_, _ = fmt.Fprintf(w,"Created:\t%s\n", c.CreatedAt.Format("2006-01-02 15:04:05"))
+	_, _ = fmt.Fprintf(w,"Updated:\t%s\n", c.UpdatedAt.Format("2006-01-02 15:04:05"))
+	_, _ = fmt.Fprintf(w,"Content:\n%s\n", c.Content)
 }
 
 func truncateString(s string, maxLen int) string {

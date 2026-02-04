@@ -625,7 +625,7 @@ func (r *TestCaseRepository) GetConnections(testCaseID, workspaceID int) (*TestC
 	if err != nil {
 		return nil, fmt.Errorf("failed to query test sets: %w", err)
 	}
-	defer setRows.Close()
+	defer func() { _ = setRows.Close() }()
 
 	for setRows.Next() {
 		var summary TestSetSummary
@@ -647,7 +647,7 @@ func (r *TestCaseRepository) GetConnections(testCaseID, workspaceID int) (*TestC
 	if err != nil {
 		return nil, fmt.Errorf("failed to query run templates: %w", err)
 	}
-	defer tmplRows.Close()
+	defer func() { _ = tmplRows.Close() }()
 
 	for tmplRows.Next() {
 		var summary RunTemplateSummary
@@ -672,7 +672,7 @@ func (r *TestCaseRepository) GetConnections(testCaseID, workspaceID int) (*TestC
 	if err != nil {
 		return nil, fmt.Errorf("failed to query executions: %w", err)
 	}
-	defer runRows.Close()
+	defer func() { _ = runRows.Close() }()
 
 	for runRows.Next() {
 		var record struct {

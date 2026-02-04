@@ -158,7 +158,7 @@ func (r *AssetRepository) DeleteSet(setID int) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Delete all associated data in order (respecting foreign key constraints)
 	deletions := []string{

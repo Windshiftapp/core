@@ -606,7 +606,7 @@ func (db *DB) initializeDefaultData() error {
 	if err != nil {
 		return fmt.Errorf("failed to query priorities: %w", err)
 	}
-	defer priorityRows.Close()
+	defer func() { _ = priorityRows.Close() }()
 
 	for priorityRows.Next() {
 		var priorityID int64

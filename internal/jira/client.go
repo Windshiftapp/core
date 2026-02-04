@@ -186,7 +186,7 @@ func (c *cloudClient) setHeaders(req *http.Request) {
 
 // handleErrorResponse handles non-2xx responses
 func (c *cloudClient) handleErrorResponse(resp *http.Response) error {
-	body, _ := io.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body) //nolint:errcheck // best-effort read for error message
 
 	switch resp.StatusCode {
 	case http.StatusUnauthorized:
