@@ -1,11 +1,7 @@
 # Multi-stage build for Windshift server
 
-# Stage 1: Build frontend on HOST platform (no QEMU emulation needed)
-# Using --platform=$BUILDPLATFORM ensures this runs natively on x86-64
-# which avoids QEMU issues with native Node.js binaries (esbuild, rollup, etc.)
-# Default to linux/amd64 for legacy Docker builder compatibility
-ARG BUILDPLATFORM=linux/amd64
-FROM --platform=${BUILDPLATFORM} node:22-alpine AS frontend-builder
+# Stage 1: Build frontend
+FROM node:22-alpine AS frontend-builder
 
 WORKDIR /build
 
@@ -19,7 +15,7 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-# Stage 2: Build Go binary (target platform, uses QEMU for arm64)
+# Stage 2: Build Go binary
 FROM golang:1.24.6-alpine AS builder
 
 # Install build dependencies (no gcc/musl-dev needed - pure Go SQLite driver)
