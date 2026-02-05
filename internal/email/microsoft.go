@@ -22,11 +22,11 @@ const (
 // Microsoft OAuth endpoints
 const (
 	microsoftAuthURLTemplate  = "https://login.microsoftonline.com/%s/oauth2/v2.0/authorize"
-	microsoftTokenURLTemplate = "https://login.microsoftonline.com/%s/oauth2/v2.0/token"
+	microsoftTokenURLTemplate = "https://login.microsoftonline.com/%s/oauth2/v2.0/token" //nolint:gosec // G101 false positive: OAuth endpoint URL, not a credential
 	microsoftUserInfoURL      = "https://graph.microsoft.com/v1.0/me"
 )
 
-// Default scopes for Microsoft 365 IMAP access
+// MicrosoftDefaultScopes defines the default scopes for Microsoft 365 IMAP access.
 var MicrosoftDefaultScopes = []string{
 	"https://outlook.office365.com/IMAP.AccessAsUser.All",
 	"offline_access", // Required for refresh tokens
@@ -64,7 +64,7 @@ func (p *MicrosoftProvider) GetType() string {
 }
 
 // GetIMAPServer returns Microsoft 365 IMAP server details
-func (p *MicrosoftProvider) GetIMAPServer(config *models.ChannelConfig) (string, int) {
+func (p *MicrosoftProvider) GetIMAPServer(config *models.ChannelConfig) (host string, port int) {
 	return MicrosoftIMAPHost, MicrosoftIMAPPort
 }
 
@@ -212,7 +212,7 @@ func (p *MicrosoftProvider) RefreshToken(ctx context.Context, refreshToken strin
 
 // GetUserEmail retrieves the email address of the authenticated user
 func (p *MicrosoftProvider) GetUserEmail(ctx context.Context, accessToken string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", microsoftUserInfoURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", microsoftUserInfoURL, http.NoBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to create user info request: %w", err)
 	}
@@ -230,9 +230,9 @@ func (p *MicrosoftProvider) GetUserEmail(ctx context.Context, accessToken string
 	}
 
 	var userInfo struct {
-		Mail                string `json:"mail"`
-		UserPrincipalName   string `json:"userPrincipalName"`
-		PreferredLanguage   string `json:"preferredLanguage"`
+		Mail              string `json:"mail"`
+		UserPrincipalName string `json:"userPrincipalName"`
+		PreferredLanguage string `json:"preferredLanguage"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
@@ -267,7 +267,7 @@ func (p *MicrosoftProvider) Connect(ctx context.Context, config *models.ChannelC
 	}
 
 	if err := client.AuthenticateXOAuth2(config.EmailOAuthEmail, config.EmailOAuthAccessToken); err != nil {
-		client.Close()
+		_ = client.Close()
 		return nil, fmt.Errorf("XOAUTH2 authentication failed: %w", err)
 	}
 
@@ -280,6 +280,6 @@ func (p *MicrosoftProvider) TestConnection(ctx context.Context, config *models.C
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 	return nil
 }

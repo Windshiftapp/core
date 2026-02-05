@@ -9,8 +9,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/allegro/bigcache/v3"
 	"windshift/internal/database"
+
+	"github.com/allegro/bigcache/v3"
 )
 
 // ItemHierarchyCache stores cached hierarchy data for an item
@@ -24,10 +25,10 @@ type ItemHierarchyCache struct {
 
 // ProjectInheritanceCache caches project inheritance for a workspace
 type ProjectInheritanceCache struct {
-	WorkspaceID    int           `json:"workspace_id"`
-	ItemProjectMap map[int]*int  `json:"item_project_map"` // item_id -> effective_project_id
-	Version        int64         `json:"version"`           // For invalidation
-	CachedAt       time.Time     `json:"cached_at"`
+	WorkspaceID    int          `json:"workspace_id"`
+	ItemProjectMap map[int]*int `json:"item_project_map"` // item_id -> effective_project_id
+	Version        int64        `json:"version"`          // For invalidation
+	CachedAt       time.Time    `json:"cached_at"`
 }
 
 // ItemCacheService handles cached item hierarchy and project data
@@ -49,11 +50,11 @@ type ItemCacheService struct {
 
 // ItemCacheConfig represents configuration for the item cache
 type ItemCacheConfig struct {
-	HierarchyTTL    time.Duration `json:"hierarchy_ttl"`    // Default: 5min
-	ProjectTTL      time.Duration `json:"project_ttl"`      // Default: 15min
-	MaxCacheSize    int          `json:"max_cache_size"`   // Default: 512MB total
-	WarmupBatchSize int          `json:"warmup_batch_size"` // Default: 500
-	EnablePreWarm   bool         `json:"enable_pre_warm"`   // Default: true
+	HierarchyTTL    time.Duration `json:"hierarchy_ttl"`     // Default: 5min
+	ProjectTTL      time.Duration `json:"project_ttl"`       // Default: 15min
+	MaxCacheSize    int           `json:"max_cache_size"`    // Default: 512MB total
+	WarmupBatchSize int           `json:"warmup_batch_size"` // Default: 500
+	EnablePreWarm   bool          `json:"enable_pre_warm"`   // Default: true
 }
 
 // DefaultItemCacheConfig returns default configuration
@@ -75,7 +76,7 @@ func NewItemCacheService(db database.Database, config ItemCacheConfig) (*ItemCac
 		LifeWindow:         config.HierarchyTTL,
 		CleanWindow:        1 * time.Minute,
 		MaxEntriesInWindow: 100000, // Support up to 100k items
-		MaxEntrySize:       4096,    // 4KB per entry
+		MaxEntrySize:       4096,   // 4KB per entry
 		Verbose:            false,
 		HardMaxCacheSize:   config.MaxCacheSize / 2, // Half for hierarchy
 		OnRemove:           nil,
@@ -92,7 +93,7 @@ func NewItemCacheService(db database.Database, config ItemCacheConfig) (*ItemCac
 		LifeWindow:         config.ProjectTTL,
 		CleanWindow:        5 * time.Minute,
 		MaxEntriesInWindow: 10000, // Support up to 10k workspaces
-		MaxEntrySize:       65536,  // 64KB per entry (can be large for big workspaces)
+		MaxEntrySize:       65536, // 64KB per entry (can be large for big workspaces)
 		Verbose:            false,
 		HardMaxCacheSize:   config.MaxCacheSize / 2, // Half for projects
 		OnRemove:           nil,
@@ -127,7 +128,7 @@ func (ics *ItemCacheService) GetItemHierarchy(itemID int) (*ItemHierarchyCache, 
 		atomic.AddInt64(&ics.hierarchyHits, 1)
 
 		var cache ItemHierarchyCache
-		if err := json.Unmarshal(data, &cache); err != nil {
+		if err = json.Unmarshal(data, &cache); err != nil {
 			atomic.AddInt64(&ics.errors, 1)
 			return nil, fmt.Errorf("failed to unmarshal hierarchy cache: %w", err)
 		}
@@ -176,7 +177,7 @@ func (ics *ItemCacheService) GetProjectCache(workspaceID int) (*ProjectInheritan
 		atomic.AddInt64(&ics.projectHits, 1)
 
 		var cache ProjectInheritanceCache
-		if err := json.Unmarshal(data, &cache); err != nil {
+		if err = json.Unmarshal(data, &cache); err != nil {
 			atomic.AddInt64(&ics.errors, 1)
 			return nil, fmt.Errorf("failed to unmarshal project cache: %w", err)
 		}
@@ -315,7 +316,7 @@ func (ics *ItemCacheService) Clear() error {
 
 // GetEffectiveProjectForItem retrieves or calculates the effective project for an item
 // This method first checks the cache, then falls back to database calculation if needed
-func (ics *ItemCacheService) GetEffectiveProjectForItem(itemID int, workspaceID int) (effectiveProjectID *int, projectInheritanceMode string, err error) {
+func (ics *ItemCacheService) GetEffectiveProjectForItem(itemID, workspaceID int) (effectiveProjectID *int, projectInheritanceMode string, err error) {
 	// Try cache first
 	hierarchyCache, err := ics.GetItemHierarchy(itemID)
 	if err == nil && hierarchyCache != nil {
@@ -333,11 +334,12 @@ func (ics *ItemCacheService) GetEffectiveProjectForItem(itemID int, workspaceID 
 	}
 
 	// Determine inheritance mode
-	if directProjectID == nil && !inheritProject {
+	switch {
+	case directProjectID == nil && !inheritProject:
 		projectInheritanceMode = "none"
-	} else if inheritProject {
+	case inheritProject:
 		projectInheritanceMode = "inherit"
-	} else {
+	default:
 		projectInheritanceMode = "direct"
 	}
 
@@ -434,11 +436,4 @@ func (ics *ItemCacheService) getHierarchyKey(itemID int) string {
 
 func (ics *ItemCacheService) getProjectKey(workspaceID int) string {
 	return fmt.Sprintf("workspace:projects:%d", workspaceID)
-}
-
-func max(a, b int64) int64 {
-	if a > b {
-		return a
-	}
-	return b
 }

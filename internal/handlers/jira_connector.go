@@ -102,7 +102,7 @@ func (h *JiraImportHandler) Connect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(JiraConnectResponse{
+	_ = json.NewEncoder(w).Encode(JiraConnectResponse{
 		ConnectionID: connectionID,
 		InstanceInfo: instanceInfo,
 	})
@@ -119,7 +119,7 @@ func (h *JiraImportHandler) GetConnections(w http.ResponseWriter, r *http.Reques
 		respondInternalError(w, r, fmt.Errorf("failed to list connections: %w", err))
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	connections := make([]ConnectionInfo, 0)
 	for rows.Next() {
@@ -147,7 +147,7 @@ func (h *JiraImportHandler) GetConnections(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(connections)
+	_ = json.NewEncoder(w).Encode(connections)
 }
 
 // DeleteConnection handles DELETE /api/jira-import/connections/{connectionId}
@@ -172,7 +172,7 @@ func (h *JiraImportHandler) DeleteConnection(w http.ResponseWriter, r *http.Requ
 }
 
 // getClientForConnection retrieves stored credentials and creates a Jira client
-func (h *JiraImportHandler) getClientForConnection(ctx context.Context, connectionID string) (jira.Client, error) {
+func (h *JiraImportHandler) getClientForConnection(_ context.Context, connectionID string) (jira.Client, error) {
 	var instanceURL, email, encryptedCredentials string
 	var deploymentTypeStr sql.NullString
 
@@ -186,7 +186,7 @@ func (h *JiraImportHandler) getClientForConnection(ctx context.Context, connecti
 	}
 
 	// Update last used timestamp
-	if _, err := h.db.ExecWrite(`
+	if _, err = h.db.ExecWrite(`
 		UPDATE jira_import_connections SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?
 	`, connectionID); err != nil {
 		slog.Warn("failed to update connection last_used_at", slog.String("component", "jira"), slog.String("connection_id", connectionID), slog.Any("error", err))

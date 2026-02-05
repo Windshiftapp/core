@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
 	"windshift/internal/models"
 	"windshift/internal/utils"
 )
@@ -55,7 +56,7 @@ func (h *AssetHandler) GetAssetSets(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var sets []models.AssetManagementSet
 	for rows.Next() {
@@ -87,7 +88,7 @@ func (h *AssetHandler) GetAssetSets(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(sets)
+	_ = json.NewEncoder(w).Encode(sets)
 }
 
 // GetAssetSet returns a single asset set
@@ -148,7 +149,7 @@ func (h *AssetHandler) GetAssetSet(w http.ResponseWriter, r *http.Request) {
 	set.UserPermission, _ = h.getUserSetRoleName(currentUser.ID, setID)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(set)
+	_ = json.NewEncoder(w).Encode(set)
 }
 
 // CreateAssetSetRequest represents the request body for creating an asset set
@@ -185,7 +186,7 @@ func (h *AssetHandler) CreateAssetSet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req CreateAssetSetRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -199,7 +200,7 @@ func (h *AssetHandler) CreateAssetSet(w http.ResponseWriter, r *http.Request) {
 
 	// If this set is marked as default, unset any existing default
 	if req.IsDefault {
-		_, err := h.db.ExecWrite("UPDATE asset_management_sets SET is_default = false WHERE is_default = true")
+		_, err = h.db.ExecWrite("UPDATE asset_management_sets SET is_default = false WHERE is_default = true")
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -254,7 +255,7 @@ func (h *AssetHandler) CreateAssetSet(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(set)
+	_ = json.NewEncoder(w).Encode(set)
 }
 
 // UpdateAssetSetRequest represents the request body for updating an asset set
@@ -290,7 +291,7 @@ func (h *AssetHandler) UpdateAssetSet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req UpdateAssetSetRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -304,7 +305,7 @@ func (h *AssetHandler) UpdateAssetSet(w http.ResponseWriter, r *http.Request) {
 
 	// If this set is marked as default, unset any existing default
 	if req.IsDefault {
-		_, err := h.db.ExecWrite("UPDATE asset_management_sets SET is_default = false WHERE is_default = true AND id != ?", setID)
+		_, err = h.db.ExecWrite("UPDATE asset_management_sets SET is_default = false WHERE is_default = true AND id != ?", setID)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -330,7 +331,7 @@ func (h *AssetHandler) UpdateAssetSet(w http.ResponseWriter, r *http.Request) {
 
 	// Return updated set
 	var set models.AssetManagementSet
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT id, name, description, is_default, created_by, created_at, updated_at
 		FROM asset_management_sets WHERE id = ?
 	`, setID).Scan(&set.ID, &set.Name, &set.Description, &set.IsDefault, &set.CreatedBy, &set.CreatedAt, &set.UpdatedAt)
@@ -338,7 +339,7 @@ func (h *AssetHandler) UpdateAssetSet(w http.ResponseWriter, r *http.Request) {
 	set.UserPermission = "Administrator"
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(set)
+	_ = json.NewEncoder(w).Encode(set)
 }
 
 // DeleteAssetSet deletes an asset management set

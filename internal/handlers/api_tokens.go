@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+
 	"windshift/internal/auth"
 	"windshift/internal/database"
 	"windshift/internal/middleware"
@@ -11,16 +12,16 @@ import (
 	"windshift/internal/services"
 )
 
-// ApiTokenHandler handles API token management
-type ApiTokenHandler struct {
+// APITokenHandler handles API token management
+type APITokenHandler struct {
 	db                database.Database
 	tokenManager      *auth.TokenManager
 	permissionService *services.PermissionService
 }
 
-// NewApiTokenHandler creates a new API token handler
-func NewApiTokenHandler(db database.Database, tokenManager *auth.TokenManager, permissionService *services.PermissionService) *ApiTokenHandler {
-	return &ApiTokenHandler{
+// NewAPITokenHandler creates a new API token handler
+func NewAPITokenHandler(db database.Database, tokenManager *auth.TokenManager, permissionService *services.PermissionService) *APITokenHandler {
+	return &APITokenHandler{
 		db:                db,
 		tokenManager:      tokenManager,
 		permissionService: permissionService,
@@ -28,7 +29,7 @@ func NewApiTokenHandler(db database.Database, tokenManager *auth.TokenManager, p
 }
 
 // CreateToken creates a new API token for a user
-func (ath *ApiTokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) {
+func (ath *APITokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) {
 	// Get user from context (set by auth middleware)
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok || user == nil {
@@ -36,7 +37,7 @@ func (ath *ApiTokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var request models.ApiTokenCreate
+	var request models.APITokenCreate
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		respondBadRequest(w, r, "Invalid JSON")
 		return
@@ -86,11 +87,11 @@ func (ath *ApiTokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tokenResponse)
+	_ = json.NewEncoder(w).Encode(tokenResponse)
 }
 
 // GetUserTokens retrieves all tokens for the current user
-func (ath *ApiTokenHandler) GetUserTokens(w http.ResponseWriter, r *http.Request) {
+func (ath *APITokenHandler) GetUserTokens(w http.ResponseWriter, r *http.Request) {
 	// Get user from context (set by auth middleware)
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok || user == nil {
@@ -105,11 +106,11 @@ func (ath *ApiTokenHandler) GetUserTokens(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tokens)
+	_ = json.NewEncoder(w).Encode(tokens)
 }
 
 // GetToken retrieves a specific token by ID (for current user)
-func (ath *ApiTokenHandler) GetToken(w http.ResponseWriter, r *http.Request) {
+func (ath *APITokenHandler) GetToken(w http.ResponseWriter, r *http.Request) {
 	tokenIDStr := r.PathValue("id")
 
 	tokenID, err := strconv.Atoi(tokenIDStr)
@@ -138,11 +139,11 @@ func (ath *ApiTokenHandler) GetToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(token)
+	_ = json.NewEncoder(w).Encode(token)
 }
 
 // RevokeToken deletes/revokes a token
-func (ath *ApiTokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
+func (ath *APITokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 	tokenIDStr := r.PathValue("id")
 
 	tokenID, err := strconv.Atoi(tokenIDStr)
@@ -172,7 +173,7 @@ func (ath *ApiTokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) 
 }
 
 // ValidateToken endpoint for testing token validity
-func (ath *ApiTokenHandler) ValidateToken(w http.ResponseWriter, r *http.Request) {
+func (ath *APITokenHandler) ValidateToken(w http.ResponseWriter, r *http.Request) {
 	// This endpoint is useful for API clients to test their tokens
 	// If they can call this successfully, their token is valid
 
@@ -183,7 +184,7 @@ func (ath *ApiTokenHandler) ValidateToken(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	apiToken, _ := r.Context().Value("api_token").(*models.ApiToken)
+	apiToken, _ := r.Context().Value("api_token").(*models.APIToken)
 	authMethod, _ := r.Context().Value("auth_method").(string)
 
 	response := map[string]interface{}{
@@ -203,11 +204,11 @@ func (ath *ApiTokenHandler) ValidateToken(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // CleanupExpiredTokens removes expired tokens (admin endpoint)
-func (ath *ApiTokenHandler) CleanupExpiredTokens(w http.ResponseWriter, r *http.Request) {
+func (ath *APITokenHandler) CleanupExpiredTokens(w http.ResponseWriter, r *http.Request) {
 	// This should be protected by admin middleware
 	count, err := ath.tokenManager.CleanupExpiredTokens()
 	if err != nil {
@@ -221,5 +222,5 @@ func (ath *ApiTokenHandler) CleanupExpiredTokens(w http.ResponseWriter, r *http.
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }

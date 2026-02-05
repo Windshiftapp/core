@@ -22,19 +22,19 @@ func TestPortalWorkflow(t *testing.T) {
 
 	// Variables to store IDs throughout the test
 	var (
-		workspaceID     int
-		workspaceKey    string
-		channelID       int
-		configSetID     int
-		bugItemTypeID   int
-		storyItemTypeID int
-		taskItemTypeID  int
-		environmentFieldID int
-		priorityFieldID    int
-		bugReportTypeID    int
+		workspaceID          int
+		workspaceKey         string
+		channelID            int
+		configSetID          int
+		bugItemTypeID        int
+		storyItemTypeID      int
+		taskItemTypeID       int
+		environmentFieldID   int
+		priorityFieldID      int
+		bugReportTypeID      int
 		featureRequestTypeID int
 		supportRequestTypeID int
-		portalSlug      string
+		portalSlug           string
 	)
 
 	// ===== SETUP PHASE =====

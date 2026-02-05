@@ -40,12 +40,12 @@ type JiraProject struct {
 
 // JiraIssueType represents a Jira issue type
 type JiraIssueType struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	IconURL     string `json:"iconUrl"`
-	Subtask     bool   `json:"subtask"`
-	HierarchyLevel int `json:"hierarchyLevel"` // -1=subtask, 0=base, 1=epic
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Description    string `json:"description"`
+	IconURL        string `json:"iconUrl"`
+	Subtask        bool   `json:"subtask"`
+	HierarchyLevel int    `json:"hierarchyLevel"` // -1=subtask, 0=base, 1=epic
 }
 
 // JiraIssueTypeWithStatuses represents a Jira issue type with its available statuses
@@ -58,13 +58,13 @@ type JiraIssueTypeWithStatuses struct {
 
 // JiraCustomField represents a Jira custom field definition
 type JiraCustomField struct {
-	ID          string              `json:"id"`   // e.g., "customfield_10001"
-	Key         string              `json:"key"`  // e.g., "com.atlassian.jira.plugin.system.customfieldtypes:textfield"
-	Name        string              `json:"name"`
-	Description string              `json:"description"`
-	FieldType   string              `json:"type"` // Custom field type identifier
-	Schema      *JiraFieldSchema    `json:"schema"`
-	Custom      bool                `json:"custom"`
+	ID          string           `json:"id"`  // e.g., "customfield_10001"
+	Key         string           `json:"key"` // e.g., "com.atlassian.jira.plugin.system.customfieldtypes:textfield"
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	FieldType   string           `json:"type"` // Custom field type identifier
+	Schema      *JiraFieldSchema `json:"schema"`
+	Custom      bool             `json:"custom"`
 }
 
 // JiraFieldSchema describes the data type of a field
@@ -95,60 +95,60 @@ type JiraStatusCategory struct {
 
 // JiraWorkflow represents a Jira workflow
 type JiraWorkflow struct {
-	ID          string                `json:"id"`
-	Name        string                `json:"name"`
-	Description string                `json:"description"`
-	Statuses    []JiraStatus          `json:"statuses"`
+	ID          string                   `json:"id"`
+	Name        string                   `json:"name"`
+	Description string                   `json:"description"`
+	Statuses    []JiraStatus             `json:"statuses"`
 	Transitions []JiraWorkflowTransition `json:"transitions"`
 }
 
 // JiraWorkflowTransition represents a transition in a workflow
 type JiraWorkflowTransition struct {
-	ID        string      `json:"id"`
-	Name      string      `json:"name"`
+	ID         string      `json:"id"`
+	Name       string      `json:"name"`
 	FromStatus *JiraStatus `json:"from"`
-	ToStatus  *JiraStatus `json:"to"`
+	ToStatus   *JiraStatus `json:"to"`
 }
 
 // JiraIssue represents a Jira issue
 type JiraIssue struct {
-	ID         string                 `json:"id"`
-	Key        string                 `json:"key"`
-	Self       string                 `json:"self"`
-	Fields     JiraIssueFields        `json:"fields"`
-	Changelog  *JiraChangelog         `json:"changelog,omitempty"`
+	ID             string                 `json:"id"`
+	Key            string                 `json:"key"`
+	Self           string                 `json:"self"`
+	Fields         JiraIssueFields        `json:"fields"`
+	Changelog      *JiraChangelog         `json:"changelog,omitempty"`
 	Renderedfields map[string]interface{} `json:"renderedFields,omitempty"`
 }
 
 // JiraIssueFields contains the fields of a Jira issue
 type JiraIssueFields struct {
-	Summary       string                 `json:"summary"`
-	Description   interface{}            `json:"description"` // Can be string or ADF
-	IssueType     *JiraIssueType         `json:"issuetype"`
-	Project       *JiraProject           `json:"project"`
-	Status        *JiraStatus            `json:"status"`
-	Priority      *JiraPriority          `json:"priority"`
-	Assignee      *JiraUser              `json:"assignee"`
-	Reporter      *JiraUser              `json:"reporter"`
-	Creator       *JiraUser              `json:"creator"`
-	Created       string                 `json:"created"`
-	Updated       string                 `json:"updated"`
-	Resolved      string                 `json:"resolutiondate"`
-	DueDate       string                 `json:"duedate"`
-	Labels        []string               `json:"labels"`
-	Components    []JiraComponent        `json:"components"`
-	FixVersions   []JiraVersion          `json:"fixVersions"`
-	Versions      []JiraVersion          `json:"versions"` // Affects versions
-	Parent        *JiraIssue             `json:"parent"`
-	Subtasks      []JiraIssue            `json:"subtasks"`
-	IssueLinks    []JiraIssueLink        `json:"issuelinks"`
-	Attachment    []JiraAttachment       `json:"attachment"`
-	Comment       *JiraCommentContainer  `json:"comment"`
-	Worklog       *JiraWorklogContainer  `json:"worklog"`
-	TimeTracking  *JiraTimeTracking      `json:"timetracking"`
-	Sprint        interface{}            `json:"sprint"`  // Can be object or customfield
-	Epic          *JiraIssue             `json:"epic"`    // Epic link for stories
-	CustomFields  map[string]interface{} `json:"-"`       // Populated separately
+	Summary      string                 `json:"summary"`
+	Description  interface{}            `json:"description"` // Can be string or ADF
+	IssueType    *JiraIssueType         `json:"issuetype"`
+	Project      *JiraProject           `json:"project"`
+	Status       *JiraStatus            `json:"status"`
+	Priority     *JiraPriority          `json:"priority"`
+	Assignee     *JiraUser              `json:"assignee"`
+	Reporter     *JiraUser              `json:"reporter"`
+	Creator      *JiraUser              `json:"creator"`
+	Created      string                 `json:"created"`
+	Updated      string                 `json:"updated"`
+	Resolved     string                 `json:"resolutiondate"`
+	DueDate      string                 `json:"duedate"`
+	Labels       []string               `json:"labels"`
+	Components   []JiraComponent        `json:"components"`
+	FixVersions  []JiraVersion          `json:"fixVersions"`
+	Versions     []JiraVersion          `json:"versions"` // Affects versions
+	Parent       *JiraIssue             `json:"parent"`
+	Subtasks     []JiraIssue            `json:"subtasks"`
+	IssueLinks   []JiraIssueLink        `json:"issuelinks"`
+	Attachment   []JiraAttachment       `json:"attachment"`
+	Comment      *JiraCommentContainer  `json:"comment"`
+	Worklog      *JiraWorklogContainer  `json:"worklog"`
+	TimeTracking *JiraTimeTracking      `json:"timetracking"`
+	Sprint       interface{}            `json:"sprint"` // Can be object or customfield
+	Epic         *JiraIssue             `json:"epic"`   // Epic link for stories
+	CustomFields map[string]interface{} `json:"-"`      // Populated separately
 }
 
 // UnmarshalJSON implements custom unmarshalling for JiraIssueFields.
@@ -197,9 +197,9 @@ type JiraPriority struct {
 // Cloud uses AccountID as the unique identifier
 // Data Center uses Name or Key as the unique identifier
 type JiraUser struct {
-	AccountID    string            `json:"accountId"`    // Cloud identifier
-	Name         string            `json:"name"`         // Data Center identifier (username)
-	Key          string            `json:"key"`          // Data Center identifier (user key)
+	AccountID    string            `json:"accountId"` // Cloud identifier
+	Name         string            `json:"name"`      // Data Center identifier (username)
+	Key          string            `json:"key"`       // Data Center identifier (user key)
 	EmailAddress string            `json:"emailAddress"`
 	DisplayName  string            `json:"displayName"`
 	Active       bool              `json:"active"`
@@ -251,10 +251,10 @@ type JiraSprint struct {
 
 // JiraIssueLink represents a link between two issues
 type JiraIssueLink struct {
-	ID           string          `json:"id"`
-	Type         *JiraLinkType   `json:"type"`
-	InwardIssue  *JiraIssue      `json:"inwardIssue"`
-	OutwardIssue *JiraIssue      `json:"outwardIssue"`
+	ID           string        `json:"id"`
+	Type         *JiraLinkType `json:"type"`
+	InwardIssue  *JiraIssue    `json:"inwardIssue"`
+	OutwardIssue *JiraIssue    `json:"outwardIssue"`
 }
 
 // JiraLinkType represents a link type between issues
@@ -354,11 +354,11 @@ type JiraChangeItem struct {
 
 // SearchResult represents the result of a JQL search
 type SearchResult struct {
-	Expand     string       `json:"expand"`
-	StartAt    int          `json:"startAt"`
-	MaxResults int          `json:"maxResults"`
-	Total      int          `json:"total"`
-	Issues     []JiraIssue  `json:"issues"`
+	Expand     string      `json:"expand"`
+	StartAt    int         `json:"startAt"`
+	MaxResults int         `json:"maxResults"`
+	Total      int         `json:"total"`
+	Issues     []JiraIssue `json:"issues"`
 }
 
 // SearchOptions contains options for searching issues
@@ -376,31 +376,31 @@ type SearchOptions struct {
 
 // AssetObjectSchema represents a Jira Assets object schema
 type AssetObjectSchema struct {
-	ID                 string    `json:"id"`
-	Name               string    `json:"name"`
-	ObjectSchemaKey    string    `json:"objectSchemaKey"`
-	Description        string    `json:"description"`
-	Created            time.Time `json:"created"`
-	Updated            time.Time `json:"updated"`
-	ObjectCount        int       `json:"objectCount"`
-	ObjectTypeCount    int       `json:"objectTypeCount"`
+	ID              string    `json:"id"`
+	Name            string    `json:"name"`
+	ObjectSchemaKey string    `json:"objectSchemaKey"`
+	Description     string    `json:"description"`
+	Created         time.Time `json:"created"`
+	Updated         time.Time `json:"updated"`
+	ObjectCount     int       `json:"objectCount"`
+	ObjectTypeCount int       `json:"objectTypeCount"`
 }
 
 // AssetObjectType represents an object type within a schema
 type AssetObjectType struct {
-	ID                  string                  `json:"id"`
-	Name                string                  `json:"name"`
-	Description         string                  `json:"description"`
-	Icon                *AssetIcon              `json:"icon"`
-	Position            int                     `json:"position"`
-	Created             time.Time               `json:"created"`
-	Updated             time.Time               `json:"updated"`
-	ObjectCount         int                     `json:"objectCount"`
-	ObjectSchemaID      string                  `json:"objectSchemaId"`
-	Inherited           bool                    `json:"inherited"`
-	AbstractObjectType  bool                    `json:"abstractObjectType"`
-	ParentObjectTypeID  string                  `json:"parentObjectTypeId,omitempty"`
-	Attributes          []AssetObjectAttribute  `json:"attributes,omitempty"`
+	ID                 string                 `json:"id"`
+	Name               string                 `json:"name"`
+	Description        string                 `json:"description"`
+	Icon               *AssetIcon             `json:"icon"`
+	Position           int                    `json:"position"`
+	Created            time.Time              `json:"created"`
+	Updated            time.Time              `json:"updated"`
+	ObjectCount        int                    `json:"objectCount"`
+	ObjectSchemaID     string                 `json:"objectSchemaId"`
+	Inherited          bool                   `json:"inherited"`
+	AbstractObjectType bool                   `json:"abstractObjectType"`
+	ParentObjectTypeID string                 `json:"parentObjectTypeId,omitempty"`
+	Attributes         []AssetObjectAttribute `json:"attributes,omitempty"`
 }
 
 // AssetIcon represents an icon for an object type
@@ -413,52 +413,52 @@ type AssetIcon struct {
 
 // AssetObjectAttribute represents an attribute definition for an object type
 type AssetObjectAttribute struct {
-	ID                   string `json:"id"`
-	Name                 string `json:"name"`
-	Label                bool   `json:"label"`
-	Type                 int    `json:"type"` // 0=Default, 1=ObjectRef, 2=User, 3=Confluence, etc.
-	TypeValue            string `json:"typeValue,omitempty"`
-	DefaultTypeID        int    `json:"defaultTypeId,omitempty"` // For type=0: 0=Text, 1=Integer, 2=Boolean, etc.
-	Description          string `json:"description"`
-	Editable             bool   `json:"editable"`
-	Hidden               bool   `json:"hidden"`
-	IncludeChildObjects  bool   `json:"includeChildObjectTypes"`
-	UniqueAttribute      bool   `json:"uniqueAttribute"`
-	MinimumCardinality   int    `json:"minimumCardinality"`
-	MaximumCardinality   int    `json:"maximumCardinality"`
-	Removable            bool   `json:"removable"`
-	Position             int    `json:"position"`
+	ID                  string `json:"id"`
+	Name                string `json:"name"`
+	Label               bool   `json:"label"`
+	Type                int    `json:"type"` // 0=Default, 1=ObjectRef, 2=User, 3=Confluence, etc.
+	TypeValue           string `json:"typeValue,omitempty"`
+	DefaultTypeID       int    `json:"defaultTypeId,omitempty"` // For type=0: 0=Text, 1=Integer, 2=Boolean, etc.
+	Description         string `json:"description"`
+	Editable            bool   `json:"editable"`
+	Hidden              bool   `json:"hidden"`
+	IncludeChildObjects bool   `json:"includeChildObjectTypes"`
+	UniqueAttribute     bool   `json:"uniqueAttribute"`
+	MinimumCardinality  int    `json:"minimumCardinality"`
+	MaximumCardinality  int    `json:"maximumCardinality"`
+	Removable           bool   `json:"removable"`
+	Position            int    `json:"position"`
 }
 
 // AssetObject represents an object instance in Assets
 type AssetObject struct {
-	ID                string                     `json:"id"`
-	Label             string                     `json:"label"`
-	ObjectKey         string                     `json:"objectKey"`
-	ObjectType        *AssetObjectType           `json:"objectType"`
-	Created           time.Time                  `json:"created"`
-	Updated           time.Time                  `json:"updated"`
-	HasAvatar         bool                       `json:"hasAvatar"`
-	Timestamp         int64                      `json:"timestamp"`
-	Attributes        []AssetObjectAttributeValue `json:"attributes"`
-	ExtendedInfo      *AssetExtendedInfo         `json:"extendedInfo,omitempty"`
-	Links             *AssetObjectLinks          `json:"links,omitempty"`
+	ID           string                      `json:"id"`
+	Label        string                      `json:"label"`
+	ObjectKey    string                      `json:"objectKey"`
+	ObjectType   *AssetObjectType            `json:"objectType"`
+	Created      time.Time                   `json:"created"`
+	Updated      time.Time                   `json:"updated"`
+	HasAvatar    bool                        `json:"hasAvatar"`
+	Timestamp    int64                       `json:"timestamp"`
+	Attributes   []AssetObjectAttributeValue `json:"attributes"`
+	ExtendedInfo *AssetExtendedInfo          `json:"extendedInfo,omitempty"`
+	Links        *AssetObjectLinks           `json:"links,omitempty"`
 }
 
 // AssetObjectAttributeValue represents an attribute value on an object
 type AssetObjectAttributeValue struct {
-	ID                    string                 `json:"id"`
-	ObjectTypeAttributeID string                 `json:"objectTypeAttributeId"`
-	ObjectAttributeValues []AssetAttributeValue  `json:"objectAttributeValues"`
+	ID                    string                `json:"id"`
+	ObjectTypeAttributeID string                `json:"objectTypeAttributeId"`
+	ObjectAttributeValues []AssetAttributeValue `json:"objectAttributeValues"`
 }
 
 // AssetAttributeValue represents a single value for an attribute
 type AssetAttributeValue struct {
-	Value          interface{} `json:"value"`
-	DisplayValue   string      `json:"displayValue"`
-	SearchValue    string      `json:"searchValue"`
-	ReferencedType int         `json:"referencedType,omitempty"`
-	User           *JiraUser   `json:"user,omitempty"`
+	Value          interface{}  `json:"value"`
+	DisplayValue   string       `json:"displayValue"`
+	SearchValue    string       `json:"searchValue"`
+	ReferencedType int          `json:"referencedType,omitempty"`
+	User           *JiraUser    `json:"user,omitempty"`
 	Status         *AssetStatus `json:"status,omitempty"`
 }
 
@@ -483,24 +483,24 @@ type AssetObjectLinks struct {
 
 // ObjectSearchOptions contains options for searching assets
 type ObjectSearchOptions struct {
-	ObjectSchemaID string `json:"objectSchemaId"`
-	ObjectTypeID   string `json:"objectTypeId,omitempty"`
-	IQL            string `json:"iql,omitempty"` // Insight Query Language
-	Page           int    `json:"page"`
-	PageSize       int    `json:"pageSize"`
-	IncludeAttributes bool `json:"includeAttributes"`
+	ObjectSchemaID    string `json:"objectSchemaId"`
+	ObjectTypeID      string `json:"objectTypeId,omitempty"`
+	IQL               string `json:"iql,omitempty"` // Insight Query Language
+	Page              int    `json:"page"`
+	PageSize          int    `json:"pageSize"`
+	IncludeAttributes bool   `json:"includeAttributes"`
 }
 
 // ObjectSearchResult represents the result of an object search
 type ObjectSearchResult struct {
-	ObjectEntries  []AssetObject `json:"objectEntries"`
+	ObjectEntries        []AssetObject          `json:"objectEntries"`
 	ObjectTypeAttributes []AssetObjectAttribute `json:"objectTypeAttributes,omitempty"`
-	PageNumber     int           `json:"pageNumber"`
-	PageSize       int           `json:"pageSize"`
-	TotalFilterCount int         `json:"totalFilterCount"`
-	StartIndex     int           `json:"startIndex"`
-	ToIndex        int           `json:"toIndex"`
-	IsLast         bool          `json:"isLast"`
+	PageNumber           int                    `json:"pageNumber"`
+	PageSize             int                    `json:"pageSize"`
+	TotalFilterCount     int                    `json:"totalFilterCount"`
+	StartIndex           int                    `json:"startIndex"`
+	ToIndex              int                    `json:"toIndex"`
+	IsLast               bool                   `json:"isLast"`
 }
 
 // ================================================================
@@ -509,9 +509,9 @@ type ObjectSearchResult struct {
 
 // JiraBoard represents a Jira Agile board
 type JiraBoard struct {
-	ID       int    `json:"id"`
-	Name     string `json:"name"`
-	Type     string `json:"type"` // scrum, kanban
+	ID       int                `json:"id"`
+	Name     string             `json:"name"`
+	Type     string             `json:"type"` // scrum, kanban
 	Location *JiraBoardLocation `json:"location"`
 }
 
@@ -582,12 +582,12 @@ type BulkFetchRequest struct {
 
 // BulkFetchResponse is the response from POST /rest/api/3/issue/bulkfetch
 type BulkFetchResponse struct {
-	Issues []JiraIssue       `json:"issues"`
-	Errors []BulkFetchError  `json:"errors,omitempty"`
+	Issues []JiraIssue      `json:"issues"`
+	Errors []BulkFetchError `json:"errors,omitempty"`
 }
 
 // BulkFetchError represents an error when fetching a specific issue
 type BulkFetchError struct {
-	IssueIdOrKey string `json:"issueIdOrKey"`
+	IssueIDOrKey string `json:"issueIdOrKey"`
 	ErrorMessage string `json:"errorMessage"`
 }

@@ -96,7 +96,7 @@ func (m *Manager) httpFetchHostFunction(ctx context.Context, plugin *extism.Curr
 	}
 
 	var fetchReq HTTPFetchRequest
-	if err := json.Unmarshal(payload, &fetchReq); err != nil {
+	if err = json.Unmarshal(payload, &fetchReq); err != nil {
 		m.logger.Warn("http_fetch host function failed to parse payload", "error", err)
 		stack[0] = 0
 		return
@@ -183,7 +183,7 @@ func (m *Manager) kvGetHostFunction(ctx context.Context, plugin *extism.CurrentP
 	}
 
 	var kvReq KVGetRequest
-	if err := json.Unmarshal(payload, &kvReq); err != nil {
+	if err = json.Unmarshal(payload, &kvReq); err != nil {
 		m.logger.Warn("kv_get host function failed to parse payload", "error", err)
 		m.writeHostResponse(plugin, stack, KVGetResponse{Status: "error", Error: "invalid request payload"})
 		return
@@ -233,7 +233,7 @@ func (m *Manager) kvSetHostFunction(ctx context.Context, plugin *extism.CurrentP
 	}
 
 	var kvReq KVSetRequest
-	if err := json.Unmarshal(payload, &kvReq); err != nil {
+	if err = json.Unmarshal(payload, &kvReq); err != nil {
 		m.logger.Warn("kv_set host function failed to parse payload", "error", err)
 		m.writeHostResponse(plugin, stack, KVSetResponse{Status: "error", Error: "invalid request payload"})
 		return
@@ -291,7 +291,7 @@ func (m *Manager) kvDeleteHostFunction(ctx context.Context, plugin *extism.Curre
 	}
 
 	var kvReq KVDeleteRequest
-	if err := json.Unmarshal(payload, &kvReq); err != nil {
+	if err = json.Unmarshal(payload, &kvReq); err != nil {
 		m.logger.Warn("kv_delete host function failed to parse payload", "error", err)
 		m.writeHostResponse(plugin, stack, KVDeleteResponse{Status: "error", Error: "invalid request payload"})
 		return
@@ -335,7 +335,7 @@ func (m *Manager) createCommentHostFunction(ctx context.Context, plugin *extism.
 	}
 
 	var req CreateCommentRequest
-	if err := json.Unmarshal(payload, &req); err != nil {
+	if err = json.Unmarshal(payload, &req); err != nil {
 		m.logger.Warn("create_comment host function failed to parse payload", "error", err)
 		m.writeHostResponse(plugin, stack, CreateCommentResponse{Status: "error", Error: "invalid request payload"})
 		return
@@ -410,7 +410,7 @@ func (m *Manager) scmCreateBranchHostFunction(ctx context.Context, plugin *extis
 	}
 
 	var req SCMCreateBranchRequest
-	if err := json.Unmarshal(payload, &req); err != nil {
+	if err = json.Unmarshal(payload, &req); err != nil {
 		m.logger.Warn("scm_create_branch host function failed to parse payload", "error", err)
 		m.writeHostResponse(plugin, stack, SCMCreateBranchResponse{Status: "error", Error: "invalid request payload"})
 		return
@@ -456,7 +456,7 @@ func (m *Manager) scmCreateItemLinkHostFunction(ctx context.Context, plugin *ext
 	}
 
 	var req SCMCreateItemLinkRequest
-	if err := json.Unmarshal(payload, &req); err != nil {
+	if err = json.Unmarshal(payload, &req); err != nil {
 		m.logger.Warn("scm_create_item_link host function failed to parse payload", "error", err)
 		m.writeHostResponse(plugin, stack, SCMCreateItemLinkResponse{Status: "error", Error: "invalid request payload"})
 		return

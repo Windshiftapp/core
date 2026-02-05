@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
@@ -49,7 +50,7 @@ func (h *DiagramHandler) Create(w http.ResponseWriter, r *http.Request) {
 		DiagramData string `json:"diagram_data"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -109,7 +110,7 @@ func (h *DiagramHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(diagram)
+	_ = json.NewEncoder(w).Encode(diagram)
 }
 
 // GetByItem retrieves all diagrams for an item
@@ -139,7 +140,7 @@ func (h *DiagramHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	diagrams := []models.ItemDiagram{}
 	for rows.Next() {
@@ -173,7 +174,7 @@ func (h *DiagramHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(diagrams)
+	_ = json.NewEncoder(w).Encode(diagrams)
 }
 
 // Get retrieves a specific diagram by ID
@@ -229,7 +230,7 @@ func (h *DiagramHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(d)
+	_ = json.NewEncoder(w).Encode(d)
 }
 
 // Update updates an existing diagram
@@ -246,7 +247,7 @@ func (h *DiagramHandler) Update(w http.ResponseWriter, r *http.Request) {
 		DiagramData string `json:"diagram_data"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -320,7 +321,7 @@ func (h *DiagramHandler) Update(w http.ResponseWriter, r *http.Request) {
 		if oldName != req.Name {
 			historyOldName = &oldName
 		}
-		if err := h.recordDiagramHistory(itemID, userID, "diagram_updated", historyOldName, int64(id), req.Name); err != nil {
+		if err = h.recordDiagramHistory(itemID, userID, "diagram_updated", historyOldName, int64(id), req.Name); err != nil {
 			slog.Warn("failed to record diagram update history", slog.String("component", "diagrams"), slog.Any("error", err))
 			// Don't fail the whole operation if history recording fails
 		}
@@ -367,7 +368,7 @@ func (h *DiagramHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(d)
+	_ = json.NewEncoder(w).Encode(d)
 }
 
 // Delete deletes a diagram
@@ -407,7 +408,7 @@ func (h *DiagramHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	// Record history before deletion
 	if userID != nil {
-		if err := h.recordDiagramHistory(itemID, userID, "diagram_deleted", &diagramName, 0, diagramName); err != nil {
+		if err = h.recordDiagramHistory(itemID, userID, "diagram_deleted", &diagramName, 0, diagramName); err != nil {
 			slog.Warn("failed to record diagram deletion history", slog.String("component", "diagrams"), slog.Any("error", err))
 			// Don't fail the whole operation if history recording fails
 		}
@@ -434,7 +435,7 @@ func (h *DiagramHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": fmt.Sprintf("Diagram %d deleted successfully", id),
 	})

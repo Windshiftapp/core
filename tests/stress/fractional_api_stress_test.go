@@ -1,7 +1,6 @@
 package stress
 
 import (
-	tests "windshift/tests"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -10,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	tests "windshift/tests"
 )
 
 // TestFractionalIndexingAPIStressTest performs comprehensive stress testing of fractional indexing

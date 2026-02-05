@@ -1,3 +1,4 @@
+// Package handlers provides HTTP handlers for the REST API v1 endpoints.
 package handlers
 
 import (

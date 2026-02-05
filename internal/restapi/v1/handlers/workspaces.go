@@ -134,8 +134,8 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check permission first
-	canView, _ := h.perms.CanViewWorkspace(user.ID, wsID)
-	if !canView {
+	canView, err := h.perms.CanViewWorkspace(user.ID, wsID)
+	if err != nil || !canView {
 		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
 		return
 	}
@@ -169,14 +169,14 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check workspace.create permission
-	hasPermission, _ := h.perms.HasGlobalPermission(user.ID, models.PermissionWorkspaceCreate)
-	if !hasPermission {
+	hasPermission, err := h.perms.HasGlobalPermission(user.ID, models.PermissionWorkspaceCreate)
+	if err != nil || !hasPermission {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "workspace.create permission required"))
 		return
 	}
 
 	var req WorkspaceCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if decodeErr := json.NewDecoder(r.Body).Decode(&req); decodeErr != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
 		return
 	}
@@ -191,8 +191,8 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check for duplicate key using service
-	keyExists, _ := h.workspaceService.KeyExists(req.Key)
-	if keyExists {
+	keyExists, err := h.workspaceService.KeyExists(req.Key)
+	if err == nil && keyExists {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeAlreadyExists, "Workspace key already exists"))
 		return
 	}
@@ -240,14 +240,14 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check permission
-	canEdit, _ := h.perms.CanEditWorkspace(user.ID, wsID)
-	if !canEdit {
+	canEdit, err := h.perms.CanEditWorkspace(user.ID, wsID)
+	if err != nil || !canEdit {
 		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
 		return
 	}
 
 	var req WorkspaceUpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
 		return
 	}
@@ -331,8 +331,8 @@ func (h *WorkspaceHandler) GetItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	canView, _ := h.perms.CanViewWorkspace(user.ID, wsID)
-	if !canView {
+	canView, err := h.perms.CanViewWorkspace(user.ID, wsID)
+	if err != nil || !canView {
 		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
 		return
 	}

@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
-
 )
 
 // AssetStatusHandler handles asset status operations
@@ -66,7 +66,7 @@ func (h *AssetStatusHandler) GetAssetStatuses(w http.ResponseWriter, r *http.Req
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var statuses []models.AssetStatus
 	for rows.Next() {
@@ -90,7 +90,7 @@ func (h *AssetStatusHandler) GetAssetStatuses(w http.ResponseWriter, r *http.Req
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(statuses)
+	_ = json.NewEncoder(w).Encode(statuses)
 }
 
 // GetAssetStatus returns a single asset status
@@ -152,7 +152,7 @@ func (h *AssetStatusHandler) GetAssetStatus(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(status)
+	_ = json.NewEncoder(w).Encode(status)
 }
 
 // CreateAssetStatusRequest represents the request body for creating an asset status
@@ -190,7 +190,7 @@ func (h *AssetStatusHandler) CreateAssetStatus(w http.ResponseWriter, r *http.Re
 	}
 
 	var req CreateAssetStatusRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -241,7 +241,7 @@ func (h *AssetStatusHandler) CreateAssetStatus(w http.ResponseWriter, r *http.Re
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(status)
+	_ = json.NewEncoder(w).Encode(status)
 }
 
 // UpdateAssetStatusRequest represents the request body for updating an asset status
@@ -291,7 +291,7 @@ func (h *AssetStatusHandler) UpdateAssetStatus(w http.ResponseWriter, r *http.Re
 	}
 
 	var req UpdateAssetStatusRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -339,7 +339,7 @@ func (h *AssetStatusHandler) UpdateAssetStatus(w http.ResponseWriter, r *http.Re
 	// Return updated status
 	var status models.AssetStatus
 	var description sql.NullString
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT id, set_id, name, color, description, is_default, display_order, created_at, updated_at
 		FROM asset_statuses WHERE id = ?
 	`, statusID).Scan(
@@ -351,7 +351,7 @@ func (h *AssetStatusHandler) UpdateAssetStatus(w http.ResponseWriter, r *http.Re
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(status)
+	_ = json.NewEncoder(w).Encode(status)
 }
 
 // DeleteAssetStatus deletes an asset status

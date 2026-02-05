@@ -1,15 +1,15 @@
 package handlers
 
 import (
-	"windshift/internal/database"
 	"database/sql"
 	"encoding/json"
-	"windshift/internal/models"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"windshift/internal/database"
+	"windshift/internal/models"
 )
 
 type PersonalLabelHandler struct {
@@ -23,14 +23,14 @@ func NewPersonalLabelHandler(db database.Database) *PersonalLabelHandler {
 func (h *PersonalLabelHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
 	userID := r.URL.Query().Get("user_id")
-	
+
 	query := `
 		SELECT id, name, color, user_id, created_at, updated_at
 		FROM personal_labels
 		WHERE 1=1`
-	
+
 	var args []interface{}
-	
+
 	// Filter by user_id if provided, otherwise show global labels (user_id IS NULL)
 	if userID != "" {
 		if userID == "null" || userID == "0" {
@@ -45,33 +45,33 @@ func (h *PersonalLabelHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		// Default: show only global labels
 		query += " AND user_id IS NULL"
 	}
-	
+
 	query += " ORDER BY name"
-	
+
 	rows, err := h.db.Query(query, args...)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var labels []models.PersonalLabel
 	for rows.Next() {
 		var label models.PersonalLabel
 		var userID sql.NullInt64
-		
+
 		err := rows.Scan(&label.ID, &label.Name, &label.Color, &userID,
 			&label.CreatedAt, &label.UpdatedAt)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
-		
+
 		if userID.Valid {
 			id := int(userID.Int64)
 			label.UserID = &id
 		}
-		
+
 		labels = append(labels, label)
 	}
 
@@ -81,7 +81,7 @@ func (h *PersonalLabelHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(labels)
+	_ = json.NewEncoder(w).Encode(labels)
 }
 
 func (h *PersonalLabelHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -116,7 +116,7 @@ func (h *PersonalLabelHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(label)
+	_ = json.NewEncoder(w).Encode(label)
 }
 
 func (h *PersonalLabelHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -193,7 +193,7 @@ func (h *PersonalLabelHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(createdLabel)
+	_ = json.NewEncoder(w).Encode(createdLabel)
 }
 
 func (h *PersonalLabelHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -204,7 +204,7 @@ func (h *PersonalLabelHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var label models.PersonalLabel
-	if err := json.NewDecoder(r.Body).Decode(&label); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&label); err != nil {
 		respondBadRequest(w, r, err.Error())
 		return
 	}
@@ -221,14 +221,14 @@ func (h *PersonalLabelHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Check for duplicate name within the same scope (excluding current record)
 	var existingCount int
 	if label.UserID != nil {
-		err := h.db.QueryRow("SELECT COUNT(*) FROM personal_labels WHERE name = ? AND user_id = ? AND id != ?",
+		err = h.db.QueryRow("SELECT COUNT(*) FROM personal_labels WHERE name = ? AND user_id = ? AND id != ?",
 			label.Name, *label.UserID, id).Scan(&existingCount)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
 	} else {
-		err := h.db.QueryRow("SELECT COUNT(*) FROM personal_labels WHERE name = ? AND user_id IS NULL AND id != ?",
+		err = h.db.QueryRow("SELECT COUNT(*) FROM personal_labels WHERE name = ? AND user_id IS NULL AND id != ?",
 			label.Name, id).Scan(&existingCount)
 		if err != nil {
 			respondInternalError(w, r, err)
@@ -275,7 +275,7 @@ func (h *PersonalLabelHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(updatedLabel)
+	_ = json.NewEncoder(w).Encode(updatedLabel)
 }
 
 func (h *PersonalLabelHandler) Delete(w http.ResponseWriter, r *http.Request) {

@@ -15,9 +15,9 @@ import (
 
 // CapturedPayloads holds all recorded Jira API responses during an import
 type CapturedPayloads struct {
-	IssueKeys  map[string][]string          `json:"issue_keys"`  // JQL -> keys
-	BulkFetch  []jira.BulkFetchResponse     `json:"bulk_fetch"`
-	UserEmails map[string]string            `json:"user_emails"` // accountID -> email
+	IssueKeys  map[string][]string      `json:"issue_keys"` // JQL -> keys
+	BulkFetch  []jira.BulkFetchResponse `json:"bulk_fetch"`
+	UserEmails map[string]string        `json:"user_emails"` // accountID -> email
 }
 
 // recordingClient wraps a jira.Client and records API responses
@@ -48,7 +48,7 @@ func (r *recordingClient) saveToFile(dir string) error {
 	}
 
 	path := filepath.Join(dir, "jira_responses.json")
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write %s: %w", path, err)
 	}
 

@@ -1,9 +1,10 @@
 package services
 
 import (
-	"windshift/internal/database"
 	"database/sql"
 	"fmt"
+
+	"windshift/internal/database"
 	"windshift/internal/models"
 )
 
@@ -121,7 +122,7 @@ func (h *HierarchyService) GetAncestors(itemID int) ([]models.Item, error) {
 }
 
 // GetDescendants returns all descendants of an item
-func (h *HierarchyService) GetDescendants(itemID int, maxDepth int) ([]models.Item, error) {
+func (h *HierarchyService) GetDescendants(itemID, maxDepth int) ([]models.Item, error) {
 	query := `
 		WITH RECURSIVE descendants AS (
 			-- Base case: get direct children
@@ -415,7 +416,7 @@ func (h *HierarchyService) GetRoot(itemID int) (*models.Item, error) {
 // GetEffectiveProject returns the effective project_id for an item by walking up the hierarchy
 // Returns: (effective_project_id, inheritance_mode, error)
 // inheritance_mode: "none" (NULL), "inherit" (-1), "direct" (>0)
-func (h *HierarchyService) GetEffectiveProject(itemID int) (*int, string, error) {
+func (h *HierarchyService) GetEffectiveProject(itemID int) (projectID *int, inheritanceMode string, err error) {
 	query := `
 		WITH RECURSIVE project_chain AS (
 			-- Base case: get the item itself
@@ -447,10 +448,10 @@ func (h *HierarchyService) GetEffectiveProject(itemID int) (*int, string, error)
 	`
 
 	var id, depth int
-	var projectID sql.NullInt64
+	var nullProjectID sql.NullInt64
 	var mode string
 
-	err := h.db.QueryRow(query, itemID).Scan(&id, &projectID, &mode, &depth)
+	err = h.db.QueryRow(query, itemID).Scan(&id, &nullProjectID, &mode, &depth)
 	if err == sql.ErrNoRows {
 		// No effective project found (all ancestors have NULL or -1)
 		return nil, "none", nil
@@ -459,8 +460,8 @@ func (h *HierarchyService) GetEffectiveProject(itemID int) (*int, string, error)
 		return nil, "", fmt.Errorf("failed to get effective project: %w", err)
 	}
 
-	if projectID.Valid {
-		val := int(projectID.Int64)
+	if nullProjectID.Valid {
+		val := int(nullProjectID.Int64)
 		return &val, mode, nil
 	}
 

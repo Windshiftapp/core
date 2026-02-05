@@ -271,8 +271,8 @@ func (p *PostgresDB) Initialize() error {
 
 		for _, m := range pgMigrations {
 			var count int
-			if err := p.db.QueryRow(m.check).Scan(&count); err == nil && count == 0 {
-				if _, err := p.db.Exec(m.alter); err != nil {
+			if err = p.db.QueryRow(m.check).Scan(&count); err == nil && count == 0 {
+				if _, err = p.db.Exec(m.alter); err != nil {
 					slog.Warn("postgres migration failed", slog.String("component", "database"), slog.String("sql", m.alter), slog.Any("error", err))
 				}
 			}
@@ -281,7 +281,7 @@ func (p *PostgresDB) Initialize() error {
 		// Create labels tables if they don't exist (for existing databases)
 		labelsContent := strings.TrimSpace(labelsSchemaPostgres)
 		if labelsContent != "" {
-			if _, err := p.db.Exec(labelsContent); err != nil {
+			if _, err = p.db.Exec(labelsContent); err != nil {
 				slog.Warn("labels postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 			}
 		}
@@ -289,7 +289,7 @@ func (p *PostgresDB) Initialize() error {
 		// Create LLM tables if they don't exist (for existing databases)
 		llmContent := strings.TrimSpace(llmSchemaPostgres)
 		if llmContent != "" {
-			if _, err := p.db.Exec(llmContent); err != nil {
+			if _, err = p.db.Exec(llmContent); err != nil {
 				slog.Warn("llm postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 			}
 		}
@@ -339,7 +339,7 @@ func (p *PostgresDB) getPostgresSchemaFiles() []schemaFile {
 	// 1. Users, WebAuthn, SSO
 	// 2. Core/custom fields, Channels
 	// 3. Time tracking base tables
-	// 4. Portal/customers (depends on users, customer_organisations, channels)
+	// 4. Portal/customers (depends on users, customer_organizations, channels)
 	// 5. Workspaces - MUST come before tables that reference it
 	// 6. Config/workflows, Milestones
 	// 7. Iterations (depends on workspaces)
@@ -419,7 +419,7 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	categoryIDs := make(map[string]int64)
 	for _, cat := range categories {
 		var id int64
-		err := tx.QueryRow(
+		err = tx.QueryRow(
 			"INSERT INTO status_categories (name, color, description, is_default, is_completed) VALUES ($1, $2, $3, $4, $5) RETURNING id",
 			cat.name, cat.color, cat.description, cat.isDefault, cat.isCompleted,
 		).Scan(&id)
@@ -448,7 +448,7 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	for _, status := range statuses {
 		categoryID := categoryIDs[status.category]
 		var id int64
-		err := tx.QueryRow(
+		err = tx.QueryRow(
 			"INSERT INTO statuses (name, description, category_id, is_default) VALUES ($1, $2, $3, $4) RETURNING id",
 			status.name, status.description, categoryID, status.isDefault,
 		).Scan(&id)
@@ -494,7 +494,7 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 		}
 		toStatusID := statusIDs[transition.to]
 
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			"INSERT INTO workflow_transitions (workflow_id, from_status_id, to_status_id, display_order) VALUES ($1, $2, $3, $4)",
 			workflowID, fromStatusID, toStatusID, i,
 		)
@@ -530,7 +530,7 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	}
 
 	for _, field := range screenFields {
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			"INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width) VALUES ($1, $2, $3, $4, $5, $6)",
 			screenID, field.fieldType, field.fieldIdentifier, field.displayOrder, field.isRequired, field.fieldWidth,
 		)
@@ -552,7 +552,7 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	// 8. Assign default screen to configuration set for all contexts
 	contexts := []string{"create", "edit", "view"}
 	for _, context := range contexts {
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			"INSERT INTO configuration_set_screens (configuration_set_id, screen_id, context) VALUES ($1, $2, $3)",
 			configSetID, screenID, context,
 		)
@@ -580,7 +580,7 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	}
 
 	for _, linkType := range linkTypes {
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			"INSERT INTO link_types (name, description, forward_label, reverse_label, color, is_system) VALUES ($1, $2, $3, $4, $5, $6)",
 			linkType.name, linkType.description, linkType.forwardLabel, linkType.reverseLabel, linkType.color, linkType.isSystem,
 		)
@@ -605,7 +605,7 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	}
 
 	for _, setting := range systemSettings {
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			"INSERT INTO system_settings (key, value, value_type, description, category) VALUES ($1, $2, $3, $4, $5)",
 			setting.key, setting.value, setting.valueType, setting.description, setting.category,
 		)
@@ -628,7 +628,7 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	}
 
 	for _, hl := range hierarchyLevels {
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			"INSERT INTO hierarchy_levels (level, name, description) VALUES ($1, $2, $3)",
 			hl.level, hl.name, hl.description,
 		)
@@ -655,7 +655,7 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	}
 
 	for _, itemType := range defaultItemTypes {
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			"INSERT INTO item_types (configuration_set_id, name, description, icon, color, hierarchy_level, sort_order, is_default) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
 			configSetID, itemType.name, itemType.description, itemType.icon, itemType.color, itemType.hierarchyLevel, itemType.sortOrder, true,
 		)
@@ -668,7 +668,7 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	itemTypesToBind := []string{"Epic", "Story", "Task", "Bug", "Sub-task"}
 	for _, typeName := range itemTypesToBind {
 		var itemTypeID int64
-		err := tx.QueryRow("SELECT id FROM item_types WHERE name = $1", typeName).Scan(&itemTypeID)
+		err = tx.QueryRow("SELECT id FROM item_types WHERE name = $1", typeName).Scan(&itemTypeID)
 		if err != nil {
 			return fmt.Errorf("failed to get item type ID for %s: %w", typeName, err)
 		}
@@ -717,7 +717,7 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	}
 
 	for _, theme := range defaultThemes {
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			"INSERT INTO themes (name, description, is_default, is_active, nav_background_color_light, nav_text_color_light, nav_background_color_dark, nav_text_color_dark) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
 			theme.name, theme.description, theme.isDefault, theme.isActive, theme.navBackgroundColorLight, theme.navTextColorLight, theme.navBackgroundColorDark, theme.navTextColorDark,
 		)
@@ -778,7 +778,7 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	}
 
 	for _, rule := range defaultEventRules {
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			`INSERT INTO notification_event_rules
 			 (notification_setting_id, event_type, is_enabled, notify_assignee, notify_creator,
 			  notify_watchers, notify_workspace_admins)
@@ -863,7 +863,7 @@ func (p *PostgresDB) EnsureDefaultNotificationSettings() error {
 	}
 
 	for _, rule := range eventRules {
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			`INSERT INTO notification_event_rules
 			 (notification_setting_id, event_type, is_enabled, notify_assignee, notify_creator,
 			  notify_watchers, notify_workspace_admins)

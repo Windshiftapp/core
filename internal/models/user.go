@@ -4,17 +4,17 @@ import "time"
 
 // User represents a system user
 type User struct {
-	ID                    int       `json:"id"`
-	Email                 string    `json:"email"`
-	Username              string    `json:"username"`
-	FirstName             string    `json:"first_name"`
-	LastName              string    `json:"last_name"`
-	IsActive              bool      `json:"is_active"`
-	AvatarURL             string    `json:"avatar_url,omitempty"`
-	PasswordHash          string    `json:"-"` // Never send password hash to client
-	RequiresPasswordReset bool      `json:"requires_password_reset"`
-	Timezone              string    `json:"timezone"` // User's timezone (IANA timezone, e.g., "America/New_York")
-	Language              string    `json:"language"` // User's preferred language (ISO 639-1 code, e.g., "en", "de")
+	ID                    int    `json:"id"`
+	Email                 string `json:"email"`
+	Username              string `json:"username"`
+	FirstName             string `json:"first_name"`
+	LastName              string `json:"last_name"`
+	IsActive              bool   `json:"is_active"`
+	AvatarURL             string `json:"avatar_url,omitempty"`
+	PasswordHash          string `json:"-"` // Never send password hash to client
+	RequiresPasswordReset bool   `json:"requires_password_reset"`
+	Timezone              string `json:"timezone"` // User's timezone (IANA timezone, e.g., "America/New_York")
+	Language              string `json:"language"` // User's preferred language (ISO 639-1 code, e.g., "en", "de")
 	// Email verification fields (for SSO users when IdP doesn't provide email_verified)
 	EmailVerified            bool       `json:"email_verified"`
 	EmailVerificationToken   string     `json:"-"` // Never send token to client

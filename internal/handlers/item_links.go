@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
@@ -104,7 +105,7 @@ func (h *ItemLinkHandler) GetLinksForItem(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // filterLinksByAccessibleWorkspaces removes links pointing to items in inaccessible workspaces
@@ -157,8 +158,8 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Ensure one is test_case and other is item
-		if !((link.SourceType == "test_case" && link.TargetType == "item") ||
-			(link.SourceType == "item" && link.TargetType == "test_case")) {
+		if (link.SourceType != "test_case" || link.TargetType != "item") &&
+			(link.SourceType != "item" || link.TargetType != "test_case") {
 			respondValidationError(w, r, "The 'Tests' link type requires one entity to be a test case and the other to be an item")
 			return
 		}
@@ -276,7 +277,7 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 	if h.actionService != nil && link.SourceType == "item" {
 		// Get workspace ID for the source item
 		var workspaceID int
-		h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", link.SourceID).Scan(&workspaceID)
+		_ = h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", link.SourceID).Scan(&workspaceID)
 
 		h.actionService.EmitActionEvent(&models.ActionEvent{
 			EventType:   models.ActionTriggerItemLinked,
@@ -293,7 +294,7 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(createdLink)
+	_ = json.NewEncoder(w).Encode(createdLink)
 }
 
 // DeleteLink removes a link
@@ -436,17 +437,17 @@ func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request
 	`
 
 	type LinkedAsset struct {
-		ID               int    `json:"id"`
-		Title            string `json:"title"`
-		Description      string `json:"description"`
-		SetID            int    `json:"set_id"`
-		SetName          string `json:"set_name"`
-		TypeName         string `json:"type_name"`
-		CategoryName     string `json:"category_name"`
-		LinkID           int    `json:"link_id"`
-		LinkTypeName     string `json:"link_type_name"`
-		LinkLabel        string `json:"link_label"`
-		Direction        string `json:"direction"` // "outgoing" or "incoming"
+		ID           int    `json:"id"`
+		Title        string `json:"title"`
+		Description  string `json:"description"`
+		SetID        int    `json:"set_id"`
+		SetName      string `json:"set_name"`
+		TypeName     string `json:"type_name"`
+		CategoryName string `json:"category_name"`
+		LinkID       int    `json:"link_id"`
+		LinkTypeName string `json:"link_type_name"`
+		LinkLabel    string `json:"link_label"`
+		Direction    string `json:"direction"` // "outgoing" or "incoming"
 	}
 
 	var linkedAssets []LinkedAsset
@@ -460,10 +461,10 @@ func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request
 	for rows.Next() {
 		var asset LinkedAsset
 		var description, setName, typeName, categoryName, linkLabel sql.NullString
-		err := rows.Scan(&asset.ID, &asset.Title, &description, &asset.SetID, &setName,
+		err = rows.Scan(&asset.ID, &asset.Title, &description, &asset.SetID, &setName,
 			&typeName, &categoryName, &asset.LinkID, &asset.LinkTypeName, &linkLabel)
 		if err != nil {
-			rows.Close()
+			_ = rows.Close()
 			respondInternalError(w, r, err)
 			return
 		}
@@ -475,7 +476,7 @@ func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request
 		asset.Direction = "outgoing"
 		linkedAssets = append(linkedAssets, asset)
 	}
-	rows.Close()
+	_ = rows.Close()
 
 	// Process incoming links
 	rows, err = h.db.Query(incomingQuery, id)
@@ -489,7 +490,7 @@ func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request
 		err := rows.Scan(&asset.ID, &asset.Title, &description, &asset.SetID, &setName,
 			&typeName, &categoryName, &asset.LinkID, &asset.LinkTypeName, &linkLabel)
 		if err != nil {
-			rows.Close()
+			_ = rows.Close()
 			respondInternalError(w, r, err)
 			return
 		}
@@ -501,10 +502,10 @@ func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request
 		asset.Direction = "incoming"
 		linkedAssets = append(linkedAssets, asset)
 	}
-	rows.Close()
+	_ = rows.Close()
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(linkedAssets)
+	_ = json.NewEncoder(w).Encode(linkedAssets)
 }
 
 // SearchLinkableItems searches for items that can be linked
@@ -564,7 +565,7 @@ func (h *ItemLinkHandler) SearchLinkableItems(w http.ResponseWriter, r *http.Req
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(items)
+	_ = json.NewEncoder(w).Encode(items)
 }
 
 // Helper functions
@@ -614,7 +615,7 @@ func (h *ItemLinkHandler) getLinksWhere(whereClause string, args ...interface{})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var links []models.ItemLink
 	for rows.Next() {
@@ -675,14 +676,15 @@ func (h *ItemLinkHandler) searchWorkItems(query string, limit int, accessibleWor
 	`, placeholders)
 
 	searchTerm := "%" + query + "%"
-	args := []interface{}{searchTerm, searchTerm}
+	args := make([]interface{}, 0, 3+len(wsArgs))
+	args = append(args, searchTerm, searchTerm)
 	args = append(args, wsArgs...)
 	args = append(args, limit)
 	rows, err := h.db.Query(sqlQuery, args...)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []models.LinkableItem
 	for rows.Next() {
@@ -733,7 +735,7 @@ func (h *ItemLinkHandler) searchTestCases(query string, limit int) ([]models.Lin
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []models.LinkableItem
 	for rows.Next() {
@@ -773,7 +775,7 @@ func (h *ItemLinkHandler) searchAssets(query string, limit int) ([]models.Linkab
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []models.LinkableItem
 	for rows.Next() {

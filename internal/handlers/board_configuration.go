@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"windshift/internal/database"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -9,8 +8,9 @@ import (
 	"net/http"
 	"strconv"
 	"time"
-	"windshift/internal/models"
 
+	"windshift/internal/database"
+	"windshift/internal/models"
 )
 
 type BoardConfigurationHandler struct {
@@ -65,13 +65,13 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 		}
 		if backlogStatusIDsJSON.Valid && backlogStatusIDsJSON.String != "" {
 			var backlogStatusIDs []int
-			if err := json.Unmarshal([]byte(backlogStatusIDsJSON.String), &backlogStatusIDs); err == nil {
+			if err = json.Unmarshal([]byte(backlogStatusIDsJSON.String), &backlogStatusIDs); err == nil {
 				config.BacklogStatusIDs = backlogStatusIDs
 			}
 		}
 		if listColumnsJSON.Valid && listColumnsJSON.String != "" {
 			var listColumns []models.ListColumn
-			if err := json.Unmarshal([]byte(listColumnsJSON.String), &listColumns); err == nil {
+			if err = json.Unmarshal([]byte(listColumnsJSON.String), &listColumns); err == nil {
 				config.ListColumns = listColumns
 			}
 		}
@@ -102,13 +102,13 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 		}
 		if backlogStatusIDsJSON.Valid && backlogStatusIDsJSON.String != "" {
 			var backlogStatusIDs []int
-			if err := json.Unmarshal([]byte(backlogStatusIDsJSON.String), &backlogStatusIDs); err == nil {
+			if err = json.Unmarshal([]byte(backlogStatusIDsJSON.String), &backlogStatusIDs); err == nil {
 				config.BacklogStatusIDs = backlogStatusIDs
 			}
 		}
 		if listColumnsJSON.Valid && listColumnsJSON.String != "" {
 			var listColumns []models.ListColumn
-			if err := json.Unmarshal([]byte(listColumnsJSON.String), &listColumns); err == nil {
+			if err = json.Unmarshal([]byte(listColumnsJSON.String), &listColumns); err == nil {
 				config.ListColumns = listColumns
 			}
 		}
@@ -132,7 +132,7 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 	config.Columns = columns
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(config)
+	_ = json.NewEncoder(w).Encode(config)
 }
 
 // CreateForCollection creates a new board configuration for a collection or workspace
@@ -153,7 +153,7 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	var configID int64
 	var collectionID *int
@@ -250,7 +250,7 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(config)
+	_ = json.NewEncoder(w).Encode(config)
 }
 
 // UpdateForCollection updates the board configuration for a collection
@@ -262,7 +262,7 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 	}
 
 	var req models.BoardConfigurationRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -275,7 +275,7 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Marshal backlog status IDs to JSON
 	var backlogStatusIDsBytes []byte
@@ -423,7 +423,7 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
+	if err = tx.Commit(); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -469,7 +469,7 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 	config.Columns = columns
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(config)
+	_ = json.NewEncoder(w).Encode(config)
 }
 
 // DeleteForCollection deletes the board configuration for a collection
@@ -503,7 +503,7 @@ func (h *BoardConfigurationHandler) getColumns(configID int) ([]models.BoardColu
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	columns := []models.BoardColumn{}
 	for rows.Next() {
@@ -547,12 +547,12 @@ func (h *BoardConfigurationHandler) getColumnsWithStatuses(configID int) ([]mode
 		for rows.Next() {
 			var statusID int
 			if err := rows.Scan(&statusID); err != nil {
-				rows.Close()
+				_ = rows.Close()
 				return nil, err
 			}
 			statusIDs = append(statusIDs, statusID)
 		}
-		rows.Close()
+		_ = rows.Close()
 		columns[i].StatusIDs = statusIDs
 	}
 

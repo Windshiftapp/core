@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 )
@@ -23,7 +24,7 @@ func NewPortalCustomersHandler(db database.Database) *PortalCustomersHandler {
 }
 
 // parseTimestamp parses a timestamp string from the database
-func parseTimestamp(s string) (time.Time, error) {
+func parseTimestamp(s string) (time.Time, error) { //nolint:unparam // error return kept for API consistency
 	// Try multiple common timestamp formats
 	formats := []string{
 		time.RFC3339,
@@ -45,6 +46,7 @@ func parseTimestamp(s string) (time.Time, error) {
 func (h *PortalCustomersHandler) GetPortalCustomers(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("GetPortalCustomers called", slog.String("component", "portal"))
 
+	//nolint:misspell // British spelling used in database
 	query := `
 		SELECT
 			pc.id, pc.name, pc.email, pc.phone,
@@ -66,7 +68,7 @@ func (h *PortalCustomersHandler) GetPortalCustomers(w http.ResponseWriter, r *ht
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var customers []models.PortalCustomer
 	for rows.Next() {
@@ -89,10 +91,12 @@ func (h *PortalCustomersHandler) GetPortalCustomers(w http.ResponseWriter, r *ht
 		}
 
 		// Parse timestamps
-		if createdAt, err := parseTimestamp(createdAtStr); err == nil {
+		var createdAt time.Time
+		if createdAt, err = parseTimestamp(createdAtStr); err == nil {
 			c.CreatedAt = createdAt
 		}
-		if updatedAt, err := parseTimestamp(updatedAtStr); err == nil {
+		var updatedAt time.Time
+		if updatedAt, err = parseTimestamp(updatedAtStr); err == nil {
 			c.UpdatedAt = updatedAt
 		}
 
@@ -106,7 +110,7 @@ func (h *PortalCustomersHandler) GetPortalCustomers(w http.ResponseWriter, r *ht
 
 		// Parse custom field values
 		if customFieldValuesStr.Valid && customFieldValuesStr.String != "" {
-			if err := json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
+			if err = json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
 				// Log error but continue with other customers
 				continue
 			}
@@ -130,7 +134,7 @@ func (h *PortalCustomersHandler) GetPortalCustomers(w http.ResponseWriter, r *ht
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(customers)
+	_ = json.NewEncoder(w).Encode(customers)
 }
 
 // GetPortalCustomer returns a single portal customer by ID
@@ -142,6 +146,7 @@ func (h *PortalCustomersHandler) GetPortalCustomer(w http.ResponseWriter, r *htt
 		return
 	}
 
+	//nolint:misspell // database uses British spelling (customer_organisation)
 	query := `
 		SELECT
 			pc.id, pc.name, pc.email, pc.phone,
@@ -182,10 +187,12 @@ func (h *PortalCustomersHandler) GetPortalCustomer(w http.ResponseWriter, r *htt
 	}
 
 	// Parse timestamps
-	if createdAt, err := parseTimestamp(createdAtStr); err == nil {
+	var createdAt time.Time
+	if createdAt, err = parseTimestamp(createdAtStr); err == nil {
 		c.CreatedAt = createdAt
 	}
-	if updatedAt, err := parseTimestamp(updatedAtStr); err == nil {
+	var updatedAt time.Time
+	if updatedAt, err = parseTimestamp(updatedAtStr); err == nil {
 		c.UpdatedAt = updatedAt
 	}
 
@@ -199,7 +206,7 @@ func (h *PortalCustomersHandler) GetPortalCustomer(w http.ResponseWriter, r *htt
 
 	// Parse custom field values
 	if customFieldValuesStr.Valid && customFieldValuesStr.String != "" {
-		if err := json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
+		if err = json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
@@ -215,7 +222,7 @@ func (h *PortalCustomersHandler) GetPortalCustomer(w http.ResponseWriter, r *htt
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(c)
+	_ = json.NewEncoder(w).Encode(c)
 }
 
 // GetCustomerChannels returns the channels a portal customer has access to
@@ -243,15 +250,15 @@ func (h *PortalCustomersHandler) GetCustomerChannels(w http.ResponseWriter, r *h
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type CustomerChannelAccess struct {
-		ID                 int    `json:"id"`
-		PortalCustomerID   int    `json:"portal_customer_id"`
-		ChannelID          int    `json:"channel_id"`
-		ChannelName        string `json:"channel_name"`
-		ChannelType        string `json:"channel_type"`
-		CreatedAt          string `json:"created_at"`
+		ID               int    `json:"id"`
+		PortalCustomerID int    `json:"portal_customer_id"`
+		ChannelID        int    `json:"channel_id"`
+		ChannelName      string `json:"channel_name"`
+		ChannelType      string `json:"channel_type"`
+		CreatedAt        string `json:"created_at"`
 	}
 
 	var channels []CustomerChannelAccess
@@ -273,7 +280,7 @@ func (h *PortalCustomersHandler) GetCustomerChannels(w http.ResponseWriter, r *h
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(channels)
+	_ = json.NewEncoder(w).Encode(channels)
 }
 
 // GetCustomerSubmissions returns all portal submissions by this customer
@@ -302,7 +309,7 @@ func (h *PortalCustomersHandler) GetCustomerSubmissions(w http.ResponseWriter, r
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type CustomerSubmission struct {
 		ID            int    `json:"id"`
@@ -335,11 +342,12 @@ func (h *PortalCustomersHandler) GetCustomerSubmissions(w http.ResponseWriter, r
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(submissions)
+	_ = json.NewEncoder(w).Encode(submissions)
 }
 
 // CreatePortalCustomer creates a new portal customer
 func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *http.Request) {
+	//nolint:misspell // API uses British spelling (customer_organisation_id)
 	var requestData struct {
 		Name                   string                 `json:"name"`
 		Email                  string                 `json:"email"`
@@ -367,7 +375,7 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 
 	// Serialize custom field values to JSON
 	var customFieldValuesJSON []byte
-	if requestData.CustomFieldValues != nil && len(requestData.CustomFieldValues) > 0 {
+	if len(requestData.CustomFieldValues) > 0 {
 		var err error
 		customFieldValuesJSON, err = json.Marshal(requestData.CustomFieldValues)
 		if err != nil {
@@ -377,6 +385,7 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 	}
 
 	// Insert the new portal customer
+	//nolint:misspell // database uses British spelling
 	query := `
 		INSERT INTO portal_customers (name, email, phone, customer_organisation_id, is_primary, custom_field_values, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -404,7 +413,7 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 	if len(roleIDsToAssign) == 0 {
 		// Get the default "Portal Customer" role ID
 		var defaultRoleID int
-		err := h.db.QueryRow("SELECT id FROM contact_roles WHERE name = 'Portal Customer'").Scan(&defaultRoleID)
+		err = h.db.QueryRow("SELECT id FROM contact_roles WHERE name = 'Portal Customer'").Scan(&defaultRoleID)
 		if err == nil {
 			roleIDsToAssign = []int{defaultRoleID}
 		}
@@ -419,6 +428,7 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 	}
 
 	// Fetch the created customer with joined data
+	//nolint:misspell // database uses British spelling
 	fetchQuery := `
 		SELECT
 			pc.id, pc.name, pc.email, pc.phone,
@@ -455,10 +465,12 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 	}
 
 	// Parse timestamps
-	if createdAt, err := parseTimestamp(createdAtStr); err == nil {
+	var createdAt time.Time
+	if createdAt, err = parseTimestamp(createdAtStr); err == nil {
 		c.CreatedAt = createdAt
 	}
-	if updatedAt, err := parseTimestamp(updatedAtStr); err == nil {
+	var updatedAt time.Time
+	if updatedAt, err = parseTimestamp(updatedAtStr); err == nil {
 		c.UpdatedAt = updatedAt
 	}
 
@@ -472,7 +484,7 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 
 	// Parse custom field values
 	if customFieldValuesStr.Valid && customFieldValuesStr.String != "" {
-		if err := json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
+		if err = json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
@@ -489,10 +501,12 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(c)
+	_ = json.NewEncoder(w).Encode(c)
 }
 
 // UpdatePortalCustomerOrganisation updates the customer organisation assignment for a portal customer
+//
+//nolint:misspell // British spelling used in API (Organisation)
 func (h *PortalCustomersHandler) UpdatePortalCustomerOrganisation(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	customerID, err := strconv.Atoi(idStr)
@@ -501,15 +515,17 @@ func (h *PortalCustomersHandler) UpdatePortalCustomerOrganisation(w http.Respons
 		return
 	}
 
+	//nolint:misspell // British spelling used in API (customer_organisation_id)
 	var requestData struct {
 		CustomerOrganisationID *int `json:"customer_organisation_id"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&requestData); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
+	//nolint:misspell // British spelling used in database (customer_organisation_id)
 	// Update the customer organisation assignment
 	query := `UPDATE portal_customers SET customer_organisation_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
 	_, err = h.db.ExecWrite(query, requestData.CustomerOrganisationID, customerID)
@@ -519,7 +535,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomerOrganisation(w http.Respons
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
 // UpdatePortalCustomer updates all fields of a portal customer
@@ -531,6 +547,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 		return
 	}
 
+	//nolint:misspell // customer_organisation is a database column name
 	var requestData struct {
 		Name                   string                 `json:"name"`
 		Email                  string                 `json:"email"`
@@ -541,7 +558,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 		CustomFieldValues      map[string]interface{} `json:"custom_field_values"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&requestData); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -558,7 +575,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 
 	// Serialize custom field values to JSON
 	var customFieldValuesJSON []byte
-	if requestData.CustomFieldValues != nil && len(requestData.CustomFieldValues) > 0 {
+	if len(requestData.CustomFieldValues) > 0 {
 		customFieldValuesJSON, err = json.Marshal(requestData.CustomFieldValues)
 		if err != nil {
 			respondBadRequest(w, r, "Invalid custom field values")
@@ -567,6 +584,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 	}
 
 	// Update the portal customer
+	//nolint:misspell // customer_organisation_id is a database column name
 	query := `
 		UPDATE portal_customers
 		SET name = ?, email = ?, phone = ?, customer_organisation_id = ?, is_primary = ?, custom_field_values = ?, updated_at = CURRENT_TIMESTAMP
@@ -594,6 +612,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 	}
 
 	// Fetch and return the updated customer
+	//nolint:misspell // customer_organisation is a database column/table name
 	fetchQuery := `
 		SELECT
 			pc.id, pc.name, pc.email, pc.phone,
@@ -630,10 +649,12 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 	}
 
 	// Parse timestamps
-	if createdAt, err := parseTimestamp(createdAtStr); err == nil {
+	var createdAt time.Time
+	if createdAt, err = parseTimestamp(createdAtStr); err == nil {
 		c.CreatedAt = createdAt
 	}
-	if updatedAt, err := parseTimestamp(updatedAtStr); err == nil {
+	var updatedAt time.Time
+	if updatedAt, err = parseTimestamp(updatedAtStr); err == nil {
 		c.UpdatedAt = updatedAt
 	}
 
@@ -647,7 +668,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 
 	// Parse custom field values
 	if customFieldValuesStr.Valid && customFieldValuesStr.String != "" {
-		if err := json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
+		if err = json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
@@ -663,7 +684,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(c)
+	_ = json.NewEncoder(w).Encode(c)
 }
 
 // DeletePortalCustomer deletes a portal customer
@@ -687,6 +708,8 @@ func (h *PortalCustomersHandler) DeletePortalCustomer(w http.ResponseWriter, r *
 }
 
 // GetOrganisationContacts returns all portal customers (contacts) for a given customer organisation
+//
+//nolint:misspell // "organisation" is intentional British spelling used throughout codebase
 func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	orgID, err := strconv.Atoi(idStr)
@@ -695,6 +718,7 @@ func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, 
 		return
 	}
 
+	//nolint:misspell // "organisation" is intentional British spelling used throughout codebase
 	query := `
 		SELECT
 			pc.id, pc.name, pc.email, pc.phone,
@@ -717,7 +741,7 @@ func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, 
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var contacts []models.PortalCustomer
 	for rows.Next() {
@@ -740,10 +764,12 @@ func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, 
 		}
 
 		// Parse timestamps
-		if createdAt, err := parseTimestamp(createdAtStr); err == nil {
+		var createdAt time.Time
+		if createdAt, err = parseTimestamp(createdAtStr); err == nil {
 			c.CreatedAt = createdAt
 		}
-		if updatedAt, err := parseTimestamp(updatedAtStr); err == nil {
+		var updatedAt time.Time
+		if updatedAt, err = parseTimestamp(updatedAtStr); err == nil {
 			c.UpdatedAt = updatedAt
 		}
 
@@ -757,7 +783,7 @@ func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, 
 
 		// Parse custom field values
 		if customFieldValuesStr.Valid && customFieldValuesStr.String != "" {
-			if err := json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
+			if err = json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
 				// Log error but continue with other contacts
 				slog.Warn("failed to parse custom field values for contact", slog.String("component", "portal"), slog.Int("contact_id", c.ID), slog.Any("error", err))
 				continue
@@ -781,7 +807,7 @@ func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(contacts)
+	_ = json.NewEncoder(w).Encode(contacts)
 }
 
 // loadPortalCustomerRoles loads the contact roles for a given portal customer
@@ -798,7 +824,7 @@ func (h *PortalCustomersHandler) loadPortalCustomerRoles(customerID int) ([]mode
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var roles []models.ContactRole
 	for rows.Next() {

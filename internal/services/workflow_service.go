@@ -36,7 +36,7 @@ func (s *WorkflowService) GetWorkflowIDForItem(workspaceID int, itemTypeID *int)
 
 	// Try item type + config set workflow (COALESCE handles item type workflow being NULL)
 	if itemTypeID != nil {
-		err := s.db.QueryRow(`
+		err = s.db.QueryRow(`
 			SELECT COALESCE(csit.workflow_id, cs.workflow_id) as workflow_id
 			FROM workspace_configuration_sets wcs
 			JOIN configuration_sets cs ON wcs.configuration_set_id = cs.id

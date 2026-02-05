@@ -73,7 +73,7 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 			respondInternalError(w, r, err)
 			return
 		}
-		defer workspaceRows.Close()
+		defer func() { _ = workspaceRows.Close() }()
 
 		for workspaceRows.Next() {
 			var workspaceID int
@@ -130,7 +130,7 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 			respondInternalError(w, r, err)
 			return
 		}
-		defer statusRows.Close()
+		defer func() { _ = statusRows.Close() }()
 
 		// Cache workflow statuses by workflow ID to avoid repeated queries
 		workflowStatusesCache := make(map[int]map[string]models.Status)
@@ -194,14 +194,14 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 				for workflowStatusRows.Next() {
 					var status models.Status
 					if err := workflowStatusRows.Scan(&status.ID, &status.Name); err != nil {
-						workflowStatusRows.Close()
+						_ = workflowStatusRows.Close()
 						respondInternalError(w, r, err)
 						return
 					}
 					normalizedName := normalizeStatusName(status.Name)
 					workflowStatuses[normalizedName] = status
 				}
-				workflowStatusRows.Close()
+				_ = workflowStatusRows.Close()
 
 				workflowStatusesCache[*workflowID] = workflowStatuses
 			}
@@ -253,7 +253,7 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 			respondInternalError(w, r, err)
 			return
 		}
-		defer statusRows.Close()
+		defer func() { _ = statusRows.Close() }()
 
 		// Get available statuses in the workflow
 		workflowStatusQuery := `
@@ -268,7 +268,7 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 			respondInternalError(w, r, err)
 			return
 		}
-		defer workflowStatusRows.Close()
+		defer func() { _ = workflowStatusRows.Close() }()
 
 		// Build map of available workflow statuses
 		workflowStatuses := make(map[string]models.Status)
@@ -404,7 +404,7 @@ func (h *ConfigurationSetHandler) AnalyzeComprehensiveMigration(w http.ResponseW
 
 	// Count total items in workspace
 	var totalItems int
-	h.db.QueryRow(`SELECT COUNT(*) FROM items WHERE workspace_id = ?`, workspaceID).Scan(&totalItems)
+	_ = h.db.QueryRow(`SELECT COUNT(*) FROM items WHERE workspace_id = ?`, workspaceID).Scan(&totalItems)
 
 	// Initialize analysis
 	analysis := models.ComprehensiveMigrationAnalysis{
@@ -458,11 +458,11 @@ func (h *ConfigurationSetHandler) analyzeItemTypeMigration(workspaceID, sourceCo
 		WHERE csit.configuration_set_id = ?
 	`, sourceConfigSetID)
 	if err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var id int
 			var name string
-			rows.Scan(&id, &name)
+			_ = rows.Scan(&id, &name)
 			sourceItemTypes[id] = name
 		}
 	}
@@ -478,10 +478,10 @@ func (h *ConfigurationSetHandler) analyzeItemTypeMigration(workspaceID, sourceCo
 		ORDER BY it.hierarchy_level, it.sort_order
 	`, targetConfigSetID)
 	if err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var target models.ItemTypeTarget
-			rows.Scan(&target.ID, &target.Name, &target.Icon, &target.Color, &target.HierarchyLevel)
+			_ = rows.Scan(&target.ID, &target.Name, &target.Icon, &target.Color, &target.HierarchyLevel)
 			targetItemTypes[target.ID] = target
 			availableTargets = append(availableTargets, target)
 		}
@@ -495,10 +495,10 @@ func (h *ConfigurationSetHandler) analyzeItemTypeMigration(workspaceID, sourceCo
 			ORDER BY hierarchy_level, sort_order
 		`)
 		if err == nil {
-			defer rows.Close()
+			defer func() { _ = rows.Close() }()
 			for rows.Next() {
 				var target models.ItemTypeTarget
-				rows.Scan(&target.ID, &target.Name, &target.Icon, &target.Color, &target.HierarchyLevel)
+				_ = rows.Scan(&target.ID, &target.Name, &target.Icon, &target.Color, &target.HierarchyLevel)
 				targetItemTypes[target.ID] = target
 				availableTargets = append(availableTargets, target)
 			}
@@ -528,13 +528,13 @@ func (h *ConfigurationSetHandler) analyzeItemTypeMigration(workspaceID, sourceCo
 	if err != nil {
 		return migrations, availableTargets, false
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var typeID int
 		var typeName string
 		var itemCount int
-		rows.Scan(&typeID, &typeName, &itemCount)
+		_ = rows.Scan(&typeID, &typeName, &itemCount)
 
 		migration := models.ItemTypeMigrationInfo{
 			CurrentItemTypeName: typeName,
@@ -592,11 +592,11 @@ func (h *ConfigurationSetHandler) analyzeCustomFieldMigration(workspaceID, sourc
 		WHERE css.configuration_set_id = ?
 	`, sourceConfigSetID)
 	if err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var id int
 			var name, fieldType string
-			rows.Scan(&id, &name, &fieldType)
+			_ = rows.Scan(&id, &name, &fieldType)
 			sourceFields[id] = struct {
 				name      string
 				fieldType string
@@ -619,12 +619,12 @@ func (h *ConfigurationSetHandler) analyzeCustomFieldMigration(workspaceID, sourc
 		WHERE css.configuration_set_id = ?
 	`, targetConfigSetID)
 	if err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var id int
 			var name, fieldType string
 			var required bool
-			rows.Scan(&id, &name, &fieldType, &required)
+			_ = rows.Scan(&id, &name, &fieldType, &required)
 			targetFields[id] = struct {
 				name      string
 				fieldType string
@@ -646,10 +646,10 @@ func (h *ConfigurationSetHandler) analyzeCustomFieldMigration(workspaceID, sourc
 		AND custom_field_values != '{}'
 	`, workspaceID)
 	if err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var cfvJSON string
-			rows.Scan(&cfvJSON)
+			_ = rows.Scan(&cfvJSON)
 			var cfv map[string]interface{}
 			if json.Unmarshal([]byte(cfvJSON), &cfv) == nil {
 				for key := range cfv {
@@ -713,11 +713,11 @@ func (h *ConfigurationSetHandler) analyzePriorityMigration(workspaceID, sourceCo
 		WHERE csp.configuration_set_id = ?
 	`, sourceConfigSetID)
 	if err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var id int
 			var name string
-			rows.Scan(&id, &name)
+			_ = rows.Scan(&id, &name)
 			sourcePriorities[id] = name
 		}
 	}
@@ -733,10 +733,10 @@ func (h *ConfigurationSetHandler) analyzePriorityMigration(workspaceID, sourceCo
 		ORDER BY p.sort_order
 	`, targetConfigSetID)
 	if err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var target models.PriorityTarget
-			rows.Scan(&target.ID, &target.Name, &target.Icon, &target.Color, &target.SortOrder)
+			_ = rows.Scan(&target.ID, &target.Name, &target.Icon, &target.Color, &target.SortOrder)
 			targetPriorities[target.ID] = target
 			availableTargets = append(availableTargets, target)
 		}
@@ -750,10 +750,10 @@ func (h *ConfigurationSetHandler) analyzePriorityMigration(workspaceID, sourceCo
 			ORDER BY sort_order
 		`)
 		if err == nil {
-			defer rows.Close()
+			defer func() { _ = rows.Close() }()
 			for rows.Next() {
 				var target models.PriorityTarget
-				rows.Scan(&target.ID, &target.Name, &target.Icon, &target.Color, &target.SortOrder)
+				_ = rows.Scan(&target.ID, &target.Name, &target.Icon, &target.Color, &target.SortOrder)
 				targetPriorities[target.ID] = target
 				availableTargets = append(availableTargets, target)
 			}
@@ -783,13 +783,13 @@ func (h *ConfigurationSetHandler) analyzePriorityMigration(workspaceID, sourceCo
 	if err != nil {
 		return migrations, availableTargets, false
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var priorityID int
 		var priorityName string
 		var itemCount int
-		rows.Scan(&priorityID, &priorityName, &itemCount)
+		_ = rows.Scan(&priorityID, &priorityName, &itemCount)
 
 		migration := models.PriorityMigrationInfo{
 			CurrentPriorityName: priorityName,
@@ -831,7 +831,7 @@ func (h *ConfigurationSetHandler) analyzePriorityMigration(workspaceID, sourceCo
 func (h *ConfigurationSetHandler) analyzeStatusMigration(workspaceID, targetConfigSetID int) ([]models.StatusMigrationInfo, bool) {
 	// Get target workflow
 	var targetWorkflowID sql.NullInt64
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT workflow_id FROM configuration_sets WHERE id = ?
 	`, targetConfigSetID).Scan(&targetWorkflowID)
 
@@ -851,11 +851,11 @@ func (h *ConfigurationSetHandler) analyzeStatusMigration(workspaceID, targetConf
 	if err != nil {
 		return nil, false
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var status models.Status
-		rows.Scan(&status.ID, &status.Name)
+		_ = rows.Scan(&status.ID, &status.Name)
 		normalizedName := normalizeStatusName(status.Name)
 		workflowStatuses[normalizedName] = status
 	}
@@ -877,13 +877,13 @@ func (h *ConfigurationSetHandler) analyzeStatusMigration(workspaceID, targetConf
 	if err != nil {
 		return nil, false
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var statusID int
 		var statusName string
 		var itemCount int
-		rows.Scan(&statusID, &statusName, &itemCount)
+		_ = rows.Scan(&statusID, &statusName, &itemCount)
 
 		migration := models.StatusMigrationInfo{
 			CurrentStatus:   statusName,
@@ -932,8 +932,8 @@ func (h *ConfigurationSetHandler) suggestStatusMapping(migration *models.StatusM
 			migration.SuggestedStatusID = &status.ID
 			migration.SuggestedStatusName = status.Name
 		}
-	case "cancelled", "canceled":
-		if status, exists := workflowStatuses["cancelled"]; exists {
+	case "cancelled", "canceled": //nolint:misspell // British spelling used in database
+		if status, exists := workflowStatuses["cancelled"]; exists { //nolint:misspell // British spelling used in database
 			migration.SuggestedStatusID = &status.ID
 			migration.SuggestedStatusName = status.Name
 		}

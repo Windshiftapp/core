@@ -76,7 +76,7 @@ func (c *httpClient) ChatCompletion(ctx context.Context, req ChatCompletionReque
 		return nil, ErrServiceNotReady
 	}
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body) //nolint:errcheck
+		respBody, _ := io.ReadAll(resp.Body) //nolint:errcheck // best-effort read for error message
 		return nil, fmt.Errorf("%w: status %d - %s", ErrAPIError, resp.StatusCode, string(respBody))
 	}
 
@@ -88,7 +88,7 @@ func (c *httpClient) ChatCompletion(ctx context.Context, req ChatCompletionReque
 }
 
 func (c *httpClient) Health(ctx context.Context) error {
-	httpReq, err := http.NewRequestWithContext(ctx, "GET", c.endpoint+"/health", nil)
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", c.endpoint+"/health", http.NoBody)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrConnectionFailed, err)
 	}

@@ -69,7 +69,7 @@ func (rl *RateLimiter) getTokenID(r *http.Request) string {
 
 func (rl *RateLimiter) getBucket(tokenID string) *tokenBucket {
 	if existing, ok := rl.limiters.Load(tokenID); ok {
-		return existing.(*tokenBucket)
+		return existing.(*tokenBucket) //nolint:errcheck // type assertion is safe, we only store *tokenBucket
 	}
 
 	bucket := &tokenBucket{
@@ -77,7 +77,7 @@ func (rl *RateLimiter) getBucket(tokenID string) *tokenBucket {
 		lastReset: time.Now(),
 	}
 	actual, _ := rl.limiters.LoadOrStore(tokenID, bucket)
-	return actual.(*tokenBucket)
+	return actual.(*tokenBucket) //nolint:errcheck // type assertion is safe, we only store *tokenBucket
 }
 
 func (tb *tokenBucket) allow(rate int, window time.Duration) (allowed bool, remaining int, resetTime time.Time) {

@@ -373,7 +373,7 @@ var testRunEndCmd = &cobra.Command{
 			return fmt.Errorf("invalid run ID: %s", args[0])
 		}
 
-		if err := client.EndTestRun(wsID, runID); err != nil {
+		if err = client.EndTestRun(wsID, runID); err != nil {
 			return fmt.Errorf("failed to end test run: %w", err)
 		}
 
@@ -507,7 +507,7 @@ Examples:
 			Notes:        testResultNotes,
 		}
 
-		if err := client.UpdateTestResult(wsID, runID, resultID, req); err != nil {
+		if err = client.UpdateTestResult(wsID, runID, resultID, req); err != nil {
 			return fmt.Errorf("failed to update result: %w", err)
 		}
 

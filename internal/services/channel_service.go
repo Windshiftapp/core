@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
@@ -99,7 +98,7 @@ func (s *ChannelService) Create(ctx context.Context, req ChannelCreateRequest) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	id, err := s.repo.Create(ctx, tx, channel)
 	if err != nil {
@@ -151,7 +150,7 @@ func (s *ChannelService) Update(ctx context.Context, id int, req ChannelUpdateRe
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := s.repo.Update(ctx, tx, channel); err != nil {
 		return nil, err
@@ -180,7 +179,7 @@ func (s *ChannelService) Delete(ctx context.Context, id int) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := s.repo.Delete(ctx, tx, id); err != nil {
 		return err
@@ -199,7 +198,7 @@ func (s *ChannelService) SetDefault(ctx context.Context, id int) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := s.repo.SetDefault(ctx, tx, id); err != nil {
 		return err
@@ -249,7 +248,7 @@ func (s *ChannelService) AddManager(ctx context.Context, channelID int, managerT
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := s.repo.AddManager(ctx, tx, channelID, managerType, managerID); err != nil {
 		return err
@@ -268,7 +267,7 @@ func (s *ChannelService) RemoveManager(ctx context.Context, channelID int, manag
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := s.repo.RemoveManager(ctx, tx, channelID, managerType, managerID); err != nil {
 		return err
@@ -296,9 +295,4 @@ func (s *ChannelService) CanUserAccessChannel(ctx context.Context, channelID, us
 
 	// Check if user is manager
 	return s.repo.IsManager(ctx, channelID, userID)
-}
-
-// Helper function to create context with timeout
-func (s *ChannelService) defaultContext() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), 10*time.Second)
 }

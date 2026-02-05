@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"testing"
+
 	"windshift/internal/models"
 	"windshift/internal/testutils"
 	"windshift/internal/testutils/mocks"
@@ -45,21 +46,21 @@ func TestSetupHandler_GetSetupStatus(t *testing.T) {
 
 			// Set up test data based on test case
 			if tt.setupCompleted {
-				tdb.Exec("UPDATE system_settings SET value = ? WHERE key = ?", 
+				tdb.Exec("UPDATE system_settings SET value = ? WHERE key = ?",
 					strconv.FormatBool(tt.setupCompleted), "setup_completed")
 			}
 			if tt.adminExists {
-				tdb.Exec("UPDATE system_settings SET value = ? WHERE key = ?", 
+				tdb.Exec("UPDATE system_settings SET value = ? WHERE key = ?",
 					strconv.FormatBool(tt.adminExists), "admin_user_created")
 			}
-			tdb.Exec("UPDATE system_settings SET value = ? WHERE key = ?", 
+			tdb.Exec("UPDATE system_settings SET value = ? WHERE key = ?",
 				strconv.FormatBool(tt.timeEnabled), "time_tracking_enabled")
-			tdb.Exec("UPDATE system_settings SET value = ? WHERE key = ?", 
+			tdb.Exec("UPDATE system_settings SET value = ? WHERE key = ?",
 				strconv.FormatBool(tt.testEnabled), "test_management_enabled")
 
 			// Create handler
 			mockAuthMiddleware := mocks.CreateMockAuthMiddleware()
-	handler := NewSetupHandler(tdb.GetDatabase(), mocks.CreateMockSessionManager(), mockAuthMiddleware)
+			handler := NewSetupHandler(tdb.GetDatabase(), mocks.CreateMockSessionManager(), mockAuthMiddleware)
 
 			// Create request
 			req := testutils.CreateJSONRequest(t, "GET", "/api/setup/status", nil)
@@ -157,14 +158,14 @@ func TestSetupHandler_CompleteInitialSetup_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to query user password: %v", err)
 	}
-	
+
 	// Verify password hash is bcrypt hash and not plain text
 	if storedHash == setupReq.AdminUser.PasswordHash {
 		t.Error("Password was not hashed")
 	}
-	
+
 	// Verify password can be verified
-	if err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(setupReq.AdminUser.PasswordHash)); err != nil {
+	if err = bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(setupReq.AdminUser.PasswordHash)); err != nil {
 		t.Errorf("Password hash verification failed: %v", err)
 	}
 
@@ -288,7 +289,7 @@ func TestSetupHandler_CompleteInitialSetup_ValidationErrors(t *testing.T) {
 
 			// Create handler
 			mockAuthMiddleware := mocks.CreateMockAuthMiddleware()
-	handler := NewSetupHandler(tdb.GetDatabase(), mocks.CreateMockSessionManager(), mockAuthMiddleware)
+			handler := NewSetupHandler(tdb.GetDatabase(), mocks.CreateMockSessionManager(), mockAuthMiddleware)
 
 			// Create request
 			req := testutils.CreateJSONRequest(t, "POST", "/api/setup/complete", tt.setupReq)

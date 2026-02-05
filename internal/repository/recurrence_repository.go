@@ -102,7 +102,7 @@ func (r *RecurrenceRepository) GetRulesNeedingGeneration(limit int) ([]*models.R
 	if err != nil {
 		return nil, fmt.Errorf("failed to query recurrence rules: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var rules []*models.RecurrenceRule
 	for rows.Next() {
@@ -210,7 +210,7 @@ func (r *RecurrenceRepository) Delete(id int) error {
 }
 
 // UpdateGenerationProgress updates the last_generated_until and next_generation_check fields
-func (r *RecurrenceRepository) UpdateGenerationProgress(id int, lastGenUntil time.Time, nextCheck time.Time) error {
+func (r *RecurrenceRepository) UpdateGenerationProgress(id int, lastGenUntil, nextCheck time.Time) error {
 	_, err := r.db.Exec(`
 		UPDATE recurrence_rules SET
 			last_generated_until = ?, next_generation_check = ?, updated_at = ?
@@ -242,7 +242,7 @@ func (r *RecurrenceRepository) GetExistingInstanceDates(ruleID int) (map[string]
 	if err != nil {
 		return nil, fmt.Errorf("failed to query existing instance dates: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	dates := make(map[string]bool)
 	for rows.Next() {
@@ -289,7 +289,7 @@ func (r *RecurrenceRepository) CreateInstance(tx database.Tx, instance *models.R
 }
 
 // GetInstancesByRuleID retrieves all instances for a rule
-func (r *RecurrenceRepository) GetInstancesByRuleID(ruleID int, limit, offset int) ([]*models.RecurrenceInstance, error) {
+func (r *RecurrenceRepository) GetInstancesByRuleID(ruleID, limit, offset int) ([]*models.RecurrenceInstance, error) {
 	rows, err := r.db.Query(`
 		SELECT ri.id, ri.recurrence_rule_id, ri.instance_item_id, ri.scheduled_date,
 		       ri.sequence_number, ri.created_at, i.title, s.name
@@ -303,7 +303,7 @@ func (r *RecurrenceRepository) GetInstancesByRuleID(ruleID int, limit, offset in
 	if err != nil {
 		return nil, fmt.Errorf("failed to query instances: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var instances []*models.RecurrenceInstance
 	for rows.Next() {
@@ -362,7 +362,7 @@ func (r *RecurrenceRepository) ListByWorkspace(workspaceID int) ([]*models.Recur
 	if err != nil {
 		return nil, fmt.Errorf("failed to query recurrence rules: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var rules []*models.RecurrenceRule
 	for rows.Next() {

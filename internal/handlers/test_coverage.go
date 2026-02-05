@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/services"
-	"windshift/internal/utils"
 )
 
 type TestCoverageHandler struct {
@@ -41,7 +41,8 @@ func (h *TestCoverageHandler) GetConfig(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		workspaceID, err := strconv.Atoi(workspaceIDStr)
+		var workspaceID int
+		workspaceID, err = strconv.Atoi(workspaceIDStr)
 		if err != nil {
 			respondInvalidID(w, r, "workspace_id")
 			return
@@ -66,12 +67,13 @@ func (h *TestCoverageHandler) GetConfig(w http.ResponseWriter, r *http.Request) 
 				config.WorkspaceID = &wid
 			}
 			if typeIDsJSON.Valid && typeIDsJSON.String != "" {
-				json.Unmarshal([]byte(typeIDsJSON.String), &config.RequirementItemTypeIDs)
+				_ = json.Unmarshal([]byte(typeIDsJSON.String), &config.RequirementItemTypeIDs)
 			}
 		}
 	} else {
 		// Collection-level configuration
-		collectionID, err := strconv.Atoi(id)
+		var collectionID int
+		collectionID, err = strconv.Atoi(id)
 		if err != nil {
 			respondInvalidID(w, r, "collectionId")
 			return
@@ -96,7 +98,7 @@ func (h *TestCoverageHandler) GetConfig(w http.ResponseWriter, r *http.Request) 
 				config.WorkspaceID = &wid
 			}
 			if typeIDsJSON.Valid && typeIDsJSON.String != "" {
-				json.Unmarshal([]byte(typeIDsJSON.String), &config.RequirementItemTypeIDs)
+				_ = json.Unmarshal([]byte(typeIDsJSON.String), &config.RequirementItemTypeIDs)
 			}
 		}
 	}
@@ -111,7 +113,7 @@ func (h *TestCoverageHandler) GetConfig(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(config)
+	_ = json.NewEncoder(w).Encode(config)
 }
 
 // CreateConfig creates a new test coverage configuration
@@ -126,7 +128,7 @@ func (h *TestCoverageHandler) CreateConfig(w http.ResponseWriter, r *http.Reques
 
 	typeIDsBytes, err := json.Marshal(req.RequirementItemTypeIDs)
 	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("Failed to marshal item type IDs"))
+		respondInternalError(w, r, fmt.Errorf("failed to marshal item type IDs"))
 		return
 	}
 
@@ -184,7 +186,7 @@ func (h *TestCoverageHandler) CreateConfig(w http.ResponseWriter, r *http.Reques
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(config)
+	_ = json.NewEncoder(w).Encode(config)
 }
 
 // UpdateConfig updates the test coverage configuration
@@ -196,14 +198,14 @@ func (h *TestCoverageHandler) UpdateConfig(w http.ResponseWriter, r *http.Reques
 	}
 
 	var req models.TestCoverageConfigRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	typeIDsBytes, err := json.Marshal(req.RequirementItemTypeIDs)
 	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("Failed to marshal item type IDs"))
+		respondInternalError(w, r, fmt.Errorf("failed to marshal item type IDs"))
 		return
 	}
 
@@ -243,11 +245,11 @@ func (h *TestCoverageHandler) UpdateConfig(w http.ResponseWriter, r *http.Reques
 		config.WorkspaceID = &wid
 	}
 	if typeIDsJSON.Valid && typeIDsJSON.String != "" {
-		json.Unmarshal([]byte(typeIDsJSON.String), &config.RequirementItemTypeIDs)
+		_ = json.Unmarshal([]byte(typeIDsJSON.String), &config.RequirementItemTypeIDs)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(config)
+	_ = json.NewEncoder(w).Encode(config)
 }
 
 // DeleteConfig deletes the test coverage configuration
@@ -277,7 +279,7 @@ func (h *TestCoverageHandler) GetSummary(w http.ResponseWriter, r *http.Request)
 		if err == sql.ErrNoRows {
 			// No config, return empty summary
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(models.TestCoverageSummary{})
+			_ = json.NewEncoder(w).Encode(models.TestCoverageSummary{})
 			return
 		}
 		respondInternalError(w, r, err)
@@ -287,7 +289,7 @@ func (h *TestCoverageHandler) GetSummary(w http.ResponseWriter, r *http.Request)
 	if len(typeIDs) == 0 {
 		// No requirement types configured
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(models.TestCoverageSummary{})
+		_ = json.NewEncoder(w).Encode(models.TestCoverageSummary{})
 		return
 	}
 
@@ -341,7 +343,7 @@ func (h *TestCoverageHandler) GetSummary(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(summary)
+	_ = json.NewEncoder(w).Encode(summary)
 }
 
 // GetRequirements returns the paginated list of requirements with coverage status
@@ -370,7 +372,7 @@ func (h *TestCoverageHandler) GetRequirements(w http.ResponseWriter, r *http.Req
 		if err == sql.ErrNoRows {
 			// No config, return empty list
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(models.TestCoverageListResponse{
+			_ = json.NewEncoder(w).Encode(models.TestCoverageListResponse{
 				Items:      []models.RequirementCoverageItem{},
 				Pagination: models.PaginationMeta{Page: page, Limit: limit, Total: 0},
 				Summary:    models.TestCoverageSummary{},
@@ -383,7 +385,7 @@ func (h *TestCoverageHandler) GetRequirements(w http.ResponseWriter, r *http.Req
 
 	if len(typeIDs) == 0 {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(models.TestCoverageListResponse{
+		_ = json.NewEncoder(w).Encode(models.TestCoverageListResponse{
 			Items:      []models.RequirementCoverageItem{},
 			Pagination: models.PaginationMeta{Page: page, Limit: limit, Total: 0},
 			Summary:    models.TestCoverageSummary{},
@@ -393,7 +395,8 @@ func (h *TestCoverageHandler) GetRequirements(w http.ResponseWriter, r *http.Req
 
 	// Override typeIDs if specific item type filter is provided
 	if itemTypeFilter != "" {
-		itemTypeID, err := strconv.Atoi(itemTypeFilter)
+		var itemTypeID int
+		itemTypeID, err = strconv.Atoi(itemTypeFilter)
 		if err == nil {
 			// Check if the filtered type is in the configured types
 			found := false
@@ -427,9 +430,10 @@ func (h *TestCoverageHandler) GetRequirements(w http.ResponseWriter, r *http.Req
 		args = append(args, "%"+searchFilter+"%")
 	}
 
-	if coveredFilter == "true" {
+	switch coveredFilter {
+	case "true":
 		havingClause = " HAVING linked_count > 0"
-	} else if coveredFilter == "false" {
+	case "false":
 		havingClause = " HAVING linked_count = 0"
 	}
 
@@ -492,13 +496,14 @@ func (h *TestCoverageHandler) GetRequirements(w http.ResponseWriter, r *http.Req
 		LIMIT ? OFFSET ?
 	`
 
-	dataArgs := append(args, limit, offset)
+	dataArgs := append([]interface{}{}, args...) //nolint:gocritic // intentionally creating new slice to add pagination params
+	dataArgs = append(dataArgs, limit, offset)
 	rows, err := h.db.Query(dataQuery, dataArgs...)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	items := []models.RequirementCoverageItem{}
 	for rows.Next() {
@@ -566,7 +571,7 @@ func (h *TestCoverageHandler) GetRequirements(w http.ResponseWriter, r *http.Req
 			WHERE i.workspace_id = ? AND i.item_type_id IN (` + strings.Join(placeholders, ",") + `)
 		) sub
 	`
-	h.db.QueryRow(summaryQuery, summaryArgs...).Scan(&summaryTotal, &summaryCovered)
+	_ = h.db.QueryRow(summaryQuery, summaryArgs...).Scan(&summaryTotal, &summaryCovered)
 
 	var coverageRate float64
 	if summaryTotal > 0 {
@@ -589,20 +594,20 @@ func (h *TestCoverageHandler) GetRequirements(w http.ResponseWriter, r *http.Req
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // getRequirementTypeIDs retrieves the requirement type IDs from the configuration
-func (h *TestCoverageHandler) getRequirementTypeIDs(id string, workspaceIDStr string) ([]int, int, error) {
+func (h *TestCoverageHandler) getRequirementTypeIDs(id, workspaceIDStr string) (typeIDs []int, workspaceID int, err error) {
 	var typeIDsJSON sql.NullString
-	var workspaceID int
 
 	if id == "default" {
 		if workspaceIDStr == "" {
 			return nil, 0, sql.ErrNoRows
 		}
 
-		wsID, err := strconv.Atoi(workspaceIDStr)
+		var wsID int
+		wsID, err = strconv.Atoi(workspaceIDStr)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -618,7 +623,8 @@ func (h *TestCoverageHandler) getRequirementTypeIDs(id string, workspaceIDStr st
 			return nil, 0, err
 		}
 	} else {
-		collectionID, err := strconv.Atoi(id)
+		var collectionID int
+		collectionID, err = strconv.Atoi(id)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -648,15 +654,9 @@ func (h *TestCoverageHandler) getRequirementTypeIDs(id string, workspaceIDStr st
 		}
 	}
 
-	var typeIDs []int
 	if typeIDsJSON.Valid && typeIDsJSON.String != "" {
-		json.Unmarshal([]byte(typeIDsJSON.String), &typeIDs)
+		_ = json.Unmarshal([]byte(typeIDsJSON.String), &typeIDs)
 	}
 
 	return typeIDs, workspaceID, nil
-}
-
-// Helper to get current user (for permission checks)
-func (h *TestCoverageHandler) getCurrentUser(r *http.Request) *models.User {
-	return utils.GetCurrentUser(r)
 }

@@ -1,3 +1,4 @@
+// Package middleware provides HTTP middleware for the REST API v1.
 package middleware
 
 import (
@@ -85,7 +86,7 @@ func (ba *BearerAuth) RequireAuth(next http.Handler) http.Handler {
 func (ba *BearerAuth) RequirePermission(permissions ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			apiToken, ok := r.Context().Value(restapi.ContextKeyAPIToken).(*models.ApiToken)
+			apiToken, ok := r.Context().Value(restapi.ContextKeyAPIToken).(*models.APIToken)
 			if !ok || apiToken == nil {
 				restapi.RespondError(w, r, restapi.ErrUnauthorized)
 				return
@@ -116,8 +117,8 @@ func GetUser(ctx context.Context) *models.User {
 }
 
 // GetAPIToken retrieves the API token from context
-func GetAPIToken(ctx context.Context) *models.ApiToken {
-	if token, ok := ctx.Value(restapi.ContextKeyAPIToken).(*models.ApiToken); ok {
+func GetAPIToken(ctx context.Context) *models.APIToken {
+	if token, ok := ctx.Value(restapi.ContextKeyAPIToken).(*models.APIToken); ok {
 		return token
 	}
 	return nil

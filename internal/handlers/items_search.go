@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
 	"windshift/internal/cql"
 	"windshift/internal/models"
 	"windshift/internal/services"
@@ -15,10 +16,10 @@ import (
 
 // Search filter limits to prevent abuse
 const (
-	maxSearchQueryLength  = 500 // Maximum characters for search query
-	maxWorkspaceFilters   = 50  // Maximum number of workspace IDs in filter
-	maxStatusFilters      = 20  // Maximum number of statuses in filter
-	maxPriorityFilters    = 10  // Maximum number of priorities in filter
+	maxSearchQueryLength = 500 // Maximum characters for search query
+	maxWorkspaceFilters  = 50  // Maximum number of workspace IDs in filter
+	maxStatusFilters     = 20  // Maximum number of statuses in filter
+	maxPriorityFilters   = 10  // Maximum number of priorities in filter
 )
 
 // Search items across workspaces with advanced filtering
@@ -62,13 +63,14 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 		if workspaceID == "" {
 			continue
 		}
-		if _, err := strconv.Atoi(workspaceID); err != nil {
+		if _, err = strconv.Atoi(workspaceID); err != nil {
 			respondValidationError(w, r, "Invalid workspace ID format")
 			return
 		}
 	}
 
 	// Validate status values against allowed statuses
+	//nolint:misspell // cancelled is a valid status value in the database
 	allowedStatuses := map[string]bool{
 		"open": true, "to_do": true, "in_progress": true, "in_review": true,
 		"completed": true, "cancelled": true, "done": true, "closed": true,
@@ -125,14 +127,13 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 		// Check if the query looks like a work item key (e.g., "OK-40", "ok-40")
 		// Pattern: letters followed by hyphen followed by digits
 		parts := strings.Split(strings.ToUpper(textQuery), "-")
-		isKeyPattern := len(parts) == 2 && len(parts[0]) > 0 && len(parts[1]) > 0
+		isKeyPattern := len(parts) == 2 && parts[0] != "" && parts[1] != ""
 
 		// Try to parse as workspace key + workspace item number
 		var workspaceKey string
 		var workspaceItemNumber int
 		if isKeyPattern {
 			workspaceKey = parts[0]
-			var err error
 			workspaceItemNumber, err = strconv.Atoi(parts[1])
 			if err != nil {
 				isKeyPattern = false
@@ -159,7 +160,8 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 		requestedIDs := make(map[int]bool)
 		for _, wsID := range workspaceIDs {
 			if wsID != "" {
-				if id, err := strconv.Atoi(wsID); err == nil {
+				var id int
+				if id, err = strconv.Atoi(wsID); err == nil {
 					requestedIDs[id] = true
 				}
 			}
@@ -209,19 +211,21 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 
 	// Add limit to prevent overwhelming results with validation
 	limitStr := r.URL.Query().Get("limit")
-	var limit int = 100 // Default limit
+	var limit = 100 // Default limit
 	if limitStr != "" {
-		parsedLimit, err := strconv.Atoi(limitStr)
+		var parsedLimit int
+		parsedLimit, err = strconv.Atoi(limitStr)
 		if err != nil {
 			respondValidationError(w, r, "Invalid limit format")
 			return
 		}
 		// Enforce reasonable limits
-		if parsedLimit < 1 {
+		switch {
+		case parsedLimit < 1:
 			limit = 1
-		} else if parsedLimit > 1000 {
+		case parsedLimit > 1000:
 			limit = 1000 // Max limit to prevent resource exhaustion
-		} else {
+		default:
 			limit = parsedLimit
 		}
 	}
@@ -233,7 +237,7 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []models.Item
 	for rows.Next() {
@@ -243,7 +247,7 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 		var parentTitle sql.NullString
 		var itemTypeName sql.NullString
 
-		err := rows.Scan(
+		err = rows.Scan(
 			&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
 			&statusID, &priorityID, &customFieldValuesJSON, &parentID,
 			&item.CreatedAt, &item.UpdatedAt, &item.WorkspaceName, &item.WorkspaceKey,
@@ -262,7 +266,7 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 
 		// Parse custom field values
 		if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
-			if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &item.CustomFieldValues); err != nil {
+			if err = json.Unmarshal([]byte(customFieldValuesJSON.String), &item.CustomFieldValues); err != nil {
 				item.CustomFieldValues = make(map[string]interface{})
 			}
 		} else {
@@ -417,7 +421,7 @@ func (h *ItemHandler) buildWorkspaceMap() (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var id int
@@ -492,7 +496,7 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 
 	if err == nil && backlogStatusIDsJSON.Valid && backlogStatusIDsJSON.String != "" {
 		// Parse the configured backlog status IDs
-		if err := json.Unmarshal([]byte(backlogStatusIDsJSON.String), &backlogStatusIDs); err != nil {
+		if err = json.Unmarshal([]byte(backlogStatusIDsJSON.String), &backlogStatusIDs); err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to parse backlog configuration"))
 			return
 		}
@@ -504,16 +508,17 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 			JOIN status_categories sc ON s.category_id = sc.id
 			WHERE COALESCE(sc.is_completed, FALSE) = FALSE`
 
-		statusRows, err := h.db.Query(statusQuery)
+		var statusRows *sql.Rows
+		statusRows, err = h.db.Query(statusQuery)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
-		defer statusRows.Close()
+		defer func() { _ = statusRows.Close() }()
 
 		for statusRows.Next() {
 			var statusID int
-			if err := statusRows.Scan(&statusID); err != nil {
+			if err = statusRows.Scan(&statusID); err != nil {
 				respondInternalError(w, r, err)
 				return
 			}
@@ -563,7 +568,8 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 	// Check for QL query parameter and add additional filtering
 	if qlQuery := r.URL.Query().Get("ql"); qlQuery != "" {
 		// Build workspace mapping for QL evaluation
-		workspaceMap, err := h.buildWorkspaceMap()
+		var workspaceMap map[string]int
+		workspaceMap, err = h.buildWorkspaceMap()
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -571,7 +577,9 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 
 		// Create QL evaluator and generate SQL
 		evaluator := cql.NewEvaluator(workspaceMap)
-		qlSQL, qlArgs, err := evaluator.EvaluateToSQL(qlQuery)
+		var qlSQL string
+		var qlArgs []interface{}
+		qlSQL, qlArgs, err = evaluator.EvaluateToSQL(qlQuery)
 		if err != nil {
 			respondValidationError(w, r, "QL query error: "+err.Error())
 			return
@@ -595,7 +603,7 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []models.Item
 	for rows.Next() {
@@ -608,7 +616,7 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 		var statusName sql.NullString
 		var priorityName, priorityIcon, priorityColor sql.NullString
 
-		err := rows.Scan(
+		err = rows.Scan(
 			&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &item.ItemTypeID, &item.Title, &item.Description,
 			&statusID, &item.IsTask,
 			&item.MilestoneID, &item.IterationID, &item.TimeProjectID, &item.AssigneeID, &item.CreatorID, &customFieldValues, &calendarData, &item.ParentID,
@@ -628,13 +636,13 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 
 		// Handle JSON fields
 		if customFieldValues.Valid && customFieldValues.String != "" {
-			if err := json.Unmarshal([]byte(customFieldValues.String), &item.CustomFieldValues); err != nil {
+			if err = json.Unmarshal([]byte(customFieldValues.String), &item.CustomFieldValues); err != nil {
 				item.CustomFieldValues = make(map[string]interface{})
 			}
 		}
 
 		if calendarData.Valid && calendarData.String != "" {
-			if err := json.Unmarshal([]byte(calendarData.String), &item.CalendarData); err != nil {
+			if err = json.Unmarshal([]byte(calendarData.String), &item.CalendarData); err != nil {
 				item.CalendarData = []models.CalendarScheduleEntry{}
 			}
 		}

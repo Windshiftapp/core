@@ -7,16 +7,17 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 )
 
 var (
-	ErrExternalAccountNotFound           = errors.New("external account not found")
-	ErrUserNotFound                      = errors.New("user not found")
-	ErrEmailNotVerified                  = errors.New("email not verified by SSO provider")
-	ErrAutoProvisionDisabled             = errors.New("automatic user provisioning is disabled")
-	ErrAccountLinkingFailed              = errors.New("failed to link external account")
+	ErrExternalAccountNotFound            = errors.New("external account not found")
+	ErrUserNotFound                       = errors.New("user not found")
+	ErrEmailNotVerified                   = errors.New("email not verified by SSO provider")
+	ErrAutoProvisionDisabled              = errors.New("automatic user provisioning is disabled")
+	ErrAccountLinkingFailed               = errors.New("failed to link external account")
 	ErrAccountLinkingRequiresVerification = errors.New("account linking requires verified email from identity provider")
 )
 
@@ -298,7 +299,8 @@ func (s *UserStore) FindOrCreateUser(provider *SSOProvider, claims *OIDCClaims) 
 	if err == nil {
 		// Update last login time
 		_ = s.UpdateLastLogin(extAccount.ID)
-		user, err := s.GetUserByID(extAccount.UserID)
+		var user *models.User
+		user, err = s.GetUserByID(extAccount.UserID)
 		if err != nil {
 			return nil, err
 		}
@@ -313,7 +315,8 @@ func (s *UserStore) FindOrCreateUser(provider *SSOProvider, claims *OIDCClaims) 
 	// Security: This prevents account takeover via malicious IdP that claims
 	// unverified emails matching existing users
 	if claims.Email != "" {
-		existingUser, err := s.FindUserByEmail(claims.Email)
+		var existingUser *models.User
+		existingUser, err = s.FindUserByEmail(claims.Email)
 		if err == nil {
 			// Security check: Only auto-link if IdP has explicitly verified the email
 			// This prevents account takeover where an attacker controls an IdP and
@@ -322,7 +325,7 @@ func (s *UserStore) FindOrCreateUser(provider *SSOProvider, claims *OIDCClaims) 
 				return nil, fmt.Errorf("%w: cannot automatically link to existing account '%s' without verified email from identity provider", ErrAccountLinkingRequiresVerification, claims.Email)
 			}
 			// Link the external account to existing user
-			if err := s.LinkExternalAccount(existingUser.ID, provider.ID, claims.Subject, claims.Email, claims); err != nil {
+			if err = s.LinkExternalAccount(existingUser.ID, provider.ID, claims.Subject, claims.Email, claims); err != nil {
 				return nil, fmt.Errorf("%w: %v", ErrAccountLinkingFailed, err)
 			}
 			result.User = existingUser

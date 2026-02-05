@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
@@ -48,16 +49,16 @@ type WorkspaceSCMConnectionResponse struct {
 
 // WorkspaceRepositoryResponse represents a linked repository for API responses
 type WorkspaceRepositoryResponse struct {
-	ID                       int       `json:"id"`
-	WorkspaceSCMConnectionID int       `json:"workspace_scm_connection_id"`
-	RepositoryExternalID     string    `json:"repository_external_id"`
-	RepositoryName           string    `json:"repository_name"`
-	RepositoryURL            string    `json:"repository_url"`
-	DefaultBranch            string    `json:"default_branch"`
-	IsActive                 bool      `json:"is_active"`
+	ID                       int        `json:"id"`
+	WorkspaceSCMConnectionID int        `json:"workspace_scm_connection_id"`
+	RepositoryExternalID     string     `json:"repository_external_id"`
+	RepositoryName           string     `json:"repository_name"`
+	RepositoryURL            string     `json:"repository_url"`
+	DefaultBranch            string     `json:"default_branch"`
+	IsActive                 bool       `json:"is_active"`
 	LastSyncedAt             *time.Time `json:"last_synced_at,omitempty"`
-	CreatedAt                time.Time `json:"created_at"`
-	UpdatedAt                time.Time `json:"updated_at"`
+	CreatedAt                time.Time  `json:"created_at"`
+	UpdatedAt                time.Time  `json:"updated_at"`
 }
 
 // CreateWorkspaceSCMConnectionRequest represents a request to create a connection
@@ -116,7 +117,7 @@ func (h *SCMWorkspaceHandler) GetWorkspaceSCMConnections(w http.ResponseWriter, 
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	connections := []WorkspaceSCMConnectionResponse{}
 	for rows.Next() {
@@ -151,7 +152,7 @@ func (h *SCMWorkspaceHandler) GetWorkspaceSCMConnections(w http.ResponseWriter, 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(connections)
+	_ = json.NewEncoder(w).Encode(connections)
 }
 
 // CreateWorkspaceSCMConnection creates a new SCM connection for a workspace
@@ -163,7 +164,7 @@ func (h *SCMWorkspaceHandler) CreateWorkspaceSCMConnection(w http.ResponseWriter
 	}
 
 	var req CreateWorkspaceSCMConnectionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -192,7 +193,8 @@ func (h *SCMWorkspaceHandler) CreateWorkspaceSCMConnection(w http.ResponseWriter
 
 	// Check if workspace is allowed to use this provider
 	if h.providerHandler != nil {
-		allowed, err := h.providerHandler.IsWorkspaceAllowedForProvider(req.SCMProviderID, workspaceID)
+		var allowed bool
+		allowed, err = h.providerHandler.IsWorkspaceAllowedForProvider(req.SCMProviderID, workspaceID)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -234,7 +236,7 @@ func (h *SCMWorkspaceHandler) CreateWorkspaceSCMConnection(w http.ResponseWriter
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(conn)
+	_ = json.NewEncoder(w).Encode(conn)
 }
 
 // GetWorkspaceSCMConnection returns a single SCM connection
@@ -267,7 +269,7 @@ func (h *SCMWorkspaceHandler) GetWorkspaceSCMConnection(w http.ResponseWriter, r
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(conn)
+	_ = json.NewEncoder(w).Encode(conn)
 }
 
 // UpdateWorkspaceSCMConnection updates an SCM connection
@@ -284,7 +286,7 @@ func (h *SCMWorkspaceHandler) UpdateWorkspaceSCMConnection(w http.ResponseWriter
 	}
 
 	var req UpdateWorkspaceSCMConnectionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -332,7 +334,7 @@ func (h *SCMWorkspaceHandler) UpdateWorkspaceSCMConnection(w http.ResponseWriter
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(conn)
+	_ = json.NewEncoder(w).Encode(conn)
 }
 
 // DeleteWorkspaceSCMConnection deletes an SCM connection
@@ -410,7 +412,8 @@ func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r
 
 	// Strict enforcement: check if workspace is still allowed to use this provider
 	if h.providerHandler != nil {
-		allowed, err := h.providerHandler.IsWorkspaceAllowedForProvider(providerID, workspaceID)
+		var allowed bool
+		allowed, err = h.providerHandler.IsWorkspaceAllowedForProvider(providerID, workspaceID)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -426,7 +429,7 @@ func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r
 	if err != nil {
 		slog.Error("failed to get provider", slog.String("component", "scm"), slog.Any("error", err))
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"error":        err.Error(),
 			"repositories": []interface{}{},
 		})
@@ -455,7 +458,7 @@ func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r
 	if err != nil {
 		slog.Error("failed to list repositories", slog.String("component", "scm"), slog.Any("error", err))
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"error":        err.Error(),
 			"repositories": []interface{}{},
 		})
@@ -469,7 +472,7 @@ func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r
 		WHERE workspace_scm_connection_id = ?
 	`, connID)
 	if err == nil {
-		defer linkedRows.Close()
+		defer func() { _ = linkedRows.Close() }()
 		for linkedRows.Next() {
 			var extID string
 			if linkedRows.Scan(&extID) == nil {
@@ -493,7 +496,7 @@ func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"repositories": result,
 		"page":         page,
 		"per_page":     perPage,
@@ -542,7 +545,7 @@ func (h *SCMWorkspaceHandler) GetLinkedRepositories(w http.ResponseWriter, r *ht
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	repos := []WorkspaceRepositoryResponse{}
 	for rows.Next() {
@@ -567,7 +570,7 @@ func (h *SCMWorkspaceHandler) GetLinkedRepositories(w http.ResponseWriter, r *ht
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(repos)
+	_ = json.NewEncoder(w).Encode(repos)
 }
 
 // LinkRepository links a repository to a workspace connection
@@ -584,7 +587,7 @@ func (h *SCMWorkspaceHandler) LinkRepository(w http.ResponseWriter, r *http.Requ
 	}
 
 	var req LinkRepositoryRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -613,7 +616,8 @@ func (h *SCMWorkspaceHandler) LinkRepository(w http.ResponseWriter, r *http.Requ
 
 	// Strict enforcement: check if workspace is still allowed to use this provider
 	if h.providerHandler != nil {
-		allowed, err := h.providerHandler.IsWorkspaceAllowedForProvider(providerID, workspaceID)
+		var allowed bool
+		allowed, err = h.providerHandler.IsWorkspaceAllowedForProvider(providerID, workspaceID)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -667,7 +671,7 @@ func (h *SCMWorkspaceHandler) LinkRepository(w http.ResponseWriter, r *http.Requ
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(repo)
+	_ = json.NewEncoder(w).Encode(repo)
 }
 
 // UnlinkRepository removes a repository from a workspace
@@ -725,7 +729,7 @@ func (h *SCMWorkspaceHandler) GetAvailableSCMProviders(w http.ResponseWriter, r 
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type AvailableProvider struct {
 		ID           int                    `json:"id"`
@@ -751,7 +755,7 @@ func (h *SCMWorkspaceHandler) GetAvailableSCMProviders(w http.ResponseWriter, r 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(providers)
+	_ = json.NewEncoder(w).Encode(providers)
 }
 
 // Helper methods
@@ -794,128 +798,6 @@ func (h *SCMWorkspaceHandler) getConnectionByID(id int) (*WorkspaceSCMConnection
 	}
 
 	return &conn, nil
-}
-
-func (h *SCMWorkspaceHandler) getProviderInstance(providerID int) (scm.Provider, error) {
-	var providerType models.SCMProviderType
-	var authMethod models.SCMAuthMethod
-	var baseURL, patEnc, oauthAccessTokenEnc sql.NullString
-
-	err := h.db.QueryRow(`
-		SELECT provider_type, auth_method, base_url,
-			   personal_access_token_encrypted, oauth_access_token_encrypted
-		FROM scm_providers WHERE id = ?
-	`, providerID).Scan(&providerType, &authMethod, &baseURL, &patEnc, &oauthAccessTokenEnc)
-	if err != nil {
-		return nil, err
-	}
-
-	cfg := scm.ProviderConfig{
-		ProviderType: providerType,
-		AuthMethod:   authMethod,
-		BaseURL:      baseURL.String,
-	}
-
-	// Decrypt credentials based on auth method
-	switch authMethod {
-	case models.SCMAuthMethodOAuth:
-		if oauthAccessTokenEnc.Valid && oauthAccessTokenEnc.String != "" {
-			token, err := h.encryption.Decrypt(oauthAccessTokenEnc.String)
-			if err != nil {
-				return nil, err
-			}
-			cfg.OAuthAccessToken = token
-		}
-	case models.SCMAuthMethodPAT:
-		if patEnc.Valid && patEnc.String != "" {
-			token, err := h.encryption.Decrypt(patEnc.String)
-			if err != nil {
-				return nil, err
-			}
-			cfg.PersonalAccessToken = token
-		}
-	}
-
-	return scm.NewProvider(cfg)
-}
-
-// getProviderInstanceWithWorkspaceCredentials creates a provider using workspace-level credentials
-func (h *SCMWorkspaceHandler) getProviderInstanceWithWorkspaceCredentials(providerID, workspaceID, connectionID int) (scm.Provider, error) {
-	var providerType models.SCMProviderType
-	var authMethod models.SCMAuthMethod
-	var baseURL sql.NullString
-	var providerPATEnc, ghAppPrivateKeyEnc, ghAppID, ghAppInstallID sql.NullString
-
-	// Get provider configuration
-	err := h.db.QueryRow(`
-		SELECT provider_type, auth_method, base_url,
-			   personal_access_token_encrypted,
-			   github_app_private_key_encrypted, github_app_id, github_app_installation_id
-		FROM scm_providers WHERE id = ?
-	`, providerID).Scan(&providerType, &authMethod, &baseURL, &providerPATEnc,
-		&ghAppPrivateKeyEnc, &ghAppID, &ghAppInstallID)
-	if err != nil {
-		return nil, err
-	}
-
-	cfg := scm.ProviderConfig{
-		ProviderType: providerType,
-		AuthMethod:   authMethod,
-		BaseURL:      baseURL.String,
-	}
-
-	// For GitHub App, use provider-level credentials
-	if authMethod == models.SCMAuthMethodGitHubApp {
-		if ghAppPrivateKeyEnc.Valid && ghAppPrivateKeyEnc.String != "" {
-			privateKey, err := h.encryption.Decrypt(ghAppPrivateKeyEnc.String)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decrypt GitHub App private key: %w", err)
-			}
-			cfg.GitHubAppID = ghAppID.String
-			cfg.GitHubAppPrivateKey = privateKey
-			cfg.GitHubAppInstallationID = ghAppInstallID.String
-		}
-		return scm.NewProvider(cfg)
-	}
-
-	// For OAuth and PAT, prefer workspace-level credentials
-	var wsOAuthTokenEnc, wsPATEnc sql.NullString
-	err = h.db.QueryRow(`
-		SELECT oauth_access_token_encrypted, personal_access_token_encrypted
-		FROM workspace_scm_connections WHERE id = ?
-	`, connectionID).Scan(&wsOAuthTokenEnc, &wsPATEnc)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-
-	switch authMethod {
-	case models.SCMAuthMethodOAuth:
-		// Prefer workspace-level token
-		if wsOAuthTokenEnc.Valid && wsOAuthTokenEnc.String != "" {
-			token, err := h.encryption.Decrypt(wsOAuthTokenEnc.String)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decrypt workspace OAuth token: %w", err)
-			}
-			cfg.OAuthAccessToken = token
-		}
-	case models.SCMAuthMethodPAT:
-		// Prefer workspace-level PAT, fall back to provider-level
-		if wsPATEnc.Valid && wsPATEnc.String != "" {
-			token, err := h.encryption.Decrypt(wsPATEnc.String)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decrypt workspace PAT: %w", err)
-			}
-			cfg.PersonalAccessToken = token
-		} else if providerPATEnc.Valid && providerPATEnc.String != "" {
-			token, err := h.encryption.Decrypt(providerPATEnc.String)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decrypt provider PAT: %w", err)
-			}
-			cfg.PersonalAccessToken = token
-		}
-	}
-
-	return scm.NewProvider(cfg)
 }
 
 // StartWorkspaceOAuth initiates the OAuth flow for a workspace SCM connection
@@ -985,7 +867,7 @@ func (h *SCMWorkspaceHandler) StartWorkspaceOAuth(w http.ResponseWriter, r *http
 
 	// Generate state token
 	stateBytes := make([]byte, 32)
-	rand.Read(stateBytes)
+	_, _ = rand.Read(stateBytes)
 	state := base64.URLEncoding.EncodeToString(stateBytes)
 
 	// Determine redirect URI
@@ -1040,7 +922,7 @@ func (h *SCMWorkspaceHandler) StartWorkspaceOAuth(w http.ResponseWriter, r *http
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	_ = json.NewEncoder(w).Encode(map[string]string{
 		"auth_url": authURL,
 	})
 }
@@ -1062,7 +944,7 @@ func (h *SCMWorkspaceHandler) SetWorkspacePAT(w http.ResponseWriter, r *http.Req
 	var req struct {
 		PersonalAccessToken string `json:"personal_access_token"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -1123,7 +1005,7 @@ func (h *SCMWorkspaceHandler) SetWorkspacePAT(w http.ResponseWriter, r *http.Req
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	_ = json.NewEncoder(w).Encode(map[string]string{
 		"status":  "ok",
 		"message": "Personal Access Token configured successfully",
 	})
@@ -1257,7 +1139,7 @@ func (h *SCMWorkspaceHandler) GetWorkspaceConnectionAuthStatus(w http.ResponseWr
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 func (h *SCMWorkspaceHandler) getWorkspaceOAuthRedirectURI(r *http.Request, providerSlug string) string {

@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
@@ -25,7 +26,7 @@ func NewTimeCustomerHandler(db database.Database, timePermissionService *service
 }
 
 // checkCustomerPermission is a helper that checks if the user has customers.manage or project.manage permission
-func (h *TimeCustomerHandler) checkCustomerPermission(w http.ResponseWriter, r *http.Request) (*models.User, bool) {
+func (h *TimeCustomerHandler) checkCustomerPermission(w http.ResponseWriter, r *http.Request) (*models.User, bool) { //nolint:unparam // User return kept for future use
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok || user == nil {
 		respondUnauthorized(w, r)
@@ -53,6 +54,7 @@ func (h *TimeCustomerHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//nolint:misspell // "organisation" is intentional British spelling used throughout codebase
 	rows, err := h.db.Query(`
 		SELECT id, name, email, description, active, avatar_url, custom_field_values, created_at, updated_at
 		FROM customer_organisations
@@ -62,7 +64,7 @@ func (h *TimeCustomerHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var customers []models.CustomerOrganisation
 	for rows.Next() {
@@ -108,6 +110,7 @@ func (h *TimeCustomerHandler) Get(w http.ResponseWriter, r *http.Request) {
 	var c models.CustomerOrganisation
 	var customFieldValuesStr sql.NullString
 	var avatarURL sql.NullString
+	//nolint:misspell // "organisation" is intentional British spelling used throughout codebase
 	err := h.db.QueryRow(`
 		SELECT id, name, email, description, active, avatar_url, custom_field_values, created_at, updated_at
 		FROM customer_organisations
@@ -158,7 +161,7 @@ func (h *TimeCustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Serialize custom field values to JSON
 	var customFieldValuesJSON []byte
-	if c.CustomFieldValues != nil && len(c.CustomFieldValues) > 0 {
+	if len(c.CustomFieldValues) > 0 {
 		var err error
 		customFieldValuesJSON, err = json.Marshal(c.CustomFieldValues)
 		if err != nil {
@@ -169,6 +172,7 @@ func (h *TimeCustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 	var id int64
+	//nolint:misspell // "organisations" is intentional British spelling used throughout codebase
 	err := h.db.QueryRow(`
 		INSERT INTO customer_organisations (name, email, description, active, avatar_url, custom_field_values, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
@@ -207,7 +211,7 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Serialize custom field values to JSON
 	var customFieldValuesJSON []byte
-	if c.CustomFieldValues != nil && len(c.CustomFieldValues) > 0 {
+	if len(c.CustomFieldValues) > 0 {
 		var err error
 		customFieldValuesJSON, err = json.Marshal(c.CustomFieldValues)
 		if err != nil {
@@ -216,6 +220,7 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	//nolint:misspell // "organisations" is intentional British spelling used throughout codebase
 	_, err := h.db.ExecWrite(`
 		UPDATE customer_organisations
 		SET name = ?, email = ?, description = ?, active = ?, avatar_url = ?, custom_field_values = ?, updated_at = ?
@@ -247,6 +252,7 @@ func (h *TimeCustomerHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//nolint:misspell // "organisations" is intentional British spelling used throughout codebase
 	_, err := h.db.ExecWrite("DELETE FROM customer_organisations WHERE id = ?", id)
 	if err != nil {
 		respondInternalError(w, r, err)

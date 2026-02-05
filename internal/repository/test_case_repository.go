@@ -31,7 +31,8 @@ func (r *TestCaseRepository) FindAll(params TestCaseListParams) ([]models.TestCa
 	var query string
 	var args []interface{}
 
-	if params.All {
+	switch {
+	case params.All:
 		query = `
 			SELECT tc.id, tc.workspace_id, tc.folder_id, tc.title,
 			       COALESCE(tc.preconditions, '') as preconditions,
@@ -45,7 +46,7 @@ func (r *TestCaseRepository) FindAll(params TestCaseListParams) ([]models.TestCa
 			ORDER BY tf.sort_order, tc.sort_order, tc.title
 		`
 		args = append(args, params.WorkspaceID)
-	} else if params.FolderID == nil {
+	case params.FolderID == nil:
 		query = `
 			SELECT tc.id, tc.workspace_id, tc.folder_id, tc.title,
 			       COALESCE(tc.preconditions, '') as preconditions,
@@ -59,7 +60,7 @@ func (r *TestCaseRepository) FindAll(params TestCaseListParams) ([]models.TestCa
 			ORDER BY tc.sort_order, tc.title
 		`
 		args = append(args, params.WorkspaceID)
-	} else {
+	default:
 		query = `
 			SELECT tc.id, tc.workspace_id, tc.folder_id, tc.title,
 			       COALESCE(tc.preconditions, '') as preconditions,
@@ -79,7 +80,7 @@ func (r *TestCaseRepository) FindAll(params TestCaseListParams) ([]models.TestCa
 	if err != nil {
 		return nil, fmt.Errorf("failed to query test cases: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var testCases []models.TestCase
 	for rows.Next() {
@@ -303,7 +304,7 @@ func (r *TestCaseRepository) FindSteps(testCaseID int) ([]models.TestStep, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to query test steps: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var steps []models.TestStep
 	for rows.Next() {
@@ -421,7 +422,7 @@ func (r *TestCaseRepository) FindAllLabels(workspaceID int) ([]models.TestLabel,
 	if err != nil {
 		return nil, fmt.Errorf("failed to query test labels: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var labels []models.TestLabel
 	for rows.Next() {
@@ -451,7 +452,7 @@ func (r *TestCaseRepository) FindLabelsByTestCaseID(testCaseID int) ([]models.Te
 	if err != nil {
 		return nil, fmt.Errorf("failed to query test case labels: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var labels []models.TestLabel
 	for rows.Next() {
@@ -629,7 +630,7 @@ func (r *TestCaseRepository) GetConnections(testCaseID, workspaceID int) (*TestC
 
 	for setRows.Next() {
 		var summary TestSetSummary
-		if err := setRows.Scan(&summary.ID, &summary.Name, &summary.Description); err != nil {
+		if err = setRows.Scan(&summary.ID, &summary.Name, &summary.Description); err != nil {
 			return nil, fmt.Errorf("failed to scan test set: %w", err)
 		}
 		connections.TestSets = append(connections.TestSets, summary)
@@ -651,7 +652,7 @@ func (r *TestCaseRepository) GetConnections(testCaseID, workspaceID int) (*TestC
 
 	for tmplRows.Next() {
 		var summary RunTemplateSummary
-		if err := tmplRows.Scan(&summary.ID, &summary.Name, &summary.Description, &summary.SetID, &summary.SetName); err != nil {
+		if err = tmplRows.Scan(&summary.ID, &summary.Name, &summary.Description, &summary.SetID, &summary.SetName); err != nil {
 			return nil, fmt.Errorf("failed to scan run template: %w", err)
 		}
 		connections.RunTemplates = append(connections.RunTemplates, summary)

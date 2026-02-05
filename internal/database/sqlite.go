@@ -49,7 +49,7 @@ func (s *SQLiteDB) QueryRow(query string, args ...interface{}) *sql.Row {
 // Exec executes a query that doesn't return rows
 // Always uses write connection for safety (all Exec operations are writes)
 func (s *SQLiteDB) Exec(query string, args ...interface{}) (sql.Result, error) {
-	return s.DB.writeConn.Exec(query, args...)
+	return s.writeConn.Exec(query, args...)
 }
 
 // QueryContext executes a query with context that returns rows
@@ -65,22 +65,22 @@ func (s *SQLiteDB) QueryRowContext(ctx context.Context, query string, args ...in
 // ExecContext executes a query with context that doesn't return rows
 // Always uses write connection for safety (all Exec operations are writes)
 func (s *SQLiteDB) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	return s.DB.writeConn.ExecContext(ctx, query, args...)
+	return s.writeConn.ExecContext(ctx, query, args...)
 }
 
 // ExecWrite explicitly executes a write query using the dedicated write connection
 func (s *SQLiteDB) ExecWrite(query string, args ...interface{}) (sql.Result, error) {
-	return s.DB.writeConn.Exec(query, args...)
+	return s.writeConn.Exec(query, args...)
 }
 
 // ExecWriteContext explicitly executes a write query with context using the dedicated write connection
 func (s *SQLiteDB) ExecWriteContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	return s.DB.writeConn.ExecContext(ctx, query, args...)
+	return s.writeConn.ExecContext(ctx, query, args...)
 }
 
 // Begin starts a new transaction (returns wrapped transaction)
 func (s *SQLiteDB) Begin() (Tx, error) {
-	tx, err := s.DB.writeConn.Begin()
+	tx, err := s.writeConn.Begin()
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (s *SQLiteDB) Begin() (Tx, error) {
 
 // BeginTx starts a new transaction with options (returns wrapped transaction)
 func (s *SQLiteDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error) {
-	tx, err := s.DB.writeConn.BeginTx(ctx, opts)
+	tx, err := s.writeConn.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
 	}

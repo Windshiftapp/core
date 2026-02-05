@@ -105,12 +105,6 @@ func respondConflict(w http.ResponseWriter, r *http.Request, message string) {
 	restapi.RespondError(w, r, err)
 }
 
-// respondMethodNotAllowed writes a 405 Method Not Allowed JSON response
-func respondMethodNotAllowed(w http.ResponseWriter, r *http.Request) {
-	err := restapi.NewAPIError(http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
-	restapi.RespondError(w, r, err)
-}
-
 // respondTooManyRequests writes a 429 Too Many Requests JSON response
 func respondTooManyRequests(w http.ResponseWriter, r *http.Request, message string) {
 	err := restapi.NewAPIError(http.StatusTooManyRequests, restapi.ErrCodeRateLimited, message)

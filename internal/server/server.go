@@ -180,12 +180,12 @@ func (s *Server) initialize() error {
 		slog.Info("SQLite database initialized", "max_read_conns", cfg.MaxReadConns, "max_write_conns", cfg.MaxWriteConns, "mode", "WAL")
 	}
 
-	if err := s.db.Initialize(); err != nil {
+	if err = s.db.Initialize(); err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
 
 	// Ensure default notification settings exist
-	if err := s.db.EnsureDefaultNotificationSettings(); err != nil {
+	if err = s.db.EnsureDefaultNotificationSettings(); err != nil {
 		slog.Warn("failed to ensure notification settings", "error", err)
 	}
 
@@ -358,7 +358,7 @@ func (s *Server) initialize() error {
 	boardConfigHandler := handlers.NewBoardConfigurationHandler(s.db)
 	testCoverageHandler := handlers.NewTestCoverageHandler(s.db, permService)
 	permissionHandler := handlers.NewPermissionHandlerWithCache(s.db, permService)
-	apiTokenHandler := handlers.NewApiTokenHandler(s.db, tokenManager, permService)
+	apiTokenHandler := handlers.NewAPITokenHandler(s.db, tokenManager, permService)
 
 	// SCIM handlers
 	scimTokenManager := auth.NewSCIMTokenManager(s.db)
@@ -843,10 +843,10 @@ func (s *Server) initialize() error {
 					http.NotFound(w, r)
 					return
 				}
-				defer indexFile.Close()
+				defer func() { _ = indexFile.Close() }()
 
 				w.Header().Set("Content-Type", "text/html")
-				http.ServeContent(w, r, "index.html", time.Time{}, indexFile.(io.ReadSeeker))
+				http.ServeContent(w, r, "index.html", time.Time{}, indexFile.(io.ReadSeeker)) //nolint:errcheck // Type assertion is safe here as fs.File from embed.FS implements io.ReadSeeker
 			})
 		}
 	}
@@ -885,7 +885,7 @@ func (s *Server) Start() error {
 	s.listener = listener
 
 	// Get actual port (important for port 0)
-	tcpAddr := listener.Addr().(*net.TCPAddr)
+	tcpAddr := listener.Addr().(*net.TCPAddr) //nolint:errcheck // Type assertion is safe; net.Listen("tcp", ...) always returns *net.TCPAddr
 	s.actualPort = tcpAddr.Port
 
 	enableHTTPS := s.config.TLSCertPath != "" && s.config.TLSKeyPath != ""
@@ -923,7 +923,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	// Stop schedulers first - use safeClose helper to avoid panics on already-closed channels
 	safeClose := func(ch chan struct{}) {
 		if ch != nil {
-			defer func() { recover() }() // Ignore panic if already closed
+			defer func() { recover() }() //nolint:errcheck // Intentionally ignoring recover() return; used to suppress panics from closing already-closed channels
 			close(ch)
 		}
 	}
@@ -960,7 +960,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 
 	if s.notificationService != nil {
 		slog.Info("stopping notification service")
-		s.notificationService.Close()
+		_ = s.notificationService.Close()
 	}
 
 	if s.notificationManager != nil {
@@ -974,7 +974,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		slog.Info("shutting down HTTP server")
 		if err := s.httpServer.Shutdown(ctx); err != nil {
 			slog.Warn("HTTP server shutdown timed out, forcing close", "error", err)
-			s.httpServer.Close()
+			_ = s.httpServer.Close()
 		}
 	}
 
@@ -1021,17 +1021,17 @@ func (s *Server) cleanup() {
 
 	// Close activity tracker
 	if s.activityTracker != nil {
-		s.activityTracker.Close()
+		_ = s.activityTracker.Close()
 	}
 
 	// Close token tracker
 	if s.tokenTracker != nil {
-		s.tokenTracker.Close()
+		_ = s.tokenTracker.Close()
 	}
 
 	// Close database
 	if s.db != nil {
-		s.db.Close()
+		_ = s.db.Close()
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"strconv"
 	"strings"
+
 	"windshift/internal/models"
 )
 
@@ -35,7 +36,7 @@ func (h *AssetHandler) getUserFieldIDsForAssetType(assetTypeID int) (map[int]boo
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	fieldIDs := make(map[int]bool)
 	for rows.Next() {
@@ -50,7 +51,7 @@ func (h *AssetHandler) getUserFieldIDsForAssetType(assetTypeID int) (map[int]boo
 
 // enrichUserCustomFields resolves user IDs to full user data for user-type custom fields
 func (h *AssetHandler) enrichUserCustomFields(asset *models.Asset) error {
-	if asset.CustomFieldValues == nil || len(asset.CustomFieldValues) == 0 {
+	if len(asset.CustomFieldValues) == 0 {
 		return nil
 	}
 
@@ -106,7 +107,7 @@ func (h *AssetHandler) enrichUserCustomFields(asset *models.Asset) error {
 
 // normalizeUserFieldValues extracts just the user ID from user-type custom field values before storage
 func (h *AssetHandler) normalizeUserFieldValues(customFieldValues map[string]interface{}, assetTypeID int) error {
-	if customFieldValues == nil || len(customFieldValues) == 0 {
+	if len(customFieldValues) == 0 {
 		return nil
 	}
 

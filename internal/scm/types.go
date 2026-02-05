@@ -5,6 +5,7 @@ package scm
 import (
 	"context"
 	"time"
+
 	"windshift/internal/models"
 )
 
@@ -76,18 +77,18 @@ type ListRepositoriesOptions struct {
 
 // ListPROptions contains options for listing pull requests
 type ListPROptions struct {
-	State string // open, closed, all
-	Page  int
+	State   string // open, closed, all
+	Page    int
 	PerPage int
 }
 
 // CreatePROptions contains options for creating a pull request
 type CreatePROptions struct {
-	Title       string
-	Body        string
-	HeadBranch  string
-	BaseBranch  string
-	Draft       bool
+	Title      string
+	Body       string
+	HeadBranch string
+	BaseBranch string
+	Draft      bool
 }
 
 // WebhookOptions contains options for webhook registration
@@ -117,22 +118,22 @@ type Repository struct {
 
 // PullRequest represents a pull request from an SCM provider
 type PullRequest struct {
-	ID           int       `json:"id"`
-	Number       int       `json:"number"`
-	Title        string    `json:"title"`
-	Body         string    `json:"body,omitempty"`
-	State        string    `json:"state"` // open, closed, merged
-	URL          string    `json:"url"`
-	HeadBranch   string    `json:"head_branch"`
-	HeadSHA      string    `json:"head_sha"`
-	BaseBranch   string    `json:"base_branch"`
-	IsMerged     bool      `json:"is_merged"`
-	IsDraft      bool      `json:"is_draft"`
-	Author       User      `json:"author"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	MergedAt     *time.Time `json:"merged_at,omitempty"`
-	ClosedAt     *time.Time `json:"closed_at,omitempty"`
+	ID         int        `json:"id"`
+	Number     int        `json:"number"`
+	Title      string     `json:"title"`
+	Body       string     `json:"body,omitempty"`
+	State      string     `json:"state"` // open, closed, merged
+	URL        string     `json:"url"`
+	HeadBranch string     `json:"head_branch"`
+	HeadSHA    string     `json:"head_sha"`
+	BaseBranch string     `json:"base_branch"`
+	IsMerged   bool       `json:"is_merged"`
+	IsDraft    bool       `json:"is_draft"`
+	Author     User       `json:"author"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
+	MergedAt   *time.Time `json:"merged_at,omitempty"`
+	ClosedAt   *time.Time `json:"closed_at,omitempty"`
 }
 
 // Commit represents a commit from an SCM provider
@@ -173,10 +174,10 @@ type OAuthTokens struct {
 
 // WebhookRegistration represents a registered webhook
 type WebhookRegistration struct {
-	ID        string   `json:"id"`
-	URL       string   `json:"url"`
-	Events    []string `json:"events"`
-	IsActive  bool     `json:"is_active"`
+	ID        string    `json:"id"`
+	URL       string    `json:"url"`
+	Events    []string  `json:"events"`
+	IsActive  bool      `json:"is_active"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -209,8 +210,8 @@ type ProviderConfig struct {
 	PersonalAccessToken string
 
 	// GitHub App credentials
-	GitHubAppID            string
-	GitHubAppPrivateKey    string
+	GitHubAppID             string
+	GitHubAppPrivateKey     string
 	GitHubAppInstallationID string
 }
 

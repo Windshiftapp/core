@@ -1,3 +1,4 @@
+// Package sso provides Single Sign-On authentication functionality.
 package sso
 
 import (
@@ -5,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
 	"windshift/internal/database"
 )
 
@@ -14,10 +16,10 @@ const (
 )
 
 var (
-	ErrProviderNotFound   = errors.New("SSO provider not found")
-	ErrProviderDisabled   = errors.New("SSO provider is disabled")
-	ErrProviderExists     = errors.New("SSO provider with this slug already exists")
-	ErrNoDefaultProvider  = errors.New("no default SSO provider configured")
+	ErrProviderNotFound  = errors.New("SSO provider not found")
+	ErrProviderDisabled  = errors.New("SSO provider is disabled")
+	ErrProviderExists    = errors.New("SSO provider with this slug already exists")
+	ErrNoDefaultProvider = errors.New("no default SSO provider configured")
 )
 
 // SSOProvider represents an SSO identity provider configuration
@@ -30,7 +32,7 @@ type SSOProvider struct {
 	IsDefault             bool      `json:"is_default"`
 	IssuerURL             string    `json:"issuer_url,omitempty"`
 	ClientID              string    `json:"client_id,omitempty"`
-	ClientSecretEncrypted string    `json:"-"` // Never send to client
+	ClientSecretEncrypted string    `json:"-"`                       // Never send to client
 	ClientSecret          string    `json:"client_secret,omitempty"` // Only used for input, never stored
 	Scopes                string    `json:"scopes"`
 	AutoProvisionUsers    bool      `json:"auto_provision_users"`
@@ -291,7 +293,7 @@ func (s *ProviderStore) Create(provider *SSOProvider) error {
 
 	// If this is the first provider or marked as default, ensure it's the only default
 	if provider.IsDefault {
-		_, err := s.db.Exec("UPDATE sso_providers SET is_default = 0 WHERE is_default = 1")
+		_, err = s.db.Exec("UPDATE sso_providers SET is_default = 0 WHERE is_default = 1")
 		if err != nil {
 			return err
 		}

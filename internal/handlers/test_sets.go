@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/services"
@@ -88,7 +89,7 @@ func (h *TestSetHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// Initialize as empty array instead of nil so JSON encoding returns [] instead of null
 	sets := make([]models.TestSet, 0)
@@ -124,7 +125,7 @@ func (h *TestSetHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(sets)
+	_ = json.NewEncoder(w).Encode(sets)
 }
 
 func (h *TestSetHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -182,7 +183,7 @@ func (h *TestSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(set)
+	_ = json.NewEncoder(w).Encode(set)
 }
 
 func (h *TestSetHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -205,7 +206,7 @@ func (h *TestSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var set models.TestSet
-	if err := json.NewDecoder(r.Body).Decode(&set); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&set); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -234,7 +235,7 @@ func (h *TestSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(set)
+	_ = json.NewEncoder(w).Encode(set)
 }
 
 func (h *TestSetHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -263,7 +264,7 @@ func (h *TestSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var set models.TestSet
-	if err := json.NewDecoder(r.Body).Decode(&set); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&set); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -290,7 +291,7 @@ func (h *TestSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	set.UpdatedAt = now
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(set)
+	_ = json.NewEncoder(w).Encode(set)
 }
 
 func (h *TestSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -382,7 +383,7 @@ func (h *TestSetHandler) GetTestCases(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// Initialize as empty array instead of nil so JSON encoding returns [] instead of null
 	testCases := make([]models.TestCase, 0)
@@ -397,7 +398,7 @@ func (h *TestSetHandler) GetTestCases(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(testCases)
+	_ = json.NewEncoder(w).Encode(testCases)
 }
 
 func (h *TestSetHandler) AddTestCase(w http.ResponseWriter, r *http.Request) {
@@ -428,7 +429,7 @@ func (h *TestSetHandler) AddTestCase(w http.ResponseWriter, r *http.Request) {
 	var request struct {
 		TestCaseID int `json:"test_case_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&request); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -582,7 +583,7 @@ func (h *TestSetHandler) GetRuns(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// Initialize as empty array instead of nil so JSON encoding returns [] instead of null
 	runs := make([]models.TestRun, 0)
@@ -597,5 +598,5 @@ func (h *TestSetHandler) GetRuns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(runs)
+	_ = json.NewEncoder(w).Encode(runs)
 }

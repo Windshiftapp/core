@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 )
@@ -118,7 +119,7 @@ func (r *WorkspaceRepository) FindAll(userID int, isPersonalOnly bool) ([]models
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var workspaces []models.Workspace
 	for rows.Next() {
@@ -250,7 +251,7 @@ func (r *WorkspaceRepository) GetTimeProjectCategories(workspaceID int) ([]int, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	categories := []int{}
 	for rows.Next() {
@@ -269,7 +270,7 @@ func (r *WorkspaceRepository) SaveTimeProjectCategories(workspaceID int, categor
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Delete existing associations
 	_, err = tx.Exec("DELETE FROM workspace_time_project_categories WHERE workspace_id = ?", workspaceID)
@@ -387,7 +388,7 @@ func (r *WorkspaceRepository) GetItemsByStatusCategory(workspaceID int, filterSQ
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	result := make(map[string]int)
 	for rows.Next() {
@@ -442,7 +443,7 @@ func (r *WorkspaceRepository) GetAssignmentDistribution(workspaceID int, since t
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []AssignmentStats
 	for rows.Next() {
@@ -505,7 +506,7 @@ func (r *WorkspaceRepository) GetProjectStatistics(workspaceID int, since time.T
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []ProjectStats
 	for rows.Next() {
@@ -550,7 +551,7 @@ func (r *WorkspaceRepository) GetPriorityBreakdown(workspaceID int, since time.T
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	result := make(map[string]int)
 	for rows.Next() {
@@ -620,7 +621,7 @@ func (r *WorkspaceRepository) GetMilestoneProgress(workspaceID int, filterSQL st
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	progressMap := make(map[int]*MilestoneStatusProgress)
 
@@ -750,7 +751,7 @@ func (r *WorkspaceRepository) GetStatusesByWorkflowID(workflowID int) ([]models.
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var statuses []models.Status
 	for rows.Next() {
@@ -788,7 +789,7 @@ func (r *WorkspaceRepository) BuildWorkspaceMap() (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var id int

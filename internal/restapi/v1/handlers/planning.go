@@ -142,14 +142,14 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check milestone.create permission (REST API v1 milestones are global)
-	hasPermission, _ := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
-	if !hasPermission {
+	hasPermission, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
+	if err != nil || !hasPermission {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "milestone.create permission required"))
 		return
 	}
 
 	var req MilestoneCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
 		return
 	}
@@ -199,14 +199,14 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check milestone.create permission (REST API v1 milestones are global)
-	hasPermission, _ := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
-	if !hasPermission {
+	hasPermission, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
+	if err != nil || !hasPermission {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "milestone.create permission required"))
 		return
 	}
 
 	var req MilestoneCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
 		return
 	}
@@ -252,8 +252,8 @@ func (h *MilestoneHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check milestone.create permission (REST API v1 milestones are global)
-	hasPermission, _ := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
-	if !hasPermission {
+	hasPermission, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
+	if err != nil || !hasPermission {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "milestone.create permission required"))
 		return
 	}
@@ -514,7 +514,7 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req IterationCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
 		return
 	}
@@ -769,7 +769,7 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req ProjectCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
 		return
 	}

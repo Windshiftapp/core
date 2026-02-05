@@ -7,9 +7,10 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"windshift/internal/utils"
 
 	"golang.org/x/time/rate"
+
+	"windshift/internal/utils"
 )
 
 // RateLimiter implements token bucket rate limiting per IP address
@@ -160,11 +161,8 @@ func (rl *RateLimiter) getVisitor(ip string) *rate.Limiter {
 
 // startCleanupLoop runs periodic cleanup of old visitors and failures
 func (rl *RateLimiter) startCleanupLoop() {
-	for {
-		select {
-		case <-rl.cleanupTicker.C:
-			rl.cleanupOldEntries()
-		}
+	for range rl.cleanupTicker.C {
+		rl.cleanupOldEntries()
 	}
 }
 

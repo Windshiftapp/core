@@ -205,7 +205,7 @@ func testFrac_Phase2_RerankingOperations(t *testing.T, server *tests.TestServer,
 		var items []item
 		for rows.Next() {
 			var it item
-			if err := rows.Scan(&it.id, &it.fracIndex); err != nil {
+			if err = rows.Scan(&it.id, &it.fracIndex); err != nil {
 				rows.Close()
 				t.Fatalf("Failed to scan item: %v", err)
 			}
@@ -299,7 +299,6 @@ func testFrac_Phase2_RerankingOperations(t *testing.T, server *tests.TestServer,
 func testFrac_Phase3_FinalValidation(t *testing.T, server *tests.TestServer, db *sql.DB, stats *FracIndexStats) {
 	t.Log("Phase 3: Performing final validation")
 
-
 	// Get all items with frac_index
 	rows, err := db.Query("SELECT id, workspace_id, parent_id, frac_index FROM items WHERE frac_index IS NOT NULL")
 	if err != nil {
@@ -308,10 +307,10 @@ func testFrac_Phase3_FinalValidation(t *testing.T, server *tests.TestServer, db 
 	defer rows.Close()
 
 	type item struct {
-		id         int
+		id          int
 		workspaceID int
-		parentID   *int
-		fracIndex  string
+		parentID    *int
+		fracIndex   string
 	}
 	var items []item
 	for rows.Next() {

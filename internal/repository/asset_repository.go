@@ -57,7 +57,7 @@ func (r *AssetRepository) ListSetsForUser(userID int, isAdmin bool) ([]models.As
 	if err != nil {
 		return nil, fmt.Errorf("failed to list asset sets: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var sets []models.AssetManagementSet
 	for rows.Next() {
@@ -340,7 +340,7 @@ func (r *AssetRepository) ListAllRoles() ([]models.AssetRole, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to list roles: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var roles []models.AssetRole
 	for rows.Next() {
@@ -383,7 +383,7 @@ func (r *AssetRepository) GetRolePermissions(roleID int) ([]models.AssetPermissi
 	if err != nil {
 		return nil, fmt.Errorf("failed to get role permissions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var permissions []models.AssetPermission
 	for rows.Next() {
@@ -419,7 +419,7 @@ func (r *AssetRepository) GetSetUserRoles(setID int) ([]models.UserAssetSetRole,
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user roles: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var roles []models.UserAssetSetRole
 	for rows.Next() {
@@ -453,7 +453,7 @@ func (r *AssetRepository) GetSetGroupRoles(setID int) ([]models.GroupAssetSetRol
 	if err != nil {
 		return nil, fmt.Errorf("failed to get group roles: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var roles []models.GroupAssetSetRole
 	for rows.Next() {

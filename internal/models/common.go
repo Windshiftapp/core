@@ -58,8 +58,8 @@ type ModuleSettings struct {
 	TestManagementEnabled bool `json:"test_management_enabled"`
 }
 
-// ApiToken represents a bearer token for API authentication
-type ApiToken struct {
+// APIToken represents a bearer token for API authentication
+type APIToken struct {
 	ID          int        `json:"id"`
 	UserID      int        `json:"user_id"`
 	Name        string     `json:"name"`         // Human-readable name for the token
@@ -76,18 +76,18 @@ type ApiToken struct {
 	UserName  string `json:"user_name,omitempty"`
 }
 
-// ApiTokenCreate represents the request for creating an API token
-type ApiTokenCreate struct {
+// APITokenCreate represents the request for creating an API token
+type APITokenCreate struct {
 	Name        string     `json:"name"`
 	UserID      *int       `json:"user_id,omitempty"` // Optional: admins can create tokens for other users
 	Permissions []string   `json:"permissions"`
 	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
 }
 
-// ApiTokenResponse represents the response when creating an API token
-type ApiTokenResponse struct {
+// APITokenResponse represents the response when creating an API token
+type APITokenResponse struct {
 	Token    string   `json:"token"`     // Only returned on creation
-	ApiToken ApiToken `json:"api_token"` // Token metadata
+	APIToken APIToken `json:"api_token"` // Token metadata
 }
 
 // CacheStats represents permission cache performance metrics

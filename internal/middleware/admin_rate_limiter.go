@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"sync"
 	"time"
+
 	"windshift/internal/database"
 )
 
@@ -98,7 +99,7 @@ func (rl *AdminFallbackRateLimiter) RecordAttempt(userID int, ipAddress string) 
 
 // IsAllowed checks if an admin fallback login attempt is allowed
 // Returns (allowed, remainingAttempts, lockedUntil)
-func (rl *AdminFallbackRateLimiter) IsAllowed(userID int, ipAddress string) (bool, int, *time.Time) {
+func (rl *AdminFallbackRateLimiter) IsAllowed(userID int, ipAddress string) (allowed bool, remaining int, resetTime *time.Time) {
 	rl.mu.RLock()
 	defer rl.mu.RUnlock()
 
@@ -178,7 +179,7 @@ func (rl *AdminFallbackRateLimiter) GetIPAttemptCount(ipAddress string) int {
 }
 
 // IsIPAllowed checks if an IP address is allowed for admin login attempts
-func (rl *AdminFallbackRateLimiter) IsIPAllowed(ipAddress string) (bool, int) {
+func (rl *AdminFallbackRateLimiter) IsIPAllowed(ipAddress string) (allowed bool, remaining int) {
 	attempts := rl.GetIPAttemptCount(ipAddress)
 	if attempts >= MaxAdminAttemptsPerIP {
 		return false, 0

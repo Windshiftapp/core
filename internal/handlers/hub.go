@@ -53,7 +53,8 @@ func (h *HubHandler) GetHub(w http.ResponseWriter, r *http.Request) {
 	`).Scan(&configJSON)
 
 	var config models.PortalHubConfig
-	if err == sql.ErrNoRows || configJSON == "" {
+	switch {
+	case err == sql.ErrNoRows || configJSON == "":
 		// Return default config
 		config = models.PortalHubConfig{
 			Title:             "Portal Hub",
@@ -78,11 +79,11 @@ func (h *HubHandler) GetHub(w http.ResponseWriter, r *http.Request) {
 				}{}},
 			},
 		}
-	} else if err != nil {
+	case err != nil:
 		respondInternalError(w, r, err)
 		return
-	} else {
-		if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+	default:
+		if err = json.Unmarshal([]byte(configJSON), &config); err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
@@ -101,7 +102,7 @@ func (h *HubHandler) GetHub(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // UpdateHubConfig updates the hub configuration
@@ -122,7 +123,7 @@ func (h *HubHandler) UpdateHubConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var config models.PortalHubConfig
-	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&config); err != nil {
 		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
@@ -149,7 +150,7 @@ func (h *HubHandler) UpdateHubConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "Hub configuration saved successfully",
 	})
@@ -232,13 +233,13 @@ func (h *HubHandler) GetHubInbox(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []models.HubInboxItem
 	for rows.Next() {
 		var item models.HubInboxItem
 		var submitterName, submitterEmail sql.NullString
-		err := rows.Scan(
+		err = rows.Scan(
 			&item.ID, &item.Title, &item.Description, &item.CreatedAt,
 			&item.StatusName, &item.StatusColor,
 			&item.WorkspaceKey, &item.WorkspaceItemNumber,
@@ -272,7 +273,7 @@ func (h *HubHandler) GetHubInbox(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // GetHubInboxItem returns a specific request detail
@@ -327,7 +328,7 @@ func (h *HubHandler) GetHubInboxItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(item)
+	_ = json.NewEncoder(w).Encode(item)
 }
 
 // getUserGroupIDs returns the group IDs for a user
@@ -336,7 +337,7 @@ func (h *HubHandler) getUserGroupIDs(ctx context.Context, userID int) []int {
 	if err != nil {
 		return nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var groupIDs []int
 	for rows.Next() {
@@ -365,7 +366,7 @@ func (h *HubHandler) getEnabledPortals(ctx context.Context, isAdmin bool, userGr
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var portals []models.HubPortalInfo
 	var portalIDs []int
@@ -374,7 +375,7 @@ func (h *HubHandler) getEnabledPortals(ctx context.Context, isAdmin bool, userGr
 		var description sql.NullString
 		var configJSON string
 
-		err := rows.Scan(
+		err = rows.Scan(
 			&portal.ID, &portal.Name, &description, &portal.Status, &configJSON,
 			&portal.RequestTypeCount,
 		)
@@ -392,7 +393,7 @@ func (h *HubHandler) getEnabledPortals(ctx context.Context, isAdmin bool, userGr
 				PortalSlug     string `json:"portal_slug"`
 				PortalGradient int    `json:"portal_gradient"`
 			}
-			if err := json.Unmarshal([]byte(configJSON), &config); err == nil {
+			if err = json.Unmarshal([]byte(configJSON), &config); err == nil {
 				portal.Slug = config.PortalSlug
 				portal.Gradient = config.PortalGradient
 			}
@@ -402,7 +403,7 @@ func (h *HubHandler) getEnabledPortals(ctx context.Context, isAdmin bool, userGr
 		portalIDs = append(portalIDs, portal.ID)
 	}
 
-	if err = rows.Err(); err != nil {
+	if err = rows.Err(); err != nil { //nolint:gocritic // Using = to avoid shadowing err from outer scope
 		return nil, err
 	}
 
@@ -454,14 +455,14 @@ func (h *HubHandler) getRequestTypesForPortals(ctx context.Context, portalIDs []
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	result := make(map[int][]models.HubPortalRequestType)
 	for rows.Next() {
 		var rt models.HubPortalRequestType
 		var channelID int
 		var visGroupIDs, visOrgIDs *string
-		err := rows.Scan(&rt.ID, &channelID, &rt.Name, &rt.Description, &rt.Icon, &rt.Color, &visGroupIDs, &visOrgIDs)
+		err = rows.Scan(&rt.ID, &channelID, &rt.Name, &rt.Description, &rt.Icon, &rt.Color, &visGroupIDs, &visOrgIDs)
 		if err != nil {
 			return nil, err
 		}
@@ -478,7 +479,7 @@ func (h *HubHandler) getRequestTypesForPortals(ctx context.Context, portalIDs []
 		}
 	}
 
-	if err = rows.Err(); err != nil {
+	if err = rows.Err(); err != nil { //nolint:gocritic // Using = to avoid shadowing err from outer scope
 		return nil, err
 	}
 

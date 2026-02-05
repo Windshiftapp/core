@@ -102,7 +102,7 @@ func setupItemCRUDTestEnv(t *testing.T, db database.Database) itemCRUDTestEnv {
 
 func TestItemCRUDService_GetByID(t *testing.T) {
 	db := createItemCRUDTestDB(t)
-	
+
 	service := services.NewItemCRUDService(db)
 	env := setupItemCRUDTestEnv(t, db)
 
@@ -133,7 +133,7 @@ func TestItemCRUDService_GetByID(t *testing.T) {
 
 func TestItemCRUDService_GetByIDBasic(t *testing.T) {
 	db := createItemCRUDTestDB(t)
-	
+
 	service := services.NewItemCRUDService(db)
 	env := setupItemCRUDTestEnv(t, db)
 
@@ -161,7 +161,7 @@ func TestItemCRUDService_GetByIDBasic(t *testing.T) {
 
 func TestItemCRUDService_Exists(t *testing.T) {
 	db := createItemCRUDTestDB(t)
-	
+
 	service := services.NewItemCRUDService(db)
 	env := setupItemCRUDTestEnv(t, db)
 
@@ -190,7 +190,7 @@ func TestItemCRUDService_Exists(t *testing.T) {
 
 func TestItemCRUDService_GetWorkspaceID(t *testing.T) {
 	db := createItemCRUDTestDB(t)
-	
+
 	service := services.NewItemCRUDService(db)
 	env := setupItemCRUDTestEnv(t, db)
 
@@ -215,7 +215,7 @@ func TestItemCRUDService_GetWorkspaceID(t *testing.T) {
 
 func TestItemCRUDService_GetChildren(t *testing.T) {
 	db := createItemCRUDTestDB(t)
-	
+
 	service := services.NewItemCRUDService(db)
 	env := setupItemCRUDTestEnv(t, db)
 
@@ -247,7 +247,7 @@ func TestItemCRUDService_GetChildren(t *testing.T) {
 
 func TestItemCRUDService_GetDescendants(t *testing.T) {
 	db := createItemCRUDTestDB(t)
-	
+
 	service := services.NewItemCRUDService(db)
 	env := setupItemCRUDTestEnv(t, db)
 
@@ -293,7 +293,7 @@ func TestItemCRUDService_GetDescendants(t *testing.T) {
 
 func TestItemCRUDService_GetAncestors(t *testing.T) {
 	db := createItemCRUDTestDB(t)
-	
+
 	service := services.NewItemCRUDService(db)
 	env := setupItemCRUDTestEnv(t, db)
 
@@ -325,7 +325,7 @@ func TestItemCRUDService_GetAncestors(t *testing.T) {
 
 func TestItemCRUDService_GetRootItems(t *testing.T) {
 	db := createItemCRUDTestDB(t)
-	
+
 	service := services.NewItemCRUDService(db)
 	env := setupItemCRUDTestEnv(t, db)
 
@@ -357,7 +357,7 @@ func TestItemCRUDService_GetRootItems(t *testing.T) {
 
 func TestItemCRUDService_Delete(t *testing.T) {
 	db := createItemCRUDTestDB(t)
-	
+
 	service := services.NewItemCRUDService(db)
 	env := setupItemCRUDTestEnv(t, db)
 
@@ -420,7 +420,7 @@ func TestItemCRUDService_Delete(t *testing.T) {
 
 func TestItemCRUDService_Copy(t *testing.T) {
 	db := createItemCRUDTestDB(t)
-	
+
 	service := services.NewItemCRUDService(db)
 	env := setupItemCRUDTestEnv(t, db)
 
@@ -506,7 +506,7 @@ func TestItemCRUDService_Copy(t *testing.T) {
 
 func TestItemCRUDService_List(t *testing.T) {
 	db := createItemCRUDTestDB(t)
-	
+
 	service := services.NewItemCRUDService(db)
 	env := setupItemCRUDTestEnv(t, db)
 
@@ -585,7 +585,7 @@ func TestItemCRUDService_List(t *testing.T) {
 
 func TestItemCRUDService_Search(t *testing.T) {
 	db := createItemCRUDTestDB(t)
-	
+
 	service := services.NewItemCRUDService(db)
 	env := setupItemCRUDTestEnv(t, db)
 
@@ -677,7 +677,7 @@ func TestItemCRUDService_GetHistory(t *testing.T) {
 
 func TestItemCRUDService_GetAttachments(t *testing.T) {
 	db := createItemCRUDTestDB(t)
-	
+
 	service := services.NewItemCRUDService(db)
 	env := setupItemCRUDTestEnv(t, db)
 
@@ -723,7 +723,7 @@ func TestItemCRUDService_GetAttachments(t *testing.T) {
 
 func TestItemCRUDService_GetWithEffectiveProject(t *testing.T) {
 	db := createItemCRUDTestDB(t)
-	
+
 	service := services.NewItemCRUDService(db)
 	env := setupItemCRUDTestEnv(t, db)
 

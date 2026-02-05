@@ -239,9 +239,10 @@ func parseFetchedMessage(msg *imapclient.FetchMessageData) (*FetchedMessage, err
 
 	// Extract header and body from body sections
 	for _, section := range buf.BodySection {
-		if section.Section.Specifier == imap.PartSpecifierHeader {
+		switch section.Section.Specifier {
+		case imap.PartSpecifierHeader:
 			fetched.Header = section.Bytes
-		} else if section.Section.Specifier == imap.PartSpecifierText {
+		case imap.PartSpecifierText:
 			fetched.Body = section.Bytes
 		}
 	}

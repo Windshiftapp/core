@@ -1,3 +1,6 @@
+// Package plugins provides WebAssembly plugin support for extending Windshift functionality.
+// It includes types for plugin metadata, routes, and extensions, as well as the CLI host
+// implementation for running plugins in a sandboxed environment.
 package plugins
 
 // PluginMetadata describes plugin-provided metadata returned from exports like get_metadata/get_routes.
@@ -90,15 +93,15 @@ type HTTPFetchResponse struct {
 
 // PluginManifest represents the manifest.json file authored by plugin developers.
 type PluginManifest struct {
-	Name         string           `json:"name"`
-	Version      string           `json:"version"`
-	Description  string           `json:"description"`
-	Author       string           `json:"author"`
-	EntryPoint   string           `json:"entryPoint"`
-	Capabilities []string         `json:"capabilities,omitempty"`
-	Extensions   []Extension      `json:"extensions,omitempty"` // UI extensions provided by this plugin
-	Routes       []Route          `json:"routes,omitempty"`     // Inline route metadata
-	Webhooks     []PluginWebhook  `json:"webhooks,omitempty"`   // Webhooks the plugin wants to receive
+	Name         string          `json:"name"`
+	Version      string          `json:"version"`
+	Description  string          `json:"description"`
+	Author       string          `json:"author"`
+	EntryPoint   string          `json:"entryPoint"`
+	Capabilities []string        `json:"capabilities,omitempty"`
+	Extensions   []Extension     `json:"extensions,omitempty"` // UI extensions provided by this plugin
+	Routes       []Route         `json:"routes,omitempty"`     // Inline route metadata
+	Webhooks     []PluginWebhook `json:"webhooks,omitempty"`   // Webhooks the plugin wants to receive
 }
 
 // PluginWebhook represents a webhook registration from a plugin.
@@ -184,7 +187,7 @@ type SCMCreateBranchRequest struct {
 
 // SCMCreateBranchResponse is returned from the scm_create_branch host function.
 type SCMCreateBranchResponse struct {
-	Status    string `json:"status"`              // "ok" or "error"
+	Status    string `json:"status"`               // "ok" or "error"
 	BranchURL string `json:"branch_url,omitempty"` // URL to the created branch
 	Error     string `json:"error,omitempty"`      // Error message if failed
 }
@@ -201,7 +204,7 @@ type SCMCreateItemLinkRequest struct {
 
 // SCMCreateItemLinkResponse is returned from the scm_create_item_link host function.
 type SCMCreateItemLinkResponse struct {
-	Status string `json:"status"`          // "ok" or "error"
+	Status string `json:"status"`            // "ok" or "error"
 	LinkID int    `json:"link_id,omitempty"` // ID of the created link
-	Error  string `json:"error,omitempty"` // Error message if failed
+	Error  string `json:"error,omitempty"`   // Error message if failed
 }

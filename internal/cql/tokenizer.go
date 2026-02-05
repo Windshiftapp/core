@@ -20,7 +20,7 @@ func NewTokenizer(input string) *Tokenizer {
 		input:    input,
 		position: 0,
 	}
-	if len(input) > 0 {
+	if input != "" {
 		t.current = rune(input[0])
 	}
 	return t
@@ -96,7 +96,7 @@ func (t *Tokenizer) readIdentifier() string {
 }
 
 // peekAhead looks ahead in the input without advancing position
-func (t *Tokenizer) peekAhead(offset int) rune {
+func (t *Tokenizer) peekAhead(offset int) rune { //nolint:unparam // offset kept for flexibility
 	pos := t.position + offset
 	if pos >= len(t.input) {
 		return 0
@@ -175,7 +175,7 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 				if t.position+1 < len(t.input) && strings.ToUpper(t.input[t.position:t.position+2]) == "IN" {
 					t.advance()
 					t.advance()
-					tokens = append(tokens, Token{Type: NOT_IN, Value: "NOT IN", Pos: start})
+					tokens = append(tokens, Token{Type: NotIn, Value: "NOT IN", Pos: start})
 				} else {
 					t.position = oldPos
 					t.current = rune(t.input[t.position])
@@ -208,28 +208,28 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 		if t.current == '!' && t.peekAhead(1) == '=' {
 			t.advance()
 			t.advance()
-			tokens = append(tokens, Token{Type: NOT_EQUALS, Value: "!=", Pos: start})
+			tokens = append(tokens, Token{Type: NotEquals, Value: "!=", Pos: start})
 			continue
 		}
 
 		if t.current == '<' && t.peekAhead(1) == '=' {
 			t.advance()
 			t.advance()
-			tokens = append(tokens, Token{Type: LESS_EQUAL, Value: "<=", Pos: start})
+			tokens = append(tokens, Token{Type: LessEqual, Value: "<=", Pos: start})
 			continue
 		}
 
 		if t.current == '>' && t.peekAhead(1) == '=' {
 			t.advance()
 			t.advance()
-			tokens = append(tokens, Token{Type: GREATER_EQUAL, Value: ">=", Pos: start})
+			tokens = append(tokens, Token{Type: GreaterEqual, Value: ">=", Pos: start})
 			continue
 		}
 
 		if t.current == '<' && t.peekAhead(1) == '>' {
 			t.advance()
 			t.advance()
-			tokens = append(tokens, Token{Type: NOT_EQUALS, Value: "<>", Pos: start})
+			tokens = append(tokens, Token{Type: NotEquals, Value: "<>", Pos: start})
 			continue
 		}
 
@@ -238,9 +238,9 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 		case '=':
 			tokens = append(tokens, Token{Type: EQUALS, Value: "=", Pos: start})
 		case '<':
-			tokens = append(tokens, Token{Type: LESS_THAN, Value: "<", Pos: start})
+			tokens = append(tokens, Token{Type: LessThan, Value: "<", Pos: start})
 		case '>':
-			tokens = append(tokens, Token{Type: GREATER_THAN, Value: ">", Pos: start})
+			tokens = append(tokens, Token{Type: GreaterThan, Value: ">", Pos: start})
 		case '~':
 			tokens = append(tokens, Token{Type: CONTAINS, Value: "~", Pos: start})
 		case '(':

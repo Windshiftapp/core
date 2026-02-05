@@ -62,20 +62,18 @@ func (s *MentionService) ExtractMentionIdentifiers(content string) []string {
 }
 
 // resolveUserIdentifier looks up a user by username or display name
-// Returns userID, displayName, error
-func (s *MentionService) resolveUserIdentifier(identifier string) (int, string, error) {
-	var userID int
+func (s *MentionService) resolveUserIdentifier(identifier string) (userID int, displayName string, err error) {
 	var firstName, lastName string
 
 	// Try username first (exact match, case insensitive)
-	err := s.db.QueryRow(`
+	err = s.db.QueryRow(`
 		SELECT id, first_name, last_name
 		FROM users
 		WHERE LOWER(username) = LOWER(?) AND is_active = true
 	`, identifier).Scan(&userID, &firstName, &lastName)
 
 	if err == nil {
-		displayName := strings.TrimSpace(firstName + " " + lastName)
+		displayName = strings.TrimSpace(firstName + " " + lastName)
 		return userID, displayName, nil
 	}
 
@@ -91,7 +89,7 @@ func (s *MentionService) resolveUserIdentifier(identifier string) (int, string, 
 	`, identifier).Scan(&userID, &firstName, &lastName)
 
 	if err == nil {
-		displayName := strings.TrimSpace(firstName + " " + lastName)
+		displayName = strings.TrimSpace(firstName + " " + lastName)
 		return userID, displayName, nil
 	}
 
@@ -149,7 +147,7 @@ func (s *MentionService) ProcessMentions(params ProcessMentionsParams) error {
 		if !existingIDs[userID] {
 			slog.Debug("Creating new mention", slog.String("component", "mentions"), slog.Int("user_id", userID), slog.String("source_type", params.SourceType), slog.Int("source_id", params.SourceID))
 
-			err := s.createMention(&models.Mention{
+			err = s.createMention(&models.Mention{
 				SourceType:               params.SourceType,
 				SourceID:                 params.SourceID,
 				MentionedUserID:          userID,
@@ -175,7 +173,7 @@ func (s *MentionService) ProcessMentions(params ProcessMentionsParams) error {
 		if _, exists := currentMentions[existingMention.MentionedUserID]; !exists {
 			slog.Debug("Removing mention", slog.String("component", "mentions"), slog.Int("mention_id", existingMention.ID), slog.Int("user_id", existingMention.MentionedUserID))
 
-			_, err := s.db.ExecWrite(`DELETE FROM mentions WHERE id = ?`, existingMention.ID)
+			_, err = s.db.ExecWrite(`DELETE FROM mentions WHERE id = ?`, existingMention.ID)
 			if err != nil {
 				slog.Error("Error deleting mention", slog.String("component", "mentions"), slog.Int("mention_id", existingMention.ID), slog.Any("error", err))
 			}
@@ -260,7 +258,7 @@ func (s *MentionService) createMention(m *models.Mention) error {
 }
 
 // emitMentionNotification sends a notification for a new mention
-func (s *MentionService) emitMentionNotification(params ProcessMentionsParams, mentionedUserID int, displayName string) {
+func (s *MentionService) emitMentionNotification(params ProcessMentionsParams, mentionedUserID int, _ string) {
 	if s.notificationService == nil {
 		return
 	}
@@ -293,11 +291,14 @@ func (s *MentionService) emitMentionNotification(params ProcessMentionsParams, m
 	itemKey := fmt.Sprintf("%s-%d", workspaceKey, workspaceItemNumber)
 
 	// Determine source type description
-	sourceTypeDesc := "content"
-	if params.SourceType == "comment" {
+	var sourceTypeDesc string
+	switch params.SourceType {
+	case "comment":
 		sourceTypeDesc = "a comment"
-	} else if params.SourceType == "item_description" {
+	case "item_description":
 		sourceTypeDesc = "the description"
+	default:
+		sourceTypeDesc = "content"
 	}
 
 	// Use AssigneeID to target the mentioned user

@@ -72,23 +72,24 @@ func (d *ItemKeyDetector) DetectItemKeysWithPattern(text, pattern string, source
 	var results []DetectedItemKey
 
 	for _, match := range matches {
-		if len(match) >= 3 {
-			key := match[0]
-			if seen[key] {
-				continue
-			}
-			seen[key] = true
-
-			var number int
-			_, _ = fmt.Sscanf(match[2], "%d", &number)
-
-			results = append(results, DetectedItemKey{
-				Key:    key,
-				Prefix: match[1],
-				Number: number,
-				Source: source,
-			})
+		if len(match) < 3 {
+			continue
 		}
+		key := match[0]
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+
+		var number int
+		_, _ = fmt.Sscanf(match[2], "%d", &number)
+
+		results = append(results, DetectedItemKey{
+			Key:    key,
+			Prefix: match[1],
+			Number: number,
+			Source: source,
+		})
 	}
 
 	return results

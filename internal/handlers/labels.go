@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/services"
@@ -48,7 +49,7 @@ func (h *LabelHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	labels := []models.Label{}
 	for rows.Next() {
@@ -166,7 +167,7 @@ func (h *LabelHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Name  string `json:"name"`
 		Color string `json:"color"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondBadRequest(w, r, err.Error())
 		return
 	}
@@ -265,7 +266,7 @@ func (h *LabelHandler) GetItemLabels(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	labels := []models.Label{}
 	for rows.Next() {
@@ -301,7 +302,7 @@ func (h *LabelHandler) SetItemLabels(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		LabelIDs []int `json:"label_ids"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondBadRequest(w, r, err.Error())
 		return
 	}
@@ -355,7 +356,7 @@ func (h *LabelHandler) AddItemLabel(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		LabelID int `json:"label_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondBadRequest(w, r, err.Error())
 		return
 	}
@@ -420,7 +421,7 @@ func (h *LabelHandler) respondItemLabels(w http.ResponseWriter, r *http.Request,
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	labels := []models.Label{}
 	for rows.Next() {
@@ -462,7 +463,7 @@ func LoadLabelsForItems(db database.Database, items []models.Item) error {
 	if err != nil {
 		return fmt.Errorf("failed to load labels for items: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// Group labels by item ID
 	labelMap := make(map[int][]models.Label)

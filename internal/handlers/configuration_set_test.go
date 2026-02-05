@@ -5,6 +5,7 @@ package handlers
 import (
 	"net/http"
 	"testing"
+
 	"windshift/internal/models"
 	"windshift/internal/testutils"
 	"windshift/internal/testutils/mocks"
@@ -989,8 +990,8 @@ func TestScreenHandler_SharedCustomFieldsDifferentConfig(t *testing.T) {
 			ScreenID:        screenA,
 			FieldType:       "custom",
 			FieldIdentifier: testutils.IntToString(sharedFieldID),
-			DisplayOrder:    10, // Changed from 1
-			IsRequired:      false, // Changed from true
+			DisplayOrder:    10,     // Changed from 1
+			IsRequired:      false,  // Changed from true
 			FieldWidth:      "half", // Changed from full
 		},
 	}

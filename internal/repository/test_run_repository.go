@@ -21,11 +21,11 @@ func NewTestRunRepository(db database.Database) *TestRunRepository {
 
 // TestRunFilters contains filter parameters for listing test runs
 type TestRunFilters struct {
-	AssigneeID   *int  // Filter by specific assignee
-	Unassigned   bool  // Filter for unassigned runs
-	TemplateID   *int  // Filter by template
-	SetID        *int  // Filter by test set
-	IncludeEnded bool  // Include ended runs
+	AssigneeID   *int // Filter by specific assignee
+	Unassigned   bool // Filter for unassigned runs
+	TemplateID   *int // Filter by template
+	SetID        *int // Filter by test set
+	IncludeEnded bool // Include ended runs
 }
 
 // FindAll returns test runs for a workspace with optional filters
@@ -69,7 +69,7 @@ func (r *TestRunRepository) FindAll(workspaceID int, filters TestRunFilters) ([]
 	if err != nil {
 		return nil, fmt.Errorf("failed to query test runs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	runs := make([]models.TestRun, 0)
 	for rows.Next() {
@@ -226,7 +226,7 @@ func (r *TestRunRepository) FindResults(runID int) ([]models.TestResult, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to query test results: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []models.TestResult
 	for rows.Next() {
@@ -312,12 +312,12 @@ func (r *TestRunRepository) CreateResultsFromSet(tx database.Tx, runID, setID in
 	if err != nil {
 		return fmt.Errorf("failed to query set test cases: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	now := time.Now()
 	for rows.Next() {
 		var testCaseID int
-		if err := rows.Scan(&testCaseID); err != nil {
+		if err = rows.Scan(&testCaseID); err != nil {
 			return fmt.Errorf("failed to scan test case ID: %w", err)
 		}
 
@@ -345,7 +345,7 @@ func (r *TestRunRepository) GetResultSummary(runID int) (map[string]int, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to query result summary: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	summary := make(map[string]int)
 	for rows.Next() {

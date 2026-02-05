@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/middleware"
@@ -49,7 +50,7 @@ func (h *WorkspaceRoleHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var roles []models.WorkspaceRole
 	for rows.Next() {
@@ -68,7 +69,7 @@ func (h *WorkspaceRoleHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(roles)
+	_ = json.NewEncoder(w).Encode(roles)
 }
 
 // Get returns a single workspace role with its permissions
@@ -113,7 +114,7 @@ func (h *WorkspaceRoleHandler) Get(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer permRows.Close()
+	defer func() { _ = permRows.Close() }()
 
 	role.Permissions = []models.Permission{}
 	for permRows.Next() {
@@ -126,7 +127,7 @@ func (h *WorkspaceRoleHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(role)
+	_ = json.NewEncoder(w).Encode(role)
 }
 
 // AssignRoleToUser assigns a role to a user in a workspace
@@ -186,11 +187,11 @@ func (h *WorkspaceRoleHandler) AssignRoleToUser(w http.ResponseWriter, r *http.R
 	if currentUser != nil {
 		// Get role, target user, and workspace details for audit log
 		var roleName, targetUsername, workspaceName string
-		readDB.QueryRow("SELECT name FROM workspace_roles WHERE id = ?", req.RoleID).Scan(&roleName)
-		readDB.QueryRow("SELECT username FROM users WHERE id = ?", req.UserID).Scan(&targetUsername)
-		readDB.QueryRow("SELECT name FROM workspaces WHERE id = ?", req.WorkspaceID).Scan(&workspaceName)
+		_ = readDB.QueryRow("SELECT name FROM workspace_roles WHERE id = ?", req.RoleID).Scan(&roleName)
+		_ = readDB.QueryRow("SELECT username FROM users WHERE id = ?", req.UserID).Scan(&targetUsername)
+		_ = readDB.QueryRow("SELECT name FROM workspaces WHERE id = ?", req.WorkspaceID).Scan(&workspaceName)
 
-		logger.LogAudit(h.BaseHandler.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -272,11 +273,11 @@ func (h *WorkspaceRoleHandler) RevokeRoleFromUser(w http.ResponseWriter, r *http
 	if currentUser != nil {
 		// Get role, target user, and workspace details for audit log
 		var roleName, targetUsername, workspaceName string
-		readDB.QueryRow("SELECT name FROM workspace_roles WHERE id = ?", roleID).Scan(&roleName)
-		readDB.QueryRow("SELECT username FROM users WHERE id = ?", userID).Scan(&targetUsername)
-		readDB.QueryRow("SELECT name FROM workspaces WHERE id = ?", workspaceID).Scan(&workspaceName)
+		_ = readDB.QueryRow("SELECT name FROM workspace_roles WHERE id = ?", roleID).Scan(&roleName)
+		_ = readDB.QueryRow("SELECT username FROM users WHERE id = ?", userID).Scan(&targetUsername)
+		_ = readDB.QueryRow("SELECT name FROM workspaces WHERE id = ?", workspaceID).Scan(&workspaceName)
 
-		logger.LogAudit(h.BaseHandler.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -337,7 +338,7 @@ func (h *WorkspaceRoleHandler) GetUserRolesInWorkspace(w http.ResponseWriter, r 
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var roles []models.WorkspaceRole
 	for rows.Next() {
@@ -354,7 +355,7 @@ func (h *WorkspaceRoleHandler) GetUserRolesInWorkspace(w http.ResponseWriter, r 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(roles)
+	_ = json.NewEncoder(w).Encode(roles)
 }
 
 // GetWorkspaceRoleAssignments returns all users with their role assignments for a workspace
@@ -387,7 +388,7 @@ func (h *WorkspaceRoleHandler) GetWorkspaceRoleAssignments(w http.ResponseWriter
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type Role struct {
 		RoleID          int    `json:"role_id"`
@@ -397,13 +398,13 @@ func (h *WorkspaceRoleHandler) GetWorkspaceRoleAssignments(w http.ResponseWriter
 	}
 
 	type UserWithRoles struct {
-		UserID    int      `json:"user_id"`
-		Username  string   `json:"username"`
-		Email     string   `json:"email"`
-		FirstName *string  `json:"first_name"`
-		LastName  *string  `json:"last_name"`
-		AvatarURL *string  `json:"avatar_url"`
-		Roles     []Role   `json:"roles"`
+		UserID    int     `json:"user_id"`
+		Username  string  `json:"username"`
+		Email     string  `json:"email"`
+		FirstName *string `json:"first_name"`
+		LastName  *string `json:"last_name"`
+		AvatarURL *string `json:"avatar_url"`
+		Roles     []Role  `json:"roles"`
 	}
 
 	// Map to group roles by user
@@ -460,7 +461,7 @@ func (h *WorkspaceRoleHandler) GetWorkspaceRoleAssignments(w http.ResponseWriter
 	})
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(users)
+	_ = json.NewEncoder(w).Encode(users)
 }
 
 type everyoneRoleResponse struct {
@@ -495,13 +496,14 @@ func (h *WorkspaceRoleHandler) GetEveryoneRole(w http.ResponseWriter, r *http.Re
 
 	// Default: implicit Viewer
 	if err == sql.ErrNoRows {
-		viewerRole, err := h.getViewerRole()
+		var viewerRole *models.WorkspaceRole
+		viewerRole, err = h.getViewerRole()
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to load Viewer role: %w", err))
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(everyoneRoleResponse{
+		_ = json.NewEncoder(w).Encode(everyoneRoleResponse{
 			WorkspaceID: workspaceID,
 			RoleID:      &viewerRole.ID,
 			RoleName:    &viewerRole.Name,
@@ -513,7 +515,7 @@ func (h *WorkspaceRoleHandler) GetEveryoneRole(w http.ResponseWriter, r *http.Re
 	// Explicit assignment (role present or explicitly removed)
 	if !storedRole.Valid {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(everyoneRoleResponse{
+		_ = json.NewEncoder(w).Encode(everyoneRoleResponse{
 			WorkspaceID: workspaceID,
 			Source:      "explicit",
 		})
@@ -527,7 +529,7 @@ func (h *WorkspaceRoleHandler) GetEveryoneRole(w http.ResponseWriter, r *http.Re
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(everyoneRoleResponse{
+	_ = json.NewEncoder(w).Encode(everyoneRoleResponse{
 		WorkspaceID: workspaceID,
 		RoleID:      &role.ID,
 		RoleName:    &role.Name,
@@ -553,7 +555,7 @@ func (h *WorkspaceRoleHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Re
 	}
 
 	var req setEveryoneRoleRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -568,7 +570,8 @@ func (h *WorkspaceRoleHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Re
 	var roleName *string
 
 	if req.RoleID != nil {
-		role, err := h.getWorkspaceRoleByID(*req.RoleID)
+		var role *models.WorkspaceRole
+		role, err = h.getWorkspaceRoleByID(*req.RoleID)
 		if err != nil {
 			respondNotFound(w, r, "role")
 			return
@@ -580,14 +583,16 @@ func (h *WorkspaceRoleHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Re
 		// (unless the user is a system admin, who always has implicit access)
 		skipViewerCheck := false
 		if h.permissionService != nil {
-			isAdmin, err := h.permissionService.IsSystemAdmin(granterID)
+			var isAdmin bool
+			isAdmin, err = h.permissionService.IsSystemAdmin(granterID)
 			if err == nil && isAdmin {
 				skipViewerCheck = true
 			}
 		}
 
 		if !skipViewerCheck {
-			hasViewer, err := h.hasWorkspaceViewerAssignment(workspaceID)
+			var hasViewer bool
+			hasViewer, err = h.hasWorkspaceViewerAssignment(workspaceID)
 			if err != nil {
 				respondInternalError(w, r, fmt.Errorf("failed to validate workspace access: %w", err))
 				return
@@ -615,7 +620,7 @@ func (h *WorkspaceRoleHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Re
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(everyoneRoleResponse{
+	_ = json.NewEncoder(w).Encode(everyoneRoleResponse{
 		WorkspaceID: workspaceID,
 		RoleID:      utils.NullInt64ToPtr(roleValue),
 		RoleName:    roleName,
@@ -680,7 +685,6 @@ func (h *WorkspaceRoleHandler) hasWorkspaceViewerAssignment(workspaceID int) (bo
 	`, workspaceID, workspaceID).Scan(&exists)
 	return exists, err
 }
-
 
 // getSessionUserID extracts user ID from session context
 func (h *WorkspaceRoleHandler) getSessionUserID(r *http.Request) int {

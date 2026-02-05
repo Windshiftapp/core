@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 )
@@ -23,13 +24,13 @@ func (h *WorkflowHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		SELECT id, name, description, is_default, created_at, updated_at
 		FROM workflows
 		ORDER BY is_default DESC, name ASC`
-	
+
 	rows, err := h.db.Query(query)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var workflows []models.Workflow
 	for rows.Next() {
@@ -41,7 +42,7 @@ func (h *WorkflowHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			respondInternalError(w, r, err)
 			return
 		}
-		
+
 		workflows = append(workflows, workflow)
 	}
 
@@ -66,7 +67,7 @@ func (h *WorkflowHandler) Get(w http.ResponseWriter, r *http.Request) {
 		WHERE id = ?
 	`, id).Scan(&workflow.ID, &workflow.Name, &workflow.Description,
 		&workflow.IsDefault, &workflow.CreatedAt, &workflow.UpdatedAt)
-	
+
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "workflow")
 		return
@@ -241,7 +242,7 @@ func (h *WorkflowHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Delete workflow transitions first
 	_, err = tx.Exec("DELETE FROM workflow_transitions WHERE workflow_id = ?", id)
@@ -266,14 +267,14 @@ func (h *WorkflowHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Workflow Transitions endpoints
+// GetTransitions returns the transitions for a workflow.
 func (h *WorkflowHandler) GetTransitions(w http.ResponseWriter, r *http.Request) {
-	workflowId, ok := requireIDParam(w, r, "id")
+	workflowID, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
 	}
 
-	transitions, err := h.getWorkflowTransitions(workflowId)
+	transitions, err := h.getWorkflowTransitions(workflowID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -283,7 +284,7 @@ func (h *WorkflowHandler) GetTransitions(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Request) {
-	workflowId, ok := requireIDParam(w, r, "id")
+	workflowID, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
 	}
@@ -300,10 +301,10 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Delete existing transitions for this workflow
-	_, err = tx.Exec("DELETE FROM workflow_transitions WHERE workflow_id = ?", workflowId)
+	_, err = tx.Exec("DELETE FROM workflow_transitions WHERE workflow_id = ?", workflowID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -345,7 +346,7 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 		_, err = tx.Exec(`
 			INSERT INTO workflow_transitions (workflow_id, from_status_id, to_status_id, display_order, source_handle, target_handle, created_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?)
-		`, workflowId, transition.FromStatusID, transition.ToStatusID, transition.DisplayOrder, transition.SourceHandle, transition.TargetHandle, time.Now())
+		`, workflowID, transition.FromStatusID, transition.ToStatusID, transition.DisplayOrder, transition.SourceHandle, transition.TargetHandle, time.Now())
 
 		if err != nil {
 			respondInternalError(w, r, err)
@@ -360,7 +361,7 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Return updated transitions
-	updatedTransitions, err := h.getWorkflowTransitions(workflowId)
+	updatedTransitions, err := h.getWorkflowTransitions(workflowID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -370,12 +371,12 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *WorkflowHandler) GetAvailableTransitions(w http.ResponseWriter, r *http.Request) {
-	workflowId, ok := requireIDParam(w, r, "id")
+	workflowID, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
 	}
 
-	statusId, ok := requireIDParam(w, r, "statusId")
+	statusID, ok := requireIDParam(w, r, "statusID")
 	if !ok {
 		return
 	}
@@ -389,13 +390,13 @@ func (h *WorkflowHandler) GetAvailableTransitions(w http.ResponseWriter, r *http
 		JOIN workflows w ON wt.workflow_id = w.id
 		WHERE wt.workflow_id = ? AND (wt.from_status_id = ? OR wt.from_status_id IS NULL)
 		ORDER BY wt.display_order ASC`
-	
-	rows, err := h.db.Query(query, workflowId, statusId)
+
+	rows, err := h.db.Query(query, workflowID, statusID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var transitions []models.WorkflowTransition
 	for rows.Next() {
@@ -419,7 +420,7 @@ func (h *WorkflowHandler) GetAvailableTransitions(w http.ResponseWriter, r *http
 		if fromStatusName.Valid {
 			transition.FromStatusName = fromStatusName.String
 		}
-		
+
 		transitions = append(transitions, transition)
 	}
 
@@ -432,7 +433,7 @@ func (h *WorkflowHandler) GetAvailableTransitions(w http.ResponseWriter, r *http
 }
 
 // Helper function to get workflow transitions
-func (h *WorkflowHandler) getWorkflowTransitions(workflowId int) ([]models.WorkflowTransition, error) {
+func (h *WorkflowHandler) getWorkflowTransitions(workflowID int) ([]models.WorkflowTransition, error) {
 	query := `
 		SELECT wt.id, wt.workflow_id, wt.from_status_id, wt.to_status_id, wt.display_order, wt.source_handle, wt.target_handle, wt.created_at,
 		       fs.name as from_status_name, ts.name as to_status_name, w.name as workflow_name
@@ -442,12 +443,12 @@ func (h *WorkflowHandler) getWorkflowTransitions(workflowId int) ([]models.Workf
 		JOIN workflows w ON wt.workflow_id = w.id
 		WHERE wt.workflow_id = ?
 		ORDER BY wt.from_status_id NULLS FIRST, wt.display_order ASC`
-	
-	rows, err := h.db.Query(query, workflowId)
+
+	rows, err := h.db.Query(query, workflowID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var transitions []models.WorkflowTransition
 	for rows.Next() {
@@ -456,7 +457,7 @@ func (h *WorkflowHandler) getWorkflowTransitions(workflowId int) ([]models.Workf
 		var fromStatusName sql.NullString
 		var sourceHandle sql.NullString
 		var targetHandle sql.NullString
-		
+
 		err := rows.Scan(&transition.ID, &transition.WorkflowID, &fromStatusID, &transition.ToStatusID,
 			&transition.DisplayOrder, &sourceHandle, &targetHandle, &transition.CreatedAt, &fromStatusName,
 			&transition.ToStatusName, &transition.WorkflowName)
@@ -472,7 +473,7 @@ func (h *WorkflowHandler) getWorkflowTransitions(workflowId int) ([]models.Workf
 		if fromStatusName.Valid {
 			transition.FromStatusName = fromStatusName.String
 		}
-		
+
 		// Handle nullable handle fields
 		if sourceHandle.Valid {
 			transition.SourceHandle = sourceHandle.String
@@ -480,7 +481,7 @@ func (h *WorkflowHandler) getWorkflowTransitions(workflowId int) ([]models.Workf
 		if targetHandle.Valid {
 			transition.TargetHandle = targetHandle.String
 		}
-		
+
 		transitions = append(transitions, transition)
 	}
 

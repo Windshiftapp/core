@@ -11,25 +11,31 @@ import (
 	"time"
 )
 
+// csrfContextKey is a private type for CSRF context keys to avoid collisions.
+type csrfContextKey string
+
+// ContextKeyCSRFToken is the context key for the CSRF token value.
+const ContextKeyCSRFToken csrfContextKey = "csrf_token"
+
 // CSRFMiddleware handles CSRF protection for web requests
 type CSRFMiddleware struct {
 	tokenStore    map[string]time.Time // In-memory token store
 	mutex         sync.RWMutex         // Protects concurrent access to tokenStore
 	maxAge        time.Duration
-	cleanupTicker *time.Ticker         // Periodic cleanup ticker
+	cleanupTicker *time.Ticker // Periodic cleanup ticker
 }
 
 // NewCSRFMiddleware creates a new CSRF middleware
 func NewCSRFMiddleware() *CSRFMiddleware {
 	cm := &CSRFMiddleware{
 		tokenStore:    make(map[string]time.Time),
-		maxAge:        24 * time.Hour, // Tokens valid for 24 hours
+		maxAge:        24 * time.Hour,                // Tokens valid for 24 hours
 		cleanupTicker: time.NewTicker(1 * time.Hour), // Clean up every hour
 	}
-	
+
 	// Start background cleanup goroutine
 	go cm.startCleanupLoop()
-	
+
 	return cm
 }
 
@@ -40,14 +46,14 @@ func (cm *CSRFMiddleware) GenerateToken() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to generate CSRF token: %w", err)
 	}
-	
+
 	token := hex.EncodeToString(bytes)
-	
+
 	// Thread-safe token storage
 	cm.mutex.Lock()
 	cm.tokenStore[token] = time.Now()
 	cm.mutex.Unlock()
-	
+
 	return token, nil
 }
 
@@ -56,15 +62,15 @@ func (cm *CSRFMiddleware) ValidateToken(token string) bool {
 	if token == "" {
 		return false
 	}
-	
+
 	cm.mutex.RLock()
 	createdAt, exists := cm.tokenStore[token]
 	cm.mutex.RUnlock()
-	
+
 	if !exists {
 		return false
 	}
-	
+
 	// Check if token has expired
 	if time.Since(createdAt) > cm.maxAge {
 		cm.mutex.Lock()
@@ -72,7 +78,7 @@ func (cm *CSRFMiddleware) ValidateToken(token string) bool {
 		cm.mutex.Unlock()
 		return false
 	}
-	
+
 	return true
 }
 
@@ -81,21 +87,21 @@ func (cm *CSRFMiddleware) ConsumeToken(token string) bool {
 	if token == "" {
 		return false
 	}
-	
+
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
-	
+
 	createdAt, exists := cm.tokenStore[token]
 	if !exists {
 		return false
 	}
-	
+
 	// Check if token has expired
 	if time.Since(createdAt) > cm.maxAge {
 		delete(cm.tokenStore, token)
 		return false
 	}
-	
+
 	// Remove token after successful validation (one-time use)
 	delete(cm.tokenStore, token)
 	return true
@@ -109,19 +115,19 @@ func (cm *CSRFMiddleware) CSRFProtection(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		
+
 		// Only check CSRF for state-changing operations
 		if r.Method == "GET" || r.Method == "HEAD" || r.Method == "OPTIONS" {
 			next.ServeHTTP(w, r)
 			return
 		}
-		
+
 		// Get CSRF token from header or form
 		token := r.Header.Get("X-CSRF-Token")
 		if token == "" {
 			token = r.FormValue("csrf_token")
 		}
-		
+
 		if token == "" {
 			cm.handleCSRFError(w, r, "CSRF token missing")
 			return
@@ -131,7 +137,7 @@ func (cm *CSRFMiddleware) CSRFProtection(next http.Handler) http.Handler {
 			cm.handleCSRFError(w, r, "Invalid or expired CSRF token")
 			return
 		}
-		
+
 		next.ServeHTTP(w, r)
 	})
 }
@@ -143,9 +149,9 @@ func (cm *CSRFMiddleware) GetTokenHandler(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Failed to generate CSRF token", http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(fmt.Sprintf(`{"csrf_token": "%s"}`, token)))
+	_, _ = fmt.Fprintf(w, `{"csrf_token": "%s"}`, token)
 }
 
 // handleCSRFError handles CSRF validation errors
@@ -154,22 +160,19 @@ func (cm *CSRFMiddleware) handleCSRFError(w http.ResponseWriter, r *http.Request
 	if strings.HasPrefix(r.URL.Path, "/api/") {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte(`{"error": "` + message + `", "code": "CSRF_ERROR"}`))
+		_, _ = w.Write([]byte(`{"error": "` + message + `", "code": "CSRF_ERROR"}`))
 		return
 	}
-	
+
 	// For web requests, return 403
 	w.WriteHeader(http.StatusForbidden)
-	w.Write([]byte(message))
+	_, _ = w.Write([]byte(message))
 }
 
 // startCleanupLoop runs periodic cleanup of expired tokens
 func (cm *CSRFMiddleware) startCleanupLoop() {
-	for {
-		select {
-		case <-cm.cleanupTicker.C:
-			cm.cleanupExpiredTokens()
-		}
+	for range cm.cleanupTicker.C {
+		cm.cleanupExpiredTokens()
 	}
 }
 
@@ -177,7 +180,7 @@ func (cm *CSRFMiddleware) startCleanupLoop() {
 func (cm *CSRFMiddleware) cleanupExpiredTokens() {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
-	
+
 	now := time.Now()
 	for token, createdAt := range cm.tokenStore {
 		if now.Sub(createdAt) > cm.maxAge {
@@ -191,7 +194,7 @@ func (cm *CSRFMiddleware) Stop() {
 	if cm.cleanupTicker != nil {
 		cm.cleanupTicker.Stop()
 	}
-	
+
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
 	cm.tokenStore = make(map[string]time.Time)
@@ -205,15 +208,15 @@ func (cm *CSRFMiddleware) AddCSRFTokenToContext(next http.Handler) http.Handler 
 			next.ServeHTTP(w, r)
 			return
 		}
-		
+
 		token, err := cm.GenerateToken()
 		if err != nil {
 			// Don't fail the request, just continue without token
 			next.ServeHTTP(w, r)
 			return
 		}
-		
-		ctx := context.WithValue(r.Context(), "csrf_token", token)
+
+		ctx := context.WithValue(r.Context(), ContextKeyCSRFToken, token)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

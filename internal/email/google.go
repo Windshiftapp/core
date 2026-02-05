@@ -1,3 +1,4 @@
+// Package email provides email integration including IMAP, OAuth, and provider-specific implementations.
 package email
 
 import (
@@ -22,11 +23,11 @@ const (
 // Google OAuth endpoints
 const (
 	googleAuthURL     = "https://accounts.google.com/o/oauth2/v2/auth"
-	googleTokenURL    = "https://oauth2.googleapis.com/token"
+	googleTokenURL    = "https://oauth2.googleapis.com/token" //nolint:gosec // G101 false positive: OAuth endpoint URL, not a credential
 	googleUserInfoURL = "https://www.googleapis.com/oauth2/v2/userinfo"
 )
 
-// Default scopes for Gmail IMAP access
+// GoogleDefaultScopes defines the default scopes for Gmail IMAP access.
 var GoogleDefaultScopes = []string{
 	"https://mail.google.com/", // Full Gmail access (required for IMAP)
 	"https://www.googleapis.com/auth/userinfo.email",
@@ -57,7 +58,7 @@ func (p *GoogleProvider) GetType() string {
 }
 
 // GetIMAPServer returns Gmail IMAP server details
-func (p *GoogleProvider) GetIMAPServer(config *models.ChannelConfig) (string, int) {
+func (p *GoogleProvider) GetIMAPServer(config *models.ChannelConfig) (string, int) { //nolint:gocritic // unnamedResult
 	return GoogleIMAPHost, GoogleIMAPPort
 }
 
@@ -194,7 +195,7 @@ func (p *GoogleProvider) RefreshToken(ctx context.Context, refreshToken string) 
 
 // GetUserEmail retrieves the email address of the authenticated user
 func (p *GoogleProvider) GetUserEmail(ctx context.Context, accessToken string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", googleUserInfoURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", googleUserInfoURL, http.NoBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to create user info request: %w", err)
 	}

@@ -31,7 +31,7 @@ func (r *ItemRepository) GetChildren(parentID int) ([]*models.Item, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get children: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	return scanItemsWithDetails(rows)
 }
@@ -68,7 +68,7 @@ func (r *ItemRepository) GetDescendants(parentID int) ([]*models.Item, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get descendants: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	return scanItemsWithDetailsAndLevel(rows)
 }
@@ -105,7 +105,7 @@ func (r *ItemRepository) GetAncestors(itemID int) ([]*models.Item, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ancestors: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	return scanItemsWithDetails(rows)
 }
@@ -132,7 +132,7 @@ func (r *ItemRepository) GetRootItems(workspaceID int) ([]*models.Item, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get root items: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	return scanItemsWithDetails(rows)
 }
@@ -151,7 +151,7 @@ func (r *ItemRepository) GetDescendantIDs(parentID int) ([]int, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get descendant ids: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var ids []int
 	for rows.Next() {

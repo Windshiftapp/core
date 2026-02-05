@@ -38,10 +38,10 @@ type User struct {
 }
 
 type UserSummary struct {
-	ID       int    `json:"id"`
-	Name     string `json:"name,omitempty"`
-	Email    string `json:"email,omitempty"`
-	Avatar   string `json:"avatar,omitempty"`
+	ID     int    `json:"id"`
+	Name   string `json:"name,omitempty"`
+	Email  string `json:"email,omitempty"`
+	Avatar string `json:"avatar,omitempty"`
 }
 
 // ============================================

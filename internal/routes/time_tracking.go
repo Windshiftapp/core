@@ -7,7 +7,6 @@ func RegisterTimeTrackingRoutes(deps *Deps) {
 	api := deps.API
 	auth := deps.AuthMiddleware.RequireAuth
 
-
 	// Time project categories
 	api.HandleH("GET /time/project-categories", auth(http.HandlerFunc(deps.TimeTracking.ProjectCategory.GetCategories)))
 	api.HandleH("POST /time/project-categories", auth(http.HandlerFunc(deps.TimeTracking.ProjectCategory.CreateCategory)))

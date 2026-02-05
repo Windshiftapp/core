@@ -35,7 +35,7 @@ func (p *GenericProvider) GetType() string {
 }
 
 // GetIMAPServer returns the configured IMAP server details
-func (p *GenericProvider) GetIMAPServer(config *models.ChannelConfig) (string, int) {
+func (p *GenericProvider) GetIMAPServer(config *models.ChannelConfig) (string, int) { //nolint:gocritic // unnamedResult
 	// For generic provider, use config from channel if available
 	host := config.IMAPHost
 	port := config.IMAPPort

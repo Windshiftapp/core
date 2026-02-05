@@ -1,3 +1,4 @@
+// Package webhook provides webhook delivery and management functionality.
 package webhook
 
 import (
@@ -222,14 +223,14 @@ func (w *WebhookSender) itemInCollections(ctx context.Context, itemID int, colle
 		// Check if item ID appears in collection results
 		// For now, use a simpler approach: check if item_id is directly referenced
 		// A full implementation would execute the QL query
-		checkQuery := fmt.Sprintf(`
+		checkQuery := `
 			SELECT EXISTS(
 				SELECT 1 FROM items
 				WHERE id = ? AND id IN (
 					SELECT i.id FROM items i WHERE i.id = ?
 				)
 			)
-		`)
+		`
 		var exists bool
 		if err := w.db.QueryRowContext(ctx, checkQuery, itemID, itemID).Scan(&exists); err == nil && exists {
 			return true
@@ -282,7 +283,7 @@ func (w *WebhookSender) sendWebhook(webhook WebhookConfig, event string, item *m
 			return
 		}
 
-		if err := w.pluginDispatcher.DispatchToPlugin(ctx, webhook.PluginName, webhook.PluginHandler, event, payloadBytes); err != nil {
+		if err = w.pluginDispatcher.DispatchToPlugin(ctx, webhook.PluginName, webhook.PluginHandler, event, payloadBytes); err != nil {
 			logger.Get().Error("Failed to dispatch webhook to plugin",
 				"error", err,
 				"plugin", webhook.PluginName,
@@ -346,7 +347,7 @@ func (w *WebhookSender) sendWebhook(webhook WebhookConfig, event string, item *m
 
 // TriggerManually sends a webhook manually for a specific item
 // This is used when webhooks are triggered from item actions, not events
-func (w *WebhookSender) TriggerManually(ctx context.Context, webhookID int, itemID int) error {
+func (w *WebhookSender) TriggerManually(ctx context.Context, webhookID, itemID int) error {
 	// Get webhook config
 	var channelName string
 	var configJSON string
@@ -357,7 +358,7 @@ func (w *WebhookSender) TriggerManually(ctx context.Context, webhookID int, item
 	}
 
 	var config models.ChannelConfig
-	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+	if err = json.Unmarshal([]byte(configJSON), &config); err != nil {
 		return fmt.Errorf("failed to parse webhook config: %w", err)
 	}
 
@@ -388,7 +389,7 @@ func (w *WebhookSender) TriggerManually(ctx context.Context, webhookID int, item
 }
 
 // SendTestWebhook sends a test webhook to verify configuration
-func (w *WebhookSender) SendTestWebhook(ctx context.Context, config *models.ChannelConfig) (bool, string) {
+func (w *WebhookSender) SendTestWebhook(ctx context.Context, config *models.ChannelConfig) (success bool, message string) {
 	if config.WebhookURL == "" {
 		return false, "Webhook URL is required"
 	}
@@ -459,7 +460,7 @@ func (w *WebhookSender) generateSignature(payload []byte, secret string) string 
 }
 
 // updateChannelActivity updates the last_activity timestamp for a channel
-func (w *WebhookSender) updateChannelActivity(ctx context.Context, channelID int, success bool) {
+func (w *WebhookSender) updateChannelActivity(ctx context.Context, channelID int, _ bool) {
 	query := "UPDATE channels SET last_activity = ? WHERE id = ?"
 	_, _ = w.db.ExecWriteContext(ctx, query, time.Now(), channelID)
 }

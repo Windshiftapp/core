@@ -34,6 +34,8 @@
 //   - created >= "2024-01-01" AND updated < now()
 //   - childrenOf("priority = high") - Find all descendants of high priority items
 //   - linkedOf("blocks", "status = open") - Find items blocked by open items
+//
+//nolint:misspell // CQL function name uses British spelling
 package cql
 
 // EntityType represents the type of entity being queried
@@ -65,15 +67,15 @@ const (
 	BOOLEAN
 
 	// Operators
-	EQUALS        // =
-	NOT_EQUALS    // !=, <>
-	LESS_THAN     // <
-	LESS_EQUAL    // <=
-	GREATER_THAN  // >
-	GREATER_EQUAL // >=
-	CONTAINS      // ~
-	IN            // IN
-	NOT_IN        // NOT IN
+	EQUALS       // =
+	NotEquals    // !=, <>
+	LessThan     // <
+	LessEqual    // <=
+	GreaterThan  // >
+	GreaterEqual // >=
+	CONTAINS     // ~
+	IN           // IN
+	NotIn        // NOT IN
 
 	// Logical operators
 	AND
@@ -94,7 +96,7 @@ const (
 func (t TokenType) String() string {
 	names := []string{
 		"IDENTIFIER", "STRING", "NUMBER", "DATE", "BOOLEAN",
-		"EQUALS", "NOT_EQUALS", "LESS_THAN", "LESS_EQUAL", "GREATER_THAN", "GREATER_EQUAL", "CONTAINS", "IN", "NOT_IN",
+		"EQUALS", "NotEquals", "LessThan", "LessEqual", "GreaterThan", "GreaterEqual", "CONTAINS", "IN", "NotIn",
 		"AND", "OR", "NOT",
 		"LPAREN", "RPAREN", "COMMA",
 		"EOF", "FUNCTION",
@@ -105,7 +107,7 @@ func (t TokenType) String() string {
 	return "UNKNOWN"
 }
 
-// AST Node types
+// NodeType represents the type of an AST node.
 type NodeType int
 
 const (
@@ -122,11 +124,11 @@ const (
 type ASTNode struct {
 	Type      NodeType
 	Value     string
-	DataType  TokenType   // For literals
+	DataType  TokenType // For literals
 	Operator  string
 	Left      *ASTNode
 	Right     *ASTNode
-	Field     *ASTNode    // For IN expressions
-	Values    *ASTNode    // For IN expressions
-	Arguments []*ASTNode  // For function calls
+	Field     *ASTNode   // For IN expressions
+	Values    *ASTNode   // For IN expressions
+	Arguments []*ASTNode // For function calls
 }

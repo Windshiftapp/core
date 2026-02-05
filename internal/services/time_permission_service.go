@@ -376,7 +376,7 @@ func (s *TimePermissionService) GetProjectMembers(projectID int) ([]models.TimeP
 }
 
 // AddProjectManager adds a manager to a project
-func (s *TimePermissionService) AddProjectManager(projectID int, managerType string, managerID int, grantedBy int) (*models.TimeProjectManager, error) {
+func (s *TimePermissionService) AddProjectManager(projectID int, managerType string, managerID, grantedBy int) (*models.TimeProjectManager, error) {
 	if managerType != "user" && managerType != "group" {
 		return nil, fmt.Errorf("invalid manager_type: must be 'user' or 'group'")
 	}
@@ -414,7 +414,7 @@ func (s *TimePermissionService) RemoveProjectManager(managerID int) error {
 }
 
 // AddProjectMember adds a member to a project
-func (s *TimePermissionService) AddProjectMember(projectID int, memberType string, memberID int, grantedBy int) (*models.TimeProjectMember, error) {
+func (s *TimePermissionService) AddProjectMember(projectID int, memberType string, memberID, grantedBy int) (*models.TimeProjectMember, error) {
 	if memberType != "user" && memberType != "group" {
 		return nil, fmt.Errorf("invalid member_type: must be 'user' or 'group'")
 	}

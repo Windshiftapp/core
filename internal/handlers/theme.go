@@ -43,12 +43,12 @@ func (h *ThemeHandler) GetThemes(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, fmt.Errorf("failed to query themes: %w", err))
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var themes []models.Theme
 	for rows.Next() {
 		var theme models.Theme
-		err := rows.Scan(
+		err = rows.Scan(
 			&theme.ID, &theme.Name, &theme.Description,
 			&theme.IsDefault, &theme.IsActive,
 			&theme.NavBackgroundColorLight, &theme.NavTextColorLight,
@@ -68,7 +68,7 @@ func (h *ThemeHandler) GetThemes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(themes)
+	_ = json.NewEncoder(w).Encode(themes)
 }
 
 // GetActiveTheme returns the currently active theme
@@ -95,7 +95,7 @@ func (h *ThemeHandler) GetActiveTheme(w http.ResponseWriter, r *http.Request) {
 	if err == sql.ErrNoRows {
 		// No active theme found - return null
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("null"))
+		_, _ = w.Write([]byte("null"))
 		return
 	}
 	if err != nil {
@@ -104,7 +104,7 @@ func (h *ThemeHandler) GetActiveTheme(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(theme)
+	_ = json.NewEncoder(w).Encode(theme)
 }
 
 // CreateTheme creates a new theme
@@ -175,7 +175,7 @@ func (h *ThemeHandler) CreateTheme(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(theme)
+	_ = json.NewEncoder(w).Encode(theme)
 }
 
 // UpdateTheme updates an existing theme
@@ -187,7 +187,7 @@ func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req models.ThemeUpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -261,7 +261,7 @@ func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(theme)
+	_ = json.NewEncoder(w).Encode(theme)
 }
 
 // DeleteTheme deletes a theme
@@ -333,5 +333,5 @@ func (h *ThemeHandler) ActivateTheme(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"success": true}`))
+	_, _ = w.Write([]byte(`{"success": true}`))
 }

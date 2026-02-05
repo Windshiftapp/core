@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 	"strconv"
+
 	"windshift/internal/models"
 )
 
@@ -61,12 +62,12 @@ func (h *ItemHandler) GetItemHistory(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	history := []models.ItemHistory{}
 	for rows.Next() {
 		var entry models.ItemHistory
-		err := rows.Scan(&entry.ID, &entry.ItemID, &entry.UserID, &entry.ChangedAt, &entry.FieldName, &entry.OldValue, &entry.NewValue, &entry.UserName, &entry.UserEmail)
+		err = rows.Scan(&entry.ID, &entry.ItemID, &entry.UserID, &entry.ChangedAt, &entry.FieldName, &entry.OldValue, &entry.NewValue, &entry.UserName, &entry.UserEmail)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return

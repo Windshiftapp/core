@@ -34,7 +34,8 @@ Examples:
 		// Check if workspace is specified
 		wsKey := cfg.GetEffectiveWorkspace()
 		if wsKey != "" {
-			wsID, err := client.ResolveWorkspaceID(wsKey)
+			var wsID int
+			wsID, err = client.ResolveWorkspaceID(wsKey)
 			if err != nil {
 				return fmt.Errorf("failed to resolve workspace: %w", err)
 			}

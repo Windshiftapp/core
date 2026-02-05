@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
 	"windshift/internal/models"
 	"windshift/internal/utils"
 )
@@ -71,12 +72,12 @@ func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer outgoingRows.Close()
+	defer func() { _ = outgoingRows.Close() }()
 
 	var outgoingLinks []models.ItemLink
 	for outgoingRows.Next() {
 		var link models.ItemLink
-		err := outgoingRows.Scan(
+		err = outgoingRows.Scan(
 			&link.ID, &link.LinkTypeID, &link.SourceType, &link.SourceID,
 			&link.TargetType, &link.TargetID, &link.CreatedBy, &link.CreatedAt,
 			&link.LinkTypeName, &link.LinkTypeColor, &link.LinkTypeForwardLabel, &link.LinkTypeReverseLabel,
@@ -113,7 +114,7 @@ func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer incomingRows.Close()
+	defer func() { _ = incomingRows.Close() }()
 
 	var incomingLinks []models.ItemLink
 	for incomingRows.Next() {
@@ -137,7 +138,7 @@ func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // CreateAssetLinkRequest represents the request body for creating an asset link
@@ -185,7 +186,7 @@ func (h *AssetHandler) CreateAssetLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req CreateAssetLinkRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -249,5 +250,5 @@ func (h *AssetHandler) CreateAssetLink(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }

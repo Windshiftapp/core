@@ -4,6 +4,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"io"
 	"os"
@@ -23,17 +24,17 @@ import (
 // mockJiraClient implements jira.Client for testing.
 // Populate IssueKeysByJQL, Issues, and Emails before calling import.
 type mockJiraClient struct {
-	IssueKeysByJQL          map[string][]string                         // JQL -> issue keys
-	Issues                  map[string]jira.JiraIssue                   // key -> issue
-	Emails                  map[string]string                           // accountID -> email
+	IssueKeysByJQL           map[string][]string                         // JQL -> issue keys
+	Issues                   map[string]jira.JiraIssue                   // key -> issue
+	Emails                   map[string]string                           // accountID -> email
 	ProjectIssueTypeStatuses map[string][]jira.JiraIssueTypeWithStatuses // projectKey -> issue type statuses
 }
 
 func newMockJiraClient() *mockJiraClient {
 	return &mockJiraClient{
-		IssueKeysByJQL:          make(map[string][]string),
-		Issues:                  make(map[string]jira.JiraIssue),
-		Emails:                  make(map[string]string),
+		IssueKeysByJQL:           make(map[string][]string),
+		Issues:                   make(map[string]jira.JiraIssue),
+		Emails:                   make(map[string]string),
 		ProjectIssueTypeStatuses: make(map[string][]jira.JiraIssueTypeWithStatuses),
 	}
 }
@@ -223,9 +224,9 @@ func TestEnsureItemTypes_MapToExisting(t *testing.T) {
 
 	mappings := []IssueTypeMapping{
 		{
-			JiraIDs:   []string{"10010", "10011"},
-			JiraName:  "Bug",
-			CreateNew: false,
+			JiraIDs:     []string{"10010", "10011"},
+			JiraName:    "Bug",
+			CreateNew:   false,
 			WindshiftID: &existingID,
 		},
 	}
@@ -346,7 +347,8 @@ func TestImportIssue_StatusAndTypeMapping(t *testing.T) {
 	err := tdb.QueryRow(`SELECT id FROM item_types LIMIT 1`).Scan(&itemTypeID)
 	if err != nil {
 		// Create one if none exist
-		res, err := tdb.Exec(`INSERT INTO item_types (name, icon, color, hierarchy_level) VALUES ('Task', 'Task', '#000', 0)`)
+		var res sql.Result
+		res, err = tdb.Exec(`INSERT INTO item_types (name, icon, color, hierarchy_level) VALUES ('Task', 'Task', '#000', 0)`)
 		if err != nil {
 			t.Fatalf("Failed to create item type: %v", err)
 		}
@@ -545,7 +547,7 @@ func TestExecuteImportWithClient_FromFixtures(t *testing.T) {
 		t.Fatalf("Failed to read request fixture: %v", err)
 	}
 	var req StartImportRequest
-	if err := json.Unmarshal(reqData, &req); err != nil {
+	if err = json.Unmarshal(reqData, &req); err != nil {
 		t.Fatalf("Failed to parse request fixture: %v", err)
 	}
 
@@ -555,7 +557,7 @@ func TestExecuteImportWithClient_FromFixtures(t *testing.T) {
 		t.Fatalf("Failed to read response fixture: %v", err)
 	}
 	var payloads CapturedPayloads
-	if err := json.Unmarshal(respData, &payloads); err != nil {
+	if err = json.Unmarshal(respData, &payloads); err != nil {
 		t.Fatalf("Failed to parse response fixture: %v", err)
 	}
 
@@ -752,7 +754,8 @@ func TestImportIssue_PriorityAndDueDate(t *testing.T) {
 	var itemTypeID int
 	err := tdb.QueryRow(`SELECT id FROM item_types LIMIT 1`).Scan(&itemTypeID)
 	if err != nil {
-		res, err := tdb.Exec(`INSERT INTO item_types (name, icon, color, hierarchy_level) VALUES ('Task', 'Task', '#000', 0)`)
+		var res sql.Result
+		res, err = tdb.Exec(`INSERT INTO item_types (name, icon, color, hierarchy_level) VALUES ('Task', 'Task', '#000', 0)`)
 		if err != nil {
 			t.Fatalf("Failed to create item type: %v", err)
 		}
@@ -1012,13 +1015,13 @@ func TestImportIssue_WithAttachments(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to query attachments: %v", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	expectedFilenames := []string{"screenshot.png", "report.pdf"}
 	i := 0
 	for rows.Next() {
 		var filePath, origFilename string
-		if err := rows.Scan(&filePath, &origFilename); err != nil {
+		if err = rows.Scan(&filePath, &origFilename); err != nil {
 			t.Fatalf("Failed to scan attachment row: %v", err)
 		}
 
@@ -1028,7 +1031,8 @@ func TestImportIssue_WithAttachments(t *testing.T) {
 		}
 
 		// Verify file exists on disk with correct content
-		content, err := os.ReadFile(filePath)
+		var content []byte
+		content, err = os.ReadFile(filePath)
 		if err != nil {
 			t.Errorf("Attachment %d: failed to read file at '%s': %v", i, filePath, err)
 		} else if string(content) != "mock attachment content" {

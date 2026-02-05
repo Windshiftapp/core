@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
@@ -138,7 +139,8 @@ func (h *SCMProviderHandler) refreshOAuthTokenIfNeeded(
 	var newTokens *scm.OAuthTokens
 	switch providerType {
 	case models.SCMProviderTypeGitea:
-		provider, err := scm.NewGiteaProvider(cfg)
+		var provider *scm.GiteaProvider
+		provider, err = scm.NewGiteaProvider(cfg)
 		if err != nil {
 			return "", fmt.Errorf("failed to create provider for refresh: %w", err)
 		}
@@ -147,7 +149,8 @@ func (h *SCMProviderHandler) refreshOAuthTokenIfNeeded(
 			return "", fmt.Errorf("failed to refresh token: %w", err)
 		}
 	case models.SCMProviderTypeGitHub:
-		provider, err := scm.NewGitHubProvider(cfg)
+		var provider *scm.GitHubProvider
+		provider, err = scm.NewGitHubProvider(cfg)
 		if err != nil {
 			return "", fmt.Errorf("failed to create provider for refresh: %w", err)
 		}
@@ -199,7 +202,7 @@ func (h *SCMProviderHandler) GetProviders(w http.ResponseWriter, r *http.Request
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	providers := []SCMProviderResponse{}
 	for rows.Next() {
@@ -212,7 +215,7 @@ func (h *SCMProviderHandler) GetProviders(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(providers)
+	_ = json.NewEncoder(w).Encode(providers)
 }
 
 // GetProvider returns a single SCM provider
@@ -234,7 +237,7 @@ func (h *SCMProviderHandler) GetProvider(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(provider)
+	_ = json.NewEncoder(w).Encode(provider)
 }
 
 // CreateProvider creates a new SCM provider
@@ -354,7 +357,7 @@ func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Reque
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(provider)
+	_ = json.NewEncoder(w).Encode(provider)
 }
 
 // UpdateProvider updates an existing SCM provider
@@ -366,7 +369,7 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 	}
 
 	var req models.SCMProviderRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -413,7 +416,8 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 	var oauthSecretEnc, patEnc, ghAppKeyEnc *string
 
 	if req.OAuthClientSecret != "" {
-		enc, err := h.encryption.Encrypt(req.OAuthClientSecret)
+		var enc string
+		enc, err = h.encryption.Encrypt(req.OAuthClientSecret)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -422,7 +426,8 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 	}
 
 	if req.PersonalAccessToken != "" {
-		enc, err := h.encryption.Encrypt(req.PersonalAccessToken)
+		var enc string
+		enc, err = h.encryption.Encrypt(req.PersonalAccessToken)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -431,7 +436,8 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 	}
 
 	if req.GitHubAppPrivateKey != "" {
-		enc, err := h.encryption.Encrypt(req.GitHubAppPrivateKey)
+		var enc string
+		enc, err = h.encryption.Encrypt(req.GitHubAppPrivateKey)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -501,7 +507,7 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(provider)
+	_ = json.NewEncoder(w).Encode(provider)
 }
 
 // DeleteProvider deletes an SCM provider
@@ -579,7 +585,8 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 	switch p.AuthMethod {
 	case models.SCMAuthMethodOAuth:
 		if oauthAccessTokenEnc.Valid && oauthAccessTokenEnc.String != "" {
-			token, err := h.encryption.Decrypt(oauthAccessTokenEnc.String)
+			var token string
+			token, err = h.encryption.Decrypt(oauthAccessTokenEnc.String)
 			if err != nil {
 				respondInternalError(w, r, err)
 				return
@@ -592,7 +599,8 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 			}
 
 			// Try to refresh if expired or expiring soon
-			refreshedToken, err := h.refreshOAuthTokenIfNeeded(
+			var refreshedToken string
+			refreshedToken, err = h.refreshOAuthTokenIfNeeded(
 				r.Context(),
 				p.ID,
 				p.ProviderType,
@@ -612,7 +620,7 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 			}
 		} else {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"success": false,
 				"error":   "OAuth not connected. Please complete the OAuth flow first.",
 			})
@@ -620,7 +628,8 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 		}
 	case models.SCMAuthMethodPAT:
 		if patEnc.Valid && patEnc.String != "" {
-			token, err := h.encryption.Decrypt(patEnc.String)
+			var token string
+			token, err = h.encryption.Decrypt(patEnc.String)
 			if err != nil {
 				respondInternalError(w, r, err)
 				return
@@ -628,7 +637,7 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 			cfg.PersonalAccessToken = token
 		} else {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"success": false,
 				"error":   "Personal Access Token not configured",
 			})
@@ -638,7 +647,7 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 		// Check required fields
 		if !ghAppID.Valid || ghAppID.String == "" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"success": false,
 				"error":   "GitHub App ID not configured",
 			})
@@ -646,7 +655,7 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 		}
 		if !ghAppKeyEnc.Valid || ghAppKeyEnc.String == "" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"success": false,
 				"error":   "GitHub App private key not configured",
 			})
@@ -654,7 +663,7 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 		}
 		if !ghAppInstallID.Valid || ghAppInstallID.String == "" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"success": false,
 				"error":   "GitHub App installation ID not configured. Use 'Discover Installations' to select an organization.",
 			})
@@ -662,7 +671,8 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 		}
 
 		// Decrypt the private key
-		privateKey, err := h.encryption.Decrypt(ghAppKeyEnc.String)
+		var privateKey string
+		privateKey, err = h.encryption.Decrypt(ghAppKeyEnc.String)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -677,7 +687,7 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 	provider, err := scm.NewProvider(cfg)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
 			"error":   err.Error(),
 		})
@@ -690,7 +700,7 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 	err = provider.TestConnection(ctx)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
 			"error":   err.Error(),
 		})
@@ -698,7 +708,7 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "Connection successful",
 	})
@@ -743,7 +753,7 @@ func (h *SCMProviderHandler) StartOAuth(w http.ResponseWriter, r *http.Request) 
 
 	// Generate state
 	stateBytes := make([]byte, 32)
-	rand.Read(stateBytes)
+	_, _ = rand.Read(stateBytes)
 	state := base64.URLEncoding.EncodeToString(stateBytes)
 
 	// Determine redirect URI
@@ -804,7 +814,7 @@ func (h *SCMProviderHandler) StartOAuth(w http.ResponseWriter, r *http.Request) 
 
 	// Return the auth URL for the frontend to redirect to
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	_ = json.NewEncoder(w).Encode(map[string]string{
 		"auth_url": authURL,
 	})
 }
@@ -841,7 +851,7 @@ func (h *SCMProviderHandler) OAuthCallback(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Delete used state (check error)
-	if _, err := h.db.Exec("DELETE FROM scm_oauth_state WHERE state = ?", state); err != nil {
+	if _, err = h.db.Exec("DELETE FROM scm_oauth_state WHERE state = ?", state); err != nil {
 		slog.Warn("failed to delete OAuth state", slog.String("component", "scm"), slog.Any("error", err))
 	}
 
@@ -1268,7 +1278,7 @@ func (h *SCMProviderHandler) GetProviderAllowedWorkspaces(w http.ResponseWriter,
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var allowlist []models.SCMProviderWorkspaceAllowlist
 	for rows.Next() {
@@ -1291,7 +1301,7 @@ func (h *SCMProviderHandler) GetProviderAllowedWorkspaces(w http.ResponseWriter,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(allowlist)
+	_ = json.NewEncoder(w).Encode(allowlist)
 }
 
 // AddWorkspaceToProviderAllowlist adds a workspace to the provider's allowlist
@@ -1305,7 +1315,7 @@ func (h *SCMProviderHandler) AddWorkspaceToProviderAllowlist(w http.ResponseWrit
 	var req struct {
 		WorkspaceID int `json:"workspace_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -1355,7 +1365,7 @@ func (h *SCMProviderHandler) AddWorkspaceToProviderAllowlist(w http.ResponseWrit
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 // RemoveWorkspaceFromProviderAllowlist removes a workspace from the provider's allowlist
@@ -1412,7 +1422,7 @@ func (h *SCMProviderHandler) UpdateProviderAllowedWorkspaces(w http.ResponseWrit
 	var req struct {
 		WorkspaceIDs []int `json:"workspace_ids"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -1505,10 +1515,10 @@ func (h *SCMProviderHandler) IsWorkspaceAllowedForProvider(providerID, workspace
 
 // GitHubAppInstallation represents a GitHub App installation for discovery
 type GitHubAppInstallation struct {
-	ID              int64  `json:"id"`
-	AccountLogin    string `json:"account_login"`
-	AccountType     string `json:"account_type"`
-	AccountID       int64  `json:"account_id"`
+	ID               int64  `json:"id"`
+	AccountLogin     string `json:"account_login"`
+	AccountType      string `json:"account_type"`
+	AccountID        int64  `json:"account_id"`
 	AccountAvatarURL string `json:"account_avatar_url,omitempty"`
 }
 
@@ -1544,7 +1554,7 @@ func (h *SCMProviderHandler) DiscoverGitHubAppInstallations(w http.ResponseWrite
 	if err != nil {
 		slog.Error("failed to create GitHub provider for discovery", slog.String("component", "scm"), slog.Any("error", err))
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success":       false,
 			"error":         "Failed to initialize GitHub App: " + err.Error(),
 			"installations": []interface{}{},
@@ -1559,7 +1569,7 @@ func (h *SCMProviderHandler) DiscoverGitHubAppInstallations(w http.ResponseWrite
 	if err != nil {
 		slog.Error("failed to discover GitHub App installations", slog.String("component", "scm"), slog.Any("error", err))
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success":       false,
 			"error":         "Failed to list installations: " + err.Error(),
 			"installations": []interface{}{},
@@ -1580,7 +1590,7 @@ func (h *SCMProviderHandler) DiscoverGitHubAppInstallations(w http.ResponseWrite
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":       true,
 		"installations": result,
 	})
@@ -1664,7 +1674,7 @@ func (h *SCMProviderHandler) RefreshGitHubAppInstallation(w http.ResponseWriter,
 
 	if foundInstallation == nil {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
 			"error":   "App is no longer installed for this organization",
 		})
@@ -1684,7 +1694,7 @@ func (h *SCMProviderHandler) RefreshGitHubAppInstallation(w http.ResponseWriter,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":         true,
 		"installation_id": foundInstallation.ID,
 		"account_login":   foundInstallation.AccountLogin,

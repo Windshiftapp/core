@@ -36,9 +36,9 @@ func TestPortalSecurity(t *testing.T) {
 		emailA := fmt.Sprintf("customerA-%d@example.com", timestamp)
 		customerIDA, tokenA := CreatePortalCustomerWithSession(t, server, "Customer A", emailA)
 		itemID_A := SubmitPortalRequest(t, server, portalSlug, tokenA, "Request A")
-		
+
 		// Verify ownership of Item A
-		// We can't check DB directly easily from here without duplicating logic, 
+		// We can't check DB directly easily from here without duplicating logic,
 		// but we can check if Customer A can see it.
 		respVerify := MakePortalRequest(t, server, tokenA, http.MethodGet, fmt.Sprintf("/portal/%s/requests/%d", portalSlug, itemID_A), nil)
 		defer respVerify.Body.Close()

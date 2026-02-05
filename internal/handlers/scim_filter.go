@@ -55,7 +55,7 @@ type SCIMFilterResult struct {
 
 // ParseSCIMFilter parses a SCIM filter string and returns SQL WHERE clause and args
 // Supports basic filters like: userName eq "john", email co "@example.com"
-func ParseSCIMFilter(filter string, resourceType string) (*SCIMFilterResult, error) {
+func ParseSCIMFilter(filter, resourceType string) (*SCIMFilterResult, error) {
 	if filter == "" {
 		return &SCIMFilterResult{WhereClause: "", Args: nil}, nil
 	}
@@ -119,7 +119,7 @@ func ParseSCIMFilter(filter string, resourceType string) (*SCIMFilterResult, err
 	case FilterOpEq:
 		// Handle boolean values for "active"
 		if attr == "active" {
-			boolVal := strings.ToLower(value) == "true"
+			boolVal := strings.EqualFold(value, "true")
 			whereClause = fmt.Sprintf("%s = ?", sqlCol)
 			args = []interface{}{boolVal}
 		} else {
@@ -128,7 +128,7 @@ func ParseSCIMFilter(filter string, resourceType string) (*SCIMFilterResult, err
 		}
 	case FilterOpNe:
 		if attr == "active" {
-			boolVal := strings.ToLower(value) == "true"
+			boolVal := strings.EqualFold(value, "true")
 			whereClause = fmt.Sprintf("%s != ?", sqlCol)
 			args = []interface{}{boolVal}
 		} else {
@@ -159,7 +159,7 @@ func ParseSCIMFilter(filter string, resourceType string) (*SCIMFilterResult, err
 
 // ParseSCIMFilterWithAnd parses multiple SCIM filters joined by "and"
 // Example: userName eq "john" and active eq true
-func ParseSCIMFilterWithAnd(filter string, resourceType string) (*SCIMFilterResult, error) {
+func ParseSCIMFilterWithAnd(filter, resourceType string) (*SCIMFilterResult, error) {
 	if filter == "" {
 		return &SCIMFilterResult{WhereClause: "", Args: nil}, nil
 	}

@@ -16,10 +16,10 @@ import (
 )
 
 var (
-	ErrMagicLinkExpired        = errors.New("magic link has expired")
-	ErrMagicLinkInvalid        = errors.New("magic link is invalid")
-	ErrMagicLinkAlreadyUsed    = errors.New("magic link has already been used")
-	ErrPortalCustomerNotFound  = errors.New("portal customer not found")
+	ErrMagicLinkExpired           = errors.New("magic link has expired")
+	ErrMagicLinkInvalid           = errors.New("magic link is invalid")
+	ErrMagicLinkAlreadyUsed       = errors.New("magic link has already been used")
+	ErrPortalCustomerNotFound     = errors.New("portal customer not found")
 	ErrMagicLinkSMTPNotConfigured = errors.New("SMTP is not configured")
 	ErrMagicLinkGenerationFailed  = errors.New("failed to generate magic link token")
 )
@@ -102,7 +102,7 @@ func (s *MagicLinkService) SendMagicLinkEmail(email, name, token, portalSlug str
 }
 
 // generateEmailBody generates the HTML and text email body for the magic link
-func (s *MagicLinkService) generateEmailBody(firstName, magicLinkURL string) (string, string, error) {
+func (s *MagicLinkService) generateEmailBody(firstName, magicLinkURL string) (htmlBody, textBody string, err error) {
 	if firstName == "" {
 		firstName = "there"
 	}
@@ -196,7 +196,7 @@ This is an automated email. Please do not reply.`
 	}
 
 	var htmlBuffer bytes.Buffer
-	if err := htmlTmpl.Execute(&htmlBuffer, templateData); err != nil {
+	if err = htmlTmpl.Execute(&htmlBuffer, templateData); err != nil {
 		return "", "", fmt.Errorf("failed to execute HTML template: %w", err)
 	}
 
@@ -332,18 +332,16 @@ func (s *MagicLinkService) grantChannelAccess(portalCustomerID, channelID int) {
 }
 
 // GetPortalCustomerByEmail finds a portal customer by email
-func (s *MagicLinkService) GetPortalCustomerByEmail(email string) (int, string, error) {
+func (s *MagicLinkService) GetPortalCustomerByEmail(email string) (customerID int, firstName string, err error) {
 	query := `SELECT id, name FROM portal_customers WHERE email = ?`
-	var customerID int
-	var name string
-	err := s.db.QueryRow(query, email).Scan(&customerID, &name)
+	err = s.db.QueryRow(query, email).Scan(&customerID, &firstName)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return 0, "", ErrPortalCustomerNotFound
 		}
 		return 0, "", fmt.Errorf("failed to find portal customer: %w", err)
 	}
-	return customerID, name, nil
+	return customerID, firstName, nil
 }
 
 // CleanupExpiredMagicLinks removes expired magic link tokens

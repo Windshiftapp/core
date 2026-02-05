@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
 	"windshift/internal/models"
 )
 
@@ -106,7 +107,7 @@ func (g *GiteaProvider) handleErrorResponse(resp *http.Response) error {
 
 // TestConnection tests if the provider connection is working
 func (g *GiteaProvider) TestConnection(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, "GET", g.apiURL("/user"), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, g.apiURL("/user"), http.NoBody)
 	if err != nil {
 		return err
 	}
@@ -139,9 +140,9 @@ func (g *GiteaProvider) ListRepositories(ctx context.Context, opts ListRepositor
 		limit = 50 // Gitea default
 	}
 
-	url := fmt.Sprintf("%s?page=%d&limit=%d", g.apiURL("/user/repos"), page, limit)
+	reqURL := fmt.Sprintf("%s?page=%d&limit=%d", g.apiURL("/user/repos"), page, limit)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -171,9 +172,9 @@ func (g *GiteaProvider) ListRepositories(ctx context.Context, opts ListRepositor
 
 // GetRepository gets details about a specific repository
 func (g *GiteaProvider) GetRepository(ctx context.Context, owner, repo string) (*Repository, error) {
-	url := g.apiURL(fmt.Sprintf("/repos/%s/%s", owner, repo))
+	reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s", owner, repo))
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -203,9 +204,9 @@ func (g *GiteaProvider) GetRepository(ctx context.Context, owner, repo string) (
 
 // ListBranches lists branches for a repository
 func (g *GiteaProvider) ListBranches(ctx context.Context, owner, repo string) ([]Branch, error) {
-	url := g.apiURL(fmt.Sprintf("/repos/%s/%s/branches", owner, repo))
+	reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/branches", owner, repo))
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -249,11 +250,11 @@ func (g *GiteaProvider) ListPullRequests(ctx context.Context, owner, repo string
 		state = "open"
 	}
 
-	url := fmt.Sprintf("%s?state=%s&page=%d&limit=%d",
+	reqURL := fmt.Sprintf("%s?state=%s&page=%d&limit=%d",
 		g.apiURL(fmt.Sprintf("/repos/%s/%s/pulls", owner, repo)),
 		state, page, limit)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -283,9 +284,9 @@ func (g *GiteaProvider) ListPullRequests(ctx context.Context, owner, repo string
 
 // GetPullRequest gets details about a specific pull request
 func (g *GiteaProvider) GetPullRequest(ctx context.Context, owner, repo string, number int) (*PullRequest, error) {
-	url := g.apiURL(fmt.Sprintf("/repos/%s/%s/pulls/%d", owner, repo, number))
+	reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/pulls/%d", owner, repo, number))
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -315,9 +316,9 @@ func (g *GiteaProvider) GetPullRequest(ctx context.Context, owner, repo string, 
 
 // GetCommit gets details about a specific commit
 func (g *GiteaProvider) GetCommit(ctx context.Context, owner, repo, sha string) (*Commit, error) {
-	url := g.apiURL(fmt.Sprintf("/repos/%s/%s/git/commits/%s", owner, repo, sha))
+	reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/git/commits/%s", owner, repo, sha))
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -483,7 +484,7 @@ func (g *GiteaProvider) RegisterWebhook(ctx context.Context, owner, repo string,
 func (g *GiteaProvider) DeleteWebhook(ctx context.Context, owner, repo, webhookID string) error {
 	deleteURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/hooks/%s", owner, repo, webhookID))
 
-	req, err := http.NewRequestWithContext(ctx, "DELETE", deleteURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "DELETE", deleteURL, http.NoBody)
 	if err != nil {
 		return err
 	}
@@ -545,9 +546,9 @@ func (r giteaRepo) toRepository() Repository {
 }
 
 type giteaBranch struct {
-	Name          string `json:"name"`
-	Protected     bool   `json:"protected"`
-	Commit        giteaBranchCommit `json:"commit"`
+	Name      string            `json:"name"`
+	Protected bool              `json:"protected"`
+	Commit    giteaBranchCommit `json:"commit"`
 }
 
 type giteaBranchCommit struct {
@@ -563,20 +564,20 @@ func (b giteaBranch) toBranch() Branch {
 }
 
 type giteaPullRequest struct {
-	ID        int64      `json:"id"`
-	Number    int64      `json:"number"` // Gitea uses "index" in some contexts but "number" in API responses
-	Title     string     `json:"title"`
-	Body      string     `json:"body"`
-	State     string     `json:"state"` // open, closed
-	HTMLURL   string     `json:"html_url"`
-	Merged    bool       `json:"merged"`
+	ID        int64         `json:"id"`
+	Number    int64         `json:"number"` // Gitea uses "index" in some contexts but "number" in API responses
+	Title     string        `json:"title"`
+	Body      string        `json:"body"`
+	State     string        `json:"state"` // open, closed
+	HTMLURL   string        `json:"html_url"`
+	Merged    bool          `json:"merged"`
 	Head      giteaPRBranch `json:"head"`
 	Base      giteaPRBranch `json:"base"`
-	User      giteaUser  `json:"user"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-	MergedAt  *time.Time `json:"merged_at"`
-	ClosedAt  *time.Time `json:"closed_at"`
+	User      giteaUser     `json:"user"`
+	CreatedAt time.Time     `json:"created_at"`
+	UpdatedAt time.Time     `json:"updated_at"`
+	MergedAt  *time.Time    `json:"merged_at"`
+	ClosedAt  *time.Time    `json:"closed_at"`
 }
 
 type giteaPRBranch struct {
@@ -680,13 +681,13 @@ func (u giteaUser) toUser() User {
 }
 
 type giteaWebhook struct {
-	ID        int64     `json:"id"`
-	Type      string    `json:"type"`
-	Events    []string  `json:"events"`
-	Active    bool      `json:"active"`
+	ID        int64              `json:"id"`
+	Type      string             `json:"type"`
+	Events    []string           `json:"events"`
+	Active    bool               `json:"active"`
 	Config    giteaWebhookConfig `json:"config"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	CreatedAt time.Time          `json:"created_at"`
+	UpdatedAt time.Time          `json:"updated_at"`
 }
 
 type giteaWebhookConfig struct {
@@ -825,7 +826,7 @@ func (g *GiteaProvider) RefreshToken(ctx context.Context, refreshToken string) (
 
 // GetCurrentUser returns the authenticated user's info from Gitea
 func (g *GiteaProvider) GetCurrentUser(ctx context.Context) (*User, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", g.apiURL("/user"), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", g.apiURL("/user"), http.NoBody)
 	if err != nil {
 		return nil, err
 	}

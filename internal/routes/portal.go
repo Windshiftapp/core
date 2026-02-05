@@ -60,6 +60,7 @@ func RegisterPortalRoutes(deps *Deps) {
 	api.HandleH("PUT /contact-roles/{id}", customersPerm(http.HandlerFunc(deps.Portal.ContactRole.Update)))
 	api.HandleH("DELETE /contact-roles/{id}", customersPerm(http.HandlerFunc(deps.Portal.ContactRole.Delete)))
 
+	//nolint:misspell // British spelling used in database
 	// Customer Organisations Management
 	api.HandleH("GET /customer-organisations", customersPerm(http.HandlerFunc(deps.TimeTracking.Customer.GetAll)))
 	api.HandleH("POST /customer-organisations", customersPerm(http.HandlerFunc(deps.TimeTracking.Customer.Create)))

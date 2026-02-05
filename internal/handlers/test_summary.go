@@ -14,6 +14,8 @@ import (
 	"windshift/internal/services"
 	"windshift/internal/utils"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 type TestSummaryHandler struct {
@@ -68,7 +70,7 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type TestSummary struct {
 		Title        string
@@ -201,7 +203,7 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		markdown.WriteString(fmt.Sprintf("| %s | %s %s | %s |\n",
 			result.Title,
 			statusIcon,
-			strings.Title(result.Status),
+			cases.Title(language.English).String(result.Status),
 			notes))
 	}
 
@@ -210,7 +212,7 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // GetReportsSummary returns aggregate test reports for a workspace
@@ -240,7 +242,8 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 
 	var milestoneID *int
 	if milestoneIDStr != "" {
-		mid, err := strconv.Atoi(milestoneIDStr)
+		var mid int
+		mid, err = strconv.Atoi(milestoneIDStr)
 		if err != nil {
 			respondInvalidID(w, r, "milestone_id")
 			return
@@ -250,7 +253,8 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 
 	days := 30 // default
 	if daysStr != "" {
-		d, err := strconv.Atoi(daysStr)
+		var d int
+		d, err = strconv.Atoi(daysStr)
 		if err != nil || d < 1 || d > 365 {
 			respondValidationError(w, r, "Invalid days parameter (must be 1-365)")
 			return
@@ -313,6 +317,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 	}
 
 	// Get trend data (daily pass rates)
+	//nolint:gosec // G202: table name from whitelist, parameters are bound
 	trendQuery := `
 		SELECT
 			DATE(tr.started_at) as date,
@@ -330,7 +335,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 		respondInternalError(w, r, err)
 		return
 	}
-	defer trendRows.Close()
+	defer func() { _ = trendRows.Close() }()
 
 	type TrendPoint struct {
 		Date     string  `json:"date"`
@@ -343,7 +348,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 		var date string
 		var total int
 		var passedCount sql.NullInt64
-		if err := trendRows.Scan(&date, &total, &passedCount); err != nil {
+		if err = trendRows.Scan(&date, &total, &passedCount); err != nil {
 			continue
 		}
 
@@ -360,6 +365,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 	}
 
 	// Get recent failures
+	//nolint:gosec // G202: table name from whitelist, parameters are bound
 	failuresQuery := `
 		SELECT
 			tc.id as test_case_id,
@@ -381,7 +387,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 		respondInternalError(w, r, err)
 		return
 	}
-	defer failureRows.Close()
+	defer func() { _ = failureRows.Close() }()
 
 	type RecentFailure struct {
 		TestCaseID    int        `json:"test_case_id"`
@@ -395,7 +401,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 	for failureRows.Next() {
 		var f RecentFailure
 		var failedAt sql.NullTime
-		if err := failureRows.Scan(&f.TestCaseID, &f.TestCaseTitle, &f.RunID, &f.RunName, &failedAt); err != nil {
+		if err = failureRows.Scan(&f.TestCaseID, &f.TestCaseTitle, &f.RunID, &f.RunName, &failedAt); err != nil {
 			continue
 		}
 		if failedAt.Valid {
@@ -405,6 +411,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 	}
 
 	// Get recent blocked tests with reasons
+	//nolint:gosec // G202: table name from whitelist, parameters are bound
 	blockedQuery := `
 		SELECT
 			tc.id as test_case_id,
@@ -427,7 +434,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 		respondInternalError(w, r, err)
 		return
 	}
-	defer blockedRows.Close()
+	defer func() { _ = blockedRows.Close() }()
 
 	type RecentBlocked struct {
 		TestCaseID    int        `json:"test_case_id"`
@@ -473,5 +480,5 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }

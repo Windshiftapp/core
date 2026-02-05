@@ -33,7 +33,7 @@ func NewTestFolderHandlerWithPool(db database.Database, permissionService *servi
 	}
 }
 
-func (h *TestFolderHandler) validateParentFolder(db *sql.DB, workspaceID int, parentID *int, currentFolderID *int) error {
+func (h *TestFolderHandler) validateParentFolder(db *sql.DB, workspaceID int, parentID, currentFolderID *int) error {
 	if parentID == nil {
 		return nil
 	}
@@ -131,7 +131,7 @@ func (h *TestFolderHandler) GetAllFolders(w http.ResponseWriter, r *http.Request
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var folders []models.TestFolder
 	for rows.Next() {
@@ -148,7 +148,7 @@ func (h *TestFolderHandler) GetAllFolders(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(folders)
+	_ = json.NewEncoder(w).Encode(folders)
 }
 
 // GetFolder returns a single test folder
@@ -203,7 +203,7 @@ func (h *TestFolderHandler) GetFolder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(folder)
+	_ = json.NewEncoder(w).Encode(folder)
 }
 
 // CreateFolder creates a new test folder
@@ -224,7 +224,7 @@ func (h *TestFolderHandler) CreateFolder(w http.ResponseWriter, r *http.Request)
 	}
 
 	var folder models.TestFolder
-	if err := json.NewDecoder(r.Body).Decode(&folder); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&folder); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -241,7 +241,7 @@ func (h *TestFolderHandler) CreateFolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := h.validateParentFolder(readDB, workspaceID, folder.ParentID, nil); err != nil {
+	if err = h.validateParentFolder(readDB, workspaceID, folder.ParentID, nil); err != nil {
 		h.writeParentValidationError(w, r, err)
 		return
 	}
@@ -289,7 +289,7 @@ func (h *TestFolderHandler) CreateFolder(w http.ResponseWriter, r *http.Request)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(folder)
+	_ = json.NewEncoder(w).Encode(folder)
 }
 
 // UpdateFolder updates an existing test folder
@@ -322,13 +322,13 @@ func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request)
 	}
 
 	var folder models.TestFolder
-	if err := json.Unmarshal(body, &folder); err != nil {
+	if err = json.Unmarshal(body, &folder); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	var rawPayload map[string]json.RawMessage
-	if err := json.Unmarshal(body, &rawPayload); err != nil {
+	if err = json.Unmarshal(body, &rawPayload); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -367,7 +367,7 @@ func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request)
 	}
 
 	if parentProvided && folder.ParentID != nil {
-		if err := h.validateParentFolder(readDB, workspaceID, folder.ParentID, &id); err != nil {
+		if err = h.validateParentFolder(readDB, workspaceID, folder.ParentID, &id); err != nil {
 			h.writeParentValidationError(w, r, err)
 			return
 		}
@@ -410,7 +410,7 @@ func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request)
 	folder.ID = id
 	folder.WorkspaceID = workspaceID
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(folder)
+	_ = json.NewEncoder(w).Encode(folder)
 }
 
 // DeleteFolder deletes a test folder (test cases will be moved to no folder)
@@ -447,7 +447,7 @@ func (h *TestFolderHandler) DeleteFolder(w http.ResponseWriter, r *http.Request)
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Move test cases to no folder (set folder_id to NULL)
 	_, err = tx.Exec("UPDATE test_cases SET folder_id = NULL WHERE folder_id = ? AND workspace_id = ?", id, workspaceID)
@@ -506,7 +506,7 @@ func (h *TestFolderHandler) ReorderFolders(w http.ResponseWriter, r *http.Reques
 		FolderIDs []int `json:"folder_ids"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&reorderData); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&reorderData); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -522,7 +522,7 @@ func (h *TestFolderHandler) ReorderFolders(w http.ResponseWriter, r *http.Reques
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Update sort order based on array position
 	for i, folderID := range reorderData.FolderIDs {
@@ -542,5 +542,5 @@ func (h *TestFolderHandler) ReorderFolders(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }

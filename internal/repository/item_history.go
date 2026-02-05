@@ -42,7 +42,7 @@ func (r *ItemRepository) RecordHistoryBatch(tx database.Tx, entries []HistoryEnt
 }
 
 // GetHistory returns the history for an item
-func (r *ItemRepository) GetHistory(itemID int, limit int) ([]HistoryEntry, error) {
+func (r *ItemRepository) GetHistory(itemID, limit int) ([]HistoryEntry, error) {
 	query := `
 		SELECT id, item_id, user_id, field_name, old_value, new_value, changed_at
 		FROM item_history
@@ -57,7 +57,7 @@ func (r *ItemRepository) GetHistory(itemID int, limit int) ([]HistoryEntry, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to get history: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var entries []HistoryEntry
 	for rows.Next() {
@@ -72,7 +72,7 @@ func (r *ItemRepository) GetHistory(itemID int, limit int) ([]HistoryEntry, erro
 }
 
 // GetHistoryWithDetails returns history with user names resolved
-func (r *ItemRepository) GetHistoryWithDetails(itemID int, limit int) ([]models.ItemHistory, error) {
+func (r *ItemRepository) GetHistoryWithDetails(itemID, limit int) ([]models.ItemHistory, error) {
 	query := `
 		SELECT h.id, h.item_id, h.user_id, h.field_name, h.old_value, h.new_value, h.changed_at,
 		       u.first_name || ' ' || u.last_name as user_name, u.email as user_email
@@ -89,7 +89,7 @@ func (r *ItemRepository) GetHistoryWithDetails(itemID int, limit int) ([]models.
 	if err != nil {
 		return nil, fmt.Errorf("failed to get history with details: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var entries []models.ItemHistory
 	for rows.Next() {

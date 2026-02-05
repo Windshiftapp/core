@@ -12,7 +12,7 @@ func RegisterAuthRoutes(deps *Deps) {
 	api.HandleH("GET /csrf-token", deps.AuthRateLimiter.Limit(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if deps.DisableCSRF {
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"csrf_token": ""}`))
+			_, _ = w.Write([]byte(`{"csrf_token": ""}`))
 		} else {
 			deps.CSRFMiddleware.GetTokenHandler(w, r)
 		}

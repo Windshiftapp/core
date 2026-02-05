@@ -1,13 +1,13 @@
 package handlers
 
 import (
-	"windshift/internal/database"
 	"database/sql"
 	"encoding/json"
-	"windshift/internal/models"
 	"net/http"
 	"strconv"
 
+	"windshift/internal/database"
+	"windshift/internal/models"
 )
 
 type WorkspaceFieldRequirementHandler struct {
@@ -40,7 +40,7 @@ func (h *WorkspaceFieldRequirementHandler) GetByWorkspace(w http.ResponseWriter,
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type WorkspaceFieldRequirement struct {
 		ID            int    `json:"id"`
@@ -70,7 +70,7 @@ func (h *WorkspaceFieldRequirementHandler) GetByWorkspace(w http.ResponseWriter,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(requirements)
+	_ = json.NewEncoder(w).Encode(requirements)
 }
 
 func (h *WorkspaceFieldRequirementHandler) SetRequirement(w http.ResponseWriter, r *http.Request) {
@@ -85,7 +85,7 @@ func (h *WorkspaceFieldRequirementHandler) SetRequirement(w http.ResponseWriter,
 		IsRequired    bool `json:"is_required"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, err.Error())
 		return
 	}
@@ -132,7 +132,7 @@ func (h *WorkspaceFieldRequirementHandler) SetRequirement(w http.ResponseWriter,
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
 
 func (h *WorkspaceFieldRequirementHandler) RemoveRequirement(w http.ResponseWriter, r *http.Request) {
@@ -182,7 +182,7 @@ func (h *WorkspaceFieldRequirementHandler) GetAvailableFields(w http.ResponseWri
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type FieldWithRequirement struct {
 		models.CustomFieldDefinition
@@ -201,12 +201,12 @@ func (h *WorkspaceFieldRequirementHandler) GetAvailableFields(w http.ResponseWri
 			respondInternalError(w, r, err)
 			return
 		}
-		
+
 		// Set options string
 		if optionsJSON.Valid {
 			field.Options = optionsJSON.String
 		}
-		
+
 		fields = append(fields, field)
 	}
 
@@ -216,5 +216,5 @@ func (h *WorkspaceFieldRequirementHandler) GetAvailableFields(w http.ResponseWri
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(fields)
+	_ = json.NewEncoder(w).Encode(fields)
 }

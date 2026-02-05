@@ -6,13 +6,14 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/teambition/rrule-go"
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/scheduler"
 	"windshift/internal/services"
 	"windshift/internal/utils"
+
+	"github.com/teambition/rrule-go"
 )
 
 // RecurrenceHandler handles recurrence rule API endpoints
@@ -60,7 +61,7 @@ func (h *RecurrenceHandler) GetRecurrence(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(rule)
+	_ = json.NewEncoder(w).Encode(rule)
 }
 
 // CreateRecurrence creates a recurrence rule for an item
@@ -100,7 +101,7 @@ func (h *RecurrenceHandler) CreateRecurrence(w http.ResponseWriter, r *http.Requ
 
 	// Parse request body
 	var req models.CreateRecurrenceRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -110,7 +111,7 @@ func (h *RecurrenceHandler) CreateRecurrence(w http.ResponseWriter, r *http.Requ
 		respondValidationError(w, r, "rrule is required")
 		return
 	}
-	if _, err := rrule.StrToROption(req.RRule); err != nil {
+	if _, err = rrule.StrToROption(req.RRule); err != nil {
 		respondValidationError(w, r, "Invalid RRULE format: "+err.Error())
 		return
 	}
@@ -132,7 +133,8 @@ func (h *RecurrenceHandler) CreateRecurrence(w http.ResponseWriter, r *http.Requ
 	// Parse optional dtend
 	var dtend *time.Time
 	if req.DtEnd != nil && *req.DtEnd != "" {
-		t, err := time.Parse(time.RFC3339, *req.DtEnd)
+		var t time.Time
+		t, err = time.Parse(time.RFC3339, *req.DtEnd)
 		if err != nil {
 			t, err = time.Parse("2006-01-02", *req.DtEnd)
 			if err != nil {
@@ -214,7 +216,7 @@ func (h *RecurrenceHandler) CreateRecurrence(w http.ResponseWriter, r *http.Requ
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(createdRule)
+	_ = json.NewEncoder(w).Encode(createdRule)
 }
 
 // UpdateRecurrence updates a recurrence rule
@@ -243,14 +245,14 @@ func (h *RecurrenceHandler) UpdateRecurrence(w http.ResponseWriter, r *http.Requ
 
 	// Parse request body
 	var req models.UpdateRecurrenceRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Apply updates
 	if req.RRule != nil {
-		if _, err := rrule.StrToROption(*req.RRule); err != nil {
+		if _, err = rrule.StrToROption(*req.RRule); err != nil {
 			respondValidationError(w, r, "Invalid RRULE format: "+err.Error())
 			return
 		}
@@ -258,7 +260,8 @@ func (h *RecurrenceHandler) UpdateRecurrence(w http.ResponseWriter, r *http.Requ
 	}
 
 	if req.DtStart != nil {
-		dtstart, err := time.Parse(time.RFC3339, *req.DtStart)
+		var dtstart time.Time
+		dtstart, err = time.Parse(time.RFC3339, *req.DtStart)
 		if err != nil {
 			dtstart, err = time.Parse("2006-01-02", *req.DtStart)
 			if err != nil {
@@ -273,7 +276,8 @@ func (h *RecurrenceHandler) UpdateRecurrence(w http.ResponseWriter, r *http.Requ
 		if *req.DtEnd == "" {
 			rule.DtEnd = nil
 		} else {
-			t, err := time.Parse(time.RFC3339, *req.DtEnd)
+			var t time.Time
+			t, err = time.Parse(time.RFC3339, *req.DtEnd)
 			if err != nil {
 				t, err = time.Parse("2006-01-02", *req.DtEnd)
 				if err != nil {
@@ -311,7 +315,7 @@ func (h *RecurrenceHandler) UpdateRecurrence(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Save updates
-	if err := h.recurrenceRepo.Update(rule); err != nil {
+	if err = h.recurrenceRepo.Update(rule); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -324,7 +328,7 @@ func (h *RecurrenceHandler) UpdateRecurrence(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(updatedRule)
+	_ = json.NewEncoder(w).Encode(updatedRule)
 }
 
 // DeleteRecurrence deletes a recurrence rule
@@ -384,7 +388,8 @@ func (h *RecurrenceHandler) ListInstances(w http.ResponseWriter, r *http.Request
 	limit := 20
 	offset := 0
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+		var l int
+		if l, err = strconv.Atoi(limitStr); err == nil && l > 0 {
 			limit = l
 			if limit > 100 {
 				limit = 100
@@ -392,7 +397,8 @@ func (h *RecurrenceHandler) ListInstances(w http.ResponseWriter, r *http.Request
 		}
 	}
 	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
-		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+		var o int
+		if o, err = strconv.Atoi(offsetStr); err == nil && o >= 0 {
 			offset = o
 		}
 	}
@@ -421,7 +427,7 @@ func (h *RecurrenceHandler) ListInstances(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // ForceGenerate forces immediate generation for a rule
@@ -460,7 +466,7 @@ func (h *RecurrenceHandler) ForceGenerate(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // PreviewRRule previews RRULE occurrences
@@ -530,5 +536,5 @@ func (h *RecurrenceHandler) PreviewRRule(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -214,7 +215,7 @@ func (h *AssetHandler) buildSetMap() (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	setMap := make(map[string]int)
 	for rows.Next() {
@@ -234,7 +235,7 @@ func (h *AssetHandler) buildWorkspaceMap() (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	workspaceMap := make(map[string]int)
 	for rows.Next() {

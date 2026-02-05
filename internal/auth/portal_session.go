@@ -11,16 +11,17 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"windshift/internal/database"
-	"windshift/internal/utils"
 
 	"github.com/gorilla/securecookie"
+
+	"windshift/internal/database"
+	"windshift/internal/utils"
 )
 
 const (
-	PortalSessionCookieName    = "windshift_portal_session"
-	PortalSessionTokenLength   = 32 // 256-bit session tokens
-	PortalSessionDuration      = 7 * 24 * time.Hour // 7 days
+	PortalSessionCookieName  = "windshift_portal_session"
+	PortalSessionTokenLength = 32                 // 256-bit session tokens
+	PortalSessionDuration    = 7 * 24 * time.Hour // 7 days
 )
 
 var (
@@ -35,7 +36,7 @@ type PortalCustomer struct {
 	Name                   string    `json:"name"`
 	Email                  string    `json:"email"`
 	Phone                  string    `json:"phone,omitempty"`
-	CustomerOrganisationID *int      `json:"customer_organisation_id,omitempty"`
+	CustomerOrganisationID *int      `json:"customer_organisation_id,omitempty"` //nolint:misspell // database column name
 	CreatedAt              time.Time `json:"created_at"`
 	UpdatedAt              time.Time `json:"updated_at"`
 }
@@ -63,7 +64,7 @@ type PortalSessionManager struct {
 }
 
 // NewPortalSessionManager creates a new portal session manager with secure cookie handling
-func NewPortalSessionManager(db database.Database, useSecureCookies bool, useProxy bool, additionalProxies []string) *PortalSessionManager {
+func NewPortalSessionManager(db database.Database, useSecureCookies, useProxy bool, additionalProxies []string) *PortalSessionManager {
 	// Generate secure cookie keys (in production, these should be from config/env)
 	hashKey := generateSecureKey(64)  // 512-bit key for HMAC
 	blockKey := generateSecureKey(32) // 256-bit key for encryption
@@ -138,6 +139,7 @@ func (sm *PortalSessionManager) ValidatePortalSession(token string) (*PortalSess
 		return nil, ErrPortalSessionInvalid
 	}
 
+	//nolint:misspell // database column name uses British spelling
 	query := `
 		SELECT
 			s.id, s.portal_customer_id, s.session_token, s.expires_at, s.ip_address, s.user_agent, s.is_active, s.created_at,

@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -77,7 +78,7 @@ func (s *WorkspaceService) List(params WorkspaceListParams) ([]WorkspaceListResu
 	for rows.Next() {
 		var ws WorkspaceListResult
 		var icon, color sql.NullString
-		err := rows.Scan(&ws.ID, &ws.Name, &ws.Key, &ws.Description, &ws.Active, &ws.IsPersonal,
+		err = rows.Scan(&ws.ID, &ws.Name, &ws.Key, &ws.Description, &ws.Active, &ws.IsPersonal,
 			&icon, &color, &ws.CreatedAt, &ws.UpdatedAt)
 		if err != nil {
 			continue
@@ -184,7 +185,7 @@ func (s *WorkspaceService) Create(params CreateWorkspaceParams) (*CreateWorkspac
 		SELECT ?, ?, id, ?, CURRENT_TIMESTAMP FROM workspace_roles WHERE name = 'Administrator'
 	`, id, params.CreatorID, params.CreatorID)
 	if err != nil {
-		// Log but don't fail - workspace was created
+		slog.Warn("failed to grant admin permission to workspace creator", "error", err, "workspace_id", id)
 	}
 
 	// Return created workspace

@@ -1,3 +1,4 @@
+// Package constants provides system-wide constant values.
 package constants
 
 // Permission constants for system-wide permissions

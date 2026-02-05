@@ -1,22 +1,22 @@
 package handlers
 
 import (
-    "windshift/internal/database"
-    "windshift/internal/models"
-    "windshift/internal/services"
-    "database/sql"
-    "encoding/json"
-    "net/http"
-    "sort"
-    "strconv"
-    "strings"
-    "time"
+	"database/sql"
+	"encoding/json"
+	"net/http"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
 
+	"windshift/internal/database"
+	"windshift/internal/models"
+	"windshift/internal/services"
 )
 
 type CredentialHandler struct {
-    db                database.Database
-    permissionService *services.PermissionService
+	db                database.Database
+	permissionService *services.PermissionService
 }
 
 func NewCredentialHandler(db database.Database, permissionService *services.PermissionService) *CredentialHandler {
@@ -26,7 +26,6 @@ func NewCredentialHandler(db database.Database, permissionService *services.Perm
 	}
 }
 
-
 // SSHKeyRequest represents the request to add an SSH key
 type SSHKeyRequest struct {
 	CredentialName string `json:"credential_name"`
@@ -35,15 +34,15 @@ type SSHKeyRequest struct {
 
 // GetUserCredentials returns all credentials for a user (both legacy and WebAuthn)
 func (h *CredentialHandler) GetUserCredentials(w http.ResponseWriter, r *http.Request) {
-    userID, err := strconv.Atoi(r.PathValue("userId"))
-    if err != nil {
-        respondInvalidID(w, r, "userId")
-        return
-    }
+	userID, err := strconv.Atoi(r.PathValue("userId"))
+	if err != nil {
+		respondInvalidID(w, r, "userId")
+		return
+	}
 
-    if AuthorizeUserRequest(w, r, userID, h.permissionService) == nil {
-        return
-    }
+	if AuthorizeUserRequest(w, r, userID, h.permissionService) == nil {
+		return
+	}
 
 	var credentials []models.UserCredential
 
@@ -60,14 +59,14 @@ func (h *CredentialHandler) GetUserCredentials(w http.ResponseWriter, r *http.Re
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var cred models.UserCredential
 		var lastUsedAt sql.NullTime
 		var id int
 
-		err := rows.Scan(&id, &cred.UserID, &cred.CredentialType, &cred.CredentialName,
+		err = rows.Scan(&id, &cred.UserID, &cred.CredentialType, &cred.CredentialName,
 			&cred.IsActive, &cred.CreatedAt, &cred.UpdatedAt, &lastUsedAt)
 		if err != nil {
 			respondInternalError(w, r, err)
@@ -96,7 +95,7 @@ func (h *CredentialHandler) GetUserCredentials(w http.ResponseWriter, r *http.Re
 		respondInternalError(w, r, err)
 		return
 	}
-	defer webauthnRows.Close()
+	defer func() { _ = webauthnRows.Close() }()
 
 	for webauthnRows.Next() {
 		var id string
@@ -114,9 +113,9 @@ func (h *CredentialHandler) GetUserCredentials(w http.ResponseWriter, r *http.Re
 		cred := models.UserCredential{
 			ID:             id,
 			UserID:         userID,
-			CredentialType: "fido",  // Mark as FIDO type for UI compatibility
+			CredentialType: "fido", // Mark as FIDO type for UI compatibility
 			CredentialName: credentialName,
-			IsActive:       true,    // WebAuthn credentials are always active
+			IsActive:       true, // WebAuthn credentials are always active
 			CreatedAt:      createdAt,
 			UpdatedAt:      createdAt, // Use created_at as updated_at for simplicity
 		}
@@ -138,9 +137,8 @@ func (h *CredentialHandler) GetUserCredentials(w http.ResponseWriter, r *http.Re
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(credentials)
+	_ = json.NewEncoder(w).Encode(credentials)
 }
-
 
 // CreateSSHKey adds an SSH public key for a user
 func (h *CredentialHandler) CreateSSHKey(w http.ResponseWriter, r *http.Request) {
@@ -155,7 +153,7 @@ func (h *CredentialHandler) CreateSSHKey(w http.ResponseWriter, r *http.Request)
 	}
 
 	var req SSHKeyRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
@@ -215,7 +213,7 @@ func (h *CredentialHandler) CreateSSHKey(w http.ResponseWriter, r *http.Request)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // isValidSSHPublicKey performs basic validation of SSH public key format
@@ -265,7 +263,8 @@ func (h *CredentialHandler) RemoveCredential(w http.ResponseWriter, r *http.Requ
 	credentialIDStr := r.PathValue("credentialId")
 
 	// Try to parse as integer for legacy credentials
-	if credentialID, err := strconv.Atoi(credentialIDStr); err == nil {
+	var credentialID int
+	if credentialID, err = strconv.Atoi(credentialIDStr); err == nil {
 		// Check if it's a legacy credential
 		var exists bool
 		err = h.db.QueryRow(`

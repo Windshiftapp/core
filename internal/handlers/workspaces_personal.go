@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"windshift/internal/models"
 )
 
@@ -97,7 +98,7 @@ func (h *WorkspaceHandler) GetOrCreatePersonalWorkspace(w http.ResponseWriter, r
 	}
 
 	// Create item number sequence for this workspace (PostgreSQL only, no-op for SQLite)
-	if err := h.db.CreateWorkspaceItemSequence(id); err != nil {
+	if err = h.db.CreateWorkspaceItemSequence(id); err != nil {
 		slog.Warn("failed to create item sequence for personal workspace", slog.String("component", "workspaces"), slog.Int64("workspace_id", id), slog.Any("error", err))
 	}
 

@@ -15,7 +15,7 @@ import (
 )
 
 // checkSetupStatusWithRetry checks the setup_completed status with exponential backoff retry logic.
-func checkSetupStatusWithRetry(db database.Database, maxRetries int, initialDelay time.Duration) (bool, error) {
+func checkSetupStatusWithRetry(db database.Database, maxRetries int, initialDelay time.Duration) (bool, error) { //nolint:unparam // error return kept for API consistency
 	delay := initialDelay
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
@@ -26,7 +26,7 @@ func checkSetupStatusWithRetry(db database.Database, maxRetries int, initialDela
 		err := db.QueryRow(query).Scan(&value)
 
 		if err == nil {
-			setupCompleted := strings.ToLower(value) == "true"
+			setupCompleted := strings.EqualFold(value, "true")
 			if setupCompleted {
 				slog.Info("setup status: COMPLETED - server will run in production mode")
 			} else {
@@ -55,7 +55,7 @@ func checkSetupStatusWithRetry(db database.Database, maxRetries int, initialDela
 	return false, nil
 }
 
-func createCORSMiddleware(allowedHosts string, serverPort string, disableCSRF bool, useProxy bool) func(http.Handler) http.Handler {
+func createCORSMiddleware(allowedHosts, serverPort string, disableCSRF, useProxy bool) func(http.Handler) http.Handler {
 	var origins []string
 
 	if disableCSRF {
@@ -123,7 +123,7 @@ func createCORSMiddleware(allowedHosts string, serverPort string, disableCSRF bo
 	return corsMw.Wrap
 }
 
-func createSecurityHeaders(enableHTTPS bool, useProxy bool, additionalProxies []net.IP) func(http.Handler) http.Handler {
+func createSecurityHeaders(enableHTTPS, useProxy bool, additionalProxies []net.IP) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("X-XSS-Protection", "1; mode=block")

@@ -50,14 +50,14 @@ func (h *NotificationTemplateHandler) GetAllTemplates(w http.ResponseWriter, r *
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var templates []models.NotificationTemplate
 	for rows.Next() {
 		var template models.NotificationTemplate
 		var subject sql.NullString
 
-		err := rows.Scan(
+		err = rows.Scan(
 			&template.ID,
 			&template.Name,
 			&template.TemplateType,
@@ -86,7 +86,7 @@ func (h *NotificationTemplateHandler) GetAllTemplates(w http.ResponseWriter, r *
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(templates)
+	_ = json.NewEncoder(w).Encode(templates)
 }
 
 // GetTemplate handles GET /api/notification-templates/{id}
@@ -135,7 +135,7 @@ func (h *NotificationTemplateHandler) GetTemplate(w http.ResponseWriter, r *http
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(template)
+	_ = json.NewEncoder(w).Encode(template)
 }
 
 // CreateTemplate handles POST /api/notification-templates
@@ -191,7 +191,7 @@ func (h *NotificationTemplateHandler) CreateTemplate(w http.ResponseWriter, r *h
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(template)
+	_ = json.NewEncoder(w).Encode(template)
 }
 
 // UpdateTemplate handles PUT /api/notification-templates/{id}
@@ -203,7 +203,7 @@ func (h *NotificationTemplateHandler) UpdateTemplate(w http.ResponseWriter, r *h
 	}
 
 	var template models.NotificationTemplate
-	if err := json.NewDecoder(r.Body).Decode(&template); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&template); err != nil {
 		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
@@ -263,7 +263,7 @@ func (h *NotificationTemplateHandler) UpdateTemplate(w http.ResponseWriter, r *h
 	template.UpdatedAt = now
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(template)
+	_ = json.NewEncoder(w).Encode(template)
 }
 
 // DeleteTemplate handles DELETE /api/notification-templates/{id}

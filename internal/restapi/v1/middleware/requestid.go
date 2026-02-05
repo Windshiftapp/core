@@ -30,7 +30,7 @@ func RequestID(next http.Handler) http.Handler {
 // generateRequestID creates a new unique request ID
 func generateRequestID() string {
 	bytes := make([]byte, 12)
-	rand.Read(bytes)
+	_, _ = rand.Read(bytes)
 	return "req_" + hex.EncodeToString(bytes)
 }
 

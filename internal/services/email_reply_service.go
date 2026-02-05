@@ -115,7 +115,7 @@ func (s *EmailReplyService) HandleCommentCreated(params HandleCommentParams) err
 	var records []trackingRecord
 	for rows.Next() {
 		var rec trackingRecord
-		if err := rows.Scan(&rec.MessageID, &rec.Subject); err != nil {
+		if err = rows.Scan(&rec.MessageID, &rec.Subject); err != nil {
 			continue
 		}
 		records = append(records, rec)

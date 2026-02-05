@@ -73,7 +73,7 @@ func ValidateItemCreation(db database.Database, params ItemValidationParams) *It
 }
 
 // validateParentHierarchy validates the parent-child hierarchy relationship
-func validateParentHierarchy(db database.Database, parentID *int, itemTypeID *int) *ItemValidationResult {
+func validateParentHierarchy(db database.Database, parentID, itemTypeID *int) *ItemValidationResult {
 	var parentItemTypeID sql.NullInt64
 	var parentItemTypeHierarchyLevel int
 	err := db.QueryRow(`
@@ -120,7 +120,7 @@ func validateParentHierarchy(db database.Database, parentID *int, itemTypeID *in
 }
 
 // validateRelatedWorkItem validates that the related work item exists and is in a valid workspace
-func validateRelatedWorkItem(db database.Database, workspaceID int, userID int, relatedWorkItemID int) *ItemValidationResult {
+func validateRelatedWorkItem(db database.Database, workspaceID, userID, relatedWorkItemID int) *ItemValidationResult {
 	// Verify workspace is personal and belongs to the user
 	var isPersonal bool
 	var ownerID *int

@@ -87,7 +87,9 @@ func (p *Parser) Parse(msg *FetchedMessage) (*ParsedEmail, error) {
 
 	// Parse body
 	if len(msg.Body) > 0 || len(msg.Header) > 0 {
-		fullMessage := append(msg.Header, msg.Body...)
+		fullMessage := make([]byte, 0, len(msg.Header)+len(msg.Body))
+		fullMessage = append(fullMessage, msg.Header...)
+		fullMessage = append(fullMessage, msg.Body...)
 		err := p.parseBody(bytes.NewReader(fullMessage), parsed)
 		if err != nil {
 			slog.Warn("failed to parse email body", "error", err, "message_id", parsed.MessageID)
@@ -340,7 +342,7 @@ var signOffPatterns = []*regexp.Regexp{
 }
 
 // contactInfoPattern matches lines containing contact information
-var contactInfoPattern = regexp.MustCompile(`[@]|(\+?\d[\d\s\-()]{7,})|www\.|https?://|[|]`)
+var contactInfoPattern = regexp.MustCompile(`@|(\+?\d[\d\s\-()]{7,})|www\.|https?://|\|`)
 
 // StripSignature removes business email signatures from plain text.
 // It scans from the bottom of the message, looking for explicit delimiters (-- ),

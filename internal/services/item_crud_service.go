@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
@@ -77,7 +78,7 @@ func (s *ItemCRUDService) Delete(itemID int) (*DeleteResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Delete all related data for item and descendants
 	allIDs := append([]int{itemID}, descendantIDs...)
@@ -145,7 +146,7 @@ func (s *ItemCRUDService) Copy(itemID int, opts CopyOptions) (*CopyResult, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Get next item number
 	nextNum, err := s.repo.GetNextWorkspaceItemNumber(tx, source.WorkspaceID)
@@ -192,7 +193,7 @@ func (s *ItemCRUDService) Copy(itemID int, opts CopyOptions) (*CopyResult, error
 	// Record item creation history for the copied item
 	updateService := NewItemUpdateService(s.db)
 	if err := updateService.recordItemCreationHistory(s.db, newID, opts.CreatorID); err != nil {
-		// Log error but don't fail the request
+		slog.Warn("failed to record item creation history", "error", err, "item_id", newID)
 	}
 
 	return &CopyResult{
@@ -249,23 +250,24 @@ func (s *ItemCRUDService) GetWithEffectiveProject(id int) (*models.Item, error) 
 	}
 
 	// Calculate effective project if inherit_project is true
-	if item.InheritProject && item.ParentID != nil {
+	switch {
+	case item.InheritProject && item.ParentID != nil:
 		effectiveProjectID, err := s.calculateEffectiveProject(id)
 		if err == nil && effectiveProjectID != nil {
 			item.EffectiveProjectID = effectiveProjectID
 			// Fetch project name
 			var name sql.NullString
-			s.db.QueryRow("SELECT name FROM time_projects WHERE id = ?", *effectiveProjectID).Scan(&name)
+			_ = s.db.QueryRow("SELECT name FROM time_projects WHERE id = ?", *effectiveProjectID).Scan(&name)
 			if name.Valid {
 				item.EffectiveProjectName = name.String
 			}
 			item.ProjectInheritanceMode = "inherit"
 		}
-	} else if item.ProjectID != nil {
+	case item.ProjectID != nil:
 		item.EffectiveProjectID = item.ProjectID
 		item.EffectiveProjectName = item.ProjectName
 		item.ProjectInheritanceMode = "direct"
-	} else {
+	default:
 		item.ProjectInheritanceMode = "none"
 	}
 

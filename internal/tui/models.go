@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/textarea"
-	"github.com/charmbracelet/bubbletea"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -56,13 +56,13 @@ type PickerState struct {
 // Model represents the main application model
 type Model struct {
 	// State
-	currentScreen  AppScreen
-	workspaces     []Workspace
-	workItems      []WorkItem
-	comments       []Comment
-	timeProjects   []TimeProject
-	statuses       []Status   // Cached list of available statuses
-	priorities     []Priority // Cached list of available priorities
+	currentScreen AppScreen
+	workspaces    []Workspace
+	workItems     []WorkItem
+	comments      []Comment
+	timeProjects  []TimeProject
+	statuses      []Status   // Cached list of available statuses
+	priorities    []Priority // Cached list of available priorities
 
 	// Current selections
 	currentWorkspace     *Workspace
@@ -83,10 +83,6 @@ type Model struct {
 	errorMessage   string
 	successMessage string
 
-	// List states
-	workspaceListCursor int
-	itemListCursor      int
-
 	// API client
 	apiClient *APIClient
 
@@ -106,19 +102,19 @@ type Model struct {
 
 // WorkItemEditForm for editing work items
 type WorkItemEditForm struct {
-	title       string
-	description string  // Keep this for storing the raw value
-	descriptionTextarea textarea.Model  // The textarea component for editing
-	statusID     *int   // ID-based status
-	statusName   string // For display
-	statusColor  string // Category color for display
-	priorityID   *int   // ID-based priority
-	priorityName string // For display
-	priorityColor string // Priority color for display
-	currentField int
-	editing     bool
+	title               string
+	description         string         // Keep this for storing the raw value
+	descriptionTextarea textarea.Model // The textarea component for editing
+	statusID            *int           // ID-based status
+	statusName          string         // For display
+	statusColor         string         // Category color for display
+	priorityID          *int           // ID-based priority
+	priorityName        string         // For display
+	priorityColor       string         // Priority color for display
+	currentField        int
+	editing             bool
 	// Cursor positions for single-line fields
-	titleCursor       int
+	titleCursor int
 }
 
 // CommentForm for creating comments
@@ -129,13 +125,13 @@ type CommentForm struct {
 
 // CreateWorkItemForm for creating new work items
 type CreateWorkItemForm struct {
-	title        string
-	description  string
-	priorityID   *int   // ID-based priority
-	priorityName string // For display
+	title         string
+	description   string
+	priorityID    *int   // ID-based priority
+	priorityName  string // For display
 	priorityColor string // Priority color for display
-	currentField int
-	editing      bool
+	currentField  int
+	editing       bool
 	// Cursor positions for single-line fields
 	titleCursor int
 }
@@ -154,15 +150,15 @@ type TimeLogForm struct {
 
 // Styles contains lipgloss styles for the TUI
 type Styles struct {
-	Title         lipgloss.Style
-	Subtitle      lipgloss.Style
-	SelectedItem  lipgloss.Style
-	NormalItem    lipgloss.Style
-	ErrorMessage  lipgloss.Style
-	HelpText      lipgloss.Style
-	Border        lipgloss.Style
-	EditingField  lipgloss.Style
-	StatusBar     lipgloss.Style
+	Title        lipgloss.Style
+	Subtitle     lipgloss.Style
+	SelectedItem lipgloss.Style
+	NormalItem   lipgloss.Style
+	ErrorMessage lipgloss.Style
+	HelpText     lipgloss.Style
+	Border       lipgloss.Style
+	EditingField lipgloss.Style
+	StatusBar    lipgloss.Style
 }
 
 // NewModel creates a new model instance
@@ -217,16 +213,16 @@ func NewModelWithUserAndToken(apiURL string, userInfo *UserInfo, sessionToken st
 
 	return Model{
 		currentScreen:        WorkspaceListScreen,
-		workspaces:          []Workspace{},
-		workItems:           []WorkItem{},
-		comments:            []Comment{},
-		timeProjects:        []TimeProject{},
+		workspaces:           []Workspace{},
+		workItems:            []WorkItem{},
+		comments:             []Comment{},
+		timeProjects:         []TimeProject{},
 		selectedWorkspaceIdx: 0,
-		selectedItemIdx:     0,
-		apiClient:           apiClient,
-		userInfo:            userInfo,
+		selectedItemIdx:      0,
+		apiClient:            apiClient,
+		userInfo:             userInfo,
 		sessionToken:         sessionToken,
-		styles:              styles,
+		styles:               styles,
 		timeForm: TimeLogForm{
 			date:      time.Now().Format("2006-01-02"),
 			startTime: time.Now().Format("15:04"),
@@ -251,10 +247,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		return m, nil
-		
+
 	case tea.KeyMsg:
 		return m.handleKeyPress(msg)
-		
+
 	case workspacesLoadedMsg:
 		m.workspaces = msg.workspaces
 		m.loading = false
@@ -262,7 +258,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.selectedWorkspaceIdx = 0
 		}
 		return m, nil
-		
+
 	case workItemsLoadedMsg:
 		m.workItems = msg.items
 		m.loading = false
@@ -270,12 +266,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.selectedItemIdx = 0
 		}
 		return m, nil
-		
+
 	case commentsLoadedMsg:
 		m.comments = msg.comments
 		m.loading = false
 		return m, nil
-		
+
 	case commentCreatedMsg:
 		// Reset comment form and reload comments
 		m.commentForm.content = ""
@@ -287,7 +283,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.loadComments(item.ID)
 		}
 		return m, nil
-		
+
 	case workItemCreatedMsg:
 		// Reset create form and reload work items
 		m.createForm.title = ""
@@ -314,7 +310,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case timeProjectsLoadedMsg:
 		m.timeProjects = msg.projects
 		return m, nil
-		
+
 	case workItemUpdatedMsg:
 		// Show success message and reload work items
 		m.successMessage = "Work item saved successfully!"
@@ -323,7 +319,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.loadWorkItems(m.currentWorkspace.ID)
 		}
 		return m, nil
-		
+
 	case timeLogCreatedMsg:
 		// Reset time form and go back to work item detail
 		m.timeForm.description = ""
@@ -332,7 +328,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.successMessage = "Time logged!"
 		m.errorMessage = ""
 		return m, nil
-		
+
 	case errorMsg:
 		m.errorMessage = msg.error
 		m.loading = false
@@ -408,15 +404,15 @@ func (m Model) View() string {
 // Helper methods for rendering different screens
 func (m Model) renderWorkspaceList() string {
 	title := m.styles.Title.Render("🏢 Windshift TUI - Workspaces")
-	
+
 	if m.loading {
 		return title + "\n\nLoading workspaces..."
 	}
-	
+
 	if len(m.workspaces) == 0 {
 		return title + "\n\nNo workspaces found."
 	}
-	
+
 	var items []string
 	for i, workspace := range m.workspaces {
 		line := fmt.Sprintf("%s - %s", workspace.Key, workspace.Name)
@@ -427,13 +423,13 @@ func (m Model) renderWorkspaceList() string {
 		}
 		items = append(items, line)
 	}
-	
+
 	content := title + "\n\n" + strings.Join(items, "\n")
-	
+
 	if m.errorMessage != "" {
 		content += "\n\n" + m.styles.ErrorMessage.Render("Error: "+m.errorMessage)
 	}
-	
+
 	return content
 }
 
@@ -442,37 +438,35 @@ func (m Model) renderWorkItemList() string {
 	if m.currentWorkspace != nil {
 		workspaceName = m.currentWorkspace.Name
 	}
-	
+
 	title := m.styles.Title.Render(fmt.Sprintf("📋 Work Items - %s", workspaceName))
-	
+
 	if m.loading {
 		return title + "\n\nLoading work items..."
 	}
-	
+
 	if len(m.workItems) == 0 {
 		return title + "\n\nNo work items found."
 	}
-	
+
 	// Calculate column widths based on available width
-	availableWidth := m.width - 4 // Account for padding
-	keyWidth := 12   // For item keys like "FIRST-123"
-	statusWidth := 15 // For status like "[in_progress]"
+	availableWidth := m.width - 4                             // Account for padding
+	keyWidth := 12                                            // For item keys like "FIRST-123"
+	statusWidth := 15                                         // For status like "[in_progress]"
 	titleWidth := availableWidth - keyWidth - statusWidth - 6 // Account for spacing and hierarchy indent
 	if titleWidth < 20 {
 		titleWidth = 20
 	}
-	
+
 	// Create column header
 	header := m.styles.Subtitle.Render(
-		fmt.Sprintf("%-*s %-*s %s", 
-			keyWidth, "KEY", 
-			titleWidth, "TITLE", 
+		fmt.Sprintf("%-*s %-*s %s",
+			keyWidth, "KEY",
+			titleWidth, "TITLE",
 			"STATUS"))
-	
-	var items []string
-	items = append(items, header)
-	items = append(items, strings.Repeat("─", availableWidth)) // Separator line
-	
+
+	items := []string{header, strings.Repeat("─", availableWidth)}
+
 	for i, item := range m.workItems {
 		// Add hierarchy indentation
 		hierarchyIndent := strings.Repeat("  ", item.GetLevel())
@@ -485,7 +479,7 @@ func (m Model) renderWorkItemList() string {
 		itemKey := fmt.Sprintf("%s-%d", workspaceKey, item.ID)
 
 		// Truncate title if too long
-		title := item.Title
+		title = item.Title
 		if len(title) > titleWidth-len(hierarchyIndent)-3 {
 			title = title[:titleWidth-len(hierarchyIndent)-6] + "..."
 		}
@@ -514,13 +508,13 @@ func (m Model) renderWorkItemList() string {
 
 		items = append(items, row)
 	}
-	
+
 	content := title + "\n\n" + strings.Join(items, "\n")
-	
+
 	if m.errorMessage != "" {
 		content += "\n\n" + m.styles.ErrorMessage.Render("Error: "+m.errorMessage)
 	}
-	
+
 	return content
 }
 
@@ -550,7 +544,7 @@ func (m Model) renderWorkItemDetail() string {
 			if cursorPos >= 0 && cursorPos <= len(titleValue) {
 				titleValue = titleValue[:cursorPos] + "█" + titleValue[cursorPos:]
 			} else {
-				titleValue = titleValue + "█"
+				titleValue += "█"
 			}
 			titleValue = m.styles.EditingField.Render(titleValue)
 		} else {
@@ -562,9 +556,7 @@ func (m Model) renderWorkItemDetail() string {
 	// Description field (index 1)
 	descLabel := m.styles.Subtitle.Render("Description:")
 	if m.editForm.currentField == 1 && m.editForm.editing {
-		content = append(content, descLabel)
-		content = append(content, m.editForm.descriptionTextarea.View())
-		content = append(content, "")
+		content = append(content, descLabel, m.editForm.descriptionTextarea.View(), "")
 	} else {
 		descValue := m.editForm.description
 		if m.editForm.currentField == 1 {
@@ -627,7 +619,7 @@ func (m Model) renderCreateWorkItem() string {
 			if cursorPos >= 0 && cursorPos <= len(titleValue) {
 				titleValue = titleValue[:cursorPos] + "█" + titleValue[cursorPos:]
 			} else {
-				titleValue = titleValue + "█"
+				titleValue += "█"
 			}
 			titleValue = m.styles.EditingField.Render(titleValue)
 		} else {
@@ -671,13 +663,13 @@ func (m Model) renderComments() string {
 	if m.selectedItemIdx >= len(m.workItems) {
 		return "No work item selected"
 	}
-	
+
 	item := m.workItems[m.selectedItemIdx]
 	title := m.styles.Title.Render(fmt.Sprintf("💬 Comments - %s", item.Title))
-	
+
 	var content []string
 	content = append(content, title, "")
-	
+
 	if len(m.comments) == 0 {
 		content = append(content, "No comments yet. Press 'n' to add a comment.")
 	} else {
@@ -686,23 +678,19 @@ func (m Model) renderComments() string {
 			if comment.AuthorName != nil {
 				authorName = *comment.AuthorName
 			}
-			
-			content = append(content, m.styles.Subtitle.Render(fmt.Sprintf("👤 %s - %s", authorName, comment.CreatedAt)))
-			content = append(content, comment.Content)
-			content = append(content, "")
+
+			content = append(content, m.styles.Subtitle.Render(fmt.Sprintf("👤 %s - %s", authorName, comment.CreatedAt)), comment.Content, "")
 		}
 	}
-	
+
 	// New comment input
 	content = append(content, m.styles.Subtitle.Render("New Comment:"))
 	if m.commentForm.editing {
-		content = append(content, m.styles.EditingField.Render(m.commentForm.content+"█"))
-		content = append(content, "", m.styles.HelpText.Render("Type your comment | Enter: Post comment | ESC: Cancel"))
+		content = append(content, m.styles.EditingField.Render(m.commentForm.content+"█"), "", m.styles.HelpText.Render("Type your comment | Enter: Post comment | ESC: Cancel"))
 	} else {
-		content = append(content, m.commentForm.content)
-		content = append(content, "", m.styles.HelpText.Render("N: New comment | R: Refresh | ESC: Back to items"))
+		content = append(content, m.commentForm.content, "", m.styles.HelpText.Render("N: New comment | R: Refresh | ESC: Back to items"))
 	}
-	
+
 	return strings.Join(content, "\n")
 }
 
@@ -725,8 +713,7 @@ func (m Model) renderTimeLogging() string {
 		{"Start Time (HH:MM)", m.timeForm.startTime, 3},
 	}
 
-	var content []string
-	content = append(content, title, "")
+	content := []string{title, ""}
 
 	for _, field := range fields {
 		label := m.styles.Subtitle.Render(field.label + ":")
@@ -740,9 +727,7 @@ func (m Model) renderTimeLogging() string {
 			}
 		}
 
-		content = append(content, label)
-		content = append(content, value)
-		content = append(content, "")
+		content = append(content, label, value, "")
 	}
 
 	// Project field (index 4) - uses picker
@@ -768,7 +753,7 @@ func (m Model) renderTimeLogging() string {
 
 func (m Model) renderHelp() string {
 	title := m.styles.Title.Render("📚 Windshift TUI Help")
-	
+
 	helpText := []string{
 		title,
 		"",
@@ -798,20 +783,21 @@ func (m Model) renderHelp() string {
 		"  c         - View comments",
 		"  ESC       - Back to items",
 	}
-	
+
 	return strings.Join(helpText, "\n")
 }
 
 func (m Model) renderStatusBar() string {
 	var status string
 
-	if m.loading {
+	switch {
+	case m.loading:
 		status = "⏳ Loading..."
-	} else if m.errorMessage != "" {
+	case m.errorMessage != "":
 		status = "❌ " + m.errorMessage
-	} else if m.successMessage != "" {
+	case m.successMessage != "":
 		status = "✅ " + m.successMessage
-	} else {
+	default:
 		switch m.currentScreen {
 		case WorkspaceListScreen:
 			status = "Select a workspace"
@@ -829,28 +815,29 @@ func (m Model) renderStatusBar() string {
 			status = "Help - Press ESC to return"
 		}
 	}
-	
+
 	leftSide := m.styles.StatusBar.Render("🌀 Windshift TUI")
-	
+
 	// Add user information to the right side of the status bar
 	var rightSide string
 	if m.userInfo != nil {
 		// Create a display name from available user information
 		var displayName string
-		
+
 		// Prefer first name + last name, fall back to username, then email
-		if m.userInfo.FirstName != "" && m.userInfo.LastName != "" {
+		switch {
+		case m.userInfo.FirstName != "" && m.userInfo.LastName != "":
 			displayName = fmt.Sprintf("%s %s", m.userInfo.FirstName, m.userInfo.LastName)
-		} else if m.userInfo.Username != "" {
+		case m.userInfo.Username != "":
 			displayName = m.userInfo.Username
-		} else if m.userInfo.Email != "" {
+		case m.userInfo.Email != "":
 			// Use the part before @ in email as display name
 			if atIndex := strings.Index(m.userInfo.Email, "@"); atIndex > 0 {
 				displayName = m.userInfo.Email[:atIndex]
 			} else {
 				displayName = m.userInfo.Email
 			}
-		} else {
+		default:
 			// Fall back to credential name (clean it up)
 			displayName = m.userInfo.CredentialName
 			if strings.Contains(displayName, " Key") {
@@ -861,19 +848,19 @@ func (m Model) renderStatusBar() string {
 				}
 			}
 		}
-		
+
 		userDisplay := fmt.Sprintf("👤 %s | %s", displayName, status)
 		rightSide = m.styles.StatusBar.Render(userDisplay)
 	} else {
 		rightSide = m.styles.StatusBar.Render(status)
 	}
-	
+
 	// Calculate padding to fill the width
 	padding := m.width - lipgloss.Width(leftSide) - lipgloss.Width(rightSide)
 	if padding < 0 {
 		padding = 0
 	}
-	
+
 	return leftSide + strings.Repeat(" ", padding) + rightSide
 }
 
@@ -900,11 +887,11 @@ func (m Model) formatStatus(status string) string {
 			Background(lipgloss.Color("#7ED321")).
 			Foreground(lipgloss.Color("#FFFFFF")).
 			Render("DONE")
-	case "cancelled", "canceled":
+	case "cancelled", "canceled": //nolint:misspell // intentionally handles both British and American spellings
 		return statusStyle.
 			Background(lipgloss.Color("#D0021B")).
 			Foreground(lipgloss.Color("#FFFFFF")).
-			Render("CANCELLED")
+			Render("CANCELED")
 	default:
 		return statusStyle.
 			Background(lipgloss.Color("#9B9B9B")).
@@ -958,7 +945,7 @@ func (m Model) formatPriorityWithColor(name, color string) string {
 }
 
 // overlayPicker renders the picker as an overlay on top of the current view
-func (m Model) overlayPicker(base string) string {
+func (m Model) overlayPicker(_ string) string {
 	var title string
 	var items []string
 

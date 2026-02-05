@@ -54,7 +54,7 @@ func NewOIDCService(cookieKey []byte) *OIDCService {
 }
 
 // CreateRelyingParty creates a new OIDC relying party for a provider
-func (s *OIDCService) CreateRelyingParty(ctx context.Context, provider *SSOProvider, redirectURI string, clientSecret string) (rp.RelyingParty, error) {
+func (s *OIDCService) CreateRelyingParty(ctx context.Context, provider *SSOProvider, redirectURI, clientSecret string) (rp.RelyingParty, error) {
 	if provider.ProviderType != ProviderTypeOIDC {
 		return nil, fmt.Errorf("provider type is not OIDC: %s", provider.ProviderType)
 	}
@@ -130,10 +130,8 @@ func (s *OIDCService) ExtractClaims(tokens *oidc.Tokens[*oidc.IDTokenClaims], at
 
 	// Get all claims for debugging
 	allClaims := idTokenClaims.Claims
-	if allClaims != nil {
-		for k, v := range allClaims {
-			claims.Raw[k] = v
-		}
+	for k, v := range allClaims {
+		claims.Raw[k] = v
 	}
 
 	// Extract email

@@ -38,17 +38,17 @@ func TestRecordItemCreationHistory(t *testing.T) {
 
 		var entries []struct {
 			FieldName string
-			OldValue string
-			NewValue string
-			UserID   int
+			OldValue  string
+			NewValue  string
+			UserID    int
 		}
 
 		for rows.Next() {
 			var entry struct {
 				FieldName string
-				OldValue string
-				NewValue string
-				UserID   int
+				OldValue  string
+				NewValue  string
+				UserID    int
 			}
 			err := rows.Scan(&entry.FieldName, &entry.OldValue, &entry.NewValue, &entry.UserID)
 			if err != nil {

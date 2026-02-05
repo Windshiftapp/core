@@ -214,11 +214,12 @@ func main() {
 				allowedHosts = parsedURL.Hostname()
 			}
 			if allowedPort == "" {
-				if parsedURL.Port() != "" {
+				switch {
+				case parsedURL.Port() != "":
 					allowedPort = parsedURL.Port()
-				} else if parsedURL.Scheme == "https" {
+				case parsedURL.Scheme == "https":
 					allowedPort = "443"
-				} else {
+				default:
 					allowedPort = "80"
 				}
 			}
@@ -311,13 +312,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := srv.Start(); err != nil {
+	if err = srv.Start(); err != nil {
 		slog.Error("failed to start server", "error", err)
 		os.Exit(1)
 	}
 
 	// Setup SSH server if enabled
 	var sshServer *ssh.Server
+	var sshDB database.Database // Declared at function scope to allow explicit cleanup
 	if enableSSH {
 		apiURL := fmt.Sprintf("http://localhost:%d", srv.Port())
 
@@ -330,7 +332,6 @@ func main() {
 		enableHTTPS := tlsCertPath != "" && tlsKeyPath != ""
 
 		// Create a separate DB connection for SSH auth
-		var sshDB database.Database
 		if postgresConn != "" {
 			sshDB, err = database.NewDatabase("postgres", postgresConn, maxReadConns, maxWriteConns)
 		} else {
@@ -339,11 +340,9 @@ func main() {
 		if err != nil {
 			slog.Error("failed to create SSH database connection", "error", err)
 		} else {
-			defer sshDB.Close()
-
 			sessionManager := auth.NewSessionManager(sshDB, enableHTTPS, useProxy, additionalProxyList)
 
-			var serverOptions []ssh.Option
+			serverOptions := make([]ssh.Option, 0, 4)
 			serverOptions = append(serverOptions,
 				wish.WithAddress(net.JoinHostPort(sshHost, sshPort)),
 				wish.WithHostKeyPath(sshKeyPath),
@@ -351,12 +350,13 @@ func main() {
 
 			slog.Info("SSH server starting with public key authentication enabled")
 			sshAuthMiddleware := middleware.NewSSHAuthMiddleware(sshDB)
-			serverOptions = append(serverOptions, wish.WithPublicKeyAuth(sshAuthMiddleware.PublicKeyHandler()))
-
-			serverOptions = append(serverOptions, wish.WithMiddleware(
-				wishbubbletea.Middleware(tui.NewTUIHandler(apiURL, sessionManager)),
-				logging.Middleware(),
-			))
+			serverOptions = append(serverOptions,
+				wish.WithPublicKeyAuth(sshAuthMiddleware.PublicKeyHandler()),
+				wish.WithMiddleware(
+					wishbubbletea.Middleware(tui.NewTUIHandler(apiURL, sessionManager)),
+					logging.Middleware(),
+				),
+			)
 
 			s, err := wish.NewServer(serverOptions...)
 			if err != nil {
@@ -404,11 +404,19 @@ func main() {
 
 	// Shutdown the main server
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
 	if err := srv.Shutdown(ctx); err != nil {
 		slog.Error("server shutdown error", "error", err)
+		cancel()
+		if sshDB != nil {
+			_ = sshDB.Close()
+		}
 		os.Exit(1)
+	}
+	cancel()
+
+	// Clean up SSH database connection
+	if sshDB != nil {
+		_ = sshDB.Close()
 	}
 
 	slog.Info("all servers stopped successfully")

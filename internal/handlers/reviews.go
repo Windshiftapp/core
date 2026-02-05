@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
@@ -77,14 +78,14 @@ func (h *ReviewHandler) GetReviews(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var reviews []models.Review
 	for rows.Next() {
 		var review models.Review
 		var userName, userEmail sql.NullString
 
-		err := rows.Scan(&review.ID, &review.UserID, &review.ReviewDate, &review.ReviewType,
+		err = rows.Scan(&review.ID, &review.UserID, &review.ReviewDate, &review.ReviewType,
 			&review.ReviewData, &review.CreatedAt, &review.UpdatedAt, &userName, &userEmail)
 		if err != nil {
 			respondInternalError(w, r, err)
@@ -107,7 +108,7 @@ func (h *ReviewHandler) GetReviews(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(reviews)
+	_ = json.NewEncoder(w).Encode(reviews)
 }
 
 // GetReview retrieves a specific review by ID
@@ -155,7 +156,7 @@ func (h *ReviewHandler) GetReview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(review)
+	_ = json.NewEncoder(w).Encode(review)
 }
 
 // CreateReview creates a new review
@@ -235,7 +236,7 @@ func (h *ReviewHandler) CreateReview(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(review)
+	_ = json.NewEncoder(w).Encode(review)
 }
 
 // UpdateReview updates an existing review
@@ -254,7 +255,7 @@ func (h *ReviewHandler) UpdateReview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req models.ReviewUpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
@@ -315,7 +316,7 @@ func (h *ReviewHandler) UpdateReview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(review)
+	_ = json.NewEncoder(w).Encode(review)
 }
 
 // DeleteReview deletes a review
@@ -416,13 +417,13 @@ func (h *ReviewHandler) GetCompletedItems(w http.ResponseWriter, r *http.Request
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []models.Item
 	for rows.Next() {
 		var item models.Item
 		var completedAtStr sql.NullString
-		err := rows.Scan(&item.ID, &item.WorkspaceID, &item.Title, &item.Description,
+		err = rows.Scan(&item.ID, &item.WorkspaceID, &item.Title, &item.Description,
 			&item.CreatedAt, &item.UpdatedAt,
 			&item.WorkspaceName, &item.WorkspaceKey,
 			&item.WorkspaceItemNumber, &item.ItemTypeID,
@@ -433,9 +434,10 @@ func (h *ReviewHandler) GetCompletedItems(w http.ResponseWriter, r *http.Request
 		}
 
 		if completedAtStr.Valid && completedAtStr.String != "" {
-			if t, err := time.Parse("2006-01-02 15:04:05", completedAtStr.String); err == nil {
+			var t time.Time
+			if t, err = time.Parse("2006-01-02 15:04:05", completedAtStr.String); err == nil {
 				item.CompletedAt = &t
-			} else if t, err := time.Parse(time.RFC3339, completedAtStr.String); err == nil {
+			} else if t, err = time.Parse(time.RFC3339, completedAtStr.String); err == nil {
 				item.CompletedAt = &t
 			}
 		}
@@ -449,5 +451,5 @@ func (h *ReviewHandler) GetCompletedItems(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(items)
+	_ = json.NewEncoder(w).Encode(items)
 }

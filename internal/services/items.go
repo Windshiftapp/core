@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -84,7 +85,7 @@ type ItemCreationParams struct {
 	InheritProject          bool
 	TimeProjectID           *int
 	AssigneeID              *int
-	ReporterID              *int   // Reporter/submitter of the item
+	ReporterID              *int // Reporter/submitter of the item
 	CreatorID               *int
 	CreatorPortalCustomerID *int
 	ChannelID               *int       // Portal-specific: track portal/channel
@@ -110,7 +111,7 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 	if err != nil {
 		return 0, fmt.Errorf("failed to start transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Get next workspace-specific item number (within transaction to prevent race conditions)
 	var nextWorkspaceItemNumber int
@@ -134,9 +135,10 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 	// If status is still nil, resolve from workflow initial status
 	if statusID == nil {
 		workflowService := NewWorkflowService(db)
-		workflowID, err := workflowService.GetWorkflowIDForItem(params.WorkspaceID, params.ItemTypeID)
-		if err == nil && workflowID != nil {
-			initialStatusID, err := workflowService.GetInitialStatusID(*workflowID)
+		workflowID, wfErr := workflowService.GetWorkflowIDForItem(params.WorkspaceID, params.ItemTypeID)
+		if wfErr == nil && workflowID != nil {
+			var initialStatusID *int
+			initialStatusID, err = workflowService.GetInitialStatusID(*workflowID)
 			if err == nil && initialStatusID != nil {
 				statusID = initialStatusID
 			}
@@ -154,7 +156,7 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 	// If priority is still nil, get the default priority
 	if priorityID == nil {
 		var defaultPriorityID int
-		err := db.QueryRow("SELECT id FROM priorities WHERE is_default = true LIMIT 1").Scan(&defaultPriorityID)
+		err = db.QueryRow("SELECT id FROM priorities WHERE is_default = true LIMIT 1").Scan(&defaultPriorityID)
 		if err == nil {
 			priorityID = &defaultPriorityID
 		}
@@ -224,8 +226,7 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 	if params.CreatorID != nil {
 		updateService := NewItemUpdateService(db)
 		if err := updateService.recordItemCreationHistory(db, int(itemID), *params.CreatorID); err != nil {
-			// Log error but don't fail the request
-			// This is a non-critical operation
+			slog.Warn("failed to record item creation history", "error", err, "item_id", itemID)
 		}
 	}
 

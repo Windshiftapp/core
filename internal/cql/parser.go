@@ -50,7 +50,7 @@ func (p *Parser) match(types ...TokenType) bool {
 }
 
 // consume advances if the current token matches the expected type
-func (p *Parser) consume(tokenType TokenType, message string) (Token, error) {
+func (p *Parser) consume(tokenType TokenType, message string) (Token, error) { //nolint:unparam // Token return reserved for future use
 	if p.peek().Type == tokenType {
 		return p.advance(), nil
 	}
@@ -149,7 +149,7 @@ func (p *Parser) comparison() (*ASTNode, error) {
 		return nil, err
 	}
 
-	if p.match(EQUALS, NOT_EQUALS, LESS_THAN, LESS_EQUAL, GREATER_THAN, GREATER_EQUAL, CONTAINS) {
+	if p.match(EQUALS, NotEquals, LessThan, LessEqual, GreaterThan, GreaterEqual, CONTAINS) {
 		operator := p.advance()
 		right, err := p.primary()
 		if err != nil {
@@ -163,7 +163,7 @@ func (p *Parser) comparison() (*ASTNode, error) {
 		}, nil
 	}
 
-	if p.match(IN, NOT_IN) {
+	if p.match(IN, NotIn) {
 		operator := p.advance()
 		_, err := p.consume(LPAREN, "expected ( after IN")
 		if err != nil {
@@ -216,7 +216,8 @@ func (p *Parser) primary() (*ASTNode, error) {
 
 		var args []*ASTNode
 		if !p.match(RPAREN) {
-			arg, err := p.expression()
+			var arg *ASTNode
+			arg, err = p.expression()
 			if err != nil {
 				return nil, err
 			}
@@ -224,7 +225,7 @@ func (p *Parser) primary() (*ASTNode, error) {
 
 			for p.match(COMMA) {
 				p.advance()
-				arg, err := p.expression()
+				arg, err = p.expression()
 				if err != nil {
 					return nil, err
 				}

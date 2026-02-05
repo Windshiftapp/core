@@ -1,3 +1,4 @@
+// Package v1 provides REST API version 1 endpoints and routing.
 package v1
 
 import (

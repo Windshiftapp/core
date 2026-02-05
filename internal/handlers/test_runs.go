@@ -64,7 +64,7 @@ func (h *TestRunHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(runs)
+	_ = json.NewEncoder(w).Encode(runs)
 }
 
 func (h *TestRunHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -100,7 +100,7 @@ func (h *TestRunHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(run)
+	_ = json.NewEncoder(w).Encode(run)
 }
 
 func (h *TestRunHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -125,7 +125,7 @@ func (h *TestRunHandler) Create(w http.ResponseWriter, r *http.Request) {
 		SetID      int    `json:"set_id"`
 		AssigneeID *int   `json:"assignee_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
@@ -143,7 +143,7 @@ func (h *TestRunHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(run)
+	_ = json.NewEncoder(w).Encode(run)
 }
 
 func (h *TestRunHandler) End(w http.ResponseWriter, r *http.Request) {
@@ -207,7 +207,7 @@ func (h *TestRunHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Name       string `json:"name"`
 		AssigneeID *int   `json:"assignee_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
@@ -226,7 +226,7 @@ func (h *TestRunHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
 func (h *TestRunHandler) GetResults(w http.ResponseWriter, r *http.Request) {
@@ -281,7 +281,7 @@ func (h *TestRunHandler) GetResults(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type ResultWithTestCase struct {
 		models.TestResult
@@ -315,7 +315,7 @@ func (h *TestRunHandler) GetResults(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(results)
+	_ = json.NewEncoder(w).Encode(results)
 }
 
 func (h *TestRunHandler) UpdateResult(w http.ResponseWriter, r *http.Request) {
@@ -412,7 +412,7 @@ func (h *TestRunHandler) GetBySet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(runs)
+	_ = json.NewEncoder(w).Encode(runs)
 }
 
 // UpdateStepResult updates or creates a step result for a test execution
@@ -450,7 +450,7 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 		Notes        string `json:"notes"`
 		ItemID       *int   `json:"item_id,omitempty"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&update); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
@@ -499,14 +499,15 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 		return
 	}
 	now := time.Now()
-	if err == sql.ErrNoRows {
+	switch err {
+	case sql.ErrNoRows:
 		// Create new step result
 		_, err = writeDB.Exec(`
 			INSERT INTO test_step_results
 			(test_result_id, test_step_id, status, actual_result, notes, item_id, executed_at, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`, testResultID, stepID, update.Status, update.ActualResult, update.Notes, update.ItemID, now, now, now)
-	} else if err == nil {
+	case nil:
 		// Update existing step result
 		_, err = writeDB.Exec(`
 			UPDATE test_step_results
@@ -527,7 +528,7 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
 
 // GetStepResults returns all step results for a test run
@@ -583,7 +584,7 @@ func (h *TestRunHandler) GetStepResults(w http.ResponseWriter, r *http.Request) 
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	stepResults := make(map[string]interface{})
 	for rows.Next() {
@@ -611,7 +612,7 @@ func (h *TestRunHandler) GetStepResults(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stepResults)
+	_ = json.NewEncoder(w).Encode(stepResults)
 }
 
 // updateTestCaseStatus updates the test case status based on its step results
@@ -629,12 +630,12 @@ func (h *TestRunHandler) updateTestCaseStatus(testResultID int) error {
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var stepStatuses []string
 	for rows.Next() {
 		var status string
-		if err := rows.Scan(&status); err != nil {
+		if err = rows.Scan(&status); err != nil { //nolint:gocritic // Using = to avoid shadowing err from outer scope
 			return err
 		}
 		stepStatuses = append(stepStatuses, status)
@@ -669,15 +670,16 @@ func (h *TestRunHandler) updateTestCaseStatus(testResultID int) error {
 	}
 
 	// Priority: failed > blocked > skipped > passed
-	if hasFailed {
+	switch {
+	case hasFailed:
 		finalStatus = "failed"
-	} else if hasBlocked {
+	case hasBlocked:
 		finalStatus = "blocked"
-	} else if hasSkipped {
+	case hasSkipped:
 		finalStatus = "skipped"
-	} else if allPassed {
+	case allPassed:
 		finalStatus = "passed"
-	} else {
+	default:
 		finalStatus = "not_run"
 	}
 
@@ -756,7 +758,7 @@ func (h *TestRunHandler) LinkItemToTestResult(w http.ResponseWriter, r *http.Req
 	var data struct {
 		ItemID int `json:"item_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&data); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
@@ -801,7 +803,7 @@ func (h *TestRunHandler) LinkItemToTestResult(w http.ResponseWriter, r *http.Req
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
 // UnlinkItemFromTestResult removes item link from test result
@@ -911,7 +913,7 @@ func (h *TestRunHandler) GetTestResultItems(w http.ResponseWriter, r *http.Reque
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	items := make([]models.Item, 0)
 	for rows.Next() {
@@ -925,5 +927,5 @@ func (h *TestRunHandler) GetTestResultItems(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(items)
+	_ = json.NewEncoder(w).Encode(items)
 }

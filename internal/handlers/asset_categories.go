@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
-
 )
 
 // AssetCategoryHandler handles asset category operations
@@ -76,7 +76,7 @@ func (h *AssetCategoryHandler) GetCategories(w http.ResponseWriter, r *http.Requ
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var categories []models.AssetCategory
 	for rows.Next() {
@@ -109,12 +109,12 @@ func (h *AssetCategoryHandler) GetCategories(w http.ResponseWriter, r *http.Requ
 		// Build tree structure
 		tree := h.buildCategoryTree(categories)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(tree)
+		_ = json.NewEncoder(w).Encode(tree)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(categories)
+	_ = json.NewEncoder(w).Encode(categories)
 }
 
 // buildCategoryTree builds a hierarchical tree from flat category list
@@ -226,7 +226,7 @@ func (h *AssetCategoryHandler) GetCategory(w http.ResponseWriter, r *http.Reques
 	cat.ParentName = parentName.String
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(cat)
+	_ = json.NewEncoder(w).Encode(cat)
 }
 
 // CreateCategoryRequest represents the request body for creating a category
@@ -262,7 +262,7 @@ func (h *AssetCategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Req
 	}
 
 	var req CreateCategoryRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -298,7 +298,7 @@ func (h *AssetCategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Req
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	var catID int64
 	err = tx.QueryRow(`
@@ -338,7 +338,7 @@ func (h *AssetCategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Req
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(cat)
+	_ = json.NewEncoder(w).Encode(cat)
 }
 
 // UpdateCategoryRequest represents the request body for updating a category
@@ -385,7 +385,7 @@ func (h *AssetCategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Req
 	}
 
 	var req UpdateCategoryRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -415,7 +415,7 @@ func (h *AssetCategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Req
 
 	// Return updated category
 	var cat models.AssetCategory
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT id, set_id, name, description, parent_id, path, has_children, children_count, descendants_count, frac_index, created_at, updated_at
 		FROM asset_categories WHERE id = ?
 	`, categoryID).Scan(
@@ -425,7 +425,7 @@ func (h *AssetCategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Req
 	)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(cat)
+	_ = json.NewEncoder(w).Encode(cat)
 }
 
 // DeleteCategory deletes a category
@@ -489,7 +489,7 @@ func (h *AssetCategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Req
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	result, err := tx.Exec("DELETE FROM asset_categories WHERE id = ?", categoryID)
 	if err != nil {
@@ -564,7 +564,7 @@ func (h *AssetCategoryHandler) MoveCategory(w http.ResponseWriter, r *http.Reque
 	}
 
 	var req MoveCategoryRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -593,7 +593,8 @@ func (h *AssetCategoryHandler) MoveCategory(w http.ResponseWriter, r *http.Reque
 		}
 
 		// Check for circular reference (cannot move to a descendant)
-		isDescendant, err := h.isDescendant(*req.ParentID, categoryID)
+		var isDescendant bool
+		isDescendant, err = h.isDescendant(*req.ParentID, categoryID)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -612,7 +613,7 @@ func (h *AssetCategoryHandler) MoveCategory(w http.ResponseWriter, r *http.Reque
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Update the category's parent
 	_, err = tx.Exec("UPDATE asset_categories SET parent_id = ?, updated_at = ? WHERE id = ?",
@@ -649,7 +650,7 @@ func (h *AssetCategoryHandler) MoveCategory(w http.ResponseWriter, r *http.Reque
 	var cat models.AssetCategory
 	var description, path, fracIndex sql.NullString
 	var parentID sql.NullInt64
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT id, set_id, name, description, parent_id, path, has_children, children_count, descendants_count, frac_index, created_at, updated_at
 		FROM asset_categories WHERE id = ?
 	`, categoryID).Scan(
@@ -663,7 +664,7 @@ func (h *AssetCategoryHandler) MoveCategory(w http.ResponseWriter, r *http.Reque
 	cat.FracIndex = utils.NullStringToPtr(fracIndex)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(cat)
+	_ = json.NewEncoder(w).Encode(cat)
 }
 
 // isDescendant checks if potentialDescendant is a descendant of categoryID
@@ -682,7 +683,7 @@ func (h *AssetCategoryHandler) isDescendant(potentialDescendant, categoryID int)
 	if err != nil {
 		return false, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	return rows.Next(), nil
 }

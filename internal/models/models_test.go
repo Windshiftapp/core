@@ -119,11 +119,11 @@ func TestSetupRequest_JSONSerialization(t *testing.T) {
 
 	// Verify module settings
 	if unmarshaled.ModuleSettings.TimeTrackingEnabled != setupReq.ModuleSettings.TimeTrackingEnabled {
-		t.Errorf("Expected TimeTrackingEnabled %v, got %v", 
+		t.Errorf("Expected TimeTrackingEnabled %v, got %v",
 			setupReq.ModuleSettings.TimeTrackingEnabled, unmarshaled.ModuleSettings.TimeTrackingEnabled)
 	}
 	if unmarshaled.ModuleSettings.TestManagementEnabled != setupReq.ModuleSettings.TestManagementEnabled {
-		t.Errorf("Expected TestManagementEnabled %v, got %v", 
+		t.Errorf("Expected TestManagementEnabled %v, got %v",
 			setupReq.ModuleSettings.TestManagementEnabled, unmarshaled.ModuleSettings.TestManagementEnabled)
 	}
 }
@@ -188,11 +188,11 @@ func TestModuleSettings_JSONSerialization(t *testing.T) {
 
 	// Verify fields
 	if unmarshaled.TimeTrackingEnabled != settings.TimeTrackingEnabled {
-		t.Errorf("Expected TimeTrackingEnabled %v, got %v", 
+		t.Errorf("Expected TimeTrackingEnabled %v, got %v",
 			settings.TimeTrackingEnabled, unmarshaled.TimeTrackingEnabled)
 	}
 	if unmarshaled.TestManagementEnabled != settings.TestManagementEnabled {
-		t.Errorf("Expected TestManagementEnabled %v, got %v", 
+		t.Errorf("Expected TestManagementEnabled %v, got %v",
 			settings.TestManagementEnabled, unmarshaled.TestManagementEnabled)
 	}
 }

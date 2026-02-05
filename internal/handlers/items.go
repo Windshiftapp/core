@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"windshift/internal/cql"
 	"windshift/internal/database"
 	"windshift/internal/models"
@@ -21,21 +22,21 @@ import (
 )
 
 type ItemHandler struct {
-	db                database.Database
-	hierarchyService  *services.HierarchyService
-	permissionService *services.PermissionService
-	itemCache         *services.ItemCacheService
-	activityTracker   *services.ActivityTracker
-	idResolver        *services.IDResolverService
-	mentionService    *services.MentionService // Mention service for processing @mentions (optional, can be nil)
+	db                  database.Database
+	hierarchyService    *services.HierarchyService
+	permissionService   *services.PermissionService
+	itemCache           *services.ItemCacheService
+	activityTracker     *services.ActivityTracker
+	idResolver          *services.IDResolverService
+	mentionService      *services.MentionService // Mention service for processing @mentions (optional, can be nil)
 	notificationService interface {
 		EmitEvent(event *services.NotificationEvent)
 	} // Notification service for async notification processing (optional, can be nil)
 	actionService interface {
 		EmitActionEvent(event *models.ActionEvent)
 	} // Action service for automation workflows (optional, can be nil)
-	webhookSender    *webhook.WebhookSender      // Webhook sender for dispatching webhook events (optional, can be nil)
-	eventCoordinator *services.EventCoordinator  // Centralized event coordinator for side effects (optional, can be nil)
+	webhookSender    *webhook.WebhookSender     // Webhook sender for dispatching webhook events (optional, can be nil)
+	eventCoordinator *services.EventCoordinator // Centralized event coordinator for side effects (optional, can be nil)
 }
 
 func NewItemHandler(db database.Database, permissionService *services.PermissionService, activityTracker *services.ActivityTracker, notificationService interface {
@@ -151,7 +152,8 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Check for QL query parameter
 	if qlQuery := r.URL.Query().Get("ql"); qlQuery != "" {
 		// Build workspace mapping for QL evaluation
-		workspaceMap, err := h.buildWorkspaceMap()
+		var workspaceMap map[string]int
+		workspaceMap, err = h.buildWorkspaceMap()
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -159,7 +161,9 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 		// Create QL evaluator and generate SQL
 		evaluator := cql.NewEvaluator(workspaceMap)
-		qlSQL, qlArgs, err := evaluator.EvaluateToSQL(qlQuery)
+		var qlSQL string
+		var qlArgs []interface{}
+		qlSQL, qlArgs, err = evaluator.EvaluateToSQL(qlQuery)
 		if err != nil {
 			respondValidationError(w, r, "QL query error: "+err.Error())
 			return
@@ -203,7 +207,8 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if level := r.URL.Query().Get("level"); level != "" {
-			levelInt, err := strconv.Atoi(level)
+			var levelInt int
+			levelInt, err = strconv.Atoi(level)
 			if err != nil {
 				respondValidationError(w, r, "Invalid level parameter: must be an integer")
 				return
@@ -213,7 +218,8 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if maxLevel := r.URL.Query().Get("max_level"); maxLevel != "" {
-			maxLevelInt, err := strconv.Atoi(maxLevel)
+			var maxLevelInt int
+			maxLevelInt, err = strconv.Atoi(maxLevel)
 			if err != nil {
 				respondValidationError(w, r, "Invalid max_level parameter: must be an integer")
 				return
@@ -257,13 +263,15 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	maxLimit := 1000 // Maximum items that can be returned from API
 
 	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
-		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+		var p int
+		if p, err = strconv.Atoi(pageStr); err == nil && p > 0 {
 			page = p
 		}
 	}
 
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+		var l int
+		if l, err = strconv.Atoi(limitStr); err == nil && l > 0 {
 			limit = l
 			if limit > maxLimit {
 				limit = maxLimit
@@ -290,7 +298,7 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []models.Item
 	for rows.Next() {
@@ -304,7 +312,7 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		var fracIndex sql.NullString
 		var inheritProject bool
 
-		err := rows.Scan(&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
+		err = rows.Scan(&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
 			&statusID, &priorityID, &dueDate, &item.IsTask, &milestoneID, &iterationID, &projectID, &inheritProject, &timeProjectID, &assigneeID, &creatorID, &customFieldValuesJSON, &calendarDataJSON, &parentID,
 			&fracIndex, &item.CreatedAt, &item.UpdatedAt, &item.WorkspaceName, &item.WorkspaceKey, &itemTypeName, &parentTitle, &milestoneName, &iterationName, &projectName, &timeProjectName,
 			&assigneeName, &assigneeEmail, &assigneeAvatar, &creatorName, &creatorEmail, &statusName, &priorityName, &priorityIcon, &priorityColor)
@@ -346,7 +354,7 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 		// Parse custom field values JSON
 		if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
-			if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &item.CustomFieldValues); err != nil {
+			if err = json.Unmarshal([]byte(customFieldValuesJSON.String), &item.CustomFieldValues); err != nil {
 				item.CustomFieldValues = make(map[string]interface{})
 			}
 		} else {
@@ -355,7 +363,7 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 		// Parse calendar data JSON
 		if calendarDataJSON.Valid && calendarDataJSON.String != "" {
-			if err := json.Unmarshal([]byte(calendarDataJSON.String), &item.CalendarData); err != nil {
+			if err = json.Unmarshal([]byte(calendarDataJSON.String), &item.CalendarData); err != nil {
 				item.CalendarData = []models.CalendarScheduleEntry{}
 			}
 		} else {
@@ -455,7 +463,7 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 			item.EffectiveProjectID = effectiveProjectID
 			item.ProjectInheritanceMode = projectInheritanceMode
 			var epName sql.NullString
-			h.db.QueryRow("SELECT name FROM time_projects WHERE id = ?", *effectiveProjectID).Scan(&epName)
+			_ = h.db.QueryRow("SELECT name FROM time_projects WHERE id = ?", *effectiveProjectID).Scan(&epName)
 			item.EffectiveProjectName = epName.String
 		}
 	}
@@ -570,7 +578,8 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Convert custom field values to JSON
 	var customFieldValuesJSON string
 	if item.CustomFieldValues != nil {
-		customFieldValuesBytes, err := json.Marshal(item.CustomFieldValues)
+		var customFieldValuesBytes []byte
+		customFieldValuesBytes, err = json.Marshal(item.CustomFieldValues)
 		if err != nil {
 			respondValidationError(w, r, "Invalid custom field values")
 			return
@@ -814,7 +823,8 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 			// Use WorkflowService for proper item type workflow resolution
 			workflowService := services.NewWorkflowService(h.db)
 			itemTypeIDPtr := utils.NullInt64ToPtr(itemTypeID)
-			valid, err := workflowService.IsValidStatusTransition(workspaceID, itemTypeIDPtr, currentStatusID.Int64, toStatusID)
+			var valid bool
+			valid, err = workflowService.IsValidStatusTransition(workspaceID, itemTypeIDPtr, currentStatusID.Int64, toStatusID)
 			if err != nil {
 				respondInternalError(w, r, err)
 				return
@@ -828,7 +838,7 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Track item edit activity
 	if h.activityTracker != nil {
-		if err := h.activityTracker.TrackItemActivity(user.ID, id, services.ActivityEdit); err != nil {
+		if err = h.activityTracker.TrackItemActivity(user.ID, id, services.ActivityEdit); err != nil {
 			slog.Warn("failed to track item edit activity", slog.Int("user_id", user.ID), slog.Int("item_id", id), slog.Any("error", err))
 			// Don't fail the request, just log the error
 		}
@@ -861,11 +871,12 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Check if assignee changed (compare originalItem with updatedItem)
 	assigneeChanged := false
-	if originalItem.AssigneeID == nil && updatedItem.AssigneeID != nil {
+	switch {
+	case originalItem.AssigneeID == nil && updatedItem.AssigneeID != nil:
 		assigneeChanged = true
-	} else if originalItem.AssigneeID != nil && updatedItem.AssigneeID == nil {
+	case originalItem.AssigneeID != nil && updatedItem.AssigneeID == nil:
 		assigneeChanged = true
-	} else if originalItem.AssigneeID != nil && updatedItem.AssigneeID != nil && *originalItem.AssigneeID != *updatedItem.AssigneeID {
+	case originalItem.AssigneeID != nil && updatedItem.AssigneeID != nil && *originalItem.AssigneeID != *updatedItem.AssigneeID:
 		assigneeChanged = true
 	}
 
@@ -874,10 +885,10 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		h.eventCoordinator.EmitItemUpdated(originalItem, updatedItem, result.StatusChanged, assigneeChanged, user.ID)
 	} else {
 		// Fallback to individual services if EventCoordinator not set
-		if h.notificationService != nil && user != nil {
+		if h.notificationService != nil {
 			var statusName string
 			if result.StatusChanged && updatedItem.StatusID != nil {
-				h.db.QueryRow("SELECT name FROM statuses WHERE id = ?", *updatedItem.StatusID).Scan(&statusName)
+				_ = h.db.QueryRow("SELECT name FROM statuses WHERE id = ?", *updatedItem.StatusID).Scan(&statusName)
 			}
 			itemKey := fmt.Sprintf("%s-%d", updatedItem.WorkspaceKey, updatedItem.WorkspaceItemNumber)
 
@@ -934,7 +945,7 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 		}
-		if h.actionService != nil && user != nil {
+		if h.actionService != nil {
 			if result.StatusChanged {
 				h.actionService.EmitActionEvent(&models.ActionEvent{
 					EventType:   models.ActionTriggerStatusTransition,
@@ -1042,7 +1053,7 @@ func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := repo.DeleteItemLinks(tx, id); err != nil {
 		respondInternalError(w, r, err)
@@ -1136,7 +1147,7 @@ func (h *ItemHandler) GetDeleteInfo(w http.ResponseWriter, r *http.Request) {
 	// Get hierarchy level for the item type (needed for filtering reparent candidates)
 	var hierarchyLevel sql.NullInt64
 	if item.ItemTypeID != nil {
-		h.db.QueryRow("SELECT hierarchy_level FROM item_types WHERE id = ?", *item.ItemTypeID).Scan(&hierarchyLevel)
+		_ = h.db.QueryRow("SELECT hierarchy_level FROM item_types WHERE id = ?", *item.ItemTypeID).Scan(&hierarchyLevel)
 	}
 
 	response := map[string]interface{}{
@@ -1198,7 +1209,8 @@ func (h *ItemHandler) ReparentChildren(w http.ResponseWriter, r *http.Request) {
 
 	// If new parent is specified, verify it exists and is in the same workspace
 	if req.NewParentID != nil {
-		newParent, err := repo.FindByID(*req.NewParentID)
+		var newParent *models.Item
+		newParent, err = repo.FindByID(*req.NewParentID)
 		if err != nil {
 			if err == repository.ErrNotFound {
 				respondNotFound(w, r, "item")
@@ -1231,7 +1243,7 @@ func (h *ItemHandler) ReparentChildren(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Update parent_id for all direct children
 	for _, child := range children {
@@ -1378,7 +1390,7 @@ func (h *ItemHandler) Copy(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	nextNum, err := repo.GetNextWorkspaceItemNumber(tx, originalItem.WorkspaceID)
 	if err != nil {
@@ -1417,7 +1429,7 @@ func (h *ItemHandler) Copy(w http.ResponseWriter, r *http.Request) {
 
 	// Record item creation history for the copied item
 	updateService := services.NewItemUpdateService(h.db)
-	if err := updateService.RecordItemCreationHistory(h.db, int(copiedItemID), user.ID); err != nil {
+	if err := updateService.RecordItemCreationHistory(h.db, copiedItemID, user.ID); err != nil {
 		slog.Warn("failed to record copied item creation history", slog.Int("item_id", copiedItemID), slog.Any("error", err))
 		// Don't fail request, just log the error
 	}

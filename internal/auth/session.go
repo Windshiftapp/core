@@ -1,3 +1,4 @@
+// Package auth provides authentication and session management functionality.
 package auth
 
 import (
@@ -11,50 +12,51 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/gorilla/securecookie"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/utils"
-
-	"github.com/gorilla/securecookie"
 )
 
 const (
-	SessionCookieName = "windshift_session"
-	SessionTokenLength = 32 // 256-bit session tokens
-	DefaultSessionDuration = 24 * time.Hour
+	SessionCookieName       = "windshift_session"
+	SessionTokenLength      = 32 // 256-bit session tokens
+	DefaultSessionDuration  = 24 * time.Hour
 	ExtendedSessionDuration = 30 * 24 * time.Hour // 30 days for "remember me"
 )
 
 var (
 	ErrSessionNotFound = errors.New("session not found")
-	ErrSessionExpired = errors.New("session expired")
-	ErrInvalidSession = errors.New("invalid session")
+	ErrSessionExpired  = errors.New("session expired")
+	ErrInvalidSession  = errors.New("invalid session")
 )
 
 // SessionManager handles secure session management
 type SessionManager struct {
-	db database.Database
-	secureCookie *securecookie.SecureCookie
-	useSecure bool // Whether to set Secure flag on cookies (true for HTTPS, false for HTTP)
-	useProxy bool // Whether proxy mode is enabled
+	db                database.Database
+	secureCookie      *securecookie.SecureCookie
+	useSecure         bool     // Whether to set Secure flag on cookies (true for HTTPS, false for HTTP)
+	useProxy          bool     // Whether proxy mode is enabled
 	additionalProxies []net.IP // Additional proxy IPs beyond private ranges
 }
 
 // Session represents an active user session
 type Session struct {
-	ID          int       `json:"id"`
-	UserID      int       `json:"user_id"`
-	Token       string    `json:"token"`
-	ExpiresAt   time.Time `json:"expires_at"`
-	IPAddress   string    `json:"ip_address"`
-	UserAgent   string    `json:"user_agent"`
-	IsActive    bool      `json:"is_active"`
-	CreatedAt   time.Time `json:"created_at"`
-	User        *models.User `json:"user,omitempty"`
+	ID        int          `json:"id"`
+	UserID    int          `json:"user_id"`
+	Token     string       `json:"token"`
+	ExpiresAt time.Time    `json:"expires_at"`
+	IPAddress string       `json:"ip_address"`
+	UserAgent string       `json:"user_agent"`
+	IsActive  bool         `json:"is_active"`
+	CreatedAt time.Time    `json:"created_at"`
+	User      *models.User `json:"user,omitempty"`
 }
 
 // NewSessionManager creates a new session manager with secure cookie handling
-func NewSessionManager(db database.Database, useSecureCookies bool, useProxy bool, additionalProxies []string) *SessionManager {
+func NewSessionManager(db database.Database, useSecureCookies, useProxy bool, additionalProxies []string) *SessionManager {
 	// Generate secure cookie keys (in production, these should be from config/env)
 	hashKey := generateSecureKey(64)  // 512-bit key for HMAC
 	blockKey := generateSecureKey(32) // 256-bit key for encryption

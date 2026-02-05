@@ -33,12 +33,13 @@ func StripHTML(html string) string {
 	inTag := false
 
 	for _, r := range html {
-		if r == '<' {
+		switch {
+		case r == '<':
 			inTag = true
-		} else if r == '>' {
+		case r == '>':
 			inTag = false
 			result.WriteRune(' ')
-		} else if !inTag {
+		case !inTag:
 			result.WriteRune(r)
 		}
 	}

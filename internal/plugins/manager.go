@@ -17,9 +17,10 @@ import (
 	"sync"
 	"time"
 
-	extism "github.com/extism/go-sdk"
 	"windshift/internal/database"
 	"windshift/internal/logger"
+
+	extism "github.com/extism/go-sdk"
 )
 
 // SMTPSender defines the minimal interface needed by plugins to send mail.
@@ -36,7 +37,7 @@ type SCMService interface {
 	CreateItemSCMLink(ctx context.Context, itemID, workspaceRepoID int, linkType, externalID, externalURL, title string) (int, error)
 }
 
-// ManagerOptions controls runtime behaviour of the plugin manager.
+// ManagerOptions controls runtime behavior of the plugin manager.
 type ManagerOptions struct {
 	PluginTimeout        time.Duration
 	MemoryLimit          uint64
@@ -58,10 +59,10 @@ func WithTimeout(d time.Duration) Option {
 	}
 }
 
-// WithMemoryLimit sets a soft memory ceiling in bytes (converted to wasm pages).
-func WithMemoryLimit(bytes uint64) Option {
+// WithMemoryLimit sets a soft memory ceiling in memoryBytes (converted to wasm pages).
+func WithMemoryLimit(memoryBytes uint64) Option {
 	return func(o *ManagerOptions) {
-		o.MemoryLimit = bytes
+		o.MemoryLimit = memoryBytes
 	}
 }
 
@@ -152,7 +153,8 @@ func NewManager(pluginDir string, opts ...Option) *Manager {
 	}
 
 	// Build list of plugin directories: primary dir + any additional dirs
-	pluginDirs := []string{pluginDir}
+	pluginDirs := make([]string, 0, 1+len(options.AdditionalPluginDirs))
+	pluginDirs = append(pluginDirs, pluginDir)
 	pluginDirs = append(pluginDirs, options.AdditionalPluginDirs...)
 
 	m := &Manager{
@@ -196,7 +198,7 @@ func (m *Manager) LoadPlugins() error {
 func (m *Manager) loadPluginsFromDir(pluginDir string) error {
 	// Only create the primary plugins directory, not additional ones
 	if pluginDir == m.pluginDirs[0] {
-		if err := os.MkdirAll(pluginDir, 0o755); err != nil {
+		if err := os.MkdirAll(pluginDir, 0o750); err != nil {
 			return fmt.Errorf("failed to create plugins directory: %w", err)
 		}
 	}
@@ -234,7 +236,7 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 	}
 
 	var manifest PluginManifest
-	if err := json.Unmarshal(manifestData, &manifest); err != nil {
+	if err = json.Unmarshal(manifestData, &manifest); err != nil {
 		return fmt.Errorf("failed to parse manifest.json: %w", err)
 	}
 
@@ -243,7 +245,7 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 	}
 
 	wasmPath := filepath.Join(pluginPath, manifest.EntryPoint)
-	if _, err := os.Stat(wasmPath); err != nil {
+	if _, err = os.Stat(wasmPath); err != nil {
 		return fmt.Errorf("failed to read WASM file: %w", err)
 	}
 
@@ -287,7 +289,7 @@ func (m *Manager) populateMetadata(ctx context.Context, plugin *LoadedPlugin) er
 	if err != nil {
 		return err
 	}
-	defer instance.Close(ctx)
+	defer func() { _ = instance.Close(ctx) }()
 
 	metadata, err := m.callFunction(ctx, instance, "get_metadata", nil)
 	if err == nil && len(metadata) > 0 {
@@ -319,7 +321,7 @@ func (m *Manager) buildExtismManifest(wasmPath string) extism.Manifest {
 		Wasm: []extism.Wasm{
 			extism.WasmFile{Path: wasmPath},
 		},
-		Timeout: uint64(m.pluginTimeout.Milliseconds()),
+		Timeout: uint64(m.pluginTimeout.Milliseconds()), //nolint:gosec // G115: value is bounded by domain constraints
 	}
 
 	if m.memoryLimit > 0 {
@@ -329,7 +331,7 @@ func (m *Manager) buildExtismManifest(wasmPath string) extism.Manifest {
 			pages = 1
 		}
 		manifest.Memory = &extism.ManifestMemory{
-			MaxPages: uint32(pages),
+			MaxPages: uint32(pages), //nolint:gosec // G115: value is bounded by domain constraints
 		}
 	}
 
@@ -449,7 +451,7 @@ func (m *Manager) HandleRequest(pluginName string, req *HTTPRequest) (*HTTPRespo
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate plugin: %w", err)
 	}
-	defer instance.Close(ctx)
+	defer func() { _ = instance.Close(ctx) }()
 
 	respBytes, err := m.callFunction(ctx, instance, "handle_request", req)
 	if err != nil {
@@ -511,7 +513,7 @@ func (m *Manager) CallPluginFunction(pluginName, funcName string, payload any) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate plugin: %w", err)
 	}
-	defer instance.Close(ctx)
+	defer func() { _ = instance.Close(ctx) }()
 
 	return m.callFunction(ctx, instance, funcName, payload)
 }
@@ -526,18 +528,19 @@ func (m *Manager) UploadPlugin(name string, zipData []byte) error {
 	var manifestData []byte
 	var manifest PluginManifest
 	for _, file := range zipReader.File {
-		if file.Name == "manifest.json" || filepath.Base(file.Name) == "manifest.json" {
-			rc, err := file.Open()
-			if err != nil {
-				return fmt.Errorf("failed to read manifest from zip: %w", err)
-			}
-			manifestData, err = io.ReadAll(rc)
-			rc.Close()
-			if err != nil {
-				return fmt.Errorf("failed to read manifest data: %w", err)
-			}
-			break
+		if file.Name != "manifest.json" && filepath.Base(file.Name) != "manifest.json" {
+			continue
 		}
+		rc, err := file.Open()
+		if err != nil {
+			return fmt.Errorf("failed to read manifest from zip: %w", err)
+		}
+		manifestData, err = io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			return fmt.Errorf("failed to read manifest data: %w", err)
+		}
+		break
 	}
 
 	if manifestData == nil {
@@ -554,12 +557,12 @@ func (m *Manager) UploadPlugin(name string, zipData []byte) error {
 
 	// Install plugins to the primary plugin directory
 	pluginPath := filepath.Join(m.pluginDirs[0], name)
-	if err := os.MkdirAll(pluginPath, 0o755); err != nil {
+	if err := os.MkdirAll(pluginPath, 0o750); err != nil {
 		return fmt.Errorf("failed to create plugin directory: %w", err)
 	}
 
 	assetsPath := filepath.Join(pluginPath, "assets")
-	if err := os.MkdirAll(assetsPath, 0o755); err != nil {
+	if err := os.MkdirAll(assetsPath, 0o750); err != nil {
 		return fmt.Errorf("failed to create assets directory: %w", err)
 	}
 
@@ -585,8 +588,6 @@ func (m *Manager) UploadPlugin(name string, zipData []byte) error {
 		if strings.HasSuffix(fileName, ".js") || strings.HasSuffix(fileName, ".css") ||
 			strings.HasPrefix(filepath.Dir(file.Name), "assets") {
 			destPath = filepath.Join(assetsPath, fileName)
-		} else if fileName == "manifest.json" || strings.HasSuffix(fileName, ".wasm") {
-			destPath = filepath.Join(pluginPath, fileName)
 		} else {
 			destPath = filepath.Join(pluginPath, fileName)
 		}
@@ -598,7 +599,7 @@ func (m *Manager) UploadPlugin(name string, zipData []byte) error {
 			return fmt.Errorf("invalid path in zip file: %s", file.Name)
 		}
 
-		if err := os.WriteFile(destPath, fileData, 0o644); err != nil {
+		if err := os.WriteFile(destPath, fileData, 0o640); err != nil { //nolint:gosec // G306: plugin files need owner rw, group r
 			return fmt.Errorf("failed to write file %s: %w", fileName, err)
 		}
 	}
@@ -607,7 +608,7 @@ func (m *Manager) UploadPlugin(name string, zipData []byte) error {
 }
 
 // UploadPluginLegacy handles plugin upload with separate WASM and manifest (backwards compatibility).
-func (m *Manager) UploadPluginLegacy(name string, wasmData []byte, manifestData []byte) error {
+func (m *Manager) UploadPluginLegacy(name string, wasmData, manifestData []byte) error {
 	var manifest PluginManifest
 	if err := json.Unmarshal(manifestData, &manifest); err != nil {
 		return fmt.Errorf("invalid manifest.json: %w", err)
@@ -619,12 +620,12 @@ func (m *Manager) UploadPluginLegacy(name string, wasmData []byte, manifestData 
 
 	// Install plugins to the primary plugin directory
 	pluginPath := filepath.Join(m.pluginDirs[0], name)
-	if err := os.MkdirAll(pluginPath, 0o755); err != nil {
+	if err := os.MkdirAll(pluginPath, 0o750); err != nil {
 		return fmt.Errorf("failed to create plugin directory: %w", err)
 	}
 
 	manifestPath := filepath.Join(pluginPath, "manifest.json")
-	if err := os.WriteFile(manifestPath, manifestData, 0o644); err != nil {
+	if err := os.WriteFile(manifestPath, manifestData, 0o640); err != nil { //nolint:gosec // G306: plugin files need owner rw, group r
 		return fmt.Errorf("failed to write manifest: %w", err)
 	}
 
@@ -633,7 +634,7 @@ func (m *Manager) UploadPluginLegacy(name string, wasmData []byte, manifestData 
 		wasmFileName = "plugin.wasm"
 	}
 	wasmPath := filepath.Join(pluginPath, wasmFileName)
-	if err := os.WriteFile(wasmPath, wasmData, 0o644); err != nil {
+	if err := os.WriteFile(wasmPath, wasmData, 0o640); err != nil { //nolint:gosec // G306: plugin files need owner rw, group r
 		return fmt.Errorf("failed to write WASM file: %w", err)
 	}
 
@@ -669,7 +670,7 @@ func (m *Manager) Close() error {
 }
 
 // GetAsset serves a static asset from a plugin's assets directory.
-func (m *Manager) GetAsset(pluginName, assetPath string) ([]byte, string, error) {
+func (m *Manager) GetAsset(pluginName, assetPath string) (data []byte, contentType string, err error) {
 	m.mu.RLock()
 	p, exists := m.plugins[pluginName]
 	m.mu.RUnlock()
@@ -693,7 +694,7 @@ func (m *Manager) GetAsset(pluginName, assetPath string) ([]byte, string, error)
 		return nil, "", fmt.Errorf("asset path outside assets directory")
 	}
 
-	data, err := os.ReadFile(fullPath)
+	data, err = os.ReadFile(fullPath)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to read asset: %w", err)
 	}
@@ -782,8 +783,8 @@ func parseRoutes(data []byte) []Route {
 	return nil
 }
 
-func attachPluginName(pluginName string, fromManifest []Extension, fromMetadata []Extension) []Extension {
-	var extensions []Extension
+func attachPluginName(pluginName string, fromManifest, fromMetadata []Extension) []Extension {
+	extensions := make([]Extension, 0, len(fromManifest)+len(fromMetadata))
 	for _, ext := range append(fromManifest, fromMetadata...) {
 		ext.PluginName = pluginName
 		extensions = append(extensions, ext)
@@ -791,7 +792,7 @@ func attachPluginName(pluginName string, fromManifest []Extension, fromMetadata 
 	return extensions
 }
 
-func mergeMetadata(base PluginMetadata, meta PluginMetadata) PluginMetadata {
+func mergeMetadata(base, meta PluginMetadata) PluginMetadata {
 	if meta.Name != "" {
 		base.Name = meta.Name
 	}

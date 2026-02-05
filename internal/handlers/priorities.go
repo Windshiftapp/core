@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
@@ -46,7 +47,7 @@ func (h *PriorityHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var priorities []models.Priority
 	for rows.Next() {
@@ -78,14 +79,14 @@ func (h *PriorityHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			var configSetID int
 			var configSetName string
 			if err := configSetRows.Scan(&configSetID, &configSetName); err != nil {
-				configSetRows.Close()
+				_ = configSetRows.Close()
 				respondInternalError(w, r, err)
 				return
 			}
 			configSetIDs = append(configSetIDs, configSetID)
 			configSetNames = append(configSetNames, configSetName)
 		}
-		configSetRows.Close()
+		_ = configSetRows.Close()
 
 		p.ConfigurationSetIDs = configSetIDs
 		p.ConfigurationSetNames = configSetNames
@@ -137,7 +138,7 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer configSetRows.Close()
+	defer func() { _ = configSetRows.Close() }()
 
 	var configSetIDs []int
 	var configSetNames []string
@@ -189,7 +190,7 @@ func (h *PriorityHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if p.IsDefault {
 		_, err := h.db.ExecWrite("UPDATE priorities SET is_default = false WHERE is_default = true")
 		if err != nil {
-			respondInternalError(w, r, fmt.Errorf("Failed to clear existing default: %w", err))
+			respondInternalError(w, r, fmt.Errorf("failed to clear existing default: %w", err))
 			return
 		}
 	}
@@ -213,12 +214,12 @@ func (h *PriorityHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Insert configuration set associations into junction table (if any are provided)
 	if len(configSetIDs) > 0 {
 		for _, csID := range configSetIDs {
-			_, err := h.db.Exec(`
+			_, err = h.db.Exec(`
 				INSERT INTO configuration_set_priorities (configuration_set_id, priority_id, created_at)
 				VALUES (?, ?, ?)
 			`, csID, id, now)
 			if err != nil {
-				respondInternalError(w, r, fmt.Errorf("Failed to associate with configuration set %d: %w", csID, err))
+				respondInternalError(w, r, fmt.Errorf("failed to associate with configuration set %d: %w", csID, err))
 				return
 			}
 		}
@@ -256,7 +257,7 @@ func (h *PriorityHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -313,7 +314,7 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if p.IsDefault {
 		_, err := h.db.ExecWrite("UPDATE priorities SET is_default = false WHERE is_default = true AND id != ?", id)
 		if err != nil {
-			respondInternalError(w, r, fmt.Errorf("Failed to clear existing default: %w", err))
+			respondInternalError(w, r, fmt.Errorf("failed to clear existing default: %w", err))
 			return
 		}
 	}
@@ -340,18 +341,18 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 		// Delete existing associations
 		_, err = h.db.ExecWrite("DELETE FROM configuration_set_priorities WHERE priority_id = ?", id)
 		if err != nil {
-			respondInternalError(w, r, fmt.Errorf("Failed to update configuration set associations: %w", err))
+			respondInternalError(w, r, fmt.Errorf("failed to update configuration set associations: %w", err))
 			return
 		}
 
 		// Insert new associations
 		for _, csID := range configSetIDs {
-			_, err := h.db.ExecWrite(`
+			_, err = h.db.ExecWrite(`
 				INSERT INTO configuration_set_priorities (configuration_set_id, priority_id, created_at)
 				VALUES (?, ?, ?)
 			`, csID, id, now)
 			if err != nil {
-				respondInternalError(w, r, fmt.Errorf("Failed to associate with configuration set %d: %w", csID, err))
+				respondInternalError(w, r, fmt.Errorf("failed to associate with configuration set %d: %w", csID, err))
 				return
 			}
 		}
@@ -359,7 +360,7 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 		// If no config sets provided, delete all existing associations
 		_, err = h.db.ExecWrite("DELETE FROM configuration_set_priorities WHERE priority_id = ?", id)
 		if err != nil {
-			respondInternalError(w, r, fmt.Errorf("Failed to clear configuration set associations: %w", err))
+			respondInternalError(w, r, fmt.Errorf("failed to clear configuration set associations: %w", err))
 			return
 		}
 	}
@@ -396,7 +397,7 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -458,7 +459,7 @@ func (h *PriorityHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),

@@ -44,7 +44,7 @@ func (h *ConfigurationSetNotificationHandler) GetConfigurationSetNotifications(w
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var assignments []models.ConfigurationSetNotificationSetting
 	for rows.Next() {
@@ -71,7 +71,7 @@ func (h *ConfigurationSetNotificationHandler) GetConfigurationSetNotifications(w
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(assignments)
+	_ = json.NewEncoder(w).Encode(assignments)
 }
 
 // AssignNotificationToConfigurationSet assigns a notification setting to a configuration set
@@ -86,7 +86,7 @@ func (h *ConfigurationSetNotificationHandler) AssignNotificationToConfigurationS
 	var req struct {
 		NotificationSettingID int `json:"notification_setting_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
@@ -139,14 +139,14 @@ func (h *ConfigurationSetNotificationHandler) AssignNotificationToConfigurationS
 		ID:                      int(id),
 		ConfigurationSetID:      configSetID,
 		NotificationSettingID:   req.NotificationSettingID,
-		CreatedAt:              time.Now(),
+		CreatedAt:               time.Now(),
 		ConfigurationSetName:    csName,
 		NotificationSettingName: nsName,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(assignment)
+	_ = json.NewEncoder(w).Encode(assignment)
 }
 
 // UnassignNotificationFromConfigurationSet removes a notification setting from a configuration set
@@ -219,7 +219,7 @@ func (h *ConfigurationSetNotificationHandler) GetAvailableNotificationSettings(w
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var settings []models.NotificationSetting
 	for rows.Next() {
@@ -247,5 +247,5 @@ func (h *ConfigurationSetNotificationHandler) GetAvailableNotificationSettings(w
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(settings)
+	_ = json.NewEncoder(w).Encode(settings)
 }

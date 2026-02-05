@@ -1,3 +1,5 @@
+// Package llm provides interfaces and implementations for interacting with
+// large language model APIs such as Anthropic's Claude.
 package llm
 
 import (
@@ -52,14 +54,6 @@ type anthropicUsage struct {
 	OutputTokens int `json:"output_tokens"`
 }
 
-type anthropicErrorResponse struct {
-	Type  string `json:"type"`
-	Error struct {
-		Type    string `json:"type"`
-		Message string `json:"message"`
-	} `json:"error"`
-}
-
 // newAnthropicClient creates a client for the Anthropic Messages API.
 func newAnthropicClient(baseURL, model, apiKey string, timeout time.Duration) *anthropicClient {
 	endpoint := strings.TrimSuffix(baseURL, "/")
@@ -83,10 +77,7 @@ func (c *anthropicClient) ChatCompletion(ctx context.Context, req ChatCompletion
 			systemPrompt = msg.Content
 			continue
 		}
-		messages = append(messages, anthropicMessage{
-			Role:    msg.Role,
-			Content: msg.Content,
-		})
+		messages = append(messages, anthropicMessage(msg))
 	}
 
 	maxTokens := req.MaxTokens
@@ -125,7 +116,7 @@ func (c *anthropicClient) ChatCompletion(ctx context.Context, req ChatCompletion
 		return nil, ErrServiceNotReady
 	}
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body) //nolint:errcheck
+		respBody, _ := io.ReadAll(resp.Body) //nolint:errcheck // best-effort read for error message
 		return nil, fmt.Errorf("%w: status %d - %s", ErrAPIError, resp.StatusCode, string(respBody))
 	}
 

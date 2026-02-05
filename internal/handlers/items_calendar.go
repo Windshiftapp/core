@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"windshift/internal/models"
 )
 
@@ -64,7 +65,7 @@ func (h *ItemHandler) ScheduleItem(w http.ResponseWriter, r *http.Request) {
 	// Parse existing calendar data
 	var calendarData []models.CalendarScheduleEntry
 	if calendarDataJSON.Valid && calendarDataJSON.String != "" {
-		if err := json.Unmarshal([]byte(calendarDataJSON.String), &calendarData); err != nil {
+		if err = json.Unmarshal([]byte(calendarDataJSON.String), &calendarData); err != nil {
 			calendarData = []models.CalendarScheduleEntry{}
 		}
 	}
@@ -166,7 +167,7 @@ func (h *ItemHandler) UnscheduleItem(w http.ResponseWriter, r *http.Request) {
 	// Parse existing calendar data
 	var calendarData []models.CalendarScheduleEntry
 	if calendarDataJSON.Valid && calendarDataJSON.String != "" {
-		if err := json.Unmarshal([]byte(calendarDataJSON.String), &calendarData); err != nil {
+		if err = json.Unmarshal([]byte(calendarDataJSON.String), &calendarData); err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
@@ -260,7 +261,7 @@ func (h *ItemHandler) GetScheduledItems(w http.ResponseWriter, r *http.Request) 
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// First collect all items with calendar data
 	var allItems []models.Item
@@ -276,7 +277,7 @@ func (h *ItemHandler) GetScheduledItems(w http.ResponseWriter, r *http.Request) 
 		var dueDate sql.NullTime
 		var isPersonal bool
 
-		err := rows.Scan(&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &item.Title, &item.Description,
+		err = rows.Scan(&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &item.Title, &item.Description,
 			&statusID, &priorityID, &assigneeID, &creatorID, &calendarDataJSON, &dueDate,
 			&item.CreatedAt, &item.UpdatedAt, &item.WorkspaceName, &item.WorkspaceKey, &isPersonal)
 		if err != nil {
@@ -309,7 +310,7 @@ func (h *ItemHandler) GetScheduledItems(w http.ResponseWriter, r *http.Request) 
 		// Parse calendar data
 		var calendarData []models.CalendarScheduleEntry
 		if calendarDataJSON.Valid && calendarDataJSON.String != "" {
-			if err := json.Unmarshal([]byte(calendarDataJSON.String), &calendarData); err != nil {
+			if err = json.Unmarshal([]byte(calendarDataJSON.String), &calendarData); err != nil {
 				continue
 			}
 		}

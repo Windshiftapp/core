@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"windshift/internal/auth"
 	"windshift/internal/database"
 	"windshift/internal/middleware"
@@ -33,18 +34,18 @@ import (
 // oidcErrorMessages maps OIDC error codes to safe user-facing messages
 // This prevents reflected error injection from IdP error_description
 var oidcErrorMessages = map[string]string{
-	"access_denied":             "Access was denied by the identity provider",
-	"invalid_request":           "Invalid authentication request",
-	"unauthorized_client":       "Client not authorized for this operation",
-	"unsupported_response_type": "Unsupported response type",
-	"invalid_scope":             "Invalid scope requested",
-	"server_error":              "Identity provider encountered an error",
-	"temporarily_unavailable":   "Identity provider is temporarily unavailable",
-	"interaction_required":      "User interaction required",
-	"login_required":            "Login required",
-	"consent_required":          "Consent required",
+	"access_denied":              "Access was denied by the identity provider",
+	"invalid_request":            "Invalid authentication request",
+	"unauthorized_client":        "Client not authorized for this operation",
+	"unsupported_response_type":  "Unsupported response type",
+	"invalid_scope":              "Invalid scope requested",
+	"server_error":               "Identity provider encountered an error",
+	"temporarily_unavailable":    "Identity provider is temporarily unavailable",
+	"interaction_required":       "User interaction required",
+	"login_required":             "Login required",
+	"consent_required":           "Consent required",
 	"account_selection_required": "Account selection required",
-	"invalid_grant":             "Invalid or expired authorization code",
+	"invalid_grant":              "Invalid or expired authorization code",
 }
 
 // SSOHandler handles SSO authentication endpoints
@@ -191,7 +192,7 @@ func (h *SSOHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// No default provider or error - SSO not enabled
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(SSOStatusResponse{
+		_ = json.NewEncoder(w).Encode(SSOStatusResponse{
 			Enabled:            false,
 			AllowPasswordLogin: true,
 		})
@@ -199,7 +200,7 @@ func (h *SSOHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(SSOStatusResponse{
+	_ = json.NewEncoder(w).Encode(SSOStatusResponse{
 		Enabled:            provider.Enabled,
 		ProviderName:       provider.Name,
 		ProviderSlug:       provider.Slug,
@@ -328,13 +329,14 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		result, err := h.userStore.FindOrCreateUser(provider, claims)
 		if err != nil {
 			slog.Error("failed to find/create user", slog.String("component", "sso"), slog.Any("error", err))
-			if err == sso.ErrAutoProvisionDisabled {
+			switch {
+			case err == sso.ErrAutoProvisionDisabled:
 				h.redirectWithError(w, r, "User account not found. Contact your administrator.")
-			} else if errors.Is(err, sso.ErrEmailNotVerified) {
+			case errors.Is(err, sso.ErrEmailNotVerified):
 				h.redirectWithError(w, r, "Your email address has not been verified by the identity provider")
-			} else if errors.Is(err, sso.ErrAccountLinkingRequiresVerification) {
+			case errors.Is(err, sso.ErrAccountLinkingRequiresVerification):
 				h.redirectWithError(w, r, "Cannot link to existing account: your identity provider must verify your email address first")
-			} else {
+			default:
 				h.redirectWithError(w, r, "Failed to process user account")
 			}
 			return
@@ -352,12 +354,13 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		if result.NeedsEmailVerification && !user.EmailVerified {
 			// User needs email verification - send verification email
 			if h.emailVerificationService != nil {
-				token, err := h.emailVerificationService.GenerateVerificationToken(user.ID)
+				var token string
+				token, err = h.emailVerificationService.GenerateVerificationToken(user.ID)
 				if err != nil {
 					slog.Warn("failed to generate verification token", slog.String("component", "sso"), slog.Int("user_id", user.ID), slog.Any("error", err))
 					// Continue with login but log the error
 				} else {
-					if err := h.emailVerificationService.SendVerificationEmail(user, token); err != nil {
+					if err = h.emailVerificationService.SendVerificationEmail(user, token); err != nil {
 						slog.Warn("failed to send verification email", slog.String("component", "sso"), slog.Int("user_id", user.ID), slog.Any("error", err))
 						// Continue with login but log the error
 					} else {
@@ -418,7 +421,7 @@ func (h *SSOHandler) ListProviders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // GetProvider returns a specific provider (admin only)
@@ -440,7 +443,7 @@ func (h *SSOHandler) GetProvider(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(h.providerToResponse(provider))
+	_ = json.NewEncoder(w).Encode(h.providerToResponse(provider))
 }
 
 // CreateProvider creates a new SSO provider (admin only)
@@ -538,7 +541,7 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(h.providerToResponse(provider))
+	_ = json.NewEncoder(w).Encode(h.providerToResponse(provider))
 }
 
 // UpdateProvider updates an existing provider (admin only)
@@ -613,7 +616,7 @@ func (h *SSOHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(h.providerToResponse(existing))
+	_ = json.NewEncoder(w).Encode(h.providerToResponse(existing))
 }
 
 // DeleteProvider deletes a provider (admin only)
@@ -679,7 +682,7 @@ func (h *SSOHandler) TestProvider(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
 			"error":   safeMessage,
 		})
@@ -687,7 +690,7 @@ func (h *SSOHandler) TestProvider(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "Successfully connected to OIDC provider",
 	})
@@ -708,7 +711,7 @@ func (h *SSOHandler) GetExternalAccounts(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(accounts)
+	_ = json.NewEncoder(w).Encode(accounts)
 }
 
 // UnlinkExternalAccount removes a linked external account
@@ -868,7 +871,6 @@ func (h *SSOHandler) providerToResponse(p *sso.SSOProvider) *SSOProviderResponse
 
 func generateRandomState() string {
 	b := make([]byte, 32)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	return base64.URLEncoding.EncodeToString(b)
 }
-

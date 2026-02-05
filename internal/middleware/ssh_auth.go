@@ -106,13 +106,13 @@ func (m *SSHAuthMiddleware) PublicKeyHandler() ssh.PublicKeyHandler {
 func (m *SSHAuthMiddleware) convertPublicKeyToString(key ssh.PublicKey) (string, error) {
 	// Use the standard SSH marshaling to get the authorized key format
 	keyStr := strings.TrimSpace(string(gossh.MarshalAuthorizedKey(key)))
-	
+
 	// Split and rejoin to ensure clean format (removes any comments)
 	parts := strings.Fields(keyStr)
 	if len(parts) < 2 {
 		return "", fmt.Errorf("invalid key format after conversion")
 	}
-	
+
 	// Return normalized format: "type data" (without comment)
 	return fmt.Sprintf("%s %s", parts[0], parts[1]), nil
 }
@@ -129,7 +129,7 @@ func GetAuthenticatedUserID(ctx ssh.Context) (int, bool) {
 func GetCredentialInfo(ctx ssh.Context) (credentialID int, credentialName string, ok bool) {
 	credID, hasCredID := ctx.Value("credential_id").(int)
 	credName, hasCredName := ctx.Value("credential_name").(string)
-	
+
 	if hasCredID && hasCredName {
 		return credID, credName, true
 	}
@@ -142,7 +142,7 @@ func GetUserInfo(ctx ssh.Context) (email, username, firstName, lastName string, 
 	username, hasUsername := ctx.Value("user_username").(string)
 	firstName, hasFirstName := ctx.Value("user_first_name").(string)
 	lastName, hasLastName := ctx.Value("user_last_name").(string)
-	
+
 	if hasEmail && hasUsername && hasFirstName && hasLastName {
 		return email, username, firstName, lastName, true
 	}

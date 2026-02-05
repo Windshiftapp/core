@@ -52,7 +52,8 @@ func (h *TestCaseHandler) GetAllTestCases(w http.ResponseWriter, r *http.Request
 	}
 
 	if folderIDParam != "" && folderIDParam != "null" {
-		folderID, err := strconv.Atoi(folderIDParam)
+		var folderID int
+		folderID, err = strconv.Atoi(folderIDParam)
 		if err != nil {
 			respondInvalidID(w, r, "folder_id")
 			return
@@ -67,7 +68,7 @@ func (h *TestCaseHandler) GetAllTestCases(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(testCases)
+	_ = json.NewEncoder(w).Encode(testCases)
 }
 
 // GetTestCase returns a single test case
@@ -104,7 +105,7 @@ func (h *TestCaseHandler) GetTestCase(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(testCase)
+	_ = json.NewEncoder(w).Encode(testCase)
 }
 
 // CreateTestCase creates a new test case
@@ -132,7 +133,7 @@ func (h *TestCaseHandler) CreateTestCase(w http.ResponseWriter, r *http.Request)
 		EstimatedDuration int    `json:"estimated_duration"`
 		FolderID          *int   `json:"folder_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
@@ -157,7 +158,7 @@ func (h *TestCaseHandler) CreateTestCase(w http.ResponseWriter, r *http.Request)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(testCase)
+	_ = json.NewEncoder(w).Encode(testCase)
 }
 
 // UpdateTestCase updates an existing test case
@@ -192,7 +193,7 @@ func (h *TestCaseHandler) UpdateTestCase(w http.ResponseWriter, r *http.Request)
 		FolderID          *int   `json:"folder_id"`
 		SortOrder         int    `json:"sort_order"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
@@ -221,7 +222,7 @@ func (h *TestCaseHandler) UpdateTestCase(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(testCase)
+	_ = json.NewEncoder(w).Encode(testCase)
 }
 
 // DeleteTestCase deletes a test case
@@ -302,7 +303,7 @@ func (h *TestCaseHandler) MoveTestCase(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
 // ReorderTestCases updates the sort order of multiple test cases within a folder
@@ -338,7 +339,7 @@ func (h *TestCaseHandler) ReorderTestCases(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
 // Test Step Handlers
@@ -384,7 +385,7 @@ func (h *TestCaseHandler) GetTestSteps(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(steps)
+	_ = json.NewEncoder(w).Encode(steps)
 }
 
 // CreateTestStep creates a new test step
@@ -426,7 +427,7 @@ func (h *TestCaseHandler) CreateTestStep(w http.ResponseWriter, r *http.Request)
 		Data     string `json:"data"`
 		Expected string `json:"expected"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
@@ -448,7 +449,7 @@ func (h *TestCaseHandler) CreateTestStep(w http.ResponseWriter, r *http.Request)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(step)
+	_ = json.NewEncoder(w).Encode(step)
 }
 
 // UpdateTestStep updates an existing test step
@@ -497,7 +498,7 @@ func (h *TestCaseHandler) UpdateTestStep(w http.ResponseWriter, r *http.Request)
 		Data       string `json:"data"`
 		Expected   string `json:"expected"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
@@ -523,7 +524,7 @@ func (h *TestCaseHandler) UpdateTestStep(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(step)
+	_ = json.NewEncoder(w).Encode(step)
 }
 
 // DeleteTestStep deletes a test step
@@ -627,7 +628,7 @@ func (h *TestCaseHandler) ReorderTestSteps(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
 // GetAllTestLabels returns all available test labels for a workspace
@@ -654,7 +655,7 @@ func (h *TestCaseHandler) GetAllTestLabels(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(labels)
+	_ = json.NewEncoder(w).Encode(labels)
 }
 
 // CreateTestLabel creates a new test label
@@ -679,7 +680,7 @@ func (h *TestCaseHandler) CreateTestLabel(w http.ResponseWriter, r *http.Request
 		Color       string `json:"color"`
 		Description string `json:"description"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
@@ -701,7 +702,7 @@ func (h *TestCaseHandler) CreateTestLabel(w http.ResponseWriter, r *http.Request
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(label)
+	_ = json.NewEncoder(w).Encode(label)
 }
 
 // UpdateTestLabel updates an existing test label
@@ -732,7 +733,7 @@ func (h *TestCaseHandler) UpdateTestLabel(w http.ResponseWriter, r *http.Request
 		Color       string `json:"color"`
 		Description string `json:"description"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
@@ -757,7 +758,7 @@ func (h *TestCaseHandler) UpdateTestLabel(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(label)
+	_ = json.NewEncoder(w).Encode(label)
 }
 
 // DeleteTestLabel deletes a test label
@@ -832,7 +833,7 @@ func (h *TestCaseHandler) GetTestCaseLabels(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(labels)
+	_ = json.NewEncoder(w).Encode(labels)
 }
 
 // AddTestCaseLabel adds a label to a test case
@@ -887,7 +888,7 @@ func (h *TestCaseHandler) AddTestCaseLabel(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
 // RemoveTestCaseLabel removes a label from a test case
@@ -979,5 +980,5 @@ func (h *TestCaseHandler) GetTestCaseConnections(w http.ResponseWriter, r *http.
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(connections)
+	_ = json.NewEncoder(w).Encode(connections)
 }

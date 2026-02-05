@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
 	"windshift/internal/models"
 	"windshift/internal/utils"
 )
@@ -53,7 +54,7 @@ func (h *AssetHandler) GetEveryoneRole(w http.ResponseWriter, r *http.Request) {
 	if err == sql.ErrNoRows {
 		// No everyone role configured - return null
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(nil)
+		_ = json.NewEncoder(w).Encode(nil)
 		return
 	}
 	if err != nil {
@@ -67,7 +68,7 @@ func (h *AssetHandler) GetEveryoneRole(w http.ResponseWriter, r *http.Request) {
 	everyoneRole.GrantedByName = grantedByName.String
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(everyoneRole)
+	_ = json.NewEncoder(w).Encode(everyoneRole)
 }
 
 // SetEveryoneRoleRequest represents the request body for setting everyone role
@@ -101,7 +102,7 @@ func (h *AssetHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req SetEveryoneRoleRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -134,5 +135,5 @@ func (h *AssetHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }

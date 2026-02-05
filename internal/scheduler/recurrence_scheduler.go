@@ -7,10 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/teambition/rrule-go"
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+
+	"github.com/teambition/rrule-go"
 )
 
 // RecurrenceScheduler handles periodic generation of recurring task instances
@@ -153,7 +154,7 @@ func (rs *RecurrenceScheduler) generateInstancesForRule(rule *models.RecurrenceR
 	if len(occurrences) == 0 {
 		// No occurrences in window, update next check time
 		nextCheck := now.Add(24 * time.Hour)
-		rs.recurrenceRepo.UpdateNextCheck(rule.ID, nextCheck)
+		_ = rs.recurrenceRepo.UpdateNextCheck(rule.ID, nextCheck)
 		return 0, nil
 	}
 
@@ -187,7 +188,7 @@ func (rs *RecurrenceScheduler) generateInstancesForRule(rule *models.RecurrenceR
 
 	// Update rule's progress
 	nextCheck := now.Add(24 * time.Hour)
-	rs.recurrenceRepo.UpdateGenerationProgress(rule.ID, generateUntil, nextCheck)
+	_ = rs.recurrenceRepo.UpdateGenerationProgress(rule.ID, generateUntil, nextCheck)
 
 	return generatedCount, nil
 }
@@ -198,7 +199,7 @@ func (rs *RecurrenceScheduler) createInstance(rule *models.RecurrenceRule, templ
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Get next workspace item number
 	var nextNum int
@@ -239,7 +240,8 @@ func (rs *RecurrenceScheduler) createInstance(rule *models.RecurrenceRule, templ
 	// Handle custom field values
 	var customFieldValuesJSON *string
 	if rule.CopyCustomFields && len(template.CustomFieldValues) > 0 {
-		cfBytes, err := json.Marshal(template.CustomFieldValues)
+		var cfBytes []byte
+		cfBytes, err = json.Marshal(template.CustomFieldValues)
 		if err == nil {
 			cfStr := string(cfBytes)
 			customFieldValuesJSON = &cfStr

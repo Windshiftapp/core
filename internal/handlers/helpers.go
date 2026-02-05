@@ -13,13 +13,13 @@ import (
 func respondJSON(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(data)
+	_ = json.NewEncoder(w).Encode(data)
 }
 
 // respondJSONOK sends a JSON response with 200 OK
 func respondJSONOK(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(data)
+	_ = json.NewEncoder(w).Encode(data)
 }
 
 // respondJSONCreated sends a JSON response with 201 Created
@@ -54,9 +54,9 @@ func respondJSONWithWarnings(w http.ResponseWriter, statusCode int, data interfa
 			"data":     data,
 			"warnings": warnings,
 		}
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	} else {
-		json.NewEncoder(w).Encode(data)
+		_ = json.NewEncoder(w).Encode(data)
 	}
 }
 

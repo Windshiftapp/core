@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
@@ -45,7 +46,7 @@ func (h *GroupHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var groups []models.TeamGroup
 	for rows.Next() {
@@ -147,7 +148,7 @@ func (h *GroupHandler) Get(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer memberRows.Close()
+	defer func() { _ = memberRows.Close() }()
 
 	var members []models.TeamGroupMember
 	for memberRows.Next() {
@@ -235,7 +236,7 @@ func (h *GroupHandler) Create(w http.ResponseWriter, r *http.Request) {
 	auditUser := utils.GetCurrentUser(r)
 	if auditUser != nil {
 		groupID := int(id)
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       auditUser.ID,
 			Username:     auditUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -285,7 +286,7 @@ func (h *GroupHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req models.TeamGroupUpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -337,7 +338,7 @@ func (h *GroupHandler) Update(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       auditUser.ID,
 			Username:     auditUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -405,7 +406,7 @@ func (h *GroupHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Log audit event
-	logger.LogAudit(h.db, logger.AuditEvent{
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
 		UserID:       auditUser.ID,
 		Username:     auditUser.Username,
 		IPAddress:    utils.GetClientIP(r),
@@ -536,7 +537,7 @@ func (h *GroupHandler) AddMembers(w http.ResponseWriter, r *http.Request) {
 	// Log audit event
 	auditUser := utils.GetCurrentUser(r)
 	if auditUser != nil && len(addedMembers) > 0 {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       auditUser.ID,
 			Username:     auditUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -614,7 +615,7 @@ func (h *GroupHandler) RemoveMembers(w http.ResponseWriter, r *http.Request) {
 	// Log audit event
 	auditUser := utils.GetCurrentUser(r)
 	if auditUser != nil && removedCount > 0 {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       auditUser.ID,
 			Username:     auditUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -679,7 +680,7 @@ func (h *GroupHandler) GetUserMemberships(w http.ResponseWriter, r *http.Request
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var groups []models.TeamGroup
 	for rows.Next() {

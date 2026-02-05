@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/services"
@@ -69,7 +70,7 @@ func (h *AssetTypeHandler) GetAssetTypes(w http.ResponseWriter, r *http.Request)
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var types []models.AssetType
 	for rows.Next() {
@@ -98,7 +99,7 @@ func (h *AssetTypeHandler) GetAssetTypes(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(types)
+	_ = json.NewEncoder(w).Encode(types)
 }
 
 // GetAssetType returns a single asset type
@@ -176,7 +177,7 @@ func (h *AssetTypeHandler) GetAssetType(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(assetType)
+	_ = json.NewEncoder(w).Encode(assetType)
 }
 
 // CreateAssetTypeRequest represents the request body for creating an asset type
@@ -215,7 +216,7 @@ func (h *AssetTypeHandler) CreateAssetType(w http.ResponseWriter, r *http.Reques
 	}
 
 	var req CreateAssetTypeRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -265,7 +266,7 @@ func (h *AssetTypeHandler) CreateAssetType(w http.ResponseWriter, r *http.Reques
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(assetType)
+	_ = json.NewEncoder(w).Encode(assetType)
 }
 
 // UpdateAssetTypeRequest represents the request body for updating an asset type
@@ -316,7 +317,7 @@ func (h *AssetTypeHandler) UpdateAssetType(w http.ResponseWriter, r *http.Reques
 	}
 
 	var req UpdateAssetTypeRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -354,7 +355,7 @@ func (h *AssetTypeHandler) UpdateAssetType(w http.ResponseWriter, r *http.Reques
 
 	// Return updated type
 	var assetType models.AssetType
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT id, set_id, name, description, icon, color, display_order, is_active, created_at, updated_at
 		FROM asset_types WHERE id = ?
 	`, typeID).Scan(
@@ -364,7 +365,7 @@ func (h *AssetTypeHandler) UpdateAssetType(w http.ResponseWriter, r *http.Reques
 	)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(assetType)
+	_ = json.NewEncoder(w).Encode(assetType)
 }
 
 // DeleteAssetType deletes an asset type
@@ -479,7 +480,7 @@ func (h *AssetTypeHandler) GetTypeFields(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(fields)
+	_ = json.NewEncoder(w).Encode(fields)
 }
 
 // UpdateTypeFieldsRequest represents the request body for updating type fields
@@ -529,7 +530,7 @@ func (h *AssetTypeHandler) UpdateTypeFields(w http.ResponseWriter, r *http.Reque
 	}
 
 	var req UpdateTypeFieldsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -540,7 +541,7 @@ func (h *AssetTypeHandler) UpdateTypeFields(w http.ResponseWriter, r *http.Reque
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Delete existing field assignments
 	_, err = tx.Exec("DELETE FROM asset_type_fields WHERE asset_type_id = ?", typeID)
@@ -575,7 +576,7 @@ func (h *AssetTypeHandler) UpdateTypeFields(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(fields)
+	_ = json.NewEncoder(w).Encode(fields)
 }
 
 // getTypeFields is a helper to get fields for an asset type
@@ -591,7 +592,7 @@ func (h *AssetTypeHandler) getTypeFields(typeID int) ([]models.AssetTypeField, e
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var fields []models.AssetTypeField
 	for rows.Next() {

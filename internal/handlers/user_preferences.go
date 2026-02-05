@@ -44,7 +44,7 @@ func (h *UserPreferencesHandler) GetUserPreferences(w http.ResponseWriter, r *ht
 			ColorMode: "system",
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 		return
 	}
 	if err != nil {
@@ -89,7 +89,7 @@ func (h *UserPreferencesHandler) GetUserPreferences(w http.ResponseWriter, r *ht
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // UpdateUserPreferences updates the current user's preferences
@@ -139,7 +139,7 @@ func (h *UserPreferencesHandler) UpdateUserPreferences(w http.ResponseWriter, r 
 
 	var prefs models.UserPreferencesData
 	if rowExists {
-		json.Unmarshal([]byte(existingPrefsJSON), &prefs)
+		_ = json.Unmarshal([]byte(existingPrefsJSON), &prefs)
 	}
 
 	// Update with new values

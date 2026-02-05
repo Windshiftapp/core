@@ -62,7 +62,7 @@ func (s *ItemUpdateService) UpdateItem(req UpdateItemRequest) (*UpdateItemResult
 	existingItem := *originalItem
 
 	// Apply validation and updates
-	if err := s.validator.ValidateAndApplyUpdates(&existingItem, req.UpdateData, req.UserID); err != nil {
+	if err = s.validator.ValidateAndApplyUpdates(&existingItem, req.UpdateData, req.UserID); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 
@@ -77,7 +77,7 @@ func (s *ItemUpdateService) UpdateItem(req UpdateItemRequest) (*UpdateItemResult
 	if err != nil {
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
-	defer tx.Rollback() // Will be ignored if transaction is committed
+	defer func() { _ = tx.Rollback() }() // Will be ignored if transaction is committed
 
 	// Update the item in database
 	now := time.Now()
@@ -99,12 +99,12 @@ func (s *ItemUpdateService) UpdateItem(req UpdateItemRequest) (*UpdateItemResult
 
 	// Generate and record history entries
 	history := s.compareAndGenerateHistory(originalItem, &existingItem, req.UserID)
-	if err := s.recordItemHistory(tx, history); err != nil {
+	if err = s.recordItemHistory(tx, history); err != nil {
 		return nil, fmt.Errorf("failed to record history: %w", err)
 	}
 
 	// Commit the transaction
-	if err := tx.Commit(); err != nil {
+	if err = tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
@@ -383,12 +383,12 @@ func (s *ItemUpdateService) compareAndGenerateHistory(original, updated *models.
 
 // RecordItemCreationHistory records the initial values when an item is created
 // This ensures that the item history shows the creation event with initial values
-func (s *ItemUpdateService) RecordItemCreationHistory(db database.Database, itemID int, userID int) error {
+func (s *ItemUpdateService) RecordItemCreationHistory(db database.Database, itemID, userID int) error {
 	return s.recordItemCreationHistory(db, itemID, userID)
 }
 
 // recordItemCreationHistory records the initial values when an item is created
-func (s *ItemUpdateService) recordItemCreationHistory(db database.Database, itemID int, userID int) error {
+func (s *ItemUpdateService) recordItemCreationHistory(db database.Database, itemID, userID int) error {
 	// Load the newly created item to get all its initial values
 	var item models.Item
 	var customFieldValuesJSON sql.NullString
@@ -484,6 +484,7 @@ func (s *ItemUpdateService) recordItemCreationHistory(db database.Database, item
 	// Add entries for all fields
 	addHistory("title", item.Title)
 	addHistory("description", item.Description)
+	addHistory("item_type_id", intPtrToString(item.ItemTypeID))
 	addHistory("status_id", intPtrToString(item.StatusID))
 	addHistory("priority_id", intPtrToString(item.PriorityID))
 	addHistory("milestone_id", intPtrToString(item.MilestoneID))

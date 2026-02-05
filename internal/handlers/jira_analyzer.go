@@ -62,7 +62,7 @@ func (h *JiraImportHandler) GetProjects(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(projectInfos)
+	_ = json.NewEncoder(w).Encode(projectInfos)
 }
 
 // Analyze handles POST /api/jira-import/analyze
@@ -109,7 +109,8 @@ func (h *JiraImportHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Get project details
-		project, err := client.GetProject(ctx, projectKey)
+		var project *jira.JiraProject
+		project, err = client.GetProject(ctx, projectKey)
 		if err != nil {
 			slog.Warn("Failed to get project", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
 			continue
@@ -121,7 +122,8 @@ func (h *JiraImportHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Get issue count (respecting open_issues_only filter)
-		count, err := client.GetIssueCount(ctx, projectKey, req.OpenIssuesOnly)
+		var count int
+		count, err = client.GetIssueCount(ctx, projectKey, req.OpenIssuesOnly)
 		if err != nil {
 			slog.Warn("Failed to get issue count for project", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
 		}
@@ -129,7 +131,8 @@ func (h *JiraImportHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 		result.TotalIssues += count
 
 		// Get project issue types and statuses
-		issueTypes, err := client.GetProjectIssueTypes(ctx, projectKey)
+		var issueTypes []jira.JiraIssueType
+		issueTypes, err = client.GetProjectIssueTypes(ctx, projectKey)
 		if err == nil {
 			for _, it := range issueTypes {
 				projectAnalysis.IssueTypes = append(projectAnalysis.IssueTypes, it.Name)
@@ -146,7 +149,8 @@ func (h *JiraImportHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Get workflow/statuses for this project
-		workflow, err := client.GetProjectWorkflowScheme(ctx, projectKey)
+		var workflow *jira.JiraWorkflow
+		workflow, err = client.GetProjectWorkflowScheme(ctx, projectKey)
 		if err == nil && workflow != nil {
 			for _, s := range workflow.Statuses {
 				if _, exists := statusMap[s.ID]; !exists {
@@ -168,7 +172,8 @@ func (h *JiraImportHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Check for versions and collect them
-		versions, err := client.GetProjectVersions(ctx, projectKey)
+		var versions []jira.JiraVersion
+		versions, err = client.GetProjectVersions(ctx, projectKey)
 		if err == nil && len(versions) > 0 {
 			projectAnalysis.HasVersions = true
 			projectAnalysis.VersionCount = len(versions)
@@ -186,7 +191,8 @@ func (h *JiraImportHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Check for sprints (via boards)
-		boards, err := client.ListBoards(ctx, projectKey)
+		var boards *jira.BoardListResult
+		boards, err = client.ListBoards(ctx, projectKey)
 		if err == nil && boards != nil && len(boards.Values) > 0 {
 			projectAnalysis.HasSprints = true
 		}
@@ -227,7 +233,8 @@ func (h *JiraImportHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 			jql = fmt.Sprintf("project = %s AND statusCategory != Done ORDER BY created DESC", projectKey)
 		}
 
-		searchResult, err := client.SearchIssues(ctx, jira.SearchOptions{
+		var searchResult *jira.SearchResult
+		searchResult, err = client.SearchIssues(ctx, jira.SearchOptions{
 			JQL:        jql,
 			MaxResults: 100,
 			StartAt:    0,
@@ -291,7 +298,7 @@ func (h *JiraImportHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 		if user.Email != "" {
 			// Try to find matching Windshift user by email
 			var userID int
-			err := h.db.QueryRow(`SELECT id FROM users WHERE email = ?`, user.Email).Scan(&userID)
+			err = h.db.QueryRow(`SELECT id FROM users WHERE email = ?`, user.Email).Scan(&userID)
 			if err == nil {
 				user.MatchedUserID = &userID
 			}
@@ -315,7 +322,7 @@ func (h *JiraImportHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	_ = json.NewEncoder(w).Encode(result)
 }
 
 // GetAssetSchemas handles GET /api/jira-import/assets?connection_id={id}
@@ -337,7 +344,7 @@ func (h *JiraImportHandler) GetAssetSchemas(w http.ResponseWriter, r *http.Reque
 		if errors.Is(err, jira.ErrAssetsNotAvailable) {
 			// Assets API not available, return empty list
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode([]JiraAssetSchemaInfo{})
+			_ = json.NewEncoder(w).Encode([]JiraAssetSchemaInfo{})
 			return
 		}
 		respondInternalError(w, r, err)
@@ -356,7 +363,7 @@ func (h *JiraImportHandler) GetAssetSchemas(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(schemaInfos)
+	_ = json.NewEncoder(w).Encode(schemaInfos)
 }
 
 // GetAssetTypes handles GET /api/jira-import/assets/{schemaId}/types?connection_id={id}
@@ -382,5 +389,5 @@ func (h *JiraImportHandler) GetAssetTypes(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(types)
+	_ = json.NewEncoder(w).Encode(types)
 }

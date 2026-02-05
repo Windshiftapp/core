@@ -50,7 +50,7 @@ func (h *WebhookHandler) TriggerWebhook(w http.ResponseWriter, r *http.Request) 
 	var request struct {
 		ItemID int `json:"item_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&request); err != nil {
 		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
@@ -102,7 +102,7 @@ func (h *WebhookHandler) TriggerWebhook(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "Webhook triggered successfully",
 	})
@@ -155,7 +155,7 @@ func (h *WebhookHandler) GetWebhooksForItem(w http.ResponseWriter, r *http.Reque
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type WebhookInfo struct {
 		ID          int    `json:"id"`
@@ -208,5 +208,5 @@ func (h *WebhookHandler) GetWebhooksForItem(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(webhooks)
+	_ = json.NewEncoder(w).Encode(webhooks)
 }

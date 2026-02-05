@@ -1,3 +1,4 @@
+// Package repository provides data access layer implementations.
 package repository
 
 import (
@@ -91,7 +92,7 @@ func (r *ActionRepository) ListByWorkspace(workspaceID int) ([]*models.Action, e
 	if err != nil {
 		return nil, fmt.Errorf("failed to query actions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var actions []*models.Action
 	for rows.Next() {
@@ -141,7 +142,7 @@ func (r *ActionRepository) ListEnabledByWorkspace(workspaceID int) ([]*models.Ac
 	if err != nil {
 		return nil, fmt.Errorf("failed to query enabled actions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var actions []*models.Action
 	for rows.Next() {
@@ -270,7 +271,7 @@ func (r *ActionRepository) GetNodesByActionID(actionID int) ([]models.ActionNode
 	if err != nil {
 		return nil, fmt.Errorf("failed to query action nodes: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var nodes []models.ActionNode
 	for rows.Next() {
@@ -355,7 +356,7 @@ func (r *ActionRepository) GetEdgesByActionID(actionID int) ([]models.ActionEdge
 	if err != nil {
 		return nil, fmt.Errorf("failed to query action edges: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var edges []models.ActionEdge
 	for rows.Next() {
@@ -457,7 +458,7 @@ func (r *ActionRepository) UpdateExecutionLog(log *models.ActionExecutionLog) er
 }
 
 // GetExecutionLogsByActionID retrieves execution logs for an action
-func (r *ActionRepository) GetExecutionLogsByActionID(actionID int, limit, offset int) ([]*models.ActionExecutionLog, error) {
+func (r *ActionRepository) GetExecutionLogsByActionID(actionID, limit, offset int) ([]*models.ActionExecutionLog, error) {
 	rows, err := r.db.Query(`
 		SELECT l.id, l.action_id, l.item_id, l.trigger_event, l.status,
 		       l.started_at, l.completed_at, l.error_message, l.execution_trace,
@@ -472,13 +473,13 @@ func (r *ActionRepository) GetExecutionLogsByActionID(actionID int, limit, offse
 	if err != nil {
 		return nil, fmt.Errorf("failed to query execution logs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	return r.scanExecutionLogs(rows)
 }
 
 // GetExecutionLogsByWorkspaceID retrieves execution logs for a workspace
-func (r *ActionRepository) GetExecutionLogsByWorkspaceID(workspaceID int, limit, offset int) ([]*models.ActionExecutionLog, error) {
+func (r *ActionRepository) GetExecutionLogsByWorkspaceID(workspaceID, limit, offset int) ([]*models.ActionExecutionLog, error) {
 	rows, err := r.db.Query(`
 		SELECT l.id, l.action_id, l.item_id, l.trigger_event, l.status,
 		       l.started_at, l.completed_at, l.error_message, l.execution_trace,
@@ -493,7 +494,7 @@ func (r *ActionRepository) GetExecutionLogsByWorkspaceID(workspaceID int, limit,
 	if err != nil {
 		return nil, fmt.Errorf("failed to query execution logs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	return r.scanExecutionLogs(rows)
 }
@@ -579,7 +580,7 @@ func (r *ActionRepository) SaveActionWithNodesAndEdges(action *models.Action, no
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Delete existing nodes and edges
 	_, err = tx.Exec(`DELETE FROM action_edges WHERE action_id = ?`, action.ID)

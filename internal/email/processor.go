@@ -107,7 +107,7 @@ func (p *Processor) ProcessEmail(
 // isAlreadyProcessed checks if an email with this Message-ID was already processed
 func (p *Processor) isAlreadyProcessed(ctx context.Context, channelID int, messageID string) (bool, error) {
 	var count int
-	err := p.db.QueryRow(`
+	err := p.db.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM email_message_tracking
 		WHERE channel_id = ? AND message_id = ?
 	`, channelID, messageID).Scan(&count)
@@ -176,14 +176,14 @@ func (p *Processor) findOrCreatePortalCustomer(
 // grantChannelAccess grants the portal customer access to the channel and connected portal
 func (p *Processor) grantChannelAccess(ctx context.Context, customerID, channelID int, config *models.ChannelConfig) {
 	// Grant access to email channel
-	_, _ = p.db.Exec(`
+	_, _ = p.db.ExecContext(ctx, `
 		INSERT OR IGNORE INTO portal_customer_channels (portal_customer_id, channel_id)
 		VALUES (?, ?)
 	`, customerID, channelID)
 
 	// Grant access to connected portal if configured
 	if config.EmailConnectedPortalID != nil {
-		_, _ = p.db.Exec(`
+		_, _ = p.db.ExecContext(ctx, `
 			INSERT OR IGNORE INTO portal_customer_channels (portal_customer_id, channel_id)
 			VALUES (?, ?)
 		`, customerID, *config.EmailConnectedPortalID)
@@ -196,7 +196,7 @@ func (p *Processor) findParentItem(ctx context.Context, channelID int, email *Pa
 
 	for _, messageID := range threadIDs {
 		var itemID int
-		err := p.db.QueryRow(`
+		err := p.db.QueryRowContext(ctx, `
 			SELECT item_id FROM email_message_tracking
 			WHERE channel_id = ? AND message_id = ? AND item_id IS NOT NULL
 		`, channelID, messageID).Scan(&itemID)
@@ -211,13 +211,14 @@ func (p *Processor) findParentItem(ctx context.Context, channelID int, email *Pa
 }
 
 // createItemFromEmail creates a new item from an email
-func (p *Processor) createItemFromEmail(
+func (p *Processor) createItemFromEmail( //nolint:unparam // ctx reserved for future use
 	ctx context.Context,
 	email *ParsedEmail,
 	channelID int,
 	config *models.ChannelConfig,
 	customerID int,
 ) (*ProcessingResult, error) {
+	_ = ctx
 	if config.EmailWorkspaceID == 0 {
 		return nil, fmt.Errorf("no workspace configured for email channel")
 	}
@@ -295,7 +296,7 @@ func (p *Processor) addCommentFromReply(
 
 	// Get user ID from portal customer (if linked)
 	var linkedUserID int
-	err := p.db.QueryRow(`
+	err := p.db.QueryRowContext(ctx, `
 		SELECT user_id FROM portal_customers WHERE id = ? AND user_id IS NOT NULL
 	`, customerID).Scan(&linkedUserID)
 	if err != nil && err != sql.ErrNoRows {
@@ -304,7 +305,8 @@ func (p *Processor) addCommentFromReply(
 
 	// Use CommentService for unified comment creation (notifications, mentions, webhooks, email reply handling)
 	if p.commentService != nil {
-		result, err := p.commentService.Create(services.CreateCommentParams{
+		var result *services.CreateCommentResult
+		result, err = p.commentService.Create(services.CreateCommentParams{
 			ItemID:           itemID,
 			AuthorID:         linkedUserID,
 			PortalCustomerID: &customerID,
@@ -336,12 +338,12 @@ func (p *Processor) addCommentFromReply(
 	now := time.Now()
 	var dbResult sql.Result
 	if linkedUserID != 0 {
-		dbResult, err = p.db.Exec(`
+		dbResult, err = p.db.ExecContext(ctx, `
 			INSERT INTO comments (item_id, author_id, content, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?)
 		`, itemID, linkedUserID, content, now, now)
 	} else {
-		dbResult, err = p.db.Exec(`
+		dbResult, err = p.db.ExecContext(ctx, `
 			INSERT INTO comments (item_id, portal_customer_id, content, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?)
 		`, itemID, customerID, content, now, now)
@@ -376,7 +378,7 @@ func (p *Processor) handleAttachments(ctx context.Context, attachments []Attachm
 	var maxFileSize int64
 	var allowedMimeJSON string
 	var enabled bool
-	err := p.db.QueryRow(`
+	err := p.db.QueryRowContext(ctx, `
 		SELECT max_file_size, allowed_mime_types, enabled
 		FROM attachment_settings ORDER BY id DESC LIMIT 1
 	`).Scan(&maxFileSize, &allowedMimeJSON, &enabled)
@@ -392,7 +394,7 @@ func (p *Processor) handleAttachments(ctx context.Context, attachments []Attachm
 	// Parse allowed MIME types
 	var allowedTypes []string
 	if allowedMimeJSON != "" {
-		json.Unmarshal([]byte(allowedMimeJSON), &allowedTypes)
+		_ = json.Unmarshal([]byte(allowedMimeJSON), &allowedTypes)
 	}
 
 	for _, att := range attachments {
@@ -422,13 +424,13 @@ func (p *Processor) handleAttachments(ctx context.Context, attachments []Attachm
 
 		// Create directory if needed
 		dir := filepath.Join(p.attachmentPath, "items", fmt.Sprintf("%d", itemID))
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
 			return fmt.Errorf("failed to create attachment directory: %w", err)
 		}
 
 		// Save file
 		filePath := filepath.Join(dir, uniqueFilename)
-		if err := os.WriteFile(filePath, att.Data, 0644); err != nil {
+		if err := os.WriteFile(filePath, att.Data, 0o600); err != nil {
 			return fmt.Errorf("failed to write attachment: %w", err)
 		}
 
@@ -437,7 +439,7 @@ func (p *Processor) handleAttachments(ctx context.Context, attachments []Attachm
 
 		// Create attachment record
 		now := time.Now()
-		_, err := p.db.Exec(`
+		_, err := p.db.ExecContext(ctx, `
 			INSERT INTO attachments (item_id, filename, original_filename, file_path, mime_type, file_size, created_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?)
 		`, itemID, uniqueFilename, att.Filename, relPath, att.ContentType, att.Size, now)
@@ -459,7 +461,7 @@ func (p *Processor) recordProcessedEmail(
 	channelID int,
 	itemID, commentID *int,
 ) error {
-	_, err := p.db.Exec(`
+	_, err := p.db.ExecContext(ctx, `
 		INSERT INTO email_message_tracking (
 			channel_id, message_id, in_reply_to, from_email, from_name, subject,
 			item_id, comment_id, direction, processed_at
@@ -478,7 +480,7 @@ func (p *Processor) recordProcessedEmail(
 }
 
 // getInitialStatus gets the initial status for a workspace
-func (p *Processor) getInitialStatus(workspaceID int) string {
+func (p *Processor) getInitialStatus(_ int) string {
 	var status string
 	err := p.db.QueryRow(`
 		SELECT s.name FROM statuses s
@@ -505,7 +507,7 @@ func (p *Processor) getPriorityByID(priorityID int) string {
 }
 
 // validateItemType checks if the item type exists
-func (p *Processor) validateItemType(itemTypeID, workspaceID int) (bool, error) {
+func (p *Processor) validateItemType(itemTypeID, _ int) (bool, error) {
 	var count int
 	// Just check that the item type exists - consistent with regular item creation
 	err := p.db.QueryRow(`SELECT COUNT(*) FROM item_types WHERE id = ?`, itemTypeID).Scan(&count)

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 )
 
@@ -36,12 +37,12 @@ type AuthPolicyConfig struct {
 
 // AuthPolicyStats contains statistics for auth policy planning
 type AuthPolicyStats struct {
-	TotalUsers         int `json:"total_users"`
-	UsersWithPasskey   int `json:"users_with_passkey"`
+	TotalUsers          int `json:"total_users"`
+	UsersWithPasskey    int `json:"users_with_passkey"`
 	UsersWithoutPasskey int `json:"users_without_passkey"`
-	SSOUsers           int `json:"sso_users"`
-	SystemAdmins       int `json:"system_admins"`
-	AdminsWithPasskey  int `json:"admins_with_passkey"`
+	SSOUsers            int `json:"sso_users"`
+	SystemAdmins        int `json:"system_admins"`
+	AdminsWithPasskey   int `json:"admins_with_passkey"`
 }
 
 // AffectedUser represents a user who would be affected by the policy change
@@ -88,7 +89,7 @@ func (h *AuthPolicyHandler) GetAuthPolicy(w http.ResponseWriter, r *http.Request
 	// Get preview mode setting
 	err = h.db.QueryRow("SELECT value FROM system_settings WHERE key = 'auth_policy_preview'").Scan(&value)
 	if err == nil {
-		config.PreviewMode = strings.ToLower(value) == "true"
+		config.PreviewMode = strings.EqualFold(value, "true")
 	}
 
 	// Get enabled_at timestamp
@@ -117,7 +118,7 @@ func (h *AuthPolicyHandler) GetAuthPolicy(w http.ResponseWriter, r *http.Request
 	config.HidePasswordForm = !h.fallbackEnabled && isRestrictivePolicy && !config.PreviewMode
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(config)
+	_ = json.NewEncoder(w).Encode(config)
 }
 
 // UpdateAuthPolicy updates the authentication policy
@@ -211,14 +212,14 @@ func (h *AuthPolicyHandler) UpdateAuthPolicy(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Update or insert auth_policy
-	h.upsertSetting("auth_policy", string(req.Policy), "string", "Authentication policy", "auth")
+	_ = h.upsertSetting("auth_policy", string(req.Policy), "string", "Authentication policy", "auth")
 
 	// Update preview mode
 	previewValue := "false"
 	if req.PreviewMode {
 		previewValue = "true"
 	}
-	h.upsertSetting("auth_policy_preview", previewValue, "boolean", "Preview mode for auth policy", "auth")
+	_ = h.upsertSetting("auth_policy_preview", previewValue, "boolean", "Preview mode for auth policy", "auth")
 
 	// Set enabled_at if transitioning from preview to active or changing policy
 	if !req.PreviewMode && req.Policy != AuthPolicyPassword {
@@ -226,7 +227,7 @@ func (h *AuthPolicyHandler) UpdateAuthPolicy(w http.ResponseWriter, r *http.Requ
 		var existingEnabled string
 		err := h.db.QueryRow("SELECT value FROM system_settings WHERE key = 'auth_policy_enabled_at'").Scan(&existingEnabled)
 		if err == sql.ErrNoRows || existingEnabled == "" {
-			h.upsertSetting("auth_policy_enabled_at", time.Now().UTC().Format(time.RFC3339), "string", "When policy was activated", "auth")
+			_ = h.upsertSetting("auth_policy_enabled_at", time.Now().UTC().Format(time.RFC3339), "string", "When policy was activated", "auth")
 		}
 	}
 
@@ -239,10 +240,10 @@ func (h *AuthPolicyHandler) GetAuthPolicyStats(w http.ResponseWriter, r *http.Re
 	stats := AuthPolicyStats{}
 
 	// Total active users
-	h.db.QueryRow("SELECT COUNT(*) FROM users WHERE is_active = 1").Scan(&stats.TotalUsers)
+	_ = h.db.QueryRow("SELECT COUNT(*) FROM users WHERE is_active = 1").Scan(&stats.TotalUsers)
 
 	// Users with at least one active passkey (FIDO credential)
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT COUNT(DISTINCT user_id) FROM user_credentials
 		WHERE credential_type = 'fido' AND is_active = 1
 	`).Scan(&stats.UsersWithPasskey)
@@ -250,13 +251,13 @@ func (h *AuthPolicyHandler) GetAuthPolicyStats(w http.ResponseWriter, r *http.Re
 	stats.UsersWithoutPasskey = stats.TotalUsers - stats.UsersWithPasskey
 
 	// Users with SSO external account linked
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT COUNT(DISTINCT user_id) FROM user_external_accounts
 		WHERE user_id IS NOT NULL
 	`).Scan(&stats.SSOUsers)
 
 	// System admins (users with system.admin global permission - direct OR via group)
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT COUNT(DISTINCT admin_user_id) FROM (
 			SELECT ugp.user_id as admin_user_id
 			FROM user_global_permissions ugp
@@ -274,7 +275,7 @@ func (h *AuthPolicyHandler) GetAuthPolicyStats(w http.ResponseWriter, r *http.Re
 	`).Scan(&stats.SystemAdmins)
 
 	// Admins with passkeys
-	h.db.QueryRow(`
+	_ = h.db.QueryRow(`
 		SELECT COUNT(DISTINCT admin_user_id) FROM (
 			SELECT ugp.user_id as admin_user_id
 			FROM user_global_permissions ugp
@@ -296,13 +297,13 @@ func (h *AuthPolicyHandler) GetAuthPolicyStats(w http.ResponseWriter, r *http.Re
 	`).Scan(&stats.AdminsWithPasskey)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stats)
+	_ = json.NewEncoder(w).Encode(stats)
 }
 
 // GetAffectedUsers returns users who would be affected by the current policy
 func (h *AuthPolicyHandler) GetAffectedUsers(w http.ResponseWriter, r *http.Request) {
 	// Get current policy
-	var policy AuthPolicy = AuthPolicyPassword
+	var policy = AuthPolicyPassword
 	var policyStr string
 	err := h.db.QueryRow("SELECT value FROM system_settings WHERE key = 'auth_policy'").Scan(&policyStr)
 	if err == nil && policyStr != "" {
@@ -312,7 +313,7 @@ func (h *AuthPolicyHandler) GetAffectedUsers(w http.ResponseWriter, r *http.Requ
 	// If policy is just password, no users are affected
 	if policy == AuthPolicyPassword {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]AffectedUser{})
+		_ = json.NewEncoder(w).Encode([]AffectedUser{})
 		return
 	}
 
@@ -351,7 +352,7 @@ func (h *AuthPolicyHandler) GetAffectedUsers(w http.ResponseWriter, r *http.Requ
 		`
 	default:
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]AffectedUser{})
+		_ = json.NewEncoder(w).Encode([]AffectedUser{})
 		return
 	}
 
@@ -360,7 +361,7 @@ func (h *AuthPolicyHandler) GetAffectedUsers(w http.ResponseWriter, r *http.Requ
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	users := []AffectedUser{}
 	for rows.Next() {
@@ -374,7 +375,7 @@ func (h *AuthPolicyHandler) GetAffectedUsers(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(users)
+	_ = json.NewEncoder(w).Encode(users)
 }
 
 // isSSOConfigured checks if any SSO provider is configured and enabled
@@ -424,7 +425,7 @@ func (h *AuthPolicyHandler) IsPreviewMode() bool {
 	if err != nil {
 		return false
 	}
-	return strings.ToLower(value) == "true"
+	return strings.EqualFold(value, "true")
 }
 
 // PublicPolicyStatus represents the public auth policy status for the login page
@@ -450,7 +451,7 @@ func (h *AuthPolicyHandler) GetPublicPolicyStatus(w http.ResponseWriter, r *http
 	// Check preview mode
 	var previewValue string
 	err = h.db.QueryRow("SELECT value FROM system_settings WHERE key = 'auth_policy_preview'").Scan(&previewValue)
-	previewMode := err == nil && strings.ToLower(previewValue) == "true"
+	previewMode := err == nil && strings.EqualFold(previewValue, "true")
 
 	// Determine if SSO is enabled
 	status.SSOEnabled = h.isSSOConfigured()
@@ -466,7 +467,7 @@ func (h *AuthPolicyHandler) GetPublicPolicyStatus(w http.ResponseWriter, r *http
 	status.HidePasswordForm = !h.fallbackEnabled && isRestrictivePolicy && !previewMode
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(status)
+	_ = json.NewEncoder(w).Encode(status)
 }
 
 // IsFallbackEnabled returns whether admin fallback is enabled
@@ -475,7 +476,7 @@ func (h *AuthPolicyHandler) IsFallbackEnabled() bool {
 }
 
 // LogAuditEvent logs an auth policy related event
-func (h *AuthPolicyHandler) LogAuditEvent(userID int, eventType string, ipAddress, userAgent string, details map[string]interface{}) error {
+func (h *AuthPolicyHandler) LogAuditEvent(userID int, eventType, ipAddress, userAgent string, details map[string]interface{}) error {
 	policy := h.GetCurrentPolicy()
 
 	var detailsJSON []byte

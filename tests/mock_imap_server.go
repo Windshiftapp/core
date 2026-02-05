@@ -59,7 +59,7 @@ func StartMockIMAPServer(t *testing.T) *MockIMAPServer {
 		t.Fatalf("Failed to create listener: %v", err)
 	}
 
-	port := listener.Addr().(*net.TCPAddr).Port
+	port := listener.Addr().(*net.TCPAddr).Port //nolint:errcheck // type assertion is safe here
 
 	// Create IMAP server
 	server := imapserver.New(&imapserver.Options{
@@ -94,7 +94,7 @@ func StartMockIMAPServer(t *testing.T) *MockIMAPServer {
 
 	// Register cleanup
 	t.Cleanup(func() {
-		mock.Close()
+		_ = mock.Close()
 	})
 
 	t.Logf("Mock IMAP server started on port %d", port)
@@ -217,8 +217,8 @@ func (m *MockIMAPServer) buildRawEmail(email MockEmail) []byte {
 	// Handle attachments or plain body
 	if len(email.Attachments) > 0 {
 		boundary := fmt.Sprintf("----=_Part_%d", time.Now().UnixNano())
-		buf.WriteString(fmt.Sprintf("MIME-Version: 1.0\r\n"))
-		buf.WriteString(fmt.Sprintf("Content-Type: multipart/mixed; boundary=\"%s\"\r\n", boundary))
+		buf.WriteString("MIME-Version: 1.0\r\n")
+		buf.WriteString(fmt.Sprintf("Content-Type: multipart/mixed; boundary=%q\r\n", boundary))
 		buf.WriteString("\r\n")
 
 		// Body part
@@ -231,8 +231,8 @@ func (m *MockIMAPServer) buildRawEmail(email MockEmail) []byte {
 		// Attachment parts
 		for _, att := range email.Attachments {
 			buf.WriteString(fmt.Sprintf("--%s\r\n", boundary))
-			buf.WriteString(fmt.Sprintf("Content-Type: %s; name=\"%s\"\r\n", att.ContentType, att.Filename))
-			buf.WriteString(fmt.Sprintf("Content-Disposition: attachment; filename=\"%s\"\r\n", att.Filename))
+			buf.WriteString(fmt.Sprintf("Content-Type: %s; name=%q\r\n", att.ContentType, att.Filename))
+			buf.WriteString(fmt.Sprintf("Content-Disposition: attachment; filename=%q\r\n", att.Filename))
 			buf.WriteString("Content-Transfer-Encoding: base64\r\n")
 			buf.WriteString("\r\n")
 			// For simplicity, just write raw bytes (real implementation would base64 encode)

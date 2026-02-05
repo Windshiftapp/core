@@ -40,7 +40,7 @@ Examples:
 		// Check if config already exists
 		if _, err := os.Stat(configPath); err == nil {
 			fmt.Printf("Config already exists at %s. Overwrite? [y/N]: ", configPath)
-			input, _ := reader.ReadString('\n')
+			input, _ := reader.ReadString('\n') //nolint:errcheck // interactive user input
 			input = strings.TrimSpace(strings.ToLower(input))
 			if input != "y" && input != "yes" {
 				fmt.Println("Aborted.")
@@ -50,17 +50,17 @@ Examples:
 
 		// Prompt for server URL
 		fmt.Print("Windshift server URL (e.g., https://windshift.example.com): ")
-		serverURL, _ := reader.ReadString('\n')
+		serverURL, _ = reader.ReadString('\n') //nolint:errcheck // interactive user input
 		serverURL = strings.TrimSpace(serverURL)
 
 		// Prompt for token
 		fmt.Print("API token (crw_...): ")
-		token, _ := reader.ReadString('\n')
+		token, _ = reader.ReadString('\n') //nolint:errcheck // interactive user input
 		token = strings.TrimSpace(token)
 
 		// Prompt for default workspace (optional)
 		fmt.Print("Default workspace key (optional, press Enter to skip): ")
-		workspaceKey, _ := reader.ReadString('\n')
+		workspaceKey, _ = reader.ReadString('\n') //nolint:errcheck // interactive user input
 		workspaceKey = strings.TrimSpace(workspaceKey)
 
 		newConfig := Config{

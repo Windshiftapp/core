@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+
 	"windshift/internal/contextkeys"
 	"windshift/internal/models"
 )
@@ -106,10 +107,11 @@ func (e *IPExtractor) isValidClientIP(ip net.IP) bool {
 	return ip != nil && !ip.IsUnspecified()
 }
 
-// GetClientIP extracts the client IP address from request headers
-// DEPRECATED: Use IPExtractor.GetClientIP for secure proxy-aware extraction
+// GetClientIP extracts the client IP address from request headers.
+//
+// Deprecated: Use IPExtractor.GetClientIP for secure proxy-aware extraction.
 // This function blindly trusts proxy headers and should only be used when
-// proxy validation is not required (e.g., internal services)
+// proxy validation is not required (e.g., internal services).
 func GetClientIP(r *http.Request) string {
 	// Check X-Forwarded-For header (for proxies)
 	forwarded := r.Header.Get("X-Forwarded-For")

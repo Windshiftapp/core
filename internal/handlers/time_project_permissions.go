@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+
 	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
@@ -80,7 +81,8 @@ func (h *TimeProjectPermissionHandler) AddManager(w http.ResponseWriter, r *http
 	}
 
 	if !hasGlobalManage {
-		isManager, err := h.timePermissionService.IsTimeProjectManager(user.ID, projectID)
+		var isManager bool
+		isManager, err = h.timePermissionService.IsTimeProjectManager(user.ID, projectID)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -92,7 +94,7 @@ func (h *TimeProjectPermissionHandler) AddManager(w http.ResponseWriter, r *http
 	}
 
 	var req models.TimeProjectManagerRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, err.Error())
 		return
 	}
@@ -233,7 +235,7 @@ func (h *TimeProjectPermissionHandler) AddMember(w http.ResponseWriter, r *http.
 	}
 
 	var req models.TimeProjectMemberRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, err.Error())
 		return
 	}

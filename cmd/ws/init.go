@@ -83,7 +83,7 @@ Examples:
 		// Generate WINDSHIFT.md
 		content := generateWindshiftMD(workspace, statuses, itemTypes, transitions)
 
-		if err := os.WriteFile("WINDSHIFT.md", []byte(content), 0644); err != nil {
+		if err := os.WriteFile("WINDSHIFT.md", []byte(content), 0o600); err != nil {
 			return fmt.Errorf("failed to write WINDSHIFT.md: %w", err)
 		}
 		fmt.Println("Created WINDSHIFT.md")
@@ -304,7 +304,7 @@ func updateAgentsFile(filename string) {
 	// Append Windshift section
 	addition := "\n\n## Windshift Integration\n\nSee [WINDSHIFT.md](./WINDSHIFT.md) for task management commands.\n"
 
-	if err := os.WriteFile(filename, append(content, []byte(addition)...), 0644); err != nil {
+	if err := os.WriteFile(filename, append(content, []byte(addition)...), 0o600); err != nil {
 		fmt.Printf("Warning: Could not update %s: %s\n", filename, err)
 		return
 	}

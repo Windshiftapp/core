@@ -55,7 +55,7 @@ func NewInnerAssetSQLGenerator(setMap map[string]int) *SQLGenerator {
 }
 
 // GenerateSQL converts a QL AST to SQL WHERE clause
-func (g *SQLGenerator) GenerateSQL(ast *ASTNode) (string, []interface{}, error) {
+func (g *SQLGenerator) GenerateSQL(ast *ASTNode) (sql string, args []interface{}, err error) {
 	if ast == nil {
 		return "", nil, nil
 	}
@@ -64,7 +64,7 @@ func (g *SQLGenerator) GenerateSQL(ast *ASTNode) (string, []interface{}, error) 
 }
 
 // generateNode generates SQL for a single AST node
-func (g *SQLGenerator) generateNode(node *ASTNode) (string, []interface{}, error) {
+func (g *SQLGenerator) generateNode(node *ASTNode) (sql string, args []interface{}, err error) {
 	switch node.Type {
 	case NodeBinaryOp:
 		return g.generateBinaryOp(node)
@@ -88,7 +88,7 @@ func (g *SQLGenerator) generateNode(node *ASTNode) (string, []interface{}, error
 }
 
 // generateBinaryOp generates SQL for binary operations (AND, OR, NOT)
-func (g *SQLGenerator) generateBinaryOp(node *ASTNode) (string, []interface{}, error) {
+func (g *SQLGenerator) generateBinaryOp(node *ASTNode) (sql string, args []interface{}, err error) {
 	switch strings.ToUpper(node.Operator) {
 	case "AND":
 		leftSQL, leftArgs, err := g.generateNode(node.Left)
@@ -99,8 +99,8 @@ func (g *SQLGenerator) generateBinaryOp(node *ASTNode) (string, []interface{}, e
 		if err != nil {
 			return "", nil, err
 		}
-		args := append(leftArgs, rightArgs...)
-		return fmt.Sprintf("(%s AND %s)", leftSQL, rightSQL), args, nil
+		leftArgs = append(leftArgs, rightArgs...)
+		return fmt.Sprintf("(%s AND %s)", leftSQL, rightSQL), leftArgs, nil
 
 	case "OR":
 		leftSQL, leftArgs, err := g.generateNode(node.Left)
@@ -111,8 +111,8 @@ func (g *SQLGenerator) generateBinaryOp(node *ASTNode) (string, []interface{}, e
 		if err != nil {
 			return "", nil, err
 		}
-		args := append(leftArgs, rightArgs...)
-		return fmt.Sprintf("(%s OR %s)", leftSQL, rightSQL), args, nil
+		leftArgs = append(leftArgs, rightArgs...)
+		return fmt.Sprintf("(%s OR %s)", leftSQL, rightSQL), leftArgs, nil
 
 	case "NOT":
 		rightSQL, rightArgs, err := g.generateNode(node.Right)
@@ -126,9 +126,9 @@ func (g *SQLGenerator) generateBinaryOp(node *ASTNode) (string, []interface{}, e
 	}
 }
 
-// getNameFieldForIdField returns the corresponding name field for an ID field
+// getNameFieldForIDField returns the corresponding name field for an ID field
 // Returns the name field and true if this is a reference field, or empty string and false if not
-func (g *SQLGenerator) getNameFieldForIdField(fieldName string) (string, bool) {
+func (g *SQLGenerator) getNameFieldForIDField(fieldName string) (string, bool) {
 	lowerField := strings.ToLower(fieldName)
 
 	switch lowerField {
@@ -146,7 +146,7 @@ func (g *SQLGenerator) getNameFieldForIdField(fieldName string) (string, bool) {
 }
 
 // generateLabelComparison generates SQL for label field comparisons using EXISTS subqueries
-func (g *SQLGenerator) generateLabelComparison(node *ASTNode) (string, []interface{}, error) {
+func (g *SQLGenerator) generateLabelComparison(node *ASTNode) (sql string, args []interface{}, err error) {
 	prefix := g.aliasPrefix
 
 	// Get the value from the right side
@@ -168,7 +168,7 @@ func (g *SQLGenerator) generateLabelComparison(node *ASTNode) (string, []interfa
 }
 
 // generateLabelInExpression generates SQL for label IN/NOT IN expressions using EXISTS subqueries
-func (g *SQLGenerator) generateLabelInExpression(node *ASTNode) (string, []interface{}, error) {
+func (g *SQLGenerator) generateLabelInExpression(node *ASTNode) (sql string, args []interface{}, err error) {
 	prefix := g.aliasPrefix
 
 	if node.Values.Type != NodeList {
@@ -176,26 +176,25 @@ func (g *SQLGenerator) generateLabelInExpression(node *ASTNode) (string, []inter
 	}
 
 	var placeholders []string
-	var args []interface{}
 	for _, valueNode := range node.Values.Arguments {
 		placeholders = append(placeholders, "LOWER(?)")
 		args = append(args, g.convertLiteral(valueNode))
 	}
 	placeholderList := strings.Join(placeholders, ", ")
 
-	if strings.ToUpper(node.Operator) == "NOT IN" {
-		sql := fmt.Sprintf(`NOT EXISTS (SELECT 1 FROM item_labels lbl_il JOIN labels lbl_l ON lbl_il.label_id = lbl_l.id WHERE lbl_il.item_id = %si.id AND LOWER(lbl_l.name) IN (%s))`, prefix, placeholderList)
+	if strings.EqualFold(node.Operator, "NOT IN") {
+		sql = fmt.Sprintf(`NOT EXISTS (SELECT 1 FROM item_labels lbl_il JOIN labels lbl_l ON lbl_il.label_id = lbl_l.id WHERE lbl_il.item_id = %si.id AND LOWER(lbl_l.name) IN (%s))`, prefix, placeholderList)
 		return sql, args, nil
 	}
 
-	sql := fmt.Sprintf(`EXISTS (SELECT 1 FROM item_labels lbl_il JOIN labels lbl_l ON lbl_il.label_id = lbl_l.id WHERE lbl_il.item_id = %si.id AND LOWER(lbl_l.name) IN (%s))`, prefix, placeholderList)
+	sql = fmt.Sprintf(`EXISTS (SELECT 1 FROM item_labels lbl_il JOIN labels lbl_l ON lbl_il.label_id = lbl_l.id WHERE lbl_il.item_id = %si.id AND LOWER(lbl_l.name) IN (%s))`, prefix, placeholderList)
 	return sql, args, nil
 }
 
 // generateComparison generates SQL for comparison operations
-func (g *SQLGenerator) generateComparison(node *ASTNode) (string, []interface{}, error) {
+func (g *SQLGenerator) generateComparison(node *ASTNode) (sql string, args []interface{}, err error) {
 	// Special handling for label field - uses EXISTS subqueries for many-to-many
-	if node.Left.Type == NodeIdentifier && strings.ToLower(node.Left.Value) == "label" {
+	if node.Left.Type == NodeIdentifier && strings.EqualFold(node.Left.Value, "label") {
 		return g.generateLabelComparison(node)
 	}
 
@@ -209,13 +208,13 @@ func (g *SQLGenerator) generateComparison(node *ASTNode) (string, []interface{},
 		return "", nil, err
 	}
 
-	args := append(leftArgs, rightArgs...)
+	leftArgs = append(leftArgs, rightArgs...)
 
 	// Smart reference field handling: if comparing an ID field with a string value,
 	// automatically use the corresponding name field instead
 	isReferenceFieldComparison := false
 	if node.Left.Type == NodeIdentifier && node.Right.Type == NodeLiteral && node.Right.DataType == STRING {
-		if nameField, isReferenceField := g.getNameFieldForIdField(node.Left.Value); isReferenceField {
+		if nameField, isReferenceField := g.getNameFieldForIDField(node.Left.Value); isReferenceField {
 			// Replace the ID field with the name field for string comparisons
 			leftSQL = nameField
 			isReferenceFieldComparison = true
@@ -236,39 +235,39 @@ func (g *SQLGenerator) generateComparison(node *ASTNode) (string, []interface{},
 	// treat the right side as a string value, not a column name
 	if isCaseInsensitiveField && node.Right.Type == NodeIdentifier {
 		rightSQL = "?"
-		// Append to existing args (which may include leftArgs), replacing rightArgs
-		args = append(leftArgs, node.Right.Value)
+		// Append to existing leftArgs, replacing rightArgs
+		leftArgs = append(leftArgs, node.Right.Value)
 	}
 
 	switch node.Operator {
 	case "=":
 		if isCaseInsensitiveField {
 			// Make status, priority, type, category comparisons case-insensitive
-			return fmt.Sprintf("LOWER(%s) = LOWER(%s)", leftSQL, rightSQL), args, nil
+			return fmt.Sprintf("LOWER(%s) = LOWER(%s)", leftSQL, rightSQL), leftArgs, nil
 		}
 		if isReferenceFieldComparison {
 			// For reference field comparisons, add NULL check to exclude items without the field
-			return fmt.Sprintf("(%s IS NOT NULL AND %s = %s)", leftSQL, leftSQL, rightSQL), args, nil
+			return fmt.Sprintf("(%s IS NOT NULL AND %s = %s)", leftSQL, leftSQL, rightSQL), leftArgs, nil
 		}
-		return fmt.Sprintf("%s = %s", leftSQL, rightSQL), args, nil
+		return fmt.Sprintf("%s = %s", leftSQL, rightSQL), leftArgs, nil
 	case "!=", "<>":
 		if isCaseInsensitiveField {
 			// Make status, priority, type, category comparisons case-insensitive
-			return fmt.Sprintf("LOWER(%s) != LOWER(%s)", leftSQL, rightSQL), args, nil
+			return fmt.Sprintf("LOWER(%s) != LOWER(%s)", leftSQL, rightSQL), leftArgs, nil
 		}
 		if isReferenceFieldComparison {
 			// For reference field comparisons, add NULL check to exclude items without the field
-			return fmt.Sprintf("(%s IS NOT NULL AND %s != %s)", leftSQL, leftSQL, rightSQL), args, nil
+			return fmt.Sprintf("(%s IS NOT NULL AND %s != %s)", leftSQL, leftSQL, rightSQL), leftArgs, nil
 		}
-		return fmt.Sprintf("%s != %s", leftSQL, rightSQL), args, nil
+		return fmt.Sprintf("%s != %s", leftSQL, rightSQL), leftArgs, nil
 	case "<":
-		return fmt.Sprintf("%s < %s", leftSQL, rightSQL), args, nil
+		return fmt.Sprintf("%s < %s", leftSQL, rightSQL), leftArgs, nil
 	case "<=":
-		return fmt.Sprintf("%s <= %s", leftSQL, rightSQL), args, nil
+		return fmt.Sprintf("%s <= %s", leftSQL, rightSQL), leftArgs, nil
 	case ">":
-		return fmt.Sprintf("%s > %s", leftSQL, rightSQL), args, nil
+		return fmt.Sprintf("%s > %s", leftSQL, rightSQL), leftArgs, nil
 	case ">=":
-		return fmt.Sprintf("%s >= %s", leftSQL, rightSQL), args, nil
+		return fmt.Sprintf("%s >= %s", leftSQL, rightSQL), leftArgs, nil
 	case "~":
 		// Only allow contains operator for text fields (title, description, tag/asset_tag)
 		isTextFieldComparison := false
@@ -286,18 +285,18 @@ func (g *SQLGenerator) generateComparison(node *ASTNode) (string, []interface{},
 		// Convert to SQL LIKE with wildcards
 		if isReferenceFieldComparison {
 			// For reference field comparisons, add NULL check to exclude items without the field
-			return fmt.Sprintf("(%s IS NOT NULL AND %s LIKE %s)", leftSQL, leftSQL, "'%' || ? || '%'"), args, nil
+			return fmt.Sprintf("(%s IS NOT NULL AND %s LIKE %s)", leftSQL, leftSQL, "'%' || ? || '%'"), leftArgs, nil
 		}
-		return fmt.Sprintf("%s LIKE %s", leftSQL, "'%' || ? || '%'"), args, nil
+		return fmt.Sprintf("%s LIKE %s", leftSQL, "'%' || ? || '%'"), leftArgs, nil
 	default:
 		return "", nil, fmt.Errorf("unsupported comparison operator: %s", node.Operator)
 	}
 }
 
 // generateInExpression generates SQL for IN expressions
-func (g *SQLGenerator) generateInExpression(node *ASTNode) (string, []interface{}, error) {
+func (g *SQLGenerator) generateInExpression(node *ASTNode) (sql string, args []interface{}, err error) {
 	// Special handling for label field - uses EXISTS subqueries for many-to-many
-	if node.Field.Type == NodeIdentifier && strings.ToLower(node.Field.Value) == "label" {
+	if node.Field.Type == NodeIdentifier && strings.EqualFold(node.Field.Value, "label") {
 		return g.generateLabelInExpression(node)
 	}
 
@@ -322,7 +321,7 @@ func (g *SQLGenerator) generateInExpression(node *ASTNode) (string, []interface{
 	// If we have string values and this is a reference field, use the name field
 	isReferenceFieldIn := false
 	if node.Field.Type == NodeIdentifier && hasStringValue {
-		if nameField, isReferenceField := g.getNameFieldForIdField(node.Field.Value); isReferenceField {
+		if nameField, isReferenceField := g.getNameFieldForIDField(node.Field.Value); isReferenceField {
 			// Replace the ID field with the name field for string comparisons
 			fieldSQL = nameField
 			isReferenceFieldIn = true
@@ -339,7 +338,6 @@ func (g *SQLGenerator) generateInExpression(node *ASTNode) (string, []interface{
 	}
 
 	var placeholders []string
-	var args []interface{}
 	args = append(args, fieldArgs...)
 
 	for _, valueNode := range node.Values.Arguments {
@@ -355,7 +353,7 @@ func (g *SQLGenerator) generateInExpression(node *ASTNode) (string, []interface{
 
 	if isCaseInsensitiveField {
 		// Make status, priority, type, category IN comparisons case-insensitive
-		if strings.ToUpper(node.Operator) == "NOT IN" {
+		if strings.EqualFold(node.Operator, "NOT IN") {
 			return fmt.Sprintf("LOWER(%s) NOT IN (%s)", fieldSQL, placeholderList), args, nil
 		}
 		return fmt.Sprintf("LOWER(%s) IN (%s)", fieldSQL, placeholderList), args, nil
@@ -363,13 +361,13 @@ func (g *SQLGenerator) generateInExpression(node *ASTNode) (string, []interface{
 
 	if isReferenceFieldIn {
 		// For reference field IN comparisons, add NULL check to exclude items without the field
-		if strings.ToUpper(node.Operator) == "NOT IN" {
+		if strings.EqualFold(node.Operator, "NOT IN") {
 			return fmt.Sprintf("(%s IS NOT NULL AND %s NOT IN (%s))", fieldSQL, fieldSQL, placeholderList), args, nil
 		}
 		return fmt.Sprintf("(%s IS NOT NULL AND %s IN (%s))", fieldSQL, fieldSQL, placeholderList), args, nil
 	}
 
-	if strings.ToUpper(node.Operator) == "NOT IN" {
+	if strings.EqualFold(node.Operator, "NOT IN") {
 		return fmt.Sprintf("%s NOT IN (%s)", fieldSQL, placeholderList), args, nil
 	}
 	return fmt.Sprintf("%s IN (%s)", fieldSQL, placeholderList), args, nil
@@ -391,7 +389,7 @@ func extractStringLiteral(node *ASTNode) (string, error) {
 }
 
 // generateFunction generates SQL for function calls
-func (g *SQLGenerator) generateFunction(node *ASTNode) (string, []interface{}, error) {
+func (g *SQLGenerator) generateFunction(node *ASTNode) (sql string, args []interface{}, err error) {
 	switch strings.ToLower(node.Value) {
 	case "currentuser":
 		// This would need to be filled in with actual user context
@@ -400,8 +398,8 @@ func (g *SQLGenerator) generateFunction(node *ASTNode) (string, []interface{}, e
 		// Portal customer ID - resolved at handler level before CQL parsing
 		return "?", []interface{}{"current-customer-id"}, nil
 	case "currentorganisation":
-		// Customer organisation ID - resolved at handler level before CQL parsing
-		return "?", []interface{}{"current-organisation-id"}, nil
+		// Customer organization ID - resolved at handler level before CQL parsing
+		return "?", []interface{}{"current-organisation-id"}, nil //nolint:misspell // CQL function name uses British spelling
 	case "now":
 		return "datetime('now')", nil, nil
 	case "startofday":
@@ -485,7 +483,7 @@ func (g *SQLGenerator) generateFunction(node *ASTNode) (string, []interface{}, e
 }
 
 // generateItemLinkedOf generates SQL for finding items linked to other items matching a query
-func (g *SQLGenerator) generateItemLinkedOf(node *ASTNode) (string, []interface{}, error) {
+func (g *SQLGenerator) generateItemLinkedOf(node *ASTNode) (sql string, args []interface{}, err error) {
 	if len(node.Arguments) != 2 {
 		return "", nil, fmt.Errorf("linkedOf() requires exactly 2 arguments (link label and QL query string)")
 	}
@@ -523,7 +521,7 @@ func (g *SQLGenerator) generateItemLinkedOf(node *ASTNode) (string, []interface{
 	// 1. Finds the link type by matching the label against forward_label or reverse_label
 	// 2. If forward_label matches: return target items (source -> target direction)
 	// 3. If reverse_label matches: return source items (target <- source direction)
-	sql := fmt.Sprintf(`i.id IN (
+	sql = fmt.Sprintf(`i.id IN (
 		SELECT CASE
 			WHEN lt.forward_label = ? THEN il.target_id
 			WHEN lt.reverse_label = ? THEN il.source_id
@@ -569,7 +567,8 @@ func (g *SQLGenerator) generateItemLinkedOf(node *ASTNode) (string, []interface{
 	)`, innerSQL, innerSQL)
 
 	// Add link label arguments (used multiple times in the query)
-	args := []interface{}{linkLabel, linkLabel, linkLabel, linkLabel, linkLabel}
+	args = make([]interface{}, 0, 6+2*len(innerArgs))
+	args = append(args, linkLabel, linkLabel, linkLabel, linkLabel, linkLabel)
 	args = append(args, innerArgs...) // First occurrence of inner query
 	args = append(args, linkLabel)    // One more label for reverse check
 	args = append(args, innerArgs...) // Second occurrence of inner query
@@ -578,7 +577,7 @@ func (g *SQLGenerator) generateItemLinkedOf(node *ASTNode) (string, []interface{
 }
 
 // generateAssetLinkedOf generates SQL for finding assets linked to items matching a query
-func (g *SQLGenerator) generateAssetLinkedOf(node *ASTNode) (string, []interface{}, error) {
+func (g *SQLGenerator) generateAssetLinkedOf(node *ASTNode) (sql string, args []interface{}, err error) {
 	if len(node.Arguments) != 2 {
 		return "", nil, fmt.Errorf("linkedOf() requires exactly 2 arguments (link label and QL query string)")
 	}
@@ -617,7 +616,7 @@ func (g *SQLGenerator) generateAssetLinkedOf(node *ASTNode) (string, []interface
 	// Assets can be linked to items via item_links table where:
 	// - source_type='asset' and target_type='item' (asset links to item)
 	// - source_type='item' and target_type='asset' (item links to asset)
-	sql := fmt.Sprintf(`a.id IN (
+	sql = fmt.Sprintf(`a.id IN (
 		SELECT CASE
 			WHEN il.source_type = 'asset' THEN il.source_id
 			WHEN il.target_type = 'asset' THEN il.target_id
@@ -661,7 +660,8 @@ func (g *SQLGenerator) generateAssetLinkedOf(node *ASTNode) (string, []interface
 	)`, innerSQL, innerSQL)
 
 	// Add link label arguments
-	args := []interface{}{linkLabel, linkLabel}
+	args = make([]interface{}, 0, 2+2*len(innerArgs))
+	args = append(args, linkLabel, linkLabel)
 	args = append(args, innerArgs...) // First occurrence of inner query
 	args = append(args, innerArgs...) // Second occurrence of inner query
 
@@ -898,7 +898,7 @@ func (g *SQLGenerator) convertLiteral(node *ASTNode) interface{} {
 	case BOOLEAN:
 		// Convert to int64 for consistent database compatibility
 		// SQLite stores booleans as integers, this ensures proper comparison
-		if strings.ToLower(node.Value) == "true" {
+		if strings.EqualFold(node.Value, "true") {
 			return int64(1)
 		}
 		return int64(0)

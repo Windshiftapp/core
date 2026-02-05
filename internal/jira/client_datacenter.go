@@ -23,7 +23,9 @@ type dataCenterClient struct {
 }
 
 // do performs an HTTP request with rate limiting
-func (c *dataCenterClient) do(ctx context.Context, method, url string, body interface{}) (*http.Response, error) {
+//
+//nolint:unparam // method is always "GET" currently but kept for future flexibility
+func (c *dataCenterClient) do(ctx context.Context, method, reqURL string, body interface{}) (*http.Response, error) {
 	if err := c.limiter.Wait(ctx); err != nil {
 		return nil, err
 	}
@@ -37,7 +39,7 @@ func (c *dataCenterClient) do(ctx context.Context, method, url string, body inte
 		bodyReader = bytes.NewReader(bodyBytes)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
+	req, err := http.NewRequestWithContext(ctx, method, reqURL, bodyReader)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +97,7 @@ func (c *dataCenterClient) TestConnection(ctx context.Context) (*JiraInstanceInf
 	}
 
 	var user JiraUser
-	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&user); err != nil { //nolint:gocritic // intentionally reusing err to avoid shadowing
 		return nil, err
 	}
 
@@ -645,7 +647,7 @@ func (c *dataCenterClient) DownloadAttachment(ctx context.Context, attachmentURL
 		return nil, "", err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", attachmentURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", attachmentURL, http.NoBody)
 	if err != nil {
 		return nil, "", err
 	}

@@ -9,11 +9,11 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
-
 )
 
 // CalendarFeedHandler handles calendar feed token management and ICS feed generation
@@ -72,7 +72,7 @@ func (h *CalendarFeedHandler) isCalendarFeedEnabled() (bool, error) {
 		}
 		return false, err
 	}
-	return strings.ToLower(value) == "true", nil
+	return strings.EqualFold(value, "true"), nil
 }
 
 // GetFeedToken returns the current user's feed token info (or creates one if none exists)
@@ -105,7 +105,7 @@ func (h *CalendarFeedHandler) GetFeedToken(w http.ResponseWriter, r *http.Reques
 	if err == sql.ErrNoRows {
 		// No token exists, return empty response
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"has_token": false,
 		})
 		return
@@ -127,7 +127,7 @@ func (h *CalendarFeedHandler) GetFeedToken(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"has_token": true,
 		"feed":      response,
 	})
@@ -188,7 +188,7 @@ func (h *CalendarFeedHandler) CreateFeedToken(w http.ResponseWriter, r *http.Req
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // RevokeFeedToken revokes the current user's feed token
@@ -274,7 +274,7 @@ func (h *CalendarFeedHandler) ServeICSFeed(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
 	w.Header().Set("Content-Disposition", "attachment; filename=windshift-calendar.ics")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	w.Write([]byte(icsContent))
+	_, _ = w.Write([]byte(icsContent))
 }
 
 // generateICSForUser creates ICS content for all of a user's scheduled items
@@ -311,7 +311,7 @@ func (h *CalendarFeedHandler) generateICSForUser(userID int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var events []icsEvent
 
@@ -380,7 +380,7 @@ type icsEvent struct {
 }
 
 // buildICSContent generates RFC 5545 compliant ICS content
-func (h *CalendarFeedHandler) buildICSContent(events []icsEvent, baseURL string) string {
+func (h *CalendarFeedHandler) buildICSContent(events []icsEvent, _ string) string {
 	var sb strings.Builder
 
 	// ICS header
@@ -473,7 +473,7 @@ func (h *CalendarFeedHandler) getAccessibleWorkspaceIDs(userID int) ([]int, erro
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var ids []int
 	for rows.Next() {

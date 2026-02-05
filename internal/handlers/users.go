@@ -1,11 +1,6 @@
 package handlers
 
 import (
-	"windshift/internal/database"
-	"windshift/internal/logger"
-	"windshift/internal/models"
-	"windshift/internal/services"
-	"windshift/internal/utils"
 	"crypto/rand"
 	"database/sql"
 	"encoding/json"
@@ -14,6 +9,12 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"windshift/internal/database"
+	"windshift/internal/logger"
+	"windshift/internal/models"
+	"windshift/internal/services"
+	"windshift/internal/utils"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -81,7 +82,7 @@ func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var users []models.User
 	for rows.Next() {
@@ -252,7 +253,7 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		FROM users WHERE id = ?
 	`, id).Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName,
 		&user.IsActive, &avatarURL, &requiresPasswordReset, &user.CreatedAt, &user.UpdatedAt)
-	
+
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -266,7 +267,7 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -280,7 +281,7 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 				"username":   user.Username,
 				"first_name": user.FirstName,
 				"last_name":  user.LastName,
-					"is_active":  user.IsActive,
+				"is_active":  user.IsActive,
 			},
 			Success: true,
 		})
@@ -366,8 +367,8 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		SET email = ?, username = ?, first_name = ?, last_name = ?, avatar_url = ?, timezone = ?, language = ?, updated_at = ?
 		WHERE id = ?
 	`, req.Email, req.Username, req.FirstName, req.LastName,
-	   nullableString(req.AvatarURL), timezone, language, now, id)
-	
+		nullableString(req.AvatarURL), timezone, language, now, id)
+
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed: users.email") {
 			respondConflict(w, r, "Email already exists")
@@ -461,7 +462,7 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 			changes["language"] = map[string]string{"old": oldLang, "new": language}
 		}
 
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -535,7 +536,7 @@ func (h *UserHandler) UpdateAvatar(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	
+
 	// Set full name for display
 	user.FullName = strings.TrimSpace(user.FirstName + " " + user.LastName)
 
@@ -651,42 +652,40 @@ func (h *UserHandler) UpdateRegionalSettings(w http.ResponseWriter, r *http.Requ
 	// Set full name for display
 	user.FullName = strings.TrimSpace(user.FirstName + " " + user.LastName)
 
-	// Log audit event (currentUser already retrieved for authorization)
-	if currentUser != nil {
-		changes := make(map[string]interface{})
+	// Log audit event (currentUser already validated at start of function)
+	changes := make(map[string]interface{})
 
-		// Track timezone changes
-		oldTz := "UTC"
-		if oldSettings.Timezone.Valid {
-			oldTz = oldSettings.Timezone.String
-		}
-		if oldTz != timezone {
-			changes["timezone"] = map[string]string{"old": oldTz, "new": timezone}
-		}
+	// Track timezone changes
+	oldTz := "UTC"
+	if oldSettings.Timezone.Valid {
+		oldTz = oldSettings.Timezone.String
+	}
+	if oldTz != timezone {
+		changes["timezone"] = map[string]string{"old": oldTz, "new": timezone}
+	}
 
-		// Track language changes
-		oldLang := "en"
-		if oldSettings.Language.Valid {
-			oldLang = oldSettings.Language.String
-		}
-		if oldLang != language {
-			changes["language"] = map[string]string{"old": oldLang, "new": language}
-		}
+	// Track language changes
+	oldLang := "en"
+	if oldSettings.Language.Valid {
+		oldLang = oldSettings.Language.String
+	}
+	if oldLang != language {
+		changes["language"] = map[string]string{"old": oldLang, "new": language}
+	}
 
-		if len(changes) > 0 {
-			logger.LogAudit(h.db, logger.AuditEvent{
-				UserID:       currentUser.ID,
-				Username:     currentUser.Username,
-				IPAddress:    utils.GetClientIP(r),
-				UserAgent:    r.UserAgent(),
-				ActionType:   logger.ActionUserUpdate,
-				ResourceType: logger.ResourceUser,
-				ResourceID:   &user.ID,
-				ResourceName: user.Username,
-				Details:      changes,
-				Success:      true,
-			})
-		}
+	if len(changes) > 0 {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionUserUpdate,
+			ResourceType: logger.ResourceUser,
+			ResourceID:   &user.ID,
+			ResourceName: user.Username,
+			Details:      changes,
+			Success:      true,
+		})
 	}
 
 	respondJSONOK(w, user)
@@ -740,7 +739,7 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	// Log audit event (currentUser already fetched above)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -764,7 +763,7 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 // ResetPasswordRequest represents the request to reset a user's password
 type ResetPasswordRequest struct {
 	UserID         int    `json:"user_id"`
-	Password       string `json:"password,omitempty"`       // Custom password to set
+	Password       string `json:"password,omitempty"`        // Custom password to set
 	GenerateRandom bool   `json:"generate_random,omitempty"` // Generate random password
 }
 
@@ -783,7 +782,7 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var password string
-	var requiresReset bool = true
+	var requiresReset = true
 	var response map[string]interface{}
 
 	if req.GenerateRandom || req.Password == "" {
@@ -840,7 +839,7 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -850,9 +849,9 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 			ResourceID:   &id,
 			ResourceName: targetUser.Username,
 			Details: map[string]interface{}{
-				"email":                    targetUser.Email,
-				"requires_password_reset":  requiresReset,
-				"password_type":            map[bool]string{true: "generated", false: "custom"}[req.GenerateRandom || req.Password == ""],
+				"email":                   targetUser.Email,
+				"requires_password_reset": requiresReset,
+				"password_type":           map[bool]string{true: "generated", false: "custom"}[req.GenerateRandom || req.Password == ""],
 			},
 			Success: true,
 		})
@@ -906,7 +905,7 @@ func (h *UserHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -978,7 +977,7 @@ func (h *UserHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 
 	// Log audit event
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),

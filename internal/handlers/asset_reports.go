@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
@@ -73,7 +74,7 @@ func (h *AssetReportHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var assetReports []models.AssetReport
 	for rows.Next() {
@@ -99,7 +100,7 @@ func (h *AssetReportHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(assetReports)
+	_ = json.NewEncoder(w).Encode(assetReports)
 }
 
 // Get returns a specific asset report by ID
@@ -142,7 +143,7 @@ func (h *AssetReportHandler) Get(w http.ResponseWriter, r *http.Request) {
 	ar.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(ar)
+	_ = json.NewEncoder(w).Encode(ar)
 }
 
 // Create creates a new asset report
@@ -154,7 +155,7 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var ar models.AssetReport
-	if err := json.NewDecoder(r.Body).Decode(&ar); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&ar); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -198,7 +199,7 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if ar.DisplayOrder == 0 {
 		// Get next display order
 		var maxOrder int
-		h.db.QueryRow("SELECT COALESCE(MAX(display_order), 0) FROM asset_reports WHERE channel_id = ?", ar.ChannelID).Scan(&maxOrder)
+		_ = h.db.QueryRow("SELECT COALESCE(MAX(display_order), 0) FROM asset_reports WHERE channel_id = ?", ar.ChannelID).Scan(&maxOrder)
 		ar.DisplayOrder = maxOrder + 1
 	}
 
@@ -248,7 +249,7 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -269,7 +270,7 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(ar)
+	_ = json.NewEncoder(w).Encode(ar)
 }
 
 // Update updates an existing asset report
@@ -296,7 +297,7 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var ar models.AssetReport
-	if err := json.NewDecoder(r.Body).Decode(&ar); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&ar); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -394,7 +395,7 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -409,7 +410,7 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(ar)
+	_ = json.NewEncoder(w).Encode(ar)
 }
 
 // Delete deletes an asset report
@@ -443,7 +444,7 @@ func (h *AssetReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	err = h.db.QueryRow("SELECT config FROM channels WHERE id = ?", channelID).Scan(&configStr)
 	if err == nil && configStr != "" {
 		var config models.ChannelConfig
-		if err := json.Unmarshal([]byte(configStr), &config); err == nil {
+		if err = json.Unmarshal([]byte(configStr), &config); err == nil {
 			// Remove the asset report ID from all portal sections
 			modified := false
 			for i := range config.PortalSections {
@@ -460,7 +461,8 @@ func (h *AssetReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 			// Update the config if we made changes
 			if modified {
-				updatedConfigJSON, err := json.Marshal(config)
+				var updatedConfigJSON []byte
+				updatedConfigJSON, err = json.Marshal(config)
 				if err == nil {
 					_, _ = h.db.ExecWrite("UPDATE channels SET config = ?, updated_at = ? WHERE id = ?",
 						string(updatedConfigJSON), time.Now(), channelID)
@@ -479,7 +481,7 @@ func (h *AssetReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -519,7 +521,7 @@ func (h *AssetReportHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 		GroupIDs []int `json:"group_ids"`
 		OrgIDs   []int `json:"org_ids"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -568,7 +570,7 @@ func (h *AssetReportHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -586,5 +588,5 @@ func (h *AssetReportHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(ar)
+	_ = json.NewEncoder(w).Encode(ar)
 }

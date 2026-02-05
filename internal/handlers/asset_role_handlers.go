@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+
 	"windshift/internal/models"
 	"windshift/internal/utils"
 )
@@ -26,7 +27,7 @@ func (h *AssetHandler) GetAssetRoles(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var roles []models.AssetRole
 	for rows.Next() {
@@ -40,7 +41,7 @@ func (h *AssetHandler) GetAssetRoles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(roles)
+	_ = json.NewEncoder(w).Encode(roles)
 }
 
 // GetAssetRole returns a single asset role with its permissions
@@ -82,7 +83,7 @@ func (h *AssetHandler) GetAssetRole(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer permRows.Close()
+	defer func() { _ = permRows.Close() }()
 
 	for permRows.Next() {
 		var perm models.AssetPermission
@@ -95,5 +96,5 @@ func (h *AssetHandler) GetAssetRole(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(role)
+	_ = json.NewEncoder(w).Encode(role)
 }

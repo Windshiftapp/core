@@ -210,7 +210,7 @@ type SCMWebhook struct {
 	ID                     int        `json:"id"`
 	WorkspaceRepositoryID  int        `json:"workspace_repository_id"`
 	WebhookExternalID      string     `json:"webhook_external_id,omitempty"`
-	WebhookSecretEncrypted string     `json:"-"` // Never expose
+	WebhookSecretEncrypted string     `json:"-"`      // Never expose
 	Events                 string     `json:"events"` // JSON array
 	IsActive               bool       `json:"is_active"`
 	LastDeliveryAt         *time.Time `json:"last_delivery_at,omitempty"`
@@ -269,8 +269,8 @@ type Worklog struct {
 	ID           int    `json:"id"`
 	ProjectID    int    `json:"project_id"`
 	CustomerID   int    `json:"customer_id"`
-	UserID       *int   `json:"user_id,omitempty"`  // User who created the worklog
-	ItemID       *int   `json:"item_id,omitempty"`  // Optional link to work item
+	UserID       *int   `json:"user_id,omitempty"` // User who created the worklog
+	ItemID       *int   `json:"item_id,omitempty"` // Optional link to work item
 	Description  string `json:"description"`
 	Date         int64  `json:"date"`       // Unix timestamp
 	StartTime    int64  `json:"start_time"` // Unix timestamp
@@ -555,13 +555,13 @@ type TestCoverageListResponse struct {
 
 // RecurrenceRule represents a recurring task pattern for generating instances
 type RecurrenceRule struct {
-	ID             int        `json:"id"`
-	TemplateItemID int        `json:"template_item_id"`
-	WorkspaceID    int        `json:"workspace_id"`
+	ID             int `json:"id"`
+	TemplateItemID int `json:"template_item_id"`
+	WorkspaceID    int `json:"workspace_id"`
 
 	// iCalendar RRULE configuration (RFC 5545)
-	RRule    string     `json:"rrule"`    // e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR"
-	DtStart  time.Time  `json:"dtstart"`  // Recurrence start date
+	RRule    string     `json:"rrule"`   // e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR"
+	DtStart  time.Time  `json:"dtstart"` // Recurrence start date
 	DtEnd    *time.Time `json:"dtend,omitempty"`
 	Timezone string     `json:"timezone"` // IANA timezone
 
@@ -578,10 +578,10 @@ type RecurrenceRule struct {
 	StatusOnCreate   *int `json:"status_on_create,omitempty"`
 
 	// Lifecycle
-	IsActive  bool       `json:"is_active"`
-	CreatedBy *int       `json:"created_by,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	IsActive  bool      `json:"is_active"`
+	CreatedBy *int      `json:"created_by,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	// Joined fields for API responses
 	TemplateTitle  string     `json:"template_title,omitempty"`
@@ -610,7 +610,7 @@ type RecurrenceInstance struct {
 type CreateRecurrenceRequest struct {
 	TemplateItemID   int     `json:"template_item_id"`
 	RRule            string  `json:"rrule"`
-	DtStart          string  `json:"dtstart"`          // ISO 8601 format
+	DtStart          string  `json:"dtstart"` // ISO 8601 format
 	DtEnd            *string `json:"dtend,omitempty"`
 	Timezone         string  `json:"timezone,omitempty"`
 	LeadTimeDays     *int    `json:"lead_time_days,omitempty"`
@@ -811,8 +811,8 @@ type AddCommentNodeConfig struct {
 
 // NotifyUserNodeConfig configures a notify_user node
 type NotifyUserNodeConfig struct {
-	Recipients  []string `json:"recipients"`      // "assignee", "creator", or specific user IDs
-	Message     string   `json:"message"`         // Can contain {{variable}} templates
+	Recipients  []string `json:"recipients"` // "assignee", "creator", or specific user IDs
+	Message     string   `json:"message"`    // Can contain {{variable}} templates
 	Title       string   `json:"title,omitempty"`
 	IncludeLink bool     `json:"include_link"` // Include link to item
 }

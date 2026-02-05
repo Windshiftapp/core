@@ -73,10 +73,10 @@ type Item struct {
 	ChannelName     string `json:"channel_name,omitempty"`      // Name of the portal/channel
 	RequestTypeName string `json:"request_type_name,omitempty"` // Name of the request type
 	// Related work item joined fields (for personal tasks)
-	RelatedWorkItemTitle        string `json:"related_work_item_title,omitempty"`
-	RelatedWorkItemWorkspaceKey string `json:"related_work_item_workspace_key,omitempty"`
-	RelatedWorkItemWorkspaceID  int    `json:"related_work_item_workspace_id,omitempty"`
-	RelatedWorkItemNumber       int    `json:"related_work_item_number,omitempty"`
+	RelatedWorkItemTitle        string  `json:"related_work_item_title,omitempty"`
+	RelatedWorkItemWorkspaceKey string  `json:"related_work_item_workspace_key,omitempty"`
+	RelatedWorkItemWorkspaceID  int     `json:"related_work_item_workspace_id,omitempty"`
+	RelatedWorkItemNumber       int     `json:"related_work_item_number,omitempty"`
 	Children                    []Item  `json:"children,omitempty"` // For tree representations
 	Labels                      []Label `json:"labels,omitempty"`   // Workspace-scoped labels
 }

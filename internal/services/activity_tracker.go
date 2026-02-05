@@ -11,8 +11,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/allegro/bigcache/v3"
 	"windshift/internal/database"
+
+	"github.com/allegro/bigcache/v3"
 )
 
 // ActivityType represents types of user activities
@@ -26,13 +27,13 @@ const (
 
 // ActivityTrackerConfig represents configuration for the activity tracker
 type ActivityTrackerConfig struct {
-	TTL                    time.Duration `json:"ttl"`                       // Cache TTL, default: 24h
-	MaxCacheSize           int          `json:"max_cache_size"`             // Default: 128MB
-	FlushInterval          time.Duration `json:"flush_interval"`            // Default: 5min
-	MaxWorkspaceVisits     int          `json:"max_workspace_visits"`       // Default: 10
-	MaxItemActivities      int          `json:"max_item_activities"`        // Default: 50 per type
-	RetentionDays          int          `json:"retention_days"`             // Default: 90
-	ImmediateFlushActivity bool         `json:"immediate_flush_activity"`   // Flush edits/comments immediately
+	TTL                    time.Duration `json:"ttl"`                      // Cache TTL, default: 24h
+	MaxCacheSize           int           `json:"max_cache_size"`           // Default: 128MB
+	FlushInterval          time.Duration `json:"flush_interval"`           // Default: 5min
+	MaxWorkspaceVisits     int           `json:"max_workspace_visits"`     // Default: 10
+	MaxItemActivities      int           `json:"max_item_activities"`      // Default: 50 per type
+	RetentionDays          int           `json:"retention_days"`           // Default: 90
+	ImmediateFlushActivity bool          `json:"immediate_flush_activity"` // Flush edits/comments immediately
 }
 
 // DefaultActivityTrackerConfig returns default configuration
@@ -53,17 +54,16 @@ type ActivityTracker struct {
 	cache  *bigcache.BigCache
 	db     database.Database
 	config ActivityTrackerConfig
-	mu     sync.RWMutex
 
 	// Pending activities (buffered for batch write)
-	pendingWorkspaceVisits map[string]*WorkspaceVisit     // key: userID:workspaceID
-	pendingItemActivities  map[string]*ItemActivity       // key: userID:itemID:activityType
+	pendingWorkspaceVisits map[string]*WorkspaceVisit // key: userID:workspaceID
+	pendingItemActivities  map[string]*ItemActivity   // key: userID:itemID:activityType
 	pendingMu              sync.RWMutex
 
 	// Cache statistics
-	hits   int64
-	misses int64
-	errors int64
+	hits    int64
+	misses  int64
+	errors  int64
 	flushes int64
 
 	// Flush ticker
@@ -74,29 +74,29 @@ type ActivityTracker struct {
 
 // WorkspaceVisit tracks a workspace visit
 type WorkspaceVisit struct {
-	UserID       int
-	WorkspaceID  int
-	VisitedAt    time.Time
-	VisitCount   int
+	UserID      int
+	WorkspaceID int
+	VisitedAt   time.Time
+	VisitCount  int
 }
 
 // ItemActivity tracks item activity
 type ItemActivity struct {
-	UserID       int
-	ItemID       int
-	ActivityType ActivityType
-	ActivityAt   time.Time
+	UserID        int
+	ItemID        int
+	ActivityType  ActivityType
+	ActivityAt    time.Time
 	ActivityCount int
 }
 
 // UserActivityCache stores cached activity data for a user
 type UserActivityCache struct {
-	UserID            int                           `json:"user_id"`
-	WorkspaceVisits   []WorkspaceVisit              `json:"workspace_visits"`    // Last 10
-	ItemActivities    map[ActivityType][]ItemActivity `json:"item_activities"`   // Last 50 per type
-	ItemWatches       []int                         `json:"item_watches"`        // All active watches
-	CachedAt          time.Time                     `json:"cached_at"`
-	ExpiresAt         time.Time                     `json:"expires_at"`
+	UserID          int                             `json:"user_id"`
+	WorkspaceVisits []WorkspaceVisit                `json:"workspace_visits"` // Last 10
+	ItemActivities  map[ActivityType][]ItemActivity `json:"item_activities"`  // Last 50 per type
+	ItemWatches     []int                           `json:"item_watches"`     // All active watches
+	CachedAt        time.Time                       `json:"cached_at"`
+	ExpiresAt       time.Time                       `json:"expires_at"`
 }
 
 // NewActivityTracker creates a new activity tracker with caching
@@ -107,7 +107,7 @@ func NewActivityTracker(db database.Database, config ActivityTrackerConfig) (*Ac
 		LifeWindow:         config.TTL,
 		CleanWindow:        5 * time.Minute,
 		MaxEntriesInWindow: 1000 * 10 * 60, // 10 minutes * 1000 entries per minute
-		MaxEntrySize:       16384,           // 16KB per entry (larger for activity data)
+		MaxEntrySize:       16384,          // 16KB per entry (larger for activity data)
 		Verbose:            false,
 		HardMaxCacheSize:   config.MaxCacheSize,
 		OnRemove:           nil,
@@ -176,10 +176,10 @@ func (at *ActivityTracker) TrackItemActivity(userID, itemID int, activityType Ac
 		activity.ActivityCount++
 	} else {
 		at.pendingItemActivities[key] = &ItemActivity{
-			UserID:       userID,
-			ItemID:       itemID,
-			ActivityType: activityType,
-			ActivityAt:   time.Now(),
+			UserID:        userID,
+			ItemID:        itemID,
+			ActivityType:  activityType,
+			ActivityAt:    time.Now(),
 			ActivityCount: 1,
 		}
 	}
@@ -378,7 +378,7 @@ func (at *ActivityTracker) loadUserActivityFromDB(userID int) (*UserActivityCach
 	now := time.Now()
 
 	cached := &UserActivityCache{
-		UserID:         userID,
+		UserID:          userID,
 		WorkspaceVisits: []WorkspaceVisit{},
 		ItemActivities: map[ActivityType][]ItemActivity{
 			ActivityView:    {},
@@ -406,14 +406,15 @@ func (at *ActivityTracker) loadUserActivityFromDB(userID int) (*UserActivityCach
 	for workspaceRows.Next() {
 		var visit WorkspaceVisit
 		visit.UserID = userID
-		if err := workspaceRows.Scan(&visit.WorkspaceID, &visit.VisitedAt, &visit.VisitCount); err == nil {
+		if err = workspaceRows.Scan(&visit.WorkspaceID, &visit.VisitedAt, &visit.VisitCount); err == nil {
 			cached.WorkspaceVisits = append(cached.WorkspaceVisits, visit)
 		}
 	}
 
 	// Load item activities for each type (last 50 per type)
 	for _, activityType := range []ActivityType{ActivityView, ActivityEdit, ActivityComment} {
-		activityRows, err := at.db.Query(`
+		var activityRows *sql.Rows
+		activityRows, err = at.db.Query(`
 			SELECT item_id, last_activity_at, activity_count
 			FROM user_item_activities
 			WHERE user_id = ? AND activity_type = ?
@@ -430,7 +431,7 @@ func (at *ActivityTracker) loadUserActivityFromDB(userID int) (*UserActivityCach
 			var activity ItemActivity
 			activity.UserID = userID
 			activity.ActivityType = activityType
-			if err := activityRows.Scan(&activity.ItemID, &activity.ActivityAt, &activity.ActivityCount); err == nil {
+			if err = activityRows.Scan(&activity.ItemID, &activity.ActivityAt, &activity.ActivityCount); err == nil {
 				activities = append(activities, activity)
 			}
 		}
@@ -571,20 +572,6 @@ func (at *ActivityTracker) flushItemActivityToDB(activity *ItemActivity) error {
 		activity.ActivityAt, activity.ActivityCount, expiresAt)
 
 	return err
-}
-
-// flushItemActivity immediately flushes a specific item activity
-func (at *ActivityTracker) flushItemActivity(key string) error {
-	at.pendingMu.Lock()
-	activity, exists := at.pendingItemActivities[key]
-	if !exists {
-		at.pendingMu.Unlock()
-		return nil
-	}
-	delete(at.pendingItemActivities, key)
-	at.pendingMu.Unlock()
-
-	return at.flushItemActivityToDB(activity)
 }
 
 // CleanupExpiredActivities removes expired activity records

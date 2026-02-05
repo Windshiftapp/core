@@ -406,7 +406,7 @@ func assignNullableString(dest *string, src sql.NullString) {
 }
 
 func marshalCustomFields(customFields map[string]interface{}) (sql.NullString, error) {
-	if customFields == nil || len(customFields) == 0 {
+	if len(customFields) == 0 {
 		return sql.NullString{Valid: false}, nil
 	}
 

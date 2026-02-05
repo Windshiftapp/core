@@ -3,6 +3,7 @@
 package repository
 
 import (
+	"database/sql"
 	"testing"
 	"time"
 
@@ -393,7 +394,8 @@ func setupRepositoryTestData(t *testing.T, tdb *testutils.TestDB) *RepositoryTes
 	var userID int
 	err = tdb.DB.QueryRow("SELECT id FROM users LIMIT 1").Scan(&userID)
 	if err != nil {
-		userResult, err := tdb.DB.Exec(`
+		var userResult sql.Result
+		userResult, err = tdb.DB.Exec(`
 			INSERT INTO users (username, email, first_name, last_name, password_hash, created_at, updated_at)
 			VALUES ('testuser', 'test@example.com', 'Test', 'User', 'hash', ?, ?)
 		`, now, now)
@@ -458,7 +460,8 @@ func setupHierarchyTestData(t *testing.T, tdb *testutils.TestDB) *HierarchyTestD
 	var userID int
 	err = tdb.DB.QueryRow("SELECT id FROM users LIMIT 1").Scan(&userID)
 	if err != nil {
-		userResult, err := tdb.DB.Exec(`
+		var userResult sql.Result
+		userResult, err = tdb.DB.Exec(`
 			INSERT INTO users (username, email, first_name, last_name, password_hash, created_at, updated_at)
 			VALUES ('hierarchyuser', 'hierarchy@example.com', 'Hierarchy', 'User', 'hash', ?, ?)
 		`, now, now)

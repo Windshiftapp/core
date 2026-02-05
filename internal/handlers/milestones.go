@@ -193,6 +193,7 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate status
+	//nolint:misspell // British spelling is intentional for status value
 	validStatuses := []string{"planning", "in-progress", "completed", "cancelled"}
 	statusValid := false
 	for _, validStatus := range validStatuses {
@@ -222,10 +223,8 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 			respondForbidden(w, r)
 			return
 		}
-	} else {
-		if !RequireWorkspacePermission(w, r, user.ID, *milestone.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
-			return
-		}
+	} else if !RequireWorkspacePermission(w, r, user.ID, *milestone.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
+		return
 	}
 
 	// Validate category_id if provided (using service)
@@ -330,6 +329,7 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate status
+	//nolint:misspell // British spelling is intentional for status value
 	validStatuses := []string{"planning", "in-progress", "completed", "cancelled"}
 	statusValid := false
 	for _, validStatus := range validStatuses {
@@ -360,10 +360,8 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 			respondForbidden(w, r)
 			return
 		}
-	} else {
-		if !RequireWorkspacePermission(w, r, user.ID, *milestone.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
-			return
-		}
+	} else if !RequireWorkspacePermission(w, r, user.ID, *milestone.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
+		return
 	}
 
 	// Validate category_id if provided (using service)
@@ -508,7 +506,8 @@ func (h *MilestoneHandler) GetTestStatistics(w http.ResponseWriter, r *http.Requ
 
 	// Check permission based on whether milestone is global or workspace-scoped
 	if isGlobal {
-		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
+		var hasGlobalPerm bool
+		hasGlobalPerm, err = h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
 		if err != nil || !hasGlobalPerm {
 			respondForbidden(w, r)
 			return
@@ -554,7 +553,8 @@ func (h *MilestoneHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 
 	// Check permission based on whether milestone is global or workspace-scoped
 	if isGlobal {
-		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
+		var hasGlobalPerm bool
+		hasGlobalPerm, err = h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
 		if err != nil || !hasGlobalPerm {
 			respondForbidden(w, r)
 			return

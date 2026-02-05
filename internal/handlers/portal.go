@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"windshift/internal/auth"
 	"windshift/internal/database"
 	"windshift/internal/middleware"
@@ -104,7 +105,7 @@ func (h *PortalHandler) getInternalUserGroupIDs(ctx context.Context, r *http.Req
 	if err != nil {
 		return nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var groupIDs []int
 	for rows.Next() {
@@ -117,24 +118,9 @@ func (h *PortalHandler) getInternalUserGroupIDs(ctx context.Context, r *http.Req
 	return groupIDs
 }
 
-// getInternalUserID returns the user ID if the request is from an internal user session
-// Returns nil if not authenticated via internal session
-func (h *PortalHandler) getInternalUserID(r *http.Request) *int {
-	clientIP := h.getClientIP(r)
-	sessionToken, err := h.sessionManager.GetSessionFromRequest(r)
-	if err != nil {
-		return nil
-	}
-	session, err := h.sessionManager.ValidateSession(sessionToken, clientIP)
-	if err != nil || session == nil {
-		return nil
-	}
-	return &session.UserID
-}
-
 // getAuthFromContext extracts auth info from context (set by RequirePortalAuth middleware)
 // Returns (internalUserID, portalCustomerID) - one will be set, the other nil
-func (h *PortalHandler) getAuthFromContext(r *http.Request) (*int, *int) {
+func (h *PortalHandler) getAuthFromContext(r *http.Request) (userID, customerID *int) {
 	ctx := r.Context()
 
 	// Check for internal user (set by middleware)
@@ -152,6 +138,8 @@ func (h *PortalHandler) getAuthFromContext(r *http.Request) (*int, *int) {
 
 // getPortalCustomerOrgID returns the customer organisation ID for a portal customer
 // Returns nil if no organisation is associated
+//
+//nolint:misspell // organisation is used in database column names (customer_organisation_id)
 func (h *PortalHandler) getPortalCustomerOrgID(ctx context.Context, portalCustomerID int) *int {
 	var orgID sql.NullInt64
 	err := h.db.QueryRowContext(ctx, `SELECT customer_organisation_id FROM portal_customers WHERE id = ?`, portalCustomerID).Scan(&orgID)
@@ -226,7 +214,7 @@ func (h *PortalHandler) findChannelByPortalSlug(ctx context.Context, slug string
 	if err != nil {
 		return nil, fmt.Errorf("failed to query portals: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var channel models.Channel
@@ -250,68 +238,6 @@ func (h *PortalHandler) findChannelByPortalSlug(ctx context.Context, slug string
 	}
 
 	return nil, fmt.Errorf("portal not found")
-}
-
-// getOrCreatePortalCustomer finds or creates a portal customer for the given user or email
-func (h *PortalHandler) getOrCreatePortalCustomer(ctx context.Context, userID *int, name, email string) (int, error) {
-	now := time.Now()
-
-	if userID != nil {
-		// Authenticated user - find or create linked portal customer
-		var customerID int
-		err := h.db.QueryRowContext(ctx, `SELECT id FROM portal_customers WHERE user_id = ?`, *userID).Scan(&customerID)
-
-		if err == sql.ErrNoRows {
-			// Get user details to create portal customer
-			var userName, userEmail string
-			err := h.db.QueryRowContext(ctx, `SELECT first_name || ' ' || last_name, email FROM users WHERE id = ?`, *userID).Scan(&userName, &userEmail)
-			if err != nil {
-				return 0, fmt.Errorf("failed to get user details: %w", err)
-			}
-
-			result, err := h.db.ExecWriteContext(ctx, `
-				INSERT INTO portal_customers (name, email, user_id, created_at, updated_at)
-				VALUES (?, ?, ?, ?, ?)
-			`, userName, userEmail, *userID, now, now)
-			if err != nil {
-				return 0, fmt.Errorf("failed to create portal customer: %w", err)
-			}
-
-			customerIDInt64, err := result.LastInsertId()
-			if err != nil {
-				return 0, fmt.Errorf("failed to get customer ID: %w", err)
-			}
-			return int(customerIDInt64), nil
-		} else if err != nil {
-			return 0, fmt.Errorf("failed to find portal customer: %w", err)
-		}
-
-		return customerID, nil
-	}
-
-	// Anonymous user - find or create by email
-	var customerID int
-	err := h.db.QueryRowContext(ctx, `SELECT id FROM portal_customers WHERE email = ?`, email).Scan(&customerID)
-
-	if err == sql.ErrNoRows {
-		result, err := h.db.ExecWriteContext(ctx, `
-			INSERT INTO portal_customers (name, email, created_at, updated_at)
-			VALUES (?, ?, ?, ?)
-		`, name, email, now, now)
-		if err != nil {
-			return 0, fmt.Errorf("failed to create portal customer: %w", err)
-		}
-
-		customerIDInt64, err := result.LastInsertId()
-		if err != nil {
-			return 0, fmt.Errorf("failed to get customer ID: %w", err)
-		}
-		return int(customerIDInt64), nil
-	} else if err != nil {
-		return 0, fmt.Errorf("failed to find portal customer: %w", err)
-	}
-
-	return customerID, nil
 }
 
 // grantChannelAccess grants a portal customer access to a channel if not already granted
@@ -366,7 +292,7 @@ func (h *PortalHandler) validateAndSeparateFields(ctx context.Context, requestTy
 	if err != nil {
 		return nil, fmt.Errorf("failed to load request type fields: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var fieldID, fieldType string
@@ -380,14 +306,15 @@ func (h *PortalHandler) validateAndSeparateFields(ctx context.Context, requestTy
 		}
 
 		if isRequired {
-			if fieldType == "default" {
+			switch fieldType {
+			case "default":
 				if fieldID == "title" && title == "" {
 					return nil, fmt.Errorf("title is required")
 				}
 				if fieldID == "description" && description == "" {
 					return nil, fmt.Errorf("description is required")
 				}
-			} else if fieldType == "custom" || fieldType == "virtual" {
+			case "custom", "virtual":
 				if customFields == nil || customFields[fieldID] == nil || customFields[fieldID] == "" {
 					return nil, fmt.Errorf("field %s is required", fieldID)
 				}
@@ -416,7 +343,7 @@ func (h *PortalHandler) validateAndSeparateFields(ctx context.Context, requestTy
 
 // storeCustomFieldValues stores custom field values for an item
 func (h *PortalHandler) storeCustomFieldValues(ctx context.Context, itemID int64, customFields map[string]interface{}) {
-	if customFields == nil || len(customFields) == 0 {
+	if len(customFields) == 0 {
 		return
 	}
 
@@ -463,7 +390,7 @@ func (h *PortalHandler) storeCustomFieldValues(ctx context.Context, itemID int64
 
 // storeVirtualFieldValues stores virtual field values for an item
 func (h *PortalHandler) storeVirtualFieldValues(ctx context.Context, itemID int64, virtualFields map[string]interface{}) {
-	if virtualFields == nil || len(virtualFields) == 0 {
+	if len(virtualFields) == 0 {
 		return
 	}
 
@@ -524,13 +451,13 @@ func (h *PortalHandler) GetPortal(w http.ResponseWriter, r *http.Request) {
 
 	// Return portal info with customization settings
 	response := map[string]interface{}{
-		"channel_id":     channel.ID,
-		"slug":           config.PortalSlug,
-		"title":          config.PortalTitle,
-		"description":    config.PortalDescription,
-		"workspace_ids":  config.PortalWorkspaceIDs,
-		"workspace_id":   workspaceID, // First workspace for backward compatibility
-		"workspace":      workspace,
+		"channel_id":    channel.ID,
+		"slug":          config.PortalSlug,
+		"title":         config.PortalTitle,
+		"description":   config.PortalDescription,
+		"workspace_ids": config.PortalWorkspaceIDs,
+		"workspace_id":  workspaceID, // First workspace for backward compatibility
+		"workspace":     workspace,
 		// Customization fields
 		"gradient":                  config.PortalGradient,
 		"theme":                     config.PortalTheme,
@@ -547,7 +474,7 @@ func (h *PortalHandler) GetPortal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // GetRequestTypes returns request types for a portal, filtered by visibility
@@ -584,7 +511,7 @@ func (h *PortalHandler) GetRequestTypes(w http.ResponseWriter, r *http.Request) 
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// Get user context for visibility filtering
 	userGroupIDs := h.getInternalUserGroupIDs(ctx, r)
@@ -659,7 +586,7 @@ func (h *PortalHandler) GetRequestTypes(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(requestTypes)
+	_ = json.NewEncoder(w).Encode(requestTypes)
 }
 
 // SubmitToPortal handles portal item submissions (requires authentication)
@@ -686,7 +613,7 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 		CustomFields  map[string]interface{} `json:"custom_fields"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&submission); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&submission); err != nil {
 		respondBadRequest(w, r, "Invalid submission")
 		return
 	}
@@ -706,7 +633,8 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 
 	// Validate request type visibility (security check)
 	if submission.RequestTypeID != nil {
-		requestType, err := h.getRequestTypeWithVisibility(ctx, *submission.RequestTypeID)
+		var requestType *models.RequestType
+		requestType, err = h.getRequestTypeWithVisibility(ctx, *submission.RequestTypeID)
 		if err != nil {
 			respondBadRequest(w, r, "Request type not found or inactive")
 			return
@@ -749,7 +677,8 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 	// Determine initial status from workflow if item type is specified
 	initialStatus := defaultItemStatus // Default fallback status
 	if validationResult.itemTypeID != nil {
-		status, err := services.GetInitialStatusForItemType(h.db, *validationResult.itemTypeID)
+		var status string
+		status, err = services.GetInitialStatusForItemType(h.db, *validationResult.itemTypeID)
 		if err != nil {
 			slog.Warn("could not determine initial status for item type", slog.String("component", "portal"), slog.Int("item_type_id", *validationResult.itemTypeID), slog.Any("error", err))
 		} else {
@@ -787,7 +716,7 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 	// Return success response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"item_id": itemID,
 		"message": "Submission received successfully",
@@ -815,18 +744,18 @@ func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Reque
 		respondNotFound(w, r, "portal")
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var found bool
 	var config models.ChannelConfig
 	for rows.Next() {
-		if err := rows.Scan(&channel.ID, &channel.Name, &channel.Type, &channel.Config, &channel.Status); err != nil {
+		if err = rows.Scan(&channel.ID, &channel.Name, &channel.Type, &channel.Config, &channel.Status); err != nil {
 			continue
 		}
 
 		// Parse config to check slug
 		if channel.Config != "" {
-			if err := json.Unmarshal([]byte(channel.Config), &config); err != nil {
+			if err = json.Unmarshal([]byte(channel.Config), &config); err != nil {
 				continue
 			}
 		}
@@ -853,7 +782,7 @@ func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Reque
 		Query string `json:"query"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&searchRequest); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&searchRequest); err != nil {
 		respondBadRequest(w, r, "Invalid search request")
 		return
 	}
@@ -888,7 +817,7 @@ func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Reque
 		respondError(w, r, restapi.NewAPIError(http.StatusBadGateway, "BAD_GATEWAY", fmt.Sprintf("Failed to search knowledge base: %v", err)))
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
@@ -906,7 +835,7 @@ func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Reque
 	// Forward response to client
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(body)
+	_, _ = w.Write(body)
 }
 
 // GetMyRequests returns all requests submitted by the authenticated portal customer through this portal
@@ -930,18 +859,18 @@ func (h *PortalHandler) GetMyRequests(w http.ResponseWriter, r *http.Request) {
 		respondNotFound(w, r, "portal")
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var found bool
 	for rows.Next() {
-		if err := rows.Scan(&channel.ID, &channel.Name, &channel.Type, &channel.Config, &channel.Status); err != nil {
+		if err = rows.Scan(&channel.ID, &channel.Name, &channel.Type, &channel.Config, &channel.Status); err != nil {
 			continue
 		}
 
 		// Parse config to check slug
 		var config models.ChannelConfig
 		if channel.Config != "" {
-			if err := json.Unmarshal([]byte(channel.Config), &config); err != nil {
+			if err = json.Unmarshal([]byte(channel.Config), &config); err != nil {
 				continue
 			}
 		}
@@ -974,7 +903,7 @@ func (h *PortalHandler) GetMyRequests(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(requests)
+	_ = json.NewEncoder(w).Encode(requests)
 }
 
 // GetRequestDetail returns detailed information about a specific request
@@ -1004,18 +933,18 @@ func (h *PortalHandler) GetRequestDetail(w http.ResponseWriter, r *http.Request)
 		respondNotFound(w, r, "portal")
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var found bool
 	for rows.Next() {
-		if err := rows.Scan(&channel.ID, &channel.Name, &channel.Type, &channel.Config, &channel.Status); err != nil {
+		if err = rows.Scan(&channel.ID, &channel.Name, &channel.Type, &channel.Config, &channel.Status); err != nil {
 			continue
 		}
 
 		// Parse config to check slug
 		var config models.ChannelConfig
 		if channel.Config != "" {
-			if err := json.Unmarshal([]byte(channel.Config), &config); err != nil {
+			if err = json.Unmarshal([]byte(channel.Config), &config); err != nil {
 				continue
 			}
 		}
@@ -1057,7 +986,7 @@ func (h *PortalHandler) GetRequestDetail(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(detail)
+	_ = json.NewEncoder(w).Encode(detail)
 }
 
 // GetRequestComments returns comments for a specific request
@@ -1103,7 +1032,7 @@ func (h *PortalHandler) GetRequestComments(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(comments)
+	_ = json.NewEncoder(w).Encode(comments)
 }
 
 // AddRequestComment adds a comment to a request from a portal customer or internal user
@@ -1145,7 +1074,7 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 	var commentData struct {
 		Content string `json:"content"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&commentData); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&commentData); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -1230,7 +1159,7 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // ExecuteAssetReport executes a CQL query for an asset report and returns the assets
@@ -1294,6 +1223,7 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 	var customerOrgID *int
 	portalCustomerID, _ = h.getPortalCustomerID(ctx, r)
 
+	//nolint:misspell // British spelling used in database
 	// Get organisation ID for this customer if authenticated
 	if portalCustomerID != nil {
 		customerOrgID = h.getPortalCustomerOrgID(ctx, *portalCustomerID)
@@ -1306,7 +1236,7 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 	if portalCustomerID != nil && strings.Contains(cqlQuery, "currentUser()") {
 		// Get the user_id linked to this portal customer (if any)
 		var userID sql.NullInt64
-		h.db.QueryRowContext(ctx, `SELECT user_id FROM portal_customers WHERE id = ?`, *portalCustomerID).Scan(&userID)
+		_ = h.db.QueryRowContext(ctx, `SELECT user_id FROM portal_customers WHERE id = ?`, *portalCustomerID).Scan(&userID)
 		if userID.Valid {
 			cqlQuery = strings.ReplaceAll(cqlQuery, "currentUser()", fmt.Sprintf("%d", userID.Int64))
 		} else {
@@ -1320,21 +1250,24 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 		cqlQuery = strings.ReplaceAll(cqlQuery, "currentCustomer()", fmt.Sprintf("%d", *portalCustomerID))
 	}
 
+	//nolint:misspell // British spelling used in database
 	// Replace currentOrganisation() with customer organisation ID
 	if customerOrgID != nil && strings.Contains(cqlQuery, "currentOrganisation()") {
-		cqlQuery = strings.ReplaceAll(cqlQuery, "currentOrganisation()", fmt.Sprintf("%d", *customerOrgID))
+		_ = strings.ReplaceAll(cqlQuery, "currentOrganisation()", fmt.Sprintf("%d", *customerOrgID))
 	}
 
 	// Parse pagination parameters
 	page := 1
 	perPage := 25
 	if p := r.URL.Query().Get("page"); p != "" {
-		if pInt, err := strconv.Atoi(p); err == nil && pInt > 0 {
+		var pInt int
+		if pInt, err = strconv.Atoi(p); err == nil && pInt > 0 {
 			page = pInt
 		}
 	}
 	if pp := r.URL.Query().Get("per_page"); pp != "" {
-		if ppInt, err := strconv.Atoi(pp); err == nil && ppInt > 0 && ppInt <= 100 {
+		var ppInt int
+		if ppInt, err = strconv.Atoi(pp); err == nil && ppInt > 0 && ppInt <= 100 {
 			perPage = ppInt
 		}
 	}
@@ -1343,7 +1276,7 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 	// Parse column config
 	var columns []string
 	if report.ColumnConfig.Valid && report.ColumnConfig.String != "" {
-		json.Unmarshal([]byte(report.ColumnConfig.String), &columns)
+		_ = json.Unmarshal([]byte(report.ColumnConfig.String), &columns)
 	}
 	if len(columns) == 0 {
 		columns = []string{"title", "asset_tag", "status_id"}
@@ -1369,7 +1302,7 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type AssetResult struct {
 		ID                int                    `json:"id"`
@@ -1413,7 +1346,7 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 			asset.CategoryID = &id
 		}
 		if customFieldValuesStr.Valid && customFieldValuesStr.String != "" {
-			json.Unmarshal([]byte(customFieldValuesStr.String), &asset.CustomFieldValues)
+			_ = json.Unmarshal([]byte(customFieldValuesStr.String), &asset.CustomFieldValues)
 		}
 		if assetTypeName.Valid {
 			asset.AssetTypeName = &assetTypeName.String
@@ -1434,7 +1367,7 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 
 	// Get total count
 	var total int
-	h.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM assets WHERE asset_set_id = ?`, report.AssetSetID).Scan(&total)
+	_ = h.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM assets WHERE asset_set_id = ?`, report.AssetSetID).Scan(&total)
 
 	// Build response
 	response := map[string]interface{}{
@@ -1447,7 +1380,7 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // DownloadPortalAttachment serves portal branding attachments (logos, backgrounds) without authentication
@@ -1500,17 +1433,17 @@ func (h *PortalHandler) DownloadPortalAttachment(w http.ResponseWriter, r *http.
 		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "File not found"))
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Set headers
 	w.Header().Set("Content-Type", mimeType)
 	w.Header().Set("Content-Length", strconv.FormatInt(fileSize, 10))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "public, max-age=86400") // Cache for 1 day
-	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", originalFilename))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", originalFilename))
 
 	// Serve file
-	io.Copy(w, file)
+	_, _ = io.Copy(w, file)
 }
 
 // GetAssetReports returns asset reports for a portal, filtered by visibility
@@ -1545,7 +1478,7 @@ func (h *PortalHandler) GetAssetReports(w http.ResponseWriter, r *http.Request) 
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// Get user context for visibility filtering
 	userGroupIDs := h.getInternalUserGroupIDs(ctx, r)
@@ -1625,7 +1558,7 @@ func (h *PortalHandler) GetAssetReports(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(assetReports)
+	_ = json.NewEncoder(w).Encode(assetReports)
 }
 
 // GetRequestTypeFields returns fields for a request type (portal-aware authentication)
@@ -1669,7 +1602,7 @@ func (h *PortalHandler) GetRequestTypeFields(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(fields)
+	_ = json.NewEncoder(w).Encode(fields)
 }
 
 // GetCustomFields returns custom field definitions used by this portal's request types
@@ -1696,5 +1629,5 @@ func (h *PortalHandler) GetCustomFields(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(fields)
+	_ = json.NewEncoder(w).Encode(fields)
 }

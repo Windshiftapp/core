@@ -228,7 +228,7 @@ type CustomFieldDefinition struct {
 	DisplayOrder                   int       `json:"display_order"`
 	SystemDefault                  bool      `json:"system_default"` // Cannot be deleted by users
 	AppliesToPortalCustomers       bool      `json:"applies_to_portal_customers"`
-	AppliesToCustomerOrganisations bool      `json:"applies_to_customer_organisations"`
+	AppliesToCustomerOrganisations bool      `json:"applies_to_customer_organisations"` //nolint:misspell // matches database column name
 	CreatedAt                      time.Time `json:"created_at"`
 	UpdatedAt                      time.Time `json:"updated_at"`
 }

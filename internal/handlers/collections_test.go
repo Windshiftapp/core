@@ -284,8 +284,8 @@ func TestCollectionHandler_Get_NotFound(t *testing.T) {
 	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Get, req, nil)
 
 	rr.AssertStatusCode(http.StatusNotFound)
-	if !strings.Contains(rr.Body.String(), "Collection not found") {
-		t.Errorf("Expected 'Collection not found', got %s", rr.Body.String())
+	if !strings.Contains(rr.Body.String(), "collection not found") {
+		t.Errorf("Expected 'collection not found', got %s", rr.Body.String())
 	}
 }
 
@@ -415,8 +415,8 @@ func TestCollectionHandler_Update_PermissionDenied(t *testing.T) {
 	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Update, updateReq, differentUser)
 
 	rr.AssertStatusCode(http.StatusForbidden)
-	if !strings.Contains(rr.Body.String(), "Permission denied") {
-		t.Errorf("Expected 'Permission denied', got %s", rr.Body.String())
+	if !strings.Contains(rr.Body.String(), "Insufficient permissions") {
+		t.Errorf("Expected 'Insufficient permissions', got %s", rr.Body.String())
 	}
 }
 
@@ -494,7 +494,7 @@ func TestCollectionHandler_Delete_PermissionDenied(t *testing.T) {
 	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Delete, deleteReq, differentUser)
 
 	rr.AssertStatusCode(http.StatusForbidden)
-	if !strings.Contains(rr.Body.String(), "Permission denied") {
-		t.Errorf("Expected 'Permission denied', got %s", rr.Body.String())
+	if !strings.Contains(rr.Body.String(), "Insufficient permissions") {
+		t.Errorf("Expected 'Insufficient permissions', got %s", rr.Body.String())
 	}
 }

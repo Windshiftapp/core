@@ -1,3 +1,4 @@
+// Package webauthn provides WebAuthn configuration and passkey authentication support.
 package webauthn
 
 import (
@@ -21,7 +22,7 @@ type Config struct {
 }
 
 // NewConfig creates a new WebAuthn configuration
-func NewConfig(rpID, rpName string, origins []string, isDev bool, allowedHosts, port string, enableHTTPS bool, useProxy bool) (*Config, error) {
+func NewConfig(rpID, rpName string, origins []string, isDev bool, allowedHosts, port string, enableHTTPS, useProxy bool) (*Config, error) {
 	c := &Config{
 		RPID:          rpID,
 		RPName:        rpName,
@@ -63,14 +64,14 @@ func NewConfig(rpID, rpName string, origins []string, isDev bool, allowedHosts, 
 				fmt.Sprintf("http://%s", c.RPID),
 				fmt.Sprintf("http://%s:8080", c.RPID),
 				fmt.Sprintf("http://%s:3000", c.RPID),
-				fmt.Sprintf("http://%s:5555", c.RPID),  // Vite dev server
-				fmt.Sprintf("http://%s:5173", c.RPID),  // Vite alternate port
+				fmt.Sprintf("http://%s:5555", c.RPID), // Vite dev server
+				fmt.Sprintf("http://%s:5173", c.RPID), // Vite alternate port
 				fmt.Sprintf("https://%s", c.RPID),
 				"http://localhost",
 				"http://localhost:8080",
 				"http://localhost:3000",
-				"http://localhost:5555",  // Vite dev server
-				"http://localhost:5173",  // Vite alternate port
+				"http://localhost:5555", // Vite dev server
+				"http://localhost:5173", // Vite alternate port
 				"https://localhost",
 			}
 		} else {
@@ -101,11 +102,11 @@ func NewConfig(rpID, rpName string, origins []string, isDev bool, allowedHosts, 
 					continue
 				}
 
-				// Add origin with explicit port
-				c.RPOrigins = append(c.RPOrigins, fmt.Sprintf("%s://%s:%s", scheme, host, port))
-
-				// Add origin with standard port
-				c.RPOrigins = append(c.RPOrigins, fmt.Sprintf("%s://%s:%s", scheme, host, standardPort))
+				// Add origin with explicit port and standard port
+				c.RPOrigins = append(c.RPOrigins,
+					fmt.Sprintf("%s://%s:%s", scheme, host, port),
+					fmt.Sprintf("%s://%s:%s", scheme, host, standardPort),
+				)
 			}
 
 			if len(c.RPOrigins) == 0 {
@@ -129,10 +130,10 @@ func NewConfig(rpID, rpName string, origins []string, isDev bool, allowedHosts, 
 		// Set reasonable defaults
 		AttestationPreference: protocol.PreferNoAttestation, // Don't require attestation by default
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
-			AuthenticatorAttachment: protocol.Platform, // Prefer platform authenticators (passkeys)
-			RequireResidentKey:      &[]bool{false}[0], // Don't require resident key
+			AuthenticatorAttachment: protocol.Platform,                        // Prefer platform authenticators (passkeys)
+			RequireResidentKey:      &[]bool{false}[0],                        // Don't require resident key
 			ResidentKey:             protocol.ResidentKeyRequirementPreferred, // Prefer resident keys for passkeys
-			UserVerification:        protocol.VerificationPreferred, // Prefer user verification
+			UserVerification:        protocol.VerificationPreferred,           // Prefer user verification
 		},
 		Debug: c.Debug,
 	}
@@ -156,9 +157,9 @@ func (c *Config) WebAuthn() *webauthn.WebAuthn {
 func (c *Config) ConfigForDiscoverableCredentials() (*webauthn.WebAuthn, error) {
 	// Create a new config with resident key required for passwordless
 	wconfig := &webauthn.Config{
-		RPDisplayName: c.RPName,
-		RPID:          c.RPID,
-		RPOrigins:     c.RPOrigins,
+		RPDisplayName:         c.RPName,
+		RPID:                  c.RPID,
+		RPOrigins:             c.RPOrigins,
 		AttestationPreference: protocol.PreferNoAttestation,
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
 			AuthenticatorAttachment: protocol.Platform,
@@ -166,9 +167,8 @@ func (c *Config) ConfigForDiscoverableCredentials() (*webauthn.WebAuthn, error) 
 			ResidentKey:             protocol.ResidentKeyRequirementRequired,
 			UserVerification:        protocol.VerificationRequired, // Require user verification for passwordless
 		},
-		Debug:   c.Debug,
+		Debug: c.Debug,
 	}
 
 	return webauthn.New(wconfig)
 }
-

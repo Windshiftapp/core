@@ -97,7 +97,7 @@ func (s *TestRunService) Create(workspaceID int, req TestRunCreateRequest) (*mod
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	runID, err := s.repo.Create(tx, run)
 	if err != nil {
@@ -134,7 +134,7 @@ func (s *TestRunService) Update(id, workspaceID int, req TestRunUpdateRequest) (
 	// Validate assignee if provided
 	if req.AssigneeID != nil && *req.AssigneeID > 0 {
 		var count int
-		err := s.db.QueryRow(`
+		err = s.db.QueryRow(`
 			SELECT COUNT(*) FROM user_workspace_roles WHERE user_id = ? AND workspace_id = ?
 		`, *req.AssigneeID, workspaceID).Scan(&count)
 		if err != nil || count == 0 {
@@ -149,7 +149,7 @@ func (s *TestRunService) Update(id, workspaceID int, req TestRunUpdateRequest) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := s.repo.Update(tx, run); err != nil {
 		return nil, err
@@ -168,7 +168,7 @@ func (s *TestRunService) Delete(id, workspaceID int) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := s.repo.Delete(tx, id, workspaceID); err != nil {
 		return err
@@ -187,7 +187,7 @@ func (s *TestRunService) Complete(id, workspaceID int) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := s.repo.Complete(tx, id, workspaceID); err != nil {
 		return err
@@ -244,7 +244,7 @@ func (s *TestRunService) UpdateResult(resultID int, req TestResultUpdateRequest)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := s.repo.UpdateResult(tx, result); err != nil {
 		return err

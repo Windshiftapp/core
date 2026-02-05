@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
@@ -28,6 +29,7 @@ func NewCustomFieldHandler(db database.Database) *CustomFieldHandler {
 }
 
 func (h *CustomFieldHandler) GetAll(w http.ResponseWriter, r *http.Request) {
+	//nolint:misspell // database uses British spelling
 	query := `
 		SELECT id, name, field_type, description, required, options, display_order, system_default,
 		       applies_to_portal_customers, applies_to_customer_organisations, created_at, updated_at
@@ -39,7 +41,7 @@ func (h *CustomFieldHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		h.logAndRespondDatabaseError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var customFields []models.CustomFieldDefinition
 	for rows.Next() {
@@ -80,6 +82,7 @@ func (h *CustomFieldHandler) Get(w http.ResponseWriter, r *http.Request) {
 	var cf models.CustomFieldDefinition
 	var optionsJSON sql.NullString
 
+	//nolint:misspell // database uses British spelling
 	err := h.db.QueryRow(`
 		SELECT id, name, field_type, description, required, options, display_order, system_default,
 		       applies_to_portal_customers, applies_to_customer_organisations, created_at, updated_at
@@ -89,7 +92,7 @@ func (h *CustomFieldHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&cf.Required, &optionsJSON, &cf.DisplayOrder, &cf.SystemDefault,
 		&cf.AppliesToPortalCustomers, &cf.AppliesToCustomerOrganisations,
 		&cf.CreatedAt, &cf.UpdatedAt)
-	
+
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "custom_field")
 		return
@@ -130,7 +133,7 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if cf.FieldType == "asset" {
 		var config struct {
 			AssetSetID int    `json:"asset_set_id"`
-			QLQuery   string `json:"ql_query"`
+			QLQuery    string `json:"ql_query"`
 		}
 		if cf.Options == "" {
 			respondValidationError(w, r, "Asset fields require asset_set_id in options")
@@ -170,13 +173,14 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 	var id int64
+	//nolint:misspell // database uses British spelling (applies_to_customer_organisations)
 	err := h.db.QueryRow(`
 		INSERT INTO custom_field_definitions (name, field_type, description, required, options, display_order,
 		                                       applies_to_portal_customers, applies_to_customer_organisations,
 		                                       created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`, cf.Name, cf.FieldType, cf.Description, cf.Required, cf.Options, cf.DisplayOrder,
-	   cf.AppliesToPortalCustomers, cf.AppliesToCustomerOrganisations, now, now).Scan(&id)
+		cf.AppliesToPortalCustomers, cf.AppliesToCustomerOrganisations, now, now).Scan(&id)
 
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -187,6 +191,7 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var createdCF models.CustomFieldDefinition
 	var returnOptionsJSON sql.NullString
 
+	//nolint:misspell // database uses British spelling (applies_to_customer_organisations)
 	err = h.db.QueryRow(`
 		SELECT id, name, field_type, description, required, options, display_order, system_default,
 		       applies_to_portal_customers, applies_to_customer_organisations, created_at, updated_at
@@ -210,7 +215,7 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -240,6 +245,7 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Get the old custom field for audit logging
 	var oldCF models.CustomFieldDefinition
 	var oldOptionsJSON sql.NullString
+	//nolint:misspell // database uses British spelling (applies_to_customer_organisations)
 	err := h.db.QueryRow(`
 		SELECT id, name, field_type, description, required, options, display_order, system_default,
 		       applies_to_portal_customers, applies_to_customer_organisations, created_at, updated_at
@@ -264,7 +270,7 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var cf models.CustomFieldDefinition
-	if err := json.NewDecoder(r.Body).Decode(&cf); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&cf); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -285,13 +291,13 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if cf.FieldType == "asset" {
 		var config struct {
 			AssetSetID int    `json:"asset_set_id"`
-			QLQuery   string `json:"ql_query"`
+			QLQuery    string `json:"ql_query"`
 		}
 		if cf.Options == "" {
 			respondValidationError(w, r, "Asset fields require asset_set_id in options")
 			return
 		}
-		if err := json.Unmarshal([]byte(cf.Options), &config); err != nil || config.AssetSetID == 0 {
+		if err = json.Unmarshal([]byte(cf.Options), &config); err != nil || config.AssetSetID == 0 {
 			respondValidationError(w, r, "Asset fields require asset_set_id in options")
 			return
 		}
@@ -300,7 +306,7 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Validate options JSON if provided (for select/multiselect fields)
 	if cf.Options != "" && cf.FieldType != "asset" && cf.FieldType != "portalcustomer" && cf.FieldType != "customerorganisation" {
 		var testOptions []string
-		if err := json.Unmarshal([]byte(cf.Options), &testOptions); err != nil {
+		if err = json.Unmarshal([]byte(cf.Options), &testOptions); err != nil {
 			respondValidationError(w, r, "Invalid options JSON format")
 			return
 		}
@@ -311,13 +317,14 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 	cf.Description = utils.StripHTMLTags(cf.Description)
 
 	now := time.Now()
+	//nolint:misspell // customer_organisations is a database table name
 	_, err = h.db.ExecWrite(`
 		UPDATE custom_field_definitions
 		SET name = ?, field_type = ?, description = ?, required = ?, options = ?, display_order = ?,
 		    applies_to_portal_customers = ?, applies_to_customer_organisations = ?, updated_at = ?
 		WHERE id = ?
 	`, cf.Name, cf.FieldType, cf.Description, cf.Required, cf.Options, cf.DisplayOrder,
-	   cf.AppliesToPortalCustomers, cf.AppliesToCustomerOrganisations, now, id)
+		cf.AppliesToPortalCustomers, cf.AppliesToCustomerOrganisations, now, id)
 
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -328,6 +335,7 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var updatedCF models.CustomFieldDefinition
 	var returnOptionsJSON sql.NullString
 
+	//nolint:misspell // customer_organisations is a database table name
 	err = h.db.QueryRow(`
 		SELECT id, name, field_type, description, required, options, display_order, system_default,
 		       applies_to_portal_customers, applies_to_customer_organisations, created_at, updated_at
@@ -378,8 +386,14 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 				"new": updatedCF.DisplayOrder,
 			}
 		}
+		if oldCF.Options != updatedCF.Options {
+			details["options_changed"] = map[string]interface{}{
+				"old": oldCF.Options,
+				"new": updatedCF.Options,
+			}
+		}
 
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -435,7 +449,7 @@ func (h *CustomFieldHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),

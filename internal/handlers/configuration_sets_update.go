@@ -30,7 +30,7 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 	}
 
 	var cs models.ConfigurationSet
-	if err := json.NewDecoder(r.Body).Decode(&cs); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&cs); err != nil {
 		respondBadRequest(w, r, err.Error())
 		return
 	}
@@ -43,7 +43,8 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 
 	// Verify workspaces exist
 	for _, workspaceID := range cs.WorkspaceIDs {
-		exists, err := h.repo.WorkspaceExists(workspaceID)
+		var exists bool
+		exists, err = h.repo.WorkspaceExists(workspaceID)
 		if err != nil || !exists {
 			respondBadRequest(w, r, "One or more workspaces not found")
 			return
@@ -55,7 +56,8 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 	skipMigrationCheck := r.URL.Query().Get("skip_migration_check") == "true"
 	if !skipMigrationCheck {
 		for _, workspaceID := range cs.WorkspaceIDs {
-			currentConfigSetID, err := h.repo.GetWorkspaceConfigSetID(workspaceID)
+			var currentConfigSetID *int
+			currentConfigSetID, err = h.repo.GetWorkspaceConfigSetID(workspaceID)
 			if err != nil {
 				respondInternalError(w, r, err)
 				return
@@ -77,11 +79,11 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 				if requiresMigration {
 					// Get config set names for the response
 					var sourceConfigSetName, targetConfigSetName string
-					h.db.QueryRow(`SELECT name FROM configuration_sets WHERE id = ?`, sourceID).Scan(&sourceConfigSetName)
-					h.db.QueryRow(`SELECT name FROM configuration_sets WHERE id = ?`, id).Scan(&targetConfigSetName)
+					_ = h.db.QueryRow(`SELECT name FROM configuration_sets WHERE id = ?`, sourceID).Scan(&sourceConfigSetName)
+					_ = h.db.QueryRow(`SELECT name FROM configuration_sets WHERE id = ?`, id).Scan(&targetConfigSetName)
 
 					var totalItems int
-					h.db.QueryRow(`SELECT COUNT(*) FROM items WHERE workspace_id = ?`, workspaceID).Scan(&totalItems)
+					_ = h.db.QueryRow(`SELECT COUNT(*) FROM items WHERE workspace_id = ?`, workspaceID).Scan(&totalItems)
 
 					analysis := models.ComprehensiveMigrationAnalysis{
 						OldConfigSetID:            sourceID,
@@ -103,7 +105,7 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusConflict)
-					json.NewEncoder(w).Encode(map[string]interface{}{
+					_ = json.NewEncoder(w).Encode(map[string]interface{}{
 						"error":    "migration_required",
 						"message":  "Migration is required before this workspace can be assigned to the new configuration set",
 						"analysis": analysis,
@@ -120,10 +122,10 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Update the configuration set
-	if err := h.repo.Update(tx, id, &cs); err != nil {
+	if err = h.repo.Update(tx, id, &cs); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -131,34 +133,34 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 	// Save notification setting
 	var notificationSettingID *int
 	if cs.NotificationSettingID != nil {
-		nsID := int(*cs.NotificationSettingID)
+		nsID := *cs.NotificationSettingID
 		notificationSettingID = &nsID
 	}
-	if err := h.repo.SaveNotificationSetting(tx, id, notificationSettingID); err != nil {
+	if err = h.repo.SaveNotificationSetting(tx, id, notificationSettingID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
 	// Save workspace assignments
-	if err := h.repo.SaveWorkspaceAssignments(tx, id, cs.WorkspaceIDs); err != nil {
+	if err = h.repo.SaveWorkspaceAssignments(tx, id, cs.WorkspaceIDs); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
 	// Save screen assignments
-	if err := h.repo.SaveScreenAssignments(tx, id, cs.CreateScreenID, cs.EditScreenID, cs.ViewScreenID); err != nil {
+	if err = h.repo.SaveScreenAssignments(tx, id, cs.CreateScreenID, cs.EditScreenID, cs.ViewScreenID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
 	// Save item type configurations
-	if err := h.repo.SaveItemTypeConfigs(tx, id, cs.ItemTypeConfigs); err != nil {
+	if err = h.repo.SaveItemTypeConfigs(tx, id, cs.ItemTypeConfigs); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
 	// Save priority assignments
-	if err := h.repo.SavePriorityAssignments(tx, id, cs.PriorityIDs); err != nil {
+	if err = h.repo.SavePriorityAssignments(tx, id, cs.PriorityIDs); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -172,7 +174,7 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 	// Refresh notification cache if service is available
 	var warnings []models.APIWarning
 	if h.notificationService != nil {
-		if err := h.notificationService.ForceRefreshCache(); err != nil {
+		if err = h.notificationService.ForceRefreshCache(); err != nil {
 			warnings = append(warnings, createCacheWarning("notification", err, fmt.Sprintf("configuration_set_id:%d", id)))
 		}
 	}
@@ -205,11 +207,11 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 		// Track workflow change
 		oldWorkflowID := 0
 		if oldCS.WorkflowID != nil {
-			oldWorkflowID = int(*oldCS.WorkflowID)
+			oldWorkflowID = *oldCS.WorkflowID
 		}
 		newWorkflowID := 0
 		if updatedCS.WorkflowID != nil {
-			newWorkflowID = int(*updatedCS.WorkflowID)
+			newWorkflowID = *updatedCS.WorkflowID
 		}
 		if oldWorkflowID != newWorkflowID {
 			details["workflow_changed"] = map[string]interface{}{
@@ -219,7 +221,7 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 		}
 		details["workspace_count"] = len(updatedCS.WorkspaceIDs)
 
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),

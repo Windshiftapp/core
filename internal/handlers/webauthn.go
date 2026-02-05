@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
 	"windshift/internal/auth"
 	"windshift/internal/database"
 	"windshift/internal/models"
@@ -45,7 +46,6 @@ type FIDORegistrationRequestNew struct {
 	CredentialName string `json:"credential_name"`
 }
 
-
 // FIDOCompleteRegistrationRequest represents the completion request
 type FIDOCompleteRegistrationRequest struct {
 	SessionID      string      `json:"sessionId"`
@@ -66,7 +66,7 @@ func (h *WebAuthnHandler) StartFIDORegistrationNew(w http.ResponseWriter, r *htt
 	}
 
 	var req FIDORegistrationRequestNew
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -133,7 +133,7 @@ func (h *WebAuthnHandler) StartFIDORegistrationNew(w http.ResponseWriter, r *htt
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // CompleteFIDORegistrationNew completes FIDO2/WebAuthn registration with proper verification
@@ -149,7 +149,7 @@ func (h *WebAuthnHandler) CompleteFIDORegistrationNew(w http.ResponseWriter, r *
 	}
 
 	var req FIDOCompleteRegistrationRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -229,16 +229,16 @@ func (h *WebAuthnHandler) CompleteFIDORegistrationNew(w http.ResponseWriter, r *
 		"status":  "success",
 		"message": "FIDO credential registered successfully",
 		"credential": map[string]interface{}{
-			"id":             credential.ID,
-			"name":           req.CredentialName,
+			"id":              credential.ID,
+			"name":            req.CredentialName,
 			"attestationType": credential.AttestationType,
-			"transport":      credential.Transport,
+			"transport":       credential.Transport,
 		},
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // GetWebAuthnCredentials returns all WebAuthn credentials for a user
@@ -265,7 +265,7 @@ func (h *WebAuthnHandler) GetWebAuthnCredentials(w http.ResponseWriter, r *http.
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(credentials)
+	_ = json.NewEncoder(w).Encode(credentials)
 }
 
 // RemoveWebAuthnCredential removes a specific WebAuthn credential
@@ -319,14 +319,13 @@ func (h *WebAuthnHandler) RemoveWebAuthnCredential(w http.ResponseWriter, r *htt
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // FIDOLoginRequestNew represents the request to start FIDO login
 type FIDOLoginRequestNew struct {
 	EmailOrUsername string `json:"email_or_username"`
 }
-
 
 // FIDOCompleteLoginRequest represents the login completion request
 type FIDOCompleteLoginRequest struct {
@@ -421,7 +420,7 @@ func (h *WebAuthnHandler) StartFIDOLoginNew(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // CompleteFIDOLoginNew completes FIDO authentication with proper verification
@@ -542,7 +541,7 @@ func (h *WebAuthnHandler) CompleteFIDOLoginNew(w http.ResponseWriter, r *http.Re
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // Helper functions
@@ -555,4 +554,3 @@ func (h *WebAuthnHandler) populateIsSystemAdmin(user *models.User) error {
 	user.IsSystemAdmin = isAdmin
 	return nil
 }
-

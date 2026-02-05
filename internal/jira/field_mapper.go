@@ -38,58 +38,58 @@ type FieldMappingSuggestion struct {
 // jiraFieldTypeMap maps Jira field type keys to Windshift field types
 var jiraFieldTypeMap = map[string]WindshiftFieldType{
 	// Standard Jira field types (from schema.type)
-	"string":   FieldTypeText,
-	"text":     FieldTypeTextarea,
-	"number":   FieldTypeNumber,
-	"date":     FieldTypeDate,
-	"datetime": FieldTypeDate,
-	"user":     FieldTypeUser,
-	"array":    FieldTypeMultiselect, // Depends on items type
-	"option":   FieldTypeSelect,
-	"priority": FieldTypeSelect, // Maps to Windshift priority
-	"version":  FieldTypeMilestone,
-	"project":  FieldTypeText,    // Project references become text
+	"string":    FieldTypeText,
+	"text":      FieldTypeTextarea,
+	"number":    FieldTypeNumber,
+	"date":      FieldTypeDate,
+	"datetime":  FieldTypeDate,
+	"user":      FieldTypeUser,
+	"array":     FieldTypeMultiselect, // Depends on items type
+	"option":    FieldTypeSelect,
+	"priority":  FieldTypeSelect, // Maps to Windshift priority
+	"version":   FieldTypeMilestone,
+	"project":   FieldTypeText,     // Project references become text
 	"issuelink": FieldTypeUnmapped, // Handled separately as links
 
 	// Custom field type keys (full plugin identifiers)
-	"com.atlassian.jira.plugin.system.customfieldtypes:textfield":       FieldTypeText,
-	"com.atlassian.jira.plugin.system.customfieldtypes:textarea":        FieldTypeTextarea,
-	"com.atlassian.jira.plugin.system.customfieldtypes:float":           FieldTypeNumber,
-	"com.atlassian.jira.plugin.system.customfieldtypes:numberfield":     FieldTypeNumber,
-	"com.atlassian.jira.plugin.system.customfieldtypes:select":          FieldTypeSelect,
-	"com.atlassian.jira.plugin.system.customfieldtypes:multiselect":     FieldTypeMultiselect,
-	"com.atlassian.jira.plugin.system.customfieldtypes:radiobuttons":    FieldTypeSelect,
-	"com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes": FieldTypeMultiselect,
-	"com.atlassian.jira.plugin.system.customfieldtypes:datepicker":      FieldTypeDate,
-	"com.atlassian.jira.plugin.system.customfieldtypes:datetime":        FieldTypeDate,
-	"com.atlassian.jira.plugin.system.customfieldtypes:url":             FieldTypeText,
-	"com.atlassian.jira.plugin.system.customfieldtypes:userpicker":      FieldTypeUser,
-	"com.atlassian.jira.plugin.system.customfieldtypes:multiuserpicker": FieldTypeUsers, // Multi-user picker (array of user IDs)
-	"com.atlassian.jira.plugin.system.customfieldtypes:grouppicker":     FieldTypeText,
+	"com.atlassian.jira.plugin.system.customfieldtypes:textfield":        FieldTypeText,
+	"com.atlassian.jira.plugin.system.customfieldtypes:textarea":         FieldTypeTextarea,
+	"com.atlassian.jira.plugin.system.customfieldtypes:float":            FieldTypeNumber,
+	"com.atlassian.jira.plugin.system.customfieldtypes:numberfield":      FieldTypeNumber,
+	"com.atlassian.jira.plugin.system.customfieldtypes:select":           FieldTypeSelect,
+	"com.atlassian.jira.plugin.system.customfieldtypes:multiselect":      FieldTypeMultiselect,
+	"com.atlassian.jira.plugin.system.customfieldtypes:radiobuttons":     FieldTypeSelect,
+	"com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes":  FieldTypeMultiselect,
+	"com.atlassian.jira.plugin.system.customfieldtypes:datepicker":       FieldTypeDate,
+	"com.atlassian.jira.plugin.system.customfieldtypes:datetime":         FieldTypeDate,
+	"com.atlassian.jira.plugin.system.customfieldtypes:url":              FieldTypeText,
+	"com.atlassian.jira.plugin.system.customfieldtypes:userpicker":       FieldTypeUser,
+	"com.atlassian.jira.plugin.system.customfieldtypes:multiuserpicker":  FieldTypeUsers, // Multi-user picker (array of user IDs)
+	"com.atlassian.jira.plugin.system.customfieldtypes:grouppicker":      FieldTypeText,
 	"com.atlassian.jira.plugin.system.customfieldtypes:multigrouppicker": FieldTypeMultiselect,
-	"com.atlassian.jira.plugin.system.customfieldtypes:cascadingselect": FieldTypeSelect,
-	"com.atlassian.jira.plugin.system.customfieldtypes:labels":          FieldTypeMultiselect,
-	"com.atlassian.jira.plugin.system.customfieldtypes:version":         FieldTypeMilestone,
-	"com.atlassian.jira.plugin.system.customfieldtypes:multiversion":    FieldTypeMultiselect,
-	"com.atlassian.jira.plugin.system.customfieldtypes:project":         FieldTypeText,
-	"com.atlassian.jira.plugin.system.customfieldtypes:readonlyfield":   FieldTypeText,
+	"com.atlassian.jira.plugin.system.customfieldtypes:cascadingselect":  FieldTypeSelect,
+	"com.atlassian.jira.plugin.system.customfieldtypes:labels":           FieldTypeMultiselect,
+	"com.atlassian.jira.plugin.system.customfieldtypes:version":          FieldTypeMilestone,
+	"com.atlassian.jira.plugin.system.customfieldtypes:multiversion":     FieldTypeMultiselect,
+	"com.atlassian.jira.plugin.system.customfieldtypes:project":          FieldTypeText,
+	"com.atlassian.jira.plugin.system.customfieldtypes:readonlyfield":    FieldTypeText,
 
 	// Greenhopper (Jira Software) fields
-	"com.pyxis.greenhopper.jira:gh-sprint":            FieldTypeIteration,
-	"com.pyxis.greenhopper.jira:gh-epic-link":         FieldTypeText, // Parent link
-	"com.pyxis.greenhopper.jira:gh-epic-label":        FieldTypeText,
-	"com.pyxis.greenhopper.jira:gh-epic-status":       FieldTypeSelect,
-	"com.pyxis.greenhopper.jira:gh-epic-color":        FieldTypeText,
-	"com.pyxis.greenhopper.jira:jsw-story-points":     FieldTypeNumber,
-	"com.pyxis.greenhopper.jira:gh-lexo-rank":         FieldTypeUnmapped, // Internal ranking
+	"com.pyxis.greenhopper.jira:gh-sprint":        FieldTypeIteration,
+	"com.pyxis.greenhopper.jira:gh-epic-link":     FieldTypeText, // Parent link
+	"com.pyxis.greenhopper.jira:gh-epic-label":    FieldTypeText,
+	"com.pyxis.greenhopper.jira:gh-epic-status":   FieldTypeSelect,
+	"com.pyxis.greenhopper.jira:gh-epic-color":    FieldTypeText,
+	"com.pyxis.greenhopper.jira:jsw-story-points": FieldTypeNumber,
+	"com.pyxis.greenhopper.jira:gh-lexo-rank":     FieldTypeUnmapped, // Internal ranking
 
 	// Tempo and time tracking
-	"com.atlassian.jira.ext.charting:timeinstatus":    FieldTypeUnmapped,
+	"com.atlassian.jira.ext.charting:timeinstatus":               FieldTypeUnmapped,
 	"com.atlassian.jira.plugin.system.customfieldtypes:importid": FieldTypeText,
 
 	// Service Management fields
-	"com.atlassian.servicedesk:sd-request-participants": FieldTypeMultiselect,
-	"com.atlassian.servicedesk:vp-origin":               FieldTypeText,
+	"com.atlassian.servicedesk:sd-request-participants":   FieldTypeMultiselect,
+	"com.atlassian.servicedesk:vp-origin":                 FieldTypeText,
 	"com.atlassian.servicedesk:sd-customer-organizations": FieldTypeMultiselect,
 
 	// Assets/Insight fields
@@ -152,14 +152,15 @@ func MapJiraFieldToWindshift(field JiraCustomField) FieldMappingSuggestion {
 			suggestion.WindshiftFieldType = FieldTypeUser
 		case "array":
 			// Array type depends on items
-			if field.Schema.Items == "option" {
+			switch field.Schema.Items {
+			case "option":
 				suggestion.WindshiftFieldType = FieldTypeMultiselect
-			} else if field.Schema.Items == "user" {
+			case "user":
 				suggestion.WindshiftFieldType = FieldTypeUsers
 				suggestion.Notes = "Multi-user field will be stored as array of user IDs"
-			} else if field.Schema.Items == "string" {
+			case "string":
 				suggestion.WindshiftFieldType = FieldTypeMultiselect
-			} else {
+			default:
 				suggestion.WindshiftFieldType = FieldTypeTextarea
 				suggestion.Notes = "Complex array field will be stored as JSON text"
 			}
@@ -291,11 +292,11 @@ func SuggestIssueTypeMapping(jiraIssueTypeName string, windshiftItemTypes []Issu
 
 	// Common issue type synonyms
 	synonyms := map[string][]string{
-		"epic":       {"initiative", "theme"},
-		"story":      {"user story", "feature"},
-		"task":       {"work item", "action"},
-		"bug":        {"defect", "issue", "error"},
-		"sub-task":   {"subtask", "sub task", "child"},
+		"epic":        {"initiative", "theme"},
+		"story":       {"user story", "feature"},
+		"task":        {"work item", "action"},
+		"bug":         {"defect", "issue", "error"},
+		"sub-task":    {"subtask", "sub task", "child"},
 		"improvement": {"enhancement", "request"},
 	}
 

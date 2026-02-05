@@ -18,7 +18,7 @@ func NewEvaluator(workspaceMap map[string]int) *Evaluator {
 }
 
 // EvaluateToSQL converts a QL query string to SQL WHERE clause
-func (e *Evaluator) EvaluateToSQL(cqlQuery string) (string, []interface{}, error) {
+func (e *Evaluator) EvaluateToSQL(cqlQuery string) (string, []interface{}, error) { //nolint:gocritic // unnamedResult
 	if strings.TrimSpace(cqlQuery) == "" {
 		return "", nil, nil
 	}
@@ -53,7 +53,7 @@ type AssetEvaluator struct {
 }
 
 // NewAssetEvaluator creates a new QL evaluator for assets
-func NewAssetEvaluator(setMap map[string]int, workspaceMap map[string]int) *AssetEvaluator {
+func NewAssetEvaluator(setMap, workspaceMap map[string]int) *AssetEvaluator {
 	return &AssetEvaluator{
 		sqlGenerator: NewAssetSQLGenerator(setMap),
 		workspaceMap: workspaceMap,
@@ -61,7 +61,7 @@ func NewAssetEvaluator(setMap map[string]int, workspaceMap map[string]int) *Asse
 }
 
 // EvaluateToSQL converts a QL query string to SQL WHERE clause for assets
-func (e *AssetEvaluator) EvaluateToSQL(cqlQuery string) (string, []interface{}, error) {
+func (e *AssetEvaluator) EvaluateToSQL(cqlQuery string) (string, []interface{}, error) { //nolint:gocritic // unnamedResult
 	if strings.TrimSpace(cqlQuery) == "" {
 		return "", nil, nil
 	}

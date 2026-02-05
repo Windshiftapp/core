@@ -1,3 +1,4 @@
+// Package scheduler provides background job scheduling and processing.
 package scheduler
 
 import (
@@ -125,7 +126,7 @@ type channelInfo struct {
 
 // getActiveEmailChannels retrieves all enabled inbound email channels
 func (es *EmailScheduler) getActiveEmailChannels(ctx context.Context) ([]channelInfo, error) {
-	rows, err := es.db.Query(`
+	rows, err := es.db.QueryContext(ctx, `
 		SELECT id, name, config
 		FROM channels
 		WHERE type = 'email' AND direction = 'inbound' AND status = 'enabled'
@@ -179,7 +180,8 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) {
 	// Refresh OAuth token if needed (for OAuth providers)
 	if oauthProvider, ok := provider.(email.OAuthProvider); ok {
 		if decryptedConfig.EmailAuthMethod == "oauth" {
-			newToken, err := es.credentials.RefreshOAuthTokenIfNeeded(ctx, ch.ID, decryptedConfig, oauthProvider)
+			var newToken string
+			newToken, err = es.credentials.RefreshOAuthTokenIfNeeded(ctx, ch.ID, decryptedConfig, oauthProvider)
 			if err != nil {
 				slog.Error("failed to refresh OAuth token", "channel_id", ch.ID, "error", err)
 				es.recordError(ctx, ch.ID, err)
@@ -196,7 +198,7 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) {
 		es.recordError(ctx, ch.ID, err)
 		return
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// Determine mailbox
 	mailbox := decryptedConfig.EmailMailbox
@@ -206,7 +208,7 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) {
 
 	// Fetch new messages
 	batchSize := 50
-	messages, err := client.FetchMessages(mailbox, uint32(state.LastUID), batchSize)
+	messages, err := client.FetchMessages(mailbox, uint32(state.LastUID), batchSize) //nolint:gosec // G115: value is bounded by IMAP UID constraints
 	if err != nil {
 		slog.Error("failed to fetch messages", "channel_id", ch.ID, "error", err)
 		es.recordError(ctx, ch.ID, err)
@@ -221,7 +223,7 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) {
 	slog.Info("fetched new emails", "channel_id", ch.ID, "count", len(messages))
 
 	// Process each message
-	var maxUID uint32 = uint32(state.LastUID)
+	maxUID := uint32(state.LastUID) //nolint:gosec // G115: value is bounded by IMAP UID constraints
 	processedCount := 0
 	errorCount := 0
 
@@ -299,7 +301,7 @@ func (es *EmailScheduler) getOrCreateChannelState(ctx context.Context, channelID
 	var lastCheckedAt sql.NullTime
 	var lastError sql.NullString
 
-	err := es.db.QueryRow(`
+	err := es.db.QueryRowContext(ctx, `
 		SELECT id, channel_id, last_uid, last_checked_at, error_count, last_error
 		FROM email_channel_state
 		WHERE channel_id = ?
@@ -323,7 +325,7 @@ func (es *EmailScheduler) getOrCreateChannelState(ctx context.Context, channelID
 	}
 
 	// Create new state
-	_, err = es.db.Exec(`
+	_, err = es.db.ExecContext(ctx, `
 		INSERT INTO email_channel_state (channel_id, last_uid, error_count, created_at, updated_at)
 		VALUES (?, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 	`, channelID)
@@ -340,7 +342,7 @@ func (es *EmailScheduler) getOrCreateChannelState(ctx context.Context, channelID
 
 // updateChannelState updates the channel state after processing
 func (es *EmailScheduler) updateChannelState(ctx context.Context, channelID, lastUID, errorCount int) {
-	_, err := es.db.Exec(`
+	_, err := es.db.ExecContext(ctx, `
 		UPDATE email_channel_state
 		SET last_uid = ?, last_checked_at = CURRENT_TIMESTAMP, error_count = ?, last_error = NULL, updated_at = CURRENT_TIMESTAMP
 		WHERE channel_id = ?
@@ -352,7 +354,7 @@ func (es *EmailScheduler) updateChannelState(ctx context.Context, channelID, las
 
 // updateLastChecked updates the last checked timestamp
 func (es *EmailScheduler) updateLastChecked(ctx context.Context, channelID int) {
-	es.db.Exec(`
+	_, _ = es.db.ExecContext(ctx, `
 		UPDATE email_channel_state
 		SET last_checked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
 		WHERE channel_id = ?
@@ -361,7 +363,7 @@ func (es *EmailScheduler) updateLastChecked(ctx context.Context, channelID int) 
 
 // recordError records an error for the channel
 func (es *EmailScheduler) recordError(ctx context.Context, channelID int, err error) {
-	es.db.Exec(`
+	_, _ = es.db.ExecContext(ctx, `
 		UPDATE email_channel_state
 		SET error_count = error_count + 1, last_error = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE channel_id = ?
@@ -370,7 +372,7 @@ func (es *EmailScheduler) recordError(ctx context.Context, channelID int, err er
 
 // updateLastActivity updates the channel's last_activity timestamp
 func (es *EmailScheduler) updateLastActivity(ctx context.Context, channelID int) {
-	es.db.Exec(`
+	_, _ = es.db.ExecContext(ctx, `
 		UPDATE channels SET last_activity = CURRENT_TIMESTAMP WHERE id = ?
 	`, channelID)
 }

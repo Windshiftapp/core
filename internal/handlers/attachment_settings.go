@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+
 	"windshift/internal/models"
 	"windshift/internal/services"
 )
@@ -27,7 +28,7 @@ func (h *AttachmentSettingsHandler) Get(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(settings)
+	_ = json.NewEncoder(w).Encode(settings)
 }
 
 // Update modifies attachment settings
@@ -39,7 +40,7 @@ func (h *AttachmentSettingsHandler) Update(w http.ResponseWriter, r *http.Reques
 	}
 
 	var req models.AttachmentSettingsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -56,7 +57,7 @@ func (h *AttachmentSettingsHandler) Update(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(settings)
+	_ = json.NewEncoder(w).Encode(settings)
 }
 
 // GetStatus returns attachment system status (enabled/disabled, path info)
@@ -68,5 +69,5 @@ func (h *AttachmentSettingsHandler) GetStatus(w http.ResponseWriter, r *http.Req
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(status)
+	_ = json.NewEncoder(w).Encode(status)
 }

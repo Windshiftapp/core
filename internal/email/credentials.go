@@ -237,14 +237,14 @@ func (m *CredentialManager) updateChannelTokens(
 ) error {
 	// Get current config
 	var configJSON string
-	err := m.db.QueryRow(`SELECT config FROM channels WHERE id = ?`, channelID).Scan(&configJSON)
+	err := m.db.QueryRowContext(ctx, `SELECT config FROM channels WHERE id = ?`, channelID).Scan(&configJSON)
 	if err != nil {
 		return fmt.Errorf("failed to get channel config: %w", err)
 	}
 
 	var config models.ChannelConfig
 	if configJSON != "" {
-		if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+		if err = json.Unmarshal([]byte(configJSON), &config); err != nil {
 			return fmt.Errorf("failed to parse channel config: %w", err)
 		}
 	}
@@ -262,7 +262,7 @@ func (m *CredentialManager) updateChannelTokens(
 		return fmt.Errorf("failed to marshal updated config: %w", err)
 	}
 
-	_, err = m.db.Exec(`
+	_, err = m.db.ExecContext(ctx, `
 		UPDATE channels SET config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
 	`, string(updatedConfigJSON), channelID)
 	if err != nil {
@@ -288,7 +288,7 @@ func (m *CredentialManager) SaveOAuthTokens(
 
 	var config models.ChannelConfig
 	if configJSON != "" {
-		if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+		if err = json.Unmarshal([]byte(configJSON), &config); err != nil {
 			return fmt.Errorf("failed to parse channel config: %w", err)
 		}
 	}

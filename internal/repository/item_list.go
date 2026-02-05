@@ -115,7 +115,7 @@ func (r *ItemRepository) FindAllWithDetails(params ItemListParams) ([]models.Ite
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to query items: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	items, err := r.scanItemList(rows)
 	if err != nil {
@@ -198,7 +198,7 @@ func (r *ItemRepository) Search(query string, workspaceIDs []int, pagination Pag
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to search items: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	items, err := r.scanItemList(rows)
 	if err != nil {
@@ -209,9 +209,8 @@ func (r *ItemRepository) Search(query string, workspaceIDs []int, pagination Pag
 }
 
 // buildWhereClause constructs the WHERE clause and arguments for item queries
-func (r *ItemRepository) buildWhereClause(params ItemListParams) (string, []interface{}) {
-	whereClause := "WHERE 1=1"
-	args := []interface{}{}
+func (r *ItemRepository) buildWhereClause(params ItemListParams) (whereClause string, args []interface{}) {
+	whereClause = "WHERE 1=1"
 
 	// Filter by accessible workspaces
 	if len(params.WorkspaceIDs) > 0 {

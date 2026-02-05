@@ -13,7 +13,7 @@ func (h *WorkspaceHandler) buildWorkspaceMap() (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var id int

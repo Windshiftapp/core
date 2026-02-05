@@ -3,6 +3,7 @@
 package validation
 
 import (
+	"database/sql"
 	"testing"
 	"time"
 
@@ -12,13 +13,13 @@ import (
 
 // TestData holds IDs for test entities
 type TestData struct {
-	WorkspaceID  int
-	StatusID     int
-	PriorityID   int
-	UserID       int
-	ProjectID    int
-	MilestoneID  int
-	IterationID  int
+	WorkspaceID int
+	StatusID    int
+	PriorityID  int
+	UserID      int
+	ProjectID   int
+	MilestoneID int
+	IterationID int
 }
 
 func TestItemFieldValidator(t *testing.T) {
@@ -393,7 +394,8 @@ func setupTestData(t *testing.T, tdb *testutils.TestDB) *TestData {
 	err = tdb.DB.QueryRow("SELECT id FROM statuses WHERE category_id = ? LIMIT 1", statusCategoryID).Scan(&statusID)
 	if err != nil {
 		// Create status if none exists
-		statusResult, err := tdb.DB.Exec(`
+		var statusResult sql.Result
+		statusResult, err = tdb.DB.Exec(`
 			INSERT INTO statuses (name, description, category_id, created_at, updated_at)
 			VALUES ('Open', 'Open status', ?, ?, ?)
 		`, statusCategoryID, now, now)
@@ -416,7 +418,8 @@ func setupTestData(t *testing.T, tdb *testutils.TestDB) *TestData {
 	err = tdb.DB.QueryRow("SELECT id FROM users LIMIT 1").Scan(&userID)
 	if err != nil {
 		// Create user if none exists
-		userResult, err := tdb.DB.Exec(`
+		var userResult sql.Result
+		userResult, err = tdb.DB.Exec(`
 			INSERT INTO users (username, email, first_name, last_name, password_hash, created_at, updated_at)
 			VALUES ('testuser', 'test@example.com', 'Test', 'User', 'hash', ?, ?)
 		`, now, now)
@@ -432,7 +435,8 @@ func setupTestData(t *testing.T, tdb *testutils.TestDB) *TestData {
 	err = tdb.DB.QueryRow("SELECT id FROM time_projects LIMIT 1").Scan(&projectID)
 	if err != nil {
 		// Create time project if none exists
-		projectResult, err := tdb.DB.Exec(`
+		var projectResult sql.Result
+		projectResult, err = tdb.DB.Exec(`
 			INSERT INTO time_projects (name, description, created_at, updated_at)
 			VALUES ('Test Project', 'Test project', ?, ?)
 		`, now, now)
@@ -458,12 +462,12 @@ func setupTestData(t *testing.T, tdb *testutils.TestDB) *TestData {
 	}
 
 	return &TestData{
-		WorkspaceID:  workspaceID,
-		StatusID:     statusID,
-		PriorityID:   priorityID,
-		UserID:       userID,
-		ProjectID:    projectID,
-		MilestoneID:  milestoneID,
-		IterationID:  iterationID,
+		WorkspaceID: workspaceID,
+		StatusID:    statusID,
+		PriorityID:  priorityID,
+		UserID:      userID,
+		ProjectID:   projectID,
+		MilestoneID: milestoneID,
+		IterationID: iterationID,
 	}
 }

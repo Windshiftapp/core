@@ -11,10 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/allegro/bigcache/v3"
 	"windshift/internal/database"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
+
+	"github.com/allegro/bigcache/v3"
 )
 
 // NotificationManager handles notification caching and persistence
@@ -44,7 +45,7 @@ func NewNotificationManager(db database.Database) (*NotificationManager, error) 
 		LifeWindow:         24 * time.Hour, // Keep notifications for 24 hours in cache
 		CleanWindow:        5 * time.Minute,
 		MaxEntriesInWindow: 1000 * 10 * 60, // 10 minutes * 1000 entries per minute
-		MaxEntrySize:       1024,            // 1KB per entry
+		MaxEntrySize:       1024,           // 1KB per entry
 		Verbose:            false,
 		HardMaxCacheSize:   512, // 512 MB
 		OnRemove:           nil,
@@ -82,12 +83,12 @@ func (nm *NotificationManager) getCacheKey(userID int) string {
 }
 
 // GetUserNotifications retrieves notifications for a user (cache-first)
-func (nm *NotificationManager) GetUserNotifications(userID int, limit int, offset int) ([]models.Notification, error) {
+func (nm *NotificationManager) GetUserNotifications(userID, limit, offset int) ([]models.Notification, error) {
 	nm.mu.RLock()
 	defer nm.mu.RUnlock()
 
 	cacheKey := nm.getCacheKey(userID)
-	
+
 	// Try cache first
 	if entry, err := nm.cache.Get(cacheKey); err == nil {
 		var cache models.NotificationCache
@@ -117,11 +118,11 @@ func (nm *NotificationManager) AddNotification(notification models.Notification)
 	slog.Debug("adding notification", slog.String("component", "notifications"), slog.Int("user_id", notification.UserID), slog.String("type", notification.Type), slog.String("title", notification.Title))
 
 	cacheKey := nm.getCacheKey(notification.UserID)
-	
+
 	// Get existing cache or create new
 	var cache models.NotificationCache
 	if entry, err := nm.cache.Get(cacheKey); err == nil {
-		json.Unmarshal(entry, &cache)
+		_ = json.Unmarshal(entry, &cache)
 	} else {
 		cache = models.NotificationCache{
 			Notifications: []models.Notification{},
@@ -134,7 +135,7 @@ func (nm *NotificationManager) AddNotification(notification models.Notification)
 	notification.ID = int(time.Now().UnixNano()) // Temporary ID for cache
 	notification.CreatedAt = time.Now()
 	notification.UpdatedAt = time.Now()
-	
+
 	cache.Notifications = append([]models.Notification{notification}, cache.Notifications...)
 	cache.IsDirty = true
 
@@ -156,12 +157,12 @@ func (nm *NotificationManager) AddNotification(notification models.Notification)
 }
 
 // MarkAsRead marks a notification as read
-func (nm *NotificationManager) MarkAsRead(userID int, notificationID int) error {
+func (nm *NotificationManager) MarkAsRead(userID, notificationID int) error {
 	nm.mu.Lock()
 	defer nm.mu.Unlock()
 
 	cacheKey := nm.getCacheKey(userID)
-	
+
 	// Get existing cache
 	var cache models.NotificationCache
 	if entry, err := nm.cache.Get(cacheKey); err == nil {
@@ -197,7 +198,7 @@ func (nm *NotificationManager) MarkAsRead(userID int, notificationID int) error 
 }
 
 // loadNotificationsFromDB loads notifications from database and updates cache
-func (nm *NotificationManager) loadNotificationsFromDB(userID int, limit int, offset int) ([]models.Notification, error) {
+func (nm *NotificationManager) loadNotificationsFromDB(userID, limit, offset int) ([]models.Notification, error) {
 	query := `
 		SELECT id, user_id, title, message, type, timestamp, read, avatar, action_url, metadata, created_at, updated_at
 		FROM notifications 
@@ -205,18 +206,18 @@ func (nm *NotificationManager) loadNotificationsFromDB(userID int, limit int, of
 		ORDER BY timestamp DESC 
 		LIMIT ? OFFSET ?
 	`
-	
+
 	rows, err := nm.db.Query(query, userID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var notifications []models.Notification
 	for rows.Next() {
 		var n models.Notification
 		var avatar, actionURL, metadata *string
-		
+
 		err := rows.Scan(
 			&n.ID, &n.UserID, &n.Title, &n.Message, &n.Type,
 			&n.Timestamp, &n.Read, &avatar, &actionURL, &metadata,
@@ -248,7 +249,7 @@ func (nm *NotificationManager) loadNotificationsFromDB(userID int, limit int, of
 		}
 		cacheData, _ := json.Marshal(cache)
 		cacheKey := nm.getCacheKey(userID)
-		nm.cache.Set(cacheKey, cacheData)
+		_ = nm.cache.Set(cacheKey, cacheData)
 	}
 
 	return notifications, nil
@@ -272,7 +273,7 @@ func (nm *NotificationManager) syncCacheToDatabase() {
 	defer nm.mu.Unlock()
 
 	slog.Debug("starting periodic notification sync to database", slog.String("component", "notifications"))
-	
+
 	// Get all cache keys (this is a simplified approach - in production you'd want to track dirty keys)
 	iterator := nm.cache.Iterator()
 	for iterator.SetNext() {
@@ -282,7 +283,7 @@ func (nm *NotificationManager) syncCacheToDatabase() {
 		}
 
 		var cache models.NotificationCache
-		if err := json.Unmarshal(info.Value(), &cache); err != nil {
+		if err = json.Unmarshal(info.Value(), &cache); err != nil {
 			continue
 		}
 
@@ -311,19 +312,19 @@ func (nm *NotificationManager) syncCacheToDatabase() {
 		cache.IsDirty = false
 		cache.LastSynced = time.Now()
 		cacheData, _ := json.Marshal(cache)
-		nm.cache.Set(key, cacheData)
+		_ = nm.cache.Set(key, cacheData)
 	}
 
 	slog.Debug("completed periodic notification sync to database", slog.String("component", "notifications"))
 }
 
 // syncUserNotifications syncs a user's notifications to the database
-func (nm *NotificationManager) syncUserNotifications(userID int, notifications []models.Notification) error {
+func (nm *NotificationManager) syncUserNotifications(_ int, notifications []models.Notification) error {
 	tx, err := nm.db.Begin()
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Prepare statements
 	insertStmt, err := tx.Prepare(`
@@ -336,7 +337,7 @@ func (nm *NotificationManager) syncUserNotifications(userID int, notifications [
 	if err != nil {
 		return err
 	}
-	defer insertStmt.Close()
+	defer func() { _ = insertStmt.Close() }()
 
 	for _, notification := range notifications {
 		// Skip temporary IDs (created in cache)
@@ -367,13 +368,12 @@ func (nm *NotificationManager) syncUserNotifications(userID int, notifications [
 	return tx.Commit()
 }
 
-
 // Stop stops the notification manager
 func (nm *NotificationManager) Stop() {
 	nm.syncTicker.Stop()
 	close(nm.stopChan)
 	nm.syncCacheToDatabase() // Final sync
-	nm.cache.Close()
+	_ = nm.cache.Close()
 }
 
 // HTTP Handlers
@@ -428,7 +428,7 @@ func (nh *NotificationHandler) GetNotifications(w http.ResponseWriter, r *http.R
 
 	slog.Debug("successfully retrieved notifications", slog.String("component", "notifications"), slog.Int("user_id", userID), slog.Int("count", len(notifications)), slog.Int("limit", limit), slog.Int("offset", offset))
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(notifications)
+	_ = json.NewEncoder(w).Encode(notifications)
 }
 
 // CreateNotification handles POST /api/notifications
@@ -451,7 +451,7 @@ func (nh *NotificationHandler) CreateNotification(w http.ResponseWriter, r *http
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(notification)
+	_ = json.NewEncoder(w).Encode(notification)
 }
 
 // MarkNotificationAsRead handles PATCH /api/notifications/{id}/read
@@ -503,7 +503,7 @@ func (nh *NotificationHandler) RefreshCache(w http.ResponseWriter, r *http.Reque
 
 	slog.Debug("cache refreshed successfully", slog.String("component", "notifications"))
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	_ = json.NewEncoder(w).Encode(map[string]string{
 		"message": "Notification cache refreshed successfully",
 	})
 }

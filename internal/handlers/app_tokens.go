@@ -69,7 +69,7 @@ func (h *AppTokenHandler) GetUserAppTokens(w http.ResponseWriter, r *http.Reques
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var tokens []models.UserAppToken
 	for rows.Next() {
@@ -98,7 +98,7 @@ func (h *AppTokenHandler) GetUserAppTokens(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tokens)
+	_ = json.NewEncoder(w).Encode(tokens)
 }
 
 // CreateAppToken creates a new app token for a user
@@ -115,7 +115,7 @@ func (h *AppTokenHandler) CreateAppToken(w http.ResponseWriter, r *http.Request)
 	}
 
 	var req CreateAppTokenRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -147,7 +147,8 @@ func (h *AppTokenHandler) CreateAppToken(w http.ResponseWriter, r *http.Request)
 	// Parse expiration date if provided
 	var expiresAt *time.Time
 	if req.ExpiresAt != nil && *req.ExpiresAt != "" {
-		parsedTime, err := time.Parse(time.RFC3339, *req.ExpiresAt)
+		var parsedTime time.Time
+		parsedTime, err = time.Parse(time.RFC3339, *req.ExpiresAt)
 		if err != nil {
 			respondValidationError(w, r, "Invalid expiration date format")
 			return
@@ -158,7 +159,8 @@ func (h *AppTokenHandler) CreateAppToken(w http.ResponseWriter, r *http.Request)
 	// Convert scopes to JSON
 	scopesJSON := "[]"
 	if len(req.Scopes) > 0 {
-		scopesBytes, err := json.Marshal(req.Scopes)
+		var scopesBytes []byte
+		scopesBytes, err = json.Marshal(req.Scopes)
 		if err != nil {
 			respondValidationError(w, r, "Invalid scopes format")
 			return
@@ -201,10 +203,10 @@ func (h *AppTokenHandler) CreateAppToken(w http.ResponseWriter, r *http.Request)
 	// Log audit event
 	// Get username for audit log
 	var username string
-	h.db.QueryRow("SELECT username FROM users WHERE id = ?", userID).Scan(&username)
+	_ = h.db.QueryRow("SELECT username FROM users WHERE id = ?", userID).Scan(&username)
 
 	tokenIDInt := int(tokenID)
-	logger.LogAudit(h.db, logger.AuditEvent{
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
 		UserID:       currentUser.ID,
 		Username:     currentUser.Username,
 		IPAddress:    utils.GetClientIP(r),
@@ -226,7 +228,7 @@ func (h *AppTokenHandler) CreateAppToken(w http.ResponseWriter, r *http.Request)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // RevokeAppToken revokes (deletes) an app token
@@ -275,7 +277,7 @@ func (h *AppTokenHandler) RevokeAppToken(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Log audit event
-	logger.LogAudit(h.db, logger.AuditEvent{
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
 		UserID:       currentUser.ID,
 		Username:     currentUser.Username,
 		IPAddress:    utils.GetClientIP(r),
@@ -315,7 +317,7 @@ func (h *AppTokenHandler) UpdateAppToken(w http.ResponseWriter, r *http.Request)
 	}
 
 	var req CreateAppTokenRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -328,7 +330,8 @@ func (h *AppTokenHandler) UpdateAppToken(w http.ResponseWriter, r *http.Request)
 	// Parse expiration date if provided
 	var expiresAt *time.Time
 	if req.ExpiresAt != nil && *req.ExpiresAt != "" {
-		parsedTime, err := time.Parse(time.RFC3339, *req.ExpiresAt)
+		var parsedTime time.Time
+		parsedTime, err = time.Parse(time.RFC3339, *req.ExpiresAt)
 		if err != nil {
 			respondValidationError(w, r, "Invalid expiration date format")
 			return
@@ -339,7 +342,8 @@ func (h *AppTokenHandler) UpdateAppToken(w http.ResponseWriter, r *http.Request)
 	// Convert scopes to JSON
 	scopesJSON := "[]"
 	if len(req.Scopes) > 0 {
-		scopesBytes, err := json.Marshal(req.Scopes)
+		var scopesBytes []byte
+		scopesBytes, err = json.Marshal(req.Scopes)
 		if err != nil {
 			respondValidationError(w, r, "Invalid scopes format")
 			return

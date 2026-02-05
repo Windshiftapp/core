@@ -30,15 +30,15 @@ func NewPluginHandler(db database.Database, manager *plugins.Manager, disabled b
 
 // PluginInfo represents plugin information for API responses
 type PluginInfo struct {
-	ID          int                       `json:"id"`
-	Name        string                    `json:"name"`
-	Version     string                    `json:"version"`
-	Description string                    `json:"description"`
-	Author      string                    `json:"author"`
-	Enabled     bool                      `json:"enabled"`
-	Routes      []map[string]string       `json:"routes"`
-	Extensions  []plugins.Extension       `json:"extensions,omitempty"`
-	InstalledAt string                    `json:"installed_at"`
+	ID          int                 `json:"id"`
+	Name        string              `json:"name"`
+	Version     string              `json:"version"`
+	Description string              `json:"description"`
+	Author      string              `json:"author"`
+	Enabled     bool                `json:"enabled"`
+	Routes      []map[string]string `json:"routes"`
+	Extensions  []plugins.Extension `json:"extensions,omitempty"`
+	InstalledAt string              `json:"installed_at"`
 }
 
 // ListPlugins returns all installed plugins
@@ -53,7 +53,7 @@ func (h *PluginHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var pluginList []PluginInfo
 	for rows.Next() {
@@ -121,7 +121,7 @@ func (h *PluginHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(pluginList)
+	_ = json.NewEncoder(w).Encode(pluginList)
 }
 
 // UploadPlugin handles plugin upload
@@ -144,7 +144,7 @@ func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
 		respondBadRequest(w, r, "Missing plugin file")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Read file content
 	fileData, err := io.ReadAll(file)
@@ -154,17 +154,18 @@ func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if it's a zip file or direct wasm
-	if strings.HasSuffix(header.Filename, ".zip") {
+	switch {
+	case strings.HasSuffix(header.Filename, ".zip"):
 		// Handle zip file - new unified approach
 		err = h.manager.UploadPlugin("", fileData)
-	} else if strings.HasSuffix(header.Filename, ".wasm") {
+	case strings.HasSuffix(header.Filename, ".wasm"):
 		// Handle direct WASM file - need manifest (legacy)
 		manifestFile, _, formErr := r.FormFile("manifest")
 		if formErr != nil {
 			respondBadRequest(w, r, "Missing manifest.json for WASM upload")
 			return
 		}
-		defer manifestFile.Close()
+		defer func() { _ = manifestFile.Close() }()
 
 		manifestData, readErr := io.ReadAll(manifestFile)
 		if readErr != nil {
@@ -175,7 +176,7 @@ func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
 		// Extract plugin name from filename or manifest
 		pluginName := strings.TrimSuffix(header.Filename, ".wasm")
 		err = h.manager.UploadPluginLegacy(pluginName, fileData, manifestData)
-	} else {
+	default:
 		respondBadRequest(w, r, "Unsupported file type. Upload .wasm or .zip files")
 		return
 	}
@@ -189,7 +190,7 @@ func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
 	h.syncPluginToDatabase()
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Plugin uploaded successfully"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Plugin uploaded successfully"})
 }
 
 // GetExtensions returns all extensions from enabled plugins
@@ -197,12 +198,12 @@ func (h *PluginHandler) GetExtensions(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if h.manager == nil {
-		json.NewEncoder(w).Encode(map[string][]plugins.Extension{})
+		_ = json.NewEncoder(w).Encode(map[string][]plugins.Extension{})
 		return
 	}
 
 	extensions := h.manager.GetExtensions()
-	json.NewEncoder(w).Encode(extensions)
+	_ = json.NewEncoder(w).Encode(extensions)
 }
 
 // GetAsset serves a static asset from a plugin
@@ -224,7 +225,7 @@ func (h *PluginHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", mimeType)
 	// Enable CORS for plugin assets
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Write(data)
+	_, _ = w.Write(data)
 }
 
 // TogglePlugin enables or disables a plugin
@@ -264,7 +265,7 @@ func (h *PluginHandler) TogglePlugin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "enabled": req.Enabled})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "enabled": req.Enabled})
 }
 
 // DeletePlugin removes a plugin
@@ -290,7 +291,7 @@ func (h *PluginHandler) DeletePlugin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Plugin deleted successfully"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Plugin deleted successfully"})
 }
 
 // ReloadPlugin reloads a plugin
@@ -311,7 +312,7 @@ func (h *PluginHandler) ReloadPlugin(w http.ResponseWriter, r *http.Request) {
 	h.syncPluginToDatabase()
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Plugin reloaded successfully"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Plugin reloaded successfully"})
 }
 
 // syncPluginToDatabase syncs loaded plugins with database
@@ -348,7 +349,7 @@ func (h *PluginHandler) syncPluginToDatabase() {
 				enabled = excluded.enabled,
 				updated_at = CURRENT_TIMESTAMP
 		`, p.Manifest.Name, p.Manifest.Version, p.Manifest.Description,
-		   p.Manifest.Author, p.Path, string(routesJSON), string(extensionsJSON), p.Enabled)
+			p.Manifest.Author, p.Path, string(routesJSON), string(extensionsJSON), p.Enabled)
 
 		if err != nil {
 			// Log error but continue

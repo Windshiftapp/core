@@ -21,19 +21,19 @@ import (
 
 // CommentHandler handles comment-related HTTP requests
 type CommentHandler struct {
-	db                database.Database
-	permissionService *services.PermissionService
-	activityTracker   *services.ActivityTracker
-	mentionService    *services.MentionService // Mention service for processing @mentions (optional, can be nil)
-	notificationService interface{
+	db                  database.Database
+	permissionService   *services.PermissionService
+	activityTracker     *services.ActivityTracker
+	mentionService      *services.MentionService // Mention service for processing @mentions (optional, can be nil)
+	notificationService interface {
 		EmitEvent(event *services.NotificationEvent)
 	} // Notification service for async notification processing (optional, can be nil)
-	webhookSender  *webhook.WebhookSender     // Webhook sender for dispatching webhook events (optional, can be nil)
-	commentService *services.CommentService   // CommentService for unified comment creation logic
+	webhookSender  *webhook.WebhookSender   // Webhook sender for dispatching webhook events (optional, can be nil)
+	commentService *services.CommentService // CommentService for unified comment creation logic
 }
 
 // NewCommentHandler creates a new comment handler
-func NewCommentHandler(db database.Database, permissionService *services.PermissionService, activityTracker *services.ActivityTracker, notificationService interface{
+func NewCommentHandler(db database.Database, permissionService *services.PermissionService, activityTracker *services.ActivityTracker, notificationService interface {
 	EmitEvent(event *services.NotificationEvent)
 }) *CommentHandler {
 	return &CommentHandler{
@@ -113,7 +113,7 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, fmt.Errorf("failed to fetch comments: %w", err))
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var comments []models.Comment
 	for rows.Next() {
@@ -123,7 +123,7 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 		var email, avatarURL sql.NullString
 		var customerName, customerEmail sql.NullString
 
-		err := rows.Scan(
+		err = rows.Scan(
 			&comment.ID, &comment.ItemID, &authorID, &portalCustomerID, &comment.Content, &comment.IsPrivate,
 			&comment.CreatedAt, &comment.UpdatedAt,
 			&firstName, &lastName, &email, &avatarURL,
@@ -139,22 +139,24 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 		comment.PortalCustomerID = utils.NullInt64ToPtr(portalCustomerID)
 
 		// Construct author name - prefer user info, fall back to portal customer
-		if firstName.Valid && lastName.Valid {
+		switch {
+		case firstName.Valid && lastName.Valid:
 			comment.AuthorName = strings.TrimSpace(firstName.String + " " + lastName.String)
-		} else if firstName.Valid {
+		case firstName.Valid:
 			comment.AuthorName = firstName.String
-		} else if lastName.Valid {
+		case lastName.Valid:
 			comment.AuthorName = lastName.String
-		} else if customerName.Valid {
+		case customerName.Valid:
 			comment.AuthorName = customerName.String
-		} else {
+		default:
 			comment.AuthorName = "Unknown User"
 		}
 
 		// Set email - prefer user email, fall back to portal customer
-		if email.Valid {
+		switch {
+		case email.Valid:
 			comment.AuthorEmail = email.String
-		} else if customerEmail.Valid {
+		case customerEmail.Valid:
 			comment.AuthorEmail = customerEmail.String
 		}
 
@@ -169,7 +171,7 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(comments)
+	_ = json.NewEncoder(w).Encode(comments)
 }
 
 // CreateComment handles POST /api/items/{id}/comments
@@ -193,7 +195,7 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		IsPrivate bool   `json:"is_private"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -246,7 +248,8 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	// Use CommentService if available, otherwise fall back to legacy inline logic
 	var commentID int64
 	if h.commentService != nil {
-		result, err := h.commentService.Create(services.CreateCommentParams{
+		var result *services.CreateCommentResult
+		result, err = h.commentService.Create(services.CreateCommentParams{
 			ItemID:      itemID,
 			AuthorID:    reqBody.AuthorID,
 			Content:     reqBody.Content,
@@ -287,7 +290,7 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(comment)
+	_ = json.NewEncoder(w).Encode(comment)
 }
 
 // UpdateComment handles PUT /api/comments/{id}
@@ -337,7 +340,8 @@ func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 	// Check if user is the comment author OR has permission to edit others' comments
 	isAuthor := user.ID == authorID
 	if !isAuthor {
-		canEditOthers, err := h.canEditOthersComments(user.ID, workspaceID)
+		var canEditOthers bool
+		canEditOthers, err = h.canEditOthersComments(user.ID, workspaceID)
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 			return
@@ -352,7 +356,7 @@ func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 		Content string `json:"content"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -396,7 +400,7 @@ func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Emit notification event
-	if h.notificationService != nil && user != nil {
+	if h.notificationService != nil {
 		assigneeIDPtr := utils.NullInt64ToPtr(assigneeID)
 		creatorIDPtr := utils.NullInt64ToPtr(creatorID)
 
@@ -440,7 +444,7 @@ func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(comment)
+	_ = json.NewEncoder(w).Encode(comment)
 }
 
 // DeleteComment handles DELETE /api/comments/{id}
@@ -490,7 +494,8 @@ func (h *CommentHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 	// Check if user is the comment author OR has permission to edit others' comments
 	isAuthor := user.ID == authorID
 	if !isAuthor {
-		canEditOthers, err := h.canEditOthersComments(user.ID, workspaceID)
+		var canEditOthers bool
+		canEditOthers, err = h.canEditOthersComments(user.ID, workspaceID)
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 			return
@@ -519,7 +524,7 @@ func (h *CommentHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Emit notification event
-	if h.notificationService != nil && user != nil {
+	if h.notificationService != nil {
 		assigneeIDPtr := utils.NullInt64ToPtr(assigneeID)
 		creatorIDPtr := utils.NullInt64ToPtr(creatorID)
 
@@ -583,22 +588,24 @@ func (h *CommentHandler) getCommentByID(commentID int) (*models.Comment, error) 
 	comment.PortalCustomerID = utils.NullInt64ToPtr(portalCustomerID)
 
 	// Construct author name - prefer user info, fall back to portal customer
-	if firstName.Valid && lastName.Valid {
+	switch {
+	case firstName.Valid && lastName.Valid:
 		comment.AuthorName = strings.TrimSpace(firstName.String + " " + lastName.String)
-	} else if firstName.Valid {
+	case firstName.Valid:
 		comment.AuthorName = firstName.String
-	} else if lastName.Valid {
+	case lastName.Valid:
 		comment.AuthorName = lastName.String
-	} else if customerName.Valid {
+	case customerName.Valid:
 		comment.AuthorName = customerName.String
-	} else {
+	default:
 		comment.AuthorName = "Unknown User"
 	}
 
 	// Set email - prefer user email, fall back to portal customer
-	if email.Valid {
+	switch {
+	case email.Valid:
 		comment.AuthorEmail = email.String
-	} else if customerEmail.Valid {
+	case customerEmail.Valid:
 		comment.AuthorEmail = customerEmail.String
 	}
 

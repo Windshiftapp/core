@@ -1,3 +1,4 @@
+// Package dto provides data transfer objects for the REST API.
 package dto
 
 import "time"

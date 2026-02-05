@@ -1,6 +1,13 @@
 package handlers
 
 import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"time"
+
 	"windshift/internal/auth"
 	"windshift/internal/database"
 	"windshift/internal/middleware"
@@ -8,12 +15,6 @@ import (
 	"windshift/internal/services"
 	"windshift/internal/sso"
 	"windshift/internal/utils"
-	"database/sql"
-	"encoding/json"
-	"fmt"
-	"log/slog"
-	"net/http"
-	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -51,12 +52,12 @@ type ChangePasswordRequest struct {
 
 // LoginResponse represents the login response
 type LoginResponse struct {
-	Success            bool          `json:"success"`
-	User               *models.User  `json:"user,omitempty"`
-	Message            string        `json:"message,omitempty"`
-	EnrollmentRequired bool          `json:"enrollment_required,omitempty"`
-	SSORequired        bool          `json:"sso_required,omitempty"`
-	PolicyMessage      string        `json:"policy_message,omitempty"`
+	Success            bool         `json:"success"`
+	User               *models.User `json:"user,omitempty"`
+	Message            string       `json:"message,omitempty"`
+	EnrollmentRequired bool         `json:"enrollment_required,omitempty"`
+	SSORequired        bool         `json:"sso_required,omitempty"`
+	PolicyMessage      string       `json:"policy_message,omitempty"`
 }
 
 // UserResponse represents the current user response
@@ -110,13 +111,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req LoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate input using validator
-	if err := utils.Validate(req); err != nil {
+	if err = utils.Validate(req); err != nil {
 		respondValidationError(w, r, err.Error())
 		return
 	}
@@ -137,7 +138,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			// Record failed attempt
 			h.rateLimiter.RecordFailedLogin(ipAddress)
 			// Always perform bcrypt comparison to prevent timing attacks
-			bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(req.Password))
+			_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(req.Password))
 			respondUnauthorized(w, r)
 			return
 		}
@@ -152,7 +153,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify password
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		// Record failed attempt
 		h.rateLimiter.RecordFailedLogin(ipAddress)
 		respondUnauthorized(w, r)
@@ -163,7 +164,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	h.rateLimiter.RecordSuccessfulLogin(ipAddress)
 
 	// Populate system admin status early (needed for policy checks)
-	if err := h.populateIsSystemAdmin(user); err != nil {
+	if err = h.populateIsSystemAdmin(user); err != nil {
 		slog.Warn("failed to populate system admin status", slog.String("component", "auth"), slog.Any("error", err))
 	}
 
@@ -188,15 +189,15 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 					respondTooManyRequests(w, r, msg)
 					return
 				}
-				h.adminRateLimiter.RecordAttempt(user.ID, ipAddress)
-				h.authPolicyHandler.LogAuditEvent(user.ID, "admin_fallback_used", ipAddress, r.UserAgent(), map[string]interface{}{
+				_ = h.adminRateLimiter.RecordAttempt(user.ID, ipAddress)
+				_ = h.authPolicyHandler.LogAuditEvent(user.ID, "admin_fallback_used", ipAddress, r.UserAgent(), map[string]interface{}{
 					"policy": string(policy),
 				})
 			} else {
 				// Either not admin OR fallback is disabled - must use SSO
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusForbidden)
-				json.NewEncoder(w).Encode(LoginResponse{
+				_ = json.NewEncoder(w).Encode(LoginResponse{
 					Success:       false,
 					SSORequired:   true,
 					PolicyMessage: "Password login is disabled. Please use SSO to sign in.",
@@ -222,15 +223,15 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				if !hasPasskey {
-					h.adminRateLimiter.RecordAttempt(user.ID, ipAddress)
-					h.authPolicyHandler.LogAuditEvent(user.ID, "admin_fallback_used", ipAddress, r.UserAgent(), map[string]interface{}{
+					_ = h.adminRateLimiter.RecordAttempt(user.ID, ipAddress)
+					_ = h.authPolicyHandler.LogAuditEvent(user.ID, "admin_fallback_used", ipAddress, r.UserAgent(), map[string]interface{}{
 						"policy": string(policy),
 					})
 				}
 			} else if !hasPasskey {
 				// Non-admin without passkey (or admin with fallback disabled) needs to enroll
 				enrollmentRequired = true
-				h.authPolicyHandler.LogAuditEvent(user.ID, "enrollment_started", ipAddress, r.UserAgent(), map[string]interface{}{
+				_ = h.authPolicyHandler.LogAuditEvent(user.ID, "enrollment_started", ipAddress, r.UserAgent(), map[string]interface{}{
 					"policy": string(policy),
 				})
 			}
@@ -275,7 +276,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // Logout handles user logout
@@ -286,7 +287,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		// Even if no session found, clear cookie and return success
 		h.sessionManager.ClearSessionCookie(w, r)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
 			"message": "Logout successful",
 		})
@@ -303,7 +304,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	h.sessionManager.ClearSessionCookie(w, r)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "Logout successful",
 	})
@@ -347,7 +348,7 @@ func (h *AuthHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // RefreshSession extends the current session
@@ -363,7 +364,7 @@ func (h *AuthHandler) RefreshSession(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		RememberMe bool `json:"remember_me"`
 	}
-	json.NewDecoder(r.Body).Decode(&req) // Optional, ignore errors
+	_ = json.NewDecoder(r.Body).Decode(&req) // Optional, ignore errors
 
 	// Refresh session
 	if err := h.sessionManager.RefreshSession(token, req.RememberMe); err != nil {
@@ -378,7 +379,7 @@ func (h *AuthHandler) RefreshSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "Session refreshed",
 	})
@@ -403,7 +404,7 @@ func (h *AuthHandler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 	h.sessionManager.ClearSessionCookie(w, r)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "All sessions logged out",
 	})
@@ -427,7 +428,7 @@ func (h *AuthHandler) findUserByEmailOrUsername(emailOrUsername string) (*models
 		&user.IsActive, &avatarURL, &user.PasswordHash,
 		&user.RequiresPasswordReset, &user.CreatedAt, &user.UpdatedAt,
 	)
-	
+
 	if err != nil {
 		return nil, err
 	}
@@ -483,7 +484,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify current password
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.CurrentPassword)); err != nil {
+	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.CurrentPassword)); err != nil {
 		respondUnauthorized(w, r)
 		return
 	}
@@ -506,8 +507,8 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	// Optionally logout all other sessions
 	if req.LogoutAll {
 		// Delete all sessions for this user
-		h.sessionManager.DeleteAllUserSessions(session.UserID)
-		
+		_ = h.sessionManager.DeleteAllUserSessions(session.UserID)
+
 		// Recreate current session
 		newSession, err := h.sessionManager.CreateSession(
 			session.UserID,
@@ -516,12 +517,12 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 			false, // Don't assume remember me for security
 		)
 		if err == nil {
-			h.sessionManager.SetSessionCookie(w, r, newSession.Token, false)
+			_ = h.sessionManager.SetSessionCookie(w, r, newSession.Token, false)
 		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "Password changed successfully",
 	})
@@ -550,7 +551,7 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 		case services.ErrAlreadyVerified:
 			// Not an error - just let them know
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"success": true,
 				"message": "Email is already verified",
 			})
@@ -563,7 +564,7 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":  true,
 		"message":  "Email verified successfully",
 		"user_id":  user.ID,
@@ -590,7 +591,7 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 		switch err {
 		case services.ErrAlreadyVerified:
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"success": true,
 				"message": "Email is already verified",
 			})
@@ -601,7 +602,7 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 				slog.String("component", "auth"),
 				slog.Int("session_user_id", session.UserID))
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"success": true,
 				"message": "If your account exists, a verification email will be sent",
 			})
@@ -615,7 +616,7 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "Verification email sent",
 	})
@@ -633,7 +634,7 @@ func (h *AuthHandler) GetVerificationStatus(w http.ResponseWriter, r *http.Reque
 	if h.emailVerificationService == nil {
 		// If email verification service is not configured, assume verified
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"email_verified": true,
 			"configured":     false,
 		})
@@ -645,7 +646,7 @@ func (h *AuthHandler) GetVerificationStatus(w http.ResponseWriter, r *http.Reque
 		slog.Error("failed to check verification status", slog.String("component", "auth"), slog.Any("error", err))
 		// Return verified=true on error for graceful degradation
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"email_verified": true,
 			"configured":     false,
 		})
@@ -653,9 +654,8 @@ func (h *AuthHandler) GetVerificationStatus(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"email_verified": verified,
 		"configured":     true,
 	})
 }
-

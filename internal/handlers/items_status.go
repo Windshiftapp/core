@@ -4,12 +4,13 @@ import (
 	"database/sql"
 	"net/http"
 	"strings"
+
 	"windshift/internal/services"
 )
 
 // GetAvailableStatusTransitions returns the valid status transitions for a work item
 func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *http.Request) {
-	itemId, ok := requireIDParam(w, r, "id")
+	itemID, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
 	}
@@ -22,15 +23,15 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 	}
 
 	// Get the item to find its current status, workspace, and item type
-	var currentStatusId sql.NullInt64
-	var workspaceId int
-	var itemTypeId sql.NullInt64
+	var currentStatusID sql.NullInt64
+	var workspaceID int
+	var itemTypeID sql.NullInt64
 
 	err := h.db.QueryRow(`
 		SELECT status_id, workspace_id, item_type_id
 		FROM items
 		WHERE id = ?
-	`, itemId).Scan(&currentStatusId, &workspaceId, &itemTypeId)
+	`, itemID).Scan(&currentStatusID, &workspaceID, &itemTypeID)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -42,7 +43,7 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 	}
 
 	// Check if user has permission to view this item's workspace
-	canView, permErr := h.canViewItem(user.ID, workspaceId)
+	canView, permErr := h.canViewItem(user.ID, workspaceID)
 	if permErr != nil {
 		respondInternalError(w, r, permErr)
 		return
@@ -54,25 +55,25 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 
 	// Get current status name for response
 	var currentStatusName string
-	if currentStatusId.Valid {
-		h.db.QueryRow(`SELECT name FROM statuses WHERE id = ?`, currentStatusId.Int64).Scan(&currentStatusName)
+	if currentStatusID.Valid {
+		_ = h.db.QueryRow(`SELECT name FROM statuses WHERE id = ?`, currentStatusID.Int64).Scan(&currentStatusName)
 	}
 
 	// Get the workflow using WorkflowService (considers item type override)
 	workflowService := services.NewWorkflowService(h.db)
-	var itemTypeIdPtr *int
-	if itemTypeId.Valid {
-		itemTypeIdInt := int(itemTypeId.Int64)
-		itemTypeIdPtr = &itemTypeIdInt
+	var itemTypeIDPtr *int
+	if itemTypeID.Valid {
+		itemTypeIDInt := int(itemTypeID.Int64)
+		itemTypeIDPtr = &itemTypeIDInt
 	}
-	workflowId, err := workflowService.GetWorkflowIDForItem(workspaceId, itemTypeIdPtr)
+	workflowID, err := workflowService.GetWorkflowIDForItem(workspaceID, itemTypeIDPtr)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
 	// No workflow configured - return empty transitions
-	if workflowId == nil {
+	if workflowID == nil {
 		response := map[string]interface{}{
 			"current_status":        currentStatusName,
 			"available_transitions": []map[string]interface{}{},
@@ -85,7 +86,7 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 	availableTransitions := []map[string]interface{}{}
 
 	// Always include current status first
-	if currentStatusId.Valid {
+	if currentStatusID.Valid {
 		var statusName string
 		var categoryColor sql.NullString
 		err = h.db.QueryRow(`
@@ -93,10 +94,10 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 			FROM statuses s
 			LEFT JOIN status_categories sc ON s.category_id = sc.id
 			WHERE s.id = ?
-		`, currentStatusId.Int64).Scan(&statusName, &categoryColor)
+		`, currentStatusID.Int64).Scan(&statusName, &categoryColor)
 		if err == nil {
 			transition := map[string]interface{}{
-				"id":    int(currentStatusId.Int64),
+				"id":    int(currentStatusID.Int64),
 				"name":  statusName,
 				"value": strings.ToLower(strings.ReplaceAll(statusName, " ", "_")),
 			}
@@ -108,41 +109,41 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 	}
 
 	// Get valid transitions from current status
-	if currentStatusId.Valid {
+	if currentStatusID.Valid {
 		rows, err := h.db.Query(`
 			SELECT s.id, s.name, sc.color
 			FROM workflow_transitions wt
 			JOIN statuses s ON wt.to_status_id = s.id
 			LEFT JOIN status_categories sc ON s.category_id = sc.id
 			WHERE wt.workflow_id = ? AND wt.from_status_id = ?
-		`, *workflowId, currentStatusId.Int64)
+		`, *workflowID, currentStatusID.Int64)
 
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		// Track IDs we've already added to avoid duplicates
-		addedIds := map[int]bool{}
-		if currentStatusId.Valid {
-			addedIds[int(currentStatusId.Int64)] = true
+		addedIDs := map[int]bool{}
+		if currentStatusID.Valid {
+			addedIDs[int(currentStatusID.Int64)] = true
 		}
 
 		for rows.Next() {
-			var statusId int
+			var statusID int
 			var statusName string
 			var categoryColor sql.NullString
 
-			err := rows.Scan(&statusId, &statusName, &categoryColor)
+			err := rows.Scan(&statusID, &statusName, &categoryColor)
 			if err != nil {
 				continue
 			}
 
 			// Don't add duplicates
-			if !addedIds[statusId] {
+			if !addedIDs[statusID] {
 				transition := map[string]interface{}{
-					"id":    statusId,
+					"id":    statusID,
 					"name":  statusName,
 					"value": strings.ToLower(strings.ReplaceAll(statusName, " ", "_")),
 				}
@@ -150,7 +151,7 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 					transition["category_color"] = categoryColor.String
 				}
 				availableTransitions = append(availableTransitions, transition)
-				addedIds[statusId] = true
+				addedIDs[statusID] = true
 			}
 		}
 	}

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/sso"
@@ -49,7 +50,7 @@ func (s *SyncService) SyncAllRepositories(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to query repositories: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type repoInfo struct {
 		ID             int
@@ -139,7 +140,7 @@ func (s *SyncService) SyncRepository(ctx context.Context, repoID int) error {
 }
 
 // syncRepository performs the actual sync for a single repository
-func (s *SyncService) syncRepository(ctx context.Context, provider Provider, repoID int, repositoryName string, workspaceID int, workspaceKey string, itemKeyPattern string) error {
+func (s *SyncService) syncRepository(ctx context.Context, provider Provider, repoID int, repositoryName string, workspaceID int, workspaceKey, itemKeyPattern string) error {
 	// Parse owner/repo from repository name
 	parts := strings.SplitN(repositoryName, "/", 2)
 	if len(parts) != 2 {
@@ -172,7 +173,7 @@ func (s *SyncService) syncRepository(ctx context.Context, provider Provider, rep
 }
 
 // syncPullRequests syncs pull requests from a repository
-func (s *SyncService) syncPullRequests(ctx context.Context, provider Provider, owner, repo string, repoID, workspaceID int, workspaceKey, itemKeyPattern string) error {
+func (s *SyncService) syncPullRequests(ctx context.Context, provider Provider, owner, repo string, repoID, workspaceID int, workspaceKey, _ string) error {
 	// Get open pull requests (and recently closed ones)
 	prs, err := provider.ListPullRequests(ctx, owner, repo, ListPROptions{
 		State:   "all", // Get all to detect state changes
@@ -217,7 +218,7 @@ func (s *SyncService) syncPullRequests(ctx context.Context, provider Provider, o
 }
 
 // syncBranches syncs branches from a repository
-func (s *SyncService) syncBranches(ctx context.Context, provider Provider, owner, repo string, repoID, workspaceID int, workspaceKey, itemKeyPattern string) error {
+func (s *SyncService) syncBranches(ctx context.Context, provider Provider, owner, repo string, repoID, workspaceID int, workspaceKey, _ string) error {
 	branches, err := provider.ListBranches(ctx, owner, repo)
 	if err != nil {
 		return fmt.Errorf("failed to list branches: %w", err)
@@ -383,7 +384,8 @@ func (s *SyncService) RefreshItemSCMLink(ctx context.Context, linkID int) error 
 	switch linkType {
 	case models.SCMLinkTypePullRequest:
 		prNumber, _ := strconv.Atoi(externalID)
-		pr, err := provider.GetPullRequest(ctx, owner, repo, prNumber)
+		var pr *PullRequest
+		pr, err = provider.GetPullRequest(ctx, owner, repo, prNumber)
 		if err != nil {
 			return fmt.Errorf("failed to get PR: %w", err)
 		}
@@ -405,7 +407,8 @@ func (s *SyncService) RefreshItemSCMLink(ctx context.Context, linkID int) error 
 		return err
 
 	case models.SCMLinkTypeCommit:
-		commit, err := provider.GetCommit(ctx, owner, repo, externalID)
+		var commit *Commit
+		commit, err = provider.GetCommit(ctx, owner, repo, externalID)
 		if err != nil {
 			return fmt.Errorf("failed to get commit: %w", err)
 		}
@@ -718,7 +721,7 @@ func (s *SyncService) RefreshAllPRLinkStates(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to query PR links: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var linkIDs []int
 	for rows.Next() {

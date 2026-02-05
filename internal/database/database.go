@@ -1,3 +1,4 @@
+// Package database provides database connection and transaction management.
 package database
 
 import (
@@ -133,7 +134,7 @@ func NewDB(dataSourceName string) (*DB, error) {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	if err := db.Ping(); err != nil {
+	if err = db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
@@ -145,12 +146,12 @@ func NewDB(dataSourceName string) (*DB, error) {
 		"PRAGMA foreign_keys=ON",
 		"PRAGMA temp_store=MEMORY",
 		"PRAGMA cache_size=-262144", // 256MB cache
-		"PRAGMA mmap_size=0", // Disable mmap for better Docker compatibility
+		"PRAGMA mmap_size=0",        // Disable mmap for better Docker compatibility
 		"PRAGMA journal_size_limit=6144000",
 	}
 
 	for _, pragma := range pragmas {
-		if _, err := db.Exec(pragma); err != nil {
+		if _, err = db.Exec(pragma); err != nil {
 			slog.Warn("failed to set pragma", slog.String("component", "database"), slog.String("pragma", pragma), slog.Any("error", err))
 		}
 	}
@@ -173,6 +174,18 @@ func NewDB(dataSourceName string) (*DB, error) {
 		_ = db.Close()
 		_ = writeConn.Close()
 		return nil, fmt.Errorf("failed to ping write connection: %w", err)
+	}
+
+	// Set critical pragmas on write connection (DSN params may not be applied by all drivers)
+	writePragmas := []string{
+		"PRAGMA foreign_keys=ON",
+		"PRAGMA busy_timeout=5000",
+		"PRAGMA synchronous=NORMAL",
+	}
+	for _, pragma := range writePragmas {
+		if _, err := writeConn.Exec(pragma); err != nil {
+			slog.Warn("failed to set write connection pragma", slog.String("component", "database"), slog.String("pragma", pragma), slog.Any("error", err))
+		}
 	}
 
 	return &DB{DB: db, writeConn: writeConn}, nil
@@ -296,7 +309,8 @@ func (db *DB) initializeDefaultData() error {
 
 	categoryIDs := make(map[string]int64)
 	for _, cat := range categories {
-		result, err := tx.Exec(
+		var result sql.Result
+		result, err = tx.Exec(
 			"INSERT INTO status_categories (name, color, description, is_default, is_completed) VALUES (?, ?, ?, ?, ?)",
 			cat.name, cat.color, cat.description, cat.isDefault, cat.isCompleted,
 		)
@@ -322,7 +336,8 @@ func (db *DB) initializeDefaultData() error {
 	statusIDs := make(map[string]int64)
 	for _, status := range statuses {
 		categoryID := categoryIDs[status.category]
-		result, err := tx.Exec(
+		var result sql.Result
+		result, err = tx.Exec(
 			"INSERT INTO statuses (name, description, category_id, is_default) VALUES (?, ?, ?, ?)",
 			status.name, status.description, categoryID, status.isDefault,
 		)
@@ -348,9 +363,9 @@ func (db *DB) initializeDefaultData() error {
 		from string // empty string means initial status
 		to   string
 	}{
-		{"", "Open"},             // Initial transition
+		{"", "Open"}, // Initial transition
 		{"Open", "In Progress"},
-		{"Open", "Done"},         // Direct completion from Open
+		{"Open", "Done"}, // Direct completion from Open
 		{"In Progress", "Done"},
 	}
 
@@ -362,7 +377,7 @@ func (db *DB) initializeDefaultData() error {
 		}
 		toStatusID := statusIDs[transition.to]
 
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			"INSERT INTO workflow_transitions (workflow_id, from_status_id, to_status_id, display_order) VALUES (?, ?, ?, ?)",
 			workflowID, fromStatusID, toStatusID, i,
 		)
@@ -398,7 +413,7 @@ func (db *DB) initializeDefaultData() error {
 	}
 
 	for _, field := range screenFields {
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			"INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width) VALUES (?, ?, ?, ?, ?, ?)",
 			screenID, field.fieldType, field.fieldIdentifier, field.displayOrder, field.isRequired, field.fieldWidth,
 		)
@@ -420,7 +435,7 @@ func (db *DB) initializeDefaultData() error {
 	// 8. Assign default screen to configuration set for all contexts
 	contexts := []string{"create", "edit", "view"}
 	for _, context := range contexts {
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			"INSERT INTO configuration_set_screens (configuration_set_id, screen_id, context) VALUES (?, ?, ?)",
 			configSetID, screenID, context,
 		)
@@ -448,7 +463,7 @@ func (db *DB) initializeDefaultData() error {
 	}
 
 	for _, linkType := range linkTypes {
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			"INSERT INTO link_types (name, description, forward_label, reverse_label, color, is_system) VALUES (?, ?, ?, ?, ?, ?)",
 			linkType.name, linkType.description, linkType.forwardLabel, linkType.reverseLabel, linkType.color, linkType.isSystem,
 		)
@@ -474,7 +489,7 @@ func (db *DB) initializeDefaultData() error {
 	}
 
 	for _, setting := range systemSettings {
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			"INSERT INTO system_settings (key, value, value_type, description, category) VALUES (?, ?, ?, ?, ?)",
 			setting.key, setting.value, setting.valueType, setting.description, setting.category,
 		)
@@ -497,7 +512,7 @@ func (db *DB) initializeDefaultData() error {
 	}
 
 	for _, hl := range hierarchyLevels {
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			"INSERT INTO hierarchy_levels (level, name, description) VALUES (?, ?, ?)",
 			hl.level, hl.name, hl.description,
 		)
@@ -524,7 +539,7 @@ func (db *DB) initializeDefaultData() error {
 	}
 
 	for _, itemType := range defaultItemTypes {
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			"INSERT INTO item_types (configuration_set_id, name, description, icon, color, hierarchy_level, sort_order, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
 			configSetID, itemType.name, itemType.description, itemType.icon, itemType.color, itemType.hierarchyLevel, itemType.sortOrder, true,
 		)
@@ -537,7 +552,7 @@ func (db *DB) initializeDefaultData() error {
 	itemTypesToBind := []string{"Epic", "Story", "Task", "Bug", "Sub-task"}
 	for _, typeName := range itemTypesToBind {
 		var itemTypeID int64
-		err := tx.QueryRow("SELECT id FROM item_types WHERE name = ?", typeName).Scan(&itemTypeID)
+		err = tx.QueryRow("SELECT id FROM item_types WHERE name = ?", typeName).Scan(&itemTypeID)
 		if err != nil {
 			return fmt.Errorf("failed to get item type ID for %s: %w", typeName, err)
 		}
@@ -586,7 +601,7 @@ func (db *DB) initializeDefaultData() error {
 	}
 
 	for _, theme := range defaultThemes {
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			"INSERT INTO themes (name, description, is_default, is_active, nav_background_color_light, nav_text_color_light, nav_background_color_dark, nav_text_color_dark) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
 			theme.name, theme.description, theme.isDefault, theme.isActive, theme.navBackgroundColorLight, theme.navTextColorLight, theme.navBackgroundColorDark, theme.navTextColorDark,
 		)
@@ -618,7 +633,7 @@ func (db *DB) initializeDefaultData() error {
 
 	for priorityRows.Next() {
 		var priorityID int64
-		if err := priorityRows.Scan(&priorityID); err != nil {
+		if err = priorityRows.Scan(&priorityID); err != nil {
 			return fmt.Errorf("failed to scan priority: %w", err)
 		}
 		_, err = tx.Exec(
@@ -642,10 +657,10 @@ func (db *DB) initializeDefaultData() error {
 
 	// 15. Create default notification event rules
 	defaultEventRules := []struct {
-		eventType           string
-		notifyAssignee      bool
-		notifyCreator       bool
-		notifyWatchers      bool
+		eventType             string
+		notifyAssignee        bool
+		notifyCreator         bool
+		notifyWatchers        bool
 		notifyWorkspaceAdmins bool
 	}{
 		// Item assignment - notify the assignee
@@ -657,7 +672,7 @@ func (db *DB) initializeDefaultData() error {
 	}
 
 	for _, rule := range defaultEventRules {
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			`INSERT INTO notification_event_rules
 			 (notification_setting_id, event_type, is_enabled, notify_assignee, notify_creator,
 			  notify_watchers, notify_workspace_admins)
@@ -750,7 +765,7 @@ func (db *DB) EnsureDefaultNotificationSettings() error {
 	}
 
 	for _, rule := range eventRules {
-		_, err := tx.Exec(
+		_, err = tx.Exec(
 			`INSERT INTO notification_event_rules
 			 (notification_setting_id, event_type, is_enabled, notify_assignee, notify_creator,
 			  notify_watchers, notify_workspace_admins)

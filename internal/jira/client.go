@@ -79,12 +79,12 @@ type Config struct {
 
 // cloudClient implements the Client interface for Jira Cloud
 type cloudClient struct {
-	baseURL     string
-	assetsURL   string
-	agileURL    string
-	authHeader  string
-	httpClient  *http.Client
-	limiter     *rate.Limiter
+	baseURL    string
+	assetsURL  string
+	agileURL   string
+	authHeader string
+	httpClient *http.Client
+	limiter    *rate.Limiter
 }
 
 // NewClient creates a new Jira API client
@@ -150,7 +150,7 @@ func NewClient(cfg Config) (Client, error) {
 }
 
 // do performs an HTTP request with rate limiting
-func (c *cloudClient) do(ctx context.Context, method, url string, body interface{}) (*http.Response, error) {
+func (c *cloudClient) do(ctx context.Context, method, reqURL string, body interface{}) (*http.Response, error) {
 	// Wait for rate limiter
 	if err := c.limiter.Wait(ctx); err != nil {
 		return nil, err
@@ -165,7 +165,7 @@ func (c *cloudClient) do(ctx context.Context, method, url string, body interface
 		bodyReader = bytes.NewReader(bodyBytes)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
+	req, err := http.NewRequestWithContext(ctx, method, reqURL, bodyReader)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +224,7 @@ func (c *cloudClient) TestConnection(ctx context.Context) (*JiraInstanceInfo, er
 	}
 
 	var user JiraUser
-	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&user); err != nil { //nolint:gocritic // intentionally reusing err to avoid shadowing
 		return nil, err
 	}
 
@@ -240,10 +240,10 @@ func (c *cloudClient) TestConnection(ctx context.Context) (*JiraInstanceInfo, er
 	defer func() { _ = serverResp.Body.Close() }()
 
 	var serverInfo struct {
-		BaseURL        string   `json:"baseUrl"`
-		Version        string   `json:"version"`
-		DeploymentType string   `json:"deploymentType"`
-		ServerTitle    string   `json:"serverTitle"`
+		BaseURL        string `json:"baseUrl"`
+		Version        string `json:"version"`
+		DeploymentType string `json:"deploymentType"`
+		ServerTitle    string `json:"serverTitle"`
 	}
 	if err := json.NewDecoder(serverResp.Body).Decode(&serverInfo); err != nil {
 		return &JiraInstanceInfo{
@@ -636,7 +636,7 @@ func (c *cloudClient) GetIssueCount(ctx context.Context, projectKey string, open
 	// Request only the key field to minimize response size
 	result, err := c.SearchIssuesJQL(ctx, JQLSearchRequest{
 		JQL:        jql,
-		MaxResults: 1,      // We only need the total count
+		MaxResults: 1, // We only need the total count
 		Fields:     []string{"key"},
 	})
 	if err != nil {
@@ -826,7 +826,7 @@ func (c *cloudClient) DownloadAttachment(ctx context.Context, attachmentURL stri
 		return nil, "", err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", attachmentURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", attachmentURL, http.NoBody)
 	if err != nil {
 		return nil, "", err
 	}
@@ -972,9 +972,9 @@ func (c *cloudClient) GetObjectTypeAttributes(ctx context.Context, objectTypeID 
 func (c *cloudClient) SearchObjects(ctx context.Context, opts ObjectSearchOptions) (*ObjectSearchResult, error) {
 	// Build the request body for object search
 	reqBody := map[string]interface{}{
-		"objectSchemaId": opts.ObjectSchemaID,
-		"page":           opts.Page,
-		"resultsPerPage": opts.PageSize,
+		"objectSchemaId":    opts.ObjectSchemaID,
+		"page":              opts.Page,
+		"resultsPerPage":    opts.PageSize,
 		"includeAttributes": opts.IncludeAttributes,
 	}
 	if opts.ObjectTypeID != "" {

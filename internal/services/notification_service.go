@@ -176,7 +176,7 @@ func (ns *NotificationService) processEvent(event *NotificationEvent) error {
 	if err != nil || configSetID == 0 {
 		// No configuration set, skip notifications
 		slog.Debug("no config set for workspace, skipping notifications", slog.String("component", "notifications"), slog.Int("workspace_id", event.WorkspaceID))
-		return nil
+		return err
 	}
 
 	slog.Debug("found config set for workspace", slog.String("component", "notifications"), slog.Int("config_set_id", configSetID), slog.Int("workspace_id", event.WorkspaceID))
@@ -270,7 +270,7 @@ func (ns *NotificationService) refreshRuleCache() error {
 
 	for rows.Next() {
 		var workspaceID, configSetID int
-		if err := rows.Scan(&workspaceID, &configSetID); err != nil {
+		if err = rows.Scan(&workspaceID, &configSetID); err != nil {
 			slog.Error("failed to scan workspace config set", slog.String("component", "notifications"), slog.Any("error", err))
 			continue
 		}
@@ -299,7 +299,7 @@ func (ns *NotificationService) refreshRuleCache() error {
 		var configSetID int
 		var customRecipients, messageTemplate *string
 
-		if err := ruleRows.Scan(
+		if err = ruleRows.Scan(
 			&rule.ID, &rule.NotificationSettingID, &rule.EventType, &rule.IsEnabled,
 			&rule.NotifyAssignee, &rule.NotifyCreator, &rule.NotifyWatchers, &rule.NotifyWorkspaceAdmins,
 			&customRecipients, &messageTemplate,
@@ -480,7 +480,7 @@ func (ns *NotificationService) getItemWatchers(itemID int) []int {
 }
 
 // generateNotificationMessage generates title and message for a notification
-func (ns *NotificationService) generateNotificationMessage(event *NotificationEvent, rule *models.NotificationEventRule) (string, string) {
+func (ns *NotificationService) generateNotificationMessage(event *NotificationEvent, rule *models.NotificationEventRule) (subject, body string) {
 	// Use custom template if provided
 	if rule.MessageTemplate != "" {
 		return ns.applyTemplate(event, rule.MessageTemplate)
@@ -500,7 +500,7 @@ func (ns *NotificationService) generateNotificationMessage(event *NotificationEv
 }
 
 // applyTemplate applies template variables to a template string
-func (ns *NotificationService) applyTemplate(event *NotificationEvent, template string) (string, string) {
+func (ns *NotificationService) applyTemplate(event *NotificationEvent, template string) (subject, body string) {
 	// Simple variable substitution
 	message := template
 	for key, value := range event.TemplateData {
@@ -519,7 +519,7 @@ func (ns *NotificationService) applyTemplate(event *NotificationEvent, template 
 }
 
 // getDefaultMessage generates default notification message based on event type
-func (ns *NotificationService) getDefaultMessage(event *NotificationEvent) (string, string) {
+func (ns *NotificationService) getDefaultMessage(event *NotificationEvent) (subject, body string) {
 	title := event.Title
 
 	var message string

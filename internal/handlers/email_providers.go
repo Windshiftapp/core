@@ -56,7 +56,7 @@ func (h *EmailProviderHandler) GetEmailProviders(w http.ResponseWriter, r *http.
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var providers []models.EmailProvider
 	for rows.Next() {
@@ -74,7 +74,7 @@ func (h *EmailProviderHandler) GetEmailProviders(w http.ResponseWriter, r *http.
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(providers)
+	_ = json.NewEncoder(w).Encode(providers)
 }
 
 // GetEmailProvider returns a single email provider
@@ -109,15 +109,15 @@ func (h *EmailProviderHandler) GetEmailProvider(w http.ResponseWriter, r *http.R
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(p)
+	_ = json.NewEncoder(w).Encode(p)
 }
 
 // CreateEmailProviderRequest represents the request body for creating a provider
 type CreateEmailProviderRequest struct {
-	Name       string `json:"name"`
-	Slug       string `json:"slug"`
-	Type       string `json:"type"` // microsoft, google, generic
-	IsEnabled  bool   `json:"is_enabled"`
+	Name      string `json:"name"`
+	Slug      string `json:"slug"`
+	Type      string `json:"type"` // microsoft, google, generic
+	IsEnabled bool   `json:"is_enabled"`
 
 	// OAuth fields
 	OAuthClientID     string `json:"oauth_client_id,omitempty"`
@@ -195,7 +195,7 @@ func (h *EmailProviderHandler) CreateEmailProvider(w http.ResponseWriter, r *htt
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"id":   id,
 		"slug": req.Slug,
 	})
@@ -211,7 +211,7 @@ func (h *EmailProviderHandler) UpdateEmailProvider(w http.ResponseWriter, r *htt
 	}
 
 	var req CreateEmailProviderRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -219,7 +219,8 @@ func (h *EmailProviderHandler) UpdateEmailProvider(w http.ResponseWriter, r *htt
 	// Encrypt client secret if provided
 	var clientSecretEnc *string
 	if req.OAuthClientSecret != "" && h.encryption != nil {
-		encrypted, err := h.encryption.Encrypt(req.OAuthClientSecret)
+		var encrypted string
+		encrypted, err = h.encryption.Encrypt(req.OAuthClientSecret)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -254,7 +255,7 @@ func (h *EmailProviderHandler) UpdateEmailProvider(w http.ResponseWriter, r *htt
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "updated"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "updated"})
 }
 
 // DeleteEmailProvider deletes an email provider
@@ -325,7 +326,6 @@ func (h *EmailProviderHandler) StartEmailOAuth(w http.ResponseWriter, r *http.Re
 	// Decrypt client secret
 	var clientSecret string
 	if clientSecretEnc != nil && *clientSecretEnc != "" && h.encryption != nil {
-		var err error
 		clientSecret, err = h.encryption.Decrypt(*clientSecretEnc)
 		if err != nil {
 			slog.Warn("failed to decrypt OAuth client secret", slog.String("component", "email_providers"), slog.Int("provider_id", provider.ID), slog.Any("error", err))
@@ -334,7 +334,7 @@ func (h *EmailProviderHandler) StartEmailOAuth(w http.ResponseWriter, r *http.Re
 
 	// Generate state token
 	stateBytes := make([]byte, 32)
-	if _, err := rand.Read(stateBytes); err != nil {
+	if _, err = rand.Read(stateBytes); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -371,7 +371,7 @@ func (h *EmailProviderHandler) StartEmailOAuth(w http.ResponseWriter, r *http.Re
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	_ = json.NewEncoder(w).Encode(map[string]string{
 		"auth_url": authURL,
 	})
 }
@@ -413,7 +413,7 @@ func (h *EmailProviderHandler) EmailOAuthCallback(w http.ResponseWriter, r *http
 	}
 
 	// Delete used state
-	h.db.Exec(`DELETE FROM email_oauth_state WHERE state = ?`, state)
+	_, _ = h.db.Exec(`DELETE FROM email_oauth_state WHERE state = ?`, state)
 
 	// Get provider
 	var provider models.EmailProvider
@@ -433,7 +433,6 @@ func (h *EmailProviderHandler) EmailOAuthCallback(w http.ResponseWriter, r *http
 	// Decrypt client secret
 	var clientSecret string
 	if clientSecretEnc != nil && *clientSecretEnc != "" && h.encryption != nil {
-		var err error
 		clientSecret, err = h.encryption.Decrypt(*clientSecretEnc)
 		if err != nil {
 			slog.Warn("failed to decrypt OAuth client secret in callback", slog.String("component", "email_providers"), slog.Int("provider_id", provider.ID), slog.Any("error", err))
@@ -507,17 +506,17 @@ func (h *EmailProviderHandler) EmailOAuthCallback(w http.ResponseWriter, r *http
 // updateChannelProviderID updates the email_provider_id in channel config
 func (h *EmailProviderHandler) updateChannelProviderID(channelID, providerID int) {
 	var configJSON string
-	h.db.QueryRow(`SELECT config FROM channels WHERE id = ?`, channelID).Scan(&configJSON)
+	_ = h.db.QueryRow(`SELECT config FROM channels WHERE id = ?`, channelID).Scan(&configJSON)
 
 	var config models.ChannelConfig
 	if configJSON != "" {
-		json.Unmarshal([]byte(configJSON), &config)
+		_ = json.Unmarshal([]byte(configJSON), &config)
 	}
 
 	config.EmailProviderID = &providerID
 
 	updatedJSON, _ := json.Marshal(config)
-	h.db.Exec(`UPDATE channels SET config = ? WHERE id = ?`, string(updatedJSON), channelID)
+	_, _ = h.db.Exec(`UPDATE channels SET config = ? WHERE id = ?`, string(updatedJSON), channelID)
 }
 
 // TestEmailChannel tests an email channel connection
@@ -536,7 +535,7 @@ func (h *EmailProviderHandler) TestEmailChannel(w http.ResponseWriter, r *http.R
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"success": "false",
 			"error":   err.Error(),
 		})
@@ -548,7 +547,7 @@ func (h *EmailProviderHandler) TestEmailChannel(w http.ResponseWriter, r *http.R
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
 			"error":   err.Error(),
 		})
@@ -556,7 +555,7 @@ func (h *EmailProviderHandler) TestEmailChannel(w http.ResponseWriter, r *http.R
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"email":   config.EmailOAuthEmail,
 	})

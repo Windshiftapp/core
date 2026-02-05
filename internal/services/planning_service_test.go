@@ -20,7 +20,6 @@ type planningTestEnv struct {
 func createPlanningTestDB(t *testing.T) database.Database {
 	t.Helper()
 	tdb := testutils.CreateTestDB(t, true)
-	t.Cleanup(func() { tdb.Close() })
 	return tdb.GetDatabase()
 }
 

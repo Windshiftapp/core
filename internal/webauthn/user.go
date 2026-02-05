@@ -4,10 +4,11 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strconv"
-	"windshift/internal/models"
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
+
+	"windshift/internal/models"
 )
 
 // User wraps the application User model to implement webauthn.User interface
@@ -71,7 +72,7 @@ func (u *User) SetCredentials(creds []webauthn.Credential) {
 // CredentialExcludeList returns a list of credential descriptors for exclusion
 // Used during registration to prevent duplicate registrations
 func (u *User) CredentialExcludeList() []protocol.CredentialDescriptor {
-	excludeList := []protocol.CredentialDescriptor{}
+	excludeList := make([]protocol.CredentialDescriptor, 0, len(u.credentials))
 	for _, cred := range u.credentials {
 		descriptor := protocol.CredentialDescriptor{
 			Type:         protocol.PublicKeyCredentialType,
@@ -85,22 +86,22 @@ func (u *User) CredentialExcludeList() []protocol.CredentialDescriptor {
 
 // WebAuthnCredential represents a stored WebAuthn credential in the database
 type WebAuthnCredential struct {
-	ID                string   `json:"id"` // Base64 encoded credential ID
-	UserID            int      `json:"user_id"`
-	CredentialName    string   `json:"credential_name"`
-	PublicKey         []byte   `json:"-"` // COSE encoded public key (not sent to client)
-	AttestationType   string   `json:"attestation_type"`
-	AAGUID            []byte   `json:"-"` // Authenticator GUID
-	SignCount         uint32   `json:"sign_count"`
-	CloneWarning      bool     `json:"clone_warning"`
-	Transport         []string `json:"transport"` // ['usb', 'nfc', 'ble', 'internal']
-	FlagsUserPresent  bool     `json:"flags_user_present"`
-	FlagsUserVerified bool     `json:"flags_user_verified"`
-	FlagsBackupEligible bool   `json:"flags_backup_eligible"`
-	FlagsBackupState  bool     `json:"flags_backup_state"`
-	CreatedAt         string   `json:"created_at"`
-	UpdatedAt         string   `json:"updated_at"`
-	LastUsedAt        *string  `json:"last_used_at,omitempty"`
+	ID                  string   `json:"id"` // Base64 encoded credential ID
+	UserID              int      `json:"user_id"`
+	CredentialName      string   `json:"credential_name"`
+	PublicKey           []byte   `json:"-"` // COSE encoded public key (not sent to client)
+	AttestationType     string   `json:"attestation_type"`
+	AAGUID              []byte   `json:"-"` // Authenticator GUID
+	SignCount           uint32   `json:"sign_count"`
+	CloneWarning        bool     `json:"clone_warning"`
+	Transport           []string `json:"transport"` // ['usb', 'nfc', 'ble', 'internal']
+	FlagsUserPresent    bool     `json:"flags_user_present"`
+	FlagsUserVerified   bool     `json:"flags_user_verified"`
+	FlagsBackupEligible bool     `json:"flags_backup_eligible"`
+	FlagsBackupState    bool     `json:"flags_backup_state"`
+	CreatedAt           string   `json:"created_at"`
+	UpdatedAt           string   `json:"updated_at"`
+	LastUsedAt          *string  `json:"last_used_at,omitempty"`
 }
 
 // ToWebAuthnCredential converts database credential to webauthn.Credential
@@ -143,24 +144,24 @@ func FromWebAuthnCredential(userID int, name string, cred *webauthn.Credential) 
 	credID := base64.RawURLEncoding.EncodeToString(cred.ID)
 
 	// Convert transport to string array
-	transports := []string{}
+	transports := make([]string, 0, len(cred.Transport))
 	for _, t := range cred.Transport {
 		transports = append(transports, string(t))
 	}
 
 	return &WebAuthnCredential{
-		ID:                credID,
-		UserID:            userID,
-		CredentialName:    name,
-		PublicKey:         cred.PublicKey,
-		AttestationType:   cred.AttestationType,
-		AAGUID:            cred.Authenticator.AAGUID,
-		SignCount:         cred.Authenticator.SignCount,
-		CloneWarning:      cred.Authenticator.CloneWarning,
-		Transport:         transports,
-		FlagsUserPresent:  cred.Flags.UserPresent,
-		FlagsUserVerified: cred.Flags.UserVerified,
+		ID:                  credID,
+		UserID:              userID,
+		CredentialName:      name,
+		PublicKey:           cred.PublicKey,
+		AttestationType:     cred.AttestationType,
+		AAGUID:              cred.Authenticator.AAGUID,
+		SignCount:           cred.Authenticator.SignCount,
+		CloneWarning:        cred.Authenticator.CloneWarning,
+		Transport:           transports,
+		FlagsUserPresent:    cred.Flags.UserPresent,
+		FlagsUserVerified:   cred.Flags.UserVerified,
 		FlagsBackupEligible: cred.Flags.BackupEligible,
-		FlagsBackupState:  cred.Flags.BackupState,
+		FlagsBackupState:    cred.Flags.BackupState,
 	}
 }

@@ -149,7 +149,7 @@ func (s *PlanningService) ListMilestones(params MilestoneListParams) ([]Mileston
 	}
 
 	var total int
-	s.db.QueryRow(countQuery, countArgs...).Scan(&total)
+	_ = s.db.QueryRow(countQuery, countArgs...).Scan(&total)
 
 	return milestones, total, nil
 }
@@ -393,7 +393,7 @@ func (s *PlanningService) ListIterations(params IterationListParams) ([]Iteratio
 	}
 
 	var total int
-	s.db.QueryRow(countQuery, countArgs...).Scan(&total)
+	_ = s.db.QueryRow(countQuery, countArgs...).Scan(&total)
 
 	return iterations, total, nil
 }
@@ -440,22 +440,20 @@ func (s *PlanningService) GetIteration(id int) (*IterationResult, error) {
 }
 
 // IsIterationGlobal checks if an iteration is global and returns its workspace_id.
-func (s *PlanningService) IsIterationGlobal(id int) (bool, *int, error) {
-	var isGlobal bool
-	var workspaceID sql.NullInt64
-	err := s.db.QueryRow("SELECT is_global, workspace_id FROM iterations WHERE id = ?", id).Scan(&isGlobal, &workspaceID)
+func (s *PlanningService) IsIterationGlobal(id int) (isGlobal bool, workspaceID *int, err error) {
+	var wsID sql.NullInt64
+	err = s.db.QueryRow("SELECT is_global, workspace_id FROM iterations WHERE id = ?", id).Scan(&isGlobal, &wsID)
 	if err == sql.ErrNoRows {
 		return false, nil, fmt.Errorf("iteration not found: %d", id)
 	}
 	if err != nil {
 		return false, nil, fmt.Errorf("failed to check iteration: %w", err)
 	}
-	var wsID *int
-	if workspaceID.Valid {
-		wid := int(workspaceID.Int64)
-		wsID = &wid
+	if wsID.Valid {
+		wid := int(wsID.Int64)
+		workspaceID = &wid
 	}
-	return isGlobal, wsID, nil
+	return isGlobal, workspaceID, nil
 }
 
 // CreateIterationParams contains parameters for creating an iteration.
@@ -602,7 +600,7 @@ func (s *PlanningService) ListProjects(params ProjectListParams) ([]ProjectResul
 	}
 
 	var total int
-	s.db.QueryRow(countQuery, countArgs...).Scan(&total)
+	_ = s.db.QueryRow(countQuery, countArgs...).Scan(&total)
 
 	return projects, total, nil
 }
@@ -793,16 +791,16 @@ type MilestoneProgressItem struct {
 
 // MilestoneProgressReport represents the full milestone progress data.
 type MilestoneProgressReport struct {
-	MilestoneID     int                              `json:"milestone_id"`
-	MilestoneName   string                           `json:"milestone_name"`
-	Description     string                           `json:"description,omitempty"`
-	TargetDate      *string                          `json:"target_date,omitempty"`
-	Status          string                           `json:"status"`
-	CategoryColor   string                           `json:"category_color,omitempty"`
-	TotalItems      int                              `json:"total_items"`
-	CompletedItems  int                              `json:"completed_items"`
-	PercentComplete float64                          `json:"percent_complete"`
-	StatusBreakdown []MilestoneStatusBreakdown       `json:"status_breakdown"`
+	MilestoneID     int                                `json:"milestone_id"`
+	MilestoneName   string                             `json:"milestone_name"`
+	Description     string                             `json:"description,omitempty"`
+	TargetDate      *string                            `json:"target_date,omitempty"`
+	Status          string                             `json:"status"`
+	CategoryColor   string                             `json:"category_color,omitempty"`
+	TotalItems      int                                `json:"total_items"`
+	CompletedItems  int                                `json:"completed_items"`
+	PercentComplete float64                            `json:"percent_complete"`
+	StatusBreakdown []MilestoneStatusBreakdown         `json:"status_breakdown"`
 	ItemsByCategory map[string][]MilestoneProgressItem `json:"items_by_category"`
 }
 
@@ -922,22 +920,20 @@ func (s *PlanningService) GetMilestoneProgress(milestoneID int) (*MilestoneProgr
 }
 
 // IsMilestoneGlobal checks if a milestone is global.
-func (s *PlanningService) IsMilestoneGlobal(id int) (bool, *int, error) {
-	var isGlobal bool
-	var workspaceID sql.NullInt64
-	err := s.db.QueryRow("SELECT is_global, workspace_id FROM milestones WHERE id = ?", id).Scan(&isGlobal, &workspaceID)
+func (s *PlanningService) IsMilestoneGlobal(id int) (isGlobal bool, workspaceID *int, err error) {
+	var wsID sql.NullInt64
+	err = s.db.QueryRow("SELECT is_global, workspace_id FROM milestones WHERE id = ?", id).Scan(&isGlobal, &wsID)
 	if err == sql.ErrNoRows {
 		return false, nil, fmt.Errorf("milestone not found: %d", id)
 	}
 	if err != nil {
 		return false, nil, fmt.Errorf("failed to check milestone: %w", err)
 	}
-	var wsID *int
-	if workspaceID.Valid {
-		wid := int(workspaceID.Int64)
-		wsID = &wid
+	if wsID.Valid {
+		wid := int(wsID.Int64)
+		workspaceID = &wid
 	}
-	return isGlobal, wsID, nil
+	return isGlobal, workspaceID, nil
 }
 
 // ========================================
@@ -969,17 +965,17 @@ type IterationProgressItem struct {
 
 // IterationProgressReport represents the full iteration progress data.
 type IterationProgressReport struct {
-	IterationID     int                               `json:"iteration_id"`
-	IterationName   string                            `json:"iteration_name"`
-	Description     string                            `json:"description,omitempty"`
-	StartDate       string                            `json:"start_date"`
-	EndDate         string                            `json:"end_date"`
-	Status          string                            `json:"status"`
-	TypeColor       string                            `json:"type_color,omitempty"`
-	TotalItems      int                               `json:"total_items"`
-	CompletedItems  int                               `json:"completed_items"`
-	PercentComplete float64                           `json:"percent_complete"`
-	StatusBreakdown []IterationStatusBreakdown        `json:"status_breakdown"`
+	IterationID     int                                `json:"iteration_id"`
+	IterationName   string                             `json:"iteration_name"`
+	Description     string                             `json:"description,omitempty"`
+	StartDate       string                             `json:"start_date"`
+	EndDate         string                             `json:"end_date"`
+	Status          string                             `json:"status"`
+	TypeColor       string                             `json:"type_color,omitempty"`
+	TotalItems      int                                `json:"total_items"`
+	CompletedItems  int                                `json:"completed_items"`
+	PercentComplete float64                            `json:"percent_complete"`
+	StatusBreakdown []IterationStatusBreakdown         `json:"status_breakdown"`
 	ItemsByCategory map[string][]IterationProgressItem `json:"items_by_category"`
 }
 
@@ -1152,7 +1148,7 @@ func (s *PlanningService) GetIterationBurndown(iterationID int) (*IterationBurnd
 	for rows.Next() {
 		var itemID int
 		var isCompleted bool
-		if err := rows.Scan(&itemID, &isCompleted); err != nil {
+		if err = rows.Scan(&itemID, &isCompleted); err != nil {
 			continue
 		}
 		itemStates[itemID] = isCompleted
@@ -1198,7 +1194,7 @@ func (s *PlanningService) GetIterationBurndown(iterationID int) (*IterationBurnd
 	for historyRows.Next() {
 		var c statusChange
 		var changedAtStr string
-		if err := historyRows.Scan(&c.ItemID, &changedAtStr, &c.OldValue, &c.NewValue); err != nil {
+		if err = historyRows.Scan(&c.ItemID, &changedAtStr, &c.OldValue, &c.NewValue); err != nil {
 			continue
 		}
 		// Parse the datetime
@@ -1404,7 +1400,7 @@ func (s *PlanningService) SaveProjectMilestoneCategories(projectID int, categori
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Delete existing associations
 	_, err = tx.Exec("DELETE FROM project_milestone_categories WHERE project_id = ?", projectID)

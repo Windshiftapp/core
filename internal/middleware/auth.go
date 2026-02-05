@@ -1,3 +1,4 @@
+// Package middleware provides HTTP middleware components.
 package middleware
 
 import (
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+
 	"windshift/internal/auth"
 	"windshift/internal/database"
 	"windshift/internal/utils"
@@ -58,10 +60,10 @@ func NewAuthMiddleware(sessionManager *auth.SessionManager, tokenManager *auth.T
 
 // authResult represents the outcome of an authentication attempt
 type authResult struct {
-	ctx             context.Context // The context with auth info added (nil if not authenticated)
-	authenticated   bool            // Whether authentication succeeded
-	errorMessage    string          // Error message (only for bearer token failures)
-	shouldClearCookie bool          // Whether to clear the session cookie
+	ctx               context.Context // The context with auth info added (nil if not authenticated)
+	authenticated     bool            // Whether authentication succeeded
+	errorMessage      string          // Error message (only for bearer token failures)
+	shouldClearCookie bool            // Whether to clear the session cookie
 }
 
 // tryAuthenticate attempts to authenticate the request using all available methods.
@@ -336,7 +338,7 @@ func (am *AuthMiddleware) CleanupMiddleware(next http.Handler) http.Handler {
 
 // SessionCleanupService should be called periodically to clean up expired sessions
 func (am *AuthMiddleware) SessionCleanupService() {
-	am.sessionManager.CleanupExpiredSessions()
+	_ = am.sessionManager.CleanupExpiredSessions()
 }
 
 // RequireVerifiedEmail middleware that blocks unverified users from accessing protected routes

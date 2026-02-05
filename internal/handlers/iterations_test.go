@@ -439,8 +439,8 @@ func TestIterationHandler_Get_NotFound(t *testing.T) {
 	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Get, req, nil)
 
 	rr.AssertStatusCode(http.StatusNotFound)
-	if !strings.Contains(rr.Body.String(), "Iteration not found") {
-		t.Errorf("Expected 'Iteration not found', got %s", rr.Body.String())
+	if !strings.Contains(rr.Body.String(), "iteration not found") {
+		t.Errorf("Expected 'iteration not found', got %s", rr.Body.String())
 	}
 }
 

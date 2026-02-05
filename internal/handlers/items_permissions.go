@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+
 	"windshift/internal/middleware"
 	"windshift/internal/models"
 )

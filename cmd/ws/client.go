@@ -51,7 +51,7 @@ func (e *APIError) Error() string {
 }
 
 // doRequest executes an HTTP request with authentication
-func (c *Client) doRequest(method, path string, body interface{}, result interface{}) error {
+func (c *Client) doRequest(method, path string, body, result interface{}) error {
 	var bodyReader io.Reader
 	if body != nil {
 		jsonBody, err := json.Marshal(body)
@@ -75,7 +75,7 @@ func (c *Client) doRequest(method, path string, body interface{}, result interfa
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -105,12 +105,12 @@ func (c *Client) GET(path string, result interface{}) error {
 }
 
 // POST performs a POST request
-func (c *Client) POST(path string, body interface{}, result interface{}) error {
+func (c *Client) POST(path string, body, result interface{}) error {
 	return c.doRequest("POST", path, body, result)
 }
 
 // PUT performs a PUT request
-func (c *Client) PUT(path string, body interface{}, result interface{}) error {
+func (c *Client) PUT(path string, body, result interface{}) error {
 	return c.doRequest("PUT", path, body, result)
 }
 

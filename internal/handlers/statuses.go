@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"windshift/internal/constants"
 	"windshift/internal/database"
 	"windshift/internal/models"
@@ -33,7 +34,7 @@ func (h *StatusHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var statuses []models.Status
 	for rows.Next() {
@@ -299,7 +300,7 @@ func (h *StatusHandler) GetNonDoneStatusIDs(w http.ResponseWriter, r *http.Reque
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var statusIDs []int
 	for rows.Next() {

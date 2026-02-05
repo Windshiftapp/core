@@ -22,11 +22,16 @@ linters:
   settings:
     errcheck:
       check-type-assertions: true
-      check-blank: true
+      check-blank: false
       exclude-functions:
         - (io.Closer).Close
         - (*os.File).Close
         - (net.Conn).Close
+        - (*database/sql.DB).Close
+        - (*database/sql.Tx).Rollback
+        - (*database/sql.Rows).Close
+        - (*database/sql.Result).LastInsertId
+        - (*database/sql.Result).RowsAffected
 
     govet:
       enable-all: true

@@ -3,6 +3,7 @@
 package services
 
 import (
+	"database/sql"
 	"fmt"
 	"testing"
 	"time"
@@ -451,7 +452,8 @@ func setupUpdateServiceTestData(t *testing.T, tdb *testutils.TestDB) *UpdateServ
 	var userID int
 	err = tdb.DB.QueryRow("SELECT id FROM users LIMIT 1").Scan(&userID)
 	if err != nil {
-		userResult, err := tdb.DB.Exec(`
+		var userResult sql.Result
+		userResult, err = tdb.DB.Exec(`
 			INSERT INTO users (username, email, first_name, last_name, password_hash, created_at, updated_at)
 			VALUES ('testuser', 'test@example.com', 'Test', 'User', 'hash', ?, ?)
 		`, now, now)
@@ -466,7 +468,8 @@ func setupUpdateServiceTestData(t *testing.T, tdb *testutils.TestDB) *UpdateServ
 	var projectID int
 	err = tdb.DB.QueryRow("SELECT id FROM time_projects LIMIT 1").Scan(&projectID)
 	if err != nil {
-		projectResult, err := tdb.DB.Exec(`
+		var projectResult sql.Result
+		projectResult, err = tdb.DB.Exec(`
 			INSERT INTO time_projects (name, description, created_at, updated_at)
 			VALUES ('Test Project', 'Test project', ?, ?)
 		`, now, now)

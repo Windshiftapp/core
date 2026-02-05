@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
 	"windshift/internal/models"
 	"windshift/internal/utils"
 )
@@ -53,14 +54,14 @@ func (h *AssetHandler) GetSetRoles(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer userRoleRows.Close()
+	defer func() { _ = userRoleRows.Close() }()
 
 	var userRoles []models.UserAssetSetRole
 	for userRoleRows.Next() {
 		var role models.UserAssetSetRole
 		var userName, userEmail, roleName, grantedByName sql.NullString
 
-		err := userRoleRows.Scan(
+		err = userRoleRows.Scan(
 			&role.ID, &role.UserID, &role.SetID, &role.RoleID, &role.GrantedBy, &role.GrantedAt,
 			&userName, &userEmail, &roleName, &grantedByName,
 		)
@@ -94,14 +95,14 @@ func (h *AssetHandler) GetSetRoles(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer groupRoleRows.Close()
+	defer func() { _ = groupRoleRows.Close() }()
 
 	var groupRoles []models.GroupAssetSetRole
 	for groupRoleRows.Next() {
 		var role models.GroupAssetSetRole
 		var groupName, roleName, grantedByName sql.NullString
 
-		err := groupRoleRows.Scan(
+		err = groupRoleRows.Scan(
 			&role.ID, &role.GroupID, &role.SetID, &role.RoleID, &role.GrantedBy, &role.GrantedAt,
 			&groupName, &roleName, &grantedByName,
 		)
@@ -155,7 +156,7 @@ func (h *AssetHandler) GetSetRoles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // AssignRoleRequest represents the request body for assigning a role
@@ -191,7 +192,7 @@ func (h *AssetHandler) AssignSetRole(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req AssignRoleRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -234,7 +235,7 @@ func (h *AssetHandler) AssignSetRole(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 // RevokeSetRole revokes a role assignment from a user or group

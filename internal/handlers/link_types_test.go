@@ -412,7 +412,7 @@ func TestLinkTypeHandler_Delete_SystemType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to query system link types: %v", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var systemID int
 	if !rows.Next() {

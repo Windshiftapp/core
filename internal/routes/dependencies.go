@@ -30,34 +30,34 @@ type Deps struct {
 	DisableCSRF          bool
 
 	// Rate limiters
-	LoginRateLimiter     RateLimiter
-	AuthRateLimiter      RateLimiter
-	FIDORateLimiter      RateLimiter
-	SSORateLimiter       RateLimiter  // Rate limiter for SSO login/callback endpoints
-	SCIMRateLimiter      RateLimiter  // Rate limiter for SCIM provisioning endpoints (10 req/sec)
-	PortalSubmitLimiter  RateLimiter
-	PortalSearchLimiter  RateLimiter
-	PortalAuthLimiter    RateLimiter  // Rate limiter for portal magic link requests (3 req/min per IP)
-	EmailVerifyLimiter   RateLimiter
-	SetupLimiter         RateLimiter
+	LoginRateLimiter    RateLimiter
+	AuthRateLimiter     RateLimiter
+	FIDORateLimiter     RateLimiter
+	SSORateLimiter      RateLimiter // Rate limiter for SSO login/callback endpoints
+	SCIMRateLimiter     RateLimiter // Rate limiter for SCIM provisioning endpoints (10 req/sec)
+	PortalSubmitLimiter RateLimiter
+	PortalSearchLimiter RateLimiter
+	PortalAuthLimiter   RateLimiter // Rate limiter for portal magic link requests (3 req/min per IP)
+	EmailVerifyLimiter  RateLimiter
+	SetupLimiter        RateLimiter
 
 	// Handler groups organized by domain
-	Auth        AuthHandlers
-	SCIM        SCIMHandlers
-	SCM         SCMHandlers
-	Items       ItemHandlers
-	Workspaces  WorkspaceHandlers
-	Users       UserHandlers
-	Admin       AdminHandlers
-	Planning    PlanningHandlers
+	Auth         AuthHandlers
+	SCIM         SCIMHandlers
+	SCM          SCMHandlers
+	Items        ItemHandlers
+	Workspaces   WorkspaceHandlers
+	Users        UserHandlers
+	Admin        AdminHandlers
+	Planning     PlanningHandlers
 	TimeTracking TimeTrackingHandlers
-	TestMgmt    TestManagementHandlers
-	Channels    ChannelHandlers
-	Portal      PortalHandlers
-	Assets      AssetHandlers
-	Collections CollectionHandlers
-	AI          AIHandlers
-	Misc        MiscHandlers
+	TestMgmt     TestManagementHandlers
+	Channels     ChannelHandlers
+	Portal       PortalHandlers
+	Assets       AssetHandlers
+	Collections  CollectionHandlers
+	AI           AIHandlers
+	Misc         MiscHandlers
 }
 
 // AuthHandlers groups authentication-related handlers.
@@ -84,34 +84,34 @@ type SCMHandlers struct {
 
 // ItemHandlers groups item-related handlers.
 type ItemHandlers struct {
-	Item       *handlers.ItemHandler
-	Recurrence *handlers.RecurrenceHandler
-	Comment    *handlers.CommentHandler
-	Attachment *handlers.AttachmentHandler // May be nil if attachments disabled
+	Item               *handlers.ItemHandler
+	Recurrence         *handlers.RecurrenceHandler
+	Comment            *handlers.CommentHandler
+	Attachment         *handlers.AttachmentHandler         // May be nil if attachments disabled
 	AttachmentSettings *handlers.AttachmentSettingsHandler // May be nil
-	Diagram    *handlers.DiagramHandler
-	ItemLink   *handlers.ItemLinkHandler
-	LinkType   *handlers.LinkTypeHandler
-	Label      *handlers.LabelHandler
+	Diagram            *handlers.DiagramHandler
+	ItemLink           *handlers.ItemLinkHandler
+	LinkType           *handlers.LinkTypeHandler
+	Label              *handlers.LabelHandler
 }
 
 // WorkspaceHandlers groups workspace-related handlers.
 type WorkspaceHandlers struct {
-	Workspace            *handlers.WorkspaceHandler
-	FieldRequirement     *handlers.WorkspaceFieldRequirementHandler
-	Screen               *handlers.ScreenHandler
-	ConfigSet            *handlers.ConfigurationSetHandler
+	Workspace             *handlers.WorkspaceHandler
+	FieldRequirement      *handlers.WorkspaceFieldRequirementHandler
+	Screen                *handlers.ScreenHandler
+	ConfigSet             *handlers.ConfigurationSetHandler
 	ConfigSetNotification *handlers.ConfigurationSetNotificationHandler
-	NotificationSettings *handlers.NotificationSettingsHandler
-	ItemType             *handlers.ItemTypeHandler
-	Priority             *handlers.PriorityHandler
-	HierarchyLevel       *handlers.EnumHandler
-	RequestType          *handlers.RequestTypeHandler
-	StatusCategory       *handlers.EnumHandler
-	Status               *handlers.EnumHandler
-	StatusLegacy         *handlers.StatusHandler
-	Workflow             *handlers.WorkflowHandler
-	Actions              *handlers.ActionsHandler
+	NotificationSettings  *handlers.NotificationSettingsHandler
+	ItemType              *handlers.ItemTypeHandler
+	Priority              *handlers.PriorityHandler
+	HierarchyLevel        *handlers.EnumHandler
+	RequestType           *handlers.RequestTypeHandler
+	StatusCategory        *handlers.EnumHandler
+	Status                *handlers.EnumHandler
+	StatusLegacy          *handlers.StatusHandler
+	Workflow              *handlers.WorkflowHandler
+	Actions               *handlers.ActionsHandler
 }
 
 // UserHandlers groups user-related handlers.
@@ -123,7 +123,7 @@ type UserHandlers struct {
 	WorkspaceRole *handlers.WorkspaceRoleHandler
 	Credential    *handlers.CredentialHandler
 	AppToken      *handlers.AppTokenHandler
-	APIToken      *handlers.ApiTokenHandler
+	APIToken      *handlers.APITokenHandler
 }
 
 // AdminHandlers groups admin-related handlers.

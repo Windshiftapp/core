@@ -10,10 +10,10 @@ import (
 
 // Config represents the CLI configuration
 type Config struct {
-	Server        ServerConfig        `toml:"server"`
-	Defaults      DefaultsConfig      `toml:"defaults"`
-	Cache         CacheConfig         `toml:"cache"`
-	StatusAliases map[string]string   `toml:"status_aliases"`
+	Server        ServerConfig      `toml:"server"`
+	Defaults      DefaultsConfig    `toml:"defaults"`
+	Cache         CacheConfig       `toml:"cache"`
+	StatusAliases map[string]string `toml:"status_aliases"`
 }
 
 type ServerConfig struct {
@@ -107,19 +107,11 @@ func getGlobalConfigPath() string {
 	return filepath.Join(home, ".config", "ws", "config.toml")
 }
 
-func getGlobalCachePath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(home, ".cache", "ws")
-}
-
 func saveGlobalConfig(config Config) error {
 	path := getGlobalConfigPath()
 	dir := filepath.Dir(path)
 
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -127,7 +119,7 @@ func saveGlobalConfig(config Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to create config file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	encoder := toml.NewEncoder(f)
 	return encoder.Encode(config)
@@ -138,7 +130,7 @@ func saveProjectConfig(config Config, path string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create config file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	encoder := toml.NewEncoder(f)
 	return encoder.Encode(config)

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -71,28 +70,34 @@ func (h *ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 	// Build filters from query parameters
 	filters := services.ItemFilters{}
 	if wsID := r.URL.Query().Get("workspace_id"); wsID != "" {
-		id, _ := strconv.Atoi(wsID)
-		filters.WorkspaceID = &id
+		if id, parseErr := strconv.Atoi(wsID); parseErr == nil {
+			filters.WorkspaceID = &id
+		}
 	}
 	if statusID := r.URL.Query().Get("status_id"); statusID != "" {
-		id, _ := strconv.Atoi(statusID)
-		filters.StatusID = &id
+		if id, parseErr := strconv.Atoi(statusID); parseErr == nil {
+			filters.StatusID = &id
+		}
 	}
 	if priorityID := r.URL.Query().Get("priority_id"); priorityID != "" {
-		id, _ := strconv.Atoi(priorityID)
-		filters.PriorityID = &id
+		if id, parseErr := strconv.Atoi(priorityID); parseErr == nil {
+			filters.PriorityID = &id
+		}
 	}
 	if assigneeID := r.URL.Query().Get("assignee_id"); assigneeID != "" {
-		id, _ := strconv.Atoi(assigneeID)
-		filters.AssigneeID = &id
+		if id, parseErr := strconv.Atoi(assigneeID); parseErr == nil {
+			filters.AssigneeID = &id
+		}
 	}
 	if itemTypeID := r.URL.Query().Get("item_type_id"); itemTypeID != "" {
-		id, _ := strconv.Atoi(itemTypeID)
-		filters.ItemTypeID = &id
+		if id, parseErr := strconv.Atoi(itemTypeID); parseErr == nil {
+			filters.ItemTypeID = &id
+		}
 	}
 	if creatorID := r.URL.Query().Get("creator_id"); creatorID != "" {
-		id, _ := strconv.Atoi(creatorID)
-		filters.CreatorID = &id
+		if id, parseErr := strconv.Atoi(creatorID); parseErr == nil {
+			filters.CreatorID = &id
+		}
 	}
 
 	// Use service layer for listing items
@@ -161,21 +166,25 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Handle expand parameter
 	expand := restapi.ParseExpand(r)
 	if expand.Comments {
-		comments, _ := h.commentSvc.GetByItemID(itemID)
-		response.Comments = dto.MapCommentsToResponse(comments)
+		if comments, err := h.commentSvc.GetByItemID(itemID); err == nil {
+			response.Comments = dto.MapCommentsToResponse(comments)
+		}
 	}
 	if expand.History {
-		history, _ := h.itemCRUD.GetHistory(itemID)
-		response.History = dto.MapHistoryToResponses(history)
+		if history, err := h.itemCRUD.GetHistory(itemID); err == nil {
+			response.History = dto.MapHistoryToResponses(history)
+		}
 	}
 	if expand.Attachments {
-		attachments, _ := h.itemCRUD.GetAttachments(itemID)
-		response.Attachments = dto.MapAttachmentsToResponse(attachments, baseURL)
+		if attachments, err := h.itemCRUD.GetAttachments(itemID); err == nil {
+			response.Attachments = dto.MapAttachmentsToResponse(attachments, baseURL)
+		}
 	}
 	if expand.Transitions {
 		if item.StatusID != nil {
-			transitions, _ := h.workflowSvc.GetTransitionsFromStatus(*item.StatusID)
-			response.Transitions = dto.MapServiceTransitionsToResponse(transitions)
+			if transitions, err := h.workflowSvc.GetTransitionsFromStatus(*item.StatusID); err == nil {
+				response.Transitions = dto.MapServiceTransitionsToResponse(transitions)
+			}
 		} else {
 			response.Transitions = []dto.TransitionResponse{}
 		}
@@ -222,7 +231,8 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Convert custom field values to JSON
 	var customFieldValuesJSON string
 	if req.CustomFields != nil {
-		customFieldValuesBytes, err := json.Marshal(req.CustomFields)
+		var customFieldValuesBytes []byte
+		customFieldValuesBytes, err = json.Marshal(req.CustomFields)
 		if err != nil {
 			restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid custom field values"))
 			return
@@ -302,7 +312,7 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req dto.ItemUpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
 		return
 	}
@@ -485,7 +495,7 @@ func (h *ItemHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req dto.CommentCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
 		return
 	}
@@ -761,13 +771,4 @@ func getBaseURL(r *http.Request) string {
 		scheme = fwdProto
 	}
 	return fmt.Sprintf("%s://%s", scheme, r.Host)
-}
-
-// nullStringValue safely extracts value from sql.NullString
-// Used by multiple handlers in this package
-func nullStringValue(ns sql.NullString) string {
-	if ns.Valid {
-		return ns.String
-	}
-	return ""
 }

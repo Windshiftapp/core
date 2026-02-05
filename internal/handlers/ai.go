@@ -86,10 +86,10 @@ func (h *AIHandler) PlanMyDay(w http.ResponseWriter, r *http.Request) {
 	var personalWSIDs []int
 	pwsRows, err := h.db.Query("SELECT id FROM workspaces WHERE is_personal = 1 AND owner_id = ? AND active = 1", user.ID)
 	if err == nil {
-		defer pwsRows.Close()
+		defer func() { _ = pwsRows.Close() }()
 		for pwsRows.Next() {
 			var id int
-			if err := pwsRows.Scan(&id); err == nil {
+			if err = pwsRows.Scan(&id); err == nil {
 				personalWSIDs = append(personalWSIDs, id)
 			}
 		}
@@ -168,7 +168,8 @@ func (h *AIHandler) PlanMyDay(w http.ResponseWriter, r *http.Request) {
 		timezone = "UTC"
 	}
 	now := time.Now()
-	if loc, err := time.LoadLocation(timezone); err == nil {
+	var loc *time.Location
+	if loc, err = time.LoadLocation(timezone); err == nil {
 		now = now.In(loc)
 	}
 
@@ -199,7 +200,7 @@ Return ONLY valid JSON (no markdown, no code fences) matching this schema:
 	// Resolve LLM client (optionally from connection_id query param)
 	var connectionID int
 	if cidStr := r.URL.Query().Get("connection_id"); cidStr != "" {
-		fmt.Sscan(cidStr, &connectionID) //nolint:errcheck
+		fmt.Sscan(cidStr, &connectionID) //nolint:errcheck // connection ID parsing is best-effort
 	}
 
 	llmClient, err := h.llmManager.ResolveForFeature("plan_my_day", connectionID)
@@ -405,12 +406,12 @@ func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
 		 LEFT JOIN users u ON c.user_id = u.id
 		 WHERE c.item_id = ? ORDER BY c.created_at DESC LIMIT 20`, itemID)
 	if err == nil {
-		defer commentRows.Close()
+		defer func() { _ = commentRows.Close() }()
 		var comments []string
 		for commentRows.Next() {
 			var content, author string
 			var createdAt time.Time
-			if err := commentRows.Scan(&content, &author, &createdAt); err == nil {
+			if err = commentRows.Scan(&content, &author, &createdAt); err == nil {
 				if len(content) > 300 {
 					content = content[:300] + "..."
 				}
@@ -465,11 +466,11 @@ func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
 		 JOIN workspaces w ON i2.workspace_id = w.id
 		 WHERE il.source_item_id = ? OR il.target_item_id = ?`, itemID, itemID, itemID)
 	if err == nil {
-		defer linkRows.Close()
+		defer func() { _ = linkRows.Close() }()
 		var links []string
 		for linkRows.Next() {
 			var linkType, title, key string
-			if err := linkRows.Scan(&linkType, &title, &key); err == nil {
+			if err = linkRows.Scan(&linkType, &title, &key); err == nil {
 				links = append(links, fmt.Sprintf("- %s: [%s] %s", linkType, key, title))
 			}
 		}
@@ -483,11 +484,11 @@ func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
 	scmRows, err := h.db.Query(
 		`SELECT title, branch_name, state FROM item_scm_links WHERE item_id = ?`, itemID)
 	if err == nil {
-		defer scmRows.Close()
+		defer func() { _ = scmRows.Close() }()
 		var scmLinks []string
 		for scmRows.Next() {
 			var title, branch, state string
-			if err := scmRows.Scan(&title, &branch, &state); err == nil {
+			if err = scmRows.Scan(&title, &branch, &state); err == nil {
 				scmLinks = append(scmLinks, fmt.Sprintf("- PR: %s (branch: %s, state: %s)", title, branch, state))
 			}
 		}
@@ -598,7 +599,7 @@ func (h *AIHandler) FindSimilarItems(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, fmt.Errorf("failed to query candidate items: %w", err))
 		return
 	}
-	defer candidateRows.Close()
+	defer func() { _ = candidateRows.Close() }()
 
 	type candidateItem struct {
 		ID          int
@@ -613,7 +614,7 @@ func (h *AIHandler) FindSimilarItems(w http.ResponseWriter, r *http.Request) {
 	var candidateLines []string
 	for candidateRows.Next() {
 		var c candidateItem
-		if err := candidateRows.Scan(&c.ID, &c.ItemKey, &c.Title, &c.StatusName, &c.Description); err == nil {
+		if err = candidateRows.Scan(&c.ID, &c.ItemKey, &c.Title, &c.StatusName, &c.Description); err == nil {
 			candidates = append(candidates, c)
 			candidateMap[c.ItemKey] = c
 			desc := c.Description
@@ -772,10 +773,10 @@ func (h *AIHandler) DecomposeItem(w http.ResponseWriter, r *http.Request) {
 		 WHERE wh.parent_type_id = ? AND it.workspace_id = ?`, item.ItemTypeID, item.WorkspaceID)
 	var childTypeNames []string
 	if err == nil {
-		defer typeRows.Close()
+		defer func() { _ = typeRows.Close() }()
 		for typeRows.Next() {
 			var name string
-			if err := typeRows.Scan(&name); err == nil {
+			if err = typeRows.Scan(&name); err == nil {
 				childTypeNames = append(childTypeNames, name)
 			}
 		}
@@ -786,10 +787,10 @@ func (h *AIHandler) DecomposeItem(w http.ResponseWriter, r *http.Request) {
 		`SELECT title FROM items WHERE parent_id = ?`, itemID)
 	var existingChildren []string
 	if err == nil {
-		defer childRows.Close()
+		defer func() { _ = childRows.Close() }()
 		for childRows.Next() {
 			var title string
-			if err := childRows.Scan(&title); err == nil {
+			if err = childRows.Scan(&title); err == nil {
 				existingChildren = append(existingChildren, title)
 			}
 		}

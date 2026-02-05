@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -36,7 +37,7 @@ func (h *ConfigurationSetHandler) ExecuteMigration(w http.ResponseWriter, r *htt
 	// Validate all target status IDs exist
 	for _, mapping := range migrationReq.StatusMappings {
 		var statusExists bool
-		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE id = ?)", mapping.ToStatusID).Scan(&statusExists)
+		err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE id = ?)", mapping.ToStatusID).Scan(&statusExists)
 		if err != nil || !statusExists {
 			respondBadRequest(w, r, fmt.Sprintf("Target status ID %d not found", mapping.ToStatusID))
 			return
@@ -49,7 +50,7 @@ func (h *ConfigurationSetHandler) ExecuteMigration(w http.ResponseWriter, r *htt
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	totalMigrated := 0
 
@@ -84,7 +85,8 @@ func (h *ConfigurationSetHandler) ExecuteMigration(w http.ResponseWriter, r *htt
 			updateArgs = append(updateArgs, wsID)
 		}
 
-		result, err := tx.Exec(updateQuery, updateArgs...)
+		var result sql.Result
+		result, err = tx.Exec(updateQuery, updateArgs...)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -119,8 +121,8 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 
 	// Validate configuration sets exist
 	var oldConfigSetExists, newConfigSetExists bool
-	h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", req.OldConfigurationSetID).Scan(&oldConfigSetExists)
-	h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", req.NewConfigurationSetID).Scan(&newConfigSetExists)
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", req.OldConfigurationSetID).Scan(&oldConfigSetExists)
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", req.NewConfigurationSetID).Scan(&newConfigSetExists)
 
 	if !oldConfigSetExists {
 		respondBadRequest(w, r, "Old configuration set not found")
@@ -140,7 +142,7 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 	// Validate all target IDs exist
 	for _, mapping := range req.ItemTypeMappings {
 		var exists bool
-		h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM item_types WHERE id = ?)", mapping.ToItemTypeID).Scan(&exists)
+		_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM item_types WHERE id = ?)", mapping.ToItemTypeID).Scan(&exists)
 		if !exists {
 			respondBadRequest(w, r, fmt.Sprintf("Target item type ID %d not found", mapping.ToItemTypeID))
 			return
@@ -149,7 +151,7 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 
 	for _, mapping := range req.StatusMappings {
 		var exists bool
-		h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE id = ?)", mapping.ToStatusID).Scan(&exists)
+		_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE id = ?)", mapping.ToStatusID).Scan(&exists)
 		if !exists {
 			respondBadRequest(w, r, fmt.Sprintf("Target status ID %d not found", mapping.ToStatusID))
 			return
@@ -158,7 +160,7 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 
 	for _, mapping := range req.PriorityMappings {
 		var exists bool
-		h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM priorities WHERE id = ?)", mapping.ToPriorityID).Scan(&exists)
+		_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM priorities WHERE id = ?)", mapping.ToPriorityID).Scan(&exists)
 		if !exists {
 			respondBadRequest(w, r, fmt.Sprintf("Target priority ID %d not found", mapping.ToPriorityID))
 			return
@@ -171,7 +173,7 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	now := time.Now()
 	stats := struct {
@@ -207,7 +209,8 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 			updateArgs = append(updateArgs, wsID)
 		}
 
-		result, err := tx.Exec(updateQuery, updateArgs...)
+		var result sql.Result
+		result, err = tx.Exec(updateQuery, updateArgs...)
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to migrate item types: %w", err))
 			return
@@ -219,7 +222,8 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 	// 2. Execute Custom Field Migrations (only add_default needs action)
 	for _, mapping := range req.CustomFieldMappings {
 		if mapping.Action == "add_default" && mapping.DefaultValue != nil {
-			count, err := h.addDefaultFieldValue(tx, req.WorkspaceIDs, mapping.FieldID, mapping.DefaultValue)
+			var count int
+			count, err = h.addDefaultFieldValue(tx, req.WorkspaceIDs, mapping.FieldID, mapping.DefaultValue)
 			if err != nil {
 				respondInternalError(w, r, fmt.Errorf("failed to add default field values: %w", err))
 				return
@@ -253,7 +257,8 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 			updateArgs = append(updateArgs, wsID)
 		}
 
-		result, err := tx.Exec(updateQuery, updateArgs...)
+		var result sql.Result
+		result, err = tx.Exec(updateQuery, updateArgs...)
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to migrate statuses: %w", err))
 			return
@@ -285,7 +290,8 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 			updateArgs = append(updateArgs, wsID)
 		}
 
-		result, err := tx.Exec(updateQuery, updateArgs...)
+		var result sql.Result
+		result, err = tx.Exec(updateQuery, updateArgs...)
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to migrate priorities: %w", err))
 			return
@@ -335,7 +341,7 @@ func (h *ConfigurationSetHandler) addDefaultFieldValue(tx database.Tx, workspace
 	if err != nil {
 		return 0, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type itemUpdate struct {
 		id     int

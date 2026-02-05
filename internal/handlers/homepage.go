@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
@@ -236,7 +237,7 @@ func (h *HomepageHandler) GetHomepage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(homepageData)
+	_ = json.NewEncoder(w).Encode(homepageData)
 }
 
 // getUserFromContext extracts the user from the request context
@@ -281,7 +282,7 @@ func (h *HomepageHandler) getWorkspaceActivitiesBatch(visits []services.Workspac
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var activities []WorkspaceActivity
 	for rows.Next() {
@@ -336,7 +337,7 @@ func (h *HomepageHandler) getItemActivitiesBatch(activities map[int]services.Ite
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	result := make(map[int]ItemActivity)
 	for rows.Next() {
@@ -407,7 +408,7 @@ func (h *HomepageHandler) getUpcomingMilestonesBatch(itemActivities map[int]serv
 		slog.Warn("error loading milestone frequencies", slog.String("component", "homepage"), slog.Any("error", err))
 		return []int{}
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []int
 	for rows.Next() {
@@ -459,7 +460,7 @@ func (h *HomepageHandler) getMilestoneStatsBatch(milestoneIDs []int) ([]Mileston
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []MilestoneProgress
 	for rows.Next() {

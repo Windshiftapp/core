@@ -180,7 +180,7 @@ func (s *AttachmentSettingsService) GetStatus() (*AttachmentStatus, error) {
 			testFile := filepath.Join(attachmentPath, ".write-test")
 			if f, err := os.Create(testFile); err == nil {
 				f.Close()
-				os.Remove(testFile)
+				_ = os.Remove(testFile)
 				status.Writable = true
 			}
 		}

@@ -13,9 +13,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"windshift/internal/models"
 
 	"github.com/golang-jwt/jwt/v5"
+
+	"windshift/internal/models"
 )
 
 // GitHubProvider implements the Provider interface for GitHub
@@ -26,10 +27,10 @@ type GitHubProvider struct {
 	accessToken  string
 	httpClient   *http.Client
 	// GitHub App specific fields
-	appID            string
-	appPrivateKey    *rsa.PrivateKey
-	installationID   int64
-	installationToken string
+	appID                   string
+	appPrivateKey           *rsa.PrivateKey
+	installationID          int64
+	installationToken       string
 	installationTokenExpiry *time.Time
 }
 
@@ -131,7 +132,7 @@ func (g *GitHubProvider) ListAppInstallations(ctx context.Context) ([]GitHubAppI
 		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", g.baseURL+"/app/installations", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", g.baseURL+"/app/installations", http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -186,8 +187,8 @@ func (g *GitHubProvider) GetInstallationAccessToken(ctx context.Context, install
 		return "", nil, err
 	}
 
-	url := fmt.Sprintf("%s/app/installations/%d/access_tokens", g.baseURL, installationID)
-	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
+	installationURL := fmt.Sprintf("%s/app/installations/%d/access_tokens", g.baseURL, installationID)
+	req, err := http.NewRequestWithContext(ctx, "POST", installationURL, http.NoBody)
 	if err != nil {
 		return "", nil, err
 	}
@@ -263,7 +264,7 @@ func (g *GitHubProvider) TestConnection(ctx context.Context) error {
 		testURL = g.baseURL + "/user"
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", testURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", testURL, http.NoBody)
 	if err != nil {
 		return err
 	}
@@ -303,20 +304,20 @@ func (g *GitHubProvider) ListRepositories(ctx context.Context, opts ListReposito
 
 	// Use different endpoints based on auth method
 	// GitHub App installation tokens use /installation/repositories
-	var url string
+	var reqURL string
 	if g.appPrivateKey != nil && g.installationID != 0 {
-		url = fmt.Sprintf("%s/installation/repositories?page=%d&per_page=%d", g.baseURL, page, perPage)
+		reqURL = fmt.Sprintf("%s/installation/repositories?page=%d&per_page=%d", g.baseURL, page, perPage)
 	} else {
-		url = fmt.Sprintf("%s/user/repos?page=%d&per_page=%d", g.baseURL, page, perPage)
+		reqURL = fmt.Sprintf("%s/user/repos?page=%d&per_page=%d", g.baseURL, page, perPage)
 		if opts.Visibility != "" {
-			url += "&visibility=" + opts.Visibility
+			reqURL += "&visibility=" + opts.Visibility
 		}
 		if opts.Sort != "" {
-			url += "&sort=" + opts.Sort
+			reqURL += "&sort=" + opts.Sort
 		}
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -362,9 +363,9 @@ func (g *GitHubProvider) ListRepositories(ctx context.Context, opts ListReposito
 
 // GetRepository gets details about a specific repository
 func (g *GitHubProvider) GetRepository(ctx context.Context, owner, repo string) (*Repository, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s", g.baseURL, owner, repo)
+	reqURL := fmt.Sprintf("%s/repos/%s/%s", g.baseURL, owner, repo)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -408,10 +409,10 @@ func (g *GitHubProvider) ListPullRequests(ctx context.Context, owner, repo strin
 		state = "open"
 	}
 
-	url := fmt.Sprintf("%s/repos/%s/%s/pulls?state=%s&page=%d&per_page=%d",
+	reqURL := fmt.Sprintf("%s/repos/%s/%s/pulls?state=%s&page=%d&per_page=%d",
 		g.baseURL, owner, repo, state, page, perPage)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -441,9 +442,9 @@ func (g *GitHubProvider) ListPullRequests(ctx context.Context, owner, repo strin
 
 // GetPullRequest gets details about a specific pull request
 func (g *GitHubProvider) GetPullRequest(ctx context.Context, owner, repo string, number int) (*PullRequest, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s/pulls/%d", g.baseURL, owner, repo, number)
+	reqURL := fmt.Sprintf("%s/repos/%s/%s/pulls/%d", g.baseURL, owner, repo, number)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -480,7 +481,7 @@ func (g *GitHubProvider) CreateBranch(ctx context.Context, owner, repo, branchNa
 
 	// First, get the SHA of the base branch
 	refURL := fmt.Sprintf("%s/repos/%s/%s/git/refs/heads/%s", g.baseURL, owner, repo, baseBranch)
-	req, err := http.NewRequestWithContext(ctx, "GET", refURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", refURL, http.NoBody)
 	if err != nil {
 		return err
 	}
@@ -501,8 +502,8 @@ func (g *GitHubProvider) CreateBranch(ctx context.Context, owner, repo, branchNa
 			SHA string `json:"sha"`
 		} `json:"object"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&ref); err != nil {
-		return err
+	if decodeErr := json.NewDecoder(resp.Body).Decode(&ref); decodeErr != nil {
+		return decodeErr
 	}
 
 	// Create the new branch
@@ -579,9 +580,9 @@ func (g *GitHubProvider) CreatePullRequest(ctx context.Context, owner, repo stri
 
 // GetCommit gets details about a specific commit
 func (g *GitHubProvider) GetCommit(ctx context.Context, owner, repo, sha string) (*Commit, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s/commits/%s", g.baseURL, owner, repo, sha)
+	reqURL := fmt.Sprintf("%s/repos/%s/%s/commits/%s", g.baseURL, owner, repo, sha)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -611,9 +612,9 @@ func (g *GitHubProvider) GetCommit(ctx context.Context, owner, repo, sha string)
 
 // ListBranches lists branches for a repository
 func (g *GitHubProvider) ListBranches(ctx context.Context, owner, repo string) ([]Branch, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s/branches", g.baseURL, owner, repo)
+	reqURL := fmt.Sprintf("%s/repos/%s/%s/branches", g.baseURL, owner, repo)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -713,7 +714,7 @@ func (g *GitHubProvider) RegisterWebhook(ctx context.Context, owner, repo string
 func (g *GitHubProvider) DeleteWebhook(ctx context.Context, owner, repo, webhookID string) error {
 	deleteURL := fmt.Sprintf("%s/repos/%s/%s/hooks/%s", g.baseURL, owner, repo, webhookID)
 
-	req, err := http.NewRequestWithContext(ctx, "DELETE", deleteURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "DELETE", deleteURL, http.NoBody)
 	if err != nil {
 		return err
 	}
@@ -748,7 +749,7 @@ func (g *GitHubProvider) GetOAuthURL(state, redirectURI string) string {
 
 // ExchangeCode exchanges an OAuth code for tokens
 func (g *GitHubProvider) ExchangeCode(ctx context.Context, code, redirectURI string) (*OAuthTokens, error) {
-	tokenURL := "https://github.com/login/oauth/access_token"
+	tokenURL := "https://github.com/login/oauth/access_token" //nolint:gosec // G101 false positive: OAuth endpoint URL, not a credential
 
 	params := url.Values{
 		"client_id":     {g.clientID},
@@ -776,11 +777,11 @@ func (g *GitHubProvider) ExchangeCode(ctx context.Context, code, redirectURI str
 	}
 
 	var tokenResp struct {
-		AccessToken  string `json:"access_token"`
-		TokenType    string `json:"token_type"`
-		Scope        string `json:"scope"`
-		Error        string `json:"error,omitempty"`
-		ErrorDesc    string `json:"error_description,omitempty"`
+		AccessToken string `json:"access_token"`
+		TokenType   string `json:"token_type"`
+		Scope       string `json:"scope"`
+		Error       string `json:"error,omitempty"`
+		ErrorDesc   string `json:"error_description,omitempty"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
 		return nil, err
@@ -806,7 +807,7 @@ func (g *GitHubProvider) RefreshToken(ctx context.Context, refreshToken string) 
 
 // GetCurrentUser returns the authenticated user's info from GitHub
 func (g *GitHubProvider) GetCurrentUser(ctx context.Context) (*User, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", g.baseURL+"/user", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", g.baseURL+"/user", http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -882,16 +883,16 @@ func (g *GitHubProvider) handleErrorResponse(resp *http.Response) error {
 // GitHub API response types
 
 type githubRepo struct {
-	ID            int       `json:"id"`
-	Name          string    `json:"name"`
-	FullName      string    `json:"full_name"`
-	Description   string    `json:"description"`
-	HTMLURL       string    `json:"html_url"`
-	CloneURL      string    `json:"clone_url"`
-	SSHURL        string    `json:"ssh_url"`
-	DefaultBranch string    `json:"default_branch"`
-	Private       bool      `json:"private"`
-	Archived      bool      `json:"archived"`
+	ID            int    `json:"id"`
+	Name          string `json:"name"`
+	FullName      string `json:"full_name"`
+	Description   string `json:"description"`
+	HTMLURL       string `json:"html_url"`
+	CloneURL      string `json:"clone_url"`
+	SSHURL        string `json:"ssh_url"`
+	DefaultBranch string `json:"default_branch"`
+	Private       bool   `json:"private"`
+	Archived      bool   `json:"archived"`
 	Owner         struct {
 		Login string `json:"login"`
 	} `json:"owner"`
@@ -918,15 +919,15 @@ func (r githubRepo) toRepository() Repository {
 }
 
 type githubPullRequest struct {
-	ID        int    `json:"id"`
-	Number    int    `json:"number"`
-	Title     string `json:"title"`
-	Body      string `json:"body"`
-	State     string `json:"state"`
-	HTMLURL   string `json:"html_url"`
-	Draft     bool   `json:"draft"`
-	Merged    bool   `json:"merged"`
-	Head      struct {
+	ID      int    `json:"id"`
+	Number  int    `json:"number"`
+	Title   string `json:"title"`
+	Body    string `json:"body"`
+	State   string `json:"state"`
+	HTMLURL string `json:"html_url"`
+	Draft   bool   `json:"draft"`
+	Merged  bool   `json:"merged"`
+	Head    struct {
 		Ref string `json:"ref"`
 		SHA string `json:"sha"`
 	} `json:"head"`

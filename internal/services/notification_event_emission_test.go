@@ -110,13 +110,13 @@ func mapKeys(m map[string]interface{}) []string {
 
 // Test environment helper
 type notificationEmissionTestEnv struct {
-	db          database.Database
-	workspaceID int
-	userID      int
-	itemID      int
-	itemTitle   string
+	db           database.Database
+	workspaceID  int
+	userID       int
+	itemID       int
+	itemTitle    string
 	workspaceKey string
-	userName    string
+	userName     string
 }
 
 // createNotificationEmissionTestDB creates an initialized test database
@@ -1018,7 +1018,7 @@ func TestNotificationEmission_CommentService_IntegrationWithNotificationService(
 	}
 
 	// Force refresh the cache
-	if err := notificationService.ForceRefreshCache(); err != nil {
+	if err = notificationService.ForceRefreshCache(); err != nil {
 		t.Fatalf("failed to refresh cache: %v", err)
 	}
 
@@ -1116,7 +1116,7 @@ func TestNotificationEmission_MentionService_IntegrationWithNotificationService(
 	}
 
 	// Force refresh the cache
-	if err := notificationService.ForceRefreshCache(); err != nil {
+	if err = notificationService.ForceRefreshCache(); err != nil {
 		t.Fatalf("failed to refresh cache: %v", err)
 	}
 

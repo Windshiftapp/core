@@ -62,7 +62,7 @@ type PortalComment struct {
 }
 
 // GetRequestsByCreatorID gets requests for internal user (by creator_id)
-func (s *PortalService) GetRequestsByCreatorID(ctx context.Context, creatorID int, channelID int) ([]PortalRequestSummary, error) {
+func (s *PortalService) GetRequestsByCreatorID(ctx context.Context, creatorID, channelID int) ([]PortalRequestSummary, error) {
 	query := `
 		SELECT
 			i.id, i.workspace_id, i.workspace_item_number, i.title, i.description,
@@ -85,7 +85,7 @@ func (s *PortalService) GetRequestsByCreatorID(ctx context.Context, creatorID in
 }
 
 // GetRequestsByPortalCustomerID gets requests for portal customer (by creator_portal_customer_id)
-func (s *PortalService) GetRequestsByPortalCustomerID(ctx context.Context, portalCustomerID int, channelID int) ([]PortalRequestSummary, error) {
+func (s *PortalService) GetRequestsByPortalCustomerID(ctx context.Context, portalCustomerID, channelID int) ([]PortalRequestSummary, error) {
 	query := `
 		SELECT
 			i.id, i.workspace_id, i.workspace_item_number, i.title, i.description,
@@ -213,7 +213,7 @@ func (s *PortalService) GetRequestDetail(ctx context.Context, itemID int) (*Port
 
 // VerifyRequestOwnership verifies that a user owns a request
 // Returns true if the user owns the request within the specified channel
-func (s *PortalService) VerifyRequestOwnership(ctx context.Context, itemID int, channelID int, internalUserID *int, portalCustomerID *int) (bool, error) {
+func (s *PortalService) VerifyRequestOwnership(ctx context.Context, itemID, channelID int, internalUserID, portalCustomerID *int) (bool, error) {
 	detail, err := s.GetRequestDetail(ctx, itemID)
 	if err != nil {
 		return false, err
@@ -382,6 +382,7 @@ func (s *PortalService) ValidateRequestTypeBelongsToChannel(ctx context.Context,
 
 // GetCustomFieldsForChannel returns custom field definitions used by request types in this channel
 func (s *PortalService) GetCustomFieldsForChannel(ctx context.Context, channelID int) ([]models.CustomFieldDefinition, error) {
+	//nolint:misspell // database uses British spelling
 	query := `
 		SELECT DISTINCT cfd.id, cfd.name, cfd.field_type, cfd.description,
 		       cfd.required, cfd.options, cfd.display_order, cfd.system_default,

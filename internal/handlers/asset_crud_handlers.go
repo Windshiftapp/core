@@ -4,9 +4,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
+
 	"windshift/internal/cql"
 	"windshift/internal/models"
 	"windshift/internal/utils"
@@ -41,12 +43,14 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 	limit := 25
 	offset := 0
 	if l := r.URL.Query().Get("limit"); l != "" {
-		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+		var parsed int
+		if parsed, err = strconv.Atoi(l); err == nil && parsed > 0 {
 			limit = parsed
 		}
 	}
 	if o := r.URL.Query().Get("offset"); o != "" {
-		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
+		var parsed int
+		if parsed, err = strconv.Atoi(o); err == nil && parsed >= 0 {
 			offset = parsed
 		}
 	}
@@ -96,14 +100,16 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 	// Check for CQL query parameter
 	if cqlQuery := r.URL.Query().Get("cql"); cqlQuery != "" {
 		// Build set mapping for CQL evaluation
-		setMap, err := h.buildSetMap()
+		var setMap map[string]int
+		setMap, err = h.buildSetMap()
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to load set mapping: %w", err))
 			return
 		}
 
 		// Build workspace mapping for linkedOf() queries
-		workspaceMap, err := h.buildWorkspaceMap()
+		var workspaceMap map[string]int
+		workspaceMap, err = h.buildWorkspaceMap()
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to load workspace mapping: %w", err))
 			return
@@ -111,7 +117,9 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 
 		// Create CQL evaluator and generate SQL
 		evaluator := cql.NewAssetEvaluator(setMap, workspaceMap)
-		cqlSQL, cqlArgs, err := evaluator.EvaluateToSQL(cqlQuery)
+		var cqlSQL string
+		var cqlArgs []interface{}
+		cqlSQL, cqlArgs, err = evaluator.EvaluateToSQL(cqlQuery)
 		if err != nil {
 			respondValidationError(w, r, "CQL query error: "+err.Error())
 			return
@@ -132,7 +140,7 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN users u ON a.created_by = u.id
 		` + whereClause
 	var total int
-	if err := h.db.QueryRow(countQuery, args...).Scan(&total); err != nil {
+	if err = h.db.QueryRow(countQuery, args...).Scan(&total); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -160,14 +168,14 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 		LIMIT ? OFFSET ?
 	`
 	// Add pagination args
-	queryArgs := append(args, limit, offset)
+	args = append(args, limit, offset)
 
-	rows, err := h.db.Query(query, queryArgs...)
+	rows, err := h.db.Query(query, args...)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var assets []models.Asset
 	for rows.Next() {
@@ -234,7 +242,7 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // GetAsset returns a single asset
@@ -338,11 +346,11 @@ func (h *AssetHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
 
 	// Enrich user-type custom fields with current user data
 	if err := h.enrichUserCustomFields(&asset); err != nil {
-		// Log error but don't fail the request
+		slog.Debug("failed to enrich user custom fields", slog.Any("error", err))
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(asset)
+	_ = json.NewEncoder(w).Encode(asset)
 }
 
 // CreateAssetRequest represents the request body for creating an asset
@@ -382,7 +390,7 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req CreateAssetRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -468,7 +476,7 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 
 	// Normalize user-type custom field values to store just the ID
 	if req.CustomFieldValues != nil {
-		if err := h.normalizeUserFieldValues(req.CustomFieldValues, req.AssetTypeID); err != nil {
+		if err = h.normalizeUserFieldValues(req.CustomFieldValues, req.AssetTypeID); err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to process custom field values: %w", err))
 			return
 		}
@@ -477,7 +485,8 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 	// Serialize custom field values
 	var customFieldValuesJSON string
 	if req.CustomFieldValues != nil {
-		customFieldValuesBytes, err := json.Marshal(req.CustomFieldValues)
+		var customFieldValuesBytes []byte
+		customFieldValuesBytes, err = json.Marshal(req.CustomFieldValues)
 		if err != nil {
 			respondValidationError(w, r, "Invalid custom field values")
 			return
@@ -514,7 +523,7 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(asset)
+	_ = json.NewEncoder(w).Encode(asset)
 }
 
 // UpdateAssetRequest represents the request body for updating an asset
@@ -566,7 +575,7 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req UpdateAssetRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -638,7 +647,7 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 
 	// Normalize user-type custom field values to store just the ID
 	if req.CustomFieldValues != nil {
-		if err := h.normalizeUserFieldValues(req.CustomFieldValues, req.AssetTypeID); err != nil {
+		if err = h.normalizeUserFieldValues(req.CustomFieldValues, req.AssetTypeID); err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to process custom field values: %w", err))
 			return
 		}
@@ -647,7 +656,8 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 	// Serialize custom field values
 	var customFieldValuesJSON string
 	if req.CustomFieldValues != nil {
-		customFieldValuesBytes, err := json.Marshal(req.CustomFieldValues)
+		var customFieldValuesBytes []byte
+		customFieldValuesBytes, err = json.Marshal(req.CustomFieldValues)
 		if err != nil {
 			respondValidationError(w, r, "Invalid custom field values")
 			return
@@ -688,7 +698,7 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(asset)
+	_ = json.NewEncoder(w).Encode(asset)
 }
 
 // DeleteAsset deletes an asset

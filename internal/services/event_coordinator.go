@@ -125,7 +125,7 @@ func (ec *EventCoordinator) EmitItemUpdated(original, updated *models.Item, stat
 		// Get status name if status changed
 		var statusName string
 		if statusChanged && updated.StatusID != nil {
-			ec.db.QueryRow("SELECT name FROM statuses WHERE id = ?", *updated.StatusID).Scan(&statusName)
+			_ = ec.db.QueryRow("SELECT name FROM statuses WHERE id = ?", *updated.StatusID).Scan(&statusName)
 		}
 
 		// Emit status changed notification
@@ -242,7 +242,7 @@ func (ec *EventCoordinator) EmitItemUpdated(original, updated *models.Item, stat
 }
 
 // EmitItemDeleted emits events for a deleted item.
-func (ec *EventCoordinator) EmitItemDeleted(item *models.Item, actorUserID int, descendantCount int) {
+func (ec *EventCoordinator) EmitItemDeleted(item *models.Item, actorUserID, descendantCount int) {
 	// Get actor username for notification
 	var actorName string
 	_ = ec.db.QueryRow("SELECT username FROM users WHERE id = ?", actorUserID).Scan(&actorName)
@@ -284,7 +284,7 @@ func (ec *EventCoordinator) EmitStatusChanged(item *models.Item, oldStatusID, ne
 		actorName = fmt.Sprintf("User #%d", actorUserID)
 	}
 	if newStatusID != nil {
-		ec.db.QueryRow("SELECT name FROM statuses WHERE id = ?", *newStatusID).Scan(&newStatusName)
+		_ = ec.db.QueryRow("SELECT name FROM statuses WHERE id = ?", *newStatusID).Scan(&newStatusName)
 	}
 
 	// Construct the item key

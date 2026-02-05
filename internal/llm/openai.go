@@ -67,7 +67,7 @@ func (c *openaiClient) ChatCompletion(ctx context.Context, req ChatCompletionReq
 		return nil, ErrServiceNotReady
 	}
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body) //nolint:errcheck
+		respBody, _ := io.ReadAll(resp.Body) //nolint:errcheck // best-effort read for error message
 		return nil, fmt.Errorf("%w: status %d - %s", ErrAPIError, resp.StatusCode, string(respBody))
 	}
 

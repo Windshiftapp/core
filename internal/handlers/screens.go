@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 )
@@ -20,13 +21,13 @@ func NewScreenHandler(db database.Database) *ScreenHandler {
 
 func (h *ScreenHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	query := `SELECT id, name, description, created_at, updated_at FROM screens ORDER BY name`
-	
+
 	rows, err := h.db.Query(query)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var screens []models.Screen
 	for rows.Next() {
@@ -57,7 +58,7 @@ func (h *ScreenHandler) Get(w http.ResponseWriter, r *http.Request) {
 		SELECT id, name, description, created_at, updated_at
 		FROM screens WHERE id = ?
 	`, id).Scan(&screen.ID, &screen.Name, &screen.Description, &screen.CreatedAt, &screen.UpdatedAt)
-	
+
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "screen")
 		return
@@ -203,7 +204,7 @@ func (h *ScreenHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Screen Fields Management
+// GetFields returns the fields configured for a screen.
 func (h *ScreenHandler) GetFields(w http.ResponseWriter, r *http.Request) {
 	screenID, ok := requireIDParam(w, r, "id")
 	if !ok {
@@ -237,7 +238,7 @@ func (h *ScreenHandler) UpdateFields(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Delete existing screen fields
 	_, err = tx.Exec("DELETE FROM screen_fields WHERE screen_id = ?", screenID)
@@ -291,7 +292,7 @@ func (h *ScreenHandler) UpdateSystemFields(w http.ResponseWriter, r *http.Reques
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Delete existing system fields
 	_, err = tx.Exec("DELETE FROM screen_system_fields WHERE screen_id = ?", screenID)
@@ -351,20 +352,19 @@ func (h *ScreenHandler) getScreenFields(screenID int) ([]models.ScreenField, err
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var fields []models.ScreenField
 	for rows.Next() {
 		var field models.ScreenField
 		var configStr sql.NullString
-		
+
 		err := rows.Scan(&field.ID, &field.ScreenID, &field.FieldType, &field.FieldIdentifier,
 			&field.DisplayOrder, &field.IsRequired, &field.FieldWidth,
 			&field.FieldName, &field.FieldLabel, &configStr)
 		if err != nil {
 			return nil, err
 		}
-		
 
 		// Parse field config if it exists
 		if configStr.Valid && configStr.String != "" {
@@ -391,7 +391,7 @@ func (h *ScreenHandler) getSystemFields(screenID int) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var systemFields []string
 	for rows.Next() {

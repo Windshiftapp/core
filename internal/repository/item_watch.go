@@ -51,7 +51,7 @@ func (r *ItemRepository) GetWatchers(itemID int) ([]int, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get watchers: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userIDs []int
 	for rows.Next() {
@@ -73,7 +73,7 @@ func (r *ItemRepository) GetUserWatchedItems(userID int) ([]int, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get watched items: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var itemIDs []int
 	for rows.Next() {

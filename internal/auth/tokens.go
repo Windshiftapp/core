@@ -8,16 +8,17 @@ import (
 	"fmt"
 	"strings"
 
-	"golang.org/x/crypto/bcrypt"
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/services"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
-	TokenPrefix = "crw_"
-	TokenLength = 32 // Total token length including prefix (to keep under bcrypt 72 byte limit)
-	PrefixLength = 4 // Length of visible prefix for identification
+	TokenPrefix  = "crw_"
+	TokenLength  = 32 // Total token length including prefix (to keep under bcrypt 72 byte limit)
+	PrefixLength = 4  // Length of visible prefix for identification
 )
 
 // TokenManager handles API token operations
@@ -42,11 +43,11 @@ func (tm *TokenManager) GenerateToken() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to generate random token: %w", err)
 	}
-	
+
 	// Convert to hex and add prefix
 	tokenBody := hex.EncodeToString(tokenBytes)
 	fullToken := TokenPrefix + tokenBody
-	
+
 	return fullToken, nil
 }
 
@@ -68,7 +69,7 @@ func (tm *TokenManager) GetTokenPrefix(token string) string {
 }
 
 // ValidateToken checks if a token is valid and returns the associated user
-func (tm *TokenManager) ValidateToken(token string) (*models.User, *models.ApiToken, error) {
+func (tm *TokenManager) ValidateToken(token string) (*models.User, *models.APIToken, error) {
 	// Check token format
 	if !strings.HasPrefix(token, TokenPrefix) || len(token) < 20 {
 		return nil, nil, fmt.Errorf("invalid token format")
@@ -94,7 +95,7 @@ func (tm *TokenManager) ValidateToken(token string) (*models.User, *models.ApiTo
 	defer rows.Close()
 
 	for rows.Next() {
-		var apiToken models.ApiToken
+		var apiToken models.APIToken
 		var user models.User
 		var expiresAt, lastUsedAt sql.NullTime
 
@@ -108,13 +109,13 @@ func (tm *TokenManager) ValidateToken(token string) (*models.User, *models.ApiTo
 		if err != nil {
 			continue // Skip invalid rows
 		}
-		
+
 		// Check if token hash matches
 		err = bcrypt.CompareHashAndPassword([]byte(apiToken.Token), []byte(token))
 		if err != nil {
 			continue // Hash doesn't match, try next token
 		}
-		
+
 		// Convert nullable times
 		if expiresAt.Valid {
 			apiToken.ExpiresAt = &expiresAt.Time
@@ -122,44 +123,44 @@ func (tm *TokenManager) ValidateToken(token string) (*models.User, *models.ApiTo
 		if lastUsedAt.Valid {
 			apiToken.LastUsedAt = &lastUsedAt.Time
 		}
-		
+
 		// Check if user is active
 		if !user.IsActive {
 			return nil, nil, fmt.Errorf("user account is disabled")
 		}
-		
+
 		// Update last used timestamp
 		go tm.updateLastUsed(apiToken.ID)
-		
+
 		return &user, &apiToken, nil
 	}
-	
+
 	return nil, nil, fmt.Errorf("invalid token")
 }
 
 // CreateToken creates a new API token for a user
-func (tm *TokenManager) CreateToken(userID int, request models.ApiTokenCreate) (*models.ApiTokenResponse, error) {
+func (tm *TokenManager) CreateToken(userID int, request models.APITokenCreate) (*models.APITokenResponse, error) {
 	// Generate token
 	token, err := tm.GenerateToken()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Hash token
 	tokenHash, err := tm.HashToken(token)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Get token prefix for identification
 	tokenPrefix := tm.GetTokenPrefix(token)
-	
+
 	// Convert permissions to JSON
 	permissionsJSON, err := json.Marshal(request.Permissions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal permissions: %w", err)
 	}
-	
+
 	// Insert token into database using RETURNING clause (supported by both SQLite 3.35+ and PostgreSQL)
 	var tokenID int64
 	err = tm.db.QueryRow(`
@@ -170,22 +171,22 @@ func (tm *TokenManager) CreateToken(userID int, request models.ApiTokenCreate) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to create token: %w", err)
 	}
-	
+
 	// Get the created token details
 	apiToken, err := tm.GetTokenByID(int(tokenID))
 	if err != nil {
 		return nil, err
 	}
-	
-	return &models.ApiTokenResponse{
+
+	return &models.APITokenResponse{
 		Token:    token, // Only returned on creation
-		ApiToken: *apiToken,
+		APIToken: *apiToken,
 	}, nil
 }
 
 // GetTokenByID retrieves a token by ID (without the actual token value)
-func (tm *TokenManager) GetTokenByID(id int) (*models.ApiToken, error) {
-	var token models.ApiToken
+func (tm *TokenManager) GetTokenByID(id int) (*models.APIToken, error) {
+	var token models.APIToken
 	var expiresAt, lastUsedAt sql.NullTime
 
 	err := tm.db.QueryRow(`
@@ -220,7 +221,7 @@ func (tm *TokenManager) GetTokenByID(id int) (*models.ApiToken, error) {
 
 // GetUserTokens retrieves all tokens for a user (without the actual token values)
 // Excludes expired tokens and temporary SSH session tokens
-func (tm *TokenManager) GetUserTokens(userID int) ([]models.ApiToken, error) {
+func (tm *TokenManager) GetUserTokens(userID int) ([]models.APIToken, error) {
 	rows, err := tm.db.Query(`
 		SELECT t.id, t.user_id, t.name, t.token_prefix, t.permissions, t.is_temporary,
 		       t.expires_at, t.last_used_at, t.created_at, t.updated_at,
@@ -237,9 +238,9 @@ func (tm *TokenManager) GetUserTokens(userID int) ([]models.ApiToken, error) {
 	}
 	defer rows.Close()
 
-	var tokens []models.ApiToken
+	var tokens []models.APIToken
 	for rows.Next() {
-		var token models.ApiToken
+		var token models.APIToken
 		var expiresAt, lastUsedAt sql.NullTime
 
 		err := rows.Scan(
@@ -271,16 +272,16 @@ func (tm *TokenManager) RevokeToken(tokenID, userID int) error {
 	if err != nil {
 		return fmt.Errorf("failed to revoke token: %w", err)
 	}
-	
+
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to check rows affected: %w", err)
 	}
-	
+
 	if rowsAffected == 0 {
 		return fmt.Errorf("token not found or not owned by user")
 	}
-	
+
 	return nil
 }
 
@@ -308,20 +309,20 @@ func (tm *TokenManager) CleanupExpiredTokens() (int, error) {
 }
 
 // CheckTokenPermissions checks if a token has specific permissions
-func (tm *TokenManager) CheckTokenPermissions(token *models.ApiToken, requiredPermissions []string) bool {
+func (tm *TokenManager) CheckTokenPermissions(token *models.APIToken, requiredPermissions []string) bool {
 	var permissions []string
 	err := json.Unmarshal([]byte(token.Permissions), &permissions)
 	if err != nil {
 		return false
 	}
-	
+
 	// Check if token has admin permission (grants all access)
 	for _, perm := range permissions {
 		if perm == "admin" {
 			return true
 		}
 	}
-	
+
 	// Check if token has all required permissions
 	for _, required := range requiredPermissions {
 		found := false
@@ -335,6 +336,6 @@ func (tm *TokenManager) CheckTokenPermissions(token *models.ApiToken, requiredPe
 			return false
 		}
 	}
-	
+
 	return true
 }

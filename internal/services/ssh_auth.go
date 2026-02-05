@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 )
@@ -51,7 +52,7 @@ func (s *SSHAuthService) GetAllActiveSSHCredentials() ([]models.UserCredential, 
 		var lastUsedAt sql.NullTime
 		var userEmail, username, firstName, lastName string
 
-		err := rows.Scan(
+		err = rows.Scan(
 			&cred.ID, &cred.UserID, &cred.CredentialType, &cred.CredentialName,
 			&cred.CredentialData, &cred.IsActive, &cred.CreatedAt, &cred.UpdatedAt, &lastUsedAt,
 			&userEmail, &username, &firstName, &lastName,
@@ -179,7 +180,7 @@ func (s *SSHAuthService) findByFullScan(normalizedKey string) (*SSHUserCredentia
 		var cred SSHUserCredential
 		var lastUsedAt sql.NullTime
 
-		err := rows.Scan(
+		err = rows.Scan(
 			&cred.ID, &cred.UserID, &cred.CredentialType, &cred.CredentialName,
 			&cred.CredentialData, &cred.IsActive, &cred.CreatedAt, &cred.UpdatedAt, &lastUsedAt,
 			&cred.Email, &cred.Username, &cred.FirstName, &cred.LastName,
@@ -194,7 +195,7 @@ func (s *SSHAuthService) findByFullScan(normalizedKey string) (*SSHUserCredentia
 
 		// Parse the stored credential data
 		var credData SSHCredentialData
-		if err := json.Unmarshal([]byte(cred.CredentialData), &credData); err != nil {
+		if err = json.Unmarshal([]byte(cred.CredentialData), &credData); err != nil {
 			// Log credential parsing errors but continue checking other credentials
 			continue
 		}

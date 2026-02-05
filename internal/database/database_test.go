@@ -57,7 +57,7 @@ func TestDatabase_Initialize_ExistingDatabase(t *testing.T) {
 	}
 
 	// Initialize again (should not recreate tables)
-	if err := tdb.Initialize(); err != nil {
+	if err = tdb.Initialize(); err != nil {
 		t.Fatalf("Failed to reinitialize database: %v", err)
 	}
 
@@ -74,23 +74,23 @@ func TestDatabase_Initialize_ExistingDatabase(t *testing.T) {
 
 func TestDatabase_NewDB_ConnectionString(t *testing.T) {
 	tests := []struct {
-		name string
-		dsn  string
+		name       string
+		dsn        string
 		shouldFail bool
 	}{
 		{
-			name: "Memory database",
-			dsn:  ":memory:",
+			name:       "Memory database",
+			dsn:        ":memory:",
 			shouldFail: false,
 		},
 		{
-			name: "File database with WAL mode",
-			dsn:  "test.db?_journal=WAL",
+			name:       "File database with WAL mode",
+			dsn:        "test.db?_journal=WAL",
 			shouldFail: false,
 		},
 		{
-			name: "Invalid file path",
-			dsn:  "/nonexistent/path/test.db",
+			name:       "Invalid file path",
+			dsn:        "/nonexistent/path/test.db",
 			shouldFail: true,
 		},
 	}
@@ -98,7 +98,7 @@ func TestDatabase_NewDB_ConnectionString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db, err := database.NewDB(tt.dsn)
-			
+
 			if tt.shouldFail {
 				if err == nil {
 					db.Close()
@@ -106,7 +106,7 @@ func TestDatabase_NewDB_ConnectionString(t *testing.T) {
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -160,11 +160,11 @@ func TestDatabase_DefaultData_SystemSettings(t *testing.T) {
 			FROM system_settings 
 			WHERE key = ?
 		`, key).Scan(&value, &valueType, &category)
-		
+
 		if err != nil {
 			t.Fatalf("Failed to query system setting %s: %v", key, err)
 		}
-		
+
 		if value != expected.value {
 			t.Errorf("Setting %s: expected value %s, got %s", key, expected.value, value)
 		}

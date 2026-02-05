@@ -48,7 +48,7 @@ func (h *PortalAuthHandler) getClientIP(r *http.Request) string {
 }
 
 // findPortalBySlug finds a portal channel by its slug
-func (h *PortalAuthHandler) findPortalBySlug(ctx context.Context, slug string) (*models.Channel, *models.ChannelConfig, error) {
+func (h *PortalAuthHandler) findPortalBySlug(ctx context.Context, slug string) (*models.Channel, *models.ChannelConfig, error) { //nolint:unparam // config return kept for API consistency
 	query := `
 		SELECT id, name, type, config, status
 		FROM channels
@@ -60,7 +60,7 @@ func (h *PortalAuthHandler) findPortalBySlug(ctx context.Context, slug string) (
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var channel models.Channel
@@ -98,7 +98,7 @@ func (h *PortalAuthHandler) RequestMagicLink(w http.ResponseWriter, r *http.Requ
 		// Always return success to prevent email enumeration
 		slog.Debug("portal not found", slog.String("component", "portal_auth"), slog.String("slug", slug))
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
 			"message": "If your email is registered, you will receive a sign-in link shortly.",
 		})
@@ -109,7 +109,7 @@ func (h *PortalAuthHandler) RequestMagicLink(w http.ResponseWriter, r *http.Requ
 	var request struct {
 		Email string `json:"email"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&request); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -126,7 +126,7 @@ func (h *PortalAuthHandler) RequestMagicLink(w http.ResponseWriter, r *http.Requ
 		slog.Error("failed to find or create portal customer", slog.String("component", "portal_auth"), slog.String("email", email), slog.Any("error", err))
 		// Still return success to prevent email enumeration
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
 			"message": "If your email is registered, you will receive a sign-in link shortly.",
 		})
@@ -142,7 +142,7 @@ func (h *PortalAuthHandler) RequestMagicLink(w http.ResponseWriter, r *http.Requ
 		slog.Error("failed to generate magic link", slog.String("component", "portal_auth"), slog.Any("error", err))
 		// Still return success to prevent enumeration
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
 			"message": "If your email is registered, you will receive a sign-in link shortly.",
 		})
@@ -159,7 +159,7 @@ func (h *PortalAuthHandler) RequestMagicLink(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "If your email is registered, you will receive a sign-in link shortly.",
 	})
@@ -210,7 +210,7 @@ func (h *PortalAuthHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Reque
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(statusCode)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
 			"message": message,
 		})
@@ -238,7 +238,7 @@ func (h *PortalAuthHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Reque
 	slog.Info("portal customer authenticated", slog.String("component", "portal_auth"), slog.Int("portal_customer_id", result.PortalCustomerID), slog.String("email", result.CustomerEmail))
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "Successfully signed in",
 		"customer": map[string]interface{}{
@@ -279,7 +279,7 @@ func (h *PortalAuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("portal customer logged out", slog.String("component", "portal_auth"), slog.String("portal", slug))
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "Successfully logged out",
 	})
@@ -307,7 +307,7 @@ func (h *PortalAuthHandler) GetCurrentCustomer(w http.ResponseWriter, r *http.Re
 		if err == nil {
 			// Portal customer authenticated
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"authenticated": true,
 				"is_internal":   false,
 				"customer": map[string]interface{}{
@@ -329,7 +329,7 @@ func (h *PortalAuthHandler) GetCurrentCustomer(w http.ResponseWriter, r *http.Re
 			if err == nil && session.User != nil {
 				// Internal user authenticated
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"authenticated": true,
 					"is_internal":   true,
 					"user": map[string]interface{}{
@@ -348,7 +348,7 @@ func (h *PortalAuthHandler) GetCurrentCustomer(w http.ResponseWriter, r *http.Re
 	// No valid session found
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusUnauthorized)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"authenticated": false,
 	})
 }

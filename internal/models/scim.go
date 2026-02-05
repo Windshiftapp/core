@@ -91,8 +91,8 @@ type SCIMUser struct {
 
 // SCIMGroupMember represents a member reference in a SCIM Group
 type SCIMGroupMember struct {
-	Value   string `json:"value"`            // User ID
-	Ref     string `json:"$ref,omitempty"`   // URI reference to user
+	Value   string `json:"value"`             // User ID
+	Ref     string `json:"$ref,omitempty"`    // URI reference to user
 	Display string `json:"display,omitempty"` // Display name
 }
 
@@ -128,7 +128,7 @@ type SCIMError struct {
 }
 
 // NewSCIMError creates a new SCIM error response
-func NewSCIMError(status int, detail string, scimType string) *SCIMError {
+func NewSCIMError(status int, detail, scimType string) *SCIMError {
 	return &SCIMError{
 		Schemas:  []string{SCIMSchemaError},
 		Detail:   detail,

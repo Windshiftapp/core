@@ -10,9 +10,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/allegro/bigcache/v3"
 	"windshift/internal/database"
 	"windshift/internal/models"
+
+	"github.com/allegro/bigcache/v3"
 )
 
 // PermissionService handles cached permission resolution
@@ -534,7 +535,7 @@ func (ps *PermissionService) OnRoleChanged(roleID int) error {
 	}
 
 	// Invalidate caches for all affected users
-	if err := ps.InvalidateMultipleUserCaches(userIDs); err != nil {
+	if err = ps.InvalidateMultipleUserCaches(userIDs); err != nil {
 		slog.Warn("Failed to invalidate user caches for role",
 			slog.String("component", "permissions"),
 			slog.Int("role_id", roleID),
@@ -826,7 +827,7 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 		for everyoneRows.Next() {
 			var workspaceID int
 			var roleID sql.NullInt64
-			if err := everyoneRows.Scan(&workspaceID, &roleID); err != nil {
+			if err = everyoneRows.Scan(&workspaceID, &roleID); err != nil {
 				continue
 			}
 
@@ -868,7 +869,7 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 
 	for globalRows.Next() {
 		var permissionKey string
-		if err := globalRows.Scan(&permissionKey); err != nil {
+		if err = globalRows.Scan(&permissionKey); err != nil {
 			continue
 		}
 		cached.GlobalPermissions[permissionKey] = true
@@ -882,7 +883,7 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 		defer func() { _ = groupRows.Close() }()
 		for groupRows.Next() {
 			var groupID int
-			if err := groupRows.Scan(&groupID); err == nil {
+			if err = groupRows.Scan(&groupID); err == nil {
 				cached.GroupMemberships = append(cached.GroupMemberships, groupID)
 			}
 		}
@@ -901,7 +902,7 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 		for roleRows.Next() {
 			var workspaceID, roleID int
 			var permissionKey string
-			if err := roleRows.Scan(&workspaceID, &roleID, &permissionKey); err != nil {
+			if err = roleRows.Scan(&workspaceID, &roleID, &permissionKey); err != nil {
 				continue
 			}
 
@@ -956,13 +957,14 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 			WHERE gwr.group_id IN (%s)
 		`, groupIDList)
 
-		groupRoleRows, err := ps.db.Query(groupRoleQuery)
+		var groupRoleRows *sql.Rows
+		groupRoleRows, err = ps.db.Query(groupRoleQuery)
 		if err == nil {
 			defer func() { _ = groupRoleRows.Close() }()
 			for groupRoleRows.Next() {
 				var workspaceID int
 				var permissionKey string
-				if err := groupRoleRows.Scan(&workspaceID, &permissionKey); err != nil {
+				if err = groupRoleRows.Scan(&workspaceID, &permissionKey); err != nil {
 					continue
 				}
 
@@ -1055,16 +1057,6 @@ func (ps *PermissionService) getWorkspaceActiveMap() (map[int]bool, error) {
 	return result, nil
 }
 
-// getRolePermissionsByName loads permission keys for a workspace role by name
-func (ps *PermissionService) getRolePermissionsByName(name string) (map[string]bool, error) {
-	var roleID int
-	err := ps.db.QueryRow(`SELECT id FROM workspace_roles WHERE name = ? LIMIT 1`, name).Scan(&roleID)
-	if err != nil {
-		return nil, err
-	}
-	return ps.getRolePermissions(roleID)
-}
-
 // getRolePermissions loads permission keys for a given workspace role id
 func (ps *PermissionService) getRolePermissions(roleID int) (map[string]bool, error) {
 	rows, err := ps.db.Query(`
@@ -1115,18 +1107,6 @@ func clonePermissionSet(src map[string]bool) map[string]bool {
 		dst[k] = v
 	}
 	return dst
-}
-
-// applyAllViewersInheritance grants permissions from roles without explicit members to all users with Viewer
-// This implements the "All Viewers" inheritance model where:
-// - Roles without explicit members grant to all users with Viewer permissions
-// - Roles with explicit members are restricted to those members only
-//
-// NOTE: This function is intentionally disabled. The feature was found to grant all permissions
-// to viewers when no explicit role assignments exist, which breaks role-based access control.
-// If needed in the future, this should be a workspace-level opt-in setting.
-func (ps *PermissionService) applyAllViewersInheritance(_ *models.UserPermissionCache, _, _, _ map[string]bool) {
-	// Function intentionally disabled - see comment above
 }
 
 // WarmCache pre-loads permissions for recently active users

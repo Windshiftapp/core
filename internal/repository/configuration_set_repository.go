@@ -142,12 +142,12 @@ func (r *ConfigurationSetRepository) List(page, limit int, search string) ([]mod
 		ORDER BY cs.is_default DESC, cs.name
 		LIMIT ? OFFSET ?`, notificationSettingSubquery, whereClause)
 
-	paginationArgs := append(args, limit, offset)
-	rows, err := r.db.Query(query, paginationArgs...)
+	args = append(args, limit, offset)
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list configuration sets: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var configSets []models.ConfigurationSet
 	for rows.Next() {
@@ -207,22 +207,22 @@ func (r *ConfigurationSetRepository) Delete(id int) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Delete associations first
-	if _, err := tx.Exec("DELETE FROM configuration_set_notification_settings WHERE configuration_set_id = ?", id); err != nil {
+	if _, err = tx.Exec("DELETE FROM configuration_set_notification_settings WHERE configuration_set_id = ?", id); err != nil {
 		return fmt.Errorf("failed to delete notification settings: %w", err)
 	}
-	if _, err := tx.Exec("DELETE FROM workspace_configuration_sets WHERE configuration_set_id = ?", id); err != nil {
+	if _, err = tx.Exec("DELETE FROM workspace_configuration_sets WHERE configuration_set_id = ?", id); err != nil {
 		return fmt.Errorf("failed to delete workspace assignments: %w", err)
 	}
-	if _, err := tx.Exec("DELETE FROM configuration_set_screens WHERE configuration_set_id = ?", id); err != nil {
+	if _, err = tx.Exec("DELETE FROM configuration_set_screens WHERE configuration_set_id = ?", id); err != nil {
 		return fmt.Errorf("failed to delete screen assignments: %w", err)
 	}
-	if _, err := tx.Exec("DELETE FROM configuration_set_item_types WHERE configuration_set_id = ?", id); err != nil {
+	if _, err = tx.Exec("DELETE FROM configuration_set_item_types WHERE configuration_set_id = ?", id); err != nil {
 		return fmt.Errorf("failed to delete item type assignments: %w", err)
 	}
-	if _, err := tx.Exec("DELETE FROM configuration_set_priorities WHERE configuration_set_id = ?", id); err != nil {
+	if _, err = tx.Exec("DELETE FROM configuration_set_priorities WHERE configuration_set_id = ?", id); err != nil {
 		return fmt.Errorf("failed to delete priority assignments: %w", err)
 	}
 
@@ -251,8 +251,8 @@ func (r *ConfigurationSetRepository) loadRelations(cs *models.ConfigurationSet) 
 	cs.Workspaces = workspaceNames
 
 	// Load screens
-	if err := r.loadScreens(cs); err != nil {
-		return err
+	if errScreens := r.loadScreens(cs); errScreens != nil {
+		return errScreens
 	}
 
 	// Load item type configs
@@ -289,7 +289,7 @@ func (r *ConfigurationSetRepository) loadRelations(cs *models.ConfigurationSet) 
 }
 
 // loadWorkspaces loads workspace assignments for a configuration set
-func (r *ConfigurationSetRepository) loadWorkspaces(configSetID int) ([]int, []string, error) {
+func (r *ConfigurationSetRepository) loadWorkspaces(configSetID int) (ids []int, names []string, err error) {
 	query := `
 		SELECT w.id, w.name
 		FROM workspace_configuration_sets wcs
@@ -301,7 +301,7 @@ func (r *ConfigurationSetRepository) loadWorkspaces(configSetID int) ([]int, []s
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load workspaces: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var workspaceIDs []int
 	var workspaceNames []string
@@ -330,7 +330,7 @@ func (r *ConfigurationSetRepository) loadScreens(cs *models.ConfigurationSet) er
 	if err != nil {
 		return fmt.Errorf("failed to load screens: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var context string
@@ -378,7 +378,7 @@ func (r *ConfigurationSetRepository) loadItemTypeConfigs(configSetID int) ([]mod
 	if err != nil {
 		return nil, fmt.Errorf("failed to load item type configs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var configs []models.ItemTypeConfig
 	for rows.Next() {
@@ -442,7 +442,7 @@ func (r *ConfigurationSetRepository) loadPriorities(configSetID int) ([]int, []m
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load priorities: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var priorityIDs []int
 	var priorities []models.PriorityDisplay
@@ -693,7 +693,7 @@ func (r *ConfigurationSetRepository) GetWorkspaceIDs(configSetID int) ([]int, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to get workspace IDs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var workspaceIDs []int
 	for rows.Next() {

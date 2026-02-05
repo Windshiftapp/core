@@ -64,7 +64,7 @@ func ParseCustomFieldValues(s sql.NullString) map[string]interface{} {
 
 // MarshalCustomFieldValues converts a map to JSON bytes for storage
 func MarshalCustomFieldValues(values map[string]interface{}) ([]byte, error) {
-	if values == nil || len(values) == 0 {
+	if len(values) == 0 {
 		return nil, nil
 	}
 	return json.Marshal(values)

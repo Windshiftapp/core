@@ -33,7 +33,7 @@ func (m *Manager) cliExecHostFunction(ctx context.Context, plugin *extism.Curren
 	}
 
 	var req CLIExecRequest
-	if err := json.Unmarshal(payload, &req); err != nil {
+	if err = json.Unmarshal(payload, &req); err != nil {
 		m.logger.Warn("cli_exec: failed to parse payload", "error", err)
 		m.writeHostResponse(plugin, stack, CLIExecResponse{
 			Status: "error",
@@ -65,7 +65,7 @@ func (m *Manager) cliExecHostFunction(ctx context.Context, plugin *extism.Curren
 	defer cancel()
 
 	// Build command
-	cmd := exec.CommandContext(execCtx, req.Command, req.Args...)
+	cmd := exec.CommandContext(execCtx, req.Command, req.Args...) //nolint:gosec // G204: command path is from trusted plugin configuration
 
 	// Set working directory if specified
 	if req.WorkingDir != "" {

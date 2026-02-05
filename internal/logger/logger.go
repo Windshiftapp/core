@@ -1,3 +1,4 @@
+// Package logger provides logging and audit trail functionality.
 package logger
 
 import (

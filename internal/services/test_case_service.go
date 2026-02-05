@@ -1,7 +1,9 @@
 package services
 
 import (
+	"database/sql"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"windshift/internal/database"
@@ -139,7 +141,7 @@ func (s *TestCaseService) Create(workspaceID int, req TestCaseCreateRequest) (*m
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	id, err := s.repo.Create(tx, tc)
 	if err != nil {
@@ -203,7 +205,7 @@ func (s *TestCaseService) Update(id, workspaceID int, req TestCaseUpdateRequest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := s.repo.Update(tx, tc); err != nil {
 		return nil, err
@@ -222,7 +224,7 @@ func (s *TestCaseService) Delete(id, workspaceID int) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := s.repo.Delete(tx, id, workspaceID); err != nil {
 		return err
@@ -241,7 +243,7 @@ func (s *TestCaseService) Move(id, workspaceID int, folderID *int, sortOrder int
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := s.repo.Move(tx, id, workspaceID, folderID, sortOrder); err != nil {
 		return err
@@ -260,7 +262,7 @@ func (s *TestCaseService) Reorder(workspaceID int, testCaseIDs []int) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := s.repo.Reorder(tx, workspaceID, testCaseIDs); err != nil {
 		return err
@@ -320,7 +322,7 @@ func (s *TestCaseService) CreateStep(testCaseID int, req TestStepCreateRequest) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	id, err := s.repo.CreateStep(tx, step)
 	if err != nil {
@@ -364,7 +366,7 @@ func (s *TestCaseService) UpdateStep(stepID, testCaseID int, req TestStepUpdateR
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := s.repo.UpdateStep(tx, step); err != nil {
 		return nil, err
@@ -383,7 +385,7 @@ func (s *TestCaseService) DeleteStep(stepID, testCaseID int) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := s.repo.DeleteStep(tx, stepID, testCaseID); err != nil {
 		return err
@@ -402,7 +404,7 @@ func (s *TestCaseService) ReorderSteps(testCaseID int, stepIDs []int) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := s.repo.ReorderSteps(tx, testCaseID, stepIDs); err != nil {
 		return err
@@ -454,7 +456,7 @@ func (s *TestCaseService) CreateLabel(workspaceID int, req TestLabelCreateReques
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	_, err = s.repo.CreateLabel(tx, label)
 	if err != nil {
@@ -494,7 +496,11 @@ func (s *TestCaseService) UpdateLabel(labelID, workspaceID int, req TestLabelUpd
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			slog.Error("failed to rollback transaction", "error", err)
+		}
+	}()
 
 	if err := s.repo.UpdateLabel(tx, label); err != nil {
 		return nil, err
@@ -514,7 +520,11 @@ func (s *TestCaseService) DeleteLabel(labelID, workspaceID int) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			slog.Error("failed to rollback transaction", "error", err)
+		}
+	}()
 
 	if err := s.repo.DeleteLabel(tx, labelID, workspaceID); err != nil {
 		return err
@@ -542,7 +552,11 @@ func (s *TestCaseService) AddLabelToTestCase(testCaseID, labelID, workspaceID in
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			slog.Error("failed to rollback transaction", "error", err)
+		}
+	}()
 
 	if err := s.repo.AddLabelToTestCase(tx, testCaseID, labelID); err != nil {
 		return err
@@ -561,7 +575,7 @@ func (s *TestCaseService) RemoveLabelFromTestCase(testCaseID, labelID int) error
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := s.repo.RemoveLabelFromTestCase(tx, testCaseID, labelID); err != nil {
 		return err

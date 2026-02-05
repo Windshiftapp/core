@@ -32,13 +32,13 @@ func (h *WorkflowHandler) SetWorkflowService(ws *services.WorkflowService) {
 
 // WorkflowResponse is the public API representation of a Workflow
 type WorkflowResponse struct {
-	ID          int                    `json:"id"`
-	Name        string                 `json:"name"`
-	Description string                 `json:"description,omitempty"`
-	IsDefault   bool                   `json:"is_default"`
+	ID          int                      `json:"id"`
+	Name        string                   `json:"name"`
+	Description string                   `json:"description,omitempty"`
+	IsDefault   bool                     `json:"is_default"`
 	Transitions []dto.TransitionResponse `json:"transitions,omitempty"`
-	CreatedAt   string                 `json:"created_at"`
-	UpdatedAt   string                 `json:"updated_at"`
+	CreatedAt   string                   `json:"created_at"`
+	UpdatedAt   string                   `json:"updated_at"`
 }
 
 // List handles GET /rest/api/v1/workflows
@@ -106,8 +106,9 @@ func (h *WorkflowHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Check for expand=transitions
 	expand := restapi.ParseExpand(r)
 	if expand.WorkflowTransitions {
-		transitions, _ := h.getWorkflowTransitions(id)
-		wf.Transitions = transitions
+		if transitions, err := h.getWorkflowTransitions(id); err == nil {
+			wf.Transitions = transitions
+		}
 	}
 
 	restapi.RespondOK(w, wf)

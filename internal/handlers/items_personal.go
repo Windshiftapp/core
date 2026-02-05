@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+
 	"windshift/internal/models"
 )
 
@@ -77,7 +78,7 @@ func (h *ItemHandler) GetPersonalTasks(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []models.Item
 	for rows.Next() {
@@ -86,7 +87,7 @@ func (h *ItemHandler) GetPersonalTasks(w http.ResponseWriter, r *http.Request) {
 		var itemTypeName, statusName, priorityName, priorityIcon, priorityColor sql.NullString
 		var assigneeName, assigneeEmail, assigneeAvatar sql.NullString
 
-		err := rows.Scan(
+		err = rows.Scan(
 			&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &item.ItemTypeID, &item.Title, &item.Description,
 			&item.StatusID, &item.PriorityID, &item.IsTask, &item.MilestoneID,
 			&item.ProjectID, &item.InheritProject, &item.TimeProjectID, &item.AssigneeID, &item.CreatorID,
@@ -132,7 +133,7 @@ func (h *ItemHandler) GetPersonalTasks(w http.ResponseWriter, r *http.Request) {
 
 		// Parse calendar data JSON
 		if calendarDataJSON.Valid && calendarDataJSON.String != "" {
-			if err := json.Unmarshal([]byte(calendarDataJSON.String), &item.CalendarData); err != nil {
+			if err = json.Unmarshal([]byte(calendarDataJSON.String), &item.CalendarData); err != nil {
 				item.CalendarData = []models.CalendarScheduleEntry{}
 			}
 		} else {

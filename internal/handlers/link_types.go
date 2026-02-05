@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 )
@@ -20,7 +21,7 @@ func NewLinkTypeHandler(db database.Database) *LinkTypeHandler {
 func (h *LinkTypeHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Check if we should include inactive link types (admin only)
 	includeInactive := r.URL.Query().Get("include_inactive") == "true"
-	
+
 	query := `
 		SELECT id, name, description, forward_label, reverse_label, color, is_system, active, created_at, updated_at
 		FROM link_types
@@ -35,7 +36,7 @@ func (h *LinkTypeHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var linkTypes []models.LinkType
 	for rows.Next() {

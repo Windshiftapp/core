@@ -65,7 +65,7 @@ func (h *JiraImportHandler) GetJobStatus(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // GetImportJobs handles GET /api/jira-import/jobs
@@ -81,7 +81,7 @@ func (h *JiraImportHandler) GetImportJobs(w http.ResponseWriter, r *http.Request
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	jobs := make([]ImportJobInfo, 0)
 	for rows.Next() {
@@ -131,7 +131,7 @@ func (h *JiraImportHandler) GetImportJobs(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(jobs)
+	_ = json.NewEncoder(w).Encode(jobs)
 }
 
 // StartImport handles POST /api/jira-import/start
@@ -179,7 +179,7 @@ func (h *JiraImportHandler) StartImport(w http.ResponseWriter, r *http.Request) 
 	go h.executeImport(jobID, req)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(StartImportResponse{
+	_ = json.NewEncoder(w).Encode(StartImportResponse{
 		JobID:   jobID,
 		Message: "Import started successfully",
 	})
@@ -202,12 +202,12 @@ func (h *JiraImportHandler) executeImport(jobID string, req StartImportRequest) 
 	// When JIRA_CAPTURE_PAYLOADS is set, save the request and wrap the client
 	captureDir := os.Getenv("JIRA_CAPTURE_PAYLOADS")
 	if captureDir != "" {
-		if err := os.MkdirAll(captureDir, 0755); err != nil {
+		if err := os.MkdirAll(captureDir, 0o750); err != nil {
 			slog.Error("Failed to create capture directory", slog.String("component", "jira"), slog.Any("error", err))
 		} else {
 			// Save import_request.json
 			reqData, _ := json.MarshalIndent(req, "", "  ")
-			if err := os.WriteFile(captureDir+"/import_request.json", reqData, 0644); err != nil {
+			if err := os.WriteFile(captureDir+"/import_request.json", reqData, 0o600); err != nil {
 				slog.Error("Failed to save import request", slog.String("component", "jira"), slog.Any("error", err))
 			}
 
@@ -285,7 +285,7 @@ func (h *JiraImportHandler) executeImportWithClient(jobID string, req StartImpor
 		}
 
 		// Create workflows and configuration set for this project
-		if err := h.ensureWorkflowsAndConfigSet(ctx, jobID, projectKey, workspaceID, statusMap, itemTypeMap, client); err != nil {
+		if err = h.ensureWorkflowsAndConfigSet(ctx, jobID, projectKey, workspaceID, statusMap, itemTypeMap, client); err != nil {
 			slog.Error("Failed to create workflows/config set", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
 			// Non-fatal: continue importing
 		}
@@ -506,9 +506,9 @@ func (h *JiraImportHandler) ensureWorkflowsAndConfigSet(
 
 	// Group item types by status set (sorted comma-joined IDs as key)
 	type workflowGroup struct {
-		statusIDs    []int
-		itemTypeIDs  []int
-		typeNames    []string
+		statusIDs   []int
+		itemTypeIDs []int
+		typeNames   []string
 	}
 	groups := make(map[string]*workflowGroup)
 
@@ -537,7 +537,7 @@ func (h *JiraImportHandler) ensureWorkflowsAndConfigSet(
 	for _, statusIDs := range groups {
 		for _, sid := range statusIDs.statusIDs {
 			var catID int
-			err := h.db.QueryRow("SELECT category_id FROM statuses WHERE id = ?", sid).Scan(&catID)
+			err = h.db.QueryRow("SELECT category_id FROM statuses WHERE id = ?", sid).Scan(&catID)
 			if err == nil && catID == 1 {
 				newStatusIDs[sid] = true
 			}
@@ -563,7 +563,7 @@ func (h *JiraImportHandler) ensureWorkflowsAndConfigSet(
 
 		// Insert workflow
 		var workflowID int
-		err := h.db.QueryRow(`
+		err = h.db.QueryRow(`
 			INSERT INTO workflows (name, description, is_default, created_at, updated_at)
 			VALUES (?, '', false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
 		`, wfName).Scan(&workflowID)
@@ -587,7 +587,7 @@ func (h *JiraImportHandler) ensureWorkflowsAndConfigSet(
 		for _, sid := range group.statusIDs {
 			if newStatusIDs[sid] {
 				order++
-				h.db.ExecWrite(`
+				_, _ = h.db.ExecWrite(`
 					INSERT INTO workflow_transitions (workflow_id, from_status_id, to_status_id, display_order, source_handle, target_handle, created_at)
 					VALUES (?, NULL, ?, ?, '', '', CURRENT_TIMESTAMP)
 				`, workflowID, sid, order)
@@ -599,7 +599,7 @@ func (h *JiraImportHandler) ensureWorkflowsAndConfigSet(
 			for _, toID := range group.statusIDs {
 				if fromID != toID {
 					order++
-					h.db.ExecWrite(`
+					_, _ = h.db.ExecWrite(`
 						INSERT INTO workflow_transitions (workflow_id, from_status_id, to_status_id, display_order, source_handle, target_handle, created_at)
 						VALUES (?, ?, ?, ?, '', '', CURRENT_TIMESTAMP)
 					`, workflowID, fromID, toID, order)
@@ -681,7 +681,7 @@ func (h *JiraImportHandler) ensureWorkflowsAndConfigSet(
 }
 
 // ensureWorkspace creates or finds a workspace for import
-func (h *JiraImportHandler) ensureWorkspace(ctx context.Context, jobID string, mapping *WorkspaceMapping) (int, error) {
+func (h *JiraImportHandler) ensureWorkspace(_ context.Context, jobID string, mapping *WorkspaceMapping) (int, error) {
 	if !mapping.CreateNew && mapping.WindshiftID != nil {
 		return *mapping.WindshiftID, nil
 	}
@@ -715,7 +715,9 @@ func (h *JiraImportHandler) ensureWorkspace(ctx context.Context, jobID string, m
 
 // ensureMilestones creates milestones for Jira versions in a workspace
 // Returns a map from Jira version ID to Windshift milestone ID
-func (h *JiraImportHandler) ensureMilestones(ctx context.Context, jobID string, workspaceID int, mappings []VersionMapping) (map[string]int, error) {
+//
+//nolint:unparam // error return kept for interface consistency with other ensure* methods
+func (h *JiraImportHandler) ensureMilestones(_ context.Context, jobID string, workspaceID int, mappings []VersionMapping) (map[string]int, error) {
 	result := make(map[string]int)
 	planningSvc := services.NewPlanningService(h.db)
 
@@ -760,7 +762,9 @@ func (h *JiraImportHandler) ensureMilestones(ctx context.Context, jobID string, 
 }
 
 // ensureStatuses creates or maps statuses (global model - shared across workspaces)
-func (h *JiraImportHandler) ensureStatuses(ctx context.Context, jobID string, mappings []StatusMapping) (map[string]int, error) {
+//
+//nolint:unparam // error return kept for interface consistency with other ensure* methods
+func (h *JiraImportHandler) ensureStatuses(_ context.Context, jobID string, mappings []StatusMapping) (map[string]int, error) {
 	result := make(map[string]int)
 	statusSvc := services.NewEnumService(h.db, services.NewStatusConfig())
 
@@ -824,7 +828,9 @@ func (h *JiraImportHandler) ensureStatuses(ctx context.Context, jobID string, ma
 }
 
 // ensureItemTypes creates or maps item types (global model - shared across workspaces)
-func (h *JiraImportHandler) ensureItemTypes(ctx context.Context, jobID string, mappings []IssueTypeMapping) (map[string]int, error) {
+//
+//nolint:unparam // error return kept for interface consistency with other ensure* methods
+func (h *JiraImportHandler) ensureItemTypes(_ context.Context, jobID string, mappings []IssueTypeMapping) (map[string]int, error) {
 	result := make(map[string]int)
 	itemTypeSvc := services.NewEnumService(h.db, services.NewItemTypeConfig())
 
@@ -880,7 +886,7 @@ func (h *JiraImportHandler) ensureItemTypes(ctx context.Context, jobID string, m
 // ensureUsers matches or creates users for import
 // Returns a map from Jira account ID to Windshift user ID
 // Fetches missing emails via the Jira API when needed
-func (h *JiraImportHandler) ensureUsers(ctx context.Context, jobID string, users []JiraUserSummary, client jira.Client) (map[string]int, error) {
+func (h *JiraImportHandler) ensureUsers(ctx context.Context, jobID string, users []JiraUserSummary, client jira.Client) (map[string]int, error) { //nolint:unparam // error return kept for API consistency
 	result := make(map[string]int)
 
 	// First pass: fetch missing emails via API
@@ -932,7 +938,7 @@ func (h *JiraImportHandler) ensureUsers(ctx context.Context, jobID string, users
 		// Try to find existing Windshift user by email
 		var userID int
 		if u.Email != "" {
-			err := h.db.QueryRow(`SELECT id FROM users WHERE email = ?`, u.Email).Scan(&userID)
+			err = h.db.QueryRow(`SELECT id FROM users WHERE email = ?`, u.Email).Scan(&userID)
 			if err == nil {
 				// Found existing user
 				result[u.AccountID] = userID
@@ -1013,11 +1019,12 @@ func generateUsername(email, displayName string) string {
 func collectUsersFromCustomField(value interface{}, fieldType string,
 	existingMap map[string]int, usersToProcess *[]JiraUserSummary, seen map[string]bool) {
 
-	if fieldType == "user" {
+	switch fieldType {
+	case "user":
 		if userObj, ok := value.(map[string]interface{}); ok {
 			addUserFromObject(userObj, existingMap, usersToProcess, seen)
 		}
-	} else if fieldType == "users" {
+	case "users":
 		if users, ok := value.([]interface{}); ok {
 			for _, u := range users {
 				if userObj, ok := u.(map[string]interface{}); ok {
@@ -1060,7 +1067,7 @@ func addUserFromObject(userObj map[string]interface{}, existingMap map[string]in
 }
 
 // importIssue imports a single Jira issue as a Windshift work item
-func (h *JiraImportHandler) importIssue(ctx context.Context, jobID string, workspaceID int, issue *jira.JiraIssue, statusMap map[string]int, itemTypeMap map[string]int, userMap map[string]int, versionMap map[string]int, customFieldMappings []CustomFieldMapping, client jira.Client, progress *ImportProgress) error {
+func (h *JiraImportHandler) importIssue(ctx context.Context, jobID string, workspaceID int, issue *jira.JiraIssue, statusMap, itemTypeMap, userMap, versionMap map[string]int, customFieldMappings []CustomFieldMapping, client jira.Client, progress *ImportProgress) error {
 	// Get mapped status and item type (use nil instead of 0 for missing mappings)
 	var statusID *int
 	if issue.Fields.Status != nil {
@@ -1264,13 +1271,14 @@ func (h *JiraImportHandler) updateJobStatus(jobID, status, phase string, progres
 	var query string
 	var args []interface{}
 
-	if status == "running" {
+	switch status {
+	case "running":
 		query = `UPDATE jira_import_jobs SET status = ?, phase = ?, progress_json = ?, started_at = CURRENT_TIMESTAMP WHERE id = ?`
 		args = []interface{}{status, phase, progressJSON, jobID}
-	} else if status == "completed" || status == "failed" {
+	case "completed", "failed":
 		query = `UPDATE jira_import_jobs SET status = ?, phase = ?, progress_json = ?, error_message = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?`
 		args = []interface{}{status, phase, progressJSON, errorMessage, jobID}
-	} else {
+	default:
 		query = `UPDATE jira_import_jobs SET status = ?, phase = ?, progress_json = ? WHERE id = ?`
 		args = []interface{}{status, phase, progressJSON, jobID}
 	}
@@ -1333,7 +1341,7 @@ func (h *JiraImportHandler) DeleteImportedData(w http.ResponseWriter, r *http.Re
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type mapping struct {
 		entityType  string
@@ -1342,7 +1350,7 @@ func (h *JiraImportHandler) DeleteImportedData(w http.ResponseWriter, r *http.Re
 	var mappings []mapping
 	for rows.Next() {
 		var m mapping
-		if err := rows.Scan(&m.entityType, &m.windshiftID); err != nil {
+		if err = rows.Scan(&m.entityType, &m.windshiftID); err != nil {
 			slog.Warn("Failed to scan mapping", slog.String("component", "jira"), slog.Any("error", err))
 			continue
 		}
@@ -1374,20 +1382,20 @@ func (h *JiraImportHandler) DeleteImportedData(w http.ResponseWriter, r *http.Re
 			tableName = "item_links"
 		case "configuration_set":
 			// Delete dependent rows first
-			h.db.ExecWrite("DELETE FROM workspace_configuration_sets WHERE configuration_set_id = ?", m.windshiftID)
-			h.db.ExecWrite("DELETE FROM configuration_set_item_types WHERE configuration_set_id = ?", m.windshiftID)
-			h.db.ExecWrite("DELETE FROM configuration_set_screens WHERE configuration_set_id = ?", m.windshiftID)
-			h.db.ExecWrite("DELETE FROM configuration_set_priorities WHERE configuration_set_id = ?", m.windshiftID)
+			_, _ = h.db.ExecWrite("DELETE FROM workspace_configuration_sets WHERE configuration_set_id = ?", m.windshiftID)
+			_, _ = h.db.ExecWrite("DELETE FROM configuration_set_item_types WHERE configuration_set_id = ?", m.windshiftID)
+			_, _ = h.db.ExecWrite("DELETE FROM configuration_set_screens WHERE configuration_set_id = ?", m.windshiftID)
+			_, _ = h.db.ExecWrite("DELETE FROM configuration_set_priorities WHERE configuration_set_id = ?", m.windshiftID)
 			tableName = "configuration_sets"
 		case "workflow":
-			h.db.ExecWrite("DELETE FROM workflow_transitions WHERE workflow_id = ?", m.windshiftID)
+			_, _ = h.db.ExecWrite("DELETE FROM workflow_transitions WHERE workflow_id = ?", m.windshiftID)
 			tableName = "workflows"
 		default:
 			slog.Warn("Unknown entity type", slog.String("component", "jira"), slog.String("entityType", m.entityType))
 			continue
 		}
 
-		_, err := h.db.ExecWrite(fmt.Sprintf("DELETE FROM %s WHERE id = ?", tableName), m.windshiftID)
+		_, err = h.db.ExecWrite(fmt.Sprintf("DELETE FROM %s WHERE id = ?", tableName), m.windshiftID)
 		if err != nil {
 			slog.Error("Failed to delete entity", slog.String("component", "jira"), slog.String("entityType", m.entityType), slog.Int("windshiftID", m.windshiftID), slog.Any("error", err))
 		} else {
@@ -1411,7 +1419,7 @@ func (h *JiraImportHandler) DeleteImportedData(w http.ResponseWriter, r *http.Re
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"deleted": deleted,
 	})
@@ -1440,7 +1448,7 @@ func (h *JiraImportHandler) GetPreviousImports(w http.ResponseWriter, r *http.Re
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type previousImport struct {
 		JobID          string     `json:"job_id"`
@@ -1494,7 +1502,7 @@ func (h *JiraImportHandler) GetPreviousImports(w http.ResponseWriter, r *http.Re
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(imports)
+	_ = json.NewEncoder(w).Encode(imports)
 }
 
 // ================================================================
@@ -1515,7 +1523,7 @@ func (h *JiraImportHandler) linkParents(jobID string) {
 		slog.Error("Failed to query item mappings for parent linking", slog.String("component", "jira"), slog.Any("error", err))
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type parentLink struct {
 		childID   int
@@ -1644,7 +1652,7 @@ func (h *JiraImportHandler) importIssueLinks(jobID string) {
 		slog.Error("Failed to query item mappings for link import", slog.String("component", "jira"), slog.Any("error", err))
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type issueLinkInfo struct {
 		sourceID  int

@@ -125,7 +125,8 @@ func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	// Check if user has permission to view projects in this workspace
 	if result.WorkspaceID != nil {
-		canView, err := h.canViewProject(user.ID, *result.WorkspaceID)
+		var canView bool
+		canView, err = h.canViewProject(user.ID, *result.WorkspaceID)
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 			return
@@ -210,7 +211,7 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Save milestone categories if provided
 	if len(project.MilestoneCategories) > 0 {
-		if err := h.planningService.SaveProjectMilestoneCategories(result.ID, project.MilestoneCategories); err != nil {
+		if err = h.planningService.SaveProjectMilestoneCategories(result.ID, project.MilestoneCategories); err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
@@ -264,7 +265,8 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Check if user has permission to edit projects in the existing workspace
 	if existingWorkspaceID != nil {
-		canEdit, err := h.canEditProject(user.ID, *existingWorkspaceID)
+		var canEdit bool
+		canEdit, err = h.canEditProject(user.ID, *existingWorkspaceID)
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 			return
@@ -276,14 +278,15 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var project models.Project
-	if err := json.NewDecoder(r.Body).Decode(&project); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&project); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate workspace exists if specified and check permission for new workspace if changing
 	if project.WorkspaceID != nil && *project.WorkspaceID != 0 {
-		exists, err := h.planningService.WorkspaceExists(*project.WorkspaceID)
+		var exists bool
+		exists, err = h.planningService.WorkspaceExists(*project.WorkspaceID)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -295,7 +298,8 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 		// If moving to a different workspace, check permission for new workspace
 		if existingWorkspaceID == nil || *project.WorkspaceID != *existingWorkspaceID {
-			canEdit, err := h.canEditProject(user.ID, *project.WorkspaceID)
+			var canEdit bool
+			canEdit, err = h.canEditProject(user.ID, *project.WorkspaceID)
 			if err != nil {
 				respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 				return
@@ -321,7 +325,7 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update milestone categories
-	if err := h.planningService.SaveProjectMilestoneCategories(id, project.MilestoneCategories); err != nil {
+	if err = h.planningService.SaveProjectMilestoneCategories(id, project.MilestoneCategories); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}

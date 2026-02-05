@@ -1,16 +1,16 @@
 package handlers
 
 import (
-	"windshift/internal/database"
-	"windshift/internal/models"
-	"windshift/internal/services"
-	"windshift/internal/utils"
 	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
 
+	"windshift/internal/database"
+	"windshift/internal/models"
+	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 type TestRunTemplateHandler struct {
@@ -63,7 +63,7 @@ func (h *TestRunTemplateHandler) GetAll(w http.ResponseWriter, r *http.Request) 
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// Initialize as empty array instead of nil so JSON encoding returns [] instead of null
 	templates := make([]models.TestRunTemplate, 0)
@@ -88,7 +88,7 @@ func (h *TestRunTemplateHandler) GetAll(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(templates)
+	_ = json.NewEncoder(w).Encode(templates)
 }
 
 // Get returns a single test run template by ID
@@ -151,7 +151,7 @@ func (h *TestRunTemplateHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(template)
+	_ = json.NewEncoder(w).Encode(template)
 }
 
 // Create creates a new test run template
@@ -175,7 +175,7 @@ func (h *TestRunTemplateHandler) Create(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var template models.TestRunTemplate
-	if err := json.NewDecoder(r.Body).Decode(&template); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&template); err != nil {
 		respondBadRequest(w, r, err.Error())
 		return
 	}
@@ -219,7 +219,7 @@ func (h *TestRunTemplateHandler) Create(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(template)
+	_ = json.NewEncoder(w).Encode(template)
 }
 
 // Update updates an existing test run template
@@ -249,7 +249,7 @@ func (h *TestRunTemplateHandler) Update(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var template models.TestRunTemplate
-	if err := json.NewDecoder(r.Body).Decode(&template); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&template); err != nil {
 		respondBadRequest(w, r, err.Error())
 		return
 	}
@@ -291,7 +291,7 @@ func (h *TestRunTemplateHandler) Update(w http.ResponseWriter, r *http.Request) 
 	template.UpdatedAt = now
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(template)
+	_ = json.NewEncoder(w).Encode(template)
 }
 
 // Delete deletes a test run template
@@ -384,7 +384,7 @@ func (h *TestRunTemplateHandler) GetExecutions(w http.ResponseWriter, r *http.Re
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// Initialize as empty array instead of nil so JSON encoding returns [] instead of null
 	runs := make([]models.TestRun, 0)
@@ -403,7 +403,7 @@ func (h *TestRunTemplateHandler) GetExecutions(w http.ResponseWriter, r *http.Re
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(runs)
+	_ = json.NewEncoder(w).Encode(runs)
 }
 
 // Execute creates a new test run from a template
@@ -496,12 +496,12 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// Create test results for each test case
 	for rows.Next() {
 		var testCaseID int
-		if err := rows.Scan(&testCaseID); err != nil {
+		if err = rows.Scan(&testCaseID); err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
@@ -536,5 +536,5 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(run)
+	_ = json.NewEncoder(w).Encode(run)
 }

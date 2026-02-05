@@ -1,3 +1,4 @@
+// Package contextkeys provides typed context keys for storing and retrieving values from context.
 package contextkeys
 
 // ContextKey is a typed key for context values to avoid string key collisions.
@@ -8,7 +9,7 @@ const (
 	User ContextKey = "user"
 	// Session stores the session (*auth.Session)
 	Session ContextKey = "session"
-	// APIToken stores the API token (*models.ApiToken)
+	// APIToken stores the API token (*models.APIToken)
 	APIToken ContextKey = "api_token"
 	// AuthMethod stores the authentication method (string: "session-header", "bearer", "cookie")
 	AuthMethod ContextKey = "auth_method"

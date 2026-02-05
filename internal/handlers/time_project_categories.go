@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 )
@@ -29,7 +30,7 @@ func (h *TimeProjectCategoryHandler) GetCategories(w http.ResponseWriter, r *htt
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	categories := []models.TimeProjectCategory{}
 	for rows.Next() {

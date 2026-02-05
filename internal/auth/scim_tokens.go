@@ -7,14 +7,15 @@ import (
 	"fmt"
 	"strings"
 
-	"golang.org/x/crypto/bcrypt"
 	"windshift/internal/database"
 	"windshift/internal/models"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
-	SCIMTokenPrefix     = "scim_"
-	SCIMTokenBodyBytes  = 32 // Random bytes for token body (becomes 64 hex chars)
+	SCIMTokenPrefix    = "scim_"
+	SCIMTokenBodyBytes = 32 // Random bytes for token body (becomes 64 hex chars)
 	// Final token: scim_ (5) + 64 hex chars = 69 bytes (under bcrypt's 72 byte limit)
 )
 

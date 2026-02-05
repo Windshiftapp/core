@@ -1,3 +1,4 @@
+// Package stress provides helper utilities for stress testing.
 package stress
 
 import (
@@ -5,6 +6,8 @@ import (
 )
 
 // averageDuration calculates the average of a slice of durations
+//
+//nolint:unused // used by test files which are not scanned by the linter
 func averageDuration(durations []time.Duration) time.Duration {
 	if len(durations) == 0 {
 		return 0

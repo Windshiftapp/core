@@ -1,3 +1,4 @@
+// Package tui provides a terminal user interface for Windshift.
 package tui
 
 import (
@@ -8,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/charmbracelet/bubbletea"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // APIClient handles communication with the Windshift API
@@ -33,14 +34,14 @@ func (c *APIClient) SetSessionToken(token string) {
 	c.sessionToken = token
 }
 
-// Data types matching the Windshift API
+// Workspace represents a workspace from the Windshift API.
 type Workspace struct {
-	ID            int     `json:"id"`
-	Name          string  `json:"name"`
-	Key           string  `json:"key"`
-	Description   string  `json:"description"`
-	Active        bool    `json:"active"`
-	TimeProjectID *int    `json:"time_project_id"`
+	ID            int    `json:"id"`
+	Name          string `json:"name"`
+	Key           string `json:"key"`
+	Description   string `json:"description"`
+	Active        bool   `json:"active"`
+	TimeProjectID *int   `json:"time_project_id"`
 }
 
 // Status represents a workflow status
@@ -67,9 +68,9 @@ type WorkItem struct {
 	ItemTypeID        *int                   `json:"item_type_id"`
 	Title             string                 `json:"title"`
 	Description       string                 `json:"description"`
-	Status            string                 `json:"status"`              // Legacy text field
-	Priority          string                 `json:"priority"`            // Legacy text field
-	StatusID          *int                   `json:"status_id,omitempty"` // ID-based status
+	Status            string                 `json:"status"`                // Legacy text field
+	Priority          string                 `json:"priority"`              // Legacy text field
+	StatusID          *int                   `json:"status_id,omitempty"`   // ID-based status
 	PriorityID        *int                   `json:"priority_id,omitempty"` // ID-based priority
 	MilestoneID       *int                   `json:"milestone_id"`
 	TimeProjectID     *int                   `json:"time_project_id"`
@@ -82,22 +83,22 @@ type WorkItem struct {
 	CreatedAt         string                 `json:"created_at"`
 	UpdatedAt         string                 `json:"updated_at"`
 	// Joined fields for display
-	WorkspaceName     string                 `json:"workspace_name"`
-	WorkspaceKey      string                 `json:"workspace_key"`
-	ItemTypeName      string                 `json:"item_type_name"`
-	ParentTitle       string                 `json:"parent_title"`
-	MilestoneName     string                 `json:"milestone_name"`
-	TimeProjectName   string                 `json:"time_project_name"`
-	AssigneeName      string                 `json:"assignee_name"`
-	AssigneeEmail     string                 `json:"assignee_email"`
-	CreatorName       string                 `json:"creator_name"`
-	CreatorEmail      string                 `json:"creator_email"`
+	WorkspaceName   string `json:"workspace_name"`
+	WorkspaceKey    string `json:"workspace_key"`
+	ItemTypeName    string `json:"item_type_name"`
+	ParentTitle     string `json:"parent_title"`
+	MilestoneName   string `json:"milestone_name"`
+	TimeProjectName string `json:"time_project_name"`
+	AssigneeName    string `json:"assignee_name"`
+	AssigneeEmail   string `json:"assignee_email"`
+	CreatorName     string `json:"creator_name"`
+	CreatorEmail    string `json:"creator_email"`
 	// ID-based status/priority display fields
-	StatusName        string                 `json:"status_name,omitempty"`
-	StatusCategoryColor string               `json:"category_color,omitempty"`
-	PriorityName      string                 `json:"priority_name,omitempty"`
-	PriorityIcon      string                 `json:"priority_icon,omitempty"`
-	PriorityColor     string                 `json:"priority_color,omitempty"`
+	StatusName          string `json:"status_name,omitempty"`
+	StatusCategoryColor string `json:"category_color,omitempty"`
+	PriorityName        string `json:"priority_name,omitempty"`
+	PriorityIcon        string `json:"priority_icon,omitempty"`
+	PriorityColor       string `json:"priority_color,omitempty"`
 }
 
 // GetLevel calculates hierarchy level from path
@@ -157,7 +158,6 @@ type CreateTimeLogRequest struct {
 	Duration    string  `json:"duration"`
 	EndTime     *string `json:"end_time"`
 }
-
 
 // Message types for tea.Cmd
 type workspacesLoadedMsg struct {
@@ -287,7 +287,7 @@ func (m Model) createComment(itemID int, content string) tea.Cmd {
 	})
 }
 
-func (m Model) createTimeLog(itemID int, projectID int, description, duration, date, startTime string) tea.Cmd {
+func (m Model) createTimeLog(itemID, projectID int, description, duration, date, startTime string) tea.Cmd {
 	return tea.Cmd(func() tea.Msg {
 		err := m.apiClient.createTimeLog(itemID, projectID, description, duration, date, startTime)
 		if err != nil {
@@ -299,7 +299,7 @@ func (m Model) createTimeLog(itemID int, projectID int, description, duration, d
 
 // HTTP API methods
 func (c *APIClient) getWorkspaces() ([]Workspace, error) {
-	req, err := http.NewRequest("GET", c.baseURL+"/api/workspaces", nil)
+	req, err := http.NewRequest("GET", c.baseURL+"/api/workspaces", http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -330,7 +330,7 @@ func (c *APIClient) getWorkspaces() ([]Workspace, error) {
 
 func (c *APIClient) getWorkItems(workspaceID int) ([]WorkItem, error) {
 	url := fmt.Sprintf("%s/api/items?workspace_id=%d", c.baseURL, workspaceID)
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -353,7 +353,7 @@ func (c *APIClient) getWorkItems(workspaceID int) ([]WorkItem, error) {
 
 	// Handle paginated response
 	var paginatedResponse struct {
-		Items []WorkItem `json:"items"`
+		Items      []WorkItem `json:"items"`
 		Pagination struct {
 			Page       int `json:"page"`
 			Limit      int `json:"limit"`
@@ -371,7 +371,7 @@ func (c *APIClient) getWorkItems(workspaceID int) ([]WorkItem, error) {
 
 func (c *APIClient) getComments(itemID int) ([]Comment, error) {
 	url := fmt.Sprintf("%s/api/items/%d/comments", c.baseURL, itemID)
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -401,7 +401,7 @@ func (c *APIClient) getComments(itemID int) ([]Comment, error) {
 }
 
 func (c *APIClient) getStatuses() ([]Status, error) {
-	req, err := http.NewRequest("GET", c.baseURL+"/api/statuses", nil)
+	req, err := http.NewRequest("GET", c.baseURL+"/api/statuses", http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -430,7 +430,7 @@ func (c *APIClient) getStatuses() ([]Status, error) {
 }
 
 func (c *APIClient) getPriorities() ([]Priority, error) {
-	req, err := http.NewRequest("GET", c.baseURL+"/api/priorities", nil)
+	req, err := http.NewRequest("GET", c.baseURL+"/api/priorities", http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -459,7 +459,7 @@ func (c *APIClient) getPriorities() ([]Priority, error) {
 }
 
 func (c *APIClient) getTimeProjects() ([]TimeProject, error) {
-	req, err := http.NewRequest("GET", c.baseURL+"/api/time/projects", nil)
+	req, err := http.NewRequest("GET", c.baseURL+"/api/time/projects", http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -605,7 +605,7 @@ func (c *APIClient) createComment(itemID int, content string) error {
 	return nil
 }
 
-func (c *APIClient) createTimeLog(itemID int, projectID int, description, duration, date, startTime string) error {
+func (c *APIClient) createTimeLog(itemID, projectID int, description, duration, date, startTime string) error {
 	data := CreateTimeLogRequest{
 		ProjectID:   projectID,
 		ItemID:      &itemID,

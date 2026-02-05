@@ -1,3 +1,5 @@
+// Package validation provides field validation for work items and other entities.
+// It includes validators for custom fields, required fields, and entity relationships.
 package validation
 
 import (
@@ -255,7 +257,7 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 	// Custom field values validation
 	if customFields, ok := updateData["custom_field_values"]; ok {
 		if customFields != nil {
-			item.CustomFieldValues = customFields.(map[string]interface{})
+			item.CustomFieldValues = customFields.(map[string]interface{}) //nolint:errcheck // type assertion is intentional - callers pass map[string]interface{}
 		} else {
 			item.CustomFieldValues = make(map[string]interface{})
 		}
@@ -452,7 +454,7 @@ func (v *ItemFieldValidator) ValidateIsTask(workspaceID int, isTask bool) error 
 
 // ConvertCustomFieldValuesToJSON converts custom field values map to JSON for database storage
 func ConvertCustomFieldValuesToJSON(customFieldValues map[string]interface{}) (sql.NullString, error) {
-	if customFieldValues == nil || len(customFieldValues) == 0 {
+	if len(customFieldValues) == 0 {
 		return sql.NullString{Valid: false}, nil
 	}
 

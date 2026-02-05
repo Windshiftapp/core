@@ -88,12 +88,12 @@ type EnumConfig struct {
 	UpdateArgs UpdateArgsFunc
 
 	// Validation
-	Validate    ValidationFunc  // Optional
-	CheckUnique UniqueCheckFunc // Optional
+	Validate    ValidationFunc   // Optional
+	CheckUnique UniqueCheckFunc  // Optional
 	ValidateFKs FKValidationFunc // Optional
 
 	// Delete handling
-	CheckDependencies DeleteCheckFunc // Optional
+	CheckDependencies DeleteCheckFunc  // Optional
 	BeforeDelete      BeforeDeleteFunc // Optional
 
 	// Update handling
@@ -288,7 +288,8 @@ func (s *EnumService) Update(id int, entity interface{}, r *http.Request) (EnumE
 
 	// Check uniqueness (excluding current record)
 	if s.config.CheckUnique != nil {
-		exists, err := s.config.CheckUnique(s.db, entity, id)
+		var exists bool
+		exists, err = s.config.CheckUnique(s.db, entity, id)
 		if err != nil {
 			return nil, err
 		}

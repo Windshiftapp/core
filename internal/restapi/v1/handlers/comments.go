@@ -57,8 +57,8 @@ func (h *CommentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check permission
-	canView, _ := h.perms.CanViewWorkspace(user.ID, commentWithDetails.WorkspaceID)
-	if !canView {
+	canView, err := h.perms.CanViewWorkspace(user.ID, commentWithDetails.WorkspaceID)
+	if err != nil || !canView {
 		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
 		return
 	}
@@ -110,15 +110,15 @@ func (h *CommentHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Check if user is author or has admin permission
 	if authorID != user.ID {
-		canEdit, _ := h.perms.CanEditWorkspace(user.ID, workspaceID)
-		if !canEdit {
+		canEdit, permErr := h.perms.CanEditWorkspace(user.ID, workspaceID)
+		if permErr != nil || !canEdit {
 			restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
 			return
 		}
 	}
 
 	var req dto.CommentUpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
 		return
 	}
@@ -182,8 +182,8 @@ func (h *CommentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	// Check if user is author or has admin permission
 	if authorID != user.ID {
-		canEdit, _ := h.perms.CanEditWorkspace(user.ID, workspaceID)
-		if !canEdit {
+		canEdit, permErr := h.perms.CanEditWorkspace(user.ID, workspaceID)
+		if permErr != nil || !canEdit {
 			restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
 			return
 		}

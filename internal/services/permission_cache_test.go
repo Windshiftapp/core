@@ -20,7 +20,7 @@ func TestPermissionServiceBasicOperations(t *testing.T) {
 
 	// Create permission service with short TTL for testing
 	config := DefaultPermissionCacheConfig()
-	config.TTL = 1 * time.Second // Short TTL for testing cache expiration
+	config.TTL = 1 * time.Second   // Short TTL for testing cache expiration
 	config.WarmupOnStartup = false // Don't warm up during tests
 
 	permService, err := NewPermissionService(db, config)
@@ -80,7 +80,7 @@ func TestPermissionServiceBasicOperations(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create user: %v", err)
 		}
-		
+
 		userID64, _ := result.LastInsertId()
 		userID := int(userID64)
 
@@ -92,7 +92,7 @@ func TestPermissionServiceBasicOperations(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create workspace: %v", err)
 		}
-		
+
 		workspaceID64, _ := wsResult.LastInsertId()
 		workspaceID := int(workspaceID64)
 
@@ -139,7 +139,7 @@ func TestPermissionServiceBasicOperations(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create batch user: %v", err)
 		}
-		
+
 		userID64, _ := result.LastInsertId()
 		userID := int(userID64)
 
@@ -196,7 +196,7 @@ func TestPermissionServiceBasicOperations(t *testing.T) {
 			models.PermissionItemEdit,
 			models.PermissionItemDelete, // This one should be false
 		}
-		
+
 		results, err := permService.HasWorkspacePermissions(userID, workspaceID, permissionsToCheck)
 		if err != nil {
 			t.Fatalf("Error checking batch permissions: %v", err)
@@ -222,7 +222,7 @@ func TestPermissionServiceBasicOperations(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create expire user: %v", err)
 		}
-		
+
 		userID64, _ := result.LastInsertId()
 		userID := int(userID64)
 
@@ -296,7 +296,7 @@ func TestPermissionServiceWithMiddleware(t *testing.T) {
 	// Test performance: measure time for multiple permission checks
 	userID := 1 // Assume user exists from previous setup
 	workspaceID := 1
-	
+
 	// First call (cache miss)
 	start := time.Now()
 	_, err = permService.HasWorkspacePermission(userID, workspaceID, models.PermissionItemCreate)
@@ -480,7 +480,7 @@ func TestAllViewersInheritance(t *testing.T) {
 			INSERT INTO user_workspace_roles (user_id, workspace_id, role_id, granted_by, granted_at)
 			VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)
 		`, user1ID, workspaceID, viewerRoleID, 1, time.Now(),
-		   user2ID, workspaceID, viewerRoleID, 1, time.Now())
+			user2ID, workspaceID, viewerRoleID, 1, time.Now())
 		if err != nil {
 			t.Fatalf("Failed to assign Viewer roles: %v", err)
 		}
@@ -491,7 +491,7 @@ func TestAllViewersInheritance(t *testing.T) {
 			INSERT INTO user_workspace_roles (user_id, workspace_id, role_id, granted_by, granted_at)
 			VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)
 		`, user2ID, workspaceID, editorRoleID, 1, time.Now(),
-		   user2ID, workspaceID, adminRoleID, 1, time.Now())
+			user2ID, workspaceID, adminRoleID, 1, time.Now())
 		if err != nil {
 			t.Fatalf("Failed to assign roles to user2: %v", err)
 		}
@@ -607,7 +607,7 @@ func TestAllViewersInheritance(t *testing.T) {
 			INSERT INTO user_workspace_roles (user_id, workspace_id, role_id, granted_by, granted_at)
 			VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)
 		`, user1ID, workspaceID, viewerRoleID, 1, time.Now(),
-		   user2ID, workspaceID, viewerRoleID, 1, time.Now())
+			user2ID, workspaceID, viewerRoleID, 1, time.Now())
 		if err != nil {
 			t.Fatalf("Failed to assign Viewer: %v", err)
 		}
@@ -626,7 +626,7 @@ func TestAllViewersInheritance(t *testing.T) {
 			INSERT INTO user_workspace_roles (user_id, workspace_id, role_id, granted_by, granted_at)
 			VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)
 		`, user2ID, workspaceID, editorRoleID, 1, time.Now(),
-		   user2ID, workspaceID, adminRoleID, 1, time.Now())
+			user2ID, workspaceID, adminRoleID, 1, time.Now())
 		if err != nil {
 			t.Fatalf("Failed to assign roles: %v", err)
 		}

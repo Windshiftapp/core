@@ -46,10 +46,9 @@ type auditLogEntry struct {
 
 // Global audit batcher (nil when using PostgreSQL or not initialized)
 var (
-	auditBatcher     *services.WriteBatcher[auditLogEntry]
-	auditBatcherDB   database.Database
-	auditBatcherOnce sync.Once
-	auditBatcherMu   sync.RWMutex
+	auditBatcher   *services.WriteBatcher[auditLogEntry]
+	auditBatcherDB database.Database
+	auditBatcherMu sync.RWMutex
 )
 
 // InitAuditBatcher initializes the audit log batcher for SQLite.
@@ -142,7 +141,7 @@ func flushAuditLogs(entries []auditLogEntry) error {
 func LogAudit(db database.Database, event AuditEvent) error {
 	// Convert details map to JSON
 	var detailsJSON *string
-	if event.Details != nil && len(event.Details) > 0 {
+	if len(event.Details) > 0 {
 		detailsBytes, err := json.Marshal(event.Details)
 		if err != nil {
 			slog.Warn("failed to marshal audit details", "error", err)
@@ -277,9 +276,9 @@ const (
 	ActionUserDeactivate    = "user.deactivate"
 
 	// Authentication
-	ActionLoginSuccess  = "login.success"
-	ActionLoginFailure  = "login.failure"
-	ActionLogout        = "logout"
+	ActionLoginSuccess   = "login.success"
+	ActionLoginFailure   = "login.failure"
+	ActionLogout         = "logout"
 	ActionPasswordChange = "password.change"
 
 	// Permission management
@@ -296,10 +295,10 @@ const (
 	ActionWorkspaceDelete = "workspace.delete"
 
 	// Group management
-	ActionGroupCreate      = "group.create"
-	ActionGroupUpdate      = "group.update"
-	ActionGroupDelete      = "group.delete"
-	ActionGroupAddMember   = "group.add_member"
+	ActionGroupCreate       = "group.create"
+	ActionGroupUpdate       = "group.update"
+	ActionGroupDelete       = "group.delete"
+	ActionGroupAddMember    = "group.add_member"
 	ActionGroupRemoveMember = "group.remove_member"
 
 	// Configuration management
@@ -350,16 +349,16 @@ const (
 	ActionAPITokenRevoke = "api_token.revoke"
 
 	// SCIM provisioning
-	ActionSCIMUserCreate       = "scim.user.create"
-	ActionSCIMUserUpdate       = "scim.user.update"
-	ActionSCIMUserDelete       = "scim.user.delete"
-	ActionSCIMGroupCreate      = "scim.group.create"
-	ActionSCIMGroupUpdate      = "scim.group.update"
-	ActionSCIMGroupDelete      = "scim.group.delete"
-	ActionSCIMGroupAddMember   = "scim.group.add_member"
+	ActionSCIMUserCreate        = "scim.user.create"
+	ActionSCIMUserUpdate        = "scim.user.update"
+	ActionSCIMUserDelete        = "scim.user.delete"
+	ActionSCIMGroupCreate       = "scim.group.create"
+	ActionSCIMGroupUpdate       = "scim.group.update"
+	ActionSCIMGroupDelete       = "scim.group.delete"
+	ActionSCIMGroupAddMember    = "scim.group.add_member"
 	ActionSCIMGroupRemoveMember = "scim.group.remove_member"
-	ActionSCIMTokenCreate      = "scim.token.create"
-	ActionSCIMTokenRevoke      = "scim.token.revoke"
+	ActionSCIMTokenCreate       = "scim.token.create" //nolint:gosec // G101 false positive: audit action constant, not a credential
+	ActionSCIMTokenRevoke       = "scim.token.revoke" //nolint:gosec // G101 false positive: audit action constant, not a credential
 
 	// Hierarchy level management
 	ActionHierarchyLevelCreate = "hierarchy_level.create"
@@ -382,12 +381,12 @@ const (
 	ActionNotificationTemplateDelete = "notification_template.delete"
 
 	// Channel management
-	ActionChannelCreate       = "channel.create"
-	ActionChannelUpdate       = "channel.update"
-	ActionChannelDelete       = "channel.delete"
-	ActionChannelActivate     = "channel.activate"
-	ActionChannelDeactivate   = "channel.deactivate"
-	ActionChannelAddManager   = "channel.add_manager"
+	ActionChannelCreate        = "channel.create"
+	ActionChannelUpdate        = "channel.update"
+	ActionChannelDelete        = "channel.delete"
+	ActionChannelActivate      = "channel.activate"
+	ActionChannelDeactivate    = "channel.deactivate"
+	ActionChannelAddManager    = "channel.add_manager"
 	ActionChannelRemoveManager = "channel.remove_manager"
 
 	// Attachment settings management

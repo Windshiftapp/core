@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
@@ -89,55 +90,9 @@ type WorklogRequest struct {
 	DurationInput string `json:"duration"`   // "1h", "30m", "2h15m" etc
 }
 
-// filterWorklogsByPermission checks permissions and hides item info if user doesn't have access
-func (h *TimeWorklogHandler) filterWorklogsByPermission(worklogs []models.Worklog, userID int) []models.Worklog {
-	if h.permissionService == nil {
-		// No permission service configured - return all worklogs as-is
-		return worklogs
-	}
-
-	// Check if user is system admin first
-	isAdmin, err := h.permissionService.IsSystemAdmin(userID)
-	if err != nil {
-		slog.Warn("error checking system admin status", slog.String("component", "time_tracking"), slog.Any("error", err))
-		// On error, fall through to per-item checking
-	} else if isAdmin {
-		// System admin can see everything
-		return worklogs
-	}
-
-	// Filter each worklog based on item permissions
-	for i := range worklogs {
-		worklog := &worklogs[i]
-
-		// Only check permission if worklog has an associated item
-		if worklog.ItemID == nil || worklog.WorkspaceID == nil {
-			continue
-		}
-
-		// Check if user has permission to view this workspace
-		hasPermission, err := h.permissionService.HasWorkspacePermission(userID, *worklog.WorkspaceID, models.PermissionItemView)
-		if err != nil {
-			slog.Warn("error checking workspace permission", slog.String("component", "time_tracking"), slog.Int("user_id", userID), slog.Int("workspace_id", *worklog.WorkspaceID), slog.Any("error", err))
-			// On error, hide item info to be safe
-			hasPermission = false
-		}
-
-		// If no permission, clear item-related fields
-		if !hasPermission {
-			worklog.ItemID = nil
-			worklog.ItemTitle = ""
-			worklog.WorkspaceID = nil
-			worklog.WorkspaceKey = ""
-			worklog.WorkspaceItemNumber = 0
-		}
-	}
-
-	return worklogs
-}
-
 func (h *TimeWorklogHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Support filtering by date range, customer, project
+	//nolint:misspell // database table name uses British spelling (customer_organisations)
 	query := `
 		SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
 		       w.end_time, w.duration_minutes, w.created_at, w.updated_at,
@@ -189,7 +144,7 @@ func (h *TimeWorklogHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var worklogs []models.Worklog
 	for rows.Next() {
@@ -236,6 +191,7 @@ func (h *TimeWorklogHandler) Get(w http.ResponseWriter, r *http.Request) {
 	var itemTitle, workspaceKey, projectSettings sql.NullString
 	var workspaceID, workspaceItemNumber sql.NullInt64
 	var projectTotalHours sql.NullFloat64
+	//nolint:misspell // database table name uses British spelling (customer_organisations)
 	err := h.db.QueryRow(`
 		SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
 		       w.end_time, w.duration_minutes, w.created_at, w.updated_at,
@@ -262,7 +218,7 @@ func (h *TimeWorklogHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Parse max_hours from project settings
 	if projectSettings.Valid && projectSettings.String != "" {
 		var settings map[string]interface{}
-		if err := json.Unmarshal([]byte(projectSettings.String), &settings); err == nil {
+		if err = json.Unmarshal([]byte(projectSettings.String), &settings); err == nil {
 			if maxHours, ok := settings["max_hours"].(float64); ok && maxHours > 0 {
 				wl.ProjectMaxHours = &maxHours
 			}
@@ -282,7 +238,9 @@ func (h *TimeWorklogHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // validateAndParseWorklog validates a WorklogRequest and returns parsed values
-func (h *TimeWorklogHandler) validateAndParseWorklog(req WorklogRequest) (customerID int, date time.Time, startTime, endTime time.Time, durationMins int, err error) {
+//
+//nolint:gocritic // tooManyResultsChecker: returns are semantically grouped
+func (h *TimeWorklogHandler) validateAndParseWorklog(req WorklogRequest) (customerID int, date, startTime, endTime time.Time, durationMins int, err error) {
 	// Validate project exists, get customer_id, and check status
 	var projectStatus string
 	err = h.db.QueryRow("SELECT customer_id, status FROM time_projects WHERE id = ?", req.ProjectID).Scan(&customerID, &projectStatus)
@@ -431,6 +389,7 @@ func (h *TimeWorklogHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var itemTitle, workspaceKey, projectSettings sql.NullString
 	var workspaceID, workspaceItemNumber sql.NullInt64
 	var projectTotalHours sql.NullFloat64
+	//nolint:misspell // database table name uses British spelling (customer_organisations)
 	err = h.db.QueryRow(`
 		SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
 		       w.end_time, w.duration_minutes, w.created_at, w.updated_at,
@@ -457,7 +416,7 @@ func (h *TimeWorklogHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Parse max_hours from project settings
 	if projectSettings.Valid && projectSettings.String != "" {
 		var settings map[string]interface{}
-		if err := json.Unmarshal([]byte(projectSettings.String), &settings); err == nil {
+		if err = json.Unmarshal([]byte(projectSettings.String), &settings); err == nil {
 			if maxHours, ok := settings["max_hours"].(float64); ok && maxHours > 0 {
 				wl.ProjectMaxHours = &maxHours
 			}
@@ -537,6 +496,7 @@ func (h *TimeWorklogHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var itemTitle, workspaceKey, projectSettings sql.NullString
 	var workspaceID, workspaceItemNumber sql.NullInt64
 	var projectTotalHours sql.NullFloat64
+	//nolint:misspell // database table name uses British spelling (customer_organisations)
 	err = h.db.QueryRow(`
 		SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
 		       w.end_time, w.duration_minutes, w.created_at, w.updated_at,
@@ -563,7 +523,7 @@ func (h *TimeWorklogHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Parse max_hours from project settings
 	if projectSettings.Valid && projectSettings.String != "" {
 		var settings map[string]interface{}
-		if err := json.Unmarshal([]byte(projectSettings.String), &settings); err == nil {
+		if err = json.Unmarshal([]byte(projectSettings.String), &settings); err == nil {
 			if maxHours, ok := settings["max_hours"].(float64); ok && maxHours > 0 {
 				wl.ProjectMaxHours = &maxHours
 			}
@@ -619,6 +579,7 @@ func (h *TimeWorklogHandler) GetByProject(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	//nolint:misspell // database table name uses British spelling (customer_organisations)
 	rows, err := h.db.Query(`
 		SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
 		       w.end_time, w.duration_minutes, w.created_at, w.updated_at,
@@ -637,7 +598,7 @@ func (h *TimeWorklogHandler) GetByProject(w http.ResponseWriter, r *http.Request
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var worklogs []models.Worklog
 	for rows.Next() {
@@ -685,6 +646,7 @@ func (h *TimeWorklogHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//nolint:misspell // database table name uses British spelling (customer_organisations)
 	rows, err := h.db.Query(`
 		SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
 		       w.end_time, w.duration_minutes, w.created_at, w.updated_at,
@@ -703,7 +665,7 @@ func (h *TimeWorklogHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var worklogs []models.Worklog
 	for rows.Next() {

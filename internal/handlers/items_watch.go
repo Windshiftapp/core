@@ -50,7 +50,7 @@ func (h *ItemHandler) AddWatch(w http.ResponseWriter, r *http.Request) {
 		Reason string `json:"reason"`
 	}
 	if r.Body != nil {
-		json.NewDecoder(r.Body).Decode(&reqBody)
+		_ = json.NewDecoder(r.Body).Decode(&reqBody)
 	}
 	if reqBody.Reason == "" {
 		reqBody.Reason = "User subscribed to item notifications"

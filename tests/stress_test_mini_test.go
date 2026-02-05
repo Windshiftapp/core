@@ -69,7 +69,7 @@ func TestMiniStressTest(t *testing.T) {
 		// Pick a random item to move
 		itemToMove := items[rand.Intn(len(items))].(map[string]interface{})
 		if int(itemToMove["id"].(float64)) == int(item1["id"].(float64)) ||
-		   int(itemToMove["id"].(float64)) == int(item2["id"].(float64)) {
+			int(itemToMove["id"].(float64)) == int(item2["id"].(float64)) {
 			// Pick a different item if we picked one of the boundary items
 			if len(items) > 2 {
 				itemToMove = items[len(items)-1].(map[string]interface{})

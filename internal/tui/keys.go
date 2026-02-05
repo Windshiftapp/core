@@ -2,7 +2,7 @@ package tui
 
 import (
 	"github.com/charmbracelet/bubbles/textarea"
-	"github.com/charmbracelet/bubbletea"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // handleKeyPress handles key presses based on the current screen
@@ -53,7 +53,7 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case HelpScreen:
 		return m.handleHelpKeys(msg)
 	}
-	
+
 	return m, cmd
 }
 
@@ -172,11 +172,11 @@ func (m Model) handleWorkItemKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "n":
 		if m.currentWorkspace != nil {
 			m.createForm = CreateWorkItemForm{
-				title:       "",
-				description: "",
-				priorityID:  nil,
+				title:        "",
+				description:  "",
+				priorityID:   nil,
 				priorityName: "",
-				titleCursor: 0,
+				titleCursor:  0,
 			}
 			m.currentScreen = CreateWorkItemScreen
 		}
@@ -403,7 +403,7 @@ func (m Model) handleCommentsKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.commentForm.editing = false
 		case "backspace":
-			if len(m.commentForm.content) > 0 {
+			if m.commentForm.content != "" {
 				m.commentForm.content = m.commentForm.content[:len(m.commentForm.content)-1]
 			}
 		default:
@@ -537,7 +537,7 @@ func (m *Model) createFormBackspace() {
 			m.createForm.titleCursor--
 		}
 	case 1:
-		if len(m.createForm.description) > 0 {
+		if m.createForm.description != "" {
 			m.createForm.description = m.createForm.description[:len(m.createForm.description)-1]
 		}
 	}
@@ -565,19 +565,19 @@ func (m *Model) createFormMoveCursor(delta int) {
 func (m *Model) timeFormBackspace() {
 	switch m.timeForm.currentField {
 	case 0:
-		if len(m.timeForm.description) > 0 {
+		if m.timeForm.description != "" {
 			m.timeForm.description = m.timeForm.description[:len(m.timeForm.description)-1]
 		}
 	case 1:
-		if len(m.timeForm.duration) > 0 {
+		if m.timeForm.duration != "" {
 			m.timeForm.duration = m.timeForm.duration[:len(m.timeForm.duration)-1]
 		}
 	case 2:
-		if len(m.timeForm.date) > 0 {
+		if m.timeForm.date != "" {
 			m.timeForm.date = m.timeForm.date[:len(m.timeForm.date)-1]
 		}
 	case 3:
-		if len(m.timeForm.startTime) > 0 {
+		if m.timeForm.startTime != "" {
 			m.timeForm.startTime = m.timeForm.startTime[:len(m.timeForm.startTime)-1]
 		}
 	}
@@ -631,11 +631,12 @@ func (m Model) handlePickerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case PickerPriority:
 			if m.picker.Selected >= 0 && m.picker.Selected < len(m.priorities) {
 				priority := m.priorities[m.picker.Selected]
-				if m.currentScreen == WorkItemDetailScreen {
+				switch m.currentScreen {
+				case WorkItemDetailScreen:
 					m.editForm.priorityID = &priority.ID
 					m.editForm.priorityName = priority.Name
 					m.editForm.priorityColor = priority.Color
-				} else if m.currentScreen == CreateWorkItemScreen {
+				case CreateWorkItemScreen:
 					m.createForm.priorityID = &priority.ID
 					m.createForm.priorityName = priority.Name
 					m.createForm.priorityColor = priority.Color

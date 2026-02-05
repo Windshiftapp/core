@@ -4,39 +4,39 @@ import "time"
 
 // Permission represents a permission definition
 type Permission struct {
-	ID            int       `json:"id" db:"id"`
-	PermissionKey string    `json:"permission_key" db:"permission_key"`
-	PermissionName string   `json:"permission_name" db:"permission_name"`
-	Description   string    `json:"description" db:"description"`
-	Scope         string    `json:"scope" db:"scope"` // 'global' or 'workspace'
-	IsSystem      bool      `json:"is_system" db:"is_system"`
-	CreatedAt     time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
+	ID             int       `json:"id" db:"id"`
+	PermissionKey  string    `json:"permission_key" db:"permission_key"`
+	PermissionName string    `json:"permission_name" db:"permission_name"`
+	Description    string    `json:"description" db:"description"`
+	Scope          string    `json:"scope" db:"scope"` // 'global' or 'workspace'
+	IsSystem       bool      `json:"is_system" db:"is_system"`
+	CreatedAt      time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // UserGlobalPermission represents a user's global permission assignment
 type UserGlobalPermission struct {
-	ID           int        `json:"id" db:"id"`
-	UserID       int        `json:"user_id" db:"user_id"`
-	PermissionID int        `json:"permission_id" db:"permission_id"`
-	GrantedBy    *int       `json:"granted_by" db:"granted_by"`
-	GrantedAt    time.Time  `json:"granted_at" db:"granted_at"`
-	
+	ID           int       `json:"id" db:"id"`
+	UserID       int       `json:"user_id" db:"user_id"`
+	PermissionID int       `json:"permission_id" db:"permission_id"`
+	GrantedBy    *int      `json:"granted_by" db:"granted_by"`
+	GrantedAt    time.Time `json:"granted_at" db:"granted_at"`
+
 	// Joined fields
-	Permission   *Permission `json:"permission,omitempty"`
-	User         *User       `json:"user,omitempty"`
-	GrantedByUser *User      `json:"granted_by_user,omitempty"`
+	Permission    *Permission `json:"permission,omitempty"`
+	User          *User       `json:"user,omitempty"`
+	GrantedByUser *User       `json:"granted_by_user,omitempty"`
 }
 
 // UserWorkspacePermission represents a user's workspace-specific permission assignment
 type UserWorkspacePermission struct {
-	ID           int        `json:"id" db:"id"`
-	UserID       int        `json:"user_id" db:"user_id"`
-	WorkspaceID  int        `json:"workspace_id" db:"workspace_id"`
-	PermissionID int        `json:"permission_id" db:"permission_id"`
-	GrantedBy    *int       `json:"granted_by" db:"granted_by"`
-	GrantedAt    time.Time  `json:"granted_at" db:"granted_at"`
-	
+	ID           int       `json:"id" db:"id"`
+	UserID       int       `json:"user_id" db:"user_id"`
+	WorkspaceID  int       `json:"workspace_id" db:"workspace_id"`
+	PermissionID int       `json:"permission_id" db:"permission_id"`
+	GrantedBy    *int      `json:"granted_by" db:"granted_by"`
+	GrantedAt    time.Time `json:"granted_at" db:"granted_at"`
+
 	// Joined fields
 	Permission    *Permission `json:"permission,omitempty"`
 	User          *User       `json:"user,omitempty"`
@@ -93,11 +93,11 @@ const (
 
 // UserPermissionSummary provides a complete overview of a user's permissions
 type UserPermissionSummary struct {
-	UserID              int                        `json:"user_id"`
-	User                *User                      `json:"user,omitempty"`
-	GlobalPermissions   []UserGlobalPermission     `json:"global_permissions"`
+	UserID               int                       `json:"user_id"`
+	User                 *User                     `json:"user,omitempty"`
+	GlobalPermissions    []UserGlobalPermission    `json:"global_permissions"`
 	WorkspacePermissions []UserWorkspacePermission `json:"workspace_permissions"`
-	HasSystemAdmin      bool                       `json:"has_system_admin"`
+	HasSystemAdmin       bool                      `json:"has_system_admin"`
 }
 
 // PermissionRequest for granting/revoking permissions
@@ -109,17 +109,17 @@ type PermissionRequest struct {
 
 // Group definitions for future use
 type Group struct {
-	ID          int        `json:"id" db:"id"`
-	GroupName   string     `json:"group_name" db:"group_name"`
-	Description string     `json:"description" db:"description"`
-	WorkspaceID *int       `json:"workspace_id" db:"workspace_id"` // NULL for global groups
-	CreatedBy   int        `json:"created_by" db:"created_by"`
-	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
-	
+	ID          int       `json:"id" db:"id"`
+	GroupName   string    `json:"group_name" db:"group_name"`
+	Description string    `json:"description" db:"description"`
+	WorkspaceID *int      `json:"workspace_id" db:"workspace_id"` // NULL for global groups
+	CreatedBy   int       `json:"created_by" db:"created_by"`
+	CreatedAt   time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
+
 	// Joined fields
-	Workspace   *Workspace `json:"workspace,omitempty"`
-	Creator     *User      `json:"creator,omitempty"`
+	Workspace *Workspace `json:"workspace,omitempty"`
+	Creator   *User      `json:"creator,omitempty"`
 }
 
 // UserGroup represents group membership
@@ -207,12 +207,12 @@ type UserWorkspaceRole struct {
 
 // UserWorkspaceDirectPermission assigns a permission directly to a user
 type UserWorkspaceDirectPermission struct {
-	ID          int       `json:"id" db:"id"`
-	UserID      int       `json:"user_id" db:"user_id"`
-	WorkspaceID int       `json:"workspace_id" db:"workspace_id"`
-	PermissionID int      `json:"permission_id" db:"permission_id"`
-	GrantedBy   *int      `json:"granted_by" db:"granted_by"`
-	GrantedAt   time.Time `json:"granted_at" db:"granted_at"`
+	ID           int       `json:"id" db:"id"`
+	UserID       int       `json:"user_id" db:"user_id"`
+	WorkspaceID  int       `json:"workspace_id" db:"workspace_id"`
+	PermissionID int       `json:"permission_id" db:"permission_id"`
+	GrantedBy    *int      `json:"granted_by" db:"granted_by"`
+	GrantedAt    time.Time `json:"granted_at" db:"granted_at"`
 
 	// Joined fields
 	User          *User       `json:"user,omitempty"`
@@ -315,7 +315,7 @@ type PermissionSetUserAssignment struct {
 
 // PermissionSetAssignmentRequest represents the payload for assigning roles/groups/users to permissions
 type PermissionSetAssignmentRequest struct {
-	PermissionID int `json:"permission_id"`
+	PermissionID int  `json:"permission_id"`
 	RoleID       *int `json:"role_id,omitempty"`
 	GroupID      *int `json:"group_id,omitempty"`
 	UserID       *int `json:"user_id,omitempty"`

@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"database/sql"
-	"strings"
 )
 
 // SQLiteTx wraps a *sql.Tx for SQLite (no placeholder conversion needed)
@@ -112,9 +111,4 @@ func (t *PostgresTx) Commit() error {
 
 func (t *PostgresTx) Rollback() error {
 	return t.tx.Rollback()
-}
-
-// Helper function to check if a query uses ? placeholders
-func usesQuestionMarkPlaceholders(query string) bool {
-	return strings.Contains(query, "?")
 }

@@ -1,3 +1,5 @@
+// Package smtp provides SMTP email sending functionality for notifications,
+// including support for batched notification delivery and various encryption methods.
 package smtp
 
 import (
@@ -6,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"net/smtp"
 	"strings"
 	"time"
@@ -34,9 +37,9 @@ func (s *NotificationSMTPSender) IsSMTPConfigured() bool {
 	}
 
 	// Check that essential SMTP fields are configured
-	return config.SMTPHost != "" && 
-		   config.SMTPPort > 0 && 
-		   config.SMTPFromEmail != ""
+	return config.SMTPHost != "" &&
+		config.SMTPPort > 0 &&
+		config.SMTPFromEmail != ""
 }
 
 // getSMTPConfig retrieves the active SMTP configuration
@@ -94,7 +97,7 @@ func (s *NotificationSMTPSender) generateSubject(count int) string {
 }
 
 // generateEmailBody generates the HTML and text email body
-func (s *NotificationSMTPSender) generateEmailBody(userName string, notifications []models.Notification) (string, string, error) {
+func (s *NotificationSMTPSender) generateEmailBody(userName string, notifications []models.Notification) (htmlBody, textBody string, err error) {
 	// HTML template
 	htmlTemplate := `
 <!DOCTYPE html>
@@ -217,7 +220,7 @@ To manage your notification preferences, please contact your administrator.`
 	}
 
 	var htmlBuffer bytes.Buffer
-	if err := htmlTmpl.Execute(&htmlBuffer, templateData); err != nil {
+	if err = htmlTmpl.Execute(&htmlBuffer, templateData); err != nil {
 		return "", "", fmt.Errorf("failed to execute HTML template: %w", err)
 	}
 
@@ -228,7 +231,7 @@ To manage your notification preferences, please contact your administrator.`
 	}
 
 	var textBuffer bytes.Buffer
-	if err := textTmpl.Execute(&textBuffer, templateData); err != nil {
+	if err = textTmpl.Execute(&textBuffer, templateData); err != nil {
 		return "", "", fmt.Errorf("failed to execute text template: %w", err)
 	}
 
@@ -298,29 +301,30 @@ func (s *NotificationSMTPSender) sendWithStartTLS(addr string, auth smtp.Auth, f
 		ServerName: strings.Split(addr, ":")[0],
 		MinVersion: tls.VersionTLS12,
 	}
-	
-	if err = client.StartTLS(tlsConfig); err != nil {
+
+	if err = client.StartTLS(tlsConfig); err != nil { //nolint:gocritic
 		return err
 	}
 
 	// Authenticate
 	if auth != nil {
-		if err = client.Auth(auth); err != nil {
+		if err = client.Auth(auth); err != nil { //nolint:gocritic
 			return err
 		}
 	}
 
 	// Set sender and recipient
-	if err = client.Mail(from); err != nil {
+	if err = client.Mail(from); err != nil { //nolint:gocritic
 		return err
 	}
 
-	if err = client.Rcpt(to); err != nil {
+	if err = client.Rcpt(to); err != nil { //nolint:gocritic
 		return err
 	}
 
 	// Send message
-	writer, err := client.Data()
+	var writer io.WriteCloser
+	writer, err = client.Data()
 	if err != nil {
 		return err
 	}
@@ -353,22 +357,23 @@ func (s *NotificationSMTPSender) sendWithSSL(addr string, auth smtp.Auth, from, 
 
 	// Authenticate
 	if auth != nil {
-		if err = client.Auth(auth); err != nil {
+		if err = client.Auth(auth); err != nil { //nolint:gocritic
 			return err
 		}
 	}
 
 	// Set sender and recipient
-	if err = client.Mail(from); err != nil {
+	if err = client.Mail(from); err != nil { //nolint:gocritic
 		return err
 	}
 
-	if err = client.Rcpt(to); err != nil {
+	if err = client.Rcpt(to); err != nil { //nolint:gocritic
 		return err
 	}
 
 	// Send message
-	writer, err := client.Data()
+	var writer io.WriteCloser
+	writer, err = client.Data()
 	if err != nil {
 		return err
 	}

@@ -35,7 +35,8 @@ var taskMineCmd = &cobra.Command{
 
 		// Add workspace filter if configured
 		if wsKey := cfg.GetEffectiveWorkspace(); wsKey != "" {
-			wsID, err := client.ResolveWorkspaceID(wsKey)
+			var wsID int
+			wsID, err = client.ResolveWorkspaceID(wsKey)
 			if err != nil {
 				return fmt.Errorf("failed to resolve workspace: %w", err)
 			}
@@ -80,7 +81,8 @@ var taskCreatedCmd = &cobra.Command{
 
 		// Add workspace filter if configured
 		if wsKey := cfg.GetEffectiveWorkspace(); wsKey != "" {
-			wsID, err := client.ResolveWorkspaceID(wsKey)
+			var wsID int
+			wsID, err = client.ResolveWorkspaceID(wsKey)
 			if err != nil {
 				return fmt.Errorf("failed to resolve workspace: %w", err)
 			}
@@ -118,7 +120,8 @@ Examples:
 
 		// Add workspace filter if configured or passed as flag
 		if wsKey := cfg.GetEffectiveWorkspace(); wsKey != "" {
-			wsID, err := client.ResolveWorkspaceID(wsKey)
+			var wsID int
+			wsID, err = client.ResolveWorkspaceID(wsKey)
 			if err != nil {
 				return fmt.Errorf("failed to resolve workspace: %w", err)
 			}
@@ -290,7 +293,7 @@ Examples:
 
 		// First, try exact match by ID
 		var statusID int
-		if _, err := fmt.Sscanf(resolvedStatus, "%d", &statusID); err == nil {
+		if _, err = fmt.Sscanf(resolvedStatus, "%d", &statusID); err == nil {
 			for _, t := range transitions {
 				if t.ToStatusID == statusID {
 					targetStatusID = statusID
@@ -339,7 +342,7 @@ Examples:
 			// Check if input was an alias
 			aliasNote := ""
 			if statusInput != resolvedStatus {
-				aliasNote = fmt.Sprintf(" (alias for \"%s\")", resolvedStatus)
+				aliasNote = fmt.Sprintf(" (alias for %q)", resolvedStatus)
 			}
 
 			return fmt.Errorf("cannot move to \"%s\"%s. Valid transitions:\n  - %s",

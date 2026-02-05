@@ -49,7 +49,7 @@ func (h *ActionsHandler) ListActions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(actions)
+	_ = json.NewEncoder(w).Encode(actions)
 }
 
 // GetAction gets a single action by ID
@@ -72,7 +72,7 @@ func (h *ActionsHandler) GetAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(action)
+	_ = json.NewEncoder(w).Encode(action)
 }
 
 // CreateAction creates a new action
@@ -86,7 +86,7 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 
 	// Parse request body
 	var req models.CreateActionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -131,10 +131,11 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 		nodeIDMap := make(map[int]int) // old ID -> new ID
 		for _, node := range req.Nodes {
 			node.ActionID = actionID
-			newID, err := h.repo.CreateNode(&node)
+			var newID int
+			newID, err = h.repo.CreateNode(&node)
 			if err != nil {
 				// Rollback by deleting the action
-				h.repo.Delete(actionID)
+				_ = h.repo.Delete(actionID)
 				respondInternalError(w, r, fmt.Errorf("failed to create nodes: %w", err))
 				return
 			}
@@ -150,10 +151,10 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 			if newTargetID, ok := nodeIDMap[edge.TargetNodeID]; ok {
 				edge.TargetNodeID = newTargetID
 			}
-			_, err := h.repo.CreateEdge(&edge)
+			_, err = h.repo.CreateEdge(&edge)
 			if err != nil {
 				// Rollback by deleting the action
-				h.repo.Delete(actionID)
+				_ = h.repo.Delete(actionID)
 				respondInternalError(w, r, fmt.Errorf("failed to create edges: %w", err))
 				return
 			}
@@ -174,7 +175,7 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(createdAction)
+	_ = json.NewEncoder(w).Encode(createdAction)
 }
 
 // UpdateAction updates an existing action
@@ -199,7 +200,7 @@ func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 
 	// Parse request body
 	var req models.UpdateActionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -250,7 +251,7 @@ func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(updatedAction)
+	_ = json.NewEncoder(w).Encode(updatedAction)
 }
 
 // DeleteAction deletes an action
@@ -317,7 +318,7 @@ func (h *ActionsHandler) ToggleAction(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		IsEnabled bool `json:"is_enabled"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		// If no body, toggle the current state
 		req.IsEnabled = !action.IsEnabled
 	}
@@ -341,7 +342,7 @@ func (h *ActionsHandler) ToggleAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(updatedAction)
+	_ = json.NewEncoder(w).Encode(updatedAction)
 }
 
 // GetActionLogs gets execution logs for an action
@@ -357,12 +358,14 @@ func (h *ActionsHandler) GetActionLogs(w http.ResponseWriter, r *http.Request) {
 	limit := 50
 	offset := 0
 	if l := r.URL.Query().Get("limit"); l != "" {
-		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
+		var parsed int
+		if parsed, err = strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
 			limit = parsed
 		}
 	}
 	if o := r.URL.Query().Get("offset"); o != "" {
-		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
+		var parsed int
+		if parsed, err = strconv.Atoi(o); err == nil && parsed >= 0 {
 			offset = parsed
 		}
 	}
@@ -378,7 +381,7 @@ func (h *ActionsHandler) GetActionLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(logs)
+	_ = json.NewEncoder(w).Encode(logs)
 }
 
 // GetWorkspaceLogs gets all execution logs for a workspace
@@ -394,12 +397,14 @@ func (h *ActionsHandler) GetWorkspaceLogs(w http.ResponseWriter, r *http.Request
 	limit := 50
 	offset := 0
 	if l := r.URL.Query().Get("limit"); l != "" {
-		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
+		var parsed int
+		if parsed, err = strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
 			limit = parsed
 		}
 	}
 	if o := r.URL.Query().Get("offset"); o != "" {
-		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
+		var parsed int
+		if parsed, err = strconv.Atoi(o); err == nil && parsed >= 0 {
 			offset = parsed
 		}
 	}
@@ -415,7 +420,7 @@ func (h *ActionsHandler) GetWorkspaceLogs(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(logs)
+	_ = json.NewEncoder(w).Encode(logs)
 }
 
 // ExecuteActionRequest represents the request body for manual action execution
@@ -434,7 +439,7 @@ func (h *ActionsHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 
 	// Parse request body
 	var req ExecuteActionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -476,5 +481,5 @@ func (h *ActionsHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "completed"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "completed"})
 }

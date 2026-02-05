@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"windshift/internal/cql"
 	"windshift/internal/middleware"
 	"windshift/internal/utils"
@@ -194,11 +195,11 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(statusQuery, statusArgs...)
 	if err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var categoryName sql.NullString
 			var count int
-			if err := rows.Scan(&categoryName, &count); err == nil {
+			if err = rows.Scan(&categoryName, &count); err == nil {
 				if categoryName.Valid {
 					stats.ItemsByStatusCategory[categoryName.String] = count
 				}
@@ -232,11 +233,11 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 
 	assignmentRows, err := h.db.Query(assignmentQuery, assignmentArgs...)
 	if err == nil {
-		defer assignmentRows.Close()
+		defer func() { _ = assignmentRows.Close() }()
 		for assignmentRows.Next() {
 			var assignment AssignmentStats
 			var assigneeID sql.NullInt64
-			if err := assignmentRows.Scan(&assigneeID, &assignment.UserName, &assignment.FirstName, &assignment.LastName, &assignment.ItemCount); err == nil {
+			if err = assignmentRows.Scan(&assigneeID, &assignment.UserName, &assignment.FirstName, &assignment.LastName, &assignment.ItemCount); err == nil {
 				if assigneeID.Valid {
 					id := int(assigneeID.Int64)
 					assignment.UserID = &id
@@ -278,12 +279,12 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 
 	projectRows, err := h.db.Query(projectQuery, projectArgs...)
 	if err == nil {
-		defer projectRows.Close()
+		defer func() { _ = projectRows.Close() }()
 		for projectRows.Next() {
 			var project ProjectStats
 			var projectID sql.NullInt64
 			var projectColor sql.NullString
-			if err := projectRows.Scan(&projectID, &project.ProjectName, &projectColor, &project.ItemCount, &project.CompletedCount); err == nil {
+			if err = projectRows.Scan(&projectID, &project.ProjectName, &projectColor, &project.ItemCount, &project.CompletedCount); err == nil {
 				project.ProjectID = utils.NullInt64ToPtr(projectID)
 				project.ProjectColor = projectColor.String
 				if project.ItemCount > 0 {
@@ -315,7 +316,7 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 
 	priorityRows, err := h.db.Query(priorityQuery, priorityArgs...)
 	if err == nil {
-		defer priorityRows.Close()
+		defer func() { _ = priorityRows.Close() }()
 		for priorityRows.Next() {
 			var priority string
 			var count int
@@ -371,7 +372,7 @@ func (h *WorkspaceHandler) loadWorkspaceMilestoneProgress(workspaceID int, filte
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	progressMap := make(map[int]*MilestoneStatusProgress)
 

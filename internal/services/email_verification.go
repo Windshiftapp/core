@@ -16,11 +16,11 @@ import (
 )
 
 var (
-	ErrTokenExpired       = errors.New("verification token has expired")
-	ErrTokenInvalid       = errors.New("verification token is invalid")
-	ErrUserNotFound       = errors.New("user not found")
-	ErrAlreadyVerified    = errors.New("email is already verified")
-	ErrSMTPNotConfigured  = errors.New("SMTP is not configured")
+	ErrTokenExpired          = errors.New("verification token has expired")
+	ErrTokenInvalid          = errors.New("verification token is invalid")
+	ErrUserNotFound          = errors.New("user not found")
+	ErrAlreadyVerified       = errors.New("email is already verified")
+	ErrSMTPNotConfigured     = errors.New("SMTP is not configured")
 	ErrTokenGenerationFailed = errors.New("failed to generate verification token")
 )
 
@@ -31,9 +31,9 @@ const (
 
 // EmailVerificationService handles email verification for SSO users
 type EmailVerificationService struct {
-	db          database.Database
-	smtpSender  *smtp.NotificationSMTPSender
-	baseURL     string
+	db         database.Database
+	smtpSender *smtp.NotificationSMTPSender
+	baseURL    string
 }
 
 // NewEmailVerificationService creates a new email verification service
@@ -97,7 +97,7 @@ func (s *EmailVerificationService) SendVerificationEmail(user *models.User, toke
 }
 
 // generateEmailBody generates the HTML and text email body for verification
-func (s *EmailVerificationService) generateEmailBody(firstName, verificationURL string) (string, string, error) {
+func (s *EmailVerificationService) generateEmailBody(firstName, verificationURL string) (htmlBody, textBody string, err error) {
 	if firstName == "" {
 		firstName = "there"
 	}
@@ -187,7 +187,7 @@ This is an automated email. Please do not reply.`
 	}
 
 	var htmlBuffer bytes.Buffer
-	if err := htmlTmpl.Execute(&htmlBuffer, templateData); err != nil {
+	if err = htmlTmpl.Execute(&htmlBuffer, templateData); err != nil {
 		return "", "", fmt.Errorf("failed to execute HTML template: %w", err)
 	}
 

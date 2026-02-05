@@ -15,12 +15,6 @@ var (
 	// Dangerous HTML tags regex
 	dangerousRegex = regexp.MustCompile(`(?i)<(script|object|embed|iframe|form|img|svg)[^>]*>`)
 
-	// Email validation regex
-	emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
-
-	// Dangerous filename characters regex
-	dangerousCharsRegex = regexp.MustCompile(`[<>:"|?*\x00-\x1f]`)
-
 	// All HTML tags regex - matches opening, closing, and self-closing tags
 	htmlTagRegex = regexp.MustCompile(`<[^>]*>`)
 
@@ -33,7 +27,7 @@ func SanitizeText(input string, maxLength int) string {
 	if input == "" {
 		return input
 	}
-	
+
 	// HTML escape to prevent script injection
 	sanitized := html.EscapeString(input)
 
@@ -42,16 +36,16 @@ func SanitizeText(input string, maxLength int) string {
 
 	// Remove other potentially dangerous tags
 	sanitized = dangerousRegex.ReplaceAllString(sanitized, "")
-	
+
 	// Trim whitespace
 	sanitized = strings.TrimSpace(sanitized)
-	
+
 	// Limit length to prevent excessive data
 	if maxLength > 0 && utf8.RuneCountInString(sanitized) > maxLength {
 		runes := []rune(sanitized)
 		sanitized = string(runes[:maxLength])
 	}
-	
+
 	return sanitized
 }
 

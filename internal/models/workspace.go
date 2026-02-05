@@ -108,11 +108,12 @@ type MilestoneCategory struct {
 
 // Milestone represents a project milestone
 type Milestone struct {
-	ID          int       `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	TargetDate  *string   `json:"target_date,omitempty"` // Date in YYYY-MM-DD format, nullable
-	Status      string    `json:"status"`                // planning, in-progress, completed, cancelled
+	ID          int     `json:"id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	TargetDate  *string `json:"target_date,omitempty"` // Date in YYYY-MM-DD format, nullable
+	//nolint:misspell // British spelling used in database
+	Status      string    `json:"status"` // planning, in-progress, completed, cancelled
 	CategoryID  *int      `json:"category_id,omitempty"`
 	IsGlobal    bool      `json:"is_global"`              // false=local to workspace, true=global (shared)
 	WorkspaceID *int      `json:"workspace_id,omitempty"` // NULL if global, set if local to workspace
@@ -136,12 +137,13 @@ type IterationType struct {
 
 // Iteration represents a time-boxed iteration (sprint)
 type Iteration struct {
-	ID          int       `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	StartDate   string    `json:"start_date"` // YYYY-MM-DD format
-	EndDate     string    `json:"end_date"`   // YYYY-MM-DD format
-	Status      string    `json:"status"`     // planned, active, completed, cancelled
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	StartDate   string `json:"start_date"` // YYYY-MM-DD format
+	EndDate     string `json:"end_date"`   // YYYY-MM-DD format
+	//nolint:misspell // British spelling used in database
+	Status      string    `json:"status"` // planned, active, completed, cancelled
 	TypeID      *int      `json:"type_id,omitempty"`
 	IsGlobal    bool      `json:"is_global"`              // false=local to workspace, true=global (shared)
 	WorkspaceID *int      `json:"workspace_id,omitempty"` // NULL if global, set if local to workspace

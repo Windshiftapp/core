@@ -35,7 +35,7 @@ func (h *NotificationSettingsHandler) GetNotificationSettings(w http.ResponseWri
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var settings []models.NotificationSetting
 	for rows.Next() {
@@ -61,10 +61,12 @@ func (h *NotificationSettingsHandler) GetNotificationSettings(w http.ResponseWri
 		}
 
 		// Parse timestamps
-		if createdAt, err := time.Parse("2006-01-02 15:04:05", createdAtStr); err == nil {
+		var createdAt time.Time
+		if createdAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr); err == nil {
 			s.CreatedAt = createdAt
 		}
-		if updatedAt, err := time.Parse("2006-01-02 15:04:05", updatedAtStr); err == nil {
+		var updatedAt time.Time
+		if updatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAtStr); err == nil {
 			s.UpdatedAt = updatedAt
 		}
 
@@ -80,7 +82,7 @@ func (h *NotificationSettingsHandler) GetNotificationSettings(w http.ResponseWri
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(settings)
+	_ = json.NewEncoder(w).Encode(settings)
 }
 
 // GetNotificationSetting returns a specific notification setting by ID
@@ -123,10 +125,12 @@ func (h *NotificationSettingsHandler) GetNotificationSetting(w http.ResponseWrit
 	}
 
 	// Parse timestamps
-	if createdAt, err := time.Parse("2006-01-02 15:04:05", createdAtStr); err == nil {
+	var createdAt time.Time
+	if createdAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr); err == nil {
 		s.CreatedAt = createdAt
 	}
-	if updatedAt, err := time.Parse("2006-01-02 15:04:05", updatedAtStr); err == nil {
+	var updatedAt time.Time
+	if updatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAtStr); err == nil {
 		s.UpdatedAt = updatedAt
 	}
 
@@ -139,7 +143,7 @@ func (h *NotificationSettingsHandler) GetNotificationSetting(w http.ResponseWrit
 	s.EventRules = eventRules
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(s)
+	_ = json.NewEncoder(w).Encode(s)
 }
 
 // CreateNotificationSetting creates a new notification setting
@@ -193,7 +197,7 @@ func (h *NotificationSettingsHandler) CreateNotificationSetting(w http.ResponseW
 	req.ID = int(id)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(req)
+	_ = json.NewEncoder(w).Encode(req)
 }
 
 // UpdateNotificationSetting updates an existing notification setting
@@ -206,7 +210,7 @@ func (h *NotificationSettingsHandler) UpdateNotificationSetting(w http.ResponseW
 	}
 
 	var req models.NotificationSetting
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
@@ -223,7 +227,7 @@ func (h *NotificationSettingsHandler) UpdateNotificationSetting(w http.ResponseW
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Update notification setting
 	_, err = tx.Exec(`
@@ -270,7 +274,7 @@ func (h *NotificationSettingsHandler) UpdateNotificationSetting(w http.ResponseW
 	// Return the updated setting
 	req.ID = id
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(req)
+	_ = json.NewEncoder(w).Encode(req)
 }
 
 // DeleteNotificationSetting deletes a notification setting
@@ -323,7 +327,7 @@ func (h *NotificationSettingsHandler) DeleteNotificationSetting(w http.ResponseW
 func (h *NotificationSettingsHandler) GetAvailableEvents(w http.ResponseWriter, r *http.Request) {
 	events := models.GetAvailableNotificationEvents()
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(events)
+	_ = json.NewEncoder(w).Encode(events)
 }
 
 // Helper function to get event rules for a notification setting
@@ -341,7 +345,7 @@ func (h *NotificationSettingsHandler) getEventRulesForSetting(settingID int) ([]
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var rules []models.NotificationEventRule
 	for rows.Next() {

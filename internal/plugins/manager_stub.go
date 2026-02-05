@@ -127,19 +127,29 @@ func (m *Manager) SetSCMService(_ SCMService) {}
 
 func (m *Manager) LoadPlugins() error { return nil }
 
-func (m *Manager) LoadPlugin(_ string) error { return errors.New("plugins disabled (built without -tags=plugins)") }
+func (m *Manager) LoadPlugin(_ string) error {
+	return errors.New("plugins disabled (built without -tags=plugins)")
+}
 
-func (m *Manager) UnloadPlugin(_ string) error { return errors.New("plugins disabled (built without -tags=plugins)") }
+func (m *Manager) UnloadPlugin(_ string) error {
+	return errors.New("plugins disabled (built without -tags=plugins)")
+}
 
 func (m *Manager) GetPlugin(_ string) (*LoadedPlugin, bool) { return nil, false }
 
 func (m *Manager) ListPlugins() []*LoadedPlugin { return nil }
 
-func (m *Manager) EnablePlugin(_ string) error { return errors.New("plugins disabled (built without -tags=plugins)") }
+func (m *Manager) EnablePlugin(_ string) error {
+	return errors.New("plugins disabled (built without -tags=plugins)")
+}
 
-func (m *Manager) DisablePlugin(_ string) error { return errors.New("plugins disabled (built without -tags=plugins)") }
+func (m *Manager) DisablePlugin(_ string) error {
+	return errors.New("plugins disabled (built without -tags=plugins)")
+}
 
-func (m *Manager) ReloadPlugin(_ string) error { return errors.New("plugins disabled (built without -tags=plugins)") }
+func (m *Manager) ReloadPlugin(_ string) error {
+	return errors.New("plugins disabled (built without -tags=plugins)")
+}
 
 func (m *Manager) HandleRequest(_ string, _ *HTTPRequest) (*HTTPResponse, error) {
 	return nil, errors.New("plugins disabled (built without -tags=plugins)")

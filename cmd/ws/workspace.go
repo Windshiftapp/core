@@ -90,10 +90,10 @@ Examples:
 
 		if outputFormat == "json" {
 			result := struct {
-				Workspace *Workspace  `json:"workspace"`
-				Statuses  []Status    `json:"statuses"`
-				ItemTypes []ItemType  `json:"item_types"`
-				Workflows []Workflow  `json:"workflows"`
+				Workspace *Workspace `json:"workspace"`
+				Statuses  []Status   `json:"statuses"`
+				ItemTypes []ItemType `json:"item_types"`
+				Workflows []Workflow `json:"workflows"`
 			}{
 				Workspace: workspace,
 				Statuses:  statuses,

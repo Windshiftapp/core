@@ -1,3 +1,4 @@
+// Package handlers provides HTTP request handlers for the Windshift API.
 package handlers
 
 import (
@@ -7,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+
 	"windshift/internal/database"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
@@ -67,32 +69,6 @@ func (h *BaseHandler) requireWriteDB(w http.ResponseWriter, r *http.Request) (*s
 		return nil, false
 	}
 	return db, true
-}
-
-// executeInTransaction executes a function within a transaction
-func (h *BaseHandler) executeInTransaction(fn func(*sql.Tx) error) error {
-	if h.db == nil {
-		return ErrDatabaseNil
-	}
-
-	tx, err := h.db.Begin()
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if p := recover(); p != nil {
-			tx.Rollback()
-			panic(p)
-		}
-	}()
-
-	if err := fn(tx.(*sql.Tx)); err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	return tx.Commit()
 }
 
 // RequireAuth checks if a user is authenticated and returns the user.
@@ -202,7 +178,7 @@ func GetAccessibleWorkspaceIDs(user *models.User, db database.Database,
 	if err != nil {
 		return nil, fmt.Errorf("failed to query workspaces: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var ids []int
 	for rows.Next() {
 		var id int
@@ -231,7 +207,7 @@ func GetAccessibleWorkspaceKeys(user *models.User, db database.Database,
 	if err != nil {
 		return nil, fmt.Errorf("failed to query workspaces: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	keys := make(map[string]bool)
 	for rows.Next() {
 		var id int
@@ -251,12 +227,13 @@ func GetAccessibleWorkspaceKeys(user *models.User, db database.Database,
 }
 
 // BuildWorkspaceIDPlaceholders builds a parameterized IN clause for workspace IDs.
-func BuildWorkspaceIDPlaceholders(ids []int) (string, []interface{}) {
-	placeholders := make([]string, len(ids))
-	args := make([]interface{}, len(ids))
+func BuildWorkspaceIDPlaceholders(ids []int) (placeholders string, args []interface{}) {
+	ph := make([]string, len(ids))
+	args = make([]interface{}, len(ids))
 	for i, id := range ids {
-		placeholders[i] = "?"
+		ph[i] = "?"
 		args[i] = id
 	}
-	return strings.Join(placeholders, ", "), args
+	placeholders = strings.Join(ph, ", ")
+	return placeholders, args
 }

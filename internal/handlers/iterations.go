@@ -195,7 +195,7 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate status
-	validStatuses := []string{"planned", "active", "completed", "cancelled"}
+	validStatuses := []string{"planned", "active", "completed", "cancelled"} //nolint:misspell // British spelling used in database
 	statusValid := false
 	for _, validStatus := range validStatuses {
 		if iteration.Status == validStatus {
@@ -224,10 +224,8 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 			respondForbidden(w, r)
 			return
 		}
-	} else {
-		if !RequireWorkspacePermission(w, r, user.ID, *iteration.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
-			return
-		}
+	} else if !RequireWorkspacePermission(w, r, user.ID, *iteration.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
+		return
 	}
 
 	// Validate type_id if provided (using service)
@@ -327,7 +325,7 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate status
-	validStatuses := []string{"planned", "active", "completed", "cancelled"}
+	validStatuses := []string{"planned", "active", "completed", "cancelled"} //nolint:misspell // British spelling used in database
 	statusValid := false
 	for _, validStatus := range validStatuses {
 		if iteration.Status == validStatus {
@@ -357,10 +355,8 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 			respondForbidden(w, r)
 			return
 		}
-	} else {
-		if !RequireWorkspacePermission(w, r, user.ID, *iteration.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
-			return
-		}
+	} else if !RequireWorkspacePermission(w, r, user.ID, *iteration.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
+		return
 	}
 
 	// Validate type_id if provided (using service)
@@ -496,7 +492,8 @@ func (h *IterationHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 
 	// Check permission based on whether iteration is global or workspace-scoped
 	if isGlobal {
-		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
+		var hasGlobalPerm bool
+		hasGlobalPerm, err = h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
 		if err != nil || !hasGlobalPerm {
 			respondForbidden(w, r)
 			return
@@ -546,7 +543,8 @@ func (h *IterationHandler) GetBurndown(w http.ResponseWriter, r *http.Request) {
 
 	// Check permission based on whether iteration is global or workspace-scoped
 	if isGlobal {
-		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
+		var hasGlobalPerm bool
+		hasGlobalPerm, err = h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
 		if err != nil || !hasGlobalPerm {
 			respondForbidden(w, r)
 			return

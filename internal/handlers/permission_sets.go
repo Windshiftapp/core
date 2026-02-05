@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/middleware"
@@ -49,7 +50,7 @@ func (h *PermissionSetHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var permissionSets []models.PermissionSet
 	for rows.Next() {
@@ -68,7 +69,7 @@ func (h *PermissionSetHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(permissionSets)
+	_ = json.NewEncoder(w).Encode(permissionSets)
 }
 
 // Get returns a single permission set with its permissions
@@ -113,7 +114,7 @@ func (h *PermissionSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer permRows.Close()
+	defer func() { _ = permRows.Close() }()
 
 	ps.Permissions = []models.Permission{}
 	for permRows.Next() {
@@ -126,7 +127,7 @@ func (h *PermissionSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(ps)
+	_ = json.NewEncoder(w).Encode(ps)
 }
 
 // Create creates a new permission set
@@ -201,7 +202,7 @@ func (h *PermissionSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		psID := int(permSetID)
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -211,7 +212,7 @@ func (h *PermissionSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 			ResourceID:   &psID,
 			ResourceName: req.Name,
 			Details: map[string]interface{}{
-				"description":     req.Description,
+				"description":      req.Description,
 				"permission_count": len(req.PermissionIDs),
 			},
 			Success: true,
@@ -220,7 +221,7 @@ func (h *PermissionSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(ps)
+	_ = json.NewEncoder(w).Encode(ps)
 }
 
 // Update updates a permission set
@@ -259,7 +260,7 @@ func (h *PermissionSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req models.PermissionSetUpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -299,7 +300,7 @@ func (h *PermissionSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Invalidate cache for all configuration sets using this permission set
 	var warnings []models.APIWarning
 	if h.permissionService != nil {
-		if err := h.permissionService.OnPermissionSetChanged(id); err != nil {
+		if err = h.permissionService.OnPermissionSetChanged(id); err != nil {
 			warnings = append(warnings, createCacheWarning("permission_set", err, fmt.Sprintf("permission_set_id:%d", id)))
 		}
 	}
@@ -338,7 +339,7 @@ func (h *PermissionSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 		details["permission_count"] = len(req.PermissionIDs)
 
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -413,7 +414,7 @@ func (h *PermissionSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -482,12 +483,12 @@ func (h *PermissionSetHandler) GetAssignments(w http.ResponseWriter, r *http.Req
 		ORDER BY p.permission_name, r.name
 	`, setID)
 	if err == nil {
-		defer roleRows.Close()
+		defer func() { _ = roleRows.Close() }()
 		for roleRows.Next() {
 			var ra models.PermissionSetRoleAssignment
 			var perm models.Permission
 			var role models.WorkspaceRole
-			err := roleRows.Scan(&ra.ID, &ra.PermissionSetID, &ra.PermissionID, &ra.RoleID, &ra.CreatedBy, &ra.CreatedAt,
+			err = roleRows.Scan(&ra.ID, &ra.PermissionSetID, &ra.PermissionID, &ra.RoleID, &ra.CreatedBy, &ra.CreatedAt,
 				&perm.PermissionKey, &perm.PermissionName, &perm.Description,
 				&role.Name)
 			if err == nil {
@@ -512,12 +513,12 @@ func (h *PermissionSetHandler) GetAssignments(w http.ResponseWriter, r *http.Req
 		ORDER BY p.permission_name, g.name
 	`, setID)
 	if err == nil {
-		defer groupRows.Close()
+		defer func() { _ = groupRows.Close() }()
 		for groupRows.Next() {
 			var ga models.PermissionSetGroupAssignment
 			var perm models.Permission
 			var group models.Group
-			err := groupRows.Scan(&ga.ID, &ga.PermissionSetID, &ga.PermissionID, &ga.GroupID, &ga.CreatedBy, &ga.CreatedAt,
+			err = groupRows.Scan(&ga.ID, &ga.PermissionSetID, &ga.PermissionID, &ga.GroupID, &ga.CreatedBy, &ga.CreatedAt,
 				&perm.PermissionKey, &perm.PermissionName, &perm.Description,
 				&group.GroupName)
 			if err == nil {
@@ -542,7 +543,7 @@ func (h *PermissionSetHandler) GetAssignments(w http.ResponseWriter, r *http.Req
 		ORDER BY p.permission_name, u.username
 	`, setID)
 	if err == nil {
-		defer userRows.Close()
+		defer func() { _ = userRows.Close() }()
 		for userRows.Next() {
 			var ua models.PermissionSetUserAssignment
 			var perm models.Permission
@@ -561,7 +562,7 @@ func (h *PermissionSetHandler) GetAssignments(w http.ResponseWriter, r *http.Req
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // CreateAssignment adds a role/group/user assignment to a permission in the set
@@ -578,7 +579,7 @@ func (h *PermissionSetHandler) CreateAssignment(w http.ResponseWriter, r *http.R
 	}
 
 	var req models.PermissionSetAssignmentRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -607,17 +608,18 @@ func (h *PermissionSetHandler) CreateAssignment(w http.ResponseWriter, r *http.R
 	}
 
 	// Create the appropriate assignment
-	if req.RoleID != nil {
+	switch {
+	case req.RoleID != nil:
 		_, err = db.Exec(`
 			INSERT INTO permission_set_role_assignments (permission_set_id, permission_id, role_id, created_by, created_at)
 			VALUES (?, ?, ?, ?, ?)
 		`, setID, req.PermissionID, *req.RoleID, userID, time.Now())
-	} else if req.GroupID != nil {
+	case req.GroupID != nil:
 		_, err = db.Exec(`
 			INSERT INTO permission_set_group_assignments (permission_set_id, permission_id, group_id, created_by, created_at)
 			VALUES (?, ?, ?, ?, ?)
 		`, setID, req.PermissionID, *req.GroupID, userID, time.Now())
-	} else if req.UserID != nil {
+	case req.UserID != nil:
 		_, err = db.Exec(`
 			INSERT INTO permission_set_user_assignments (permission_set_id, permission_id, user_id, created_by, created_at)
 			VALUES (?, ?, ?, ?, ?)
@@ -684,7 +686,7 @@ func (h *PermissionSetHandler) DeleteAssignment(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	query := fmt.Sprintf("DELETE FROM %s WHERE id = ? AND permission_set_id = ?", table)
+	query := fmt.Sprintf("DELETE FROM %s WHERE id = ? AND permission_set_id = ?", table) //nolint:gosec // G201: table name from whitelist, parameters are bound
 	result, err := db.Exec(query, assignmentID, setID)
 	if err != nil {
 		respondInternalError(w, r, err)

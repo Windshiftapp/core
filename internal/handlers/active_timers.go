@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/utils"
@@ -97,13 +98,14 @@ func (h *ActiveTimerHandler) StartTimer(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(timer)
+	_ = json.NewEncoder(w).Encode(timer)
 }
 
 // GetActiveTimer gets the currently active timer
 func (h *ActiveTimerHandler) GetActiveTimer(w http.ResponseWriter, r *http.Request) {
 	var timer *models.ActiveTimer
 
+	//nolint:misspell // customer_organisations is a database table name
 	query := `
 		SELECT 
 			at.id, at.workspace_id, at.item_id, at.project_id, at.description, 
@@ -142,7 +144,7 @@ func (h *ActiveTimerHandler) GetActiveTimer(w http.ResponseWriter, r *http.Reque
 
 	if err == sql.ErrNoRows {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(nil)
+		_ = json.NewEncoder(w).Encode(nil)
 		return
 	} else if err != nil {
 		respondInternalError(w, r, err)
@@ -150,7 +152,7 @@ func (h *ActiveTimerHandler) GetActiveTimer(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(timer)
+	_ = json.NewEncoder(w).Encode(timer)
 }
 
 // StopTimer stops the active timer and creates a worklog entry
@@ -235,14 +237,15 @@ func (h *ActiveTimerHandler) StopTimer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // getActiveTimerByID is a helper function to retrieve a timer with joined data
 func (h *ActiveTimerHandler) getActiveTimerByID(id int) (*models.ActiveTimer, error) {
+	//nolint:misspell // database uses British spelling (customer_organisations)
 	query := `
-		SELECT 
-			at.id, at.workspace_id, at.item_id, at.project_id, at.description, 
+		SELECT
+			at.id, at.workspace_id, at.item_id, at.project_id, at.description,
 			at.start_time_utc, at.created_at,
 			tp.name as project_name,
 			tc.name as customer_name,

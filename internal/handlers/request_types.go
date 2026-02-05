@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
@@ -73,7 +74,7 @@ func (h *RequestTypeHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var requestTypes []models.RequestType
 	for rows.Next() {
@@ -98,7 +99,7 @@ func (h *RequestTypeHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(requestTypes)
+	_ = json.NewEncoder(w).Encode(requestTypes)
 }
 
 // Get returns a specific request type by ID
@@ -140,7 +141,7 @@ func (h *RequestTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 	rt.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(rt)
+	_ = json.NewEncoder(w).Encode(rt)
 }
 
 // Create creates a new request type
@@ -152,7 +153,7 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var rt models.RequestType
-	if err := json.NewDecoder(r.Body).Decode(&rt); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&rt); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -196,7 +197,7 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if rt.DisplayOrder == 0 {
 		// Get next display order
 		var maxOrder int
-		h.db.QueryRow("SELECT COALESCE(MAX(display_order), 0) FROM request_types WHERE channel_id = ?", rt.ChannelID).Scan(&maxOrder)
+		_ = h.db.QueryRow("SELECT COALESCE(MAX(display_order), 0) FROM request_types WHERE channel_id = ?", rt.ChannelID).Scan(&maxOrder)
 		rt.DisplayOrder = maxOrder + 1
 	}
 
@@ -245,7 +246,7 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -266,7 +267,7 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(rt)
+	_ = json.NewEncoder(w).Encode(rt)
 }
 
 // Update updates an existing request type
@@ -293,7 +294,7 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var rt models.RequestType
-	if err := json.NewDecoder(r.Body).Decode(&rt); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&rt); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -390,7 +391,7 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -405,7 +406,7 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(rt)
+	_ = json.NewEncoder(w).Encode(rt)
 }
 
 // Delete deletes a request type
@@ -439,7 +440,7 @@ func (h *RequestTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	err = h.db.QueryRow("SELECT config FROM channels WHERE id = ?", channelID).Scan(&configStr)
 	if err == nil && configStr != "" {
 		var config models.ChannelConfig
-		if err := json.Unmarshal([]byte(configStr), &config); err == nil {
+		if err = json.Unmarshal([]byte(configStr), &config); err == nil {
 			// Remove the request type ID from all portal sections
 			modified := false
 			for i := range config.PortalSections {
@@ -456,7 +457,8 @@ func (h *RequestTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 			// Update the config if we made changes
 			if modified {
-				updatedConfigJSON, err := json.Marshal(config)
+				var updatedConfigJSON []byte
+				updatedConfigJSON, err = json.Marshal(config)
 				if err == nil {
 					_, _ = h.db.ExecWrite("UPDATE channels SET config = ?, updated_at = ? WHERE id = ?",
 						string(updatedConfigJSON), time.Now(), channelID)
@@ -482,7 +484,7 @@ func (h *RequestTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -534,7 +536,7 @@ func (h *RequestTypeHandler) GetFields(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var fields []models.RequestTypeField
 	for rows.Next() {
@@ -556,7 +558,7 @@ func (h *RequestTypeHandler) GetFields(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(fields)
+	_ = json.NewEncoder(w).Encode(fields)
 }
 
 // UpdateFields updates the fields for a request type
@@ -576,7 +578,7 @@ func (h *RequestTypeHandler) UpdateFields(w http.ResponseWriter, r *http.Request
 	}
 
 	var fields []models.RequestTypeField
-	if err := json.NewDecoder(r.Body).Decode(&fields); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&fields); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -615,7 +617,7 @@ func (h *RequestTypeHandler) UpdateFields(w http.ResponseWriter, r *http.Request
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -663,19 +665,19 @@ func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.R
 		FieldType  string `json:"field_type,omitempty"`
 	}
 
-	var fields []AvailableField
-
 	// Add default fields
-	fields = append(fields, AvailableField{
-		Identifier: "title",
-		Name:       "Title",
-		Type:       "default",
-	})
-	fields = append(fields, AvailableField{
-		Identifier: "description",
-		Name:       "Description",
-		Type:       "default",
-	})
+	fields := []AvailableField{
+		{
+			Identifier: "title",
+			Name:       "Title",
+			Type:       "default",
+		},
+		{
+			Identifier: "description",
+			Name:       "Description",
+			Type:       "default",
+		},
+	}
 
 	// Get custom fields for this item type
 	// Custom fields can be associated with specific item types via item_type_id
@@ -691,7 +693,7 @@ func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.R
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var id int
@@ -709,7 +711,7 @@ func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.R
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(fields)
+	_ = json.NewEncoder(w).Encode(fields)
 }
 
 // UpdateVisibility updates only the visibility settings for a request type
@@ -733,7 +735,7 @@ func (h *RequestTypeHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 		GroupIDs []int `json:"group_ids"`
 		OrgIDs   []int `json:"org_ids"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -781,7 +783,7 @@ func (h *RequestTypeHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -799,5 +801,5 @@ func (h *RequestTypeHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(rt)
+	_ = json.NewEncoder(w).Encode(rt)
 }

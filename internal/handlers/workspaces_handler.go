@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/middleware"
@@ -119,13 +120,13 @@ func (h *WorkspaceHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var workspaces []models.Workspace
 	for rows.Next() {
 		var workspace models.Workspace
 		var timeProjectName, icon, color, defaultView, displayMode sql.NullString
-		err := rows.Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
+		err = rows.Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
 			&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID, &icon, &color, &workspace.AvatarURL, &defaultView, &displayMode, &workspace.CreatedAt, &workspace.UpdatedAt,
 			&workspace.ProjectCount, &timeProjectName)
 		if err != nil {
@@ -230,7 +231,8 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Check permissions based on workspace state
 	if !workspace.Active {
 		// For inactive workspaces, check if user has admin access
-		canAccess, err := h.canAccessInactiveWorkspace(currentUser, workspace.ID)
+		var canAccess bool
+		canAccess, err = h.canAccessInactiveWorkspace(currentUser, workspace.ID)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -241,7 +243,8 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// For active workspaces, check if user has view permission
-		canView, err := h.canViewWorkspace(currentUser.ID, workspace.ID)
+		var canView bool
+		canView, err = h.canViewWorkspace(currentUser.ID, workspace.ID)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -254,7 +257,7 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	// Track workspace visit
 	if h.activityTracker != nil {
-		if err := h.activityTracker.TrackWorkspaceVisit(currentUser.ID, workspace.ID); err != nil {
+		if err = h.activityTracker.TrackWorkspaceVisit(currentUser.ID, workspace.ID); err != nil {
 			slog.Error("failed to track workspace visit", slog.String("component", "workspaces"), slog.Int("user_id", currentUser.ID), slog.Int("workspace_id", workspace.ID), slog.Any("error", err))
 			// Don't fail the request, just log the error
 		}
@@ -294,13 +297,13 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Parse request
 	var req CreateWorkspaceRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate input using validator
-	if err := utils.Validate(req); err != nil {
+	if err = utils.Validate(req); err != nil {
 		respondValidationError(w, r, err.Error())
 		return
 	}
@@ -352,7 +355,7 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create item number sequence for this workspace (PostgreSQL only, no-op for SQLite)
-	if err := h.db.CreateWorkspaceItemSequence(id); err != nil {
+	if err = h.db.CreateWorkspaceItemSequence(id); err != nil {
 		slog.Warn("failed to create item sequence for workspace", slog.String("component", "workspaces"), slog.Int64("workspace_id", id), slog.Any("error", err))
 	}
 
@@ -394,7 +397,7 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -463,13 +466,13 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Parse request
 	var req UpdateWorkspaceRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
 	// Validate input using validator
-	if err := utils.Validate(req); err != nil {
+	if err = utils.Validate(req); err != nil {
 		respondValidationError(w, r, err.Error())
 		return
 	}
@@ -500,7 +503,7 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Save time project categories if provided
 	if req.TimeProjectCategories != nil {
-		if err := h.saveTimeProjectCategories(id, req.TimeProjectCategories); err != nil {
+		if err = h.saveTimeProjectCategories(id, req.TimeProjectCategories); err != nil {
 			slog.Error("failed to save time project categories", slog.String("component", "workspaces"), slog.Int("workspace_id", id), slog.Any("error", err))
 			// Don't fail the entire update, just log the error
 		}
@@ -591,7 +594,7 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -651,7 +654,7 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Drop item number sequence for this workspace (PostgreSQL only, no-op for SQLite)
-	if err := h.db.DropWorkspaceItemSequence(int64(id)); err != nil {
+	if err = h.db.DropWorkspaceItemSequence(int64(id)); err != nil {
 		slog.Warn("failed to drop item sequence for workspace", slog.String("component", "workspaces"), slog.Int("workspace_id", id), slog.Any("error", err))
 	}
 
@@ -664,7 +667,7 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),

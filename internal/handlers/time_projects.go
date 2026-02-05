@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
@@ -45,6 +46,7 @@ func (h *TimeProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build query based on accessible projects
+	//nolint:misspell // database table name uses British spelling (customer_organisations)
 	query := `
 		SELECT p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color,
 		       p.hourly_rate, p.settings, p.created_at, p.updated_at,
@@ -55,7 +57,7 @@ func (h *TimeProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN time_project_categories cat ON p.category_id = cat.id`
 
 	var args []interface{}
-	if accessibleIDs != nil && len(accessibleIDs) > 0 {
+	if len(accessibleIDs) > 0 {
 		// Filter to only accessible projects
 		placeholders := make([]string, len(accessibleIDs))
 		for i, id := range accessibleIDs {
@@ -63,8 +65,8 @@ func (h *TimeProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			args = append(args, id)
 		}
 		query += " WHERE p.id IN (" + strings.Join(placeholders, ",") + ")"
-	} else if accessibleIDs != nil && len(accessibleIDs) == 0 {
-		// User has no access to any projects
+	} else if accessibleIDs != nil {
+		// User has no access to any projects (slice is non-nil but empty)
 		respondJSONOK(w, []models.TimeProject{})
 		return
 	}
@@ -77,7 +79,7 @@ func (h *TimeProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var projects []models.TimeProject
 	for rows.Next() {
@@ -209,6 +211,7 @@ func (h *TimeProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Validate customer exists (if provided)
 	if p.CustomerID != nil {
 		var customerExists bool
+		//nolint:misspell // database table name uses British spelling (customer_organisations)
 		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM customer_organisations WHERE id = ?)", *p.CustomerID).Scan(&customerExists)
 		if err != nil {
 			respondInternalError(w, r, err)
@@ -236,7 +239,7 @@ func (h *TimeProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Serialize settings to JSON
 	var settingsJSON *string
-	if p.Settings != nil && len(p.Settings) > 0 {
+	if len(p.Settings) > 0 {
 		b, err := json.Marshal(p.Settings)
 		if err == nil {
 			s := string(b)
@@ -303,6 +306,7 @@ func (h *TimeProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Validate customer exists (if provided)
 	if p.CustomerID != nil {
 		var customerExists bool
+		//nolint:misspell // database table name uses British spelling (customer_organisations)
 		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM customer_organisations WHERE id = ?)", *p.CustomerID).Scan(&customerExists)
 		if err != nil {
 			respondInternalError(w, r, err)
@@ -330,7 +334,7 @@ func (h *TimeProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Serialize settings to JSON
 	var settingsJSON *string
-	if p.Settings != nil && len(p.Settings) > 0 {
+	if len(p.Settings) > 0 {
 		b, err := json.Marshal(p.Settings)
 		if err == nil {
 			s := string(b)
@@ -398,6 +402,7 @@ func (h *TimeProjectHandler) GetByCustomer(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	//nolint:misspell // database table name uses British spelling (customer_organisations)
 	rows, err := h.db.Query(`
 		SELECT p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color,
 		       p.hourly_rate, p.settings, p.created_at, p.updated_at,
@@ -413,7 +418,7 @@ func (h *TimeProjectHandler) GetByCustomer(w http.ResponseWriter, r *http.Reques
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var projects []models.TimeProject
 	for rows.Next() {
@@ -472,14 +477,14 @@ func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Reque
 	var allowedCategories []int
 	for categoryRows.Next() {
 		var categoryID int
-		if err := categoryRows.Scan(&categoryID); err != nil {
-			categoryRows.Close()
+		if err = categoryRows.Scan(&categoryID); err != nil {
+			_ = categoryRows.Close()
 			respondInternalError(w, r, err)
 			return
 		}
 		allowedCategories = append(allowedCategories, categoryID)
 	}
-	categoryRows.Close()
+	_ = categoryRows.Close()
 
 	// Build query based on whether there are category restrictions
 	var query string
@@ -493,6 +498,7 @@ func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Reque
 			args = append(args, categoryID)
 		}
 
+		//nolint:misspell // database table name uses British spelling (customer_organisations)
 		query = `
 			SELECT p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color,
 			       p.hourly_rate, p.settings, p.created_at, p.updated_at,
@@ -506,6 +512,7 @@ func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Reque
 		`
 	} else {
 		// No category restrictions - return all projects
+		//nolint:misspell // database table name uses British spelling (customer_organisations)
 		query = `
 			SELECT p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color,
 			       p.hourly_rate, p.settings, p.created_at, p.updated_at,
@@ -523,7 +530,7 @@ func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Reque
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var projects []models.TimeProject
 	for rows.Next() {

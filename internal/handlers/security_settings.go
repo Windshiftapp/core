@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+
 	"windshift/internal/database"
 )
 
@@ -28,26 +29,26 @@ type SecuritySettings struct {
 // GetSecuritySettings returns current security settings
 func (h *SecuritySettingsHandler) GetSecuritySettings(w http.ResponseWriter, r *http.Request) {
 	settings := SecuritySettings{
-		CalendarFeedEnabled:  true,                // Default enabled
-		PluginCLIExecEnabled: false,               // Default disabled for security
-		PluginsDisabled:      h.pluginsDisabled,   // Read-only, set by startup flag
+		CalendarFeedEnabled:  true,              // Default enabled
+		PluginCLIExecEnabled: false,             // Default disabled for security
+		PluginsDisabled:      h.pluginsDisabled, // Read-only, set by startup flag
 	}
 
 	// Get calendar_feed_enabled setting
 	var value string
 	err := h.db.QueryRow("SELECT value FROM system_settings WHERE key = 'calendar_feed_enabled'").Scan(&value)
 	if err == nil {
-		settings.CalendarFeedEnabled = strings.ToLower(value) == "true"
+		settings.CalendarFeedEnabled = strings.EqualFold(value, "true")
 	}
 
 	// Get plugin_cli_exec_enabled setting
 	err = h.db.QueryRow("SELECT value FROM system_settings WHERE key = 'plugin_cli_exec_enabled'").Scan(&value)
 	if err == nil {
-		settings.PluginCLIExecEnabled = strings.ToLower(value) == "true"
+		settings.PluginCLIExecEnabled = strings.EqualFold(value, "true")
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(settings)
+	_ = json.NewEncoder(w).Encode(settings)
 }
 
 // UpdateSecuritySettings updates security settings
@@ -105,5 +106,5 @@ func (h *SecuritySettingsHandler) UpdateSecuritySettings(w http.ResponseWriter, 
 
 	// Return updated settings
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(settings)
+	_ = json.NewEncoder(w).Encode(settings)
 }

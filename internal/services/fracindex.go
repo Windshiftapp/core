@@ -118,7 +118,7 @@ func KeyBetween(a, b string) (string, error) {
 // `a < b` lexicographically if `b` is non-empty.
 // a == "" means first possible string.
 // b == "" means last possible string.
-func midpoint(a string, b string) string {
+func midpoint(a, b string) string {
 	if b != "" {
 		// remove longest common prefix.  pad `a` with 0s as we
 		// go.  note that we don't need to pad `b`, because it can't
@@ -167,7 +167,7 @@ func midpoint(a string, b string) string {
 	// '4' + midpoint('9', null), which will become
 	// '4' + '9' + midpoint('', null), which is '495'
 	sa := ""
-	if len(a) > 0 {
+	if a != "" {
 		sa = a[1:]
 	}
 	return string(base62Digits[digitA]) + midpoint(sa, "")
@@ -185,11 +185,12 @@ func validateInt(i string) error {
 }
 
 func getIntLen(head byte) (int, error) {
-	if head >= 'a' && head <= 'z' {
+	switch {
+	case head >= 'a' && head <= 'z':
 		return int(head - 'a' + 2), nil
-	} else if head >= 'A' && head <= 'Z' {
+	case head >= 'A' && head <= 'Z':
 		return int('Z' - head + 2), nil
-	} else {
+	default:
 		return 0, fmt.Errorf("invalid order key head: %s", string(head))
 	}
 }
@@ -255,7 +256,7 @@ func incrementInt(x string) (string, error) {
 		} else {
 			digs = digs[1:]
 		}
-		return string(h) + strings.Join(digs, ""), nil
+		return h + strings.Join(digs, ""), nil
 	}
 	return head + strings.Join(digs, ""), nil
 }
@@ -368,7 +369,7 @@ func NKeysBetween(a, b string, n uint) ([]string, error) {
 		}
 		result := make([]string, 0, n)
 		result = append(result, c)
-		for i := 0; i < int(n)-1; i++ {
+		for i := 0; i < int(n)-1; i++ { //nolint:gosec // G115: value is bounded by domain constraints
 			c, err = KeyBetween(c, b)
 			if err != nil {
 				return nil, err
@@ -384,7 +385,7 @@ func NKeysBetween(a, b string, n uint) ([]string, error) {
 		}
 		result := make([]string, 0, n)
 		result = append(result, c)
-		for i := 0; i < int(n)-1; i++ {
+		for i := 0; i < int(n)-1; i++ { //nolint:gosec // G115: value is bounded by domain constraints
 			c, err = KeyBetween(a, c)
 			if err != nil {
 				return nil, err
@@ -438,7 +439,7 @@ func GenerateFracIndexForNewItem(db *sql.DB, workspaceID int, parentID *int) (st
 
 	// Try to use cached value first (fast path)
 	if cached := fracIndexCache.Load(); cached != nil {
-		lastIndex := cached.(*string)
+		lastIndex := cached.(*string) //nolint:errcheck // type assertion is safe, we only store *string
 		if lastIndex != nil {
 			newIndex, err := KeyBetween(*lastIndex, "")
 			if err == nil {
@@ -458,7 +459,7 @@ func GenerateFracIndexForNewItem(db *sql.DB, workspaceID int, parentID *int) (st
 
 	// Double-check cache after acquiring lock (another goroutine may have populated it)
 	if cached := fracIndexCache.Load(); cached != nil {
-		lastIndex := cached.(*string)
+		lastIndex := cached.(*string) //nolint:errcheck // type assertion is safe, we only store *string
 		if lastIndex != nil {
 			newIndex, err := KeyBetween(*lastIndex, "")
 			if err == nil {

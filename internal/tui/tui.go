@@ -7,7 +7,7 @@ import (
 	"windshift/internal/auth"
 	"windshift/internal/middleware"
 
-	"github.com/charmbracelet/bubbletea"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/ssh"
 )
 
@@ -43,13 +43,13 @@ func NewTUIHandler(apiURL string, sessionManager *auth.SessionManager) func(s ss
 				if err != nil {
 					slog.Error("failed to create session",
 						slog.String("component", "tui"),
-						slog.Int("user_id", int(userID)),
+						slog.Int("user_id", userID),
 						slog.Any("error", err))
 				} else {
 					sessionToken = session.Token
 					slog.Debug("created session for SSH TUI",
 						slog.String("component", "tui"),
-						slog.Int("user_id", int(userID)),
+						slog.Int("user_id", userID),
 						slog.String("username", username),
 						slog.Int("session_id", session.ID))
 				}

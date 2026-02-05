@@ -1,3 +1,4 @@
+// Package services provides business logic and service layer functionality.
 package services
 
 import (
@@ -12,11 +13,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/google/uuid"
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/utils"
+
+	"github.com/google/uuid"
 )
 
 // ExecutionChain tracks state for cycle detection during action cascades.
@@ -279,7 +281,7 @@ func (as *ActionService) getChain(chainID string) *ExecutionChain {
 		return nil
 	}
 	if chain, ok := as.chainCache.Load(chainID); ok {
-		return chain.(*ExecutionChain)
+		return chain.(*ExecutionChain) //nolint:errcheck // type assertion always succeeds for cached chains
 	}
 	return nil
 }
@@ -301,7 +303,7 @@ func (as *ActionService) cleanupChains() {
 	threshold := time.Now().Add(-5 * time.Minute)
 	cleaned := 0
 	as.chainCache.Range(func(key, value interface{}) bool {
-		chain := value.(*ExecutionChain)
+		chain := value.(*ExecutionChain) //nolint:errcheck // type assertion always succeeds for cached chains
 		if chain.CreatedAt.Before(threshold) {
 			as.chainCache.Delete(key)
 			cleaned++
@@ -320,7 +322,7 @@ func (as *ActionService) cleanupChains() {
 const MaxCascadeDepth = 5
 
 // processEvent processes a single action event
-func (as *ActionService) processEvent(event *models.ActionEvent) error {
+func (as *ActionService) processEvent(event *models.ActionEvent) error { //nolint:unparam // error return kept for API consistency
 	slog.Debug("processing action event",
 		slog.String("component", "actions"),
 		slog.String("event_type", string(event.EventType)),
@@ -1004,7 +1006,7 @@ func (as *ActionService) executeCondition(node *models.ActionNode, ctx *models.E
 }
 
 // evaluateCondition evaluates a condition
-func (as *ActionService) evaluateCondition(value interface{}, operator string, compareValue string) bool {
+func (as *ActionService) evaluateCondition(value interface{}, operator, compareValue string) bool {
 	strValue := fmt.Sprintf("%v", value)
 
 	switch operator {
@@ -1059,7 +1061,7 @@ func (as *ActionService) evaluateCondition(value interface{}, operator string, c
 
 // substituteVariables replaces {{variable}} placeholders with actual values
 func (as *ActionService) substituteVariables(template string, ctx *models.ExecutionContext) string {
-	// Pattern: {{variable_name}}
+	// Matches double-brace variable placeholders like {{variable_name}}
 	re := regexp.MustCompile(`\{\{([^}]+)\}\}`)
 
 	return re.ReplaceAllStringFunc(template, func(match string) string {
@@ -1142,7 +1144,7 @@ func (as *ActionService) executeUpdateAsset(node *models.ActionNode, ctx *models
 
 	var customFieldValues map[string]interface{}
 	if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
-		if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &customFieldValues); err != nil {
+		if err = json.Unmarshal([]byte(customFieldValuesJSON.String), &customFieldValues); err != nil {
 			return fmt.Errorf("failed to parse item custom_field_values: %w", err)
 		}
 	}
@@ -1215,7 +1217,7 @@ func (as *ActionService) executeUpdateAsset(node *models.ActionNode, ctx *models
 	// Parse existing asset custom_field_values
 	var assetCustomFields map[string]interface{}
 	if asset.CustomFieldValues.Valid && asset.CustomFieldValues.String != "" {
-		if err := json.Unmarshal([]byte(asset.CustomFieldValues.String), &assetCustomFields); err != nil {
+		if err = json.Unmarshal([]byte(asset.CustomFieldValues.String), &assetCustomFields); err != nil {
 			assetCustomFields = make(map[string]interface{})
 		}
 	} else {
@@ -1320,7 +1322,7 @@ func (as *ActionService) executeCreateAsset(node *models.ActionNode, ctx *models
 
 	var itemCustomFields map[string]interface{}
 	if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
-		if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &itemCustomFields); err != nil {
+		if err = json.Unmarshal([]byte(customFieldValuesJSON.String), &itemCustomFields); err != nil {
 			itemCustomFields = make(map[string]interface{})
 		}
 	} else {
@@ -1362,7 +1364,7 @@ func (as *ActionService) executeCreateAsset(node *models.ActionNode, ctx *models
 		statusID = *config.StatusID
 	} else {
 		// Get default status from asset set
-		err := as.db.QueryRow(`SELECT default_status_id FROM asset_sets WHERE id = ?`, config.AssetSetID).Scan(&statusID)
+		err = as.db.QueryRow(`SELECT default_status_id FROM asset_sets WHERE id = ?`, config.AssetSetID).Scan(&statusID)
 		if err != nil {
 			slog.Warn("failed to get default status for asset set, using 0",
 				slog.String("component", "actions"),
@@ -1420,7 +1422,7 @@ func (as *ActionService) GetStats() map[string]int64 {
 
 // ExecuteActionManually executes a specific action for a given item.
 // This bypasses the normal trigger matching and directly executes the action.
-func (as *ActionService) ExecuteActionManually(action *models.Action, itemID int, actorUserID int) error {
+func (as *ActionService) ExecuteActionManually(action *models.Action, itemID, actorUserID int) error {
 	slog.Debug("executing action manually",
 		slog.String("component", "actions"),
 		slog.Int("action_id", action.ID),

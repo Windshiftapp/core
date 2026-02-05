@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/utils"
@@ -75,7 +76,7 @@ func (h *CollectionHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var collections []models.Collection
 	for rows.Next() {
@@ -268,13 +269,13 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var payload map[string]json.RawMessage
-	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
+	if err = json.Unmarshal(bodyBytes, &payload); err != nil {
 		respondBadRequest(w, r, "Invalid JSON: "+err.Error())
 		return
 	}
 
 	var collection models.Collection
-	if err := json.Unmarshal(bodyBytes, &collection); err != nil {
+	if err = json.Unmarshal(bodyBytes, &collection); err != nil {
 		respondBadRequest(w, r, "Invalid JSON: "+err.Error())
 		return
 	}
@@ -338,7 +339,7 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Validate workspace_id if provided
 	if workspaceProvided && collection.WorkspaceID != nil {
 		var exists bool
-		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", *collection.WorkspaceID).Scan(&exists)
+		err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", *collection.WorkspaceID).Scan(&exists)
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to validate workspace: %w", err))
 			return
@@ -356,7 +357,7 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var exists bool
-		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM collection_categories WHERE id = ?)", *collection.CategoryID).Scan(&exists)
+		err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM collection_categories WHERE id = ?)", *collection.CategoryID).Scan(&exists)
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to validate category: %w", err))
 			return

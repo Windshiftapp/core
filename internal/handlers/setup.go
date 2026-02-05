@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
 	"windshift/internal/auth"
 	"windshift/internal/database"
 	"windshift/internal/logger"
@@ -49,7 +50,7 @@ func (h *SetupHandler) GetSetupStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(status)
+	_ = json.NewEncoder(w).Encode(status)
 }
 
 // CompleteInitialSetup handles the initial setup process
@@ -83,7 +84,7 @@ func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Reque
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Create admin user
 	adminUser := req.AdminUser
@@ -184,7 +185,7 @@ func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Set session cookie
-	if err := h.SessionManager.SetSessionCookie(w, r, session.Token, false); err != nil {
+	if err = h.SessionManager.SetSessionCookie(w, r, session.Token, false); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -197,7 +198,7 @@ func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "Initial setup completed successfully",
 		"status":  status,
@@ -224,7 +225,7 @@ func (h *SetupHandler) GetModuleSettings(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(settings)
+	_ = json.NewEncoder(w).Encode(settings)
 }
 
 // UpdateModuleSettings updates module visibility settings
@@ -256,7 +257,7 @@ func (h *SetupHandler) UpdateModuleSettings(w http.ResponseWriter, r *http.Reque
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	for _, setting := range moduleSettings {
 		_, err = tx.Exec(`
@@ -276,7 +277,7 @@ func (h *SetupHandler) UpdateModuleSettings(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Log audit event
-	logger.LogAudit(h.DB, logger.AuditEvent{
+	_ = logger.LogAudit(h.DB, logger.AuditEvent{
 		UserID:       user.ID,
 		Username:     user.Username,
 		IPAddress:    h.getClientIP(r),
@@ -292,9 +293,9 @@ func (h *SetupHandler) UpdateModuleSettings(w http.ResponseWriter, r *http.Reque
 	})
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": "Module settings updated successfully",
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":  true,
+		"message":  "Module settings updated successfully",
 		"settings": settings,
 	})
 }
@@ -338,7 +339,7 @@ func (h *SetupHandler) getSettingBool(key string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return strings.ToLower(value) == "true", nil
+	return strings.EqualFold(value, "true"), nil
 }
 
 func (h *SetupHandler) validateSetupRequest(req models.SetupRequest) error {
@@ -358,7 +359,7 @@ func (h *SetupHandler) validateSetupRequest(req models.SetupRequest) error {
 	if req.AdminUser.PasswordHash == "" {
 		return fmt.Errorf("admin password is required")
 	}
-	
+
 	// Basic email validation
 	if !strings.Contains(req.AdminUser.Email, "@") {
 		return fmt.Errorf("invalid email format")
@@ -389,6 +390,6 @@ func (h *SetupHandler) getClientIP(r *http.Request) string {
 	if colonIndex := strings.LastIndex(ip, ":"); colonIndex != -1 {
 		ip = ip[:colonIndex]
 	}
-	
+
 	return ip
 }

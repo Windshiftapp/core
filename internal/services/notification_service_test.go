@@ -80,7 +80,7 @@ func TestNotificationService_AssignmentIncludesItemKey(t *testing.T) {
 		CreatorID:   &env.actorUserID,
 		Title:       "Item Assigned",
 		TemplateData: map[string]interface{}{
-			"item.key":  itemKey,
+			"item.key":   itemKey,
 			"item.title": "Important Item",
 		},
 	})

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
@@ -46,7 +47,7 @@ func (h *ItemTypeHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var itemTypes []models.ItemType
 	for rows.Next() {
@@ -78,14 +79,14 @@ func (h *ItemTypeHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			var configSetID int
 			var configSetName string
 			if err := configSetRows.Scan(&configSetID, &configSetName); err != nil {
-				configSetRows.Close()
+				_ = configSetRows.Close()
 				respondInternalError(w, r, err)
 				return
 			}
 			configSetIDs = append(configSetIDs, configSetID)
 			configSetNames = append(configSetNames, configSetName)
 		}
-		configSetRows.Close()
+		_ = configSetRows.Close()
 
 		it.ConfigurationSetIDs = configSetIDs
 		it.ConfigurationSetNames = configSetNames
@@ -143,7 +144,7 @@ func (h *ItemTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer configSetRows.Close()
+	defer func() { _ = configSetRows.Close() }()
 
 	var configSetIDs []int
 	var configSetNames []string
@@ -221,7 +222,7 @@ func (h *ItemTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Insert configuration set associations into junction table (if any are provided)
 	if len(configSetIDs) > 0 {
 		for _, csID := range configSetIDs {
-			_, err := h.db.Exec(`
+			_, err = h.db.Exec(`
 				INSERT INTO configuration_set_item_types (configuration_set_id, item_type_id, created_at)
 				VALUES (?, ?, ?)
 			`, csID, id, now)
@@ -262,7 +263,7 @@ func (h *ItemTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer configSetRows.Close()
+	defer func() { _ = configSetRows.Close() }()
 
 	var configSetIDsResult []int
 	var configSetNames []string
@@ -283,7 +284,7 @@ func (h *ItemTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -331,7 +332,7 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var it models.ItemType
-	if err := json.NewDecoder(r.Body).Decode(&it); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&it); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -363,7 +364,7 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		// Verify all configuration sets exist
 		for _, csID := range it.ConfigurationSetIDs {
 			var configSetExists bool
-			err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", csID).Scan(&configSetExists)
+			err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", csID).Scan(&configSetExists)
 			if err != nil || !configSetExists {
 				respondValidationError(w, r, fmt.Sprintf("Configuration set %d not found", csID))
 				return
@@ -379,7 +380,7 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 		// Insert new associations
 		for _, csID := range it.ConfigurationSetIDs {
-			_, err := h.db.ExecWrite(`
+			_, err = h.db.ExecWrite(`
 				INSERT INTO configuration_set_item_types (configuration_set_id, item_type_id, created_at)
 				VALUES (?, ?, ?)
 			`, csID, id, now)
@@ -416,7 +417,7 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer configSetRows.Close()
+	defer func() { _ = configSetRows.Close() }()
 
 	var configSetIDsResult []int
 	var configSetNames []string
@@ -474,7 +475,7 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 			details["configuration_sets"] = configSetNames
 		}
 
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -525,7 +526,7 @@ func (h *ItemTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -548,7 +549,7 @@ func (h *ItemTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *ItemTypeHandler) createDefaultScreens(itemTypeID int) {
 	contexts := []string{"create", "edit", "view"}
 	for _, context := range contexts {
-		h.db.ExecWrite(`
+		_, _ = h.db.ExecWrite(`
 			INSERT INTO screens (item_type_id, name, description, screen_type, context, created_at, updated_at)
 			VALUES (?, ?, ?, 'issue', ?, datetime('now'), datetime('now'))
 		`, itemTypeID, context+" Screen", "Default "+context+" screen", context)

@@ -36,7 +36,7 @@ func (s *UserReadService) List(pagination PaginationParams) ([]models.User, int,
 	for rows.Next() {
 		var u models.User
 		var avatarURL, timezone, language sql.NullString
-		err := rows.Scan(&u.ID, &u.Email, &u.Username, &u.FirstName, &u.LastName, &u.IsActive,
+		err = rows.Scan(&u.ID, &u.Email, &u.Username, &u.FirstName, &u.LastName, &u.IsActive,
 			&avatarURL, &timezone, &language, &u.CreatedAt)
 		if err != nil {
 			continue

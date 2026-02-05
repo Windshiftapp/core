@@ -14,23 +14,6 @@ import (
 	"windshift/internal/utils"
 )
 
-const notificationSettingColumns = `
-	   (
-	       SELECT csns.notification_setting_id
-	       FROM configuration_set_notification_settings csns
-	       WHERE csns.configuration_set_id = cs.id
-	       ORDER BY csns.created_at DESC
-	       LIMIT 1
-	   ) AS notification_setting_id,
-	   (
-	       SELECT ns.name
-	       FROM configuration_set_notification_settings csns2
-	       JOIN notification_settings ns ON ns.id = csns2.notification_setting_id
-	       WHERE csns2.configuration_set_id = cs.id
-	       ORDER BY csns2.created_at DESC
-	       LIMIT 1
-	   ) AS notification_setting_name`
-
 type ConfigurationSetHandler struct {
 	db                  database.Database
 	repo                *repository.ConfigurationSetRepository
@@ -136,7 +119,7 @@ func (h *ConfigurationSetHandler) Create(w http.ResponseWriter, r *http.Request)
 		respondInternalError(w, r, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Create the configuration set
 	id, err := h.repo.Create(tx, &cs)
@@ -149,34 +132,34 @@ func (h *ConfigurationSetHandler) Create(w http.ResponseWriter, r *http.Request)
 	// Save notification setting
 	var notificationSettingID *int
 	if cs.NotificationSettingID != nil {
-		nsID := int(*cs.NotificationSettingID)
+		nsID := *cs.NotificationSettingID
 		notificationSettingID = &nsID
 	}
-	if err := h.repo.SaveNotificationSetting(tx, configSetID, notificationSettingID); err != nil {
+	if err = h.repo.SaveNotificationSetting(tx, configSetID, notificationSettingID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
 	// Save workspace assignments
-	if err := h.repo.SaveWorkspaceAssignments(tx, configSetID, cs.WorkspaceIDs); err != nil {
+	if err = h.repo.SaveWorkspaceAssignments(tx, configSetID, cs.WorkspaceIDs); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
 	// Save screen assignments
-	if err := h.repo.SaveScreenAssignments(tx, configSetID, cs.CreateScreenID, cs.EditScreenID, cs.ViewScreenID); err != nil {
+	if err = h.repo.SaveScreenAssignments(tx, configSetID, cs.CreateScreenID, cs.EditScreenID, cs.ViewScreenID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
 	// Save item type configurations
-	if err := h.repo.SaveItemTypeConfigs(tx, configSetID, cs.ItemTypeConfigs); err != nil {
+	if err = h.repo.SaveItemTypeConfigs(tx, configSetID, cs.ItemTypeConfigs); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
 	// Save priority assignments
-	if err := h.repo.SavePriorityAssignments(tx, configSetID, cs.PriorityIDs); err != nil {
+	if err = h.repo.SavePriorityAssignments(tx, configSetID, cs.PriorityIDs); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -190,7 +173,7 @@ func (h *ConfigurationSetHandler) Create(w http.ResponseWriter, r *http.Request)
 	// Refresh notification cache if service is available
 	var warnings []models.APIWarning
 	if h.notificationService != nil {
-		if err := h.notificationService.ForceRefreshCache(); err != nil {
+		if err = h.notificationService.ForceRefreshCache(); err != nil {
 			warnings = append(warnings, createCacheWarning("notification", err, fmt.Sprintf("configuration_set_id:%d", id)))
 		}
 	}
@@ -205,7 +188,7 @@ func (h *ConfigurationSetHandler) Create(w http.ResponseWriter, r *http.Request)
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
@@ -256,7 +239,7 @@ func (h *ConfigurationSetHandler) Delete(w http.ResponseWriter, r *http.Request)
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logger.LogAudit(h.db, logger.AuditEvent{
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),

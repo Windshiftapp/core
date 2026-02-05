@@ -136,9 +136,9 @@ func TestQLFiltering(t *testing.T) {
 
 		// Create statuses
 		statusIDs := CreateTestStatuses(t, server, "QL", categoryIDs)
-		statusOpen = statusIDs[0]        // To Do category
-		statusInProgress = statusIDs[2]  // In Progress category
-		statusClosed = statusIDs[4]      // Done category
+		statusOpen = statusIDs[0]       // To Do category
+		statusInProgress = statusIDs[2] // In Progress category
+		statusClosed = statusIDs[4]     // Done category
 
 		// Get existing priorities (Low, Medium, High are built-in)
 		prioritiesResp := MakeAuthRequest(t, server, http.MethodGet, "/priorities", nil)

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
 	"windshift/internal/middleware"
 	"windshift/internal/models"
 )
@@ -22,7 +23,7 @@ func (h *WorkspaceHandler) loadTimeProjectCategories(workspaceID int) ([]int, er
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	categories := []int{} // Initialize as empty slice instead of nil
 	for rows.Next() {
@@ -42,7 +43,7 @@ func (h *WorkspaceHandler) saveTimeProjectCategories(workspaceID int, categories
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Delete existing associations
 	_, err = tx.Exec("DELETE FROM workspace_time_project_categories WHERE workspace_id = ?", workspaceID)
@@ -283,7 +284,7 @@ func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var statuses []models.Status
 	for rows.Next() {

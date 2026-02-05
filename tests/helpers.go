@@ -1,3 +1,4 @@
+// Package tests provides integration test helpers and utilities.
 package tests
 
 import (
@@ -38,7 +39,7 @@ type TestServer struct {
 // StartTestServer starts a windshift server with an isolated database
 // and returns a TestServer instance with cleanup function.
 // This uses an in-process server for faster, more reliable tests.
-func StartTestServer(t *testing.T, dbType string) (*TestServer, func()) {
+func StartTestServer(t *testing.T, dbType string) (ts *TestServer, cleanup func()) {
 	t.Helper()
 
 	// Generate unique database name
@@ -47,29 +48,30 @@ func StartTestServer(t *testing.T, dbType string) (*TestServer, func()) {
 
 	var dbPath string
 
-	if dbType == "sqlite" {
+	switch dbType {
+	case "sqlite":
 		// Use temp directory to avoid polluting project root
 		tempDir := filepath.Join(os.TempDir(), "windshift-tests")
-		if err := os.MkdirAll(tempDir, 0755); err != nil {
+		if err := os.MkdirAll(tempDir, 0o750); err != nil {
 			t.Fatalf("Failed to create test temp dir: %v", err)
 		}
 		dbPath = filepath.Join(tempDir, fmt.Sprintf("test_%d_%d.db", timestamp, pid))
-	} else if dbType == "postgres" {
+	case "postgres":
 		// PostgreSQL setup would go here
 		t.Skip("PostgreSQL testing not yet implemented")
-	} else {
+	default:
 		t.Fatalf("Unknown database type: %s", dbType)
 	}
 
 	// Set required environment variables for testing
-	os.Setenv("SESSION_SECRET", "test-session-secret-for-integration-tests")
+	_ = os.Setenv("SESSION_SECRET", "test-session-secret-for-integration-tests")
 
 	// Create server configuration for testing
 	cfg := server.Config{
 		Port:          "0", // Use port 0 for OS-assigned free port
 		DBPath:        dbPath,
-		DisableCSRF:   true,                              // Disable CSRF for testing
-		SilentMode:    os.Getenv("TEST_VERBOSE") == "",   // Suppress logs unless TEST_VERBOSE is set
+		DisableCSRF:   true,                            // Disable CSRF for testing
+		SilentMode:    os.Getenv("TEST_VERBOSE") == "", // Suppress logs unless TEST_VERBOSE is set
 		MaxReadConns:  10,
 		MaxWriteConns: 1,
 	}
@@ -82,7 +84,7 @@ func StartTestServer(t *testing.T, dbType string) (*TestServer, func()) {
 
 	// Start the server
 	if err := srv.Start(); err != nil {
-		srv.Shutdown(context.Background())
+		_ = srv.Shutdown(context.Background())
 		t.Fatalf("Failed to start test server: %v", err)
 	}
 
@@ -90,7 +92,7 @@ func StartTestServer(t *testing.T, dbType string) (*TestServer, func()) {
 	baseURL := fmt.Sprintf("http://localhost:%d", port)
 	apiBase := baseURL + "/api"
 
-	ts := &TestServer{
+	ts = &TestServer{
 		Port:    port,
 		BaseURL: baseURL,
 		APIBase: apiBase,
@@ -100,7 +102,7 @@ func StartTestServer(t *testing.T, dbType string) (*TestServer, func()) {
 	}
 
 	// Cleanup function with graceful shutdown
-	cleanup := func() {
+	cleanup = func() {
 		// Ensure we always clean up database files, even if server cleanup fails
 		defer func() {
 			if dbPath != "" && dbType == "sqlite" {
@@ -109,9 +111,9 @@ func StartTestServer(t *testing.T, dbType string) (*TestServer, func()) {
 					t.Logf("Warning: Failed to remove database file %s: %v", dbPath, err)
 				}
 				// Also remove WAL files (ignore errors if they don't exist)
-				os.Remove(dbPath + "-shm")
-				os.Remove(dbPath + "-wal")
-				os.Remove(dbPath + "-journal")
+				_ = os.Remove(dbPath + "-shm")
+				_ = os.Remove(dbPath + "-wal")
+				_ = os.Remove(dbPath + "-journal")
 			}
 		}()
 
@@ -131,7 +133,7 @@ func StartTestServer(t *testing.T, dbType string) (*TestServer, func()) {
 }
 
 // CreateBearerToken completes the full authentication flow and returns a bearer token
-func CreateBearerToken(t *testing.T, server *TestServer) string {
+func CreateBearerToken(t *testing.T, testServer *TestServer) string {
 	t.Helper()
 
 	// Step 1: Complete initial setup
@@ -150,9 +152,9 @@ func CreateBearerToken(t *testing.T, server *TestServer) string {
 	}
 
 	// Get CSRF token for setup
-	csrfToken1 := getCSRFToken(t, server.APIBase)
+	csrfToken1 := getCSRFToken(t, testServer.APIBase)
 
-	setupResp := makeRequest(t, http.MethodPost, server.APIBase+"/setup/complete", "", setupData, map[string]string{
+	setupResp := makeRequest(t, http.MethodPost, testServer.APIBase+"/setup/complete", "", setupData, map[string]string{
 		"X-CSRF-Token": csrfToken1,
 	})
 
@@ -163,14 +165,14 @@ func CreateBearerToken(t *testing.T, server *TestServer) string {
 	setupResp.Body.Close()
 
 	// Step 2: Login to get session cookie
-	csrfToken2 := getCSRFToken(t, server.APIBase)
+	csrfToken2 := getCSRFToken(t, testServer.APIBase)
 
 	loginData := map[string]string{
 		"email_or_username": "admin",
 		"password":          "testpass123",
 	}
 
-	loginResp := makeRequest(t, http.MethodPost, server.APIBase+"/auth/login", "", loginData, map[string]string{
+	loginResp := makeRequest(t, http.MethodPost, testServer.APIBase+"/auth/login", "", loginData, map[string]string{
 		"X-CSRF-Token": csrfToken2,
 	})
 
@@ -195,14 +197,14 @@ func CreateBearerToken(t *testing.T, server *TestServer) string {
 	loginResp.Body.Close()
 
 	// Step 3: Create API bearer token
-	csrfToken3 := getCSRFTokenWithCookie(t, server.APIBase, sessionCookie)
+	csrfToken3 := getCSRFTokenWithCookie(t, testServer.APIBase, sessionCookie)
 
 	tokenData := map[string]interface{}{
 		"name":        "Test API Token",
 		"permissions": []string{"read", "write", "admin"},
 	}
 
-	tokenResp := makeRequest(t, http.MethodPost, server.APIBase+"/api-tokens", "", tokenData, map[string]string{
+	tokenResp := makeRequest(t, http.MethodPost, testServer.APIBase+"/api-tokens", "", tokenData, map[string]string{
 		"X-CSRF-Token": csrfToken3,
 		"Cookie":       sessionCookie,
 	})
@@ -225,7 +227,7 @@ func CreateBearerToken(t *testing.T, server *TestServer) string {
 		t.Fatal("Empty bearer token received")
 	}
 
-	server.BearerToken = tokenResult.Token
+	testServer.BearerToken = tokenResult.Token
 	return tokenResult.Token
 }
 
@@ -254,7 +256,7 @@ func getCSRFToken(t *testing.T, apiBase string) string {
 func getCSRFTokenWithCookie(t *testing.T, apiBase, cookie string) string {
 	t.Helper()
 
-	req, err := http.NewRequest(http.MethodGet, apiBase+"/csrf-token", nil)
+	req, err := http.NewRequest(http.MethodGet, apiBase+"/csrf-token", http.NoBody)
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
 	}
@@ -317,18 +319,18 @@ func makeRequest(t *testing.T, method, url, bearerToken string, body interface{}
 }
 
 // MakeAuthRequest makes an authenticated request using the server's bearer token
-func MakeAuthRequest(t *testing.T, server *TestServer, method, endpoint string, body interface{}) *http.Response {
+func MakeAuthRequest(t *testing.T, testServer *TestServer, method, endpoint string, body interface{}) *http.Response {
 	t.Helper()
 
-	url := server.APIBase + endpoint
-	return makeRequest(t, method, url, server.BearerToken, body, nil)
+	url := testServer.APIBase + endpoint
+	return makeRequest(t, method, url, testServer.BearerToken, body, nil)
 }
 
 // MakeAuthRequestRaw makes an authenticated request with a raw string body (for testing invalid JSON)
-func MakeAuthRequestRaw(t *testing.T, server *TestServer, method, endpoint string, rawBody string) *http.Response {
+func MakeAuthRequestRaw(t *testing.T, testServer *TestServer, method, endpoint, rawBody string) *http.Response {
 	t.Helper()
 
-	url := server.APIBase + endpoint
+	url := testServer.APIBase + endpoint
 
 	req, err := http.NewRequest(method, url, strings.NewReader(rawBody))
 	if err != nil {
@@ -336,7 +338,7 @@ func MakeAuthRequestRaw(t *testing.T, server *TestServer, method, endpoint strin
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+server.BearerToken)
+	req.Header.Set("Authorization", "Bearer "+testServer.BearerToken)
 
 	resp, err := testHTTPClient.Do(req)
 	if err != nil {
@@ -393,7 +395,7 @@ func ExtractIDFromResponse(t *testing.T, result map[string]interface{}) int {
 }
 
 // CreateTestWorkspace creates a test workspace and returns its ID and key
-func CreateTestWorkspace(t *testing.T, server *TestServer, name, key string) (int, string) {
+func CreateTestWorkspace(t *testing.T, testServer *TestServer, name, key string) (workspaceID int, workspaceKey string) {
 	t.Helper()
 
 	// Generate short key if not already present
@@ -408,7 +410,7 @@ func CreateTestWorkspace(t *testing.T, server *TestServer, name, key string) (in
 		"active":      true,
 	}
 
-	resp := MakeAuthRequest(t, server, http.MethodPost, "/workspaces", workspaceData)
+	resp := MakeAuthRequest(t, testServer, http.MethodPost, "/workspaces", workspaceData)
 	defer resp.Body.Close()
 
 	AssertStatusCode(t, resp, http.StatusCreated)
@@ -416,14 +418,14 @@ func CreateTestWorkspace(t *testing.T, server *TestServer, name, key string) (in
 	var result map[string]interface{}
 	DecodeJSON(t, resp, &result)
 
-	workspaceID := ExtractIDFromResponse(t, result)
-	workspaceKey, _ := result["key"].(string)
+	workspaceID = ExtractIDFromResponse(t, result)
+	workspaceKey, _ = result["key"].(string)
 
 	return workspaceID, workspaceKey
 }
 
 // CreateTestCustomField creates a custom field and returns its ID
-func CreateTestCustomField(t *testing.T, server *TestServer, name, fieldType, options string) int {
+func CreateTestCustomField(t *testing.T, testServer *TestServer, name, fieldType, options string) int {
 	t.Helper()
 
 	fieldData := map[string]interface{}{
@@ -437,7 +439,7 @@ func CreateTestCustomField(t *testing.T, server *TestServer, name, fieldType, op
 		fieldData["options"] = options
 	}
 
-	resp := MakeAuthRequest(t, server, http.MethodPost, "/custom-fields", fieldData)
+	resp := MakeAuthRequest(t, testServer, http.MethodPost, "/custom-fields", fieldData)
 	defer resp.Body.Close()
 
 	AssertStatusCode(t, resp, http.StatusCreated)
@@ -449,7 +451,7 @@ func CreateTestCustomField(t *testing.T, server *TestServer, name, fieldType, op
 }
 
 // CreateTestStatusCategories creates 3 standard status categories and returns their IDs
-func CreateTestStatusCategories(t *testing.T, server *TestServer, prefix string) []int {
+func CreateTestStatusCategories(t *testing.T, testServer *TestServer, prefix string) []int {
 	t.Helper()
 
 	timestamp := time.Now().Unix()
@@ -477,10 +479,9 @@ func CreateTestStatusCategories(t *testing.T, server *TestServer, prefix string)
 		},
 	}
 
-	var categoryIDs []int
+	categoryIDs := make([]int, 0, len(categories))
 	for _, catData := range categories {
-		resp := MakeAuthRequest(t, server, http.MethodPost, "/status-categories", catData)
-		defer resp.Body.Close()
+		resp := MakeAuthRequest(t, testServer, http.MethodPost, "/status-categories", catData)
 
 		AssertStatusCode(t, resp, http.StatusCreated)
 
@@ -488,13 +489,14 @@ func CreateTestStatusCategories(t *testing.T, server *TestServer, prefix string)
 		DecodeJSON(t, resp, &result)
 
 		categoryIDs = append(categoryIDs, ExtractIDFromResponse(t, result))
+		resp.Body.Close()
 	}
 
 	return categoryIDs
 }
 
 // CreateTestStatuses creates 6 standard statuses across 3 categories and returns their IDs
-func CreateTestStatuses(t *testing.T, server *TestServer, prefix string, categoryIDs []int) []int {
+func CreateTestStatuses(t *testing.T, testServer *TestServer, prefix string, categoryIDs []int) []int {
 	t.Helper()
 
 	if len(categoryIDs) != 3 {
@@ -534,17 +536,16 @@ func CreateTestStatuses(t *testing.T, server *TestServer, prefix string, categor
 			"is_default":  false,
 		},
 		{
-			"name":        fmt.Sprintf("%s Cancelled %d", prefix, timestamp),
-			"description": "Cancelled",
+			"name":        fmt.Sprintf("%s Canceled %d", prefix, timestamp),
+			"description": "Canceled",
 			"category_id": categoryIDs[2],
 			"is_default":  false,
 		},
 	}
 
-	var statusIDs []int
+	statusIDs := make([]int, 0, len(statuses))
 	for _, statusData := range statuses {
-		resp := MakeAuthRequest(t, server, http.MethodPost, "/statuses", statusData)
-		defer resp.Body.Close()
+		resp := MakeAuthRequest(t, testServer, http.MethodPost, "/statuses", statusData)
 
 		AssertStatusCode(t, resp, http.StatusCreated)
 
@@ -552,16 +553,17 @@ func CreateTestStatuses(t *testing.T, server *TestServer, prefix string, categor
 		DecodeJSON(t, resp, &result)
 
 		statusIDs = append(statusIDs, ExtractIDFromResponse(t, result))
+		resp.Body.Close()
 	}
 
 	return statusIDs
 }
 
 // GetDefaultConfigurationSet retrieves the default configuration set ID
-func GetDefaultConfigurationSet(t *testing.T, server *TestServer) int {
+func GetDefaultConfigurationSet(t *testing.T, testServer *TestServer) int {
 	t.Helper()
 
-	resp := MakeAuthRequest(t, server, http.MethodGet, "/configuration-sets", nil)
+	resp := MakeAuthRequest(t, testServer, http.MethodGet, "/configuration-sets", nil)
 	defer resp.Body.Close()
 
 	AssertStatusCode(t, resp, http.StatusOK)
@@ -591,12 +593,12 @@ func GetDefaultConfigurationSet(t *testing.T, server *TestServer) int {
 }
 
 // GetItemTypes retrieves all item types for a configuration set as a map of name->ID
-func GetItemTypes(t *testing.T, server *TestServer, configSetID int) map[string]int {
+func GetItemTypes(t *testing.T, testServer *TestServer, configSetID int) map[string]int {
 	t.Helper()
 
 	// First try with config set filter
 	endpoint := fmt.Sprintf("/item-types?configuration_set_id=%d", configSetID)
-	resp := MakeAuthRequest(t, server, http.MethodGet, endpoint, nil)
+	resp := MakeAuthRequest(t, testServer, http.MethodGet, endpoint, nil)
 	defer resp.Body.Close()
 
 	AssertStatusCode(t, resp, http.StatusOK)
@@ -611,7 +613,7 @@ func GetItemTypes(t *testing.T, server *TestServer, configSetID int) map[string]
 	// If no item types found for config set, fall back to all item types
 	// This handles the case where item types aren't yet associated with configuration sets
 	if len(itemTypes) == 0 {
-		allResp := MakeAuthRequest(t, server, http.MethodGet, "/item-types", nil)
+		allResp := MakeAuthRequest(t, testServer, http.MethodGet, "/item-types", nil)
 		allBodyBytes, _ := io.ReadAll(allResp.Body)
 		allResp.Body.Close()
 		if err := json.Unmarshal(allBodyBytes, &itemTypes); err != nil {
@@ -642,7 +644,7 @@ func shortKey(prefix string) string {
 	if len(prefix) > maxPrefixLen {
 		prefix = prefix[:maxPrefixLen]
 	}
-	return fmt.Sprintf("%s%d", prefix, mathrand.Intn(10000))
+	return fmt.Sprintf("%s%d", prefix, mathrand.Intn(10000)) //nolint:gosec // G404: test helper, crypto random not needed
 }
 
 // ============================================================================
@@ -651,10 +653,10 @@ func shortKey(prefix string) string {
 
 // CreateTestUserWithCredentials creates a user via the API and returns userID, username, and password.
 // Requires admin token to be set on the server.
-func CreateTestUserWithCredentials(t *testing.T, server *TestServer, username, email string) (int, string, string) {
+func CreateTestUserWithCredentials(t *testing.T, testServer *TestServer, username, email string) (userID int, uname, password string) {
 	t.Helper()
 
-	password := "testpass123"
+	password = "testpass123"
 
 	userData := map[string]interface{}{
 		"email":      email,
@@ -665,7 +667,7 @@ func CreateTestUserWithCredentials(t *testing.T, server *TestServer, username, e
 		"password":   password,
 	}
 
-	resp := MakeAuthRequest(t, server, http.MethodPost, "/users", userData)
+	resp := MakeAuthRequest(t, testServer, http.MethodPost, "/users", userData)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
@@ -676,23 +678,23 @@ func CreateTestUserWithCredentials(t *testing.T, server *TestServer, username, e
 	var result map[string]interface{}
 	DecodeJSON(t, resp, &result)
 
-	userID := ExtractIDFromResponse(t, result)
+	userID = ExtractIDFromResponse(t, result)
 	return userID, username, password
 }
 
 // CreateBearerTokenForUser logs in as the specified user and creates a bearer token.
-func CreateBearerTokenForUser(t *testing.T, server *TestServer, username, password string) string {
+func CreateBearerTokenForUser(t *testing.T, testServer *TestServer, username, password string) string {
 	t.Helper()
 
 	// Login to get session cookie
-	csrfToken := getCSRFToken(t, server.APIBase)
+	csrfToken := getCSRFToken(t, testServer.APIBase)
 
 	loginData := map[string]string{
 		"email_or_username": username,
 		"password":          password,
 	}
 
-	loginResp := makeRequest(t, http.MethodPost, server.APIBase+"/auth/login", "", loginData, map[string]string{
+	loginResp := makeRequest(t, http.MethodPost, testServer.APIBase+"/auth/login", "", loginData, map[string]string{
 		"X-CSRF-Token": csrfToken,
 	})
 
@@ -717,14 +719,14 @@ func CreateBearerTokenForUser(t *testing.T, server *TestServer, username, passwo
 	loginResp.Body.Close()
 
 	// Create API bearer token
-	csrfToken2 := getCSRFTokenWithCookie(t, server.APIBase, sessionCookie)
+	csrfToken2 := getCSRFTokenWithCookie(t, testServer.APIBase, sessionCookie)
 
 	tokenData := map[string]interface{}{
 		"name":        fmt.Sprintf("Test Token for %s", username),
 		"permissions": []string{"read", "write", "admin"},
 	}
 
-	tokenResp := makeRequest(t, http.MethodPost, server.APIBase+"/api-tokens", "", tokenData, map[string]string{
+	tokenResp := makeRequest(t, http.MethodPost, testServer.APIBase+"/api-tokens", "", tokenData, map[string]string{
 		"X-CSRF-Token": csrfToken2,
 		"Cookie":       sessionCookie,
 	})
@@ -751,18 +753,18 @@ func CreateBearerTokenForUser(t *testing.T, server *TestServer, username, passwo
 }
 
 // MakeAuthRequestWithToken makes an authenticated request using a specific bearer token.
-func MakeAuthRequestWithToken(t *testing.T, server *TestServer, token, method, endpoint string, body interface{}) *http.Response {
+func MakeAuthRequestWithToken(t *testing.T, testServer *TestServer, token, method, endpoint string, body interface{}) *http.Response {
 	t.Helper()
 
-	url := server.APIBase + endpoint
+	url := testServer.APIBase + endpoint
 	return makeRequest(t, method, url, token, body, nil)
 }
 
 // GetWorkspaceRoles retrieves all workspace roles and returns a map of name -> ID.
-func GetWorkspaceRoles(t *testing.T, server *TestServer) map[string]int {
+func GetWorkspaceRoles(t *testing.T, testServer *TestServer) map[string]int {
 	t.Helper()
 
-	resp := MakeAuthRequest(t, server, http.MethodGet, "/workspace-roles", nil)
+	resp := MakeAuthRequest(t, testServer, http.MethodGet, "/workspace-roles", nil)
 	defer resp.Body.Close()
 
 	AssertStatusCode(t, resp, http.StatusOK)
@@ -784,10 +786,10 @@ func GetWorkspaceRoles(t *testing.T, server *TestServer) map[string]int {
 
 // GetPermissions retrieves all permissions and returns a map of permission_key -> ID.
 // Note: This requires system admin permissions.
-func GetPermissions(t *testing.T, server *TestServer) map[string]int {
+func GetPermissions(t *testing.T, testServer *TestServer) map[string]int {
 	t.Helper()
 
-	resp := MakeAuthRequest(t, server, http.MethodGet, "/permissions", nil)
+	resp := MakeAuthRequest(t, testServer, http.MethodGet, "/permissions", nil)
 	defer resp.Body.Close()
 
 	AssertStatusCode(t, resp, http.StatusOK)
@@ -809,11 +811,11 @@ func GetPermissions(t *testing.T, server *TestServer) map[string]int {
 
 // AssignWorkspaceRole assigns a role to a user in a workspace.
 // roleName should be "Viewer", "Editor", or "Administrator".
-func AssignWorkspaceRole(t *testing.T, server *TestServer, userID, workspaceID int, roleName string) {
+func AssignWorkspaceRole(t *testing.T, testServer *TestServer, userID, workspaceID int, roleName string) {
 	t.Helper()
 
 	// Get role ID from name
-	roles := GetWorkspaceRoles(t, server)
+	roles := GetWorkspaceRoles(t, testServer)
 	roleID, ok := roles[roleName]
 	if !ok {
 		t.Fatalf("Role %s not found. Available roles: %v", roleName, roles)
@@ -825,7 +827,7 @@ func AssignWorkspaceRole(t *testing.T, server *TestServer, userID, workspaceID i
 		"role_id":      roleID,
 	}
 
-	resp := MakeAuthRequest(t, server, http.MethodPost, "/workspace-roles/assign", assignData)
+	resp := MakeAuthRequest(t, testServer, http.MethodPost, "/workspace-roles/assign", assignData)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
@@ -836,11 +838,11 @@ func AssignWorkspaceRole(t *testing.T, server *TestServer, userID, workspaceID i
 }
 
 // RevokeWorkspaceRole removes a user's role assignment in a workspace.
-func RevokeWorkspaceRole(t *testing.T, server *TestServer, userID, workspaceID, roleID int) {
+func RevokeWorkspaceRole(t *testing.T, testServer *TestServer, userID, workspaceID, roleID int) {
 	t.Helper()
 
 	endpoint := fmt.Sprintf("/users/%d/workspaces/%d/roles/%d", userID, workspaceID, roleID)
-	resp := MakeAuthRequest(t, server, http.MethodDelete, endpoint, nil)
+	resp := MakeAuthRequest(t, testServer, http.MethodDelete, endpoint, nil)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
@@ -851,11 +853,11 @@ func RevokeWorkspaceRole(t *testing.T, server *TestServer, userID, workspaceID, 
 }
 
 // GrantGlobalPermission grants a global permission to a user.
-func GrantGlobalPermission(t *testing.T, server *TestServer, userID int, permissionKey string) {
+func GrantGlobalPermission(t *testing.T, testServer *TestServer, userID int, permissionKey string) {
 	t.Helper()
 
 	// Get permission ID from key
-	permissions := GetPermissions(t, server)
+	permissions := GetPermissions(t, testServer)
 	permissionID, ok := permissions[permissionKey]
 	if !ok {
 		t.Fatalf("Permission %s not found. Available permissions: %v", permissionKey, permissions)
@@ -866,7 +868,7 @@ func GrantGlobalPermission(t *testing.T, server *TestServer, userID int, permiss
 		"permission_id": permissionID,
 	}
 
-	resp := MakeAuthRequest(t, server, http.MethodPost, "/permissions/global/grant", grantData)
+	resp := MakeAuthRequest(t, testServer, http.MethodPost, "/permissions/global/grant", grantData)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
@@ -877,11 +879,11 @@ func GrantGlobalPermission(t *testing.T, server *TestServer, userID int, permiss
 }
 
 // RevokeGlobalPermission removes a global permission from a user.
-func RevokeGlobalPermission(t *testing.T, server *TestServer, userID, permissionID int) {
+func RevokeGlobalPermission(t *testing.T, testServer *TestServer, userID, permissionID int) {
 	t.Helper()
 
 	endpoint := fmt.Sprintf("/users/%d/permissions/global/%d", userID, permissionID)
-	resp := MakeAuthRequest(t, server, http.MethodDelete, endpoint, nil)
+	resp := MakeAuthRequest(t, testServer, http.MethodDelete, endpoint, nil)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
@@ -893,7 +895,7 @@ func RevokeGlobalPermission(t *testing.T, server *TestServer, userID, permission
 
 // SetEveryoneRole sets or removes the Everyone role for a workspace.
 // Pass nil to remove Everyone access (lock down the workspace).
-func SetEveryoneRole(t *testing.T, server *TestServer, workspaceID int, roleID *int) {
+func SetEveryoneRole(t *testing.T, testServer *TestServer, workspaceID int, roleID *int) {
 	t.Helper()
 
 	endpoint := fmt.Sprintf("/workspaces/%d/everyone-role", workspaceID)
@@ -901,7 +903,7 @@ func SetEveryoneRole(t *testing.T, server *TestServer, workspaceID int, roleID *
 		"role_id": roleID,
 	}
 
-	resp := MakeAuthRequest(t, server, http.MethodPut, endpoint, data)
+	resp := MakeAuthRequest(t, testServer, http.MethodPut, endpoint, data)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -913,18 +915,18 @@ func SetEveryoneRole(t *testing.T, server *TestServer, workspaceID int, roleID *
 
 // LockDownWorkspace removes the Everyone role access from a workspace,
 // requiring explicit role assignments for access.
-func LockDownWorkspace(t *testing.T, server *TestServer, workspaceID int) {
+func LockDownWorkspace(t *testing.T, testServer *TestServer, workspaceID int) {
 	t.Helper()
-	SetEveryoneRole(t, server, workspaceID, nil)
+	SetEveryoneRole(t, testServer, workspaceID, nil)
 }
 
 // CreateTestItem creates a work item in a workspace and returns its ID.
-func CreateTestItem(t *testing.T, server *TestServer, workspaceID int, title string) int {
+func CreateTestItem(t *testing.T, testServer *TestServer, workspaceID int, title string) int {
 	t.Helper()
 
 	// Get default configuration set and item type
-	configSetID := GetDefaultConfigurationSet(t, server)
-	itemTypes := GetItemTypes(t, server, configSetID)
+	configSetID := GetDefaultConfigurationSet(t, testServer)
+	itemTypes := GetItemTypes(t, testServer, configSetID)
 
 	// Find the first item type (usually "Task" or similar)
 	var itemTypeID int
@@ -943,7 +945,7 @@ func CreateTestItem(t *testing.T, server *TestServer, workspaceID int, title str
 		"item_type_id": itemTypeID,
 	}
 
-	resp := MakeAuthRequest(t, server, http.MethodPost, "/items", itemData)
+	resp := MakeAuthRequest(t, testServer, http.MethodPost, "/items", itemData)
 	defer resp.Body.Close()
 
 	AssertStatusCode(t, resp, http.StatusCreated)
@@ -959,14 +961,14 @@ func CreateTestItem(t *testing.T, server *TestServer, workspaceID int, title str
 // ============================================================================
 
 // CreateSCIMToken creates a SCIM token via the admin API and returns the raw token string.
-func CreateSCIMToken(t *testing.T, server *TestServer, name string) string {
+func CreateSCIMToken(t *testing.T, testServer *TestServer, name string) string {
 	t.Helper()
 
 	tokenData := map[string]interface{}{
 		"name": name,
 	}
 
-	resp := MakeAuthRequest(t, server, http.MethodPost, "/scim-tokens", tokenData)
+	resp := MakeAuthRequest(t, testServer, http.MethodPost, "/scim-tokens", tokenData)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
@@ -988,10 +990,10 @@ func CreateSCIMToken(t *testing.T, server *TestServer, name string) string {
 
 // MakeSCIMRequest makes a request to a SCIM endpoint with SCIM token authentication.
 // The endpoint should start with /scim/v2/ (e.g., "/scim/v2/Users")
-func MakeSCIMRequest(t *testing.T, server *TestServer, scimToken, method, endpoint string, body interface{}) *http.Response {
+func MakeSCIMRequest(t *testing.T, testServer *TestServer, scimToken, method, endpoint string, body interface{}) *http.Response {
 	t.Helper()
 
-	url := server.BaseURL + endpoint
+	url := testServer.BaseURL + endpoint
 	return makeRequest(t, method, url, scimToken, body, map[string]string{
 		"Content-Type": "application/scim+json",
 	})
@@ -999,12 +1001,12 @@ func MakeSCIMRequest(t *testing.T, server *TestServer, scimToken, method, endpoi
 
 // MakeSCIMRequestNoAuth makes a request to a SCIM endpoint without authentication.
 // Used for testing public endpoints like ServiceProviderConfig.
-func MakeSCIMRequestNoAuth(t *testing.T, server *TestServer, method, endpoint string) *http.Response {
+func MakeSCIMRequestNoAuth(t *testing.T, testServer *TestServer, method, endpoint string) *http.Response {
 	t.Helper()
 
-	url := server.BaseURL + endpoint
+	url := testServer.BaseURL + endpoint
 
-	req, err := http.NewRequest(method, url, nil)
+	req, err := http.NewRequest(method, url, http.NoBody)
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
 	}
@@ -1018,12 +1020,12 @@ func MakeSCIMRequestNoAuth(t *testing.T, server *TestServer, method, endpoint st
 }
 
 // CreateTestItemWithToken creates a work item using a specific bearer token.
-func CreateTestItemWithToken(t *testing.T, server *TestServer, token string, workspaceID int, title string) (*http.Response, int) {
+func CreateTestItemWithToken(t *testing.T, testServer *TestServer, token string, workspaceID int, title string) (resp *http.Response, itemID int) {
 	t.Helper()
 
 	// Get default configuration set and item type (using admin token)
-	configSetID := GetDefaultConfigurationSet(t, server)
-	itemTypes := GetItemTypes(t, server, configSetID)
+	configSetID := GetDefaultConfigurationSet(t, testServer)
+	itemTypes := GetItemTypes(t, testServer, configSetID)
 
 	// Find the first item type
 	var itemTypeID int
@@ -1042,14 +1044,13 @@ func CreateTestItemWithToken(t *testing.T, server *TestServer, token string, wor
 		"item_type_id": itemTypeID,
 	}
 
-	resp := MakeAuthRequestWithToken(t, server, token, http.MethodPost, "/items", itemData)
+	resp = MakeAuthRequestWithToken(t, testServer, token, http.MethodPost, "/items", itemData)
 
 	if resp.StatusCode == http.StatusCreated {
 		var result map[string]interface{}
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		json.Unmarshal(bodyBytes, &result)
-		itemID := 0
+		_ = json.Unmarshal(bodyBytes, &result)
 		if id, ok := result["id"].(float64); ok {
 			itemID = int(id)
 		}
@@ -1079,7 +1080,7 @@ type EmailChannelConfig struct {
 }
 
 // CreateEmailProvider creates an email provider for testing
-func CreateEmailProvider(t *testing.T, server *TestServer, name string, providerType string) int {
+func CreateEmailProvider(t *testing.T, testServer *TestServer, name, providerType string) int {
 	t.Helper()
 
 	// Generate a slug from the name
@@ -1092,7 +1093,7 @@ func CreateEmailProvider(t *testing.T, server *TestServer, name string, provider
 		"is_enabled": true,
 	}
 
-	resp := MakeAuthRequest(t, server, http.MethodPost, "/email-providers", data)
+	resp := MakeAuthRequest(t, testServer, http.MethodPost, "/email-providers", data)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
@@ -1113,7 +1114,7 @@ func CreateEmailProvider(t *testing.T, server *TestServer, name string, provider
 }
 
 // CreateInboundEmailChannel creates an inbound email channel for testing
-func CreateInboundEmailChannel(t *testing.T, server *TestServer, config EmailChannelConfig) int {
+func CreateInboundEmailChannel(t *testing.T, testServer *TestServer, config EmailChannelConfig) int {
 	t.Helper()
 
 	encryption := config.Encryption
@@ -1122,12 +1123,12 @@ func CreateInboundEmailChannel(t *testing.T, server *TestServer, config EmailCha
 	}
 
 	channelConfig := map[string]interface{}{
-		"email_provider_id":    config.EmailProviderID,
-		"email_workspace_id":   config.WorkspaceID,
-		"email_item_type_id":   config.ItemTypeID,
-		"email_auth_method":    "basic",
-		"email_mailbox":        "INBOX",
-		"email_mark_as_read":   true,
+		"email_provider_id":  config.EmailProviderID,
+		"email_workspace_id": config.WorkspaceID,
+		"email_item_type_id": config.ItemTypeID,
+		"email_auth_method":  "basic",
+		"email_mailbox":      "INBOX",
+		"email_mark_as_read": true,
 		// IMAP settings for generic provider
 		"imap_host":       config.IMAPHost,
 		"imap_port":       config.IMAPPort,
@@ -1155,7 +1156,7 @@ func CreateInboundEmailChannel(t *testing.T, server *TestServer, config EmailCha
 		"config":      string(configJSON),
 	}
 
-	resp := MakeAuthRequest(t, server, http.MethodPost, "/channels", data)
+	resp := MakeAuthRequest(t, testServer, http.MethodPost, "/channels", data)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
@@ -1177,11 +1178,11 @@ func CreateInboundEmailChannel(t *testing.T, server *TestServer, config EmailCha
 }
 
 // TriggerEmailProcessing triggers immediate email processing for a channel
-func TriggerEmailProcessing(t *testing.T, server *TestServer, channelID int) {
+func TriggerEmailProcessing(t *testing.T, testServer *TestServer, channelID int) {
 	t.Helper()
 
 	endpoint := fmt.Sprintf("/channels/%d/process-emails", channelID)
-	resp := MakeAuthRequest(t, server, http.MethodPost, endpoint, nil)
+	resp := MakeAuthRequest(t, testServer, http.MethodPost, endpoint, nil)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -1194,11 +1195,11 @@ func TriggerEmailProcessing(t *testing.T, server *TestServer, channelID int) {
 }
 
 // GetItemsByWorkspace returns items in a workspace
-func GetItemsByWorkspace(t *testing.T, server *TestServer, workspaceID int) []map[string]interface{} {
+func GetItemsByWorkspace(t *testing.T, testServer *TestServer, workspaceID int) []map[string]interface{} {
 	t.Helper()
 
 	endpoint := fmt.Sprintf("/items?workspace_id=%d", workspaceID)
-	resp := MakeAuthRequest(t, server, http.MethodGet, endpoint, nil)
+	resp := MakeAuthRequest(t, testServer, http.MethodGet, endpoint, nil)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -1217,7 +1218,7 @@ func GetItemsByWorkspace(t *testing.T, server *TestServer, workspaceID int) []ma
 }
 
 // AssociateWorkspaceWithConfigSet associates a workspace with a configuration set
-func AssociateWorkspaceWithConfigSet(t *testing.T, server *TestServer, workspaceID, configSetID int) {
+func AssociateWorkspaceWithConfigSet(t *testing.T, testServer *TestServer, workspaceID, configSetID int) {
 	t.Helper()
 
 	data := map[string]interface{}{
@@ -1225,7 +1226,7 @@ func AssociateWorkspaceWithConfigSet(t *testing.T, server *TestServer, workspace
 	}
 
 	endpoint := fmt.Sprintf("/workspaces/%d/configuration-sets", workspaceID)
-	resp := MakeAuthRequest(t, server, http.MethodPost, endpoint, data)
+	resp := MakeAuthRequest(t, testServer, http.MethodPost, endpoint, data)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
@@ -1244,7 +1245,7 @@ func (ts *TestServer) DB() database.Database {
 
 // CreatePortalCustomerWithSession creates a portal customer via the admin API
 // and inserts a session directly into the database. Returns customerID and raw session token.
-func CreatePortalCustomerWithSession(t *testing.T, server *TestServer, name, email string) (int, string) {
+func CreatePortalCustomerWithSession(t *testing.T, testServer *TestServer, name, email string) (customerID int, sessionToken string) {
 	t.Helper()
 
 	// Create portal customer via admin API
@@ -1253,7 +1254,7 @@ func CreatePortalCustomerWithSession(t *testing.T, server *TestServer, name, ema
 		"email": email,
 	}
 
-	resp := MakeAuthRequest(t, server, http.MethodPost, "/portal-customers", customerData)
+	resp := MakeAuthRequest(t, testServer, http.MethodPost, "/portal-customers", customerData)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
@@ -1263,17 +1264,17 @@ func CreatePortalCustomerWithSession(t *testing.T, server *TestServer, name, ema
 
 	var result map[string]interface{}
 	DecodeJSON(t, resp, &result)
-	customerID := ExtractIDFromResponse(t, result)
+	customerID = ExtractIDFromResponse(t, result)
 
 	// Generate a random session token
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
 		t.Fatalf("Failed to generate session token: %v", err)
 	}
-	sessionToken := fmt.Sprintf("%x", tokenBytes)
+	sessionToken = fmt.Sprintf("%x", tokenBytes)
 
 	// Insert session directly into the database
-	db := server.DB()
+	db := testServer.DB()
 	_, err := db.ExecWrite(
 		`INSERT INTO portal_customer_sessions (portal_customer_id, session_token, expires_at, ip_address, user_agent, is_active, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -1287,24 +1288,24 @@ func CreatePortalCustomerWithSession(t *testing.T, server *TestServer, name, ema
 }
 
 // MakeUnauthenticatedRequest makes a request with no authentication
-func MakeUnauthenticatedRequest(t *testing.T, server *TestServer, method, endpoint string, body interface{}) *http.Response {
+func MakeUnauthenticatedRequest(t *testing.T, testServer *TestServer, method, endpoint string, body interface{}) *http.Response {
 	t.Helper()
 
-	url := server.APIBase + endpoint
+	url := testServer.APIBase + endpoint
 	return makeRequest(t, method, url, "", body, nil)
 }
 
 // MakePortalRequest makes a request using a portal session token as Bearer auth
-func MakePortalRequest(t *testing.T, server *TestServer, portalToken, method, endpoint string, body interface{}) *http.Response {
+func MakePortalRequest(t *testing.T, testServer *TestServer, portalToken, method, endpoint string, body interface{}) *http.Response {
 	t.Helper()
 
-	url := server.APIBase + endpoint
+	url := testServer.APIBase + endpoint
 	return makeRequest(t, method, url, portalToken, body, nil)
 }
 
 // SetupPortalChannel creates a portal channel with a slug and a request type.
 // Returns the portal slug.
-func SetupPortalChannel(t *testing.T, server *TestServer, workspaceID int) string {
+func SetupPortalChannel(t *testing.T, testServer *TestServer, workspaceID int) string {
 	t.Helper()
 
 	timestamp := time.Now().UnixNano()
@@ -1319,7 +1320,7 @@ func SetupPortalChannel(t *testing.T, server *TestServer, workspaceID int) strin
 		"status":      "active",
 	}
 
-	resp := MakeAuthRequest(t, server, http.MethodPost, "/channels", channelData)
+	resp := MakeAuthRequest(t, testServer, http.MethodPost, "/channels", channelData)
 	defer resp.Body.Close()
 	AssertStatusCode(t, resp, http.StatusCreated)
 
@@ -1343,13 +1344,13 @@ func SetupPortalChannel(t *testing.T, server *TestServer, workspaceID int) strin
 		"config": string(configJSON),
 	}
 
-	resp2 := MakeAuthRequest(t, server, http.MethodPut, fmt.Sprintf("/channels/%d", channelID), updateData)
+	resp2 := MakeAuthRequest(t, testServer, http.MethodPut, fmt.Sprintf("/channels/%d", channelID), updateData)
 	defer resp2.Body.Close()
 	AssertStatusCode(t, resp2, http.StatusOK)
 
 	// Create a request type for submissions
-	configSetID := GetDefaultConfigurationSet(t, server)
-	itemTypes := GetItemTypes(t, server, configSetID)
+	configSetID := GetDefaultConfigurationSet(t, testServer)
+	itemTypes := GetItemTypes(t, testServer, configSetID)
 	var itemTypeID int
 	for _, id := range itemTypes {
 		itemTypeID = id
@@ -1365,7 +1366,7 @@ func SetupPortalChannel(t *testing.T, server *TestServer, workspaceID int) strin
 		"is_active":    true,
 	}
 
-	resp3 := MakeAuthRequest(t, server, http.MethodPost, fmt.Sprintf("/channels/%d/request-types", channelID), requestTypeData)
+	resp3 := MakeAuthRequest(t, testServer, http.MethodPost, fmt.Sprintf("/channels/%d/request-types", channelID), requestTypeData)
 	defer resp3.Body.Close()
 	AssertStatusCode(t, resp3, http.StatusCreated)
 
@@ -1375,7 +1376,7 @@ func SetupPortalChannel(t *testing.T, server *TestServer, workspaceID int) strin
 // SubmitPortalRequest submits a request through the portal for a specific portal customer.
 // Requires portal authentication token from CreatePortalCustomerWithSession.
 // Returns the created item ID.
-func SubmitPortalRequest(t *testing.T, server *TestServer, portalSlug, portalToken, title string) int {
+func SubmitPortalRequest(t *testing.T, testServer *TestServer, portalSlug, portalToken, title string) int {
 	t.Helper()
 
 	submissionData := map[string]interface{}{
@@ -1384,7 +1385,7 @@ func SubmitPortalRequest(t *testing.T, server *TestServer, portalSlug, portalTok
 	}
 
 	endpoint := fmt.Sprintf("/portal/%s/submit", portalSlug)
-	submitResp := MakePortalRequest(t, server, portalToken, http.MethodPost, endpoint, submissionData)
+	submitResp := MakePortalRequest(t, testServer, portalToken, http.MethodPost, endpoint, submissionData)
 	defer submitResp.Body.Close()
 
 	AssertStatusCode(t, submitResp, http.StatusCreated)
@@ -1400,11 +1401,11 @@ func SubmitPortalRequest(t *testing.T, server *TestServer, portalSlug, portalTok
 }
 
 // GetItemComments returns comments for an item
-func GetItemComments(t *testing.T, server *TestServer, itemID int) []map[string]interface{} {
+func GetItemComments(t *testing.T, testServer *TestServer, itemID int) []map[string]interface{} {
 	t.Helper()
 
 	endpoint := fmt.Sprintf("/items/%d/comments", itemID)
-	resp := MakeAuthRequest(t, server, http.MethodGet, endpoint, nil)
+	resp := MakeAuthRequest(t, testServer, http.MethodGet, endpoint, nil)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {

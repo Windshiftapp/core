@@ -1,3 +1,4 @@
+// Package shared provides common utilities for REST API handlers.
 package shared
 
 import (

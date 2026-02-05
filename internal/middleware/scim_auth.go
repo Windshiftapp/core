@@ -66,7 +66,7 @@ func GetSCIMToken(r *http.Request) *models.SCIMToken {
 }
 
 // respondSCIMError sends a SCIM-formatted error response
-func respondSCIMError(w http.ResponseWriter, status int, detail string, scimType string) {
+func respondSCIMError(w http.ResponseWriter, status int, detail, scimType string) {
 	w.Header().Set("Content-Type", "application/scim+json")
 	w.WriteHeader(status)
 
@@ -77,7 +77,7 @@ func respondSCIMError(w http.ResponseWriter, status int, detail string, scimType
 		ScimType: scimType,
 	}
 
-	json.NewEncoder(w).Encode(scimError)
+	_ = json.NewEncoder(w).Encode(scimError)
 }
 
 // formatStatusCode converts an int status code to a string

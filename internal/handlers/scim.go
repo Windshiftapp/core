@@ -41,13 +41,14 @@ const scimMaxBodySize = 1 * 1024 * 1024
 
 // limitRequestBody wraps the request body with a size limiter
 // Returns true if the body was limited successfully, false if body is too large
-func (h *SCIMHandler) limitRequestBody(w http.ResponseWriter, r *http.Request) bool {
+func (h *SCIMHandler) limitRequestBody(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, scimMaxBodySize)
-	return true
 }
 
 // logSCIMAuditEvent logs a SCIM provisioning event to the audit log
-func (h *SCIMHandler) logSCIMAuditEvent(r *http.Request, actionType string, resourceType string, resourceID *int, resourceName string, details map[string]interface{}, success bool, errorMsg string) {
+//
+//nolint:unparam // success is always true currently but kept for future error logging
+func (h *SCIMHandler) logSCIMAuditEvent(r *http.Request, actionType, resourceType string, resourceID *int, resourceName string, details map[string]interface{}, success bool, errorMsg string) {
 	// Get SCIM token from context to identify the requester
 	scimToken := middleware.GetSCIMToken(r)
 	tokenPrefix := ""
@@ -76,18 +77,18 @@ func (h *SCIMHandler) logSCIMAuditEvent(r *http.Request, actionType string, reso
 	}
 
 	// Fire and forget - don't block on audit logging
-	go logger.LogAudit(h.db, event)
+	go func() { _ = logger.LogAudit(h.db, event) }()
 }
 
 // respondSCIMJSON sends a SCIM JSON response
 func respondSCIMJSON(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/scim+json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(data)
+	_ = json.NewEncoder(w).Encode(data)
 }
 
 // respondSCIMErrorMsg sends a SCIM error response
-func respondSCIMErrorMsg(w http.ResponseWriter, status int, detail string, scimType string) {
+func respondSCIMErrorMsg(w http.ResponseWriter, status int, detail, scimType string) {
 	w.Header().Set("Content-Type", "application/scim+json")
 	w.WriteHeader(status)
 
@@ -98,7 +99,7 @@ func respondSCIMErrorMsg(w http.ResponseWriter, status int, detail string, scimT
 		ScimType: scimType,
 	}
 
-	json.NewEncoder(w).Encode(scimError)
+	_ = json.NewEncoder(w).Encode(scimError)
 }
 
 // =============================================================================
@@ -200,7 +201,7 @@ func (h *SCIMHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 	// Get total count
 	var totalResults int
-	if err := h.db.QueryRow(countQuery, args...).Scan(&totalResults); err != nil {
+	if err = h.db.QueryRow(countQuery, args...).Scan(&totalResults); err != nil {
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to count users", "")
 		return
 	}
@@ -215,7 +216,7 @@ func (h *SCIMHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to query users", "")
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var resources []interface{}
 	for rows.Next() {
@@ -368,7 +369,7 @@ func (h *SCIMHandler) ReplaceUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var scimUser models.SCIMUser
-	if err := json.NewDecoder(r.Body).Decode(&scimUser); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&scimUser); err != nil {
 		if err.Error() == "http: request body too large" {
 			respondSCIMErrorMsg(w, http.StatusRequestEntityTooLarge, "Request body too large", "tooLarge")
 			return
@@ -452,7 +453,7 @@ func (h *SCIMHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var patchReq models.SCIMPatchRequest
-	if err := json.NewDecoder(r.Body).Decode(&patchReq); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&patchReq); err != nil {
 		if err.Error() == "http: request body too large" {
 			respondSCIMErrorMsg(w, http.StatusRequestEntityTooLarge, "Request body too large", "tooLarge")
 			return
@@ -463,7 +464,7 @@ func (h *SCIMHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 
 	// Process operations
 	for _, op := range patchReq.Operations {
-		if err := h.applyUserPatchOp(id, op); err != nil {
+		if err = h.applyUserPatchOp(id, op); err != nil {
 			respondSCIMErrorMsg(w, http.StatusBadRequest, "Failed to apply patch: "+err.Error(), "invalidValue")
 			return
 		}
@@ -554,7 +555,7 @@ func (h *SCIMHandler) ListGroups(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var totalResults int
-	if err := h.db.QueryRow(countQuery, args...).Scan(&totalResults); err != nil {
+	if err = h.db.QueryRow(countQuery, args...).Scan(&totalResults); err != nil {
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to count groups", "")
 		return
 	}
@@ -567,7 +568,7 @@ func (h *SCIMHandler) ListGroups(w http.ResponseWriter, r *http.Request) {
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to query groups", "")
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var resources []interface{}
 	for rows.Next() {
@@ -641,11 +642,12 @@ func (h *SCIMHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 
 	// Add members
 	for _, member := range scimGroup.Members {
-		memberID, err := strconv.Atoi(member.Value)
+		var memberID int
+		memberID, err = strconv.Atoi(member.Value)
 		if err != nil {
 			continue
 		}
-		h.db.Exec(`
+		_, _ = h.db.Exec(`
 			INSERT INTO group_members (group_id, user_id, scim_managed, added_at)
 			VALUES (?, ?, true, CURRENT_TIMESTAMP)
 		`, groupID, memberID)
@@ -704,7 +706,7 @@ func (h *SCIMHandler) ReplaceGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var scimGroup models.SCIMGroup
-	if err := json.NewDecoder(r.Body).Decode(&scimGroup); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&scimGroup); err != nil {
 		if err.Error() == "http: request body too large" {
 			respondSCIMErrorMsg(w, http.StatusRequestEntityTooLarge, "Request body too large", "tooLarge")
 			return
@@ -725,13 +727,14 @@ func (h *SCIMHandler) ReplaceGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Replace members - remove SCIM-managed members and add new ones
-	h.db.Exec(`DELETE FROM group_members WHERE group_id = ? AND scim_managed = true`, id)
+	_, _ = h.db.Exec(`DELETE FROM group_members WHERE group_id = ? AND scim_managed = true`, id)
 	for _, member := range scimGroup.Members {
-		memberID, err := strconv.Atoi(member.Value)
+		var memberID int
+		memberID, err = strconv.Atoi(member.Value)
 		if err != nil {
 			continue
 		}
-		h.db.Exec(`
+		_, _ = h.db.Exec(`
 			INSERT INTO group_members (group_id, user_id, scim_managed, added_at)
 			VALUES (?, ?, true, CURRENT_TIMESTAMP)
 			ON CONFLICT(group_id, user_id) DO UPDATE SET scim_managed = true
@@ -775,7 +778,7 @@ func (h *SCIMHandler) PatchGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var patchReq models.SCIMPatchRequest
-	if err := json.NewDecoder(r.Body).Decode(&patchReq); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&patchReq); err != nil {
 		if err.Error() == "http: request body too large" {
 			respondSCIMErrorMsg(w, http.StatusRequestEntityTooLarge, "Request body too large", "tooLarge")
 			return
@@ -785,7 +788,7 @@ func (h *SCIMHandler) PatchGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, op := range patchReq.Operations {
-		if err := h.applyGroupPatchOp(id, op); err != nil {
+		if err = h.applyGroupPatchOp(id, op); err != nil {
 			respondSCIMErrorMsg(w, http.StatusBadRequest, "Failed to apply patch: "+err.Error(), "invalidValue")
 			return
 		}
@@ -884,7 +887,7 @@ func (h *SCIMHandler) getGroupMembers(groupID int) ([]models.SCIMGroupMember, er
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var members []models.SCIMGroupMember
 	for rows.Next() {
@@ -970,7 +973,7 @@ func (h *SCIMHandler) applyUserPatchOp(userID int, op models.SCIMPatchOp) error 
 			if !ok {
 				// Try string conversion
 				if strVal, ok := op.Value.(string); ok {
-					active = strings.ToLower(strVal) == "true"
+					active = strings.EqualFold(strVal, "true")
 				}
 			}
 			_, err := h.db.Exec(`UPDATE users SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, active, userID)
@@ -1055,7 +1058,7 @@ func (h *SCIMHandler) applyGroupPatchOp(groupID int, op models.SCIMPatchOp) erro
 							if err != nil {
 								continue
 							}
-							h.db.Exec(`
+							_, _ = h.db.Exec(`
 								INSERT INTO group_members (group_id, user_id, scim_managed, added_at)
 								VALUES (?, ?, true, CURRENT_TIMESTAMP)
 								ON CONFLICT(group_id, user_id) DO UPDATE SET scim_managed = true
@@ -1079,7 +1082,7 @@ func (h *SCIMHandler) applyGroupPatchOp(groupID int, op models.SCIMPatchOp) erro
 								if err != nil {
 									continue
 								}
-								h.db.Exec(`DELETE FROM group_members WHERE group_id = ? AND user_id = ?`, groupID, memberID)
+								_, _ = h.db.Exec(`DELETE FROM group_members WHERE group_id = ? AND user_id = ?`, groupID, memberID)
 							}
 						}
 					}

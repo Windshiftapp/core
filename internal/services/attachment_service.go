@@ -47,7 +47,7 @@ type CreateAttachmentParams struct {
 // CanModifyItemAttachment checks if a user can upload/delete attachments on an item.
 // For internal users: requires item.edit permission in the workspace.
 // For portal customers: can only modify attachments on items they created.
-func (s *AttachmentService) CanModifyItemAttachment(userID *int, portalCustomerID *int, itemID int) (bool, error) {
+func (s *AttachmentService) CanModifyItemAttachment(userID, portalCustomerID *int, itemID int) (bool, error) {
 	// Get item's workspace_id and creator_portal_customer_id
 	var workspaceID int
 	var creatorPortalCustomerID sql.NullInt64
@@ -89,13 +89,12 @@ func (s *AttachmentService) CanModifyItemAttachment(userID *int, portalCustomerI
 
 // GetAttachmentItemID returns the item_id and entity_type for an attachment.
 // Returns (itemID, entityType, error). itemID may be nil for non-item attachments.
-func (s *AttachmentService) GetAttachmentItemID(attachmentID int) (*int, string, error) {
-	var itemID sql.NullInt64
-	var entityType string
-	err := s.db.QueryRow(`
+func (s *AttachmentService) GetAttachmentItemID(attachmentID int) (itemID *int, entityType string, err error) {
+	var nullItemID sql.NullInt64
+	err = s.db.QueryRow(`
 		SELECT item_id, COALESCE(entity_type, 'item')
 		FROM attachments WHERE id = ?
-	`, attachmentID).Scan(&itemID, &entityType)
+	`, attachmentID).Scan(&nullItemID, &entityType)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, "", fmt.Errorf("attachment not found")
@@ -103,8 +102,8 @@ func (s *AttachmentService) GetAttachmentItemID(attachmentID int) (*int, string,
 		return nil, "", fmt.Errorf("failed to get attachment: %w", err)
 	}
 
-	if itemID.Valid {
-		id := int(itemID.Int64)
+	if nullItemID.Valid {
+		id := int(nullItemID.Int64)
 		return &id, entityType, nil
 	}
 	return nil, entityType, nil

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
@@ -61,7 +62,7 @@ func (h *UserSCMTokenHandler) GetUserConnections(w http.ResponseWriter, r *http.
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	connections := []UserSCMConnectionResponse{}
 	for rows.Next() {
@@ -89,7 +90,7 @@ func (h *UserSCMTokenHandler) GetUserConnections(w http.ResponseWriter, r *http.
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(connections)
+	_ = json.NewEncoder(w).Encode(connections)
 }
 
 // GetConnectionStatus returns the user's connection status for a specific provider
@@ -145,7 +146,7 @@ func (h *UserSCMTokenHandler) GetConnectionStatus(w http.ResponseWriter, r *http
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"connected":     false,
 			"provider_id":   providerID,
 			"provider_name": providerName,
@@ -167,7 +168,7 @@ func (h *UserSCMTokenHandler) GetConnectionStatus(w http.ResponseWriter, r *http
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"connected":  true,
 		"connection": conn,
 	})
@@ -203,7 +204,7 @@ func (h *UserSCMTokenHandler) DisconnectProvider(w http.ResponseWriter, r *http.
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "SCM account disconnected",
 	})
@@ -232,7 +233,7 @@ func (h *UserSCMTokenHandler) GetAvailableProviders(w http.ResponseWriter, r *ht
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type ProviderWithStatus struct {
 		ID           int                    `json:"id"`
@@ -273,5 +274,5 @@ func (h *UserSCMTokenHandler) GetAvailableProviders(w http.ResponseWriter, r *ht
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(providers)
+	_ = json.NewEncoder(w).Encode(providers)
 }

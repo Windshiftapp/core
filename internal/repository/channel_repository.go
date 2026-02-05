@@ -80,11 +80,12 @@ func (r *ChannelRepository) FindAll(ctx context.Context, userID int, isAdmin boo
 	if err != nil {
 		return nil, fmt.Errorf("failed to query channels: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var channels []models.Channel
 	for rows.Next() {
-		channel, err := r.scanChannel(rows)
+		var channel *models.Channel
+		channel, err = r.scanChannel(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -277,7 +278,7 @@ func (r *ChannelRepository) FindManagers(ctx context.Context, channelID int) ([]
 	if err != nil {
 		return nil, fmt.Errorf("failed to query channel managers: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var managers []models.ChannelManager
 	for rows.Next() {
