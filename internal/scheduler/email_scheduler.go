@@ -11,6 +11,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/email"
 	"windshift/internal/models"
+	"windshift/internal/services"
 )
 
 // EmailScheduler handles periodic IMAP polling for inbound email channels
@@ -40,6 +41,12 @@ func NewEmailScheduler(db database.Database, credentials *email.CredentialManage
 		defaultInterval: 5 * time.Minute,
 		attachmentPath:  attachmentPath,
 	}
+}
+
+// SetCommentService passes the CommentService through to the email processor
+// for unified comment creation from inbound email replies.
+func (es *EmailScheduler) SetCommentService(cs *services.CommentService) {
+	es.processor.SetCommentService(cs)
 }
 
 // Start begins the email polling scheduler

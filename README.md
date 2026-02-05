@@ -43,7 +43,7 @@ Windshift is a comprehensive work management platform that combines task trackin
 
 ## Tech Stack
 
-- **Backend**: Go 1.24+
+- **Backend**: Go 1.25+
 - **Frontend**: Svelte 5, Vite, Tailwind CSS
 - **Database**: SQLite (default) or PostgreSQL
 - **Authentication**: Sessions, JWT, WebAuthn, OIDC
@@ -52,7 +52,7 @@ Windshift is a comprehensive work management platform that combines task trackin
 
 ### Prerequisites
 
-- Go 1.24.5 or later
+- Go 1.25.7 or later
 - Node.js 18 or later
 - npm
 

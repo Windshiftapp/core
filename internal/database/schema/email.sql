@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS email_message_tracking (
 	subject TEXT,
 	item_id INTEGER,
 	comment_id INTEGER,
+	direction TEXT DEFAULT 'inbound' CHECK(direction IN ('inbound', 'outbound')),
 	processed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,

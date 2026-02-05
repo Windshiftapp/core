@@ -508,6 +508,14 @@ func (s *Server) initialize() error {
 	commentService.SetWebhookSender(webhookSender)
 	commentHandler.SetCommentService(commentService)
 	s.actionService.SetCommentService(commentService)
+
+	// Wire email reply service for bidirectional email threading
+	emailReplyService := services.NewEmailReplyService(s.db, smtpSender)
+	commentService.SetEmailReplyService(emailReplyService)
+
+	// Wire CommentService into email processor for unified comment creation
+	s.emailScheduler.SetCommentService(commentService)
+
 	slog.Info("comment service initialized")
 
 	// Wire up action service

@@ -396,3 +396,85 @@ func (s *NotificationSMTPSender) SendCustomEmail(toEmail, subject, htmlBody, tex
 func (s *NotificationSMTPSender) SendEmailWithConfig(config *models.ChannelConfig, toEmail, subject, htmlBody, textBody string) error {
 	return s.sendEmail(config, toEmail, subject, htmlBody, textBody)
 }
+
+// ThreadedEmailParams contains the parameters for sending a threaded email reply.
+type ThreadedEmailParams struct {
+	ToEmail    string
+	ToName     string
+	Subject    string
+	HTMLBody   string
+	TextBody   string
+	MessageID  string
+	InReplyTo  string
+	References []string
+}
+
+// SendThreadedEmail sends an email with RFC 5322 threading headers (Message-ID, In-Reply-To, References).
+func (s *NotificationSMTPSender) SendThreadedEmail(params ThreadedEmailParams) error {
+	config, err := s.getSMTPConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get SMTP config: %w", err)
+	}
+
+	message := s.buildThreadedMimeMessage(config.SMTPFromEmail, config.SMTPFromName, params)
+
+	var auth smtp.Auth
+	if config.SMTPUsername != "" && config.SMTPPassword != "" {
+		auth = smtp.PlainAuth("", config.SMTPUsername, config.SMTPPassword, config.SMTPHost)
+	}
+
+	addr := fmt.Sprintf("%s:%d", config.SMTPHost, config.SMTPPort)
+
+	switch strings.ToLower(config.SMTPEncryption) {
+	case "tls":
+		return s.sendWithStartTLS(addr, auth, config.SMTPFromEmail, params.ToEmail, message)
+	case "ssl":
+		return s.sendWithSSL(addr, auth, config.SMTPFromEmail, params.ToEmail, message)
+	default:
+		return smtp.SendMail(addr, auth, config.SMTPFromEmail, []string{params.ToEmail}, []byte(message))
+	}
+}
+
+// buildThreadedMimeMessage builds a MIME multipart message with threading headers.
+func (s *NotificationSMTPSender) buildThreadedMimeMessage(fromEmail, fromName string, params ThreadedEmailParams) string {
+	boundary := "----=_NextPart_" + fmt.Sprintf("%d", time.Now().UnixNano())
+
+	var from string
+	if fromName != "" {
+		from = fmt.Sprintf("%s <%s>", fromName, fromEmail)
+	} else {
+		from = fromEmail
+	}
+
+	var to string
+	if params.ToName != "" {
+		to = fmt.Sprintf("%s <%s>", params.ToName, params.ToEmail)
+	} else {
+		to = params.ToEmail
+	}
+
+	headers := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=%s\r\n",
+		from, to, params.Subject, boundary)
+
+	if params.MessageID != "" {
+		headers += fmt.Sprintf("Message-ID: %s\r\n", params.MessageID)
+	}
+	if params.InReplyTo != "" {
+		headers += fmt.Sprintf("In-Reply-To: %s\r\n", params.InReplyTo)
+	}
+	if len(params.References) > 0 {
+		headers += fmt.Sprintf("References: %s\r\n", strings.Join(params.References, " "))
+	}
+
+	headers += "\r\n"
+
+	textPart := fmt.Sprintf("--%s\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n%s\r\n\r\n",
+		boundary, params.TextBody)
+
+	htmlPart := fmt.Sprintf("--%s\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n%s\r\n\r\n",
+		boundary, params.HTMLBody)
+
+	ending := fmt.Sprintf("--%s--\r\n", boundary)
+
+	return headers + textPart + htmlPart + ending
+}

@@ -3,6 +3,7 @@ package email
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -21,6 +22,7 @@ import (
 type Processor struct {
 	db             database.Database
 	attachmentPath string
+	commentService *services.CommentService
 }
 
 // NewProcessor creates a new email processor
@@ -29,6 +31,11 @@ func NewProcessor(db database.Database, attachmentPath string) *Processor {
 		db:             db,
 		attachmentPath: attachmentPath,
 	}
+}
+
+// SetCommentService sets the comment service for unified comment creation.
+func (p *Processor) SetCommentService(cs *services.CommentService) {
+	p.commentService = cs
 }
 
 // ProcessEmail processes a single email, creating an item or comment
@@ -236,7 +243,7 @@ func (p *Processor) createItemFromEmail(
 	params := services.ItemCreationParams{
 		WorkspaceID:             config.EmailWorkspaceID,
 		Title:                   email.GetSubjectForItem(),
-		Description:             email.GetBodyText(),
+		Description:             StripSignature(email.GetBodyText()),
 		Status:                  initialStatus,
 		ItemTypeID:              config.EmailItemTypeID,
 		Priority:                "medium",
@@ -276,7 +283,7 @@ func (p *Processor) addCommentFromReply(
 	customerID int,
 ) (*ProcessingResult, error) {
 	// Extract reply content (strip quoted text)
-	content := ExtractReplyContent(email.GetBodyText())
+	content := StripSignature(ExtractReplyContent(email.GetBodyText()))
 
 	if strings.TrimSpace(content) == "" {
 		// No new content - skip
@@ -287,25 +294,54 @@ func (p *Processor) addCommentFromReply(
 	}
 
 	// Get user ID from portal customer (if linked)
-	var authorID *int
+	var linkedUserID int
 	err := p.db.QueryRow(`
-		SELECT user_id FROM portal_customers WHERE id = ?
-	`, customerID).Scan(&authorID)
+		SELECT user_id FROM portal_customers WHERE id = ? AND user_id IS NOT NULL
+	`, customerID).Scan(&linkedUserID)
 	if err != nil && err != sql.ErrNoRows {
 		slog.Warn("failed to get user_id for portal customer", "error", err)
 	}
 
-	// Create comment - use author_id if customer has linked user, otherwise use portal_customer_id
+	// Use CommentService for unified comment creation (notifications, mentions, webhooks, email reply handling)
+	if p.commentService != nil {
+		result, err := p.commentService.Create(services.CreateCommentParams{
+			ItemID:           itemID,
+			AuthorID:         linkedUserID,
+			PortalCustomerID: &customerID,
+			Content:          content,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create comment: %w", err)
+		}
+
+		commentID := int(result.CommentID)
+
+		slog.Info("added comment from email reply",
+			"comment_id", commentID,
+			"item_id", itemID,
+			"from", email.From.Address,
+		)
+
+		return &ProcessingResult{
+			Action:    ActionCommentAdded,
+			ItemID:    &itemID,
+			CommentID: &commentID,
+		}, nil
+	}
+
+	// Fallback: direct DB insert (should not be used in production)
+	slog.Warn("commentService not set in email processor, using direct DB insert",
+		"item_id", itemID)
+
 	now := time.Now()
-	var result sql.Result
-	if authorID != nil {
-		result, err = p.db.Exec(`
+	var dbResult sql.Result
+	if linkedUserID != 0 {
+		dbResult, err = p.db.Exec(`
 			INSERT INTO comments (item_id, author_id, content, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?)
-		`, itemID, *authorID, content, now, now)
+		`, itemID, linkedUserID, content, now, now)
 	} else {
-		// Portal customer without linked user - use portal_customer_id
-		result, err = p.db.Exec(`
+		dbResult, err = p.db.Exec(`
 			INSERT INTO comments (item_id, portal_customer_id, content, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?)
 		`, itemID, customerID, content, now, now)
@@ -314,7 +350,7 @@ func (p *Processor) addCommentFromReply(
 		return nil, fmt.Errorf("failed to create comment: %w", err)
 	}
 
-	commentIDInt64, _ := result.LastInsertId()
+	commentIDInt64, _ := dbResult.LastInsertId()
 	commentID := int(commentIDInt64)
 
 	slog.Info("added comment from email reply",
@@ -333,10 +369,53 @@ func (p *Processor) addCommentFromReply(
 // handleAttachments saves email attachments to the item
 func (p *Processor) handleAttachments(ctx context.Context, attachments []Attachment, itemID int) error {
 	if p.attachmentPath == "" {
-		return fmt.Errorf("attachment path not configured")
+		return nil // Attachments not enabled — silently skip
+	}
+
+	// Load attachment settings
+	var maxFileSize int64
+	var allowedMimeJSON string
+	var enabled bool
+	err := p.db.QueryRow(`
+		SELECT max_file_size, allowed_mime_types, enabled
+		FROM attachment_settings ORDER BY id DESC LIMIT 1
+	`).Scan(&maxFileSize, &allowedMimeJSON, &enabled)
+	if err != nil {
+		// No settings row = use defaults (enabled, 50MB, all types)
+		maxFileSize = 52428800
+		enabled = true
+	}
+	if !enabled {
+		return nil
+	}
+
+	// Parse allowed MIME types
+	var allowedTypes []string
+	if allowedMimeJSON != "" {
+		json.Unmarshal([]byte(allowedMimeJSON), &allowedTypes)
 	}
 
 	for _, att := range attachments {
+		// Check size limit
+		if att.Size > maxFileSize {
+			slog.Debug("skipping attachment: exceeds max size", "filename", att.Filename, "size", att.Size)
+			continue
+		}
+		// Check MIME allowlist
+		if len(allowedTypes) > 0 {
+			allowed := false
+			for _, t := range allowedTypes {
+				if strings.HasPrefix(att.ContentType, t) {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				slog.Debug("skipping attachment: MIME type not allowed", "filename", att.Filename, "type", att.ContentType)
+				continue
+			}
+		}
+
 		// Generate unique filename
 		ext := filepath.Ext(att.Filename)
 		uniqueFilename := fmt.Sprintf("%s%s", uuid.New().String(), ext)
@@ -353,12 +432,15 @@ func (p *Processor) handleAttachments(ctx context.Context, attachments []Attachm
 			return fmt.Errorf("failed to write attachment: %w", err)
 		}
 
+		// Relative path for DB record
+		relPath := filepath.Join("items", fmt.Sprintf("%d", itemID), uniqueFilename)
+
 		// Create attachment record
 		now := time.Now()
 		_, err := p.db.Exec(`
-			INSERT INTO attachments (item_id, filename, original_filename, file_size, content_type, created_at)
-			VALUES (?, ?, ?, ?, ?, ?)
-		`, itemID, uniqueFilename, att.Filename, att.Size, att.ContentType, now)
+			INSERT INTO attachments (item_id, filename, original_filename, file_path, mime_type, file_size, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+		`, itemID, uniqueFilename, att.Filename, relPath, att.ContentType, att.Size, now)
 		if err != nil {
 			slog.Error("failed to create attachment record", "error", err, "filename", att.Filename)
 			continue
@@ -380,8 +462,8 @@ func (p *Processor) recordProcessedEmail(
 	_, err := p.db.Exec(`
 		INSERT INTO email_message_tracking (
 			channel_id, message_id, in_reply_to, from_email, from_name, subject,
-			item_id, comment_id, processed_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+			item_id, comment_id, direction, processed_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'inbound', CURRENT_TIMESTAMP)
 	`,
 		channelID,
 		email.MessageID,

@@ -329,6 +329,114 @@ func isFooterLine(line string) bool {
 	return false
 }
 
+// signOffPatterns matches common email sign-off lines
+var signOffPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)^(best|kind|warm|warmest)?\s*regards?,?\s*$`),
+	regexp.MustCompile(`(?i)^thanks?,?\s*$`),
+	regexp.MustCompile(`(?i)^thank\s+you,?\s*$`),
+	regexp.MustCompile(`(?i)^cheers,?\s*$`),
+	regexp.MustCompile(`(?i)^sincerely,?\s*$`),
+	regexp.MustCompile(`(?i)^(all\s+the\s+)?best,?\s*$`),
+}
+
+// contactInfoPattern matches lines containing contact information
+var contactInfoPattern = regexp.MustCompile(`[@]|(\+?\d[\d\s\-()]{7,})|www\.|https?://|[|]`)
+
+// StripSignature removes business email signatures from plain text.
+// It scans from the bottom of the message, looking for explicit delimiters (-- ),
+// footer patterns (Sent from my iPhone), and sign-off heuristics (Best regards,).
+// Errs on the side of keeping content — false negatives are preferred over false positives.
+func StripSignature(body string) string {
+	if body == "" {
+		return ""
+	}
+
+	lines := strings.Split(body, "\n")
+
+	// Layer 1: Explicit delimiter (-- or "-- ")
+	for i, line := range lines {
+		trimmed := strings.TrimRight(line, " \t\r")
+		if trimmed == "--" || trimmed == "-- " || strings.TrimSpace(line) == "--" {
+			// Check the actual trimmed content
+			t := strings.TrimSpace(line)
+			if t == "--" || t == "-- " {
+				result := strings.TrimRight(strings.Join(lines[:i], "\n"), " \t\r\n")
+				return result
+			}
+		}
+	}
+
+	// Layer 2: Footer patterns (Sent from my iPhone, etc.)
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if isFooterLine(trimmed) {
+			result := strings.TrimRight(strings.Join(lines[:i], "\n"), " \t\r\n")
+			return result
+		}
+	}
+
+	// Layer 3: Sign-off heuristic (conservative)
+	// Only look in the last ~15 lines
+	totalLines := len(lines)
+	searchStart := 0
+	if totalLines > 15 {
+		searchStart = totalLines - 15
+	}
+
+	for i := searchStart; i < totalLines; i++ {
+		trimmed := strings.TrimSpace(lines[i])
+		if isSignOff(trimmed) {
+			// Validate: what follows should be short (≤10 lines) and/or contain contact info
+			remaining := lines[i+1:]
+			if validateSignatureBlock(remaining) {
+				result := strings.TrimRight(strings.Join(lines[:i], "\n"), " \t\r\n")
+				return result
+			}
+		}
+	}
+
+	return body
+}
+
+// isSignOff checks if a line matches a sign-off pattern
+func isSignOff(line string) bool {
+	for _, pattern := range signOffPatterns {
+		if pattern.MatchString(line) {
+			return true
+		}
+	}
+	return false
+}
+
+// validateSignatureBlock checks that the content after a sign-off looks like a signature
+// (short block and/or contains contact info patterns)
+func validateSignatureBlock(lines []string) bool {
+	// Count non-empty lines
+	nonEmpty := 0
+	hasContactInfo := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" {
+			nonEmpty++
+			if contactInfoPattern.MatchString(trimmed) {
+				hasContactInfo = true
+			}
+		}
+	}
+
+	// Accept if the block is short (≤10 non-empty lines)
+	if nonEmpty <= 10 {
+		return true
+	}
+
+	// Accept if it contains contact info even if slightly longer
+	if hasContactInfo && nonEmpty <= 15 {
+		return true
+	}
+
+	return false
+}
+
 // StripHTML removes HTML tags from a string (for HTML-only emails)
 func StripHTML(html string) string {
 	// Remove script and style elements (using separate patterns since RE2 doesn't support backreferences)

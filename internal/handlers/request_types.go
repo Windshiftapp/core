@@ -278,25 +278,10 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get the old request type for audit logging
-	var oldRT models.RequestType
-	var oldVisibilityGroupIDs, oldVisibilityOrgIDs *string
-	err = h.db.QueryRow(`
-		SELECT rt.id, rt.channel_id, rt.name, rt.description, rt.item_type_id,
-		       rt.icon, rt.color, rt.display_order, rt.is_active,
-		       rt.visibility_group_ids, rt.visibility_org_ids,
-		       rt.created_at, rt.updated_at,
-		       c.name as channel_name, it.name as item_type_name
-		FROM request_types rt
-		LEFT JOIN channels c ON rt.channel_id = c.id
-		LEFT JOIN item_types it ON rt.item_type_id = it.id
-		WHERE rt.id = ?
-	`, id).Scan(&oldRT.ID, &oldRT.ChannelID, &oldRT.Name, &oldRT.Description, &oldRT.ItemTypeID,
-		&oldRT.Icon, &oldRT.Color, &oldRT.DisplayOrder, &oldRT.IsActive,
-		&oldVisibilityGroupIDs, &oldVisibilityOrgIDs,
-		&oldRT.CreatedAt, &oldRT.UpdatedAt,
-		&oldRT.ChannelName, &oldRT.ItemTypeName)
-	oldRT.VisibilityGroupIDs = deserializeIntArray(oldVisibilityGroupIDs)
-	oldRT.VisibilityOrgIDs = deserializeIntArray(oldVisibilityOrgIDs)
+	var oldName, oldIcon, oldColor string
+	var oldItemTypeID int
+	err = h.db.QueryRow(`SELECT name, item_type_id, icon, color FROM request_types WHERE id = ?`, id).
+		Scan(&oldName, &oldItemTypeID, &oldIcon, &oldColor)
 
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "request_type")
@@ -380,27 +365,27 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		details := make(map[string]interface{})
 
 		// Track what changed
-		if oldRT.Name != rt.Name {
+		if oldName != rt.Name {
 			details["name_changed"] = map[string]interface{}{
-				"old": oldRT.Name,
+				"old": oldName,
 				"new": rt.Name,
 			}
 		}
-		if oldRT.ItemTypeID != rt.ItemTypeID {
+		if oldItemTypeID != rt.ItemTypeID {
 			details["item_type_changed"] = map[string]interface{}{
-				"old": oldRT.ItemTypeID,
+				"old": oldItemTypeID,
 				"new": rt.ItemTypeID,
 			}
 		}
-		if oldRT.Icon != rt.Icon {
+		if oldIcon != rt.Icon {
 			details["icon_changed"] = map[string]interface{}{
-				"old": oldRT.Icon,
+				"old": oldIcon,
 				"new": rt.Icon,
 			}
 		}
-		if oldRT.Color != rt.Color {
+		if oldColor != rt.Color {
 			details["color_changed"] = map[string]interface{}{
-				"old": oldRT.Color,
+				"old": oldColor,
 				"new": rt.Color,
 			}
 		}

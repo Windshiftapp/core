@@ -413,5 +413,161 @@ func TestCommentService_GetAuthorID(t *testing.T) {
 	})
 }
 
+// mockEmailReplyHandler implements services.EmailReplyHandler for testing.
+type mockEmailReplyHandler struct {
+	calls []services.HandleCommentParams
+	err   error
+}
+
+func (m *mockEmailReplyHandler) HandleCommentCreated(p services.HandleCommentParams) error {
+	m.calls = append(m.calls, p)
+	return m.err
+}
+
+func TestCommentService_CreateWithPortalCustomerID(t *testing.T) {
+	db := createCommentTestDB(t)
+	service := services.NewCommentService(db)
+	env := setupCommentTestEnv(t, db)
+
+	// Create a portal customer
+	res, err := db.Exec(`
+		INSERT INTO portal_customers (name, email) VALUES ('Portal User', 'portal@example.com')
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create portal customer: %v", err)
+	}
+	pcID64, _ := res.LastInsertId()
+	pcID := int(pcID64)
+
+	t.Run("PortalCustomerWithoutLinkedUser", func(t *testing.T) {
+		params := services.CreateCommentParams{
+			ItemID:           env.ItemID,
+			AuthorID:         0,
+			PortalCustomerID: &pcID,
+			Content:          "Comment from portal customer",
+			ActorUserID:      0,
+		}
+
+		result, err := service.Create(params)
+		if err != nil {
+			t.Fatalf("Expected no error, got: %v", err)
+		}
+		if result.CommentID == 0 {
+			t.Error("Expected non-zero comment ID")
+		}
+
+		// Verify portal_customer_id is set
+		var portalCustomerID int
+		err = db.QueryRow("SELECT portal_customer_id FROM comments WHERE id = ?", result.CommentID).Scan(&portalCustomerID)
+		if err != nil {
+			t.Fatalf("Failed to query comment: %v", err)
+		}
+		if portalCustomerID != pcID {
+			t.Errorf("Expected portal_customer_id %d, got %d", pcID, portalCustomerID)
+		}
+	})
+
+	t.Run("PortalCustomerWithLinkedUser", func(t *testing.T) {
+		params := services.CreateCommentParams{
+			ItemID:           env.ItemID,
+			AuthorID:         env.UserID,
+			PortalCustomerID: &pcID,
+			Content:          "Comment from linked portal customer",
+			ActorUserID:      env.UserID,
+		}
+
+		result, err := service.Create(params)
+		if err != nil {
+			t.Fatalf("Expected no error, got: %v", err)
+		}
+
+		// When AuthorID is set, the internal user path is used (author_id column)
+		var authorID int
+		err = db.QueryRow("SELECT author_id FROM comments WHERE id = ?", result.CommentID).Scan(&authorID)
+		if err != nil {
+			t.Fatalf("Failed to query comment: %v", err)
+		}
+		if authorID != env.UserID {
+			t.Errorf("Expected author_id %d, got %d", env.UserID, authorID)
+		}
+	})
+}
+
+func TestCommentService_CreateCallsEmailReplyService(t *testing.T) {
+	db := createCommentTestDB(t)
+	service := services.NewCommentService(db)
+	env := setupCommentTestEnv(t, db)
+
+	mock := &mockEmailReplyHandler{}
+	service.SetEmailReplyService(mock)
+
+	t.Run("InternalUserComment", func(t *testing.T) {
+		mock.calls = nil
+		params := services.CreateCommentParams{
+			ItemID:      env.ItemID,
+			AuthorID:    env.UserID,
+			Content:     "Internal reply",
+			ActorUserID: env.UserID,
+		}
+
+		_, err := service.Create(params)
+		if err != nil {
+			t.Fatalf("Expected no error, got: %v", err)
+		}
+
+		if len(mock.calls) != 1 {
+			t.Fatalf("Expected 1 call to HandleCommentCreated, got %d", len(mock.calls))
+		}
+		call := mock.calls[0]
+		if call.AuthorID != env.UserID {
+			t.Errorf("Expected AuthorID %d, got %d", env.UserID, call.AuthorID)
+		}
+		if call.ItemID != env.ItemID {
+			t.Errorf("Expected ItemID %d, got %d", env.ItemID, call.ItemID)
+		}
+		if call.PortalCustomerID != nil {
+			t.Error("Expected PortalCustomerID to be nil for internal user")
+		}
+	})
+
+	t.Run("PortalCustomerComment", func(t *testing.T) {
+		mock.calls = nil
+
+		// Create portal customer for this test
+		res, err := db.Exec(`
+			INSERT INTO portal_customers (name, email) VALUES ('Another Customer', 'another@example.com')
+		`)
+		if err != nil {
+			t.Fatalf("Failed to create portal customer: %v", err)
+		}
+		pcID64, _ := res.LastInsertId()
+		pcID := int(pcID64)
+
+		params := services.CreateCommentParams{
+			ItemID:           env.ItemID,
+			AuthorID:         0,
+			PortalCustomerID: &pcID,
+			Content:          "Customer comment",
+			ActorUserID:      0,
+		}
+
+		_, err = service.Create(params)
+		if err != nil {
+			t.Fatalf("Expected no error, got: %v", err)
+		}
+
+		if len(mock.calls) != 1 {
+			t.Fatalf("Expected 1 call to HandleCommentCreated, got %d", len(mock.calls))
+		}
+		call := mock.calls[0]
+		if call.PortalCustomerID == nil {
+			t.Fatal("Expected PortalCustomerID to be set")
+		}
+		if *call.PortalCustomerID != pcID {
+			t.Errorf("Expected PortalCustomerID %d, got %d", pcID, *call.PortalCustomerID)
+		}
+	})
+}
+
 // Remove unused import warning
 var _ = time.Now

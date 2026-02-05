@@ -280,27 +280,11 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get the old asset report for audit logging
-	var oldAR models.AssetReport
-	var oldColumnConfig, oldVisibilityGroupIDs, oldVisibilityOrgIDs *string
-	err = h.db.QueryRow(`
-		SELECT ar.id, ar.channel_id, ar.asset_set_id, ar.name, ar.description,
-		       ar.cql_query, ar.icon, ar.color, ar.display_order, ar.is_active,
-		       ar.column_config, ar.visibility_group_ids, ar.visibility_org_ids,
-		       ar.created_at, ar.updated_at,
-		       c.name as channel_name, ams.name as asset_set_name
-		FROM asset_reports ar
-		LEFT JOIN channels c ON ar.channel_id = c.id
-		LEFT JOIN asset_management_sets ams ON ar.asset_set_id = ams.id
-		WHERE ar.id = ?
-	`, id).Scan(&oldAR.ID, &oldAR.ChannelID, &oldAR.AssetSetID, &oldAR.Name, &oldAR.Description,
-		&oldAR.CQLQuery, &oldAR.Icon, &oldAR.Color, &oldAR.DisplayOrder, &oldAR.IsActive,
-		&oldColumnConfig, &oldVisibilityGroupIDs, &oldVisibilityOrgIDs,
-		&oldAR.CreatedAt, &oldAR.UpdatedAt,
-		&oldAR.ChannelName, &oldAR.AssetSetName)
-	oldAR.ColumnConfig = deserializeStringArray(oldColumnConfig)
-	oldAR.VisibilityGroupIDs = deserializeIntArray(oldVisibilityGroupIDs)
-	oldAR.VisibilityOrgIDs = deserializeIntArray(oldVisibilityOrgIDs)
+	// Get the old asset report fields needed for audit logging
+	var oldName, oldIcon, oldColor string
+	var oldAssetSetID int
+	err = h.db.QueryRow(`SELECT name, asset_set_id, icon, color FROM asset_reports WHERE id = ?`, id).
+		Scan(&oldName, &oldAssetSetID, &oldIcon, &oldColor)
 
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "asset_report")
@@ -385,27 +369,27 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 		details := make(map[string]interface{})
 
 		// Track what changed
-		if oldAR.Name != ar.Name {
+		if oldName != ar.Name {
 			details["name_changed"] = map[string]interface{}{
-				"old": oldAR.Name,
+				"old": oldName,
 				"new": ar.Name,
 			}
 		}
-		if oldAR.AssetSetID != ar.AssetSetID {
+		if oldAssetSetID != ar.AssetSetID {
 			details["asset_set_changed"] = map[string]interface{}{
-				"old": oldAR.AssetSetID,
+				"old": oldAssetSetID,
 				"new": ar.AssetSetID,
 			}
 		}
-		if oldAR.Icon != ar.Icon {
+		if oldIcon != ar.Icon {
 			details["icon_changed"] = map[string]interface{}{
-				"old": oldAR.Icon,
+				"old": oldIcon,
 				"new": ar.Icon,
 			}
 		}
-		if oldAR.Color != ar.Color {
+		if oldColor != ar.Color {
 			details["color_changed"] = map[string]interface{}{
-				"old": oldAR.Color,
+				"old": oldColor,
 				"new": ar.Color,
 			}
 		}

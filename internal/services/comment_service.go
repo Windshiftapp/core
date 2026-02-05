@@ -18,6 +18,22 @@ type WebhookDispatcher interface {
 	DispatchEvent(eventType string, item *models.Item)
 }
 
+// EmailReplyHandler is an interface for handling outbound email replies on comment creation.
+// This avoids an import cycle with the email reply service.
+type EmailReplyHandler interface {
+	HandleCommentCreated(params HandleCommentParams) error
+}
+
+// HandleCommentParams contains the parameters for handling a comment creation event.
+type HandleCommentParams struct {
+	CommentID        int
+	ItemID           int
+	AuthorID         int
+	PortalCustomerID *int
+	Content          string
+	IsPrivate        bool
+}
+
 // CommentService encapsulates comment creation logic used by both HTTP handlers
 // and action automation service.
 type CommentService struct {
@@ -26,16 +42,18 @@ type CommentService struct {
 	notificationService *NotificationService
 	mentionService      *MentionService
 	webhookSender       WebhookDispatcher
+	emailReplyService   EmailReplyHandler
 }
 
 // CreateCommentParams contains the parameters for creating a comment.
 type CreateCommentParams struct {
-	ItemID      int
-	AuthorID    int
-	Content     string     // Raw content (will be sanitized)
-	IsPrivate   bool       // For action automation private notes
-	ActorUserID int        // User performing the action (for notifications)
-	CreatedAt   *time.Time // Optional: override created_at (e.g. for imports preserving original timestamps)
+	ItemID           int
+	AuthorID         int        // Internal user (0 if portal customer without linked user)
+	PortalCustomerID *int       // Portal customer (nil if internal user)
+	Content          string     // Raw content (will be sanitized)
+	IsPrivate        bool       // For action automation private notes
+	ActorUserID      int        // User performing the action (for notifications, 0 for portal customers)
+	CreatedAt        *time.Time // Optional: override created_at (e.g. for imports preserving original timestamps)
 }
 
 // CreateCommentResult contains the result of creating a comment.
@@ -71,6 +89,11 @@ func (s *CommentService) SetWebhookSender(ws WebhookDispatcher) {
 	s.webhookSender = ws
 }
 
+// SetEmailReplyService sets the email reply service for sending threaded replies to portal customers.
+func (s *CommentService) SetEmailReplyService(ers EmailReplyHandler) {
+	s.emailReplyService = ers
+}
+
 // Create creates a new comment with all associated side effects:
 // activity tracking, notifications, mentions, and webhooks.
 func (s *CommentService) Create(params CreateCommentParams) (*CreateCommentResult, error) {
@@ -101,16 +124,25 @@ func (s *CommentService) Create(params CreateCommentParams) (*CreateCommentResul
 	if params.CreatedAt != nil {
 		now = *params.CreatedAt
 	}
-	// AuthorID 0 means no author (e.g. import without user mapping) — store as NULL
-	var authorID interface{}
-	if params.AuthorID != 0 {
-		authorID = params.AuthorID
-	}
+
 	var commentID int64
-	err = s.db.QueryRow(`
-		INSERT INTO comments (item_id, author_id, content, is_private, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
-	`, params.ItemID, authorID, sanitizedContent, params.IsPrivate, now, now).Scan(&commentID)
+	if params.PortalCustomerID != nil && params.AuthorID == 0 {
+		// Portal customer without linked user — insert with portal_customer_id
+		err = s.db.QueryRow(`
+			INSERT INTO comments (item_id, portal_customer_id, content, is_private, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?) RETURNING id
+		`, params.ItemID, *params.PortalCustomerID, sanitizedContent, params.IsPrivate, now, now).Scan(&commentID)
+	} else {
+		// Internal user or portal customer with linked user
+		var authorID interface{}
+		if params.AuthorID != 0 {
+			authorID = params.AuthorID
+		}
+		err = s.db.QueryRow(`
+			INSERT INTO comments (item_id, author_id, content, is_private, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?) RETURNING id
+		`, params.ItemID, authorID, sanitizedContent, params.IsPrivate, now, now).Scan(&commentID)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create comment: %w", err)
 	}
@@ -132,11 +164,19 @@ func (s *CommentService) Create(params CreateCommentParams) (*CreateCommentResul
 		assigneeIDPtr := utils.NullInt64ToPtr(assigneeID)
 		creatorIDPtr := utils.NullInt64ToPtr(creatorID)
 
-		// Get actor username for notification
+		// Get actor name for notification
 		var actorName string
-		_ = s.db.QueryRow("SELECT username FROM users WHERE id = ?", params.ActorUserID).Scan(&actorName)
-		if actorName == "" {
-			actorName = fmt.Sprintf("User #%d", params.ActorUserID)
+		if params.PortalCustomerID != nil {
+			// Portal customer — look up customer name
+			_ = s.db.QueryRow("SELECT name FROM portal_customers WHERE id = ?", *params.PortalCustomerID).Scan(&actorName)
+			if actorName == "" {
+				actorName = "Portal Customer"
+			}
+		} else {
+			_ = s.db.QueryRow("SELECT username FROM users WHERE id = ?", params.ActorUserID).Scan(&actorName)
+			if actorName == "" {
+				actorName = fmt.Sprintf("User #%d", params.ActorUserID)
+			}
 		}
 
 		// Construct the item key (e.g., "TST-1")
@@ -193,7 +233,25 @@ func (s *CommentService) Create(params CreateCommentParams) (*CreateCommentResul
 		}
 	}
 
-	// 8. Return created comment
+	// 8. Handle outbound email reply (if emailReplyService != nil)
+	if s.emailReplyService != nil {
+		if err := s.emailReplyService.HandleCommentCreated(HandleCommentParams{
+			CommentID:        int(commentID),
+			ItemID:           params.ItemID,
+			AuthorID:         params.AuthorID,
+			PortalCustomerID: params.PortalCustomerID,
+			Content:          sanitizedContent,
+			IsPrivate:        params.IsPrivate,
+		}); err != nil {
+			slog.Warn("failed to handle email reply for comment",
+				slog.String("component", "comment_service"),
+				slog.Int64("comment_id", commentID),
+				slog.Any("error", err),
+			)
+		}
+	}
+
+	// 9. Return created comment
 	return &CreateCommentResult{
 		CommentID: commentID,
 	}, nil

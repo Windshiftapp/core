@@ -121,12 +121,12 @@ make build-windows
 ## Build Requirements
 
 ### For Server + Frontend
-- **Go 1.21+** - Backend compilation
+- **Go 1.25+** - Backend compilation
 - **Node.js 18+** - Frontend build
 - **npm** - Package management
 
 ### For WS Client Only
-- **Go 1.21+** - Client compilation only
+- **Go 1.25+** - Client compilation only
 
 ### For Cross-Compilation (release.sh)
 - **Zig** - Cross-compilation toolchain (optional, native builds work without it)
