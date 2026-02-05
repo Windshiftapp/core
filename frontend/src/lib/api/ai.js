@@ -1,4 +1,4 @@
-import { get, post, put, del } from './core.js';
+import { del, get, post, put } from './core.js';
 
 export const ai = {
   status: () => get('/ai/status'),

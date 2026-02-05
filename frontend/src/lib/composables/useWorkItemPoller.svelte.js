@@ -1,6 +1,6 @@
 import { activityStore } from '../stores/activityStore.svelte.js';
 
-const ACTIVE_INTERVAL = 30_000;   // 30 seconds when user is active
+const ACTIVE_INTERVAL = 30_000; // 30 seconds when user is active
 const IDLE_INTERVAL = 5 * 60_000; // 5 minutes when user is idle
 
 /**
@@ -55,7 +55,11 @@ export function useWorkItemPoller(fetchFn) {
 
   return {
     poll,
-    get isPolling() { return isPolling; },
-    get lastPollTime() { return lastPollTime; },
+    get isPolling() {
+      return isPolling;
+    },
+    get lastPollTime() {
+      return lastPollTime;
+    },
   };
 }

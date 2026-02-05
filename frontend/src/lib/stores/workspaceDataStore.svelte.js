@@ -207,7 +207,8 @@ class WorkspaceDataStore {
       milestones: () => api.milestones.getAll(),
       iterations: () => api.iterations.getAll(),
       priorities: () => api.priorities.getAll(),
-      projects: () => api.workspaces.getProjects ? api.workspaces.getProjects(workspaceId) : Promise.resolve([]),
+      projects: () =>
+        api.workspaces.getProjects ? api.workspaces.getProjects(workspaceId) : Promise.resolve([]),
       customFieldDefinitions: () => api.customFields.getAll(),
     };
 

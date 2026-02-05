@@ -52,7 +52,7 @@ class StatusTransitionStore {
     if (fromStatusId === toStatusId) return true;
     const transitions = this.get(itemTypeId, fromStatusId);
     if (!transitions) return false; // fail-safe: deny if unknown
-    return transitions.some(t => t.id === toStatusId);
+    return transitions.some((t) => t.id === toStatusId);
   }
 
   /**
@@ -104,7 +104,10 @@ class StatusTransitionStore {
         this._cache.set(cacheKey, { transitions, fetchedAt: Date.now() });
         return transitions;
       } catch (err) {
-        console.error(`StatusTransitionStore: failed to fetch transitions for key ${cacheKey}`, err);
+        console.error(
+          `StatusTransitionStore: failed to fetch transitions for key ${cacheKey}`,
+          err
+        );
         return [];
       } finally {
         this._pending.delete(cacheKey);

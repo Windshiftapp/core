@@ -45,7 +45,7 @@ class ItemTestCaseLinksStore {
   async loadForItems(itemIds) {
     if (!itemIds || itemIds.length === 0) return;
 
-    const toFetch = itemIds.filter(id => {
+    const toFetch = itemIds.filter((id) => {
       // Skip if already in-flight
       if (this._pending.has(id)) return false;
       // Skip if cached and not expired
@@ -56,14 +56,12 @@ class ItemTestCaseLinksStore {
 
     if (toFetch.length === 0) {
       // Still wait on any in-flight requests for the requested IDs
-      const pending = itemIds
-        .map(id => this._pending.get(id))
-        .filter(Boolean);
+      const pending = itemIds.map((id) => this._pending.get(id)).filter(Boolean);
       if (pending.length > 0) await Promise.all(pending);
       return;
     }
 
-    const fetchPromises = toFetch.map(id => this._fetchForItem(id));
+    const fetchPromises = toFetch.map((id) => this._fetchForItem(id));
     await Promise.all(fetchPromises);
   }
 
@@ -79,21 +77,23 @@ class ItemTestCaseLinksStore {
         const allLinks = [...(links.outgoing || []), ...(links.incoming || [])];
 
         const testCases = allLinks
-          .filter(link => link.link_type_id === 1)
-          .map(link => {
+          .filter((link) => link.link_type_id === 1)
+          .map((link) => {
             const isSource = link.source_type === 'item' && link.source_id === itemId;
-            const testCaseData = isSource ? {
-              id: link.target_id,
-              title: link.target_title,
-              type: link.target_type
-            } : {
-              id: link.source_id,
-              title: link.source_title,
-              type: link.source_type
-            };
+            const testCaseData = isSource
+              ? {
+                  id: link.target_id,
+                  title: link.target_title,
+                  type: link.target_type,
+                }
+              : {
+                  id: link.source_id,
+                  title: link.source_title,
+                  type: link.source_type,
+                };
             return testCaseData.type === 'test_case' ? testCaseData : null;
           })
-          .filter(tc => tc !== null);
+          .filter((tc) => tc !== null);
 
         this._cache.set(itemId, { testCases, fetchedAt: Date.now() });
       } catch (err) {
