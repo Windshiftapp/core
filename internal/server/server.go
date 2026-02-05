@@ -21,6 +21,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/email"
 	"windshift/internal/handlers"
+	"windshift/internal/llm"
 	"windshift/internal/logger"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
@@ -72,6 +73,10 @@ type Config struct {
 	EnableAdminFallback bool
 	// BaseURL is the external URL for the server (used for email links, etc.)
 	BaseURL string
+	// LLMEndpoint is the URL of the LLM inference service (e.g., http://llm:8081)
+	LLMEndpoint string
+	// LLMProvidersFile is the path to a custom LLM providers JSON file (optional)
+	LLMProvidersFile string
 	// FrontendFiles is the embedded filesystem containing frontend assets
 	FrontendFiles embed.FS
 
@@ -600,6 +605,29 @@ func (s *Server) initialize() error {
 	}
 	systemHandler := handlers.NewSystemHandler(shutdownChan)
 
+	// Load LLM provider definitions
+	if cfg.LLMProvidersFile != "" {
+		if err := llm.LoadProviders(cfg.LLMProvidersFile); err != nil {
+			slog.Error("failed to load custom LLM providers file, falling back to built-in defaults", "path", cfg.LLMProvidersFile, "error", err)
+			llm.LoadDefaultProviders()
+		} else {
+			slog.Info("loaded custom LLM providers", "path", cfg.LLMProvidersFile)
+		}
+	} else {
+		llm.LoadDefaultProviders()
+	}
+
+	// LLM connection manager and AI handler
+	fallbackLLMClient := llm.NewClient(llm.Config{Endpoint: cfg.LLMEndpoint})
+	if fallbackLLMClient.Available() {
+		slog.Info("LLM fallback service configured", slog.String("endpoint", cfg.LLMEndpoint))
+	} else {
+		slog.Info("LLM fallback service not configured")
+	}
+	llmManager := llm.NewConnectionManager(s.db, scmProviderHandler.GetEncryption(), fallbackLLMClient)
+	llmConnHandler := handlers.NewLLMConnectionHandler(llmManager)
+	aiHandler := handlers.NewAIHandler(s.db, llmManager, permService)
+
 	// Build API middleware chain
 	corsMiddleware := createCORSMiddleware(cfg.AllowedHosts, effectivePort, cfg.DisableCSRF, cfg.UseProxy)
 	apiMiddleware := router.MiddlewareChain{corsMiddleware, authMiddleware.OptionalAuth}
@@ -758,6 +786,10 @@ func (s *Server) initialize() error {
 			Collection:   collectionHandler,
 			BoardConfig:  boardConfigHandler,
 			TestCoverage: testCoverageHandler,
+		},
+		AI: routes.AIHandlers{
+			AI:            aiHandler,
+			LLMConnection: llmConnHandler,
 		},
 		Misc: routes.MiscHandlers{
 			Homepage:     homepageHandler,

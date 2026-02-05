@@ -1,0 +1,92 @@
+# =============================================================================
+# Windshift Companion LLM Container
+# Bundles llama.cpp with LFM2.5-1.2B-Instruct for local AI inference
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Stage 1: Build llama.cpp from source
+# ---------------------------------------------------------------------------
+FROM alpine:3.21 AS builder
+
+RUN apk add --no-cache build-base cmake git curl-dev linux-headers
+
+# Pin to a release that supports LFM2 architecture (b5460+)
+ARG LLAMA_CPP_TAG=b5535
+RUN git clone --depth 1 --branch ${LLAMA_CPP_TAG} \
+    https://github.com/ggerganov/llama.cpp.git /build/llama.cpp
+
+WORKDIR /build/llama.cpp
+
+RUN cmake -B build \
+    -DGGML_NATIVE=OFF \
+    -DGGML_BACKEND_DL=ON \
+    -DGGML_CPU_ALL_VARIANTS=ON \
+    -DLLAMA_CURL=ON \
+    -DLLAMA_BUILD_TESTS=OFF \
+    -DLLAMA_BUILD_EXAMPLES=OFF \
+    -DLLAMA_BUILD_SERVER=ON \
+    -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build build --target llama-server -j$(nproc)
+
+# ---------------------------------------------------------------------------
+# Stage 2: Download model (separate stage for layer caching)
+# ---------------------------------------------------------------------------
+FROM alpine:3.21 AS model
+
+RUN apk add --no-cache curl
+
+ARG MODEL_REPO=LiquidAI/LFM2.5-1.2B-Instruct-GGUF
+ARG MODEL_FILE=LFM2.5-1.2B-Instruct-Q8_0.gguf
+
+RUN curl -L -o /model.gguf \
+    "https://huggingface.co/${MODEL_REPO}/resolve/main/${MODEL_FILE}"
+
+# ---------------------------------------------------------------------------
+# Stage 3: Runtime
+# ---------------------------------------------------------------------------
+FROM alpine:3.21
+
+RUN apk add --no-cache libgomp libcurl curl ca-certificates libstdc++
+
+# Copy llama-server binary
+COPY --from=builder /build/llama.cpp/build/bin/llama-server /usr/local/bin/llama-server
+
+# Copy shared libraries (backend .so files for runtime CPU detection)
+RUN mkdir -p /usr/local/lib/llama
+COPY --from=builder /build/llama.cpp/build/src/ /tmp/build-src/
+COPY --from=builder /build/llama.cpp/build/ggml/ /tmp/build-ggml/
+RUN find /tmp/build-src -name "*.so*" -exec cp {} /usr/local/lib/llama/ \; && \
+    find /tmp/build-ggml -name "*.so*" -exec cp {} /usr/local/lib/llama/ \; && \
+    rm -rf /tmp/build-src /tmp/build-ggml
+
+ENV LD_LIBRARY_PATH=/usr/local/lib/llama
+
+# Copy model
+COPY --from=model /model.gguf /models/model.gguf
+
+# Configurable server parameters
+ENV LLM_PORT=8081
+ENV LLM_CTX_SIZE=4096
+ENV LLM_THREADS=4
+ENV LLM_THREADS_BATCH=4
+ENV LLM_PARALLEL=2
+ENV LLM_BATCH_SIZE=512
+ENV LLM_UBATCH_SIZE=512
+
+# Run as non-root user (matches windshift pattern)
+USER 65534:65534
+
+HEALTHCHECK --interval=15s --timeout=5s --retries=3 --start-period=120s \
+    CMD curl -f http://localhost:${LLM_PORT}/health || exit 1
+
+EXPOSE ${LLM_PORT}
+
+ENTRYPOINT ["sh", "-c", \
+    "exec llama-server \
+    --model /models/model.gguf \
+    --host 0.0.0.0 --port ${LLM_PORT} \
+    --ctx-size ${LLM_CTX_SIZE} \
+    --threads ${LLM_THREADS} --threads-batch ${LLM_THREADS_BATCH} \
+    --parallel ${LLM_PARALLEL} \
+    --batch-size ${LLM_BATCH_SIZE} --ubatch-size ${LLM_UBATCH_SIZE} \
+    --cont-batching --flash-attn --mlock --no-webui"]

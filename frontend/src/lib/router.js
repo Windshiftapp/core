@@ -17,6 +17,7 @@ const routes = {
   '/personal': 'personal-workspace',
   '/personal/calendar': 'workspace-calendar',
   '/personal/reviews': 'workspace-reviews',
+  '/personal/plan': 'personal-plan',
   '/personal/items/:itemId': 'item-detail',
   '/workspaces/:id/calendar': 'workspace-calendar',
   '/workspaces/:id/reviews': 'workspace-reviews',
@@ -206,6 +207,7 @@ export function isWorkspaceRoute(view) {
   return (
     view === 'workspaces' ||
     view === 'personal-workspace' ||
+    view === 'personal-plan' ||
     view?.startsWith('workspace-') ||
     view?.startsWith('test-') ||
     view === 'item-detail'

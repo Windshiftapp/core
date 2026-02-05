@@ -248,7 +248,7 @@ func (h *ItemHandler) GetScheduledItems(w http.ResponseWriter, r *http.Request) 
 	query := fmt.Sprintf(`
 		SELECT i.id, i.workspace_id, i.workspace_item_number, i.title, i.description, i.status_id, i.priority_id,
 		       i.assignee_id, i.creator_id, i.calendar_data, i.due_date, i.created_at, i.updated_at,
-		       w.name as workspace_name, w.key as workspace_key
+		       w.name as workspace_name, w.key as workspace_key, w.is_personal
 		FROM items i
 		JOIN workspaces w ON i.workspace_id = w.id
 		WHERE i.calendar_data IS NOT NULL AND i.calendar_data != ''
@@ -266,18 +266,24 @@ func (h *ItemHandler) GetScheduledItems(w http.ResponseWriter, r *http.Request) 
 	var allItems []models.Item
 	itemCalendarData := make(map[int][]models.CalendarScheduleEntry) // item.ID -> calendar entries
 
+	// Track is_personal per item ID for the response
+	itemIsPersonal := make(map[int]bool)
+
 	for rows.Next() {
 		var item models.Item
 		var calendarDataJSON sql.NullString
 		var statusID, priorityID, assigneeID, creatorID sql.NullInt64
 		var dueDate sql.NullTime
+		var isPersonal bool
 
 		err := rows.Scan(&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &item.Title, &item.Description,
 			&statusID, &priorityID, &assigneeID, &creatorID, &calendarDataJSON, &dueDate,
-			&item.CreatedAt, &item.UpdatedAt, &item.WorkspaceName, &item.WorkspaceKey)
+			&item.CreatedAt, &item.UpdatedAt, &item.WorkspaceName, &item.WorkspaceKey, &isPersonal)
 		if err != nil {
 			continue
 		}
+
+		itemIsPersonal[item.ID] = isPersonal
 
 		// Handle nullable fields
 		if statusID.Valid {
@@ -356,6 +362,7 @@ func (h *ItemHandler) GetScheduledItems(w http.ResponseWriter, r *http.Request) 
 				"creator_id":          item.CreatorID,
 				"workspace_name":      item.WorkspaceName,
 				"workspace_key":       item.WorkspaceKey,
+				"is_personal":         itemIsPersonal[item.ID],
 				"due_date":            item.DueDate,
 				"created_at":          item.CreatedAt,
 				"updated_at":          item.UpdatedAt,

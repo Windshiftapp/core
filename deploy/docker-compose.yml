@@ -36,6 +36,8 @@ services:
       # - DB_PASSWORD=${POSTGRES_PASSWORD}
       # - DB_NAME=windshift
       # - DB_SSLMODE=disable
+      # --- LLM (uncomment when using llm service) ---
+      # - LLM_ENDPOINT=http://llm:8081
     volumes:
       - windshift-data:/data
       # tmpfs for /tmp - needed for SQLite WAL mode in scratch containers
@@ -57,6 +59,9 @@ services:
     depends_on: []
       # --- PostgreSQL dependency (uncomment when using postgres service) ---
       # postgres:
+      #   condition: service_healthy
+      # --- LLM dependency (uncomment when using llm service) ---
+      # llm:
       #   condition: service_healthy
 
   # ---------------------------------------------------------------------------
@@ -119,6 +124,34 @@ services:
   #   restart: unless-stopped
   #   networks:
   #     - traefik
+
+  # ---------------------------------------------------------------------------
+  # Local LLM Inference (uncomment for AI features like "Plan My Day")
+  # ---------------------------------------------------------------------------
+  # When using the LLM service:
+  #   1. Uncomment this service
+  #   2. Uncomment the LLM_ENDPOINT environment variable in windshift service above
+  #   3. Uncomment the depends_on llm section in windshift service
+  # Note: Container needs ~2 GB RAM (1.25 GB model + KV cache + overhead)
+  # ---------------------------------------------------------------------------
+  # llm:
+  #   build:
+  #     context: ..
+  #     dockerfile: deploy/Dockerfile.llm
+  #   # image: ghcr.io/windshiftapp/llm:latest
+  #   container_name: windshift-llm
+  #   environment:
+  #     LLM_PORT: 8081
+  #     LLM_CTX_SIZE: 4096
+  #     LLM_THREADS: ${LLM_THREADS:-4}
+  #     LLM_PARALLEL: 2
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+  #     interval: 15s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 120s
 
 volumes:
   windshift-data:

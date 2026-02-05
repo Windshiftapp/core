@@ -25,6 +25,13 @@ func NewWorkflowService(db database.Database) *WorkflowService {
 //
 // Returns nil only if NO workflow exists at any level
 func (s *WorkflowService) GetWorkflowIDForItem(workspaceID int, itemTypeID *int) (*int, error) {
+	// Personal workspaces are not bound by workflow rules
+	var isPersonal bool
+	err := s.db.QueryRow(`SELECT is_personal FROM workspaces WHERE id = ?`, workspaceID).Scan(&isPersonal)
+	if err == nil && isPersonal {
+		return nil, nil
+	}
+
 	var workflowID *int
 
 	// Try item type + config set workflow (COALESCE handles item type workflow being NULL)
@@ -45,7 +52,7 @@ func (s *WorkflowService) GetWorkflowIDForItem(workspaceID int, itemTypeID *int)
 	}
 
 	// Try config set default workflow (no item type consideration)
-	err := s.db.QueryRow(`
+	err = s.db.QueryRow(`
 		SELECT cs.workflow_id
 		FROM workspace_configuration_sets wcs
 		JOIN configuration_sets cs ON wcs.configuration_set_id = cs.id

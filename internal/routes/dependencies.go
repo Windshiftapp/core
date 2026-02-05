@@ -56,6 +56,7 @@ type Deps struct {
 	Portal      PortalHandlers
 	Assets      AssetHandlers
 	Collections CollectionHandlers
+	AI          AIHandlers
 	Misc        MiscHandlers
 }
 
@@ -199,6 +200,12 @@ type CollectionHandlers struct {
 	Collection   *handlers.CollectionHandler
 	BoardConfig  *handlers.BoardConfigurationHandler
 	TestCoverage *handlers.TestCoverageHandler
+}
+
+// AIHandlers groups AI-related handlers.
+type AIHandlers struct {
+	AI            *handlers.AIHandler
+	LLMConnection *handlers.LLMConnectionHandler
 }
 
 // MiscHandlers groups miscellaneous handlers.

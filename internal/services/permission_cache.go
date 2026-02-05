@@ -30,6 +30,9 @@ type PermissionService struct {
 	// Configuration
 	ttl       time.Duration
 	batchSize int
+
+	// Static data cached at startup
+	allPermissionKeys []string
 }
 
 // PermissionCacheConfig represents configuration for the permission cache
@@ -77,6 +80,13 @@ func NewPermissionService(db database.Database, config PermissionCacheConfig) (*
 		ttl:       config.TTL,
 		batchSize: config.BatchSize,
 		loadTimes: make([]int64, 0, 1000), // Track last 1000 load times
+	}
+
+	// Pre-load all permission keys (static data)
+	if err := service.loadAllPermissionKeys(); err != nil {
+		slog.Warn("Failed to pre-load permission keys; will lazy-load on first cache build",
+			slog.String("component", "permissions"),
+			slog.Any("error", err))
 	}
 
 	// Warm up cache if configured
@@ -973,6 +983,43 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 		}
 	}
 
+	// Grant all permissions for personal workspaces owned by this user
+	personalRows, err := ps.db.Query(`
+		SELECT w.id FROM workspaces w WHERE w.is_personal = 1 AND w.owner_id = ? AND w.active = 1
+	`, userID)
+	if err == nil {
+		defer func() { _ = personalRows.Close() }()
+
+		// Lazy-load if startup pre-load failed
+		if len(ps.allPermissionKeys) == 0 {
+			if err := ps.loadAllPermissionKeys(); err != nil {
+				slog.Warn("Failed to lazy-load permission keys for personal workspace grant",
+					slog.String("component", "permissions"),
+					slog.Int("user_id", userID),
+					slog.Any("error", err))
+			}
+		}
+
+		if len(ps.allPermissionKeys) > 0 {
+			for personalRows.Next() {
+				var wsID int
+				if err := personalRows.Scan(&wsID); err != nil {
+					continue
+				}
+				if cached.WorkspacePermissions[wsID] == nil {
+					cached.WorkspacePermissions[wsID] = make(map[string]bool)
+				}
+				for _, key := range ps.allPermissionKeys {
+					cached.WorkspacePermissions[wsID][key] = true
+				}
+				if cached.PermissionSources[wsID] == nil {
+					cached.PermissionSources[wsID] = make(map[string]string)
+				}
+				cached.PermissionSources[wsID]["_source"] = "personal_owner"
+			}
+		}
+	}
+
 	return cached, nil
 }
 
@@ -1039,6 +1086,27 @@ func (ps *PermissionService) getRolePermissions(roleID int) (map[string]bool, er
 		}
 	}
 	return perms, nil
+}
+
+// loadAllPermissionKeys fetches all permission keys from the database and
+// stores them on the service. The permissions table is static, so this only
+// needs to run once (at startup or lazily on first cache build).
+func (ps *PermissionService) loadAllPermissionKeys() error {
+	rows, err := ps.db.Query(`SELECT permission_key FROM permissions`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var keys []string
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err == nil {
+			keys = append(keys, key)
+		}
+	}
+	ps.allPermissionKeys = keys
+	return nil
 }
 
 func clonePermissionSet(src map[string]bool) map[string]bool {

@@ -24,6 +24,7 @@
   import SSOSettings from '../settings/SSOSettings.svelte';
   import SCMProviderManager from '../settings/SCMProviderManager.svelte';
   import SecuritySettings from '../settings/SecuritySettings.svelte';
+  import LLMConnectionManager from '../settings/LLMConnectionManager.svelte';
   import AssetManager from '../features/assets/AssetManager.svelte';
   import Channels from '../features/channels/Channels.svelte';
   import PermissionSetEdit from '../settings/PermissionSetEdit.svelte';
@@ -37,7 +38,7 @@
     Settings, UserStar, Layout, Database, GitBranch,
     Workflow, Package, Link, Paperclip, Puzzle,
     Network, FileText, Shield, Bell, Search, X,
-    Layers, Cog, LinkIcon, UserCheck, MessageSquare, Folder, UsersRound, Palette, Notebook, Grip, ScrollText, AlertCircle, KeyRound, BadgeCheck, GitMerge, CloudDownload, LifeBuoy
+    Layers, Cog, LinkIcon, UserCheck, MessageSquare, Folder, UsersRound, Palette, Notebook, Grip, ScrollText, AlertCircle, KeyRound, BadgeCheck, GitMerge, CloudDownload, LifeBuoy, Sparkles
   } from 'lucide-svelte';
   import { useEventListener } from 'runed';
 
@@ -95,6 +96,7 @@
       label: t('settings.adminGroups.integrationLinks'),
       icon: LinkIcon,
       items: [
+        { id: 'llm-connections', label: t('settings.adminItems.llmConnections.title'), icon: Sparkles, description: t('settings.adminItems.llmConnections.description') },
         { id: 'scm-providers', label: t('settings.adminItems.scmProviders.title'), icon: GitMerge, description: t('settings.adminItems.scmProviders.description') },
         { id: 'system-import', label: t('settings.adminItems.systemImport.title'), icon: CloudDownload, description: t('settings.adminItems.systemImport.description') },
         { id: 'link-types', label: t('settings.adminItems.linkTypes.title'), icon: Link, description: t('settings.adminItems.linkTypes.description') },
@@ -541,6 +543,11 @@
   <!-- SCM Providers Tab -->
   {#if activeTab === 'scm-providers'}
     <SCMProviderManager />
+  {/if}
+
+  <!-- LLM Connections Tab -->
+  {#if activeTab === 'llm-connections'}
+    <LLMConnectionManager />
   {/if}
 
   <!-- System Import Tab -->

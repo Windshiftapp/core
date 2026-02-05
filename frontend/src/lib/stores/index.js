@@ -96,6 +96,11 @@ export { itemTestCaseLinksStore } from './itemTestCaseLinksStore.svelte.js';
 // Methods: activityStore.init()
 // Tracks user idle state for adaptive polling
 export { activityStore } from './activityStore.svelte.js';
+// AI store
+// Access via: aiStore.available, aiStore.loaded, aiStore.loading
+// Methods: aiStore.load(), aiStore.reload()
+// Provides AI feature availability status for UI components (checks item_analysis LLM connection)
+export { aiStore } from './aiStore.svelte.js';
 // Workspace stores
 // Access currentWorkspace.workspace and workspacesStore properties:
 // workspacesStore.allWorkspaces, workspacesStore.regularWorkspaces,

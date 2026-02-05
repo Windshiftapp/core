@@ -89,6 +89,10 @@ export default {
         description: 'Configure inbound and outbound channels, portals, and webhooks',
       },
       assets: { title: 'Assets', description: 'Manage asset sets, types, categories, and assets' },
+      llmConnections: {
+        title: 'AI Connections',
+        description: 'Configure AI model providers for intelligent features',
+      },
     },
 
     // Attachment Settings

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Plus, CheckSquare, Calendar, Home, Inbox, SquareKanban, List, GitBranch, MapPin, Settings, BookOpen, Package, ChevronDown, FileCheck, FileStack, Play, BarChart3, ListTree, Milestone, Grip, Zap, Palette } from 'lucide-svelte';
+  import { Plus, CheckSquare, Calendar, Home, Inbox, SquareKanban, List, GitBranch, MapPin, Settings, BookOpen, Package, ChevronDown, FileCheck, FileStack, Play, BarChart3, ListTree, Milestone, Grip, Zap, Palette, Sparkles } from 'lucide-svelte';
   import { workspaceIconMap } from '../utils/icons.js';
   import { navigate, currentRoute } from '../router.js';
   import { currentWorkspace, workspacePermissions } from '../stores';
@@ -362,6 +362,16 @@
       >
         <Calendar class="w-4 h-4" />
         Weekly Calendar
+      </button>
+      <button
+        onclick={() => navigate('/personal/plan')}
+        class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item"
+        style={$currentRoute.view === 'personal-plan' ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
+        onmouseenter={(e) => { if ($currentRoute.view !== 'personal-plan') e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
+        onmouseleave={(e) => { if ($currentRoute.view !== 'personal-plan') e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
+      >
+        <Sparkles class="w-4 h-4" />
+        Plan My Day
       </button>
     </nav>
   </div>

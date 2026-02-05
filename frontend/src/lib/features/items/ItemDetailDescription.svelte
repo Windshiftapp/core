@@ -4,10 +4,11 @@
   import Button from '../../components/Button.svelte';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import AttachmentDiagramList from '../assets/AttachmentDiagramList.svelte';
+  import AIActionsDropdown from './AIActionsDropdown.svelte';
   import { createEventDispatcher } from 'svelte';
   import { getShortcut, matchesShortcut, getDisplayString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { attachmentStatus } from '../../stores';
+  import { attachmentStatus, aiStore } from '../../stores';
   import { onClickOutside } from 'runed';
 
   const dispatch = createEventDispatcher();
@@ -25,7 +26,8 @@
     attachments = [],
     diagrams = [],
     showLinkButton = true,
-    manualActions = []
+    manualActions = [],
+    canCreate = false,
   } = $props();
 
   let milkdownEditor = $state(null);
@@ -267,6 +269,14 @@
           </div>
         {/if}
       </div>
+    {/if}
+    {#if aiStore.available}
+      <AIActionsDropdown
+        {item}
+        {availableSubIssueTypes}
+        {canCreate}
+        on:ai-action
+      />
     {/if}
   </div>
 

@@ -6,6 +6,7 @@
   import EmailVerificationBanner from '../features/notifications/EmailVerificationBanner.svelte';
   import { moduleSettings } from '../stores/moduleSettings.js';
   import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
+  import { aiStore } from '../stores/aiStore.svelte.js';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import NotFound from './NotFound.svelte';
@@ -94,7 +95,8 @@
     'workspace-reviews': () => import('../features/personal/PersonalReview.svelte'),
     'workflow-designer': () => import('../features/workflows/WorkflowDesigner.svelte'),
     'configuration-set-detail': () => import('../settings/ConfigurationSetDetail.svelte'),
-    'workspace-look-and-feel': () => import('../workspaces/WorkspaceLookAndFeel.svelte')
+    'workspace-look-and-feel': () => import('../workspaces/WorkspaceLookAndFeel.svelte'),
+    'personal-plan': () => import('../features/personal/PlanMyDay.svelte')
   };
 
   // Preload all chunks after initial load for faster navigation
@@ -334,6 +336,11 @@
       errorMsg: 'Failed to load Look and Feel',
       wrapper: 'none',
       getProps: (route) => ({ workspaceId: route.params.id })
+    },
+    'personal-plan': {
+      loadingMsg: 'Loading Plan My Day...',
+      errorMsg: 'Failed to load Plan My Day',
+      wrapper: 'surface-full'
     }
   };
 
@@ -399,6 +406,7 @@
     workspacesStore.loadPersonalWorkspace();
     moduleSettings.load();
     attachmentStatus.load();
+    aiStore.load();
     // Load all permissions for permission checking (admin only)
     await permissionStore.loadAllPermissions(authStore.currentUser);
     // Load workspace permissions for current user
@@ -514,7 +522,7 @@
   // Load current workspace when route changes (only for workspace routes)
   $effect(() => {
     // Handle personal workspace routes
-    if ($currentRoute.path?.startsWith('/personal') && ($currentRoute.view?.startsWith('workspace-') || $currentRoute.view === 'personal-workspace' || $currentRoute.view === 'item-detail')) {
+    if ($currentRoute.path?.startsWith('/personal') && ($currentRoute.view?.startsWith('workspace-') || $currentRoute.view === 'personal-workspace' || $currentRoute.view === 'personal-plan' || $currentRoute.view === 'item-detail')) {
       const personalWorkspaceId = $workspacesStore.personalWorkspace?.id;
       if (personalWorkspaceId) {
         currentWorkspace.load(personalWorkspaceId);

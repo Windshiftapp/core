@@ -6,7 +6,7 @@
   import { workspacePermissions, itemDetailStore } from '../../stores';
   import { t } from '../../stores/i18n.svelte.js';
   import { toHotkeyString, getShortcut, matchesShortcut, isTypingInField } from '../../utils/keyboardShortcuts.js';
-  import { Trash2, FileText, AlertCircle, X, Maximize2, Minimize2, Copy } from 'lucide-svelte';
+  import { Trash2, FileText, AlertCircle, X, Maximize2, Minimize2, Copy, BookOpen, Search, GitBranch } from 'lucide-svelte';
   import { scale, fly } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
   import { Bookmark, BookmarkCheck, ExternalLink } from 'lucide-svelte';
@@ -24,6 +24,10 @@
 import Modal from '../../dialogs/Modal.svelte';
 import DeleteItemDialog from '../../dialogs/DeleteItemDialog.svelte';
 import LinkItemModal from '../../dialogs/LinkItemModal.svelte';
+import AIViewModal from '../../dialogs/AIViewModal.svelte';
+import AIConfirmModal from '../../dialogs/AIConfirmModal.svelte';
+import CatchMeUpBriefing from './CatchMeUpBriefing.svelte';
+import FindSimilarResults from './FindSimilarResults.svelte';
 
   // Import the shared content component
   import ItemDetailContent from '../items/ItemDetailContent.svelte';
@@ -707,6 +711,72 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     }
   });
 
+  // --- AI Actions ---
+  let aiModalType = $state(null);
+  let aiLoading = $state(false);
+  let aiError = $state(null);
+  let aiResult = $state(null);
+  let aiCreating = $state(false);
+
+  async function handleAIAction(detail) {
+    const { action } = detail;
+    aiModalType = action;
+    aiLoading = true;
+    aiError = null;
+    aiResult = null;
+    try {
+      if (action === 'catch-me-up') {
+        aiResult = await api.ai.catchMeUp(itemId);
+      } else if (action === 'find-similar') {
+        aiResult = await api.ai.findSimilar(itemId);
+      } else if (action === 'decompose') {
+        aiResult = await api.ai.decompose(itemId);
+      }
+    } catch (err) {
+      aiError = err.message || 'AI analysis failed';
+    } finally {
+      aiLoading = false;
+    }
+  }
+
+  function closeAIModal() {
+    aiModalType = null;
+    aiLoading = false;
+    aiError = null;
+    aiResult = null;
+    aiCreating = false;
+  }
+
+  async function handleCreateSubTasks(selectedTasks) {
+    if (!selectedTasks.length || !item) return;
+    aiCreating = true;
+    try {
+      const childTypeId = availableSubIssueTypes[0]?.id;
+      if (!childTypeId) {
+        errorToast('No child item type available');
+        return;
+      }
+      for (const task of selectedTasks) {
+        await api.items.create({
+          title: task.title,
+          description: task.description || '',
+          workspace_id: parseInt(workspaceId),
+          parent_id: parseInt(itemId),
+          item_type_id: childTypeId,
+        });
+      }
+      successToast(`Created ${selectedTasks.length} sub-task${selectedTasks.length > 1 ? 's' : ''}`);
+      closeAIModal();
+      // Reload child items
+      await itemDetailStore.loadChildItems();
+    } catch (err) {
+      console.error('Failed to create sub-tasks:', err);
+      errorToast(err.message || 'Failed to create sub-tasks');
+    } finally {
+      aiCreating = false;
+    }
+  }
+
   // Handler for executing a manual action
   async function handleExecuteAction(detail) {
     const action = detail;
@@ -993,6 +1063,8 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     diagrams={itemDetailStore.diagrams}
     loadingDiagrams={itemDetailStore.loadingDiagrams}
     manualActions={itemDetailStore.manualActions}
+    canCreate={untrack(() => workspacePermissions.canCreate(workspaceId))}
+    onaiAction={handleAIAction}
     onnavigate={handleNavigate}
     ongoBack={handleGoBack}
     oncopyKey={handleCopyKey}
@@ -1167,3 +1239,41 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   on:submit={handleLinkCreated}
   on:cancel={handleLinkModalCancel}
 />
+
+<!-- AI View Modal (Catch Me Up / Find Similar) -->
+{#if aiModalType === 'catch-me-up' || aiModalType === 'find-similar'}
+  <AIViewModal
+    show={aiModalType === 'catch-me-up' || aiModalType === 'find-similar'}
+    title={aiModalType === 'catch-me-up' ? 'Catch Me Up' : 'Find Similar Items'}
+    icon={aiModalType === 'catch-me-up' ? BookOpen : Search}
+    loading={aiLoading}
+    error={aiError}
+    onclose={closeAIModal}
+  >
+    {#if aiResult && aiModalType === 'catch-me-up'}
+      <CatchMeUpBriefing briefing={aiResult.briefing} itemKey={aiResult.item_key} />
+    {:else if aiResult && aiModalType === 'find-similar'}
+      <FindSimilarResults
+        similarItems={aiResult.similar_items || []}
+        summary={aiResult.summary}
+        onnavigate={handleNavigate}
+      />
+    {/if}
+  </AIViewModal>
+{/if}
+
+<!-- AI Confirm Modal (Decompose) -->
+{#if aiModalType === 'decompose'}
+  <AIConfirmModal
+    show={aiModalType === 'decompose'}
+    title="Break Down Into Sub-Tasks"
+    icon={GitBranch}
+    loading={aiLoading}
+    error={aiError}
+    subTasks={aiResult?.sub_tasks || []}
+    reasoning={aiResult?.reasoning || ''}
+    creating={aiCreating}
+    onclose={closeAIModal}
+    oncreate={handleCreateSubTasks}
+  />
+{/if}

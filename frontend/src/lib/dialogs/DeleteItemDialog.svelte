@@ -33,6 +33,7 @@
   const descendantCount = $derived(deleteInfo?.descendantCount || 0);
   const totalCount = $derived(descendantCount + 1);
   const canConfirmDelete = $derived(
+    (deleteInfo && !hasChildren) ||
     (selectedMode === 'reparent' && (selectedNewParentId !== null || deleteInfo?.parentId === null)) ||
     (selectedMode === 'deleteAll' && confirmText.trim() === item?.title?.trim())
   );

@@ -1,5 +1,5 @@
 <script>
-  import { onMount, createEventDispatcher } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../../api.js';
   import { attachmentStatus } from '../../stores';
   import Modal from '../../dialogs/Modal.svelte';
@@ -17,13 +17,13 @@
   // Use centralized icon map for work item types
   const iconMap = itemTypeIconMap;
 
-  const dispatch = createEventDispatcher();
-
   let {
     itemId,
     workspaceId,
     statuses = [],
-    isModal = true
+    isModal = true,
+    onclose = null,
+    onupdate = null
   } = $props();
 
   // Load statuses if not provided (for full-page mode)
@@ -189,7 +189,7 @@
       if (targetStatusId) {
         await api.items.update(item.id, { status_id: targetStatusId });
         item = { ...item, status_id: targetStatusId };
-        dispatch('update');
+        onupdate?.();
       }
     } catch (err) {
       console.error('Failed to toggle done status:', err);
@@ -211,7 +211,7 @@
       await api.items.update(item.id, { title: editTitle.trim() });
       item = { ...item, title: editTitle.trim() };
       editingTitle = false;
-      dispatch('update');
+      onupdate?.();
     } catch (err) {
       console.error('Failed to save title:', err);
       error = err.message;
@@ -226,7 +226,7 @@
       await api.items.update(item.id, { description: editDescription });
       item = { ...item, description: editDescription };
       editingDescription = false;
-      dispatch('update');
+      onupdate?.();
     } catch (err) {
       console.error('Failed to save description:', err);
       error = err.message;
@@ -242,7 +242,7 @@
       await api.items.update(item.id, { due_date: dueDate });
       item = { ...item, due_date: dueDate };
       editingDueDate = false;
-      dispatch('update');
+      onupdate?.();
     } catch (err) {
       console.error('Failed to save due date:', err);
       error = err.message;
@@ -318,7 +318,7 @@
 
   function closeModal() {
     if (isModal) {
-      dispatch('close');
+      onclose?.();
     } else {
       // Full-page mode: navigate back
       window.history.back();

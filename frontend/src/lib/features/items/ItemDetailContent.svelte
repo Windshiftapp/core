@@ -95,6 +95,8 @@
     onattachmentPageSizeChange = null,
     ondiagramSaved = null,
     onexecuteAction = null,
+    onaiAction = null,
+    canCreate = false,
     onclose = null,
   } = $props();
 
@@ -297,6 +299,10 @@
   function handleExecuteAction(event) {
     onexecuteAction?.(event.detail);
   }
+
+  function handleAIAction(event) {
+    onaiAction?.(event.detail);
+  }
 </script>
 
 {#if loading}
@@ -370,6 +376,7 @@
             {attachments}
             {diagrams}
             {manualActions}
+            {canCreate}
             on:save-field={handleSaveField}
             on:cancel-edit={handleCancelEdit}
             on:start-editing-description={() => onstartEditingDescription?.()}
@@ -383,6 +390,7 @@
             on:edit-diagram={(e) => handleEditDiagram(e.detail)}
             on:delete-diagram={(e) => handleDeleteDiagram(e.detail)}
             on:execute-action={handleExecuteAction}
+            on:ai-action={handleAIAction}
           />
 
           <ItemDetailLinks

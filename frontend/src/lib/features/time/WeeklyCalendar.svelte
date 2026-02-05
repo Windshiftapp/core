@@ -241,16 +241,12 @@
   }
 
   // Close item modal
-  async function closeItemModal(event) {
+  async function closeItemModal() {
     showItemModal = false;
     selectedItemId = null;
     selectedWorkspaceId = null;
-
-    // Reload data if changes were made
-    if (event?.detail?.hasChanges) {
-      await loadScheduledItems();
-      await loadAssignedWorkItems();
-    }
+    await loadScheduledItems();
+    await loadAssignedWorkItems();
   }
 
   // Get all tasks for the current week (work items only)
@@ -557,7 +553,7 @@
           workspace_name: item.workspace_name,
           workspace_key: item.workspace_key,
           workspace_id: item.workspace_id,
-          is_personal: item.workspace_name === "User's Todo List",
+          is_personal: item.is_personal === true || item.is_personal === 1,
           type: 'work-item',
           scheduledDate: dateKey,
           scheduledTime: item.scheduled_time || null,
@@ -1085,7 +1081,7 @@
                               <button
                                 onclick={(e) => { e.stopPropagation(); openWorkItem(workItem); }}
                                 class="text-xs font-medium truncate block w-full text-left cursor-pointer hover:underline"
-                                style="color: var(--ds-text);"
+                                style="color: var(--ds-text);{isPersonalTaskCompleted(workItem) ? ' text-decoration: line-through;' : ''}"
                               >
                                 {workItem.title}
                               </button>
@@ -1145,7 +1141,7 @@
                             <button
                               onclick={(e) => { e.stopPropagation(); openWorkItem(workItem); }}
                               class="text-xs font-medium truncate flex-1 text-left cursor-pointer hover:underline"
-                              style="color: var(--ds-text);"
+                              style="color: var(--ds-text);{isPersonalTaskCompleted(workItem) ? ' text-decoration: line-through;' : ''}"
                             >
                               {workItem.title}
                             </button>

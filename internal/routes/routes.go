@@ -17,5 +17,6 @@ func RegisterAll(deps *Deps) {
 	RegisterPortalRoutes(deps)
 	RegisterAssetRoutes(deps)
 	RegisterCollectionRoutes(deps)
+	RegisterAIRoutes(deps)
 	RegisterMiscRoutes(deps)
 }

@@ -113,6 +113,7 @@ func main() {
 	var tlsKeyPath string
 	var disablePlugins bool
 	var enableAdminFallback bool
+	var llmProvidersFile string
 	flag.StringVar(&port, "port", "8080", "Port to run the HTTP server on")
 	flag.StringVar(&port, "p", "8080", "Port to run the HTTP server on (shorthand)")
 	flag.StringVar(&dbPath, "db", "windshift.db", "Database file path (SQLite)")
@@ -136,6 +137,7 @@ func main() {
 	flag.StringVar(&tlsKeyPath, "tls-key", "", "Path to TLS key file (enables HTTPS)")
 	flag.BoolVar(&disablePlugins, "disable-plugins", false, "Disable the plugin system (prevents loading and uploading plugins)")
 	flag.BoolVar(&enableAdminFallback, "enable-fallback", false, "Enable admin password fallback for restrictive auth policies (disabled by default for security)")
+	flag.StringVar(&llmProvidersFile, "llm-providers", "", "Path to custom LLM providers JSON file (overrides built-in provider list)")
 	flag.Parse()
 
 	// Initialize logger early, before any other operations
@@ -252,6 +254,14 @@ func main() {
 		enableAdminFallback = true
 	}
 
+	// LLM endpoint for AI features
+	llmEndpoint := os.Getenv("LLM_ENDPOINT")
+
+	// LLM providers file override
+	if envLLMProviders := os.Getenv("LLM_PROVIDERS_FILE"); envLLMProviders != "" && llmProvidersFile == "" {
+		llmProvidersFile = envLLMProviders
+	}
+
 	// Validate additional proxies requires use-proxy
 	if additionalProxies != "" && !useProxy {
 		slog.Warn("--additional-proxies ignored: --use-proxy not enabled")
@@ -288,6 +298,8 @@ func main() {
 		DisablePlugins:      disablePlugins,
 		EnableAdminFallback: enableAdminFallback,
 		BaseURL:             baseURL,
+		LLMEndpoint:         llmEndpoint,
+		LLMProvidersFile:    llmProvidersFile,
 		FrontendFiles:       frontendFiles,
 		ShutdownChan:        shutdownChan,
 	}

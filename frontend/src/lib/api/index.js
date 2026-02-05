@@ -1,6 +1,7 @@
 // Main API barrel export - assembles all domain modules into single api object
 
 import { actions } from './actions.js';
+import { ai, llmConnections, llmProviders } from './ai.js';
 import { securitySettings, setup, system, themes } from './admin.js';
 import {
   assetCategories,
@@ -328,6 +329,15 @@ export const api = {
 
   // Workspace Actions (automation)
   actions,
+
+  // AI features
+  ai,
+
+  // LLM connection management (admin)
+  llmConnections,
+
+  // LLM provider info (user)
+  llmProviders,
 };
 
 // Security settings exports

@@ -1,0 +1,42 @@
+{
+  "providers": [
+    {
+      "type": "anthropic",
+      "name": "Anthropic",
+      "api_format": "anthropic",
+      "base_url": "https://api.anthropic.com",
+      "models": [
+        {"id": "claude-sonnet-4-20250514", "name": "Claude Sonnet 4", "max_tokens": 8192},
+        {"id": "claude-haiku-3-5-20241022", "name": "Claude 3.5 Haiku", "max_tokens": 8192}
+      ]
+    },
+    {
+      "type": "openai",
+      "name": "OpenAI",
+      "api_format": "openai",
+      "base_url": "https://api.openai.com",
+      "models": [
+        {"id": "gpt-4o", "name": "GPT-4o", "max_tokens": 4096},
+        {"id": "gpt-4o-mini", "name": "GPT-4o Mini", "max_tokens": 4096}
+      ]
+    },
+    {
+      "type": "zai",
+      "name": "Z.AI",
+      "api_format": "openai",
+      "base_url": "https://api.z.ai/api/paas/v4",
+      "chat_path": "/chat/completions",
+      "models": [
+        {"id": "glm-4.7", "name": "GLM-4.7", "max_tokens": 8192},
+        {"id": "glm-4.5", "name": "GLM-4.5", "max_tokens": 8192}
+      ]
+    },
+    {
+      "type": "local",
+      "name": "Local / Custom",
+      "api_format": "openai",
+      "base_url": "",
+      "models": []
+    }
+  ]
+}

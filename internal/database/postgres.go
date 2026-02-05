@@ -101,6 +101,9 @@ var actionsSchemaPostgres string
 //go:embed schema/labels_postgres.sql
 var labelsSchemaPostgres string
 
+//go:embed schema/llm_postgres.sql
+var llmSchemaPostgres string
+
 // PostgresDB implements the Database interface for PostgreSQL
 type PostgresDB struct {
 	db  *sql.DB
@@ -283,6 +286,14 @@ func (p *PostgresDB) Initialize() error {
 			}
 		}
 
+		// Create LLM tables if they don't exist (for existing databases)
+		llmContent := strings.TrimSpace(llmSchemaPostgres)
+		if llmContent != "" {
+			if _, err := p.db.Exec(llmContent); err != nil {
+				slog.Warn("llm postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
 		return nil
 	}
 
@@ -367,6 +378,7 @@ func (p *PostgresDB) getPostgresSchemaFiles() []schemaFile {
 		{"jira_import_postgres.sql", jiraImportSchemaPostgres},
 		{"actions_postgres.sql", actionsSchemaPostgres},
 		{"labels_postgres.sql", labelsSchemaPostgres},
+		{"llm_postgres.sql", llmSchemaPostgres},
 	}
 }
 
