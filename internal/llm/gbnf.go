@@ -56,7 +56,7 @@ func (g *gbnfGenerator) uniqueName(base string) string {
 }
 
 func (g *gbnfGenerator) String() string {
-	var lines []string
+	lines := make([]string, 0, len(g.ruleOrder))
 
 	// Add common rules first
 	g.addCommonRules()
@@ -143,7 +143,7 @@ func (g *gbnfGenerator) generateObject(name string, s *jsonSchema) string {
 	}
 
 	// Determine which properties to include
-	var props []string
+	props := make([]string, 0, len(s.Properties))
 	requiredSet := make(map[string]bool)
 	for _, r := range s.Required {
 		requiredSet[r] = true
@@ -158,11 +158,9 @@ func (g *gbnfGenerator) generateObject(name string, s *jsonSchema) string {
 
 	// If additionalProperties is false, only include defined properties
 	// For GBNF we always only include defined properties
-	for _, propName := range propNames {
-		// For simplicity, include all defined properties
-		// (In a full implementation, we'd handle optional vs required differently)
-		props = append(props, propName)
-	}
+	// For simplicity, include all defined properties
+	// (In a full implementation, we'd handle optional vs required differently)
+	props = append(props, propNames...)
 
 	if len(props) == 0 {
 		return `"{" ws "}"`

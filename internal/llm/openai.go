@@ -58,7 +58,7 @@ func (c *openaiClient) ChatCompletion(ctx context.Context, req ChatCompletionReq
 			"type": "json_schema",
 			"json_schema": map[string]interface{}{
 				"name":   req.StructuredOutput.SchemaName,
-				"schema": json.RawMessage(req.StructuredOutput.Schema),
+				"schema": req.StructuredOutput.Schema,
 				"strict": req.StructuredOutput.Strict,
 			},
 		}
