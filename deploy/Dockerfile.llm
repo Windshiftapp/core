@@ -78,4 +78,4 @@ ENTRYPOINT ["sh", "-c", \
     --threads ${LLM_THREADS} --threads-batch ${LLM_THREADS_BATCH} \
     --parallel ${LLM_PARALLEL} \
     --batch-size ${LLM_BATCH_SIZE} --ubatch-size ${LLM_UBATCH_SIZE} \
-    --cont-batching --flash-attn --mlock --no-webui"]
+    --cont-batching --flash-attn on --mlock --no-webui"]
