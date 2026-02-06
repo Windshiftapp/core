@@ -113,6 +113,7 @@ function parseArgs() {
     keepServer: true,
     cleanDb: false,
     challenge: false,
+    scale: false,
     adminUser: 'admin',
     adminPassword: 'admin'
   };
@@ -147,6 +148,9 @@ function parseArgs() {
       case '--challenge':
         options.challenge = true;
         break;
+      case '--scale':
+        options.scale = true;
+        break;
       case '--admin-user':
         options.adminUser = args[++i];
         break;
@@ -170,6 +174,7 @@ ${colors.cyan}Options:${colors.reset}
   --stop-server          Stop server after completion (for CI/e2e tests)
   --clean                Delete existing database before generating demo
   --challenge            Include edge-case and security test data
+  --scale                Generate large-scale dataset (22 workspaces, 10,000+ items)
   --admin-user <user>    Admin username for login (default: admin)
   --admin-password <pw>  Admin password for login (default: admin)
   --help                 Show this help message
@@ -1943,6 +1948,53 @@ async function createPersonalTasks(baseURL, token, personalTasksData = personalT
   return createdCount;
 }
 
+// Create comments on items (scale mode)
+async function createComments(baseURL, token, itemMap, userMap, scaleModule) {
+  logSection('Creating Comments (Scale)');
+
+  const rng = scaleModule.createRNG(99999);
+  const commentData = scaleModule.generateCommentsForItems(itemMap, userMap, rng);
+
+  let createdCount = 0;
+  let errorCount = 0;
+
+  for (const { itemKey, comments } of commentData) {
+    const itemId = itemMap[itemKey];
+    if (!itemId) continue;
+
+    for (const comment of comments) {
+      const userId = userMap[comment.username];
+      if (!userId) continue;
+
+      try {
+        const response = await makeRequest('POST', `${baseURL}/api/items/${itemId}/comments`, {
+          content: comment.content,
+          author_id: userId,
+          is_private: comment.is_private
+        }, { 'Authorization': `Bearer ${token}` });
+
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          createdCount++;
+        } else {
+          errorCount++;
+        }
+      } catch (err) {
+        errorCount++;
+      }
+
+      if (createdCount > 0 && createdCount % 100 === 0) {
+        logInfo(`  ...created ${createdCount} comments so far`);
+      }
+    }
+  }
+
+  if (errorCount > 0) {
+    logError(`Failed to create ${errorCount} comments`);
+  }
+  logSuccess(`Created ${createdCount} comments on items`);
+  return createdCount;
+}
+
 // Main execution
 async function main() {
   const options = parseArgs();
@@ -1962,19 +2014,44 @@ ${colors.reset}`);
     logInfo('Challenge mode enabled - including edge-case and security test data');
   }
 
-  // Helper to merge normal + challenge data
-  function getMergedData(normalData, challengeKey) {
-    if (!challengeData || !challengeData[challengeKey]) return normalData;
+  // Conditionally load scale data
+  let scaleData = null;
+  if (options.scale) {
+    scaleData = await import('./scale-data.js');
+    logInfo('Scale mode enabled - generating large-scale dataset (10,000+ items)');
+  }
 
-    if (Array.isArray(normalData)) {
-      return [...normalData, ...challengeData[challengeKey]];
+  // Helper to merge normal + challenge + scale data
+  function getMergedData(normalData, challengeKey, scaleKey) {
+    let result = normalData;
+
+    // Merge challenge data
+    if (challengeData && challengeData[challengeKey]) {
+      if (Array.isArray(result)) {
+        result = [...result, ...challengeData[challengeKey]];
+      } else {
+        const merged = { ...result };
+        for (const [key, items] of Object.entries(challengeData[challengeKey])) {
+          merged[key] = [...(merged[key] || []), ...items];
+        }
+        result = merged;
+      }
     }
-    // For object-keyed data (like workItems, assets)
-    const merged = { ...normalData };
-    for (const [key, items] of Object.entries(challengeData[challengeKey])) {
-      merged[key] = [...(merged[key] || []), ...items];
+
+    // Merge scale data
+    if (scaleData && scaleKey && scaleData[scaleKey]) {
+      if (Array.isArray(result)) {
+        result = [...result, ...scaleData[scaleKey]];
+      } else {
+        const merged = { ...result };
+        for (const [key, items] of Object.entries(scaleData[scaleKey])) {
+          merged[key] = [...(merged[key] || []), ...items];
+        }
+        result = merged;
+      }
     }
-    return merged;
+
+    return result;
   }
 
   let serverProcess = null;
@@ -2010,19 +2087,25 @@ ${colors.reset}`);
     }
 
     // Create all demo content (merge with challenge data if enabled)
-    const users = await createUsers(options.baseURL, token, getMergedData(demoUsers, 'challengeUsers'));
-    const workspaceMap = await createWorkspaces(options.baseURL, token, getMergedData(workspaces, 'challengeWorkspaces'));
-    const customerMap = await createTimeCustomers(options.baseURL, token, getMergedData(timeCustomers, 'challengeTimeCustomers'));
-    const projectMap = await createProjects(options.baseURL, token, workspaceMap, customerMap, getMergedData(projects, 'challengeProjects'));
+    const users = await createUsers(options.baseURL, token, getMergedData(demoUsers, 'challengeUsers', 'scaleUsers'));
+    const workspaceMap = await createWorkspaces(options.baseURL, token, getMergedData(workspaces, 'challengeWorkspaces', 'scaleWorkspaces'));
+    const customerMap = await createTimeCustomers(options.baseURL, token, getMergedData(timeCustomers, 'challengeTimeCustomers', 'scaleTimeCustomers'));
+    const projectMap = await createProjects(options.baseURL, token, workspaceMap, customerMap, getMergedData(projects, 'challengeProjects', 'scaleProjects'));
     const fieldMap = await createCustomFields(options.baseURL, token);
     const screenMap = await createScreens(options.baseURL, token, fieldMap);
     const priorityMap = await createPriorities(options.baseURL, token);
     const categoryMap = await createMilestoneCategories(options.baseURL, token);
-    const milestoneMap = await createMilestones(options.baseURL, token, workspaceMap, categoryMap, getMergedData(milestones, 'challengeMilestones'));
-    const iterationMap = await createIterations(options.baseURL, token, workspaceMap, getMergedData(iterations, 'challengeIterations'));
+    const milestoneMap = await createMilestones(options.baseURL, token, workspaceMap, categoryMap, getMergedData(milestones, 'challengeMilestones', 'scaleMilestones'));
+    const iterationMap = await createIterations(options.baseURL, token, workspaceMap, getMergedData(iterations, 'challengeIterations', 'scaleIterations'));
     const itemTypes = await getItemTypes(options.baseURL, token);
-    const itemMap = await createWorkItems(options.baseURL, token, workspaceMap, projectMap, priorityMap, itemTypes, milestoneMap, iterationMap, getMergedData(workItems, 'challengeWorkItems'));
+    const itemMap = await createWorkItems(options.baseURL, token, workspaceMap, projectMap, priorityMap, itemTypes, milestoneMap, iterationMap, getMergedData(workItems, 'challengeWorkItems', 'scaleWorkItems'));
     const worklogCount = await createWorkLogs(options.baseURL, token, itemMap, projectMap);
+
+    // Create comments (scale mode only)
+    let commentCount = 0;
+    if (options.scale && scaleData) {
+      commentCount = await createComments(options.baseURL, token, itemMap, users, scaleData);
+    }
 
     // Create test management data
     // Get Software Development workspace ID for test data (use key 'SOFT', not name)
@@ -2070,7 +2153,7 @@ ${colors.reset}`);
     logSuccess(`Created ${Object.keys(iterationMap).length} iterations (global + local)`);
     logSuccess(`Created ${Object.keys(customerMap).length} time customers`);
 
-    const mergedWorkItems = getMergedData(workItems, 'challengeWorkItems');
+    const mergedWorkItems = getMergedData(workItems, 'challengeWorkItems', 'scaleWorkItems');
     let totalItems = 0;
     for (const items of Object.values(mergedWorkItems)) {
       const countItems = (itemList) => {
@@ -2086,6 +2169,9 @@ ${colors.reset}`);
     }
     logSuccess(`Created ${totalItems} work items`);
     logSuccess(`Created ${worklogCount} work logs`);
+    if (commentCount > 0) {
+      logSuccess(`Created ${commentCount} comments`);
+    }
     logSuccess(`Created ${Object.keys(labelMap).length} test labels`);
     logSuccess(`Created ${Object.keys(folderMap).length} test folders`);
     logSuccess(`Created ${Object.keys(testCaseMap).length} test cases`);
@@ -2099,7 +2185,7 @@ ${colors.reset}`);
     logSuccess(`Created ${assetCount} assets`);
     logSuccess(`Created ${personalTaskCount} personal tasks`);
 
-    const modeText = options.challenge ? ' (with challenge data)' : '';
+    const modeText = options.scale ? ' (with scale data)' : (options.challenge ? ' (with challenge data)' : '');
     log(`\n${colors.bright}${colors.green}✓ Demo content generated successfully${modeText}!${colors.reset}\n`);
     logInfo(`Access the application at: ${options.baseURL}`);
     logInfo(`Login with: ${options.adminUser} / ${options.adminPassword}`);
@@ -2149,6 +2235,7 @@ export {
   createMilestones,
   createIterations,
   createWorkItems,
+  createComments,
   createPersonalTasks,
   createAssetSets,
   createAssetTypes,
