@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import {
     SvelteFlow,
     Controls,
@@ -55,17 +55,16 @@
     }
   };
 
-  onMount(() => {
-    if (workflow && statuses.length > 0) {
-      loadWorkflowData();
-    }
-  });
-
   useEventListener(() => window, 'workflow-edge-swap', (event) => handleEdgeSwap(event));
   useEventListener(() => window, 'workflow-set-initial', (event) => handleSetInitial(event.detail?.statusId));
+  useEventListener(() => window, 'workflow-status-remove', (event) => onStatusRemove(event));
 
   $effect(() => {
-    if (workflow && statuses.length > 0) loadWorkflowData();
+    const w = workflow;
+    const s = statuses;
+    if (w && s.length > 0) {
+      untrack(() => loadWorkflowData());
+    }
   });
 
   function loadWorkflowData() {
@@ -340,17 +339,23 @@
     !nodes.some(node => node.data.statusId === status.id)
   ));
 
-  // Watch for position changes and save to localStorage
-  let positionSaveTimeout;
-
+  // Watch for node count changes and save positions to localStorage
   $effect(() => {
-    if (nodes.length > 0 && workflow?.id) {
-      clearTimeout(positionSaveTimeout);
-      positionSaveTimeout = setTimeout(() => {
-        positionPersistence.save(workflow.id, nodes);
-      }, 100);
+    const nodeCount = nodes.length;
+    const wfId = workflow?.id;
+    if (nodeCount > 0 && wfId) {
+      const timeout = setTimeout(() => {
+        untrack(() => positionPersistence.save(wfId, nodes));
+      }, 500);
+      return () => clearTimeout(timeout);
     }
   });
+
+  function onNodeDragStop() {
+    if (workflow?.id) {
+      positionPersistence.save(workflow.id, nodes);
+    }
+  }
 
   function markInitialNode(nodeList, statusId) {
     return nodeList.map((node) => ({
@@ -441,11 +446,10 @@
       {onConnect}
       onnodeschange={onNodesChange}
       onedgeschange={onEdgesChange}
+      onnodedragstop={onNodeDragStop}
       {...flowOptions}
       fitView
       class="workflow-flow"
-      onstatusRemove={onStatusRemove}
-      onswap={handleEdgeSwap}
     >
       <Controls />
       <MiniMap nodeColor="var(--workflow-minimap-node, #e2e8f0)" maskColor="var(--workflow-minimap-mask, rgba(0, 0, 0, 0.2))" />

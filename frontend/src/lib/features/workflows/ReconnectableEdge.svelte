@@ -5,40 +5,40 @@
     getSmoothStepPath,
     Position
   } from '@xyflow/svelte';
-  import { createEventDispatcher } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
-  const dispatch = createEventDispatcher();
-
-  export let id;
-  export let sourceX;
-  export let sourceY;
-  export let targetX;
-  export let targetY;
-  export let sourcePosition;
-  export let targetPosition;
-  export let selected = false;
-  export let data = {};
+  let {
+    id,
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    sourcePosition,
+    targetPosition,
+    selected = false,
+    data = {},
+    ...rest
+  } = $props();
 
   // Get offset from edge data (for multiple edges to same handle)
-  $: offset = data?.offset || 0;
+  let offset = $derived(data?.offset || 0);
 
   // Apply offset perpendicular to the edge direction
-  $: offsetSourceX = sourcePosition === 'top' || sourcePosition === 'bottom'
+  let offsetSourceX = $derived(sourcePosition === 'top' || sourcePosition === 'bottom'
     ? sourceX + offset
-    : sourceX;
-  $: offsetSourceY = sourcePosition === 'left' || sourcePosition === 'right'
+    : sourceX);
+  let offsetSourceY = $derived(sourcePosition === 'left' || sourcePosition === 'right'
     ? sourceY + offset
-    : sourceY;
-  $: offsetTargetX = targetPosition === 'top' || targetPosition === 'bottom'
+    : sourceY);
+  let offsetTargetX = $derived(targetPosition === 'top' || targetPosition === 'bottom'
     ? targetX + offset
-    : targetX;
-  $: offsetTargetY = targetPosition === 'left' || targetPosition === 'right'
+    : targetX);
+  let offsetTargetY = $derived(targetPosition === 'left' || targetPosition === 'right'
     ? targetY + offset
-    : targetY;
+    : targetY);
 
   // Calculate the smooth step path for rectangular edges with rounded corners
-  $: [edgePath, labelX, labelY] = getSmoothStepPath({
+  let pathResult = $derived(getSmoothStepPath({
     sourceX: offsetSourceX,
     sourceY: offsetSourceY,
     sourcePosition: sourcePosition || Position.Right,
@@ -46,9 +46,12 @@
     targetY: offsetTargetY,
     targetPosition: targetPosition || Position.Left,
     borderRadius: 8
-  });
+  }));
+  let edgePath = $derived(pathResult[0]);
+  let labelX = $derived(pathResult[1]);
+  let labelY = $derived(pathResult[2]);
 
-  let reconnecting = false;
+  let reconnecting = $state(false);
 </script>
 
 <!-- Render the base edge path if not currently reconnecting -->
@@ -80,7 +83,8 @@
       <button
         class="edge-swap-btn"
         title={t('workflows.swapDirection')}
-        on:click|stopPropagation={(evt) => {
+        onclick={(evt) => {
+          evt.stopPropagation();
           const customId = id || data?.transitionId || data?.id;
           if (customId) {
             window.dispatchEvent(new CustomEvent('workflow-edge-swap', { detail: { id: customId } }));

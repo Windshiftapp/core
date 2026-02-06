@@ -1,19 +1,13 @@
 <script>
   import { Handle } from '@xyflow/svelte';
   import { X } from 'lucide-svelte';
-  import { createEventDispatcher } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
-  export let data;
-  export let selected = false;
-  export let dragging = false;
-  export let xPos;
-  export let yPos;
+  let { data, selected = false, dragging = false, ...rest } = $props();
 
-  const dispatch = createEventDispatcher();
-
-  function handleRemove() {
-    dispatch('remove', { statusId: data.statusId });
+  function handleRemove(event) {
+    event.stopPropagation();
+    window.dispatchEvent(new CustomEvent('workflow-status-remove', { detail: { statusId: data.statusId } }));
   }
 
   function handleSetInitial(event) {
@@ -47,7 +41,7 @@
     <button
       class="initial-chip"
       class:initial-active={data.initial}
-      on:click|stopPropagation={handleSetInitial}
+      onclick={handleSetInitial}
       title={data.initial ? t('workflows.initialStatus') : t('workflows.setAsInitialStatus')}
     >
       {#if data.initial}
@@ -60,7 +54,7 @@
     <!-- Remove button - positioned in top-right corner -->
     <button
       class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 p-1 transition-opacity duration-200 z-10"
-      on:click|stopPropagation={handleRemove}
+      onclick={handleRemove}
       title={t('workflows.removeFromWorkflow')}
     >
       <X class="w-3 h-3" />
