@@ -109,6 +109,10 @@ export default {
         title: 'Assets',
         description: 'Asset-Sets, -Typen, -Kategorien und Assets verwalten',
       },
+      llmConnections: {
+        title: 'KI-Verbindungen',
+        description: 'KI-Modellanbieter für intelligente Funktionen konfigurieren',
+      },
     },
 
     // Attachment Settings
