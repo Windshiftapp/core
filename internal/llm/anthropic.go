@@ -28,11 +28,24 @@ type anthropicRequest struct {
 	System      string             `json:"system,omitempty"`
 	Messages    []anthropicMessage `json:"messages"`
 	Temperature float64            `json:"temperature,omitempty"`
+	Tools       []anthropicTool    `json:"tools,omitempty"`
+	ToolChoice  *anthropicChoice   `json:"tool_choice,omitempty"`
 }
 
 type anthropicMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+}
+
+type anthropicTool struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description,omitempty"`
+	InputSchema json.RawMessage `json:"input_schema"`
+}
+
+type anthropicChoice struct {
+	Type string `json:"type"`
+	Name string `json:"name,omitempty"`
 }
 
 type anthropicResponse struct {
@@ -45,8 +58,11 @@ type anthropicResponse struct {
 }
 
 type anthropicContent struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
+	Type  string          `json:"type"`
+	Text  string          `json:"text,omitempty"`
+	ID    string          `json:"id,omitempty"`
+	Name  string          `json:"name,omitempty"`
+	Input json.RawMessage `json:"input,omitempty"`
 }
 
 type anthropicUsage struct {
@@ -93,6 +109,25 @@ func (c *anthropicClient) ChatCompletion(ctx context.Context, req ChatCompletion
 		Temperature: req.Temperature,
 	}
 
+	// Add tool for structured output
+	useToolOutput := false
+	if req.StructuredOutput != nil && len(req.StructuredOutput.Schema) > 0 {
+		toolName := req.StructuredOutput.SchemaName
+		if toolName == "" {
+			toolName = "structured_output"
+		}
+		anthropicReq.Tools = []anthropicTool{{
+			Name:        toolName,
+			Description: "Return the response in the specified JSON format",
+			InputSchema: req.StructuredOutput.Schema,
+		}}
+		anthropicReq.ToolChoice = &anthropicChoice{
+			Type: "tool",
+			Name: toolName,
+		}
+		useToolOutput = true
+	}
+
 	body, err := json.Marshal(anthropicReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
@@ -130,6 +165,9 @@ func (c *anthropicClient) ChatCompletion(ctx context.Context, req ChatCompletion
 	for _, c := range result.Content {
 		if c.Type == "text" {
 			content += c.Text
+		} else if c.Type == "tool_use" && useToolOutput {
+			// Extract JSON from tool input for structured output
+			content = string(c.Input)
 		}
 	}
 

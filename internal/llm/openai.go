@@ -40,10 +40,31 @@ func newOpenAIClient(baseURL, model, apiKey string, timeout time.Duration, chatP
 }
 
 func (c *openaiClient) ChatCompletion(ctx context.Context, req ChatCompletionRequest) (*ChatCompletionResponse, error) {
-	// Inject model into the request
-	req.Model = c.model
+	// Build request body as map to allow adding response_format
+	bodyMap := map[string]interface{}{
+		"model":    c.model,
+		"messages": req.Messages,
+	}
+	if req.Temperature != 0 {
+		bodyMap["temperature"] = req.Temperature
+	}
+	if req.MaxTokens != 0 {
+		bodyMap["max_tokens"] = req.MaxTokens
+	}
 
-	body, err := json.Marshal(req)
+	// Add response_format for structured output
+	if req.StructuredOutput != nil && len(req.StructuredOutput.Schema) > 0 {
+		bodyMap["response_format"] = map[string]interface{}{
+			"type": "json_schema",
+			"json_schema": map[string]interface{}{
+				"name":   req.StructuredOutput.SchemaName,
+				"schema": json.RawMessage(req.StructuredOutput.Schema),
+				"strict": req.StructuredOutput.Strict,
+			},
+		}
+	}
+
+	body, err := json.Marshal(bodyMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}

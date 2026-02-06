@@ -1,17 +1,28 @@
 package llm
 
+import "encoding/json"
+
 // Message represents a chat message in the OpenAI-compatible format.
 type Message struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 }
 
+// StructuredOutputConfig configures structured output constraints.
+// The Schema is a JSON Schema that the response must conform to.
+type StructuredOutputConfig struct {
+	Schema     json.RawMessage `json:"schema,omitempty"`
+	SchemaName string          `json:"schema_name,omitempty"`
+	Strict     bool            `json:"strict,omitempty"`
+}
+
 // ChatCompletionRequest is the request body for /v1/chat/completions.
 type ChatCompletionRequest struct {
-	Model       string    `json:"model,omitempty"`
-	Messages    []Message `json:"messages"`
-	Temperature float64   `json:"temperature,omitempty"`
-	MaxTokens   int       `json:"max_tokens,omitempty"`
+	Model            string                  `json:"model,omitempty"`
+	Messages         []Message               `json:"messages"`
+	Temperature      float64                 `json:"temperature,omitempty"`
+	MaxTokens        int                     `json:"max_tokens,omitempty"`
+	StructuredOutput *StructuredOutputConfig `json:"structured_output,omitempty"`
 }
 
 // ChatCompletionResponse is the response from /v1/chat/completions.

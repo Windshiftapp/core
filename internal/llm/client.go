@@ -55,7 +55,29 @@ type httpClient struct {
 }
 
 func (c *httpClient) ChatCompletion(ctx context.Context, req ChatCompletionRequest) (*ChatCompletionResponse, error) {
-	body, err := json.Marshal(req)
+	// Build request body as map to allow adding grammar parameter
+	bodyMap := map[string]interface{}{
+		"messages": req.Messages,
+	}
+	if req.Model != "" {
+		bodyMap["model"] = req.Model
+	}
+	if req.Temperature != 0 {
+		bodyMap["temperature"] = req.Temperature
+	}
+	if req.MaxTokens != 0 {
+		bodyMap["max_tokens"] = req.MaxTokens
+	}
+
+	// Add grammar for structured output (llama.cpp)
+	if req.StructuredOutput != nil && len(req.StructuredOutput.Schema) > 0 {
+		grammar, err := JSONSchemaToGBNF(req.StructuredOutput.Schema)
+		if err == nil && grammar != "" {
+			bodyMap["grammar"] = grammar
+		}
+	}
+
+	body, err := json.Marshal(bodyMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}

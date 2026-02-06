@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -175,14 +174,11 @@ func (h *AIHandler) PlanMyDay(w http.ResponseWriter, r *http.Request) {
 
 	systemPrompt := `You are a work planning assistant. Given a list of work items assigned to a user, suggest a prioritized schedule for today. Consider due dates, priorities, and logical task ordering.
 
-Return ONLY valid JSON (no markdown, no code fences) matching this schema:
-- activities: array of objects with fields:
-  - time: start time in HH:MM format (schedule across the full workday, not all at the same time)
-  - duration_minutes: estimated minutes for the task
-  - item_key: the exact item key from the provided list (e.g. "WS-12"), do NOT invent keys
-  - title: the item title from the provided list
-  - reason: brief explanation of why this task is scheduled at this time
-- summary: a short overview of the planned day`
+Return a JSON object with:
+- activities: array of objects with time (HH:MM format), duration_minutes, item_key (exact key from provided list), title, and reason
+- summary: a short overview of the planned day
+
+Schedule tasks across the full workday, not all at the same time. Use only item keys from the provided list.`
 
 	userPrompt := fmt.Sprintf("Today is %s (%s timezone). Here are my open work items:\n\n%s\n\nPlease plan my day.",
 		now.Format("Monday, January 2, 2006"), timezone, strings.Join(itemLines, "\n"))
@@ -214,51 +210,26 @@ Return ONLY valid JSON (no markdown, no code fences) matching this schema:
 		return
 	}
 
-	// Call the LLM
+	// Call the LLM with structured output
 	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
 
-	resp, err := llmClient.ChatCompletion(ctx, llm.ChatCompletionRequest{
+	plan, err := llm.ChatCompletionStructured[PlanMyDayResponse](ctx, llmClient, llm.ChatCompletionRequest{
 		Messages: []llm.Message{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
 		Temperature: 0.7,
+		StructuredOutput: &llm.StructuredOutputConfig{
+			Schema:     llm.SchemaPlanMyDay,
+			SchemaName: "plan_my_day",
+			Strict:     true,
+		},
 	})
 	if err != nil {
 		slog.Error("LLM chat completion failed", slog.Any("error", err))
 		respondServiceUnavailable(w, r, "AI service is temporarily unavailable. Please try again later.")
 		return
-	}
-
-	if len(resp.Choices) == 0 {
-		respondServiceUnavailable(w, r, "AI service returned no response.")
-		return
-	}
-
-	// Parse the LLM response
-	content := resp.Choices[0].Message.Content
-	// Strip markdown code fences if present
-	content = strings.TrimSpace(content)
-	if strings.HasPrefix(content, "```") {
-		lines := strings.SplitN(content, "\n", 2)
-		if len(lines) > 1 {
-			content = lines[1]
-		}
-		if idx := strings.LastIndex(content, "```"); idx >= 0 {
-			content = content[:idx]
-		}
-		content = strings.TrimSpace(content)
-	}
-
-	var plan PlanMyDayResponse
-	if err := json.Unmarshal([]byte(content), &plan); err != nil {
-		slog.Warn("failed to parse LLM plan response", slog.Any("error", err))
-		// Return the raw summary as fallback
-		plan = PlanMyDayResponse{
-			Activities: []PlannedActivity{},
-			Summary:    content,
-		}
 	}
 
 	// Enrich activities with item IDs and workspace IDs from our data
@@ -280,7 +251,7 @@ Return ONLY valid JSON (no markdown, no code fences) matching this schema:
 
 	plan.SystemPrompt = systemPrompt
 	plan.Prompt = userPrompt
-	respondJSONOK(w, plan)
+	respondJSONOK(w, *plan)
 }
 
 // Status checks whether AI features are available by resolving the LLM client
@@ -640,14 +611,11 @@ func (h *AIHandler) FindSimilarItems(w http.ResponseWriter, r *http.Request) {
 
 	systemPrompt := `You are a project management assistant. Given a work item and a list of other items in the same workspace, identify items that are similar, potentially duplicates, or closely related.
 
-Return ONLY valid JSON (no markdown, no code fences) matching this schema:
-- similar_items: array of objects with fields:
-  - item_key: the exact item key from the candidate list (e.g. "WS-12"), do NOT invent keys
-  - similarity: one of "duplicate", "closely_related", or "somewhat_related"
-  - reason: brief explanation of why these items are similar
+Return a JSON object with:
+- similar_items: array with item_key (exact key from candidate list), similarity (duplicate/closely_related/somewhat_related), and reason
 - summary: a one-sentence summary of findings
 
-Only include items that are genuinely similar. If no items are similar, return an empty array. Maximum 10 results.`
+Only include genuinely similar items. If none are similar, return an empty array. Maximum 10 results.`
 
 	userPrompt := fmt.Sprintf(`Current item [%s]: %s
 Description: %s
@@ -660,45 +628,22 @@ Find similar items.`, itemKey, item.Title, currentDesc, strings.Join(candidateLi
 	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
 
-	resp, err := llmClient.ChatCompletion(ctx, llm.ChatCompletionRequest{
+	result, err := llm.ChatCompletionStructured[FindSimilarResponse](ctx, llmClient, llm.ChatCompletionRequest{
 		Messages: []llm.Message{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
 		Temperature: 0.3,
+		StructuredOutput: &llm.StructuredOutputConfig{
+			Schema:     llm.SchemaFindSimilar,
+			SchemaName: "find_similar",
+			Strict:     true,
+		},
 	})
 	if err != nil {
 		slog.Error("LLM chat completion failed", slog.Any("error", err))
 		respondServiceUnavailable(w, r, "AI service is temporarily unavailable. Please try again later.")
 		return
-	}
-
-	if len(resp.Choices) == 0 {
-		respondServiceUnavailable(w, r, "AI service returned no response.")
-		return
-	}
-
-	// Parse response
-	content := resp.Choices[0].Message.Content
-	content = strings.TrimSpace(content)
-	if strings.HasPrefix(content, "```") {
-		lines := strings.SplitN(content, "\n", 2)
-		if len(lines) > 1 {
-			content = lines[1]
-		}
-		if idx := strings.LastIndex(content, "```"); idx >= 0 {
-			content = content[:idx]
-		}
-		content = strings.TrimSpace(content)
-	}
-
-	var result FindSimilarResponse
-	if err := json.Unmarshal([]byte(content), &result); err != nil {
-		slog.Warn("failed to parse LLM find-similar response", slog.Any("error", err))
-		result = FindSimilarResponse{
-			SimilarItems: []SimilarItem{},
-			Summary:      content,
-		}
 	}
 
 	// Enrich results from our candidate data (don't trust LLM for titles/IDs)
@@ -718,7 +663,7 @@ Find similar items.`, itemKey, item.Title, currentDesc, strings.Join(candidateLi
 	}
 	result.SimilarItems = enriched
 
-	respondJSONOK(w, result)
+	respondJSONOK(w, *result)
 }
 
 // DecomposeItem suggests sub-tasks for an item.
@@ -818,25 +763,28 @@ func (h *AIHandler) DecomposeItem(w http.ResponseWriter, r *http.Request) {
 
 	systemPrompt := `You are a project management assistant. Given a work item, suggest how to break it down into smaller sub-tasks.
 
-Return ONLY valid JSON (no markdown, no code fences) matching this schema:
-- sub_tasks: array of objects with fields:
-  - title: concise task title (imperative form, e.g. "Implement user login form")
-  - description: 1-2 sentence description of what needs to be done
+Return a JSON object with:
+- sub_tasks: array with title (imperative form) and description (1-2 sentences)
 - reasoning: brief explanation of the decomposition approach
 
-Suggest 3-8 sub-tasks. Each should be a meaningful, actionable piece of work. Don't create trivially small tasks. If existing children are listed, don't duplicate them.`
+Suggest 3-8 meaningful, actionable sub-tasks. Don't create trivially small tasks. If existing children are listed, don't duplicate them.`
 
 	userPrompt := fmt.Sprintf("Break this work item into sub-tasks:\n\n%s", strings.Join(contextParts, "\n"))
 
 	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
 
-	resp, err := llmClient.ChatCompletion(ctx, llm.ChatCompletionRequest{
+	result, err := llm.ChatCompletionStructured[DecomposeResponse](ctx, llmClient, llm.ChatCompletionRequest{
 		Messages: []llm.Message{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
 		Temperature: 0.7,
+		StructuredOutput: &llm.StructuredOutputConfig{
+			Schema:     llm.SchemaDecompose,
+			SchemaName: "decompose",
+			Strict:     true,
+		},
 	})
 	if err != nil {
 		slog.Error("LLM chat completion failed", slog.Any("error", err))
@@ -844,33 +792,5 @@ Suggest 3-8 sub-tasks. Each should be a meaningful, actionable piece of work. Do
 		return
 	}
 
-	if len(resp.Choices) == 0 {
-		respondServiceUnavailable(w, r, "AI service returned no response.")
-		return
-	}
-
-	// Parse response
-	content := resp.Choices[0].Message.Content
-	content = strings.TrimSpace(content)
-	if strings.HasPrefix(content, "```") {
-		lines := strings.SplitN(content, "\n", 2)
-		if len(lines) > 1 {
-			content = lines[1]
-		}
-		if idx := strings.LastIndex(content, "```"); idx >= 0 {
-			content = content[:idx]
-		}
-		content = strings.TrimSpace(content)
-	}
-
-	var result DecomposeResponse
-	if err := json.Unmarshal([]byte(content), &result); err != nil {
-		slog.Warn("failed to parse LLM decompose response", slog.Any("error", err))
-		result = DecomposeResponse{
-			SubTasks:  []SuggestedSubTask{},
-			Reasoning: content,
-		}
-	}
-
-	respondJSONOK(w, result)
+	respondJSONOK(w, *result)
 }
