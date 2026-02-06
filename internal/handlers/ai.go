@@ -764,7 +764,7 @@ func (h *AIHandler) DecomposeItem(w http.ResponseWriter, r *http.Request) {
 	systemPrompt := `You are a project management assistant. Given a work item, suggest how to break it down into smaller sub-tasks.
 
 Return a JSON object with:
-- sub_tasks: array with title (imperative form) and description (1-2 sentences)
+- sub_tasks: array of objects, each with "title" (string, imperative form) and "description" (string, 1-2 sentences)
 - reasoning: brief explanation of the decomposition approach
 
 Suggest 3-8 meaningful, actionable sub-tasks. Don't create trivially small tasks. If existing children are listed, don't duplicate them.`

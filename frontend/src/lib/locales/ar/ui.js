@@ -121,6 +121,27 @@ export default {
     narrowWidth: 'ضيق (1/3 العرض)',
     mediumWidth: 'متوسط (2/3 العرض)',
     fullWidth: 'عرض كامل',
+    chart: {
+      items: 'عناصر',
+    },
+    completionChart: {
+      emptyMessage: 'لا تتوفر بيانات الإنجاز',
+    },
+    createdChart: {
+      emptyMessage: 'لا تتوفر بيانات الإنشاء',
+    },
+    milestoneProgress: {
+      emptyTitle: 'لا توجد معالم',
+      emptySubtitle: 'أنشئ معالم لتتبع التقدم',
+      due: 'الاستحقاق',
+      done: 'مكتمل',
+      item: 'عنصر',
+      items: 'عناصر',
+      noItems: 'لا توجد عناصر',
+      noStatus: 'بدون حالة',
+      activeMilestone: 'نشط',
+      noCategorizedWork: 'لا يوجد عمل مصنف',
+    },
   },
 
   footer: {

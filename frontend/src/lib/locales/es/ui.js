@@ -118,6 +118,27 @@ export default {
     narrowWidth: 'Estrecho (1/3 de ancho)',
     mediumWidth: 'Medio (2/3 de ancho)',
     fullWidth: 'Ancho completo',
+    chart: {
+      items: 'elementos',
+    },
+    completionChart: {
+      emptyMessage: 'No hay datos de finalización disponibles',
+    },
+    createdChart: {
+      emptyMessage: 'No hay datos de creación disponibles',
+    },
+    milestoneProgress: {
+      emptyTitle: 'Sin hitos',
+      emptySubtitle: 'Crea hitos para seguir el progreso',
+      due: 'Vence',
+      done: 'completados',
+      item: 'elemento',
+      items: 'elementos',
+      noItems: 'Sin elementos',
+      noStatus: 'Sin estado',
+      activeMilestone: 'Activo',
+      noCategorizedWork: 'Sin trabajo categorizado',
+    },
   },
 
   footer: {},

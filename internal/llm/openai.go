@@ -54,13 +54,17 @@ func (c *openaiClient) ChatCompletion(ctx context.Context, req ChatCompletionReq
 
 	// Add response_format for structured output
 	if req.StructuredOutput != nil && len(req.StructuredOutput.Schema) > 0 {
-		bodyMap["response_format"] = map[string]interface{}{
-			"type": "json_schema",
-			"json_schema": map[string]interface{}{
-				"name":   req.StructuredOutput.SchemaName,
-				"schema": req.StructuredOutput.Schema,
-				"strict": req.StructuredOutput.Strict,
-			},
+		// Unmarshal schema to interface{} so it embeds correctly in the JSON
+		var schemaObj interface{}
+		if err := json.Unmarshal(req.StructuredOutput.Schema, &schemaObj); err == nil {
+			bodyMap["response_format"] = map[string]interface{}{
+				"type": "json_schema",
+				"json_schema": map[string]interface{}{
+					"name":   req.StructuredOutput.SchemaName,
+					"schema": schemaObj,
+					"strict": req.StructuredOutput.Strict,
+				},
+			}
 		}
 	}
 

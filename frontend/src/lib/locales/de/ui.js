@@ -393,6 +393,14 @@ export default {
     milestoneProgress: {
       emptyTitle: 'Keine Meilensteine',
       emptySubtitle: 'Erstellen Sie Meilensteine, um den Fortschritt zu verfolgen',
+      due: 'Fällig',
+      done: 'erledigt',
+      item: 'Element',
+      items: 'Elemente',
+      noItems: 'Keine Elemente',
+      noStatus: 'Kein Status',
+      activeMilestone: 'Aktiv',
+      noCategorizedWork: 'Keine kategorisierte Arbeit',
     },
   },
 

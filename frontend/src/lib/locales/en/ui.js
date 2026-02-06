@@ -387,6 +387,14 @@ export default {
     milestoneProgress: {
       emptyTitle: 'No milestones',
       emptySubtitle: 'Create milestones to track progress',
+      due: 'Due',
+      done: 'done',
+      item: 'item',
+      items: 'items',
+      noItems: 'No items',
+      noStatus: 'No status',
+      activeMilestone: 'Active',
+      noCategorizedWork: 'No categorized work',
     },
   },
 
