@@ -122,6 +122,10 @@ func (h *DiagramHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
+		return
+	}
+
 	query := `
 		SELECT
 			d.id, d.item_id, d.name, d.diagram_data, d.created_at, d.updated_at, d.created_by, d.updated_by,
@@ -213,6 +217,11 @@ func (h *DiagramHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("failed to query diagram", slog.String("component", "diagrams"), slog.Any("error", err))
 		respondInternalError(w, r, err)
+		return
+	}
+
+	// Check workspace permission via the diagram's item
+	if !CheckItemPermission(w, r, h.db, h.permissionService, d.ItemID, models.PermissionItemView) {
 		return
 	}
 

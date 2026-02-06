@@ -450,8 +450,8 @@ func (s *Server) initialize() error {
 
 	// SCM provider handler
 	scmProviderHandler := handlers.NewSCMProviderHandler(s.db)
-	scmWorkspaceHandler := handlers.NewSCMWorkspaceHandler(s.db, scmProviderHandler.GetEncryption(), scmProviderHandler)
-	scmItemLinksHandler := handlers.NewSCMItemLinksHandler(s.db, scmProviderHandler.GetEncryption())
+	scmWorkspaceHandler := handlers.NewSCMWorkspaceHandler(s.db, scmProviderHandler.GetEncryption(), scmProviderHandler, permService)
+	scmItemLinksHandler := handlers.NewSCMItemLinksHandler(s.db, scmProviderHandler.GetEncryption(), permService)
 	userSCMTokenHandler := handlers.NewUserSCMTokenHandler(s.db, scmProviderHandler.GetEncryption())
 
 	// Asset management handlers

@@ -1,6 +1,10 @@
 package routes
 
-import "net/http"
+import (
+	"net/http"
+
+	"windshift/internal/models"
+)
 
 // RegisterSCMRoutes registers source code management routes (providers, workspace connections, item links).
 func RegisterSCMRoutes(deps *Deps) {
@@ -40,23 +44,24 @@ func RegisterSCMRoutes(deps *Deps) {
 	api.Handle("GET /email/oauth/{provider_slug}/callback", http.HandlerFunc(deps.SCM.EmailProvider.EmailOAuthCallback))
 	api.HandleH("POST /channels/{id}/test-email", auth(http.HandlerFunc(deps.SCM.EmailProvider.TestEmailChannel)))
 
-	// Workspace SCM connection endpoints
-	api.HandleH("GET /workspaces/{id}/scm-providers", auth(http.HandlerFunc(deps.SCM.Workspace.GetAvailableSCMProviders)))
-	api.HandleH("GET /workspaces/{id}/scm-connections", auth(http.HandlerFunc(deps.SCM.Workspace.GetWorkspaceSCMConnections)))
-	api.HandleH("POST /workspaces/{id}/scm-connections", auth(http.HandlerFunc(deps.SCM.Workspace.CreateWorkspaceSCMConnection)))
-	api.HandleH("GET /workspaces/{id}/scm-connections/{connId}", auth(http.HandlerFunc(deps.SCM.Workspace.GetWorkspaceSCMConnection)))
-	api.HandleH("PUT /workspaces/{id}/scm-connections/{connId}", auth(http.HandlerFunc(deps.SCM.Workspace.UpdateWorkspaceSCMConnection)))
-	api.HandleH("DELETE /workspaces/{id}/scm-connections/{connId}", auth(http.HandlerFunc(deps.SCM.Workspace.DeleteWorkspaceSCMConnection)))
-	api.HandleH("GET /workspaces/{id}/scm-connections/{connId}/repositories/available", auth(http.HandlerFunc(deps.SCM.Workspace.ListAvailableRepositories)))
-	api.HandleH("GET /workspaces/{id}/scm-connections/{connId}/repositories", auth(http.HandlerFunc(deps.SCM.Workspace.GetLinkedRepositories)))
-	api.HandleH("POST /workspaces/{id}/scm-connections/{connId}/repositories", auth(http.HandlerFunc(deps.SCM.Workspace.LinkRepository)))
+	// Workspace SCM connection endpoints (require workspace admin permission)
+	wsAdmin := deps.PermissionMiddleware.RequireWorkspacePermission(models.PermissionWorkspaceAdmin)
+	api.HandleH("GET /workspaces/{id}/scm-providers", auth(wsAdmin(http.HandlerFunc(deps.SCM.Workspace.GetAvailableSCMProviders))))
+	api.HandleH("GET /workspaces/{id}/scm-connections", auth(wsAdmin(http.HandlerFunc(deps.SCM.Workspace.GetWorkspaceSCMConnections))))
+	api.HandleH("POST /workspaces/{id}/scm-connections", auth(wsAdmin(http.HandlerFunc(deps.SCM.Workspace.CreateWorkspaceSCMConnection))))
+	api.HandleH("GET /workspaces/{id}/scm-connections/{connId}", auth(wsAdmin(http.HandlerFunc(deps.SCM.Workspace.GetWorkspaceSCMConnection))))
+	api.HandleH("PUT /workspaces/{id}/scm-connections/{connId}", auth(wsAdmin(http.HandlerFunc(deps.SCM.Workspace.UpdateWorkspaceSCMConnection))))
+	api.HandleH("DELETE /workspaces/{id}/scm-connections/{connId}", auth(wsAdmin(http.HandlerFunc(deps.SCM.Workspace.DeleteWorkspaceSCMConnection))))
+	api.HandleH("GET /workspaces/{id}/scm-connections/{connId}/repositories/available", auth(wsAdmin(http.HandlerFunc(deps.SCM.Workspace.ListAvailableRepositories))))
+	api.HandleH("GET /workspaces/{id}/scm-connections/{connId}/repositories", auth(wsAdmin(http.HandlerFunc(deps.SCM.Workspace.GetLinkedRepositories))))
+	api.HandleH("POST /workspaces/{id}/scm-connections/{connId}/repositories", auth(wsAdmin(http.HandlerFunc(deps.SCM.Workspace.LinkRepository))))
 	api.HandleH("DELETE /workspace-repositories/{repoId}", auth(http.HandlerFunc(deps.SCM.Workspace.UnlinkRepository)))
 
-	// Workspace SCM connection auth endpoints
-	api.HandleH("POST /workspaces/{id}/scm-connections/{connId}/auth/start", auth(http.HandlerFunc(deps.SCM.Workspace.StartWorkspaceOAuth)))
-	api.HandleH("POST /workspaces/{id}/scm-connections/{connId}/auth/pat", auth(http.HandlerFunc(deps.SCM.Workspace.SetWorkspacePAT)))
-	api.HandleH("DELETE /workspaces/{id}/scm-connections/{connId}/auth", auth(http.HandlerFunc(deps.SCM.Workspace.ClearWorkspaceCredentials)))
-	api.HandleH("GET /workspaces/{id}/scm-connections/{connId}/auth/status", auth(http.HandlerFunc(deps.SCM.Workspace.GetWorkspaceConnectionAuthStatus)))
+	// Workspace SCM connection auth endpoints (require workspace admin permission)
+	api.HandleH("POST /workspaces/{id}/scm-connections/{connId}/auth/start", auth(wsAdmin(http.HandlerFunc(deps.SCM.Workspace.StartWorkspaceOAuth))))
+	api.HandleH("POST /workspaces/{id}/scm-connections/{connId}/auth/pat", auth(wsAdmin(http.HandlerFunc(deps.SCM.Workspace.SetWorkspacePAT))))
+	api.HandleH("DELETE /workspaces/{id}/scm-connections/{connId}/auth", auth(wsAdmin(http.HandlerFunc(deps.SCM.Workspace.ClearWorkspaceCredentials))))
+	api.HandleH("GET /workspaces/{id}/scm-connections/{connId}/auth/status", auth(wsAdmin(http.HandlerFunc(deps.SCM.Workspace.GetWorkspaceConnectionAuthStatus))))
 	api.HandleH("POST /workspace-repositories/{repoId}/sync", auth(http.HandlerFunc(deps.SCM.ItemLinks.SyncWorkspaceRepository)))
 
 	// Item SCM Links endpoints

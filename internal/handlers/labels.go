@@ -39,6 +39,19 @@ func (h *LabelHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check workspace view permission
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+	if h.permissionService != nil {
+		hasPermission, permErr := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionItemView)
+		if permErr != nil || !hasPermission {
+			respondNotFound(w, r, "Labels")
+			return
+		}
+	}
+
 	rows, err := h.db.Query(`
 		SELECT id, name, color, workspace_id, created_at, updated_at
 		FROM labels
@@ -87,6 +100,19 @@ func (h *LabelHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	// Check workspace view permission
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+	if h.permissionService != nil {
+		hasPermission, permErr := h.permissionService.HasWorkspacePermission(user.ID, label.WorkspaceID, models.PermissionItemView)
+		if permErr != nil || !hasPermission {
+			respondNotFound(w, r, "Label")
+			return
+		}
 	}
 
 	respondJSONOK(w, label)
@@ -252,6 +278,10 @@ func (h *LabelHandler) GetItemLabels(w http.ResponseWriter, r *http.Request) {
 	itemID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
+		return
+	}
+
+	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
 		return
 	}
 

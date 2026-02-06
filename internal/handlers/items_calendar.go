@@ -58,7 +58,7 @@ func (h *ItemHandler) ScheduleItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canEdit {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 
@@ -154,7 +154,7 @@ func (h *ItemHandler) UnscheduleItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canEdit {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 

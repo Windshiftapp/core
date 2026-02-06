@@ -49,7 +49,7 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 		return
 	}
 	if !canView {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 

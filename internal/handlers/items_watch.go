@@ -145,9 +145,31 @@ func (h *ItemHandler) GetWatchStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get item's workspace_id for permission check
+	var workspaceID int
+	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			respondNotFound(w, r, "item")
+			return
+		}
+		respondInternalError(w, r, err)
+		return
+	}
+
+	// Check if user has permission to view this item
+	canView, permErr := h.canViewItem(user.ID, workspaceID)
+	if permErr != nil {
+		respondInternalError(w, r, permErr)
+		return
+	}
+	if !canView {
+		respondNotFound(w, r, "item")
+		return
+	}
+
 	// Check watch status using ActivityTracker
 	var isWatching bool
-	var err error
 	if h.activityTracker != nil {
 		isWatching, err = h.activityTracker.IsWatching(user.ID, itemID)
 		if err != nil {

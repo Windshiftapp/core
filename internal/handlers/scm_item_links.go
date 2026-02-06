@@ -15,14 +15,16 @@ import (
 	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/scm"
+	"windshift/internal/services"
 	"windshift/internal/sso"
 )
 
 // SCMItemLinksHandler handles item SCM link endpoints
 type SCMItemLinksHandler struct {
-	db          database.Database
-	encryption  *sso.SecretEncryption
-	syncService *scm.SyncService
+	db                database.Database
+	encryption        *sso.SecretEncryption
+	syncService       *scm.SyncService
+	permissionService *services.PermissionService
 }
 
 // getItemURL constructs the URL to an item based on the request context
@@ -94,11 +96,12 @@ type CreateBranchForItemResponse struct {
 }
 
 // NewSCMItemLinksHandler creates a new item SCM links handler
-func NewSCMItemLinksHandler(db database.Database, encryption *sso.SecretEncryption) *SCMItemLinksHandler {
+func NewSCMItemLinksHandler(db database.Database, encryption *sso.SecretEncryption, permissionService *services.PermissionService) *SCMItemLinksHandler {
 	return &SCMItemLinksHandler{
-		db:          db,
-		encryption:  encryption,
-		syncService: scm.NewSyncService(db, encryption),
+		db:                db,
+		encryption:        encryption,
+		syncService:       scm.NewSyncService(db, encryption),
+		permissionService: permissionService,
 	}
 }
 
@@ -350,15 +353,35 @@ func (h *SCMItemLinksHandler) SyncWorkspaceRepository(w http.ResponseWriter, r *
 		return
 	}
 
-	// Verify repository exists
-	var exists int
-	err = h.db.QueryRow("SELECT 1 FROM workspace_repositories WHERE id = ?", repoID).Scan(&exists)
+	// Look up the workspace ID for this repository
+	var workspaceID int
+	err = h.db.QueryRow(`
+		SELECT wsc.workspace_id FROM workspace_repositories wr
+		JOIN workspace_scm_connections wsc ON wr.workspace_scm_connection_id = wsc.id
+		WHERE wr.id = ?
+	`, repoID).Scan(&workspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			respondNotFound(w, r, "repository")
 		} else {
 			respondInternalError(w, r, fmt.Errorf("failed to verify repository: %w", err))
 		}
+		return
+	}
+
+	// Require workspace admin permission
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	if !ok {
+		respondUnauthorized(w, r)
+		return
+	}
+	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionWorkspaceAdmin)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !hasPermission {
+		respondForbidden(w, r)
 		return
 	}
 

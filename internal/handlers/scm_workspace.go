@@ -19,6 +19,7 @@ import (
 	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/scm"
+	"windshift/internal/services"
 	"windshift/internal/sso"
 )
 
@@ -28,6 +29,7 @@ type SCMWorkspaceHandler struct {
 	encryption         *sso.SecretEncryption
 	providerHandler    *SCMProviderHandler
 	credentialResolver *scm.CredentialResolver
+	permissionService  *services.PermissionService
 }
 
 // WorkspaceSCMConnectionResponse represents a workspace SCM connection for API responses
@@ -84,12 +86,13 @@ type LinkRepositoryRequest struct {
 }
 
 // NewSCMWorkspaceHandler creates a new workspace SCM handler
-func NewSCMWorkspaceHandler(db database.Database, encryption *sso.SecretEncryption, providerHandler *SCMProviderHandler) *SCMWorkspaceHandler {
+func NewSCMWorkspaceHandler(db database.Database, encryption *sso.SecretEncryption, providerHandler *SCMProviderHandler, permissionService *services.PermissionService) *SCMWorkspaceHandler {
 	return &SCMWorkspaceHandler{
 		db:                 db,
 		encryption:         encryption,
 		providerHandler:    providerHandler,
 		credentialResolver: scm.NewCredentialResolver(db, encryption),
+		permissionService:  permissionService,
 	}
 }
 
@@ -679,6 +682,38 @@ func (h *SCMWorkspaceHandler) UnlinkRepository(w http.ResponseWriter, r *http.Re
 	repoID, err := strconv.Atoi(r.PathValue("repoId"))
 	if err != nil {
 		respondInvalidID(w, r, "repositoryId")
+		return
+	}
+
+	// Look up the workspace ID for this repository
+	var workspaceID int
+	err = h.db.QueryRow(`
+		SELECT wsc.workspace_id FROM workspace_repositories wr
+		JOIN workspace_scm_connections wsc ON wr.workspace_scm_connection_id = wsc.id
+		WHERE wr.id = ?
+	`, repoID).Scan(&workspaceID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			respondNotFound(w, r, "repository")
+		} else {
+			respondInternalError(w, r, err)
+		}
+		return
+	}
+
+	// Require workspace admin permission
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	if !ok {
+		respondUnauthorized(w, r)
+		return
+	}
+	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionWorkspaceAdmin)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !hasPermission {
+		respondForbidden(w, r)
 		return
 	}
 

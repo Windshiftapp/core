@@ -44,7 +44,7 @@ func (h *ItemHandler) GetChildren(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canView {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 
@@ -102,7 +102,7 @@ func (h *ItemHandler) GetAncestors(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canView {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 
@@ -160,7 +160,7 @@ func (h *ItemHandler) GetDescendantsNew(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if !canView {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 
@@ -228,7 +228,7 @@ func (h *ItemHandler) GetTree(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canView {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 
@@ -332,7 +332,7 @@ func (h *ItemHandler) GetChildrenNew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canView {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 

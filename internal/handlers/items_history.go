@@ -41,7 +41,7 @@ func (h *ItemHandler) GetItemHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canView {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 

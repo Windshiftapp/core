@@ -668,8 +668,6 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 		&attachment.FilePath, &attachment.MimeType, &attachment.FileSize,
 	)
 
-	// Note: itemID is scanned but only used to satisfy the query; the Download endpoint doesn't need it
-
 	if err == sql.ErrNoRows {
 		slog.Debug("attachment not found in database", slog.String("component", "attachments"), slog.Int("attachment_id", attachmentID))
 		respondNotFound(w, r, "attachment")
@@ -681,6 +679,13 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Debug("found attachment", slog.String("component", "attachments"), slog.String("original_filename", attachment.OriginalFilename), slog.String("path", attachment.FilePath))
+
+	// Check workspace permission if attachment belongs to an item
+	if itemID.Valid {
+		if !CheckItemPermission(w, r, h.db, h.permissionService, int(itemID.Int64), models.PermissionItemView) {
+			return
+		}
+	}
 
 	// Validate file path is within attachment directory (prevent path traversal)
 	absPath, err := filepath.Abs(attachment.FilePath)
@@ -832,10 +837,11 @@ func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 	var hasThumbnail bool
 	var thumbnailPath string
 	var mimeType string
+	var thumbItemID sql.NullInt64
 	err = h.db.QueryRow(`
-		SELECT has_thumbnail, thumbnail_path, mime_type
+		SELECT has_thumbnail, thumbnail_path, mime_type, item_id
 		FROM attachments WHERE id = ?
-	`, attachmentID).Scan(&hasThumbnail, &thumbnailPath, &mimeType)
+	`, attachmentID).Scan(&hasThumbnail, &thumbnailPath, &mimeType, &thumbItemID)
 
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "attachment")
@@ -844,6 +850,13 @@ func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	// Check workspace permission if attachment belongs to an item
+	if thumbItemID.Valid {
+		if !CheckItemPermission(w, r, h.db, h.permissionService, int(thumbItemID.Int64), models.PermissionItemView) {
+			return
+		}
 	}
 
 	if !hasThumbnail || thumbnailPath == "" {

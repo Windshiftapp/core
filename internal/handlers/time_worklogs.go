@@ -646,6 +646,10 @@ func (h *TimeWorklogHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
+		return
+	}
+
 	//nolint:misspell // database table name uses British spelling (customer_organisations)
 	rows, err := h.db.Query(`
 		SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,

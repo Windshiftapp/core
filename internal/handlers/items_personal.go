@@ -22,11 +22,21 @@ func (h *ItemHandler) GetPersonalTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify the work item exists
+	// Verify the work item exists and check view permission
 	var workItemWorkspaceID int
 	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", workItemID).Scan(&workItemWorkspaceID)
 	if err != nil {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
+		return
+	}
+
+	canView, permErr := h.canViewItem(user.ID, workItemWorkspaceID)
+	if permErr != nil {
+		respondInternalError(w, r, permErr)
+		return
+	}
+	if !canView {
+		respondNotFound(w, r, "Item")
 		return
 	}
 

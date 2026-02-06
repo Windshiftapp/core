@@ -341,7 +341,7 @@ func (h *ItemHandler) UpdateFracIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canEdit {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 
