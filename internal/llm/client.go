@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -72,7 +73,10 @@ func (c *httpClient) ChatCompletion(ctx context.Context, req ChatCompletionReque
 	// Add grammar for structured output (llama.cpp)
 	if req.StructuredOutput != nil && len(req.StructuredOutput.Schema) > 0 {
 		grammar, err := JSONSchemaToGBNF(req.StructuredOutput.Schema)
-		if err == nil && grammar != "" {
+		if err != nil {
+			slog.Warn("failed to generate GBNF grammar", slog.Any("error", err))
+		} else if grammar != "" {
+			slog.Debug("applying GBNF grammar", slog.Int("length", len(grammar)))
 			bodyMap["grammar"] = grammar
 		}
 	}

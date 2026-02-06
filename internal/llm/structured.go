@@ -6,7 +6,26 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 )
+
+// stripMarkdownCodeBlock extracts JSON content from markdown code blocks.
+// Handles formats like: ```json\n{...}\n``` or ```\n{...}\n```
+func stripMarkdownCodeBlock(s string) string {
+	s = strings.TrimSpace(s)
+	if !strings.HasPrefix(s, "```") {
+		return s
+	}
+	// Skip the opening ``` line (may include language hint)
+	if idx := strings.Index(s, "\n"); idx >= 0 {
+		s = s[idx+1:]
+	}
+	// Remove closing ```
+	if idx := strings.LastIndex(s, "```"); idx >= 0 {
+		s = s[:idx]
+	}
+	return strings.TrimSpace(s)
+}
 
 // ErrNoResponse is returned when the LLM returns no choices.
 var ErrNoResponse = errors.New("LLM returned no response")
@@ -29,6 +48,7 @@ func ChatCompletionStructured[T any](
 		}
 
 		content := resp.Choices[0].Message.Content
+		content = stripMarkdownCodeBlock(content)
 		var result T
 		if err := json.Unmarshal([]byte(content), &result); err != nil {
 			if attempt == 0 {
