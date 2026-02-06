@@ -10,8 +10,8 @@ FROM alpine:3.21 AS builder
 
 RUN apk add --no-cache build-base cmake git curl-dev linux-headers
 
-# Pin to a release that supports LFM2 architecture (b5460+)
-ARG LLAMA_CPP_TAG=b5535
+# Pin to a release that supports LFM2 architecture (requires b7952+ for LFM2)
+ARG LLAMA_CPP_TAG=b7952
 RUN git clone --depth 1 --branch ${LLAMA_CPP_TAG} \
     https://github.com/ggerganov/llama.cpp.git /build/llama.cpp
 
