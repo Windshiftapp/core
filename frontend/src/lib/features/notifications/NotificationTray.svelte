@@ -6,19 +6,27 @@
   import { scale, fly } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
   import { navigate } from '../../router.js';
-  import { onClickOutside } from 'runed';
   import { t } from '../../stores/i18n.svelte.js';
+  import { createPopover, melt } from '@melt-ui/svelte';
 
   let {
     expanded = false,
     label = ''
   } = $props();
 
-  let showDropdown = $state(false);
   let unreadCount = $state(0);
-  let dropdownElement = $state();
-  let buttonElement = $state();
-  let shouldShowAbove = $state(false);
+
+  // Create popover with portal to body to escape sidebar stacking context
+  const {
+    elements: { trigger, content },
+    states: { open }
+  } = createPopover({
+    forceVisible: true,
+    positioning: {
+      placement: 'right-start'
+    },
+    portal: 'body'
+  });
 
   // Subscribe to notifications store
   let unsubscribe;
@@ -32,36 +40,8 @@
     if (unsubscribe) unsubscribe();
   });
 
-  // Handle click outside using runed
-  onClickOutside(
-    () => dropdownElement,
-    () => { showDropdown = false; }
-  );
-
-  function calculatePosition() {
-    if (!buttonElement) return;
-
-    const buttonRect = buttonElement.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
-    const dropdownHeight = 500; // max-height of dropdown
-
-    // Check if dropdown would go below viewport
-    const spaceBelow = viewportHeight - buttonRect.bottom;
-    const spaceAbove = buttonRect.top;
-
-    // Show above if there's not enough space below but enough space above
-    shouldShowAbove = spaceBelow < dropdownHeight && spaceAbove > dropdownHeight;
-  }
-
-  function toggleDropdown() {
-    if (!showDropdown) {
-      calculatePosition();
-    }
-    showDropdown = !showDropdown;
-  }
-
   function closeDropdown() {
-    showDropdown = false;
+    open.set(false);
   }
 
   function handleMarkAllRead() {
@@ -70,7 +50,7 @@
 
   // Handle escape key
   function handleKeydown(event) {
-    if (event.key === 'Escape') {
+    if (event.key === 'Escape' && $open) {
       closeDropdown();
     }
   }
@@ -78,15 +58,13 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="notification-tray relative" bind:this={dropdownElement}>
+<div class="notification-tray relative">
   <!-- Notification Bell Button -->
   <button
-    bind:this={buttonElement}
-    onclick={toggleDropdown}
-    class="{expanded ? 'w-full px-3' : 'w-10 justify-center'} h-10 rounded flex items-center cursor-pointer nav-button {showDropdown ? 'nav-button-selected' : ''}"
+    use:melt={$trigger}
+    class="{expanded ? 'w-full px-3' : 'w-10 justify-center'} h-10 rounded flex items-center cursor-pointer nav-button {$open ? 'nav-button-selected' : ''}"
     title={t('notifications.title')}
     aria-label={t('notifications.title')}
-    aria-expanded={showDropdown}
   >
     <span class="relative">
       <Bell class="w-5 h-5 flex-shrink-0" />
@@ -108,9 +86,10 @@
   </button>
 
   <!-- Notification Dropdown -->
-  {#if showDropdown}
+  {#if $open}
     <div
-      class="notification-dropdown absolute left-full ml-2 w-96 rounded shadow-xl z-[9999] max-h-[500px] overflow-hidden {shouldShowAbove ? 'bottom-0' : 'top-0'}"
+      use:melt={$content}
+      class="notification-dropdown w-96 rounded shadow-xl max-h-[500px] overflow-hidden"
       style="background-color: var(--ds-surface-overlay); border: 1px solid var(--ds-border); color: var(--ds-text);"
       in:fly={{ x: -10, duration: 200, easing: quintOut }}
       out:fly={{ x: -10, duration: 150 }}
@@ -182,12 +161,6 @@
 </div>
 
 <style>
-  .notification-dropdown {
-    /* Ensure dropdown appears above everything */
-    position: absolute;
-    z-index: 9999;
-  }
-
   /* Custom scrollbar for notifications list */
   .notification-dropdown .max-h-96::-webkit-scrollbar {
     width: 6px;
