@@ -1221,18 +1221,49 @@ func GetItemsByWorkspace(t *testing.T, testServer *TestServer, workspaceID int) 
 func AssociateWorkspaceWithConfigSet(t *testing.T, testServer *TestServer, workspaceID, configSetID int) {
 	t.Helper()
 
-	data := map[string]interface{}{
-		"configuration_set_id": configSetID,
+	// First, get the current configuration set
+	getEndpoint := fmt.Sprintf("/configuration-sets/%d", configSetID)
+	getResp := MakeAuthRequest(t, testServer, http.MethodGet, getEndpoint, nil)
+	defer getResp.Body.Close()
+
+	if getResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(getResp.Body)
+		t.Fatalf("Failed to get config set %d: %d - %s", configSetID, getResp.StatusCode, string(body))
 	}
 
-	endpoint := fmt.Sprintf("/workspaces/%d/configuration-sets", workspaceID)
-	resp := MakeAuthRequest(t, testServer, http.MethodPost, endpoint, data)
-	defer resp.Body.Close()
+	var configSet map[string]interface{}
+	if err := json.NewDecoder(getResp.Body).Decode(&configSet); err != nil {
+		t.Fatalf("Failed to decode config set: %v", err)
+	}
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
-		t.Logf("Failed to associate workspace with config set: %d - %s", resp.StatusCode, string(body))
-		// Don't fail - it might already be associated
+	// Add workspace to WorkspaceIDs if not already present
+	workspaceIDs := []int{}
+	if ids, ok := configSet["workspace_ids"].([]interface{}); ok {
+		for _, id := range ids {
+			if idFloat, ok := id.(float64); ok {
+				workspaceIDs = append(workspaceIDs, int(idFloat))
+			}
+		}
+	}
+
+	// Check if already associated
+	for _, id := range workspaceIDs {
+		if id == workspaceID {
+			t.Logf("Workspace %d already associated with configuration set %d", workspaceID, configSetID)
+			return
+		}
+	}
+	workspaceIDs = append(workspaceIDs, workspaceID)
+	configSet["workspace_ids"] = workspaceIDs
+
+	// Update the configuration set with skip_migration_check
+	updateEndpoint := fmt.Sprintf("/configuration-sets/%d?skip_migration_check=true", configSetID)
+	updateResp := MakeAuthRequest(t, testServer, http.MethodPut, updateEndpoint, configSet)
+	defer updateResp.Body.Close()
+
+	if updateResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(updateResp.Body)
+		t.Logf("Failed to associate workspace with config set: %d - %s", updateResp.StatusCode, string(body))
 	} else {
 		t.Logf("Associated workspace %d with configuration set %d", workspaceID, configSetID)
 	}
