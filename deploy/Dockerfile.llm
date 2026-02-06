@@ -19,8 +19,7 @@ WORKDIR /build/llama.cpp
 
 RUN cmake -B build \
     -DGGML_NATIVE=OFF \
-    -DGGML_BACKEND_DL=ON \
-    -DGGML_CPU_ALL_VARIANTS=ON \
+    -DBUILD_SHARED_LIBS=OFF \
     -DLLAMA_CURL=ON \
     -DLLAMA_BUILD_TESTS=OFF \
     -DLLAMA_BUILD_EXAMPLES=OFF \
@@ -48,18 +47,8 @@ FROM alpine:3.21
 
 RUN apk add --no-cache libgomp libcurl curl ca-certificates libstdc++
 
-# Copy llama-server binary
+# Copy statically-linked llama-server binary
 COPY --from=builder /build/llama.cpp/build/bin/llama-server /usr/local/bin/llama-server
-
-# Copy shared libraries (backend .so files for runtime CPU detection)
-RUN mkdir -p /usr/local/lib/llama
-COPY --from=builder /build/llama.cpp/build/src/ /tmp/build-src/
-COPY --from=builder /build/llama.cpp/build/ggml/ /tmp/build-ggml/
-RUN find /tmp/build-src -name "*.so*" -exec cp {} /usr/local/lib/llama/ \; && \
-    find /tmp/build-ggml -name "*.so*" -exec cp {} /usr/local/lib/llama/ \; && \
-    rm -rf /tmp/build-src /tmp/build-ggml
-
-ENV LD_LIBRARY_PATH=/usr/local/lib/llama
 
 # Copy model
 COPY --from=model /model.gguf /models/model.gguf

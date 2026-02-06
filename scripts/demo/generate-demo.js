@@ -20,10 +20,13 @@
  *   --no-server            Don't start server (assumes server is already running)
  *   --base-url <url>       Base URL if server is already running (default: http://localhost:8080)
  *   --keep-server          Don't stop server after completion
+ *   --admin-user <user>    Admin username for login (default: admin)
+ *   --admin-password <pw>  Admin password for login (default: admin)
  *   --help                 Show this help message
  */
 
 import * as http from 'http';
+import * as https from 'https';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
@@ -109,7 +112,9 @@ function parseArgs() {
     baseURL: null,
     keepServer: true,
     cleanDb: false,
-    challenge: false
+    challenge: false,
+    adminUser: 'admin',
+    adminPassword: 'admin'
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -142,6 +147,12 @@ function parseArgs() {
       case '--challenge':
         options.challenge = true;
         break;
+      case '--admin-user':
+        options.adminUser = args[++i];
+        break;
+      case '--admin-password':
+        options.adminPassword = args[++i];
+        break;
       case '--help':
         console.log(`
 ${colors.bright}${APP_NAME} Demo Content Generator${colors.reset}
@@ -159,6 +170,8 @@ ${colors.cyan}Options:${colors.reset}
   --stop-server          Stop server after completion (for CI/e2e tests)
   --clean                Delete existing database before generating demo
   --challenge            Include edge-case and security test data
+  --admin-user <user>    Admin username for login (default: admin)
+  --admin-password <pw>  Admin password for login (default: admin)
   --help                 Show this help message
 
 ${colors.cyan}Examples:${colors.reset}
@@ -173,6 +186,9 @@ ${colors.cyan}Examples:${colors.reset}
 
   ${colors.dim}# Custom database and keep server running${colors.reset}
   node generate-demo.js --db my-demo.db --keep-server
+
+  ${colors.dim}# Connect to existing instance with custom credentials${colors.reset}
+  node generate-demo.js --no-server --base-url https://example.com --admin-user myuser --admin-password mypass
 `);
         process.exit(0);
       default:
@@ -213,9 +229,10 @@ function logInfo(message) {
 function makeRequest(method, url, data = null, headers = {}) {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
+    const isHttps = urlObj.protocol === 'https:';
     const options = {
       hostname: urlObj.hostname,
-      port: urlObj.port,
+      port: urlObj.port || (isHttps ? 443 : 80),
       path: urlObj.pathname + urlObj.search,
       method: method,
       headers: {
@@ -224,7 +241,8 @@ function makeRequest(method, url, data = null, headers = {}) {
       }
     };
 
-    const req = http.request(options, (res) => {
+    const httpModule = isHttps ? https : http;
+    const req = httpModule.request(options, (res) => {
       let body = '';
       res.on('data', (chunk) => body += chunk);
       res.on('end', () => {
@@ -452,8 +470,11 @@ async function completeSetup(baseURL) {
 }
 
 // Get bearer token - following exact Go test pattern
-async function getBearerToken(baseURL) {
+async function getBearerToken(baseURL, options = {}) {
   logSection('Getting Bearer Token');
+
+  const adminUser = options.adminUser || 'admin';
+  const adminPassword = options.adminPassword || 'admin';
 
   try {
     // Step 1: Get CSRF token for login
@@ -461,10 +482,10 @@ async function getBearerToken(baseURL) {
     const csrfToken1 = await getCSRFToken(baseURL);
 
     // Step 2: Login to get session cookie
-    logInfo('Logging in...');
+    logInfo(`Logging in as ${adminUser}...`);
     const loginData = {
-      email_or_username: 'admin',
-      password: 'admin'
+      email_or_username: adminUser,
+      password: adminPassword
     };
 
     const loginResponse = await makeRequest('POST', `${baseURL}/api/auth/login`, loginData, {
@@ -1971,18 +1992,19 @@ ${colors.reset}`);
       serverProcess = await startServer(options);
       // Wait a bit for migrations
       await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Complete setup only for fresh local instances
+      const setupSuccess = await completeSetup(options.baseURL);
+      if (!setupSuccess) {
+        throw new Error('Setup failed');
+      }
     } else {
       logInfo(`Using existing server at ${options.baseURL}`);
-    }
-
-    // Complete setup
-    const setupSuccess = await completeSetup(options.baseURL);
-    if (!setupSuccess) {
-      throw new Error('Setup failed');
+      logInfo('Skipping setup (assuming instance is already configured)');
     }
 
     // Get bearer token
-    const token = await getBearerToken(options.baseURL);
+    const token = await getBearerToken(options.baseURL, options);
     if (!token) {
       throw new Error('Failed to get bearer token');
     }
@@ -2080,7 +2102,7 @@ ${colors.reset}`);
     const modeText = options.challenge ? ' (with challenge data)' : '';
     log(`\n${colors.bright}${colors.green}✓ Demo content generated successfully${modeText}!${colors.reset}\n`);
     logInfo(`Access the application at: ${options.baseURL}`);
-    logInfo(`Login with: admin / admin`);
+    logInfo(`Login with: ${options.adminUser} / ${options.adminPassword}`);
 
     if (serverProcess && options.keepServer) {
       log(`\n${colors.yellow}Server is still running. Press Ctrl+C to stop.${colors.reset}\n`);
