@@ -410,6 +410,46 @@ function generateDescription(rng, ws, title) {
   return `## Background\n\n${bg}\n\nThis work involves building a ${adj} solution leveraging ${domainTerms}.\n\n## Technical Approach\n\n${tech}\n\n## Acceptance Criteria\n\n${ac}`;
 }
 
+function generateStoryDescription(rng, ws) {
+  const noun = pick(rng, ws.nouns);
+  const adj = pick(rng, technicalAdjectives);
+  const domainTerms = pickN(rng, ws.domain, 2, 3).join(' and ');
+  const noun2 = pick(rng, ws.nouns);
+
+  const contextVariants = [
+    `As a developer working on the ${ws.name.toLowerCase()} platform, I need to ${pick(rng, ['implement', 'enhance', 'extend', 'refactor'])} the ${noun} so that the system can handle ${adj} workloads reliably.`,
+    `The ${noun} currently lacks support for ${adj} operations. Users have reported that integration with ${domainTerms} is unreliable, and this story addresses those gaps.`,
+    `Product requirements call for a ${adj} ${noun} that integrates with ${domainTerms}. This will unblock downstream work on the ${noun2} and improve overall platform stability.`,
+    `Following the recent architecture review, the team identified that the ${noun} needs to be redesigned to support ${adj} patterns when working with ${domainTerms}.`,
+  ];
+
+  const detailVariants = [
+    `The implementation should leverage ${domainTerms} to ensure the ${noun} meets our ${adj} requirements. Pay special attention to error boundaries and graceful degradation when upstream services are unavailable. Coordinate with the team working on the ${noun2} to ensure interface compatibility.`,
+    `This involves updating the existing ${noun} abstraction layer and adding integration points for ${domainTerms}. The ${adj} nature of the solution requires careful handling of concurrency and state management. Existing consumers of the ${noun} API should not require changes.`,
+    `The scope includes modifying the ${noun} service layer, adding ${domainTerms} integration hooks, and updating the data model to support ${adj} operations. The ${noun2} depends on this work, so API contracts should be finalized early.`,
+    `Work should be split into two phases: first, refactor the ${noun} internals to support ${adj} patterns; second, wire up ${domainTerms} as the backing infrastructure. Include feature flags so the rollout can be controlled independently of deployment.`,
+  ];
+
+  const acItems = pickN(rng, [
+    `${noun} handles concurrent requests without data corruption`,
+    `Integration with ${pick(rng, ws.domain)} is covered by automated tests`,
+    `Error responses include structured messages with correlation IDs`,
+    `P95 latency remains under 150ms for all affected endpoints`,
+    `Existing API consumers are not broken (backward compatible)`,
+    `Logging captures all state transitions for debugging`,
+    `Feature flag allows disabling the new behavior in production`,
+    `Documentation is updated with usage examples and migration notes`,
+    `Database migrations are reversible and tested against production schema`,
+    `Monitoring dashboard is updated to include new metrics`,
+  ], 3, 5);
+
+  const context = pick(rng, contextVariants);
+  const details = pick(rng, detailVariants);
+  const acList = acItems.map(item => `- [ ] ${item}`).join('\n');
+
+  return `## Context\n\n${context}\n\n## Implementation Notes\n\n${details}\n\n## Acceptance Criteria\n\n${acList}`;
+}
+
 function generateShortDescription(rng, ws) {
   const noun = pick(rng, ws.nouns);
   const adj = pick(rng, technicalAdjectives);
@@ -419,16 +459,56 @@ function generateShortDescription(rng, ws) {
 
 function generateSubtaskDescription(rng, ws) {
   const noun = pick(rng, ws.nouns);
-  return `Work on the ${noun} component. ${pick(rng, [
-    'Write unit tests covering edge cases.',
-    'Update API documentation and add examples.',
-    'Implement error handling and logging.',
-    'Add input validation and sanitization.',
-    'Configure monitoring and alerting.',
-    'Set up integration tests with mocked dependencies.',
-    'Review and update database migration scripts.',
-    'Implement retry logic for transient failures.'
-  ])}`;
+  const adj = pick(rng, technicalAdjectives);
+  const domainTerm = pick(rng, ws.domain);
+  const taskScope = pick(rng, [
+    `Update the ${noun} component to support ${adj} operations with ${domainTerm}.`,
+    `Refactor the ${noun} internals to align with the ${adj} architecture pattern.`,
+    `Add ${domainTerm} integration to the ${noun} module.`,
+    `Harden the ${noun} against edge cases identified during code review.`,
+  ]);
+  const steps = pick(rng, [
+    `Write unit tests covering edge cases and verify integration with ${domainTerm}. Update inline documentation.`,
+    `Implement error handling and structured logging. Validate behavior under ${adj} load conditions.`,
+    `Add input validation, sanitization, and retry logic for transient ${domainTerm} failures.`,
+    `Set up integration tests with mocked dependencies and update the API documentation with examples.`,
+    `Review database migration scripts and ensure rollback safety. Add monitoring for key metrics.`,
+  ]);
+  return `${taskScope} ${steps}`;
+}
+
+function generateBugDescription(rng, ws) {
+  const noun = pick(rng, ws.nouns);
+  const domainTerm = pick(rng, ws.domain);
+  const adj = pick(rng, technicalAdjectives);
+
+  const stepsVariants = [
+    [`Navigate to the ${noun} management page`, `Trigger a ${adj} operation involving ${domainTerm}`, `Observe the response or UI state`],
+    [`Create or open an existing ${noun}`, `Perform an update that involves ${domainTerm} integration`, `Check the result in the API response or database`],
+    [`Configure the ${noun} with ${domainTerm} settings`, `Submit the form or trigger the API call`, `Monitor the logs for unexpected behavior`],
+  ];
+  const steps = pick(rng, stepsVariants);
+  const stepsList = steps.map((s, i) => `${i + 1}. ${s}`).join('\n');
+
+  const expectedVariants = [
+    `The ${noun} should complete the operation successfully and return a valid response with correct data.`,
+    `The system should process the ${adj} request and update the ${noun} state consistently.`,
+    `The ${noun} should handle the ${domainTerm} interaction gracefully and reflect the changes immediately.`,
+  ];
+
+  const actualVariants = [
+    `The ${noun} returns incorrect data or fails silently, causing downstream inconsistencies.`,
+    `The operation times out or throws an unhandled exception under ${adj} conditions.`,
+    `The ${noun} produces duplicate entries or ignores validation rules when ${domainTerm} is involved.`,
+  ];
+
+  const envVariants = [
+    `Observed in staging environment with ${domainTerm} ${pick(rng, ['v2.1', 'v3.0', 'latest'])} configured.`,
+    `Reproducible on both local development and CI environments using ${domainTerm}.`,
+    `Occurs intermittently under ${adj} load; consistent on staging with ${domainTerm} enabled.`,
+  ];
+
+  return `## Steps to Reproduce\n\n${stepsList}\n\n## Expected Behavior\n\n${pick(rng, expectedVariants)}\n\n## Actual Behavior\n\n${pick(rng, actualVariants)}\n\n## Environment\n\n${pick(rng, envVariants)}`;
 }
 
 function generateEpicTitle(rng, ws, index) {
@@ -484,10 +564,24 @@ export function generateWorkspaceItems(wsKey, seed) {
   const rng = createRNG(seed);
   const items = [];
 
+  // Track used titles to avoid duplicates (causes 400 errors via itemMap key collision)
+  const usedTitles = new Set();
+  function uniqueTitle(baseTitle) {
+    if (!usedTitles.has(baseTitle)) {
+      usedTitles.add(baseTitle);
+      return baseTitle;
+    }
+    let counter = 2;
+    while (usedTitles.has(`${baseTitle} (#${counter})`)) counter++;
+    const unique = `${baseTitle} (#${counter})`;
+    usedTitles.add(unique);
+    return unique;
+  }
+
   // Generate 40 epics
   const epicCount = 40;
   for (let e = 0; e < epicCount; e++) {
-    const epicTitle = generateEpicTitle(rng, ws, e);
+    const epicTitle = uniqueTitle(generateEpicTitle(rng, ws, e));
     const epic = {
       title: epicTitle,
       description: generateDescription(rng, ws, epicTitle),
@@ -501,10 +595,10 @@ export function generateWorkspaceItems(wsKey, seed) {
     // 4-7 stories per epic
     const storyCount = rangeInt(rng, 4, 7);
     for (let s = 0; s < storyCount; s++) {
-      const storyTitle = generateStoryTitle(rng, ws);
+      const storyTitle = uniqueTitle(generateStoryTitle(rng, ws));
       const story = {
         title: storyTitle,
-        description: generateShortDescription(rng, ws),
+        description: generateStoryDescription(rng, ws),
         status_id: pickStatus(rng),
         priority: pickPriority(rng),
         iterationName: rng() < 0.4 ? `${wsKey} Sprint 1` : (rng() < 0.3 ? `${wsKey} Sprint 2` : undefined),
@@ -516,7 +610,7 @@ export function generateWorkspaceItems(wsKey, seed) {
         const subtaskCount = rangeInt(rng, 2, 3);
         for (let t = 0; t < subtaskCount; t++) {
           story.children.push({
-            title: generateSubtaskTitle(rng, ws),
+            title: uniqueTitle(generateSubtaskTitle(rng, ws)),
             description: generateSubtaskDescription(rng, ws),
             status_id: pickStatus(rng),
             priority: pickPriority(rng),
@@ -535,17 +629,17 @@ export function generateWorkspaceItems(wsKey, seed) {
     if (rng() < 0.6) {
       // Bug
       items.push({
-        title: generateBugTitle(rng, ws),
-        description: generateShortDescription(rng, ws),
+        title: uniqueTitle(generateBugTitle(rng, ws)),
+        description: generateBugDescription(rng, ws),
         status_id: pickStatus(rng),
         priority: pickPriority(rng),
       });
     } else {
-      // Standalone task
+      // Standalone task (tasks can only have status Open=1 or Done=3)
       items.push({
-        title: `${pick(rng, actionVerbs)} ${pick(rng, ws.nouns)}`,
+        title: uniqueTitle(`${pick(rng, actionVerbs)} ${pick(rng, ws.nouns)}`),
         description: generateShortDescription(rng, ws),
-        status_id: pickStatus(rng),
+        status_id: rng() < 0.5 ? 1 : 3,
         priority: pickPriority(rng),
         is_task: true,
       });

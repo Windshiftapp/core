@@ -1967,13 +1967,13 @@ async function createComments(baseURL, token, itemMap, userMap, scaleModule) {
       if (!userId) continue;
 
       try {
-        const response = await makeRequest('POST', `${baseURL}/api/items/${itemId}/comments`, {
+        const response = await makeAuthRequest(baseURL, 'POST', `/api/items/${itemId}/comments`, {
           content: comment.content,
           author_id: userId,
           is_private: comment.is_private
-        }, { 'Authorization': `Bearer ${token}` });
+        }, token);
 
-        if (response.statusCode >= 200 && response.statusCode < 300) {
+        if (response.status >= 200 && response.status < 300) {
           createdCount++;
         } else {
           errorCount++;
