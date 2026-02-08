@@ -228,6 +228,7 @@ type ItemLink struct {
 	SourceItemTypeIcon  string `json:"source_item_type_icon,omitempty"`
 	SourceItemTypeColor string `json:"source_item_type_color,omitempty"`
 	SourceWorkspaceKey  string `json:"source_workspace_key,omitempty"`
+	SourceWorkspaceID   *int   `json:"source_workspace_id,omitempty"`
 	// Target item details
 	TargetStatusID      *int   `json:"target_status_id,omitempty"`
 	TargetStatusName    string `json:"target_status_name,omitempty"`
@@ -236,6 +237,7 @@ type ItemLink struct {
 	TargetItemTypeIcon  string `json:"target_item_type_icon,omitempty"`
 	TargetItemTypeColor string `json:"target_item_type_color,omitempty"`
 	TargetWorkspaceKey  string `json:"target_workspace_key,omitempty"`
+	TargetWorkspaceID   *int   `json:"target_workspace_id,omitempty"`
 }
 
 // LinkableItem represents an item that can be linked (work item, test case, or asset)

@@ -585,13 +585,15 @@ func (h *ItemLinkHandler) getLinksWhere(whereClause string, args ...interface{})
 		       COALESCE(sit.icon, '') as source_item_type_icon,
 		       COALESCE(sit.color, '') as source_item_type_color,
 		       COALESCE(sw.key, '') as source_workspace_key,
+		       si.workspace_id as source_workspace_id,
 		       ti.status_id as target_status_id,
 		       COALESCE(ts.name, '') as target_status_name,
 		       ti.item_type_id as target_item_type_id,
 		       COALESCE(tit.name, '') as target_item_type_name,
 		       COALESCE(tit.icon, '') as target_item_type_icon,
 		       COALESCE(tit.color, '') as target_item_type_color,
-		       COALESCE(tw.key, '') as target_workspace_key
+		       COALESCE(tw.key, '') as target_workspace_key,
+		       ti.workspace_id as target_workspace_id
 		FROM item_links il
 		JOIN link_types lt ON il.link_type_id = lt.id
 		LEFT JOIN items si ON il.source_type = 'item' AND il.source_id = si.id
@@ -626,10 +628,10 @@ func (h *ItemLinkHandler) getLinksWhere(whereClause string, args ...interface{})
 			&link.SourceTitle, &link.TargetTitle, &link.CreatedByName,
 			&link.SourceStatusID, &link.SourceStatusName,
 			&link.SourceItemTypeID, &link.SourceItemTypeName, &link.SourceItemTypeIcon, &link.SourceItemTypeColor,
-			&link.SourceWorkspaceKey,
+			&link.SourceWorkspaceKey, &link.SourceWorkspaceID,
 			&link.TargetStatusID, &link.TargetStatusName,
 			&link.TargetItemTypeID, &link.TargetItemTypeName, &link.TargetItemTypeIcon, &link.TargetItemTypeColor,
-			&link.TargetWorkspaceKey)
+			&link.TargetWorkspaceKey, &link.TargetWorkspaceID)
 		if err != nil {
 			return nil, err
 		}
