@@ -415,7 +415,7 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 
 	// Sanitize user input to prevent XSS
 	req.Title = utils.StripHTMLTags(req.Title)
-	req.Description = utils.StripHTMLTags(req.Description)
+	req.Description = utils.SanitizeDescription(req.Description)
 
 	// Validate category if provided
 	if req.CategoryID != nil {
@@ -578,7 +578,7 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 
 	// Sanitize user input to prevent XSS
 	req.Title = utils.StripHTMLTags(req.Title)
-	req.Description = utils.StripHTMLTags(req.Description)
+	req.Description = utils.SanitizeDescription(req.Description)
 
 	// Validate asset type if changing
 	if req.AssetTypeID != 0 {

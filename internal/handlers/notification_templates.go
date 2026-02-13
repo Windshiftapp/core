@@ -159,10 +159,10 @@ func (h *NotificationTemplateHandler) CreateTemplate(w http.ResponseWriter, r *h
 	}
 
 	// Sanitize user input to prevent XSS
-	template.Name = utils.StripHTMLTags(template.Name)
-	template.Subject = utils.StripHTMLTags(template.Subject)
-	template.Content = utils.StripHTMLTags(template.Content)
-	template.Description = utils.StripHTMLTags(template.Description)
+	template.Name = utils.SanitizeName(template.Name)
+	template.Subject = utils.SanitizeCommentContent(template.Subject)
+	template.Content = utils.SanitizeCommentContent(template.Content)
+	template.Description = utils.SanitizeCommentContent(template.Description)
 
 	db, ok := h.requireWriteDB(w, r)
 	if !ok {
@@ -221,10 +221,10 @@ func (h *NotificationTemplateHandler) UpdateTemplate(w http.ResponseWriter, r *h
 	}
 
 	// Sanitize user input to prevent XSS
-	template.Name = utils.StripHTMLTags(template.Name)
-	template.Subject = utils.StripHTMLTags(template.Subject)
-	template.Content = utils.StripHTMLTags(template.Content)
-	template.Description = utils.StripHTMLTags(template.Description)
+	template.Name = utils.SanitizeName(template.Name)
+	template.Subject = utils.SanitizeCommentContent(template.Subject)
+	template.Content = utils.SanitizeCommentContent(template.Content)
+	template.Description = utils.SanitizeCommentContent(template.Description)
 
 	db, ok := h.requireWriteDB(w, r)
 	if !ok {

@@ -5,27 +5,35 @@ import (
 	"regexp"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/microcosm-cc/bluemonday"
 )
 
-// Pre-compiled regular expressions for performance
+// Bluemonday policies (safe for concurrent use after creation)
 var (
-	// Script tag removal regex
-	scriptRegex = regexp.MustCompile(`(?i)<script[^>]*>.*?</script>`)
+	// strictPolicy strips ALL HTML tags
+	strictPolicy = bluemonday.StrictPolicy()
 
-	// Dangerous HTML tags regex
-	dangerousRegex = regexp.MustCompile(`(?i)<(script|object|embed|iframe|form|img|svg)[^>]*>`)
+	// brOnlyPolicy strips all HTML except <br> tags (used by Milkdown for blank lines)
+	brOnlyPolicy = func() *bluemonday.Policy {
+		p := bluemonday.StrictPolicy()
+		p.AllowElements("br")
+		return p
+	}()
+)
 
+// Pre-compiled regular expressions for non-HTML patterns
+var (
 	// Email validation regex
 	emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 
 	// Dangerous filename characters regex
 	dangerousCharsRegex = regexp.MustCompile(`[<>:"|?*\x00-\x1f]`)
 
-	// All HTML tags regex - matches opening, closing, and self-closing tags
-	htmlTagRegex = regexp.MustCompile(`<[^>]*>`)
-
-	// Safe br tag variations (used by Milkdown to preserve blank lines)
-	brTagRegex = regexp.MustCompile(`<br\s*/?>`)
+	// Dangerous URL schemes in Markdown links: [text](javascript:...) or ![alt](data:...)
+	// Matches both link and image syntax, case-insensitive scheme names.
+	// Handles one level of nested parens in the URL (e.g. alert(1)) before the closing Markdown paren.
+	dangerousMarkdownURLRegex = regexp.MustCompile(`(?i)(!?\[[^\]]*\])\(\s*(javascript|vbscript|data)\s*:(?:[^()]*(?:\([^()]*\)[^()]*)*)\)`)
 )
 
 // SanitizeText removes potentially dangerous HTML/script content and limits length
@@ -33,25 +41,22 @@ func SanitizeText(input string, maxLength int) string {
 	if input == "" {
 		return input
 	}
-	
+
 	// HTML escape to prevent script injection
 	sanitized := html.EscapeString(input)
 
-	// Remove any remaining script tags (belt and suspenders approach)
-	sanitized = scriptRegex.ReplaceAllString(sanitized, "")
+	// Strip any HTML tags that might remain (belt and suspenders after escaping)
+	sanitized = strictPolicy.Sanitize(sanitized)
 
-	// Remove other potentially dangerous tags
-	sanitized = dangerousRegex.ReplaceAllString(sanitized, "")
-	
 	// Trim whitespace
 	sanitized = strings.TrimSpace(sanitized)
-	
+
 	// Limit length to prevent excessive data
 	if maxLength > 0 && utf8.RuneCountInString(sanitized) > maxLength {
 		runes := []rune(sanitized)
 		sanitized = string(runes[:maxLength])
 	}
-	
+
 	return sanitized
 }
 
@@ -66,7 +71,7 @@ func StripHTMLTags(input string) string {
 	if input == "" {
 		return ""
 	}
-	return htmlTagRegex.ReplaceAllString(input, "")
+	return strictPolicy.Sanitize(input)
 }
 
 // SanitizeDescription sanitizes descriptions by stripping HTML tags and limiting size.
@@ -77,16 +82,14 @@ func SanitizeDescription(description string) string {
 		return ""
 	}
 
-	// Preserve <br> tags by replacing with placeholder before stripping HTML
-	// These are used by Milkdown's remarkPreserveEmptyLinePlugin for blank lines
-	const brPlaceholder = "\x00BR_PLACEHOLDER\x00"
-	description = brTagRegex.ReplaceAllString(description, brPlaceholder)
+	// Use brOnlyPolicy to strip all HTML except <br> tags
+	description = brOnlyPolicy.Sanitize(description)
 
-	// Strip any other HTML tags - Markdown content shouldn't have any
-	description = StripHTMLTags(description)
+	// Normalize <br/> (bluemonday output) back to <br /> for Milkdown compatibility
+	description = strings.ReplaceAll(description, "<br/>", "<br />")
 
-	// Restore <br /> tags
-	description = strings.ReplaceAll(description, brPlaceholder, "<br />")
+	// Sanitize dangerous Markdown URLs (javascript:, vbscript:, data: schemes)
+	description = SanitizeMarkdownURLs(description)
 
 	// Limit size to prevent excessive data (10KB should be enough for rich text)
 	maxLength := 10000
@@ -100,6 +103,26 @@ func SanitizeDescription(description string) string {
 // SanitizeName sanitizes names (workspace names, field names, etc.)
 func SanitizeName(name string) string {
 	return SanitizeText(name, 100)
+}
+
+// SanitizeMarkdownURLs replaces dangerous URL schemes in Markdown link/image syntax.
+// This catches XSS vectors like [Click me](javascript:alert(1)) and ![img](data:text/html,<script>...)
+// that survive HTML tag stripping because they contain no HTML tags.
+func SanitizeMarkdownURLs(input string) string {
+	if input == "" {
+		return ""
+	}
+	return dangerousMarkdownURLRegex.ReplaceAllString(input, "${1}(#unsafe-link-removed)")
+}
+
+// SanitizeCommentContent sanitizes user-submitted comment content.
+// It chains HTML tag stripping (for injected HTML) with Markdown URL sanitization
+// (for javascript:/vbscript:/data: links that would be rendered by the Markdown editor).
+func SanitizeCommentContent(input string) string {
+	if input == "" {
+		return ""
+	}
+	return SanitizeMarkdownURLs(StripHTMLTags(input))
 }
 
 // SanitizeJSON sanitizes JSON strings by limiting their size

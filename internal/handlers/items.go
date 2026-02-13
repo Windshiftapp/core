@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"windshift/internal/cql"
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -27,6 +26,7 @@ type ItemHandler struct {
 	itemCache         *services.ItemCacheService
 	activityTracker   *services.ActivityTracker
 	idResolver        *services.IDResolverService
+	itemCRUD          *services.ItemCRUDService
 	mentionService    *services.MentionService // Mention service for processing @mentions (optional, can be nil)
 	notificationService interface {
 		EmitEvent(event *services.NotificationEvent)
@@ -56,6 +56,7 @@ func NewItemHandler(db database.Database, permissionService *services.Permission
 		itemCache:           itemCache,
 		activityTracker:     activityTracker,
 		idResolver:          services.NewIDResolverService(db),
+		itemCRUD:            services.NewItemCRUDService(db),
 		notificationService: notificationService,
 	}
 }
@@ -108,153 +109,10 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build query components separately for reuse
-	// No CTE needed for GetAll - effective_project is only calculated on detailed GET
-	selectClause := `SELECT
-			i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description, i.status_id, i.priority_id, i.due_date, i.is_task,
-		    i.milestone_id, i.iteration_id, i.project_id, i.inherit_project, i.time_project_id, i.assignee_id, i.creator_id, i.custom_field_values, i.calendar_data, i.parent_id,
-		    i.frac_index, i.created_at, i.updated_at,
-		    w.name as workspace_name, w.key as workspace_key, it.name as item_type_name,
-		    p.title as parent_title, m.name as milestone_name, iter.name as iteration_name, proj.name as project_name, tp.name as time_project_name,
-		    assignee.first_name || ' ' || assignee.last_name as assignee_name, assignee.email as assignee_email, assignee.avatar_url as assignee_avatar,
-		    creator.first_name || ' ' || creator.last_name as creator_name, creator.email as creator_email,
-		    st.name as status_name, pri.name as priority_name, pri.icon as priority_icon, pri.color as priority_color
-		`
-
-	fromClause := `FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN item_types it ON i.item_type_id = it.id
-		LEFT JOIN items p ON i.parent_id = p.id
-		LEFT JOIN milestones m ON i.milestone_id = m.id
-		LEFT JOIN iterations iter ON i.iteration_id = iter.id
-		LEFT JOIN time_projects proj ON i.project_id = proj.id
-		LEFT JOIN time_projects tp ON i.time_project_id = tp.id
-		LEFT JOIN users assignee ON i.assignee_id = assignee.id
-		LEFT JOIN users creator ON i.creator_id = creator.id
-		LEFT JOIN statuses st ON i.status_id = st.id
-		LEFT JOIN priorities pri ON i.priority_id = pri.id
-		`
-
-	whereClause := "WHERE 1=1"
-	args := []interface{}{}
-
-	// Filter by accessible workspaces (respects workspace active status)
-	if len(accessibleWorkspaceIDs) > 0 {
-		placeholders := make([]string, len(accessibleWorkspaceIDs))
-		for i, id := range accessibleWorkspaceIDs {
-			placeholders[i] = "?"
-			args = append(args, id)
-		}
-		whereClause += " AND i.workspace_id IN (" + strings.Join(placeholders, ",") + ")"
-	}
-
-	// Check for QL query parameter
-	if qlQuery := r.URL.Query().Get("ql"); qlQuery != "" {
-		// Build workspace mapping for QL evaluation
-		workspaceMap, err := h.buildWorkspaceMap()
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		// Create QL evaluator and generate SQL
-		evaluator := cql.NewEvaluator(workspaceMap)
-		qlSQL, qlArgs, err := evaluator.EvaluateToSQL(qlQuery)
-		if err != nil {
-			respondValidationError(w, r, "QL query error: "+err.Error())
-			return
-		}
-
-		if qlSQL != "" {
-			whereClause += " AND (" + qlSQL + ")"
-			args = append(args, qlArgs...)
-		}
-	} else {
-		// Add filters based on query parameters (fallback for non-QL queries)
-		// Note: workspace_id permission check already done at the start of the function
-		if workspaceID := r.URL.Query().Get("workspace_id"); workspaceID != "" {
-			whereClause += " AND i.workspace_id = ?"
-			args = append(args, workspaceID)
-		}
-
-		if status := r.URL.Query().Get("status"); status != "" {
-			whereClause += " AND i.status_id = ?"
-			args = append(args, status)
-		}
-
-		if priorityID := r.URL.Query().Get("priority_id"); priorityID != "" {
-			whereClause += " AND i.priority_id = ?"
-			args = append(args, priorityID)
-		}
-
-		if assigneeID := r.URL.Query().Get("assignee_id"); assigneeID != "" {
-			whereClause += " AND i.assignee_id = ?"
-			args = append(args, assigneeID)
-		}
-
-		// Hierarchy filters
-		if parentID := r.URL.Query().Get("parent_id"); parentID != "" {
-			if parentID == "null" || parentID == "0" {
-				whereClause += " AND i.parent_id IS NULL"
-			} else {
-				whereClause += " AND i.parent_id = ?"
-				args = append(args, parentID)
-			}
-		}
-
-		if level := r.URL.Query().Get("level"); level != "" {
-			levelInt, err := strconv.Atoi(level)
-			if err != nil {
-				respondValidationError(w, r, "Invalid level parameter: must be an integer")
-				return
-			}
-			whereClause += " AND COALESCE(it.hierarchy_level, 0) = ?"
-			args = append(args, levelInt)
-		}
-
-		if maxLevel := r.URL.Query().Get("max_level"); maxLevel != "" {
-			maxLevelInt, err := strconv.Atoi(maxLevel)
-			if err != nil {
-				respondValidationError(w, r, "Invalid max_level parameter: must be an integer")
-				return
-			}
-			whereClause += " AND COALESCE(it.hierarchy_level, 0) <= ?"
-			args = append(args, maxLevelInt)
-		}
-
-		// Date filters
-		if createdSince := r.URL.Query().Get("created_since"); createdSince != "" {
-			whereClause += " AND i.created_at >= ?"
-			args = append(args, createdSince)
-		}
-	}
-
-	// ID filter (applies to both QL and non-QL queries)
-	if id := r.URL.Query().Get("id"); id != "" {
-		whereClause += " AND i.id = ?"
-		args = append(args, id)
-	}
-
-	// Add ordering - support multiple ordering strategies
-	orderBy := r.URL.Query().Get("order_by")
-	var orderByClause string
-
-	if orderBy == "created_at" {
-		// Sort by creation time only
-		orderByClause = ` ORDER BY
-			i.created_at DESC`
-	} else {
-		// Default: prioritize frac_index over creation time
-		orderByClause = ` ORDER BY
-			CASE WHEN i.frac_index IS NULL THEN 1 ELSE 0 END,
-			i.frac_index ASC,
-			i.created_at DESC`
-	}
-
 	// Parse pagination parameters
 	page := 1
-	limit := 50      // Default items per page
-	maxLimit := 1000 // Maximum items that can be returned from API
+	limit := 50
+	maxLimit := 1000
 
 	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
 		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
@@ -271,103 +129,135 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Build count query (no ORDER BY needed for count)
-	countQuery := "SELECT COUNT(DISTINCT i.id) " + fromClause + whereClause
-
-	var totalCount int
-	err = h.db.QueryRow(countQuery, args...).Scan(&totalCount)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Build data query with ordering and pagination
 	offset := (page - 1) * limit
-	dataQuery := selectClause + fromClause + whereClause + orderByClause + fmt.Sprintf(" LIMIT %d OFFSET %d", limit, offset)
 
-	rows, err := h.db.Query(dataQuery, args...)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
+	// Build filters from query parameters
+	var filters services.ItemFilters
+	qlQuery := r.URL.Query().Get("ql")
+	var collectionID int
+	var workspaceID int
+
+	// Resolve collection_id
+	if qlQuery == "" {
+		if collectionParam := r.URL.Query().Get("collection_id"); collectionParam != "" {
+			cid, err := strconv.Atoi(collectionParam)
+			if err != nil {
+				respondValidationError(w, r, "Invalid collection_id parameter")
+				return
+			}
+			collectionID = cid
+		}
 	}
-	defer rows.Close()
 
-	var items []models.Item
-	for rows.Next() {
-		var item models.Item
-		var customFieldValuesJSON, calendarDataJSON sql.NullString
-		var itemTypeID, parentID, milestoneID, iterationID, projectID, timeProjectID, assigneeID, creatorID, statusID, priorityID sql.NullInt64
-		var dueDate sql.NullTime
-		var itemTypeName, parentTitle, milestoneName, iterationName, projectName, timeProjectName sql.NullString
-		var assigneeName, assigneeEmail, assigneeAvatar, creatorName, creatorEmail, statusName sql.NullString
-		var priorityName, priorityIcon, priorityColor sql.NullString
-		var fracIndex sql.NullString
-		var inheritProject bool
+	// Apply workspace_id only when no collection_id was provided
+	if collectionID == 0 {
+		if wsParam := r.URL.Query().Get("workspace_id"); wsParam != "" {
+			wsID, err := strconv.Atoi(wsParam)
+			if err != nil {
+				respondValidationError(w, r, "Invalid workspace_id parameter")
+				return
+			}
+			workspaceID = wsID
+		}
+	}
 
-		err := rows.Scan(&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
-			&statusID, &priorityID, &dueDate, &item.IsTask, &milestoneID, &iterationID, &projectID, &inheritProject, &timeProjectID, &assigneeID, &creatorID, &customFieldValuesJSON, &calendarDataJSON, &parentID,
-			&fracIndex, &item.CreatedAt, &item.UpdatedAt, &item.WorkspaceName, &item.WorkspaceKey, &itemTypeName, &parentTitle, &milestoneName, &iterationName, &projectName, &timeProjectName,
-			&assigneeName, &assigneeEmail, &assigneeAvatar, &creatorName, &creatorEmail, &statusName, &priorityName, &priorityIcon, &priorityColor)
-		if err != nil {
-			respondInternalError(w, r, err)
+	// When no QL query, apply individual filters
+	if qlQuery == "" && collectionID == 0 {
+		if status := r.URL.Query().Get("status"); status != "" {
+			statusID, err := strconv.Atoi(status)
+			if err == nil {
+				filters.StatusID = &statusID
+			}
+		}
+
+		if priorityParam := r.URL.Query().Get("priority_id"); priorityParam != "" {
+			priorityID, err := strconv.Atoi(priorityParam)
+			if err == nil {
+				filters.PriorityID = &priorityID
+			}
+		}
+
+		if assigneeParam := r.URL.Query().Get("assignee_id"); assigneeParam != "" {
+			assigneeID, err := strconv.Atoi(assigneeParam)
+			if err == nil {
+				filters.AssigneeID = &assigneeID
+			}
+		}
+
+		// Hierarchy filters
+		if parentID := r.URL.Query().Get("parent_id"); parentID != "" {
+			if parentID == "null" || parentID == "0" {
+				zero := 0
+				filters.ParentID = &zero
+				filters.ParentIDIsSet = true
+			} else {
+				pid, err := strconv.Atoi(parentID)
+				if err == nil {
+					filters.ParentID = &pid
+					filters.ParentIDIsSet = true
+				}
+			}
+		}
+
+		if level := r.URL.Query().Get("level"); level != "" {
+			levelInt, err := strconv.Atoi(level)
+			if err != nil {
+				respondValidationError(w, r, "Invalid level parameter: must be an integer")
+				return
+			}
+			filters.Level = &levelInt
+		}
+
+		if maxLevel := r.URL.Query().Get("max_level"); maxLevel != "" {
+			maxLevelInt, err := strconv.Atoi(maxLevel)
+			if err != nil {
+				respondValidationError(w, r, "Invalid max_level parameter: must be an integer")
+				return
+			}
+			filters.MaxLevel = &maxLevelInt
+		}
+
+		if createdSince := r.URL.Query().Get("created_since"); createdSince != "" {
+			filters.CreatedSince = &createdSince
+		}
+	}
+
+	// ID filter (applies to both QL and non-QL queries)
+	if idParam := r.URL.Query().Get("id"); idParam != "" {
+		itemID, err := strconv.Atoi(idParam)
+		if err == nil {
+			filters.ItemID = &itemID
+		}
+	}
+
+	// Determine sort order
+	sortBy := r.URL.Query().Get("order_by")
+
+	// Call service
+	items, totalCount, err := h.itemCRUD.ListWithQL(services.ListWithQLParams{
+		WorkspaceID:  workspaceID,
+		CollectionID: collectionID,
+		QLQuery:      qlQuery,
+		WorkspaceIDs: accessibleWorkspaceIDs,
+		Filters:      filters,
+		Pagination: services.PaginationParams{
+			Limit:  limit,
+			Offset: offset,
+		},
+		SortBy: sortBy,
+	})
+	if err != nil {
+		// Check for QL-specific errors to return as validation errors
+		if strings.Contains(err.Error(), "QL query error:") {
+			respondValidationError(w, r, err.Error())
 			return
 		}
-
-		// Handle nullable fields
-		item.ItemTypeID = utils.NullInt64ToPtr(itemTypeID)
-		item.ParentID = utils.NullInt64ToPtr(parentID)
-		item.DueDate = utils.NullTimeToPtr(dueDate)
-		item.MilestoneID = utils.NullInt64ToPtr(milestoneID)
-		item.ItemTypeName = itemTypeName.String
-		item.ParentTitle = parentTitle.String
-		item.MilestoneName = milestoneName.String
-		item.IterationID = utils.NullInt64ToPtr(iterationID)
-		item.IterationName = iterationName.String
-		item.StatusID = utils.NullInt64ToPtr(statusID)
-		item.StatusName = statusName.String
-		item.ProjectID = utils.NullInt64ToPtr(projectID)
-		item.InheritProject = inheritProject
-		item.ProjectName = projectName.String
-		item.TimeProjectID = utils.NullInt64ToPtr(timeProjectID)
-		item.TimeProjectName = timeProjectName.String
-		item.FracIndex = utils.NullStringToPtr(fracIndex)
-		item.PriorityID = utils.NullInt64ToPtr(priorityID)
-		item.PriorityName = priorityName.String
-		item.PriorityIcon = priorityIcon.String
-		item.PriorityColor = priorityColor.String
-		item.AssigneeID = utils.NullInt64ToPtr(assigneeID)
-		item.CreatorID = utils.NullInt64ToPtr(creatorID)
-		item.AssigneeName = assigneeName.String
-		item.AssigneeEmail = assigneeEmail.String
-		item.AssigneeAvatar = assigneeAvatar.String
-		item.CreatorName = creatorName.String
-		item.CreatorEmail = creatorEmail.String
-		// Note: effective_project fields are NOT calculated on list operations for performance
-
-		// Parse custom field values JSON
-		if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
-			if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &item.CustomFieldValues); err != nil {
-				item.CustomFieldValues = make(map[string]interface{})
-			}
-		} else {
-			item.CustomFieldValues = make(map[string]interface{})
+		if strings.Contains(err.Error(), "collection not found") {
+			respondNotFound(w, r, "collection")
+			return
 		}
-
-		// Parse calendar data JSON
-		if calendarDataJSON.Valid && calendarDataJSON.String != "" {
-			if err := json.Unmarshal([]byte(calendarDataJSON.String), &item.CalendarData); err != nil {
-				item.CalendarData = []models.CalendarScheduleEntry{}
-			}
-		} else {
-			item.CalendarData = []models.CalendarScheduleEntry{}
-		}
-
-		items = append(items, item)
-	}
-
-	// Always return an array, even if empty
-	if items == nil {
-		items = []models.Item{}
+		respondInternalError(w, r, err)
+		return
 	}
 
 	// Filter items based on user permissions

@@ -1,9 +1,16 @@
 package llm
 
+// Attachment holds a base64-encoded file to include in a message (e.g. a PDF for Anthropic document blocks).
+type Attachment struct {
+	MimeType string `json:"mime_type"`
+	Data     string `json:"data"` // base64-encoded
+}
+
 // Message represents a chat message in the OpenAI-compatible format.
 type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role        string       `json:"role"`
+	Content     string       `json:"content"`
+	Attachments []Attachment `json:"attachments,omitempty"`
 }
 
 // ChatCompletionRequest is the request body for /v1/chat/completions.

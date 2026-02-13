@@ -259,14 +259,14 @@ func (sm *SessionManager) isSecureRequest(r *http.Request) bool {
 	}
 
 	// Extract direct client IP (not from headers)
-	remoteAddr := r.RemoteAddr
-	if colonIndex := strings.LastIndex(remoteAddr, ":"); colonIndex != -1 {
-		remoteAddr = remoteAddr[:colonIndex]
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
 	}
 
-	clientIP := net.ParseIP(remoteAddr)
+	clientIP := net.ParseIP(host)
 	if clientIP == nil {
-		slog.Debug("secure request check: failed to parse IP", slog.String("component", "sso"), slog.String("remote_addr", remoteAddr), slog.Bool("result", false))
+		slog.Debug("secure request check: failed to parse IP", slog.String("component", "sso"), slog.String("remote_addr", host), slog.Bool("result", false))
 		return false
 	}
 

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"windshift/internal/database"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -9,16 +8,83 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+	"windshift/internal/database"
 	"windshift/internal/models"
-
+	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 type BoardConfigurationHandler struct {
-	db database.Database
+	db                database.Database
+	permissionService *services.PermissionService
 }
 
-func NewBoardConfigurationHandler(db database.Database) *BoardConfigurationHandler {
-	return &BoardConfigurationHandler{db: db}
+func NewBoardConfigurationHandler(db database.Database, permissionService *services.PermissionService) *BoardConfigurationHandler {
+	return &BoardConfigurationHandler{db: db, permissionService: permissionService}
+}
+
+// checkCollectionAccess verifies the user can access the collection (public or owned by user).
+// Returns true if access is granted, false if denied (response already written).
+func (h *BoardConfigurationHandler) checkCollectionAccess(w http.ResponseWriter, r *http.Request, collectionID int) bool {
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser == nil {
+		respondUnauthorized(w, r)
+		return false
+	}
+
+	var isPublic bool
+	var createdBy sql.NullInt64
+	err := h.db.QueryRow("SELECT is_public, created_by FROM collections WHERE id = ?", collectionID).
+		Scan(&isPublic, &createdBy)
+	if err == sql.ErrNoRows {
+		respondNotFound(w, r, "collection")
+		return false
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return false
+	}
+
+	if !isPublic && (!createdBy.Valid || int(createdBy.Int64) != currentUser.ID) {
+		respondNotFound(w, r, "collection")
+		return false
+	}
+	return true
+}
+
+// checkBoardConfigAccess looks up the collection/workspace associated with a board config
+// and verifies the user has access.
+func (h *BoardConfigurationHandler) checkBoardConfigAccess(w http.ResponseWriter, r *http.Request, configID int) bool {
+	var collID, wsID sql.NullInt64
+	err := h.db.QueryRow("SELECT collection_id, workspace_id FROM board_configurations WHERE id = ?", configID).
+		Scan(&collID, &wsID)
+	if err == sql.ErrNoRows {
+		respondNotFound(w, r, "board_configuration")
+		return false
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return false
+	}
+
+	if wsID.Valid {
+		return h.checkWorkspaceAccess(w, r, int(wsID.Int64))
+	}
+	if collID.Valid {
+		return h.checkCollectionAccess(w, r, int(collID.Int64))
+	}
+	return true
+}
+
+// checkWorkspaceAccess verifies the user has view permission on the workspace.
+// Returns true if access is granted, false if denied (response already written).
+func (h *BoardConfigurationHandler) checkWorkspaceAccess(w http.ResponseWriter, r *http.Request, workspaceID int) bool {
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser == nil {
+		respondUnauthorized(w, r)
+		return false
+	}
+	return RequireWorkspacePermission(w, r, currentUser.ID, workspaceID, models.PermissionItemView, h.permissionService)
 }
 
 // GetByCollection returns the board configuration for a specific collection or workspace
@@ -42,6 +108,10 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 		workspaceID, parseErr := strconv.Atoi(workspaceIDStr)
 		if parseErr != nil {
 			respondInvalidID(w, r, "workspace_id")
+			return
+		}
+
+		if !h.checkWorkspaceAccess(w, r, workspaceID) {
 			return
 		}
 
@@ -80,6 +150,10 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 		collectionID, parseErr := strconv.Atoi(id)
 		if parseErr != nil {
 			respondInvalidID(w, r, "id")
+			return
+		}
+
+		if !h.checkCollectionAccess(w, r, collectionID) {
 			return
 		}
 
@@ -195,6 +269,10 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 			respondInvalidID(w, r, "workspace_id")
 			return
 		}
+
+		if !h.checkWorkspaceAccess(w, r, wsID) {
+			return
+		}
 		workspaceID = &wsID
 
 		// Create workspace board configuration
@@ -208,6 +286,10 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 		collID, parseErr := strconv.Atoi(id)
 		if parseErr != nil {
 			respondInvalidID(w, r, "id")
+			return
+		}
+
+		if !h.checkCollectionAccess(w, r, collID) {
 			return
 		}
 		collectionID = &collID
@@ -258,6 +340,11 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 	configID, err := strconv.Atoi(r.PathValue("configId"))
 	if err != nil {
 		respondInvalidID(w, r, "configId")
+		return
+	}
+
+	// Verify access to the board config's collection or workspace
+	if !h.checkBoardConfigAccess(w, r, configID) {
 		return
 	}
 
@@ -477,6 +564,11 @@ func (h *BoardConfigurationHandler) DeleteForCollection(w http.ResponseWriter, r
 	configID, err := strconv.Atoi(r.PathValue("configId"))
 	if err != nil {
 		respondInvalidID(w, r, "configId")
+		return
+	}
+
+	// Verify access to the board config's collection or workspace
+	if !h.checkBoardConfigAccess(w, r, configID) {
 		return
 	}
 

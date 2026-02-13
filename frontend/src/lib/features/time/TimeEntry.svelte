@@ -1,15 +1,15 @@
 <script>
   import { onMount } from 'svelte';
-  import { Filter, Plus, Edit, Trash2, MoreHorizontal } from 'lucide-svelte';
+  import { Filter, Plus, Edit, Trash2 } from 'lucide-svelte';
   import AlertBox from '../../components/AlertBox.svelte';
   import { navigate } from '../../router.js';
   import { timeEntryStore } from '../../stores';
   import Button from '../../components/Button.svelte';
   import Input from '../../components/Input.svelte';
-  import Select from '../../components/Select.svelte';
+  import BasePicker from '../../pickers/BasePicker.svelte';
+  import DataTable from '../../components/DataTable.svelte';
   import TimeTrackingOnboarding from './TimeTrackingOnboarding.svelte';
   import TimeLogModal from '../../dialogs/TimeLogModal.svelte';
-  import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
 
@@ -25,6 +25,16 @@
   let filters = $derived(timeEntryStore.filters);
   let activeProjects = $derived(timeEntryStore.activeProjects);
   let filteredProjects = $derived(timeEntryStore.filteredProjects);
+
+  const worklogColumns = $derived([
+    { key: 'date', label: t('common.date'), render: (w) => new Date(w.date * 1000).toLocaleDateString() },
+    { key: 'project_name', label: t('time.reports.project'), slot: 'project' },
+    { key: 'item_title', label: t('items.workItem'), slot: 'item' },
+    { key: 'description', label: t('common.description') },
+    { key: 'time', label: t('common.time'), slot: 'details' },
+    { key: 'duration_minutes', label: t('time.duration'), render: (w) => formatDuration(w.duration_minutes) },
+    { key: 'actions', label: t('common.actions') }
+  ]);
 
   onMount(async () => {
     await timeEntryStore.init();
@@ -157,21 +167,29 @@
   <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
     <div>
       <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.customer')}</label>
-      <Select value={filters.customer_id} onchange={(e) => setFilter('customer_id', e.target.value)} size="small">
-        <option value="">{t('time.reports.allCustomers')}</option>
-        {#each customers as customer}
-          <option value={customer.id}>{customer.name}</option>
-        {/each}
-      </Select>
+      <BasePicker
+        value={filters.customer_id}
+        items={customers}
+        placeholder={t('time.reports.allCustomers')}
+        showUnassigned={true}
+        unassignedLabel={t('time.reports.allCustomers')}
+        getValue={(item) => item.id}
+        getLabel={(item) => item.name}
+        onSelect={(item) => setFilter('customer_id', item ? item.id : '')}
+      />
     </div>
     <div>
       <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.project')}</label>
-      <Select value={filters.project_id} onchange={(e) => setFilter('project_id', e.target.value)} size="small">
-        <option value="">{t('time.reports.allProjects')}</option>
-        {#each filteredProjects as project}
-          <option value={project.id}>{project.name}</option>
-        {/each}
-      </Select>
+      <BasePicker
+        value={filters.project_id}
+        items={filteredProjects}
+        placeholder={t('time.reports.allProjects')}
+        showUnassigned={true}
+        unassignedLabel={t('time.reports.allProjects')}
+        getValue={(item) => item.id}
+        getLabel={(item) => item.name}
+        onSelect={(item) => setFilter('project_id', item ? item.id : '')}
+      />
     </div>
     <div>
       <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.fromDate')}</label>
@@ -205,81 +223,47 @@
 
 <!-- Time Entries -->
 <div class="rounded-xl border shadow-sm overflow-hidden" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-  {#if worklogs.length === 0}
-    <div class="p-8 text-center" style="color: var(--ds-text-subtle);">
-      {t('time.entry.noEntries')}
-    </div>
-  {:else}
-    <div class="overflow-x-auto">
-      <table class="w-full">
-        <thead style="background-color: var(--ds-background-neutral);">
-          <tr>
-            <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('common.date')}</th>
-            <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('time.reports.project')}</th>
-            <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('items.workItem')}</th>
-            <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('common.description')}</th>
-            <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('common.time')}</th>
-            <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('time.duration')}</th>
-            <th class="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('common.actions')}</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-200">
-          {#each worklogs as worklog (worklog.id)}
-            <tr class="transition-colors duration-150 hover:bg-opacity-50" style="hover:background-color: var(--ds-background-neutral-hovered);">
-              <td class="px-6 py-4 text-sm" style="color: var(--ds-text);">
-                {new Date(worklog.date * 1000).toLocaleDateString()}
-              </td>
-              <td class="px-6 py-4">
-                <div class="flex items-center gap-2">
-                  <div class="text-sm">
-                    <div class="font-semibold" style="color: var(--ds-text);">{worklog.project_name}</div>
-                    <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">{worklog.customer_name}</div>
-                  </div>
-                  {#if isProjectOverBudget(worklog)}
-                    <div title="{worklog.project_total_hours?.toFixed(1)}h / {worklog.project_max_hours?.toFixed(1)}h {t('time.entry.budgetExceeded')}">
-                      <AlertTriangle size={16} class="text-amber-500" />
-                    </div>
-                  {/if}
-                </div>
-              </td>
-              <td class="px-6 py-4 text-sm" style="color: var(--ds-text);">
-                {#if worklog.item_title && worklog.workspace_key && worklog.workspace_item_number}
-                  <button
-                    class="font-medium text-blue-600 hover:text-blue-800 cursor-pointer text-left hover:underline"
-                    onclick={() => navigateToItem(worklog.workspace_id, worklog.item_id)}
-                    title={t('time.entry.clickToView', { key: worklog.workspace_key, number: worklog.workspace_item_number })}
-                  >
-                    {worklog.workspace_key}-{worklog.workspace_item_number}: {worklog.item_title}
-                  </button>
-                {:else}
-                  <span class="text-gray-400 text-xs">—</span>
-                {/if}
-              </td>
-              <td class="px-6 py-4 text-sm" style="color: var(--ds-text);">
-                {worklog.description}
-              </td>
-              <td class="px-6 py-4 text-sm font-mono" style="color: var(--ds-text-subtle);">
-                {formatTime(worklog.start_time)} - {formatTime(worklog.end_time)}
-              </td>
-              <td class="px-6 py-4 text-sm font-semibold" style="color: var(--ds-text);">
-                {formatDuration(worklog.duration_minutes)}
-              </td>
-              <td class="px-6 py-4 text-right text-sm font-medium">
-                <DropdownMenu
-                  items={buildWorklogDropdownItems(worklog)}
-                  triggerIcon={MoreHorizontal}
-                  showChevron={false}
-                  iconOnly={true}
-                  triggerClass="p-2 rounded-md hover-bg transition-colors duration-150"
-                />
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
+  <DataTable
+    columns={worklogColumns}
+    data={worklogs}
+    keyField="id"
+    emptyMessage={t('time.entry.noEntries')}
+    actionItems={buildWorklogDropdownItems}
+    class="rounded-none border-0 shadow-none overflow-hidden"
+  >
+    <!-- Project: name + customer -->
+    <div slot="project" let:item={worklog}>
+      <div class="text-sm">
+        <div class="font-semibold" style="color: var(--ds-text);">{worklog.project_name}</div>
+        <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">{worklog.customer_name}</div>
+      </div>
     </div>
 
-    <!-- Summary -->
+    <!-- Work Item: clickable link -->
+    <div slot="item" let:item={worklog}>
+      {#if worklog.item_title && worklog.workspace_key && worklog.workspace_item_number}
+        <button
+          class="font-medium text-blue-600 hover:text-blue-800 cursor-pointer text-left hover:underline text-sm"
+          onclick={() => navigateToItem(worklog.workspace_id, worklog.item_id)}
+          title={t('time.entry.clickToView', { key: worklog.workspace_key, number: worklog.workspace_item_number })}
+        >
+          {worklog.workspace_key}-{worklog.workspace_item_number}: {worklog.item_title}
+        </button>
+      {:else}
+        <span class="text-gray-400 text-xs">—</span>
+      {/if}
+    </div>
+
+    <!-- Time range with mono font -->
+    <div slot="details" let:item={worklog}>
+      <span class="text-sm font-mono" style="color: var(--ds-text-subtle);">
+        {formatTime(worklog.start_time)} — {formatTime(worklog.end_time)}
+      </span>
+    </div>
+  </DataTable>
+
+  <!-- Summary footer -->
+  {#if worklogs.length > 0}
     <div class="px-6 py-4 border-t" style="background-color: var(--ds-background-neutral); border-color: var(--ds-border);">
       <div class="text-sm font-semibold" style="color: var(--ds-text);">
         {t('time.reports.totalTime')}: {formatDuration(timeEntryStore.totalDuration)}

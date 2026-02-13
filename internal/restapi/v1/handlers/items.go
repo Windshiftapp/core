@@ -217,7 +217,7 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Sanitize user input to prevent XSS
 	req.Title = utils.StripHTMLTags(req.Title)
-	req.Description = utils.StripHTMLTags(req.Description)
+	req.Description = utils.SanitizeCommentContent(req.Description)
 
 	// Convert custom field values to JSON
 	var customFieldValuesJSON string
@@ -313,7 +313,7 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		updateData["title"] = utils.StripHTMLTags(*req.Title)
 	}
 	if req.Description != nil {
-		updateData["description"] = utils.StripHTMLTags(*req.Description)
+		updateData["description"] = utils.SanitizeCommentContent(*req.Description)
 	}
 	if req.StatusID != nil {
 		updateData["status_id"] = *req.StatusID

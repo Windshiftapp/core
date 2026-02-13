@@ -14,6 +14,7 @@
   export let isEditing = false;
   export let canSave = false;
   export let categories = [];
+  export let returnPath = null;
 
   // Computed: is this a global collection (no workspace)?
   $: isGlobal = !collection?.workspace_id;
@@ -33,7 +34,7 @@
   }
 
   function handleCancel() {
-    navigate('/collections');
+    navigate(returnPath || '/collections');
   }
 
   function handleSave() {

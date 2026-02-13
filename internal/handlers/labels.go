@@ -254,6 +254,10 @@ func (h *LabelHandler) GetItemLabels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
+		return
+	}
+
 	rows, err := h.db.Query(`
 		SELECT l.id, l.name, l.color, l.workspace_id, l.created_at, l.updated_at
 		FROM item_labels il

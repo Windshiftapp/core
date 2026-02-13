@@ -1,5 +1,50 @@
 import { api } from '../../api.js';
 
+/**
+ * Fetches items for a collection (or all workspace items if no collection).
+ * Handles QL query resolution and correct API parameter naming.
+ */
+export async function fetchCollectionItems(workspaceId, collectionId, extraFilters = {}) {
+  let collectionName = 'Default';
+  const filters = { ...extraFilters };
+
+  if (collectionId) {
+    const collection = await getCollection(collectionId);
+    if (collection) {
+      collectionName = collection.name;
+      // collection_id overrides workspace_id — let backend resolve the QL query
+      filters.collection_id = collectionId;
+    } else {
+      filters.workspace_id = workspaceId;
+    }
+  } else {
+    filters.workspace_id = workspaceId;
+  }
+
+  const response = await api.items.getAll(filters);
+  const items = response?.items ?? (Array.isArray(response) ? response : []);
+  const pagination = response?.pagination ?? null;
+
+  return { items, collectionName, pagination };
+}
+
+/**
+ * Fetches backlog items for a collection.
+ */
+export async function fetchCollectionBacklog(workspaceId, collectionId) {
+  let collectionName = 'Default';
+
+  if (collectionId) {
+    const collection = await getCollection(collectionId);
+    if (collection) {
+      collectionName = collection.name;
+    }
+  }
+
+  const items = await api.items.getBacklog(workspaceId, null, collectionId || null);
+  return { items: items || [], collectionName };
+}
+
 // Cache for collection data to avoid redundant API calls
 const collectionCache = new Map();
 

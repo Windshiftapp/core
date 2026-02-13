@@ -228,12 +228,12 @@ func (sm *PortalSessionManager) isSecureRequest(r *http.Request) bool {
 	}
 
 	// Extract direct client IP (not from headers)
-	remoteAddr := r.RemoteAddr
-	if colonIndex := strings.LastIndex(remoteAddr, ":"); colonIndex != -1 {
-		remoteAddr = remoteAddr[:colonIndex]
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
 	}
 
-	clientIP := net.ParseIP(remoteAddr)
+	clientIP := net.ParseIP(host)
 	if clientIP == nil {
 		return false
 	}

@@ -15,17 +15,19 @@ import (
 
 // ActionsHandler handles action automation API endpoints
 type ActionsHandler struct {
-	db            database.Database
-	repo          *repository.ActionRepository
-	actionService *services.ActionService
+	db                database.Database
+	repo              *repository.ActionRepository
+	actionService     *services.ActionService
+	permissionService *services.PermissionService
 }
 
 // NewActionsHandler creates a new actions handler
-func NewActionsHandler(db database.Database, actionService *services.ActionService) *ActionsHandler {
+func NewActionsHandler(db database.Database, actionService *services.ActionService, permissionService *services.PermissionService) *ActionsHandler {
 	return &ActionsHandler{
-		db:            db,
-		repo:          repository.NewActionRepository(db),
-		actionService: actionService,
+		db:                db,
+		repo:              repository.NewActionRepository(db),
+		actionService:     actionService,
+		permissionService: permissionService,
 	}
 }
 
@@ -54,15 +56,20 @@ func (h *ActionsHandler) ListActions(w http.ResponseWriter, r *http.Request) {
 
 // GetAction gets a single action by ID
 func (h *ActionsHandler) GetAction(w http.ResponseWriter, r *http.Request) {
-	actionIDStr := r.PathValue("id")
-	actionID, err := strconv.Atoi(actionIDStr)
+	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
+	if err != nil {
+		respondInvalidID(w, r, "workspaceId")
+		return
+	}
+
+	actionID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
 		return
 	}
 
 	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound {
+	if err == repository.ErrNotFound || (err == nil && action.WorkspaceID != workspaceID) {
 		respondNotFound(w, r, "action")
 		return
 	}
@@ -179,8 +186,13 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 
 // UpdateAction updates an existing action
 func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
-	actionIDStr := r.PathValue("id")
-	actionID, err := strconv.Atoi(actionIDStr)
+	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
+	if err != nil {
+		respondInvalidID(w, r, "workspaceId")
+		return
+	}
+
+	actionID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
 		return
@@ -188,7 +200,7 @@ func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 
 	// Get existing action
 	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound {
+	if err == repository.ErrNotFound || (err == nil && action.WorkspaceID != workspaceID) {
 		respondNotFound(w, r, "action")
 		return
 	}
@@ -255,16 +267,21 @@ func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 
 // DeleteAction deletes an action
 func (h *ActionsHandler) DeleteAction(w http.ResponseWriter, r *http.Request) {
-	actionIDStr := r.PathValue("id")
-	actionID, err := strconv.Atoi(actionIDStr)
+	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
+	if err != nil {
+		respondInvalidID(w, r, "workspaceId")
+		return
+	}
+
+	actionID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
 		return
 	}
 
-	// Get the action to get workspace ID for cache invalidation
+	// Get the action to verify workspace ownership and for cache invalidation
 	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound {
+	if err == repository.ErrNotFound || (err == nil && action.WorkspaceID != workspaceID) {
 		respondNotFound(w, r, "action")
 		return
 	}
@@ -272,8 +289,6 @@ func (h *ActionsHandler) DeleteAction(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	workspaceID := action.WorkspaceID
 
 	err = h.repo.Delete(actionID)
 	if err == repository.ErrNotFound {
@@ -295,8 +310,13 @@ func (h *ActionsHandler) DeleteAction(w http.ResponseWriter, r *http.Request) {
 
 // ToggleAction enables or disables an action
 func (h *ActionsHandler) ToggleAction(w http.ResponseWriter, r *http.Request) {
-	actionIDStr := r.PathValue("id")
-	actionID, err := strconv.Atoi(actionIDStr)
+	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
+	if err != nil {
+		respondInvalidID(w, r, "workspaceId")
+		return
+	}
+
+	actionID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
 		return
@@ -304,7 +324,7 @@ func (h *ActionsHandler) ToggleAction(w http.ResponseWriter, r *http.Request) {
 
 	// Get existing action
 	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound {
+	if err == repository.ErrNotFound || (err == nil && action.WorkspaceID != workspaceID) {
 		respondNotFound(w, r, "action")
 		return
 	}
@@ -346,10 +366,26 @@ func (h *ActionsHandler) ToggleAction(w http.ResponseWriter, r *http.Request) {
 
 // GetActionLogs gets execution logs for an action
 func (h *ActionsHandler) GetActionLogs(w http.ResponseWriter, r *http.Request) {
-	actionIDStr := r.PathValue("id")
-	actionID, err := strconv.Atoi(actionIDStr)
+	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
+	if err != nil {
+		respondInvalidID(w, r, "workspaceId")
+		return
+	}
+
+	actionID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
+		return
+	}
+
+	// Verify action belongs to this workspace
+	action, err := h.repo.GetByID(actionID)
+	if err == repository.ErrNotFound || (err == nil && action.WorkspaceID != workspaceID) {
+		respondNotFound(w, r, "action")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -425,8 +461,13 @@ type ExecuteActionRequest struct {
 
 // ExecuteAction manually executes an action for a specific item
 func (h *ActionsHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
-	actionIDStr := r.PathValue("id")
-	actionID, err := strconv.Atoi(actionIDStr)
+	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
+	if err != nil {
+		respondInvalidID(w, r, "workspaceId")
+		return
+	}
+
+	actionID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
 		return
@@ -444,14 +485,19 @@ func (h *ActionsHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get action
+	// Get action and verify workspace ownership
 	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound {
+	if err == repository.ErrNotFound || (err == nil && action.WorkspaceID != workspaceID) {
 		respondNotFound(w, r, "action")
 		return
 	}
 	if err != nil {
 		respondInternalError(w, r, err)
+		return
+	}
+
+	// Verify user has edit permission on the item's workspace
+	if !CheckItemPermission(w, r, h.db, h.permissionService, req.ItemID, models.PermissionItemEdit) {
 		return
 	}
 

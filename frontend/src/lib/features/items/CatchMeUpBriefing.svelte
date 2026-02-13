@@ -1,5 +1,6 @@
 <script>
   import { Copy, Check } from 'lucide-svelte';
+  import { sanitizeHtml } from '../../utils/sanitize.ts';
 
   let { briefing = '', itemKey = '' } = $props();
 
@@ -39,7 +40,7 @@
   </div>
 
   <div class="prose-sm max-w-none text-sm leading-relaxed" style="color: var(--ds-text);">
-    {@html renderMarkdown(briefing)}
+    {@html sanitizeHtml(renderMarkdown(briefing))}
   </div>
 </div>
 

@@ -49,6 +49,10 @@ func (h *RecurrenceHandler) GetRecurrence(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
+		return
+	}
+
 	rule, err := h.recurrenceRepo.GetByTemplateItemID(itemID)
 	if err == repository.ErrNotFound {
 		respondNotFound(w, r, "recurrence_rule")
@@ -366,6 +370,10 @@ func (h *RecurrenceHandler) ListInstances(w http.ResponseWriter, r *http.Request
 	itemID, err := strconv.Atoi(itemIDStr)
 	if err != nil {
 		respondInvalidID(w, r, "id")
+		return
+	}
+
+	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
 		return
 	}
 

@@ -1,10 +1,10 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { useEventListener } from 'runed';
   import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
-  import { getCollection } from '../collections/collectionService.js';
+  import { collectionData, reloadCollection } from '../../stores/collectionContext.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { workspaceDataStore } from '../../stores/index.js';
@@ -77,21 +77,24 @@
     listColumns.map(col => `${col.width}fr`).join(' ') + ' auto'
   );
 
-  // Adaptive polling replaces handleWindowFocus
-  const poller = useWorkItemPoller(() => loadWorkItems());
 
-  onMount(async () => {
-    if (workspaceId) {
-      await loadWorkspaceGradient(workspaceId);
-      // Reference data comes from the shared workspaceDataStore
-      await workspaceDataStore.initialize(workspaceId);
-      await loadBoardConfiguration();
-      await loadWorkItems();
+  useEventListener(() => window, 'refresh-work-items', () => reloadCollection());
+
+  // Sync items from central store
+  $effect(() => {
+    if (!$collectionData.loading) {
+      currentCollectionName = $collectionData.collectionName;
+      const items = $collectionData.items;
+      // untrack to avoid tracking reads of allItems, searchQuery, currentPage,
+      // itemsPerPage, boardConfig, listColumns inside these calls
+      untrack(() => {
+        allItems = items;
+        updatePaginatedResults();
+        loadBoardConfiguration();
+        loading = false;
+      });
     }
-    loading = false;
   });
-
-  useEventListener(() => window, 'refresh-work-items', loadWorkItems);
 
   async function loadBoardConfiguration() {
     try {
@@ -152,81 +155,9 @@
   }
 
   async function loadWorkItems(page = 1, limit = itemsPerPage) {
-    try {
-      loadingItems = true;
-
-      // Build base filters
-      const filters = {
-        workspace_id: workspaceId,
-        page: page,
-        limit: limit
-      };
-
-      // Apply collection filter if specified
-      if (collectionId) {
-        const collection = await getCollection(collectionId);
-        if (collection) {
-          currentCollectionName = collection.name;
-          if (collection.cql_query) {
-            filters.vql = collection.cql_query;
-          }
-        }
-      } else {
-        currentCollectionName = 'Default';
-      }
-
-      if (searchQuery.trim()) {
-        // When searching, load ALL items and filter locally
-        await loadAllItemsForSearch();
-        currentPage = page;
-        itemsPerPage = limit;
-        updatePaginatedResults();
-      } else {
-        // Normal paginated loading
-        const response = await api.items.getAll(filters);
-
-        if (response && response.items) {
-          // Handle paginated response
-          workItems = response.items;
-          itemsPagination = response.pagination;
-          currentPage = page;
-          itemsPerPage = limit;
-        } else {
-          // Handle legacy response (backward compatibility)
-          workItems = response || [];
-          itemsPagination = null;
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load work items:', error);
-      workItems = [];
-      itemsPagination = null;
-    } finally {
-      loadingItems = false;
-    }
-  }
-
-  async function loadAllItemsForSearch() {
-    const filters = {
-      workspace_id: workspaceId,
-      page: 1,
-      limit: 1000 // Load a large number to get all items
-    };
-
-    // Apply collection filter if specified
-    if (collectionId) {
-      const collection = await getCollection(collectionId);
-      if (collection?.cql_query) {
-        filters.vql = collection.cql_query;
-      }
-    }
-
-    const response = await api.items.getAll(filters);
-    if (response && response.items) {
-      allItems = response.items;
-    } else {
-      allItems = response || [];
-    }
+    currentPage = page;
+    itemsPerPage = limit;
+    updatePaginatedResults();
   }
 
   function updatePaginatedResults() {
@@ -290,7 +221,7 @@
     try {
       await api.items.delete(item.id);
       // Refresh the work items list
-      await loadWorkItems();
+      reloadCollection();
     } catch (error) {
       console.error('Failed to delete item:', error);
       alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
@@ -350,19 +281,6 @@
     alert(t('dialogs.alerts.failedToUpdate', { error: `${field}: ${error}` }));
   }
 
-  // Reload data when workspaceId or collectionId changes
-  let lastWorkspaceId = workspaceId;
-  let lastCollectionId = collectionId;
-  $effect(() => {
-    if (workspaceId && !loading) {
-      if (workspaceId !== lastWorkspaceId || collectionId !== lastCollectionId) {
-        lastWorkspaceId = workspaceId;
-        lastCollectionId = collectionId;
-        loadBoardConfiguration();
-        loadWorkItems();
-      }
-    }
-  });
 
   // Get column header name
   function getColumnHeaderName(column) {

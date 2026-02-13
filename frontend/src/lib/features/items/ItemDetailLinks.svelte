@@ -1,9 +1,13 @@
 <script>
-  import { FileText, Link2, Trash2, Plus } from 'lucide-svelte';
+  import { FileText, Link2, Trash2, Plus, GripVertical } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import Button from '../../components/Button.svelte';
   import LinkComponent from '../../components/Link.svelte';
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onDestroy } from 'svelte';
+  import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+  import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
+  import DropIndicator from '../../layout/DropIndicator.svelte';
+  import { api } from '../../api.js';
   import { t } from '../../stores/i18n.svelte.js';
 
   const dispatch = createEventDispatcher();
@@ -19,6 +23,7 @@
   export let loadingChildItems = false;
   export let itemTypes = [];
   export let isModal = false;
+  export let isLowestLevel = false;
 
   const TEST_LINK_TYPE_ID = 1;
 
@@ -60,6 +65,164 @@
   function handleShowLinkModal() {
     dispatch('show-link-modal');
   }
+
+  // Drag and drop state for child items
+  let dragState = new Map();
+  let setupElements = new Map();
+  let pendingDrops = new Set();
+  let setupTimeout;
+  const childRowGap = 8; // space-y-2 = 8px
+
+  $: if (isLowestLevel && childItems.length > 0 && typeof document !== 'undefined') {
+    if (setupTimeout) clearTimeout(setupTimeout);
+    setupTimeout = setTimeout(() => {
+      setupDragAndDrop();
+    }, 100);
+  }
+
+  function setupDragAndDrop() {
+    if (setupTimeout) clearTimeout(setupTimeout);
+
+    // Clean up existing registrations
+    setupElements.forEach((cleanup) => {
+      if (typeof cleanup === 'function') cleanup();
+    });
+    setupElements.clear();
+    dragState = new Map();
+
+    const itemCards = document.querySelectorAll('[data-child-item-card]');
+
+    itemCards.forEach(element => {
+      const childItemId = parseInt(element.dataset.itemId);
+      const elementId = `child-${childItemId}`;
+
+      const childItem = childItems.find(i => i.id === childItemId);
+      if (!childItem) return;
+
+      dragState.set(childItemId, { isDragging: false, closestEdge: null });
+
+      const draggableCleanup = draggable({
+        element,
+        getInitialData: () => ({
+          item: childItem,
+          type: 'child-item'
+        }),
+        onDragStart: () => {
+          element.style.opacity = '0.5';
+          document.body.classList.add('is-dragging');
+          const newMap = new Map(dragState);
+          newMap.set(childItemId, { ...(dragState.get(childItemId) || {}), isDragging: true });
+          dragState = newMap;
+        },
+        onDrop: () => {
+          element.style.opacity = '';
+          document.body.classList.remove('is-dragging');
+          const newMap = new Map();
+          dragState.forEach((state, id) => {
+            newMap.set(id, { isDragging: false, closestEdge: null });
+          });
+          dragState = newMap;
+        }
+      });
+
+      const dropTargetCleanup = dropTargetForElements({
+        element,
+        canDrop: ({ source }) => {
+          return source.data.type === 'child-item' && source.data.item.id !== childItemId;
+        },
+        getData: ({ input, element }) => {
+          return attachClosestEdge({}, {
+            input,
+            element,
+            allowedEdges: ['top', 'bottom']
+          });
+        },
+        onDragEnter: ({ self, source }) => {
+          if (source.data.type === 'child-item' && source.data.item.id !== childItemId) {
+            const closestEdge = extractClosestEdge(self.data);
+            const newMap = new Map(dragState);
+            newMap.set(childItemId, { ...(dragState.get(childItemId) || {}), closestEdge });
+            dragState = newMap;
+          }
+        },
+        onDragLeave: () => {
+          const newMap = new Map(dragState);
+          newMap.set(childItemId, { ...(dragState.get(childItemId) || {}), closestEdge: null });
+          dragState = newMap;
+        },
+        onDrop: ({ self, source }) => {
+          const closestEdge = extractClosestEdge(self.data);
+          if (source.data.type === 'child-item' && closestEdge) {
+            handleEdgeBasedDrop(source.data.item, childItem, closestEdge);
+          }
+        }
+      });
+
+      setupElements.set(elementId, () => {
+        draggableCleanup();
+        dropTargetCleanup();
+      });
+    });
+  }
+
+  async function handleEdgeBasedDrop(draggedItem, targetItem, closestEdge) {
+    const dropId = `${draggedItem.id}-edge-${targetItem.id}-${closestEdge}`;
+
+    try {
+      if (pendingDrops.has(dropId)) return;
+      pendingDrops.add(dropId);
+
+      const targetIndex = childItems.findIndex(i => i.id === targetItem.id);
+      const draggedIndex = childItems.findIndex(i => i.id === draggedItem.id);
+
+      const otherItems = childItems.filter(i => i.id !== draggedItem.id);
+      const adjustedTargetIndex = otherItems.findIndex(i => i.id === targetItem.id);
+
+      const isDroppingSamePosition = (
+        (closestEdge === 'top' && draggedIndex === targetIndex - 1) ||
+        (closestEdge === 'bottom' && draggedIndex === targetIndex + 1)
+      );
+
+      if (isDroppingSamePosition) return;
+
+      let prevItemId = null;
+      let nextItemId = null;
+
+      if (closestEdge === 'top') {
+        if (adjustedTargetIndex > 0) {
+          const prevItem = otherItems[adjustedTargetIndex - 1];
+          if (prevItem) prevItemId = prevItem.id;
+        }
+        if (targetItem) nextItemId = targetItem.id;
+      } else if (closestEdge === 'bottom') {
+        if (targetItem) prevItemId = targetItem.id;
+        if (adjustedTargetIndex < otherItems.length - 1) {
+          const nextItem = otherItems[adjustedTargetIndex + 1];
+          if (nextItem) nextItemId = nextItem.id;
+        }
+      }
+
+      await api.items.updateFracIndex(draggedItem.id, {
+        prev_item_id: prevItemId,
+        next_item_id: nextItemId
+      });
+
+      dispatch('reorder-children');
+    } catch (error) {
+      console.error('Failed to reorder child item:', error);
+      dispatch('reorder-children');
+    } finally {
+      setTimeout(() => pendingDrops.delete(dropId), 500);
+    }
+  }
+
+  onDestroy(() => {
+    if (setupTimeout) clearTimeout(setupTimeout);
+    setupElements.forEach((cleanup) => {
+      if (typeof cleanup === 'function') cleanup();
+    });
+    setupElements.clear();
+  });
 </script>
 
 <!-- Links Section -->
@@ -195,10 +358,20 @@
           {#each childItems as childItem}
             {@const childItemType = itemTypes.find(type => type.id === childItem.item_type_id)}
             <div
-              class="group flex items-center justify-between px-4 py-3 rounded-lg border transition-colors"
+              class="group flex items-center justify-between px-4 py-3 rounded-lg border transition-colors relative"
               style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
+              data-child-item-card
+              data-item-id={childItem.id}
             >
+              {#if isLowestLevel && dragState.get(childItem.id)?.closestEdge}
+                <DropIndicator edge={dragState.get(childItem.id)?.closestEdge} gap={childRowGap} />
+              {/if}
               <div class="flex items-center gap-3 flex-1 min-w-0">
+                {#if isLowestLevel}
+                  <div class="cursor-grab active:cursor-grabbing flex-shrink-0" style="color: var(--ds-text-subtle);">
+                    <GripVertical class="w-4 h-4" />
+                  </div>
+                {/if}
                 <!-- Item type icon -->
                 {#if childItemType}
                   <div

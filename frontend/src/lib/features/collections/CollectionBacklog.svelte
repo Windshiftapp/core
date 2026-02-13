@@ -4,7 +4,7 @@
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { getCollection } from '../collections/collectionService.js';
+  import { collectionData, reloadCollection } from '../../stores/collectionContext.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { GripVertical, List } from 'lucide-svelte';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -49,8 +49,13 @@
     if (event.detail?.itemId) {
       try {
         const newItem = await api.items.get(event.detail.itemId);
-        // Add the new item to the end of the items array if it belongs to this workspace
-        if (Number(newItem.workspace_id) === Number(workspaceId)) {
+        // When viewing a collection, accept items from any workspace (the collection defines scope).
+        // Otherwise fall back to current-workspace check.
+        const belongsToView = collectionId
+          ? true
+          : Number(newItem.workspace_id) === Number(workspaceId);
+          console.log('belongstoview',belongsToView)
+        if (belongsToView) {
           items = [...items, newItem];
         }
       } catch (error) {
@@ -64,52 +69,20 @@
   onMount(async () => {
     if (workspaceId) {
       await loadWorkspaceGradient(workspaceId);
-      await loadData();
+      await workspaceDataStore.initialize(workspaceId);
     }
     loading = false;
   });
 
-  // Reactive statement to reload when workspaceId or collectionId changes
+  // Sync items from central store
   $effect(() => {
-    if (workspaceId) {
-      loadData();
-    }
+    items = $collectionData.backlogItems;
+    currentCollectionName = $collectionData.collectionName;
+    backlogStore.setCount(workspaceId, $collectionData.backlogItems.length);
   });
 
-  async function loadData() {
-    loading = true;
-    try {
-      // Ensure workspace reference data is available
-      await workspaceDataStore.initialize(workspaceId);
-
-      // Get collection data once if needed
-      let cqlQuery = null;
-      if (collectionId) {
-        const collection = await getCollection(collectionId);
-        if (collection) {
-          currentCollectionName = collection.name;
-          if (collection.cql_query) {
-            cqlQuery = collection.cql_query;
-          }
-        }
-      } else {
-        currentCollectionName = 'Default';
-      }
-
-      // Only fetch dynamic data — reference data comes from workspaceDataStore
-      const backlogItemsData = await api.items.getBacklog(workspaceId, cqlQuery);
-      items = backlogItemsData || [];
-      backlogStore.setCount(workspaceId, items.length);
-
-    } catch (error) {
-      console.error('Failed to load backlog data:', error);
-    } finally {
-      loading = false;
-    }
-  }
-
   // Adaptive polling for backlog items
-  const poller = useWorkItemPoller(() => loadData());
+  const poller = useWorkItemPoller(() => reloadCollection());
 
   function openItem(itemId, event) {
     // Don't open item if we're dragging
@@ -128,11 +101,7 @@
     
     // If changes were made in the modal, reload data
     if (event?.hasChanges) {
-      await loadData();
-      // Re-setup drag and drop after data reload
-      setTimeout(() => {
-        setupDragAndDrop();
-      }, 100);
+      reloadCollection();
     }
   }
 
@@ -306,23 +275,16 @@
       };
       const updatedItem = await api.items.updateFracIndex(draggedItem.id, indexData);
       
-      // Reload data from backend to get the correct ordering
-      // The backend is the single source of truth for item order
-      await loadData();
-      
-      
-      // Re-setup drag and drop
-      setTimeout(() => {
-        setupDragAndDrop();
-      }, 100);
-      
+      // Reload data from central store to get the correct ordering
+      reloadCollection();
+
     } catch (error) {
       console.error('Failed to handle edge-based drop:', error);
       console.error('Error details:', error.message);
-      
-      // If we get a rank ordering error, reload fresh data from the API
+
+      // If we get a rank ordering error, reload fresh data
       if (error.message.includes('Internal Server Error')) {
-        await loadData();
+        reloadCollection();
       }
     } finally {
       // Always remove from pending drops

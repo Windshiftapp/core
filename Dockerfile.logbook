@@ -1,0 +1,56 @@
+# Multi-stage build for Windshift Logbook service
+
+# Stage 1: Build Go binary
+FROM golang:1.25.7-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache git
+
+WORKDIR /build
+
+# Copy go mod files and download dependencies
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+# Copy source code
+COPY . .
+
+# Build logbook binary (no CGO needed)
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 \
+    go build -ldflags '-s -w' \
+    -o logbook ./cmd/logbook
+
+# Create data directory
+RUN mkdir -p /data/logbook && \
+    touch /data/.keep /data/logbook/.keep && \
+    chown -R 65534:65534 /data
+
+# Stage 2: Runtime (needs system tools for text extraction)
+FROM alpine:3.21
+
+# Install runtime dependencies
+RUN apk add --no-cache ca-certificates poppler-utils
+
+# Copy kreuzberg-cli for text extraction
+COPY --from=ghcr.io/kreuzberg-dev/kreuzberg-cli:4.3.1 /usr/local/bin/kreuzberg /usr/local/bin/kreuzberg
+
+# Copy binary
+COPY --from=builder /build/logbook /logbook
+
+# Copy data directory with correct ownership
+COPY --from=builder --chown=65534:65534 /data /data
+
+# Expose default port (internal only)
+EXPOSE 8090
+
+# Default environment variables
+ENV LOGBOOK_PORT=8090
+ENV LOGBOOK_STORAGE_PATH=/data/logbook
+ENV LOG_LEVEL=info
+
+USER 65534:65534
+
+ENTRYPOINT ["/logbook"]

@@ -7,10 +7,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"windshift/internal/cql"
 	"windshift/internal/models"
 	"windshift/internal/services"
-	"windshift/internal/utils"
 )
 
 // Search filter limits to prevent abuse
@@ -68,29 +66,6 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Validate status values against allowed statuses
-	allowedStatuses := map[string]bool{
-		"open": true, "to_do": true, "in_progress": true, "in_review": true,
-		"completed": true, "cancelled": true, "done": true, "closed": true,
-	}
-	for _, status := range statuses {
-		if status != "" && !allowedStatuses[status] {
-			respondValidationError(w, r, fmt.Sprintf("Invalid status: %s", status))
-			return
-		}
-	}
-
-	// Validate priority values
-	allowedPriorities := map[string]bool{
-		"low": true, "medium": true, "high": true, "critical": true,
-	}
-	for _, priority := range priorities {
-		if priority != "" && !allowedPriorities[priority] {
-			respondValidationError(w, r, fmt.Sprintf("Invalid priority: %s", priority))
-			return
-		}
-	}
-
 	// Limit array sizes to prevent abuse
 	if len(workspaceIDs) > maxWorkspaceFilters {
 		respondValidationError(w, r, fmt.Sprintf("Too many workspace filters (max %d)", maxWorkspaceFilters))
@@ -105,57 +80,9 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build the base query
-	query := `
-		SELECT i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description, i.status_id, i.priority_id,
-		       i.custom_field_values, i.parent_id,
-		       i.created_at, i.updated_at,
-		       w.name as workspace_name, w.key as workspace_key, it.name as item_type_name,
-		       p.title as parent_title
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN item_types it ON i.item_type_id = it.id
-		LEFT JOIN items p ON i.parent_id = p.id
-		WHERE 1=1`
-
-	args := []interface{}{}
-
-	// Add text search if provided
-	if textQuery != "" {
-		// Check if the query looks like a work item key (e.g., "OK-40", "ok-40")
-		// Pattern: letters followed by hyphen followed by digits
-		parts := strings.Split(strings.ToUpper(textQuery), "-")
-		isKeyPattern := len(parts) == 2 && len(parts[0]) > 0 && len(parts[1]) > 0
-
-		// Try to parse as workspace key + workspace item number
-		var workspaceKey string
-		var workspaceItemNumber int
-		if isKeyPattern {
-			workspaceKey = parts[0]
-			var err error
-			workspaceItemNumber, err = strconv.Atoi(parts[1])
-			if err != nil {
-				isKeyPattern = false
-			}
-		}
-
-		if isKeyPattern && workspaceItemNumber > 0 {
-			// Search by workspace key and workspace item number (case-insensitive workspace key)
-			query += " AND (LOWER(w.key) = LOWER(?) AND i.workspace_item_number = ?)"
-			args = append(args, workspaceKey, workspaceItemNumber)
-		} else {
-			// Regular text search (case-insensitive)
-			query += " AND (LOWER(i.title) LIKE LOWER(?) OR LOWER(i.description) LIKE LOWER(?))"
-			searchPattern := "%" + textQuery + "%"
-			args = append(args, searchPattern, searchPattern)
-		}
-	}
-
-	// Filter by accessible workspaces (respects workspace active status)
-	// If specific workspace IDs were requested, intersect with accessible workspaces
+	// Intersect requested workspace IDs with accessible ones
 	finalWorkspaceIDs := accessibleWorkspaceIDs
 	if len(workspaceIDs) > 0 {
-		// Convert requested workspace IDs to integers for comparison
 		requestedIDs := make(map[int]bool)
 		for _, wsID := range workspaceIDs {
 			if wsID != "" {
@@ -164,8 +91,6 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-
-		// Intersect requested IDs with accessible IDs
 		finalWorkspaceIDs = []int{}
 		for _, id := range accessibleWorkspaceIDs {
 			if requestedIDs[id] {
@@ -174,122 +99,66 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Add workspace filter to query
-	if len(finalWorkspaceIDs) > 0 {
-		placeholders := make([]string, len(finalWorkspaceIDs))
-		for i, id := range finalWorkspaceIDs {
-			placeholders[i] = "?"
-			args = append(args, id)
-		}
-		query += " AND i.workspace_id IN (" + strings.Join(placeholders, ",") + ")"
-	}
-
-	// Add status filter if provided
-	if len(statuses) > 0 {
-		placeholders := strings.Repeat("?,", len(statuses))
-		placeholders = strings.TrimSuffix(placeholders, ",")
-		query += " AND i.status_id IN (" + placeholders + ")"
-		for _, status := range statuses {
-			args = append(args, status)
+	// Parse status IDs (numeric)
+	var statusIDs []int
+	for _, s := range statuses {
+		if s != "" {
+			if id, err := strconv.Atoi(s); err == nil {
+				statusIDs = append(statusIDs, id)
+			}
 		}
 	}
 
-	// Add priority filter if provided
-	if len(priorities) > 0 {
-		placeholders := strings.Repeat("?,", len(priorities))
-		placeholders = strings.TrimSuffix(placeholders, ",")
-		query += " AND i.priority_id IN (" + placeholders + ")"
-		for _, priority := range priorities {
-			args = append(args, priority)
+	// Parse priority IDs (numeric)
+	var priorityIDs []int
+	for _, p := range priorities {
+		if p != "" {
+			if id, err := strconv.Atoi(p); err == nil {
+				priorityIDs = append(priorityIDs, id)
+			}
 		}
 	}
 
-	// Add ordering
-	query += " ORDER BY i.updated_at DESC, i.created_at DESC"
-
-	// Add limit to prevent overwhelming results with validation
-	limitStr := r.URL.Query().Get("limit")
-	var limit int = 100 // Default limit
-	if limitStr != "" {
+	// Parse limit
+	limit := 100
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
 		parsedLimit, err := strconv.Atoi(limitStr)
 		if err != nil {
 			respondValidationError(w, r, "Invalid limit format")
 			return
 		}
-		// Enforce reasonable limits
 		if parsedLimit < 1 {
 			limit = 1
 		} else if parsedLimit > 1000 {
-			limit = 1000 // Max limit to prevent resource exhaustion
+			limit = 1000
 		} else {
 			limit = parsedLimit
 		}
 	}
-	query += " LIMIT ?"
-	args = append(args, limit)
 
-	rows, err := h.db.Query(query, args...)
+	// Call service
+	items, _, err := h.itemCRUD.SearchWithFilters(services.SearchParams{
+		TextQuery:    textQuery,
+		WorkspaceIDs: finalWorkspaceIDs,
+		StatusIDs:    statusIDs,
+		PriorityIDs:  priorityIDs,
+		Pagination: services.PaginationParams{
+			Limit: limit,
+		},
+	})
 	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer rows.Close()
-
-	var items []models.Item
-	for rows.Next() {
-		var item models.Item
-		var customFieldValuesJSON sql.NullString
-		var itemTypeID, statusID, priorityID, parentID sql.NullInt64
-		var parentTitle sql.NullString
-		var itemTypeName sql.NullString
-
-		err := rows.Scan(
-			&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
-			&statusID, &priorityID, &customFieldValuesJSON, &parentID,
-			&item.CreatedAt, &item.UpdatedAt, &item.WorkspaceName, &item.WorkspaceKey,
-			&itemTypeName, &parentTitle,
-		)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		// Handle nullable fields
-		item.ItemTypeID = utils.NullInt64ToPtr(itemTypeID)
-		item.StatusID = utils.NullInt64ToPtr(statusID)
-		item.PriorityID = utils.NullInt64ToPtr(priorityID)
-		item.ParentID = utils.NullInt64ToPtr(parentID)
-
-		// Parse custom field values
-		if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
-			if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &item.CustomFieldValues); err != nil {
-				item.CustomFieldValues = make(map[string]interface{})
-			}
-		} else {
-			item.CustomFieldValues = make(map[string]interface{})
-		}
-
-		item.ItemTypeName = itemTypeName.String
-		item.ParentTitle = parentTitle.String
-
-		items = append(items, item)
-	}
-
-	if err = rows.Err(); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
 	// Filter items based on user permissions
-
 	filteredItems, err := h.filterItemsByPermissions(user.ID, items)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	items = filteredItems
 
-	respondJSONOK(w, items)
+	respondJSONOK(w, filteredItems)
 }
 
 // UpdateFracIndex updates the frac_index of an item for fractional indexing ordering
@@ -409,32 +278,6 @@ func (h *ItemHandler) UpdateFracIndex(w http.ResponseWriter, r *http.Request) {
 	h.Get(w, r)
 }
 
-// buildWorkspaceMap creates a mapping of workspace names/keys to IDs for QL evaluation
-func (h *ItemHandler) buildWorkspaceMap() (map[string]int, error) {
-	workspaceMap := make(map[string]int)
-
-	rows, err := h.db.Query("SELECT id, name, key FROM workspaces")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var id int
-		var name, key string
-		if err := rows.Scan(&id, &name, &key); err != nil {
-			return nil, err
-		}
-
-		// Map by ID, name (lowercase), and key (lowercase)
-		workspaceMap[strconv.Itoa(id)] = id
-		workspaceMap[strings.ToLower(name)] = id
-		workspaceMap[strings.ToLower(key)] = id
-	}
-
-	return workspaceMap, nil
-}
-
 // GetBacklogItems returns items whose statuses are not marked as completed for a workspace
 func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 	// Get user from context
@@ -444,17 +287,33 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	workspaceID := r.URL.Query().Get("workspace_id")
-	if workspaceID == "" {
+	workspaceIDParam := r.URL.Query().Get("workspace_id")
+	collectionIDParam := r.URL.Query().Get("collection_id")
+
+	// workspace_id is required when no collection_id is provided
+	if workspaceIDParam == "" && collectionIDParam == "" {
 		respondValidationError(w, r, "workspace_id parameter is required")
 		return
 	}
 
-	// Convert workspace ID to int for validation
-	wsID, err := strconv.Atoi(workspaceID)
-	if err != nil {
-		respondValidationError(w, r, "Invalid workspace_id format")
-		return
+	var wsID int
+	if workspaceIDParam != "" {
+		var err error
+		wsID, err = strconv.Atoi(workspaceIDParam)
+		if err != nil {
+			respondValidationError(w, r, "Invalid workspace_id format")
+			return
+		}
+	}
+
+	var collectionID int
+	if collectionIDParam != "" {
+		var err error
+		collectionID, err = strconv.Atoi(collectionIDParam)
+		if err != nil {
+			respondValidationError(w, r, "Invalid collection_id parameter")
+			return
+		}
 	}
 
 	// Get accessible workspace IDs
@@ -464,204 +323,31 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if user can access this workspace
-	canAccess := false
-	for _, id := range accessibleWorkspaceIDs {
-		if id == wsID {
-			canAccess = true
-			break
-		}
-	}
-
-	if !canAccess {
-		respondForbidden(w, r)
-		return
-	}
-
-	// Get backlog status IDs - either from board configuration or default to non-Done statuses
-	var backlogStatusIDs []int
-
-	// First, check if there's a board configuration with backlog_status_ids for this workspace
-	var backlogStatusIDsJSON sql.NullString
-	err = h.db.QueryRow(`
-		SELECT backlog_status_ids
-		FROM board_configurations
-		WHERE workspace_id = ?`,
-		wsID,
-	).Scan(&backlogStatusIDsJSON)
-
-	if err == nil && backlogStatusIDsJSON.Valid && backlogStatusIDsJSON.String != "" {
-		// Parse the configured backlog status IDs
-		if err := json.Unmarshal([]byte(backlogStatusIDsJSON.String), &backlogStatusIDs); err != nil {
-			respondInternalError(w, r, fmt.Errorf("failed to parse backlog configuration"))
-			return
-		}
-	} else {
-		// Fall back to default behavior: get status IDs that are not marked as completed
-		statusQuery := `
-			SELECT DISTINCT s.id
-			FROM statuses s
-			JOIN status_categories sc ON s.category_id = sc.id
-			WHERE COALESCE(sc.is_completed, FALSE) = FALSE`
-
-		statusRows, err := h.db.Query(statusQuery)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		defer statusRows.Close()
-
-		for statusRows.Next() {
-			var statusID int
-			if err := statusRows.Scan(&statusID); err != nil {
-				respondInternalError(w, r, err)
-				return
-			}
-			backlogStatusIDs = append(backlogStatusIDs, statusID)
-		}
-	}
-
-	if len(backlogStatusIDs) == 0 {
-		// Return empty array if no statuses found
+	if len(accessibleWorkspaceIDs) == 0 {
 		respondJSONOK(w, []models.Item{})
 		return
 	}
 
-	// Build the query with placeholders for all backlog status IDs
-	placeholders := strings.Repeat("?,", len(backlogStatusIDs))
-	placeholders = placeholders[:len(placeholders)-1] // Remove trailing comma
+	qlQuery := r.URL.Query().Get("ql")
 
-	// Build base query
-	query := fmt.Sprintf(`
-		SELECT i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description, i.status_id, i.is_task,
-		       i.milestone_id, i.iteration_id, i.time_project_id, i.assignee_id, i.creator_id, i.custom_field_values, i.calendar_data, i.parent_id,
-		       i.created_at, i.updated_at,
-		       w.name as workspace_name, it.name as item_type_name,
-		       p.title as parent_title, m.name as milestone_name, iter.name as iteration_name, tp.name as time_project_name,
-		       assignee.first_name || ' ' || assignee.last_name as assignee_name, assignee.email as assignee_email, assignee.avatar_url as assignee_avatar,
-		       creator.first_name || ' ' || creator.last_name as creator_name, creator.email as creator_email,
-		       st.name as status_name, pri.name as priority_name, pri.icon as priority_icon, pri.color as priority_color
-		FROM items i
-		LEFT JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN item_types it ON i.item_type_id = it.id
-		LEFT JOIN items p ON i.parent_id = p.id
-		LEFT JOIN milestones m ON i.milestone_id = m.id
-		LEFT JOIN iterations iter ON i.iteration_id = iter.id
-		LEFT JOIN time_projects tp ON i.time_project_id = tp.id
-		LEFT JOIN users assignee ON i.assignee_id = assignee.id
-		LEFT JOIN users creator ON i.creator_id = creator.id
-		LEFT JOIN statuses st ON i.status_id = st.id
-		LEFT JOIN priorities pri ON i.priority_id = pri.id
-		WHERE i.workspace_id = ? AND i.status_id IN (%s)`, placeholders)
-
-	// Prepare arguments: workspace_id + all backlog status IDs
-	args := []interface{}{workspaceID}
-	for _, statusID := range backlogStatusIDs {
-		args = append(args, statusID)
-	}
-
-	// Check for QL query parameter and add additional filtering
-	if qlQuery := r.URL.Query().Get("ql"); qlQuery != "" {
-		// Build workspace mapping for QL evaluation
-		workspaceMap, err := h.buildWorkspaceMap()
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		// Create QL evaluator and generate SQL
-		evaluator := cql.NewEvaluator(workspaceMap)
-		qlSQL, qlArgs, err := evaluator.EvaluateToSQL(qlQuery)
-		if err != nil {
-			respondValidationError(w, r, "QL query error: "+err.Error())
-			return
-		}
-
-		if qlSQL != "" {
-			query += " AND (" + qlSQL + ")"
-			args = append(args, qlArgs...)
-		}
-	}
-
-	// Add ORDER BY clause
-	query += `
-		ORDER BY
-			CASE WHEN i.frac_index IS NULL THEN 1 ELSE 0 END,
-			i.frac_index ASC,
-			i.created_at DESC`
-
-	rows, err := h.db.Query(query, args...)
+	// Call service
+	items, _, err := h.itemCRUD.GetBacklogItems(services.BacklogParams{
+		WorkspaceID:  wsID,
+		CollectionID: collectionID,
+		QLQuery:      qlQuery,
+		WorkspaceIDs: accessibleWorkspaceIDs,
+	})
 	if err != nil {
+		if strings.Contains(err.Error(), "QL query error:") {
+			respondValidationError(w, r, err.Error())
+			return
+		}
+		if strings.Contains(err.Error(), "collection not found") {
+			respondNotFound(w, r, "collection")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
-	}
-	defer rows.Close()
-
-	var items []models.Item
-	for rows.Next() {
-		var item models.Item
-		var customFieldValues sql.NullString
-		var calendarData sql.NullString
-		var statusID sql.NullInt64
-		var workspaceName, itemTypeName, parentTitle, milestoneName, iterationName, timeProjectName sql.NullString
-		var assigneeName, assigneeEmail, assigneeAvatar, creatorName, creatorEmail sql.NullString
-		var statusName sql.NullString
-		var priorityName, priorityIcon, priorityColor sql.NullString
-
-		err := rows.Scan(
-			&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &item.ItemTypeID, &item.Title, &item.Description,
-			&statusID, &item.IsTask,
-			&item.MilestoneID, &item.IterationID, &item.TimeProjectID, &item.AssigneeID, &item.CreatorID, &customFieldValues, &calendarData, &item.ParentID,
-			&item.CreatedAt, &item.UpdatedAt,
-			&workspaceName, &itemTypeName, &parentTitle, &milestoneName, &iterationName, &timeProjectName,
-			&assigneeName, &assigneeEmail, &assigneeAvatar, &creatorName, &creatorEmail,
-			&statusName,
-			&priorityName, &priorityIcon, &priorityColor,
-		)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		// Handle nullable status_id field
-		item.StatusID = utils.NullInt64ToPtr(statusID)
-
-		// Handle JSON fields
-		if customFieldValues.Valid && customFieldValues.String != "" {
-			if err := json.Unmarshal([]byte(customFieldValues.String), &item.CustomFieldValues); err != nil {
-				item.CustomFieldValues = make(map[string]interface{})
-			}
-		}
-
-		if calendarData.Valid && calendarData.String != "" {
-			if err := json.Unmarshal([]byte(calendarData.String), &item.CalendarData); err != nil {
-				item.CalendarData = []models.CalendarScheduleEntry{}
-			}
-		}
-
-		// Set joined fields
-		item.WorkspaceName = workspaceName.String
-		item.ItemTypeName = itemTypeName.String
-		item.ParentTitle = parentTitle.String
-		item.MilestoneName = milestoneName.String
-		item.IterationName = iterationName.String
-		item.TimeProjectName = timeProjectName.String
-		item.AssigneeName = assigneeName.String
-		item.AssigneeEmail = assigneeEmail.String
-		item.AssigneeAvatar = assigneeAvatar.String
-		item.CreatorName = creatorName.String
-		item.CreatorEmail = creatorEmail.String
-		item.StatusName = statusName.String
-		item.PriorityName = priorityName.String
-		item.PriorityIcon = priorityIcon.String
-		item.PriorityColor = priorityColor.String
-
-		items = append(items, item)
-	}
-
-	// Always return an array, even if empty
-	if items == nil {
-		items = []models.Item{}
 	}
 
 	// Filter items based on user permissions
@@ -670,7 +356,6 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	items = filteredItems
 
-	respondJSONOK(w, items)
+	respondJSONOK(w, filteredItems)
 }

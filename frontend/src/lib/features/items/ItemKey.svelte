@@ -15,9 +15,10 @@
   export let onClick = null; // Optional: custom click handler (e.g., for modals)
 
   // Compute the display key
-  $: displayKey = workspace?.key
-    ? `${workspace.key}-${item.workspace_item_number}`
-    : `ITEM-${item.workspace_item_number}`;
+  $: displayKey = (() => {
+    const key = item.workspace_key || workspace?.key;
+    return key ? `${key}-${item.workspace_item_number}` : `ITEM-${item.workspace_item_number}`;
+  })();
 </script>
 
 {#if href}

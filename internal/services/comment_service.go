@@ -97,8 +97,8 @@ func (s *CommentService) SetEmailReplyService(ers EmailReplyHandler) {
 // Create creates a new comment with all associated side effects:
 // activity tracking, notifications, mentions, and webhooks.
 func (s *CommentService) Create(params CreateCommentParams) (*CreateCommentResult, error) {
-	// 1. Sanitize content (XSS prevention)
-	sanitizedContent := utils.StripHTMLTags(params.Content)
+	// 1. Sanitize content (XSS prevention — strips HTML tags + dangerous Markdown URLs)
+	sanitizedContent := utils.SanitizeCommentContent(params.Content)
 
 	// 2. Get item details for notifications
 	var workspaceID int
@@ -308,8 +308,8 @@ func (s *CommentService) Get(commentID int) (*CommentWithDetails, error) {
 
 // Update updates a comment's content
 func (s *CommentService) Update(commentID int, content string, userID int) (*models.Comment, error) {
-	// Sanitize content
-	sanitizedContent := utils.StripHTMLTags(content)
+	// Sanitize content (strips HTML tags + dangerous Markdown URLs)
+	sanitizedContent := utils.SanitizeCommentContent(content)
 
 	// Check if comment exists and get author
 	var authorID int

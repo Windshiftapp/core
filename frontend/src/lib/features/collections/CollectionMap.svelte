@@ -1,10 +1,11 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { useEventListener } from 'runed';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { getCollection, checkItemVisibility } from '../collections/collectionService.js';
+  import { collectionData, reloadCollection } from '../../stores/collectionContext.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { FileText, Plus, ChevronDown, Package, ChevronRight, Home, MapPin } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
@@ -78,16 +79,11 @@
     await loadAllData();
   });
 
-  // Reload when workspaceId or collectionId changes
-  let lastWorkspaceId = workspaceId;
-  let lastCollectionId = collectionId;
+  // Sync items from central store
   $effect(() => {
-    if (workspaceId) {
-      if (workspaceId !== lastWorkspaceId || collectionId !== lastCollectionId) {
-        lastWorkspaceId = workspaceId;
-        lastCollectionId = collectionId;
-        loadAllData();
-      }
+    if (!$collectionData.loading) {
+      currentCollectionName = $collectionData.collectionName;
+      untrack(() => processMapItems($collectionData.items));
     }
   });
 
@@ -237,67 +233,49 @@ async function loadStatuses() {
     hierarchyBreadcrumbs = newBreadcrumbs;
   }
 
+  function processMapItems(items) {
+    const parentId = currentParentId;
+
+    // Compute into local variables to avoid read-after-write on $state
+    const newBackbone = parentId === null
+      ? items.filter(item => !item.parent_id).sort((a, b) => a.id - b.id)
+      : items.filter(item => item.parent_id === parentId).sort((a, b) => a.id - b.id);
+
+    // Group child items by their parent ID (children of current backbone items)
+    const newChildren = {};
+    items
+      .filter(item => item.parent_id && newBackbone.some(b => b.id === item.parent_id))
+      .forEach(child => {
+        if (!newChildren[child.parent_id]) {
+          newChildren[child.parent_id] = [];
+        }
+        newChildren[child.parent_id].push(child);
+      });
+
+    // Sort child items within each parent group
+    Object.keys(newChildren).forEach(pid => {
+      newChildren[pid].sort((a, b) => a.id - b.id);
+    });
+
+    // Batch-assign to $state at the end
+    backboneItems = newBackbone;
+    childItemsByParent = newChildren;
+
+    // Update breadcrumbs
+    updateHierarchyBreadcrumbs();
+  }
+
   async function loadStoryMapData(parentId = null) {
     try {
-      // Build filters based on collection
-      const filters = { workspace_id: workspaceId };
-      
-      if (collectionId) {
-        const collection = await getCollection(collectionId);
-        if (collection) {
-          currentCollectionName = collection.name;
-          if (collection.cql_query) {
-            filters.vql = collection.cql_query;
-          }
-        }
-      } else {
-        currentCollectionName = 'Default';
-      }
-      
-      // Load all items and item types
-      const [itemsResponse, itemTypesResponse] = await Promise.all([
-        api.items.getAll(filters),
-        api.itemTypes.getAll()
-      ]);
-      
-      const items = Array.isArray(itemsResponse) ? itemsResponse : itemsResponse.items || [];
+      // Load item types
+      const itemTypesResponse = await api.itemTypes.getAll();
       itemTypes = itemTypesResponse;
 
       // Set current parent ID
       currentParentId = parentId;
 
-      // Get backbone items based on current parent level
-      if (parentId === null) {
-        // Root level - items with no parent
-        backboneItems = items
-          .filter(item => !item.parent_id)
-          .sort((a, b) => a.id - b.id);
-      } else {
-        // Child level - direct children of the specified parent
-        backboneItems = items
-          .filter(item => item.parent_id === parentId)
-          .sort((a, b) => a.id - b.id);
-      }
-
-      // Group child items by their parent ID (children of current backbone items)
-      childItemsByParent = {};
-      items
-        .filter(item => item.parent_id && backboneItems.some(backbone => backbone.id === item.parent_id))
-        .forEach(child => {
-          if (!childItemsByParent[child.parent_id]) {
-            childItemsByParent[child.parent_id] = [];
-          }
-          childItemsByParent[child.parent_id].push(child);
-        });
-
-      // Sort child items within each parent group
-      Object.keys(childItemsByParent).forEach(parentId => {
-        childItemsByParent[parentId].sort((a, b) => a.id - b.id);
-      });
-
-      // Update breadcrumbs
-      await updateHierarchyBreadcrumbs();
-
+      // Process items from the store
+      processMapItems($collectionData.items);
     } catch (error) {
       console.error('Failed to load story map data:', error);
     }
@@ -398,10 +376,8 @@ async function loadStatuses() {
       // Update the item's parent_id
       const result = await api.items.update(itemId, { parent_id: newParentId });
 
-      // Reload the story map data, maintaining the current hierarchy level
-      await loadStoryMapData(currentParentId);
-
-      // The reactive statement will handle drag and drop re-setup automatically
+      // Reload data from central store
+      reloadCollection();
     } catch (error) {
       console.error('Failed to move item:', error);
 
@@ -554,8 +530,8 @@ async function loadStatuses() {
 
       if (collectionId) {
         const collection = await getCollection(collectionId);
-        if (collection?.cql_query) {
-          filters.vql = collection.cql_query;
+        if (collection?.ql_query) {
+          filters.ql = collection.ql_query;
         }
       }
 
@@ -570,7 +546,7 @@ async function loadStatuses() {
 
       // Reset state and reload
       cancelQuickAdd(parentId);
-      await loadStoryMapData(currentParentId);
+      reloadCollection();
     } catch (error) {
       console.error('Failed to create child item:', error);
       quickAddState[parentId].error = 'Failed to create item: ' + (error.message || error);
@@ -656,7 +632,7 @@ async function loadStatuses() {
 
     // If changes were made in the modal, reload data
     if (event?.hasChanges) {
-      await loadStoryMapDataFromURL();
+      reloadCollection();
     }
   }
 </script>

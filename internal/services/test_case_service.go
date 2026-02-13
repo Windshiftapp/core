@@ -90,7 +90,7 @@ type TestCaseCreateRequest struct {
 func (s *TestCaseService) Create(workspaceID int, req TestCaseCreateRequest) (*models.TestCase, error) {
 	// Sanitize input
 	req.Title = utils.StripHTMLTags(req.Title)
-	req.Preconditions = utils.StripHTMLTags(req.Preconditions)
+	req.Preconditions = utils.SanitizeCommentContent(req.Preconditions)
 
 	// Set defaults
 	if req.Priority == "" {
@@ -169,7 +169,7 @@ type TestCaseUpdateRequest struct {
 func (s *TestCaseService) Update(id, workspaceID int, req TestCaseUpdateRequest) (*models.TestCase, error) {
 	// Sanitize input
 	req.Title = utils.StripHTMLTags(req.Title)
-	req.Preconditions = utils.StripHTMLTags(req.Preconditions)
+	req.Preconditions = utils.SanitizeCommentContent(req.Preconditions)
 
 	// Validate priority if provided
 	if req.Priority != "" && !isValidTestCasePriority(req.Priority) {
@@ -295,9 +295,9 @@ type TestStepCreateRequest struct {
 // CreateStep creates a new test step
 func (s *TestCaseService) CreateStep(testCaseID int, req TestStepCreateRequest) (*models.TestStep, error) {
 	// Sanitize input
-	req.Action = utils.StripHTMLTags(req.Action)
-	req.Data = utils.StripHTMLTags(req.Data)
-	req.Expected = utils.StripHTMLTags(req.Expected)
+	req.Action = utils.SanitizeCommentContent(req.Action)
+	req.Data = utils.SanitizeCommentContent(req.Data)
+	req.Expected = utils.SanitizeCommentContent(req.Expected)
 
 	// Get max step number
 	maxStepNumber, err := s.repo.GetMaxStepNumber(testCaseID)
@@ -346,9 +346,9 @@ type TestStepUpdateRequest struct {
 // UpdateStep updates an existing test step
 func (s *TestCaseService) UpdateStep(stepID, testCaseID int, req TestStepUpdateRequest) (*models.TestStep, error) {
 	// Sanitize input
-	req.Action = utils.StripHTMLTags(req.Action)
-	req.Data = utils.StripHTMLTags(req.Data)
-	req.Expected = utils.StripHTMLTags(req.Expected)
+	req.Action = utils.SanitizeCommentContent(req.Action)
+	req.Data = utils.SanitizeCommentContent(req.Data)
+	req.Expected = utils.SanitizeCommentContent(req.Expected)
 
 	step := &models.TestStep{
 		ID:         stepID,

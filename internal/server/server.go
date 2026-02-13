@@ -77,6 +77,8 @@ type Config struct {
 	LLMEndpoint string
 	// LLMProvidersFile is the path to a custom LLM providers JSON file (optional)
 	LLMProvidersFile string
+	// LogbookEndpoint is the URL of the logbook sidecar service (e.g., http://logbook:8090)
+	LogbookEndpoint string
 	// FrontendFiles is the embedded filesystem containing frontend assets
 	FrontendFiles embed.FS
 
@@ -354,8 +356,8 @@ func (s *Server) initialize() error {
 	credentialHandler := handlers.NewCredentialHandler(s.db, permService)
 	webAuthnHandler := handlers.NewWebAuthnHandler(s.db, permService, sessionManager, webAuthnConfig, ipExtractor)
 	appTokenHandler := handlers.NewAppTokenHandler(s.db, permService)
-	collectionHandler := handlers.NewCollectionHandler(s.db)
-	boardConfigHandler := handlers.NewBoardConfigurationHandler(s.db)
+	collectionHandler := handlers.NewCollectionHandler(s.db, permService)
+	boardConfigHandler := handlers.NewBoardConfigurationHandler(s.db, permService)
 	testCoverageHandler := handlers.NewTestCoverageHandler(s.db, permService)
 	permissionHandler := handlers.NewPermissionHandlerWithCache(s.db, permService)
 	apiTokenHandler := handlers.NewApiTokenHandler(s.db, tokenManager, permService)
@@ -397,7 +399,7 @@ func (s *Server) initialize() error {
 	recurrenceHandler := handlers.NewRecurrenceHandler(s.db, s.recurrenceScheduler, permService)
 
 	// Actions handler
-	actionsHandler := handlers.NewActionsHandler(s.db, s.actionService)
+	actionsHandler := handlers.NewActionsHandler(s.db, s.actionService, permService)
 
 	milestoneCategoryHandler := handlers.NewEnumHandler(
 		services.NewEnumService(s.db, services.NewMilestoneCategoryConfig()),
@@ -439,7 +441,7 @@ func (s *Server) initialize() error {
 	notificationHandler := handlers.NewNotificationHandler(s.notificationManager, s.notificationService)
 	notificationTemplateHandler := handlers.NewNotificationTemplateHandlerWithPool(s.db)
 
-	permissionMiddleware := middleware.NewPermissionMiddleware(s.db)
+	permissionMiddleware := middleware.NewPermissionMiddleware(s.db, permService)
 	csrfMiddleware := middleware.NewCSRFMiddleware()
 
 	// Setup handler
@@ -450,8 +452,8 @@ func (s *Server) initialize() error {
 
 	// SCM provider handler
 	scmProviderHandler := handlers.NewSCMProviderHandler(s.db)
-	scmWorkspaceHandler := handlers.NewSCMWorkspaceHandler(s.db, scmProviderHandler.GetEncryption(), scmProviderHandler)
-	scmItemLinksHandler := handlers.NewSCMItemLinksHandler(s.db, scmProviderHandler.GetEncryption())
+	scmWorkspaceHandler := handlers.NewSCMWorkspaceHandler(s.db, scmProviderHandler.GetEncryption(), scmProviderHandler, permService)
+	scmItemLinksHandler := handlers.NewSCMItemLinksHandler(s.db, scmProviderHandler.GetEncryption(), permService)
 	userSCMTokenHandler := handlers.NewUserSCMTokenHandler(s.db, scmProviderHandler.GetEncryption())
 
 	// Asset management handlers
@@ -635,6 +637,29 @@ func (s *Server) initialize() error {
 	llmManager := llm.NewConnectionManager(s.db, scmProviderHandler.GetEncryption(), fallbackLLMClient)
 	llmConnHandler := handlers.NewLLMConnectionHandler(llmManager)
 	aiHandler := handlers.NewAIHandler(s.db, llmManager, permService)
+
+	// Logbook reverse proxy (optional sidecar)
+	if cfg.LogbookEndpoint != "" {
+		logbookProxy := NewLogbookProxy(LogbookProxyConfig{
+			Endpoint:          cfg.LogbookEndpoint,
+			AuthMiddleware:    authMiddleware,
+			PermissionService: permService,
+		})
+		mux.Handle("GET /api/logbook/", logbookProxy)
+		mux.Handle("POST /api/logbook/", logbookProxy)
+		mux.Handle("PUT /api/logbook/", logbookProxy)
+		mux.Handle("PATCH /api/logbook/", logbookProxy)
+		mux.Handle("DELETE /api/logbook/", logbookProxy)
+		slog.Info("logbook proxy enabled", "endpoint", cfg.LogbookEndpoint)
+
+		// Internal LLM proxy for logbook article generation
+		if ssoSecret := os.Getenv("SSO_SECRET"); ssoSecret != "" {
+			llmProxy := NewInternalLLMProxy(llmManager, "logbook_article", ssoSecret)
+			mux.Handle("POST /api/internal/llm/v1/chat/completions", llmProxy)
+			mux.Handle("GET /api/internal/llm/health", NewInternalLLMHealthCheck(llmManager, "logbook_article", ssoSecret))
+			slog.Info("internal LLM proxy enabled for logbook article generation")
+		}
+	}
 
 	// Build API middleware chain
 	corsMiddleware := createCORSMiddleware(cfg.AllowedHosts, effectivePort, cfg.DisableCSRF, cfg.UseProxy)

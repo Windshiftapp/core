@@ -7,16 +7,18 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/services"
 )
 
 // PermissionMiddleware handles permission checking for protected routes
 type PermissionMiddleware struct {
-	db database.Database
+	db                database.Database
+	permissionService *services.PermissionService
 }
 
 // NewPermissionMiddleware creates a new permission middleware
-func NewPermissionMiddleware(db database.Database) *PermissionMiddleware {
-	return &PermissionMiddleware{db: db}
+func NewPermissionMiddleware(db database.Database, permissionService *services.PermissionService) *PermissionMiddleware {
+	return &PermissionMiddleware{db: db, permissionService: permissionService}
 }
 
 // RequireGlobalPermission creates middleware that requires a specific global permission
@@ -87,7 +89,7 @@ func (pm *PermissionMiddleware) RequireWorkspacePermission(permissionKey string)
 			}
 
 			// Check if user has the specific workspace permission
-			hasPermission, err := pm.hasWorkspacePermission(user.ID, workspaceID, permissionKey)
+			hasPermission, err := pm.permissionService.HasWorkspacePermission(user.ID, workspaceID, permissionKey)
 			if err != nil {
 				slog.Error("error checking workspace permission", slog.Any("error", err))
 				http.Error(w, "Permission check failed", http.StatusInternalServerError)
@@ -328,7 +330,7 @@ func (pm *PermissionMiddleware) CheckWorkspacePermission(userID, workspaceID int
 		return true, nil
 	}
 
-	return pm.hasWorkspacePermission(userID, workspaceID, permissionKey)
+	return pm.permissionService.HasWorkspacePermission(userID, workspaceID, permissionKey)
 }
 
 // GetUserPermissionLevel returns a descriptive permission level for a user in a workspace
@@ -339,7 +341,7 @@ func (pm *PermissionMiddleware) GetUserPermissionLevel(userID, workspaceID int) 
 	}
 
 	// Check for workspace administrator
-	isWorkspaceAdmin, err := pm.hasWorkspacePermission(userID, workspaceID, models.PermissionWorkspaceAdmin)
+	isWorkspaceAdmin, err := pm.permissionService.HasWorkspacePermission(userID, workspaceID, models.PermissionWorkspaceAdmin)
 	if err == nil && isWorkspaceAdmin {
 		return "Workspace Administrator"
 	}

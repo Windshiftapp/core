@@ -14,14 +14,16 @@ import (
 	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/scm"
+	"windshift/internal/services"
 	"windshift/internal/sso"
 )
 
 // SCMItemLinksHandler handles item SCM link endpoints
 type SCMItemLinksHandler struct {
-	db          database.Database
-	encryption  *sso.SecretEncryption
-	syncService *scm.SyncService
+	db                database.Database
+	encryption        *sso.SecretEncryption
+	syncService       *scm.SyncService
+	permissionService *services.PermissionService
 }
 
 // getItemURL constructs the URL to an item based on the request context
@@ -93,11 +95,12 @@ type CreateBranchForItemResponse struct {
 }
 
 // NewSCMItemLinksHandler creates a new item SCM links handler
-func NewSCMItemLinksHandler(db database.Database, encryption *sso.SecretEncryption) *SCMItemLinksHandler {
+func NewSCMItemLinksHandler(db database.Database, encryption *sso.SecretEncryption, permissionService *services.PermissionService) *SCMItemLinksHandler {
 	return &SCMItemLinksHandler{
-		db:          db,
-		encryption:  encryption,
-		syncService: scm.NewSyncService(db, encryption),
+		db:                db,
+		encryption:        encryption,
+		syncService:       scm.NewSyncService(db, encryption),
+		permissionService: permissionService,
 	}
 }
 
@@ -106,6 +109,10 @@ func (h *SCMItemLinksHandler) GetItemSCMLinks(w http.ResponseWriter, r *http.Req
 	itemID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
+		return
+	}
+
+	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
 		return
 	}
 
@@ -180,6 +187,10 @@ func (h *SCMItemLinksHandler) CreateItemSCMLink(w http.ResponseWriter, r *http.R
 	itemID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
+		return
+	}
+
+	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit) {
 		return
 	}
 
@@ -282,6 +293,13 @@ func (h *SCMItemLinksHandler) CreateItemSCMLink(w http.ResponseWriter, r *http.R
 	json.NewEncoder(w).Encode(link)
 }
 
+// getItemIDForLink looks up the item_id for a given SCM link ID
+func (h *SCMItemLinksHandler) getItemIDForLink(linkID int) (int, error) {
+	var itemID int
+	err := h.db.QueryRow("SELECT item_id FROM item_scm_links WHERE id = ?", linkID).Scan(&itemID)
+	return itemID, err
+}
+
 // DeleteItemSCMLink deletes an SCM link
 func (h *SCMItemLinksHandler) DeleteItemSCMLink(w http.ResponseWriter, r *http.Request) {
 	linkID, err := strconv.Atoi(r.PathValue("linkId"))
@@ -290,15 +308,18 @@ func (h *SCMItemLinksHandler) DeleteItemSCMLink(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Verify link exists
-	var exists int
-	err = h.db.QueryRow("SELECT 1 FROM item_scm_links WHERE id = ?", linkID).Scan(&exists)
+	// Look up item for permission check
+	itemID, err := h.getItemIDForLink(linkID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			respondNotFound(w, r, "link")
 		} else {
 			respondInternalError(w, r, fmt.Errorf("failed to verify link: %w", err))
 		}
+		return
+	}
+
+	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit) {
 		return
 	}
 
@@ -317,6 +338,21 @@ func (h *SCMItemLinksHandler) RefreshItemSCMLink(w http.ResponseWriter, r *http.
 	linkID, err := strconv.Atoi(r.PathValue("linkId"))
 	if err != nil {
 		respondInvalidID(w, r, "linkId")
+		return
+	}
+
+	// Look up item for permission check
+	itemID, err := h.getItemIDForLink(linkID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			respondNotFound(w, r, "link")
+		} else {
+			respondInternalError(w, r, fmt.Errorf("failed to get link: %w", err))
+		}
+		return
+	}
+
+	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
 		return
 	}
 
@@ -386,6 +422,10 @@ func (h *SCMItemLinksHandler) GetWorkspaceRepositoriesForItem(w http.ResponseWri
 		return
 	}
 
+	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
+		return
+	}
+
 	// Get item's workspace
 	var workspaceID int
 	err = h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
@@ -446,6 +486,10 @@ func (h *SCMItemLinksHandler) CreateBranchForItem(w http.ResponseWriter, r *http
 	itemID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
+		return
+	}
+
+	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit) {
 		return
 	}
 
@@ -651,6 +695,10 @@ func (h *SCMItemLinksHandler) CreatePRFromBranch(w http.ResponseWriter, r *http.
 		return
 	}
 
+	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit) {
+		return
+	}
+
 	// Verify this is a branch link
 	if linkType != "branch" {
 		respondValidationError(w, r, "Can only create PR from a branch link")
@@ -789,6 +837,10 @@ func (h *SCMItemLinksHandler) GetSCMConnectionStatus(w http.ResponseWriter, r *h
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		respondUnauthorized(w, r)
+		return
+	}
+
+	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
 		return
 	}
 

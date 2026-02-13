@@ -12,6 +12,7 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 type TestRunHandler struct {
@@ -367,6 +368,10 @@ func (h *TestRunHandler) UpdateResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Sanitize user input to prevent XSS
+	input.ActualResult = utils.SanitizeCommentContent(input.ActualResult)
+	input.Notes = utils.SanitizeCommentContent(input.Notes)
+
 	if err := h.service.UpdateResult(resultID, services.TestResultUpdateRequest{
 		Status:       input.Status,
 		ActualResult: input.ActualResult,
@@ -454,6 +459,10 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
+
+	// Sanitize user input to prevent XSS
+	update.ActualResult = utils.SanitizeCommentContent(update.ActualResult)
+	update.Notes = utils.SanitizeCommentContent(update.Notes)
 
 	readDB, ok := h.requireReadDB(w, r)
 	if !ok {

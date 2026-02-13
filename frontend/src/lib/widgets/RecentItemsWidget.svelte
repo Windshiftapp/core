@@ -5,17 +5,19 @@
   import WidgetState from './WidgetState.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  let { workspaceId = null, maxItems = 10 } = $props();
+  let { workspaceId = null, collectionFilter = null, maxItems = 10 } = $props();
 
   let items = $state([]);
   let loading = $state(false);
   let error = $state(null);
   let fetchVersion = $state(0);
   let lastWorkspaceId = $state(undefined);
+  let lastCollectionFilter = $state(undefined);
 
   $effect(() => {
-    if (workspaceId !== lastWorkspaceId) {
+    if (workspaceId !== lastWorkspaceId || collectionFilter !== lastCollectionFilter) {
       lastWorkspaceId = workspaceId;
+      lastCollectionFilter = collectionFilter;
       loadRecentActivity();
     }
   });
@@ -26,39 +28,70 @@
     error = null;
 
     try {
-      const data = await api.homepage.get();
-      if (currentVersion !== fetchVersion) return;
+      if (collectionFilter) {
+        const trimmedFilter = (collectionFilter || '').trim();
+        const parts = [];
+        if (trimmedFilter) parts.push(`(${trimmedFilter})`);
+        parts.push(`workspace_id = ${workspaceId}`);
+        const ql = parts.join(' AND ');
 
-      const sources = [
-        ...(data?.recently_viewed ?? []),
-        ...(data?.recently_edited ?? []),
-        ...(data?.recently_commented ?? [])
-      ];
-
-      const deduped = [];
-      const seen = new Set();
-
-      sources.forEach(activity => {
-        if (!activity?.item_id) return;
-        if (workspaceId && activity.workspace_id !== Number(workspaceId)) return;
-
-        const key = activity.item_id;
-        if (seen.has(key)) return;
-        seen.add(key);
-
-        deduped.push({
-          ...activity,
-          lastActivityDate: activity.last_activity ? new Date(activity.last_activity) : null
+        const response = await api.items.getAll({
+          ql,
+          limit: maxItems,
+          order_by: 'updated_at'
         });
-      });
+        if (currentVersion !== fetchVersion) return;
 
-      deduped.sort((a, b) => {
-        const left = a.lastActivityDate?.getTime() ?? 0;
-        const right = b.lastActivityDate?.getTime() ?? 0;
-        return right - left;
-      });
+        const rawItems = Array.isArray(response)
+          ? response
+          : (response?.items ?? []);
 
-      items = deduped.slice(0, maxItems);
+        items = rawItems
+          .filter(item => item && item.id)
+          .map(item => ({
+            item_id: item.id,
+            title: item.title,
+            workspace_id: item.workspace_id,
+            workspace_key: item.workspace_key,
+            workspace_item_number: item.workspace_item_number,
+            lastActivityDate: item.updated_at ? new Date(item.updated_at) : null
+          }))
+          .slice(0, maxItems);
+      } else {
+        const data = await api.homepage.get();
+        if (currentVersion !== fetchVersion) return;
+
+        const sources = [
+          ...(data?.recently_viewed ?? []),
+          ...(data?.recently_edited ?? []),
+          ...(data?.recently_commented ?? [])
+        ];
+
+        const deduped = [];
+        const seen = new Set();
+
+        sources.forEach(activity => {
+          if (!activity?.item_id) return;
+          if (workspaceId && activity.workspace_id !== Number(workspaceId)) return;
+
+          const key = activity.item_id;
+          if (seen.has(key)) return;
+          seen.add(key);
+
+          deduped.push({
+            ...activity,
+            lastActivityDate: activity.last_activity ? new Date(activity.last_activity) : null
+          });
+        });
+
+        deduped.sort((a, b) => {
+          const left = a.lastActivityDate?.getTime() ?? 0;
+          const right = b.lastActivityDate?.getTime() ?? 0;
+          return right - left;
+        });
+
+        items = deduped.slice(0, maxItems);
+      }
     } catch (err) {
       if (currentVersion !== fetchVersion) return;
       console.error('Failed to load recent items widget:', err);

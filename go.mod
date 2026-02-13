@@ -24,6 +24,7 @@ require (
 	github.com/jub0bs/cors v0.9.2
 	github.com/klauspost/compress v1.18.3
 	github.com/lib/pq v1.10.9
+	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/spf13/cobra v1.8.0
 	github.com/teambition/rrule-go v1.8.2
 	github.com/zitadel/oidc/v3 v3.45.3
@@ -38,6 +39,7 @@ require (
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
+	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/colorprofile v0.3.2 // indirect
 	github.com/charmbracelet/keygen v0.5.3 // indirect
@@ -66,6 +68,7 @@ require (
 	github.com/go-webauthn/x v0.1.26 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/google/go-tpm v0.9.6 // indirect
+	github.com/gorilla/css v1.0.1 // indirect
 	github.com/ianlancetaylor/demangle v0.0.0-20240805132620-81f5be970eca // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect

@@ -137,6 +137,11 @@ func (h *TimeWorklogHandler) filterWorklogsByPermission(worklogs []models.Worklo
 }
 
 func (h *TimeWorklogHandler) GetAll(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	// Support filtering by date range, customer, project
 	query := `
 		SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
@@ -223,10 +228,17 @@ func (h *TimeWorklogHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		worklogs = append(worklogs, worklog)
 	}
 
+	worklogs = h.filterWorklogsByPermission(worklogs, user.ID)
+
 	respondJSONOK(w, worklogs)
 }
 
 func (h *TimeWorklogHandler) Get(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
@@ -278,7 +290,9 @@ func (h *TimeWorklogHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSONOK(w, wl)
+	// Filter item info by permission
+	filtered := h.filterWorklogsByPermission([]models.Worklog{wl}, user.ID)
+	respondJSONOK(w, filtered[0])
 }
 
 // validateAndParseWorklog validates a WorklogRequest and returns parsed values
@@ -682,6 +696,10 @@ func (h *TimeWorklogHandler) GetByProject(w http.ResponseWriter, r *http.Request
 func (h *TimeWorklogHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 	itemID, ok := requireIDParam(w, r, "id")
 	if !ok {
+		return
+	}
+
+	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
 		return
 	}
 

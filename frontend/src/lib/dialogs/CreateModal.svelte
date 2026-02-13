@@ -196,6 +196,8 @@
           name: workspaceFormData.name,
           key: workspaceFormData.key,
           description: workspaceFormData.description || '',
+          icon: 'Package',
+          color: '#3b82f6',
           active: true
         });
 
@@ -208,7 +210,7 @@
         const result = await api.collections.create({
           name: collectionFormData.name,
           description: collectionFormData.description || '',
-          cql_query: '',
+          ql_query: '',
           is_public: false,
           workspace_id: collectionFormData.workspace_id,
           category_id: collectionCategoryId
@@ -295,6 +297,8 @@
     if (event.detail?.workspaceId) {
       const workspaceId = event.detail.workspaceId;
       const workspaceIdNum = typeof workspaceId === 'string' ? parseInt(workspaceId, 10) : workspaceId;
+
+      collectionFormData.workspace_id = workspaceIdNum;
 
       if ($workspacesStore.regularWorkspaces.length === 0) {
         loadWorkspaces().then(() => {

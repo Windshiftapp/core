@@ -679,6 +679,13 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Debug("found attachment", slog.String("component", "attachments"), slog.String("original_filename", attachment.OriginalFilename), slog.String("path", attachment.FilePath))
 
+	// Check item permission if attachment is associated with an item
+	if attachment.ItemID != nil {
+		if !CheckItemPermission(w, r, h.db, h.permissionService, *attachment.ItemID, models.PermissionItemView) {
+			return
+		}
+	}
+
 	// Validate file path is within attachment directory (prevent path traversal)
 	absPath, err := filepath.Abs(attachment.FilePath)
 	if err != nil {
@@ -829,11 +836,12 @@ func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 	var hasThumbnail bool
 	var thumbnailPath string
 	var mimeType string
+	var thumbItemID sql.NullInt64
 	err = h.db.QueryRow(`
-		SELECT has_thumbnail, thumbnail_path, mime_type
+		SELECT has_thumbnail, thumbnail_path, mime_type, item_id
 		FROM attachments WHERE id = ?
-	`, attachmentID).Scan(&hasThumbnail, &thumbnailPath, &mimeType)
-	
+	`, attachmentID).Scan(&hasThumbnail, &thumbnailPath, &mimeType, &thumbItemID)
+
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "attachment")
 		return
@@ -841,6 +849,13 @@ func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	// Check item permission if attachment is associated with an item
+	if thumbItemID.Valid {
+		if !CheckItemPermission(w, r, h.db, h.permissionService, int(thumbItemID.Int64), models.PermissionItemView) {
+			return
+		}
 	}
 
 	if !hasThumbnail || thumbnailPath == "" {
@@ -905,9 +920,12 @@ func (h *AttachmentHandler) verifyFileContent(file io.ReadSeeker, filename strin
 		detectedBase := strings.Split(detectedType, ";")[0]
 		expectedBase := strings.Split(expectedType, ";")[0]
 
-		// Allow octet-stream as it's a generic fallback
-		// Otherwise, types must match
-		if detectedBase != expectedBase && detectedBase != "application/octet-stream" {
+		// Allow octet-stream as it's a generic fallback.
+		// Allow text/plain when the expected type is a text/* subtype, since
+		// http.DetectContentType cannot distinguish between text subtypes
+		// (e.g. CSV, XML, YAML are all detected as text/plain).
+		if detectedBase != expectedBase && detectedBase != "application/octet-stream" &&
+			!(detectedBase == "text/plain" && strings.HasPrefix(expectedBase, "text/")) {
 			return "", fmt.Errorf("file content type (%s) doesn't match extension %s (expected %s)", detectedBase, ext, expectedBase)
 		}
 	}
@@ -937,9 +955,12 @@ func (h *AttachmentHandler) verifyFileContentFromBytes(fileData []byte, filename
 		detectedBase := strings.Split(detectedType, ";")[0]
 		expectedBase := strings.Split(expectedType, ";")[0]
 
-		// Allow octet-stream as it's a generic fallback
-		// Otherwise, types must match
-		if detectedBase != expectedBase && detectedBase != "application/octet-stream" {
+		// Allow octet-stream as it's a generic fallback.
+		// Allow text/plain when the expected type is a text/* subtype, since
+		// http.DetectContentType cannot distinguish between text subtypes
+		// (e.g. CSV, XML, YAML are all detected as text/plain).
+		if detectedBase != expectedBase && detectedBase != "application/octet-stream" &&
+			!(detectedBase == "text/plain" && strings.HasPrefix(expectedBase, "text/")) {
 			return "", fmt.Errorf("file content type (%s) doesn't match extension %s (expected %s)", detectedBase, ext, expectedBase)
 		}
 	}
