@@ -2,11 +2,12 @@
   import { onMount } from 'svelte';
   import { fade, slide } from 'svelte/transition';
   import { currentRoute, navigate, isWorkspaceRoute } from '../router.js';
-  import { testingStore, authStore, permissionStore, uiStore, currentWorkspace, workspacesStore, workspacePermissions, ssoStore, workspaceDataStore, activityStore } from '../stores';
+  import { testingStore, authStore, permissionStore, uiStore, currentWorkspace, workspacesStore, workspacePermissions, ssoStore, workspaceDataStore, activityStore, collectionData } from '../stores';
   import EmailVerificationBanner from '../features/notifications/EmailVerificationBanner.svelte';
   import { moduleSettings } from '../stores/moduleSettings.js';
   import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
   import { aiStore } from '../stores/aiStore.svelte.js';
+  import { logbookStore } from '../stores/logbook.svelte.js';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import NotFound from './NotFound.svelte';
@@ -96,7 +97,9 @@
     'workflow-designer': () => import('../features/workflows/WorkflowDesigner.svelte'),
     'configuration-set-detail': () => import('../settings/ConfigurationSetDetail.svelte'),
     'workspace-look-and-feel': () => import('../workspaces/WorkspaceLookAndFeel.svelte'),
-    'personal-plan': () => import('../features/personal/PlanMyDay.svelte')
+    'personal-plan': () => import('../features/personal/PlanMyDay.svelte'),
+    'logbook': () => import('../features/logbook/Logbook.svelte'),
+    'logbook-document': () => import('../features/logbook/DocumentDetail.svelte')
   };
 
   // Preload all chunks after initial load for faster navigation
@@ -341,6 +344,17 @@
       loadingMsg: 'Loading Plan My Day...',
       errorMsg: 'Failed to load Plan My Day',
       wrapper: 'surface-full'
+    },
+    'logbook': {
+      loadingMsg: 'Loading Knowledge Base...',
+      errorMsg: 'Failed to load Knowledge Base',
+      wrapper: 'surface-full'
+    },
+    'logbook-document': {
+      loadingMsg: 'Loading Document...',
+      errorMsg: 'Failed to load Document',
+      wrapper: 'surface-full',
+      getProps: (route) => ({ documentId: route.params.documentId })
     }
   };
 
@@ -394,7 +408,9 @@
 
     return view;
   });
-  
+
+  let routeProps = $derived.by(() => getPropsForRoute(effectiveView));
+
   onMount(async () => {
     // Initialize activity tracking for adaptive polling
     activityStore.init();
@@ -407,6 +423,10 @@
     moduleSettings.load();
     attachmentStatus.load();
     aiStore.load();
+    // Check logbook availability
+    logbookStore.checkAvailability().then(() => {
+      permissionStore.setLogbookAvailable(logbookStore.available);
+    });
     // Load all permissions for permission checking (admin only)
     await permissionStore.loadAllPermissions(authStore.currentUser);
     // Load workspace permissions for current user
@@ -542,6 +562,9 @@
       workspaceDataStore.reset();
     }
   });
+
+  // Activate collection data store — pre-fetches items when navigating to collection views
+  $effect(() => { $collectionData; });
 
   // Track display mode changes to enable transitions only after an actual mode switch
   $effect(() => {
@@ -703,13 +726,12 @@
   </div>
 {/snippet}
 
-{#snippet lazyLoadedComponent(view)}
+{#snippet lazyLoadedComponent(view, props)}
   {@const component = getComponentForView(view)}
   {@const loading = isComponentLoading(view)}
   {@const routeEntry = resolveRouteConfig(view)}
   {@const config = routeEntry.config}
   {@const loaderKey = routeEntry.key || view}
-  {@const props = getPropsForRoute(view)}
 
   {#if loading}
     {@render loadingState(config?.loadingMsg || 'Loading...')}
@@ -832,7 +854,7 @@
 
     {:else if view === 'admin'}
       <PermissionGuard requireSystemAdmin={true}>
-        {@render lazyLoadedComponent(view)}
+        {@render lazyLoadedComponent(view, routeProps)}
         <svelte:fragment slot="fallback" let:requiredPermissionDisplay>
           <UnauthorizedAccess
             message="You need system administrator privileges to access the administration panel."
@@ -843,20 +865,20 @@
 
     {:else if view === 'workspace-actions'}
       <div class="h-full" style="background-color: var(--ds-surface); height: calc(100vh - 56px);">
-        {@render lazyLoadedComponent(view)}
+        {@render lazyLoadedComponent(view, routeProps)}
       </div>
 
     {:else if hasLazyRoute}
       {#if wrapper === 'surface-full'}
         <div style="background-color: var(--ds-surface);">
-          {@render lazyLoadedComponent(view)}
+          {@render lazyLoadedComponent(view, routeProps)}
         </div>
       {:else if wrapper === 'surface-padded'}
         <div class="p-6" style="background-color: var(--ds-surface);">
-          {@render lazyLoadedComponent(view)}
+          {@render lazyLoadedComponent(view, routeProps)}
         </div>
       {:else}
-        {@render lazyLoadedComponent(view)}
+        {@render lazyLoadedComponent(view, routeProps)}
       {/if}
 
       {:else}

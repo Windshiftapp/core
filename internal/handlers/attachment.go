@@ -680,9 +680,9 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Debug("found attachment", slog.String("component", "attachments"), slog.String("original_filename", attachment.OriginalFilename), slog.String("path", attachment.FilePath))
 
-	// Check workspace permission if attachment belongs to an item
-	if itemID.Valid {
-		if !CheckItemPermission(w, r, h.db, h.permissionService, int(itemID.Int64), models.PermissionItemView) {
+	// Check item permission if attachment is associated with an item
+	if attachment.ItemID != nil {
+		if !CheckItemPermission(w, r, h.db, h.permissionService, *attachment.ItemID, models.PermissionItemView) {
 			return
 		}
 	}
@@ -852,7 +852,7 @@ func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check workspace permission if attachment belongs to an item
+	// Check item permission if attachment is associated with an item
 	if thumbItemID.Valid {
 		if !CheckItemPermission(w, r, h.db, h.permissionService, int(thumbItemID.Int64), models.PermissionItemView) {
 			return
@@ -891,7 +891,48 @@ func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=31536000") // Cache for 1 year
 
 	// Serve thumbnail
-	_, _ = io.Copy(w, file)
+	io.Copy(w, file)
+}
+
+// verifyFileContent detects actual file content and validates it matches the extension
+func (h *AttachmentHandler) verifyFileContent(file io.ReadSeeker, filename string) (string, error) {
+	// Read first 512 bytes for content detection
+	buffer := make([]byte, 512)
+	n, err := file.Read(buffer)
+	if err != nil && err != io.EOF {
+		return "", fmt.Errorf("failed to read file for content detection: %w", err)
+	}
+
+	// Reset file pointer to beginning for subsequent reads
+	if _, err := file.Seek(0, 0); err != nil {
+		return "", fmt.Errorf("failed to reset file pointer: %w", err)
+	}
+
+	// Detect actual content type from file content
+	detectedType := http.DetectContentType(buffer[:n])
+
+	// Get expected type from file extension
+	ext := filepath.Ext(filename)
+	expectedType := mime.TypeByExtension(ext)
+
+	// Validate content matches extension (if we have an expected type)
+	if expectedType != "" {
+		// Extract base type (before semicolon and parameters)
+		detectedBase := strings.Split(detectedType, ";")[0]
+		expectedBase := strings.Split(expectedType, ";")[0]
+
+		// Allow octet-stream as it's a generic fallback.
+		// Allow text/plain when the expected type is a text/* subtype, since
+		// http.DetectContentType cannot distinguish between text subtypes
+		// (e.g. CSV, XML, YAML are all detected as text/plain).
+		if detectedBase != expectedBase && detectedBase != "application/octet-stream" &&
+			!(detectedBase == "text/plain" && strings.HasPrefix(expectedBase, "text/")) {
+			return "", fmt.Errorf("file content type (%s) doesn't match extension %s (expected %s)", detectedBase, ext, expectedBase)
+		}
+	}
+
+	slog.Debug("content verification passed", slog.String("component", "attachments"), slog.String("filename", filename), slog.String("detected_type", detectedType))
+	return detectedType, nil
 }
 
 // verifyFileContentFromBytes detects actual file content from bytes and validates it matches the extension
@@ -915,9 +956,12 @@ func (h *AttachmentHandler) verifyFileContentFromBytes(fileData []byte, filename
 		detectedBase := strings.Split(detectedType, ";")[0]
 		expectedBase := strings.Split(expectedType, ";")[0]
 
-		// Allow octet-stream as it's a generic fallback
-		// Otherwise, types must match
-		if detectedBase != expectedBase && detectedBase != "application/octet-stream" {
+		// Allow octet-stream as it's a generic fallback.
+		// Allow text/plain when the expected type is a text/* subtype, since
+		// http.DetectContentType cannot distinguish between text subtypes
+		// (e.g. CSV, XML, YAML are all detected as text/plain).
+		if detectedBase != expectedBase && detectedBase != "application/octet-stream" &&
+			!(detectedBase == "text/plain" && strings.HasPrefix(expectedBase, "text/")) {
 			return "", fmt.Errorf("file content type (%s) doesn't match extension %s (expected %s)", detectedBase, ext, expectedBase)
 		}
 	}

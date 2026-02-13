@@ -220,7 +220,6 @@ func (h *DiagramHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check workspace permission via the diagram's item
 	if !CheckItemPermission(w, r, h.db, h.permissionService, d.ItemID, models.PermissionItemView) {
 		return
 	}

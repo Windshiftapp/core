@@ -25,6 +25,7 @@ type Client interface {
 // Config contains configuration for the LLM client.
 type Config struct {
 	Endpoint string        // Base URL (e.g., http://llm:8081)
+	APIKey   string        // Bearer token for authenticated endpoints
 	Timeout  time.Duration // HTTP timeout (default: 120s)
 }
 
@@ -43,6 +44,7 @@ func NewClient(cfg Config) Client {
 
 	return &httpClient{
 		endpoint: endpoint,
+		apiKey:   cfg.APIKey,
 		http: &http.Client{
 			Timeout: timeout,
 		},
@@ -52,6 +54,7 @@ func NewClient(cfg Config) Client {
 // httpClient implements Client using HTTP requests to an OpenAI-compatible API.
 type httpClient struct {
 	endpoint string
+	apiKey   string
 	http     *http.Client
 }
 
@@ -91,6 +94,9 @@ func (c *httpClient) ChatCompletion(ctx context.Context, req ChatCompletionReque
 		return nil, fmt.Errorf("%w: %v", ErrConnectionFailed, err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	if c.apiKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
 
 	resp, err := c.http.Do(httpReq)
 	if err != nil {
@@ -117,6 +123,9 @@ func (c *httpClient) Health(ctx context.Context) error {
 	httpReq, err := http.NewRequestWithContext(ctx, "GET", c.endpoint+"/health", http.NoBody)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrConnectionFailed, err)
+	}
+	if c.apiKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
 	}
 
 	resp, err := c.http.Do(httpReq)

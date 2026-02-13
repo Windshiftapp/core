@@ -66,7 +66,7 @@
         vql += ` AND status_id NOT IN (${doneStatusIds.join(',')})`;
       }
       const response = await api.items.getAll({
-        vql,
+        ql: vql,
         limit: 50 // fetch more than needed, filter client-side
       });
       const items = Array.isArray(response) ? response : (response?.items ?? []);

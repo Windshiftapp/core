@@ -96,6 +96,7 @@
     ondiagramSaved = null,
     onexecuteAction = null,
     onaiAction = null,
+    onreorderChildren = null,
     canCreate = false,
     onclose = null,
   } = $props();
@@ -300,6 +301,10 @@
     onexecuteAction?.(event.detail);
   }
 
+  function handleReorderChildren() {
+    onreorderChildren?.();
+  }
+
   function handleAIAction(event) {
     onaiAction?.(event.detail);
   }
@@ -405,11 +410,13 @@
             {childItems}
             {loadingChildItems}
             {itemTypes}
+            isLowestLevel={availableSubIssueTypes.length === 0}
             on:navigate={handleNavigate}
             on:create-sub-issue={handleCreateSubIssue}
             on:remove-link={handleRemoveLink}
             on:view-test-case={handleViewTestCase}
             on:show-link-modal={handleShowLinkModal}
+            on:reorder-children={handleReorderChildren}
           />
 
           <ItemDetailTabs

@@ -4,6 +4,7 @@
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { Filter, Search, MoreHorizontal, Calendar, User, AlertCircle, Trash2, Eye, Save, SquareKanban } from 'lucide-svelte';
+  import { escapeHtml } from '../../utils/sanitize.ts';
   import Button from '../../components/Button.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import Pagination from '../../components/Pagination.svelte';
@@ -62,6 +63,10 @@
 
 
   // Workspace association modal state
+  // Read workspace return context from query param
+  let returnWorkspaceId = null;
+  let returnPath = null;
+
   let showWorkspaceAssociationModal = false;
   let workspaceAssociationSelection = [];
   let workspaceAssociationError = null;
@@ -76,7 +81,18 @@
 
     // Check if we need to load a specific collection from collectionId prop or URL params
     const urlParams = new URLSearchParams(window.location.search);
+
+    // Capture workspace return context before it gets cleared
+    const wsParam = urlParams.get('workspace');
+    if (wsParam) {
+      returnWorkspaceId = wsParam;
+    }
     const loadCollectionId = collectionId || urlParams.get('load');
+    if (returnWorkspaceId && loadCollectionId) {
+      returnPath = `/workspaces/${returnWorkspaceId}/collections/${loadCollectionId}`;
+    } else if (returnWorkspaceId) {
+      returnPath = `/workspaces/${returnWorkspaceId}`;
+    }
     if (loadCollectionId) {
       await loadCollectionById(loadCollectionId);
     } else {
@@ -101,7 +117,7 @@
         currentCollection = collection;
 
         // Set the QL query from the collection
-        qlQuery = collection.cql_query || '';
+        qlQuery = collection.ql_query || '';
 
         // Parse QL to extract filters and set UI accordingly
         const parsedFilters = QLBuilder.parseFiltersFromQuery(qlQuery, workspaces, priorities, statuses);
@@ -521,34 +537,34 @@
       label: 'Key',
       width: 'w-28',
       html: true,
-      render: (item) => `<span class="text-xs font-mono px-1.5 py-0.5 rounded whitespace-nowrap" style="color: var(--ds-text-subtle); background-color: var(--ds-interactive-subtle);">${item.display_key}</span>`
+      render: (item) => `<span class="text-xs font-mono px-1.5 py-0.5 rounded whitespace-nowrap" style="color: var(--ds-text-subtle); background-color: var(--ds-interactive-subtle);">${escapeHtml(item.display_key)}</span>`
     },
     {
       key: 'title',
       label: 'Title',
       html: true,
-      render: (item) => `<span class="block truncate" title="${(item.title || '').replace(/"/g, '&quot;')}">${item.title || '—'}</span>`
+      render: (item) => `<span class="block truncate" title="${escapeHtml(item.title)}">${escapeHtml(item.title) || '—'}</span>`
     },
     {
       key: 'workspace_name',
       label: 'Workspace',
       width: 'w-36',
       html: true,
-      render: (item) => `<span class="block truncate" title="${(item.workspace_name || '').replace(/"/g, '&quot;')}">${item.workspace_name || '—'}</span>`
+      render: (item) => `<span class="block truncate" title="${escapeHtml(item.workspace_name)}">${escapeHtml(item.workspace_name) || '—'}</span>`
     },
     {
       key: 'status_name',
       label: 'Status',
       width: 'w-28',
       html: true,
-      render: (item) => item.status_name ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap" style="${getStatusInlineStyle(item.status_name, statuses, statusCategories)}">${item.status_name}</span>` : '—'
+      render: (item) => item.status_name ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap" style="${getStatusInlineStyle(item.status_name, statuses, statusCategories)}">${escapeHtml(item.status_name)}</span>` : '—'
     },
     {
       key: 'priority_name',
       label: 'Priority',
       width: 'w-24',
       html: true,
-      render: (item) => item.priority_name ? `<span class="text-sm font-medium capitalize whitespace-nowrap" style="color: ${item.priority_color || 'var(--ds-text-subtle)'}">${item.priority_name}</span>` : '—'
+      render: (item) => item.priority_name ? `<span class="text-sm font-medium capitalize whitespace-nowrap" style="color: ${escapeHtml(item.priority_color) || 'var(--ds-text-subtle)'}">${escapeHtml(item.priority_name)}</span>` : '—'
     },
     {
       key: 'created_at',
@@ -630,14 +646,14 @@
       await api.collections.update(currentCollection.id, {
         name: currentCollection.name,
         description: currentCollection.description || null,
-        cql_query: qlQuery,
+        ql_query: qlQuery,
         is_public: currentCollection.is_public,
         workspace_id: currentCollection.workspace_id ?? null,
         category_id: currentCollection.category_id ?? null
       });
 
-      // Navigate back to collections list
-      navigate('/collections');
+      // Navigate back to workspace if we came from one, otherwise collections list
+      navigate(returnPath || '/collections');
     } catch (error) {
       console.error('Failed to update collection:', error);
       alert(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
@@ -668,7 +684,7 @@
       await api.collections.update(currentCollection.id, {
         name: currentCollection.name,
         description: currentCollection.description || null,
-        cql_query: qlQuery,
+        ql_query: qlQuery,
         is_public: currentCollection.is_public,
         workspace_id: workspaceId
       });
@@ -736,6 +752,7 @@
       isEditing={!!currentCollection}
       canSave={canSubmitCollection}
       categories={$collectionCategoriesStore}
+      {returnPath}
       on:save={updateCollectionDirectly}
       on:associate-workspace={openAssociateWorkspaceModal}
       on:name-change={(e) => { if (currentCollection) currentCollection.name = e.detail; }}

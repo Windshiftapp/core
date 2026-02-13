@@ -303,7 +303,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   async function handleCopyKey() {
     console.log('[handleCopyKey] Copy key button clicked');
     try {
-      const key = `${workspace?.key || 'WORK'}-${item.workspace_item_number}`;
+      const key = `${item.workspace_key || workspace?.key || 'WORK'}-${item.workspace_item_number}`;
       console.log('[handleCopyKey] Copying key:', key);
       await navigator.clipboard.writeText(key);
       console.log('[handleCopyKey] Copy successful, calling showCopySuccess');
@@ -313,7 +313,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
       // Fallback for browsers that don't support clipboard API
       try {
         const textArea = document.createElement('textarea');
-        const key = `${workspace?.key || 'WORK'}-${item.workspace_item_number}`;
+        const key = `${item.workspace_key || workspace?.key || 'WORK'}-${item.workspace_item_number}`;
         textArea.value = key;
         document.body.appendChild(textArea);
         textArea.select();
@@ -330,7 +330,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 
   function showCopySuccess(key) {
     console.log('[showCopySuccess] Showing copy toast for key:', key);
-    successToast(`${workspace?.key || 'WORK'}-${item?.workspace_item_number}`, t('toast.copied'));
+    successToast(`${item?.workspace_key || workspace?.key || 'WORK'}-${item?.workspace_item_number}`, t('toast.copied'));
   }
 
   function showCopyError() {
@@ -584,7 +584,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
       const copiedItem = await itemDetailStore.copyItem();
 
       // Show clickable success toast that navigates to the copied item
-      const itemKey = workspace?.key ? `${workspace.key}-${copiedItem.workspace_item_number}` : `ITEM-${copiedItem.workspace_item_number}`;
+      const itemKey = (() => { const k = copiedItem.workspace_key || workspace?.key; return k ? `${k}-${copiedItem.workspace_item_number}` : `ITEM-${copiedItem.workspace_item_number}`; })();
       addToast({
         title: t('items.itemCopiedAs', { key: itemKey }),
         message: t('items.clickToViewCopied'),
@@ -599,6 +599,14 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     } catch (err) {
       console.error('Failed to copy item:', err);
       showError(t('items.failedToCopy'), err.message || String(err));
+    }
+  }
+
+  async function handleReorderChildren() {
+    try {
+      await itemDetailStore.loadChildItems();
+    } catch (error) {
+      console.error('Failed to reload child items after reorder:', error);
     }
   }
 
@@ -810,7 +818,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   function registerItemContextCommands(hasActiveTimer = false) {
     if (!item) return;
 
-    const itemKey = workspace?.key ? `${workspace.key}-${item.workspace_item_number}` : `ITEM-${item.workspace_item_number}`;
+    const itemKey = (() => { const k = item.workspace_key || workspace?.key; return k ? `${k}-${item.workspace_item_number}` : `ITEM-${item.workspace_item_number}`; })();
     const commands = [];
 
     // Add Link command
@@ -1096,6 +1104,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     onattachmentPageSizeChange={attachmentManager.handlePageSizeChange}
     ondiagramSaved={handleDiagramSaved}
     onexecuteAction={handleExecuteAction}
+    onreorderChildren={handleReorderChildren}
     onclose={closeModal}
   />
 {/snippet}
@@ -1124,7 +1133,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
             <div class="flex items-center gap-3">
               <h1 class="text-lg font-semibold" style="color: var(--ds-text);">{t('items.workItemDetails')}</h1>
               <span class="px-2 py-1 text-sm font-mono rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
-                {itemDetailStore.workspace.key}-{itemDetailStore.item.workspace_item_number}
+                {itemDetailStore.item.workspace_key || itemDetailStore.workspace.key}-{itemDetailStore.item.workspace_item_number}
               </span>
             </div>
             <div class="flex items-center gap-2">

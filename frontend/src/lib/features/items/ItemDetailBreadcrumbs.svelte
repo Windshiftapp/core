@@ -382,7 +382,7 @@
           class="text-xs px-2 py-1 rounded transition-colors cursor-pointer flex-shrink-0 whitespace-nowrap"
           style="background-color: var(--ds-surface); color: var(--ds-text);"
         >
-          {workspace?.key || "WORK"}-{item.workspace_item_number}
+          {item.workspace_key || workspace?.key || "WORK"}-{item.workspace_item_number}
         </button>
       {/snippet}
     </Tooltip>

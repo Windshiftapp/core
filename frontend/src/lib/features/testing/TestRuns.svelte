@@ -4,6 +4,7 @@
   import { writable } from 'svelte/store';
   import { navigate } from '../../router.js';
   import { Trash2, Play, Eye, PlayCircle, User } from 'lucide-svelte';
+  import { escapeHtml } from '../../utils/sanitize.ts';
   import Button from '../../components/Button.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
   import Input from '../../components/Input.svelte';
@@ -145,13 +146,13 @@
       key: 'name',
       label: t('testing.runName'),
       html: true,
-      render: (run) => `<a href="${workspaceTestBase}/runs/${run.id}?from=runs" style="color: var(--ds-text-link);" class="hover:underline">${run.name}</a>`
+      render: (run) => `<a href="${workspaceTestBase}/runs/${run.id}?from=runs" style="color: var(--ds-text-link);" class="hover:underline">${escapeHtml(run.name)}</a>`
     },
     {
       key: 'testSetName',
       label: t('testing.testPlan'),
       html: true,
-      render: (run) => `<a href="${workspaceTestBase}/sets?milestone=${run.milestoneId || ''}" style="color: var(--ds-text-link);" class="hover:underline">${run.testSetName}</a>`
+      render: (run) => `<a href="${workspaceTestBase}/sets?milestone=${run.milestoneId || ''}" style="color: var(--ds-text-link);" class="hover:underline">${escapeHtml(run.testSetName)}</a>`
     },
     {
       key: 'assignee',
@@ -159,13 +160,14 @@
       html: true,
       render: (run) => {
         if (run.assignee_id && run.assignee_name) {
-          const initials = run.assignee_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+          const safeName = escapeHtml(run.assignee_name);
+          const initials = escapeHtml(run.assignee_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2));
           return `<div class="flex items-center gap-2">
             ${run.assignee_avatar
-              ? `<img src="${run.assignee_avatar}" alt="${run.assignee_name}" class="w-6 h-6 rounded-full" />`
+              ? `<img src="${escapeHtml(run.assignee_avatar)}" alt="${safeName}" class="w-6 h-6 rounded-full" />`
               : `<div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium" style="background-color: var(--ds-background-accent-blue-subtler); color: var(--ds-text-accent-blue);">${initials}</div>`
             }
-            <span>${run.assignee_name}</span>
+            <span>${safeName}</span>
           </div>`;
         }
         return `<span style="color: var(--ds-text-subtle);">${t('common.unassigned')}</span>`;
@@ -176,7 +178,7 @@
       label: t('milestones.milestone'),
       html: true,
       render: (run) => run.milestoneId
-        ? `<a href="/milestones" style="color: var(--ds-text-link);" class="hover:underline">${run.milestoneName}</a>`
+        ? `<a href="/milestones" style="color: var(--ds-text-link);" class="hover:underline">${escapeHtml(run.milestoneName)}</a>`
         : `<span style="color: var(--ds-text-subtle);">${t('testing.noMilestone')}</span>`
     },
     {

@@ -255,7 +255,7 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Sanitize user input to prevent XSS
 	milestone.Name = utils.StripHTMLTags(milestone.Name)
-	milestone.Description = utils.StripHTMLTags(milestone.Description)
+	milestone.Description = utils.SanitizeCommentContent(milestone.Description)
 
 	// Get target date as string
 	targetDate := ""
@@ -392,7 +392,7 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Sanitize user input to prevent XSS
 	milestone.Name = utils.StripHTMLTags(milestone.Name)
-	milestone.Description = utils.StripHTMLTags(milestone.Description)
+	milestone.Description = utils.SanitizeCommentContent(milestone.Description)
 
 	// Get target date as string
 	targetDate := ""

@@ -149,13 +149,15 @@
       <!-- Header -->
       <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
         <div class="flex items-center gap-3">
-          <div class="flex-shrink-0">
-            <svelte:component
-              this={icon}
-              class="w-6 h-6"
-              style="color: {styles.iconColor};"
-            />
-          </div>
+          {#if icon}
+            <div class="flex-shrink-0">
+              <svelte:component
+                this={icon}
+                class="w-6 h-6"
+                style="color: {styles.iconColor};"
+              />
+            </div>
+          {/if}
           <h3
             id="dialog-title"
             class="text-lg font-medium flex-1"

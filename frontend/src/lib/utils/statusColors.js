@@ -3,6 +3,7 @@
  */
 
 import { getTextColorForBackground as _getTextColorForBackground } from './colorUtils.js';
+import { escapeHtml } from './sanitize.ts';
 
 // Re-export getTextColorForBackground from colorUtils for backward compatibility
 export { getTextColorForBackground } from './colorUtils.js';
@@ -334,5 +335,5 @@ export function renderMilestoneBadge(name) {
   if (!name) {
     return `<span style="color: var(--ds-text-subtle);">No milestone</span>`;
   }
-  return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" style="background-color: var(--ds-status-info-bg); color: var(--ds-status-info-text);">${name}</span>`;
+  return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" style="background-color: var(--ds-status-info-bg); color: var(--ds-status-info-text);">${escapeHtml(name)}</span>`;
 }

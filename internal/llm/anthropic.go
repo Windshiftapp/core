@@ -33,8 +33,20 @@ type anthropicRequest struct {
 }
 
 type anthropicMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    string      `json:"role"`
+	Content interface{} `json:"content"` // string or []anthropicContentBlock
+}
+
+type anthropicContentBlock struct {
+	Type   string           `json:"type"`             // "text" or "document"
+	Text   string           `json:"text,omitempty"`   // for type="text"
+	Source *anthropicSource `json:"source,omitempty"` // for type="document"
+}
+
+type anthropicSource struct {
+	Type      string `json:"type"`       // "base64"
+	MediaType string `json:"media_type"` // e.g. "application/pdf"
+	Data      string `json:"data"`       // base64-encoded content
 }
 
 type anthropicTool struct {
@@ -93,7 +105,21 @@ func (c *anthropicClient) ChatCompletion(ctx context.Context, req ChatCompletion
 			systemPrompt = msg.Content
 			continue
 		}
-		messages = append(messages, anthropicMessage(msg))
+		if len(msg.Attachments) > 0 {
+			var blocks []anthropicContentBlock
+			for _, att := range msg.Attachments {
+				blocks = append(blocks, anthropicContentBlock{
+					Type:   "document",
+					Source: &anthropicSource{Type: "base64", MediaType: att.MimeType, Data: att.Data},
+				})
+			}
+			if msg.Content != "" {
+				blocks = append(blocks, anthropicContentBlock{Type: "text", Text: msg.Content})
+			}
+			messages = append(messages, anthropicMessage{Role: msg.Role, Content: blocks})
+		} else {
+			messages = append(messages, anthropicMessage{Role: msg.Role, Content: msg.Content})
+		}
 	}
 
 	maxTokens := req.MaxTokens

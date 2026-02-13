@@ -6,7 +6,7 @@
   import WidgetState from './WidgetState.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  let { workspaceId = null, maxItems = 8 } = $props();
+  let { workspaceId = null, collectionFilter = null, maxItems = 8 } = $props();
 
   let tasks = $state([]);
   let loading = $state(false);
@@ -15,7 +15,7 @@
   let lastFetchKey = $state(null);
 
   const currentUserId = $derived($authStore?.currentUser?.id ?? null);
-  const fetchKey = $derived(currentUserId ? `${currentUserId}` : null);
+  const fetchKey = $derived(currentUserId ? `${currentUserId}-${collectionFilter ?? ''}` : null);
 
   $effect(() => {
     if (fetchKey && fetchKey !== lastFetchKey) {
@@ -35,8 +35,17 @@
     error = null;
 
     try {
+      const parts = [];
+      const trimmedFilter = (collectionFilter || '').trim();
+      if (trimmedFilter) {
+        parts.push(`(${trimmedFilter})`);
+      }
+      parts.push(`workspace_id = ${workspaceId}`);
+      parts.push(`assignee_id = ${userId}`);
+      const ql = parts.join(' AND ');
+
       const response = await api.items.getAll({
-        assignee_id: userId,
+        ql,
         limit: maxItems * 3,
         order_by: 'created_at'
       });

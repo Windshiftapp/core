@@ -82,7 +82,10 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	queryParams := r.URL.Query()
-	vqlQuery := queryParams.Get("vql")
+	vqlQuery := queryParams.Get("ql")
+	if vqlQuery == "" {
+		vqlQuery = queryParams.Get("vql")
+	}
 	if vqlQuery == "" {
 		vqlQuery = queryParams.Get("cql")
 	}
@@ -164,6 +167,7 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	totalItemsQuery := `
 		SELECT COUNT(*)
 		FROM items i
+		JOIN workspaces w ON i.workspace_id = w.id
 		WHERE i.workspace_id = ?`
 	totalItemsArgs := []interface{}{workspaceID}
 	if filterSQL != "" {
@@ -180,6 +184,7 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	statusQuery := `
 		SELECT sc.name, COUNT(i.id) as item_count
 		FROM items i
+		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN statuses s ON i.status_id = s.id
 		LEFT JOIN status_categories sc ON s.category_id = sc.id
 		WHERE i.workspace_id = ?`
@@ -216,6 +221,7 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 			COALESCE(u.last_name, '') as last_name,
 			COUNT(i.id) as item_count
 		FROM items i
+		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN users u ON i.assignee_id = u.id
 		WHERE i.workspace_id = ?
 		  AND i.created_at >= ?`
@@ -259,6 +265,7 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 			COUNT(i.id) as item_count,
 			SUM(CASE WHEN LOWER(sc.name) = 'done' THEN 1 ELSE 0 END) as completed_count
 		FROM items i
+		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN time_projects tp ON i.time_project_id = tp.id
 		LEFT JOIN statuses s ON i.status_id = s.id
 		LEFT JOIN status_categories sc ON s.category_id = sc.id
@@ -301,6 +308,7 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 			COALESCE(pri.name, 'None') as priority,
 			COUNT(i.id) as item_count
 		FROM items i
+		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN priorities pri ON i.priority_id = pri.id
 		WHERE i.workspace_id = ?
 		  AND i.created_at >= ?`
@@ -350,6 +358,7 @@ func (h *WorkspaceHandler) loadWorkspaceMilestoneProgress(workspaceID int, filte
 			sc.is_completed,
 			COUNT(i.id) as item_count
 		FROM items i
+		JOIN workspaces w ON i.workspace_id = w.id
 		JOIN milestones m ON i.milestone_id = m.id
 		LEFT JOIN milestone_categories mc ON m.category_id = mc.id
 		LEFT JOIN statuses s ON i.status_id = s.id
@@ -365,8 +374,7 @@ func (h *WorkspaceHandler) loadWorkspaceMilestoneProgress(workspaceID int, filte
 	}
 
 	query += `
-		GROUP BY m.id, m.name, m.target_date, m.status, mc.color, sc.name, sc.color, sc.is_completed
-		ORDER BY m.target_date IS NULL, m.target_date, m.name`
+		GROUP BY m.id, m.name, m.target_date, m.status, mc.color, sc.name, sc.color, sc.is_completed`
 
 	rows, err := h.db.Query(query, args...)
 	if err != nil {

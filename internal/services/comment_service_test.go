@@ -130,6 +130,65 @@ func TestCommentService_Create(t *testing.T) {
 		}
 	})
 
+	t.Run("SanitizesMarkdownXSS", func(t *testing.T) {
+		params := services.CreateCommentParams{
+			ItemID:      env.ItemID,
+			AuthorID:    env.UserID,
+			Content:     "[Click me](javascript:alert(document.cookie))",
+			IsPrivate:   false,
+			ActorUserID: env.UserID,
+		}
+
+		result, err := service.Create(params)
+		if err != nil {
+			t.Fatalf("Expected no error, got: %v", err)
+		}
+
+		var content string
+		err = db.QueryRow("SELECT content FROM comments WHERE id = ?", result.CommentID).Scan(&content)
+		if err != nil {
+			t.Fatalf("Failed to fetch comment: %v", err)
+		}
+
+		if content == params.Content {
+			t.Error("Expected markdown XSS to be sanitized, but it was not")
+		}
+		if content != "[Click me](#unsafe-link-removed)" {
+			t.Errorf("Expected sanitized markdown link, got '%s'", content)
+		}
+	})
+
+	t.Run("SanitizesDataURIXSS", func(t *testing.T) {
+		params := services.CreateCommentParams{
+			ItemID:      env.ItemID,
+			AuthorID:    env.UserID,
+			Content:     "![img](data:text/html,<script>alert(1)</script>)",
+			IsPrivate:   false,
+			ActorUserID: env.UserID,
+		}
+
+		result, err := service.Create(params)
+		if err != nil {
+			t.Fatalf("Expected no error, got: %v", err)
+		}
+
+		var content string
+		err = db.QueryRow("SELECT content FROM comments WHERE id = ?", result.CommentID).Scan(&content)
+		if err != nil {
+			t.Fatalf("Failed to fetch comment: %v", err)
+		}
+
+		// HTML tags inside data URI are stripped first, then the data: scheme is neutralized
+		if content == params.Content {
+			t.Error("Expected data URI XSS to be sanitized, but it was not")
+		}
+		// After StripHTMLTags: "![img](data:text/html,alert(1))"
+		// After SanitizeMarkdownURLs: "![img](#unsafe-link-removed)"
+		if content != "![img](#unsafe-link-removed)" {
+			t.Errorf("Expected sanitized data URI, got '%s'", content)
+		}
+	})
+
 	t.Run("ItemNotFound", func(t *testing.T) {
 		params := services.CreateCommentParams{
 			ItemID:      99999,
@@ -231,6 +290,28 @@ func TestCommentService_Update(t *testing.T) {
 
 		if comment.Content != "Bold text" {
 			t.Errorf("Expected sanitized content 'Bold text', got '%s'", comment.Content)
+		}
+	})
+
+	t.Run("SanitizesMarkdownXSS", func(t *testing.T) {
+		comment, err := service.Update(int(created.CommentID), "[evil](javascript:alert(1))", env.UserID)
+		if err != nil {
+			t.Fatalf("Expected no error, got: %v", err)
+		}
+
+		if comment.Content != "[evil](#unsafe-link-removed)" {
+			t.Errorf("Expected sanitized markdown link, got '%s'", comment.Content)
+		}
+	})
+
+	t.Run("SanitizesDataURIXSS", func(t *testing.T) {
+		comment, err := service.Update(int(created.CommentID), "![x](data:text/html,payload)", env.UserID)
+		if err != nil {
+			t.Fatalf("Expected no error, got: %v", err)
+		}
+
+		if comment.Content != "![x](#unsafe-link-removed)" {
+			t.Errorf("Expected sanitized data URI, got '%s'", comment.Content)
 		}
 	})
 

@@ -403,6 +403,26 @@ func (ps *PermissionService) loadUserPermissionAndCheckMultiple(userID, workspac
 	return result, nil
 }
 
+// GetGroupMemberships returns the group IDs for a user, leveraging the permission cache.
+// Falls back to a direct DB query on cache miss.
+func (ps *PermissionService) GetGroupMemberships(userID int) ([]int, error) {
+	cached, err := ps.getUserPermissionCache(userID)
+	if err == nil {
+		atomic.AddInt64(&ps.hits, 1)
+		return cached.GroupMemberships, nil
+	}
+
+	// Cache miss — build cache and return group memberships
+	atomic.AddInt64(&ps.misses, 1)
+	cached, err = ps.buildUserPermissionCache(userID)
+	if err != nil {
+		atomic.AddInt64(&ps.errors, 1)
+		return nil, err
+	}
+	_ = ps.storeUserPermissionCache(userID, cached)
+	return cached.GroupMemberships, nil
+}
+
 // InvalidateUserCache removes a user's permission cache
 func (ps *PermissionService) InvalidateUserCache(userID int) error {
 	cacheKey := ps.getCacheKey(userID)

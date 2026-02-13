@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"windshift/internal/models"
@@ -35,6 +36,11 @@ type ItemFilters struct {
 	CreatedSince  *string // ISO date string
 	QLQuery       string  // Custom QL query
 	QLArgs        []interface{}
+	StatusIDs     []int  // Multi-value status filter (for backlog + search)
+	PriorityIDs   []int  // Multi-value priority filter
+	TextQuery     string // LIKE search on title/description
+	ItemKeyQuery  string // Workspace key pattern match (e.g. "OK-40")
+	ItemID        *int   // Filter by specific item ID
 }
 
 // PaginationParams contains pagination parameters
@@ -125,87 +131,33 @@ func (r *ItemRepository) FindAllWithDetails(params ItemListParams) ([]models.Ite
 	return items, total, nil
 }
 
-// Search searches items by title and description with text matching
+// Search searches items by title and description with text matching.
+// It delegates to FindAllWithDetails using TextQuery/ItemKeyQuery filters.
 func (r *ItemRepository) Search(query string, workspaceIDs []int, pagination PaginationParams) ([]models.Item, int, error) {
 	if len(workspaceIDs) == 0 {
 		return []models.Item{}, 0, nil
 	}
 
-	searchQuery := "%" + query + "%"
-
-	// Build workspace placeholders
-	placeholders := make([]string, len(workspaceIDs))
-	args := []interface{}{searchQuery, searchQuery}
-	for i, id := range workspaceIDs {
-		placeholders[i] = "?"
-		args = append(args, id)
+	// Detect workspace key pattern (e.g. "OK-40")
+	filters := ItemFilters{}
+	parts := strings.Split(strings.ToUpper(query), "-")
+	isKeyPattern := len(parts) == 2 && len(parts[0]) > 0 && len(parts[1]) > 0
+	if isKeyPattern {
+		if _, err := strconv.Atoi(parts[1]); err == nil {
+			filters.ItemKeyQuery = query
+		} else {
+			filters.TextQuery = query
+		}
+	} else {
+		filters.TextQuery = query
 	}
 
-	whereClause := fmt.Sprintf(`WHERE (i.title LIKE ? OR i.description LIKE ?) AND i.workspace_id IN (%s)`, strings.Join(placeholders, ","))
-
-	// Count total
-	countQuery := "SELECT COUNT(*) FROM items i " + whereClause
-	var total int
-	if err := r.db.QueryRow(countQuery, args...).Scan(&total); err != nil {
-		return nil, 0, fmt.Errorf("failed to count search results: %w", err)
-	}
-
-	// Build full query
-	selectClause := `SELECT
-		i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description,
-		i.status_id, i.priority_id, i.due_date, i.is_task, i.milestone_id, i.iteration_id,
-		i.project_id, i.inherit_project, i.time_project_id, i.assignee_id, i.creator_id, i.custom_field_values, i.calendar_data, i.parent_id,
-		i.frac_index, i.created_at, i.updated_at,
-		w.name as workspace_name, w.key as workspace_key,
-		it.name as item_type_name,
-		p.title as parent_title,
-		m.name as milestone_name, iter.name as iteration_name, proj.name as project_name, tp.name as time_project_name,
-		COALESCE(assignee.first_name || ' ' || assignee.last_name, '') as assignee_name,
-		COALESCE(assignee.email, '') as assignee_email,
-		COALESCE(assignee.avatar_url, '') as assignee_avatar,
-		COALESCE(creator.first_name || ' ' || creator.last_name, '') as creator_name,
-		COALESCE(creator.email, '') as creator_email,
-		st.name as status_name,
-		pri.name as priority_name, pri.icon as priority_icon, pri.color as priority_color
-	FROM items i
-	JOIN workspaces w ON i.workspace_id = w.id
-	LEFT JOIN item_types it ON i.item_type_id = it.id
-	LEFT JOIN items p ON i.parent_id = p.id
-	LEFT JOIN milestones m ON i.milestone_id = m.id
-	LEFT JOIN iterations iter ON i.iteration_id = iter.id
-	LEFT JOIN time_projects proj ON i.project_id = proj.id
-	LEFT JOIN time_projects tp ON i.time_project_id = tp.id
-	LEFT JOIN users assignee ON i.assignee_id = assignee.id
-	LEFT JOIN users creator ON i.creator_id = creator.id
-	LEFT JOIN statuses st ON i.status_id = st.id
-	LEFT JOIN priorities pri ON i.priority_id = pri.id
-	`
-
-	limit := pagination.Limit
-	if limit <= 0 {
-		limit = 50
-	}
-	if limit > 1000 {
-		limit = 1000
-	}
-	offset := pagination.Offset
-	if offset < 0 {
-		offset = 0
-	}
-
-	fullQuery := selectClause + whereClause + fmt.Sprintf(" ORDER BY i.created_at DESC LIMIT %d OFFSET %d", limit, offset)
-	rows, err := r.db.Query(fullQuery, args...)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to search items: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	items, err := r.scanItemList(rows)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return items, total, nil
+	return r.FindAllWithDetails(ItemListParams{
+		WorkspaceIDs: workspaceIDs,
+		Filters:      filters,
+		Pagination:   pagination,
+		SortBy:       "updated_at",
+	})
 }
 
 // buildWhereClause constructs the WHERE clause and arguments for item queries
@@ -292,6 +244,50 @@ func (r *ItemRepository) buildWhereClause(params ItemListParams) (whereClause st
 	if params.Filters.CreatedSince != nil {
 		whereClause += " AND i.created_at >= ?"
 		args = append(args, *params.Filters.CreatedSince)
+	}
+
+	// Multi-value status filter
+	if len(params.Filters.StatusIDs) > 0 {
+		placeholders := make([]string, len(params.Filters.StatusIDs))
+		for i, id := range params.Filters.StatusIDs {
+			placeholders[i] = "?"
+			args = append(args, id)
+		}
+		whereClause += " AND i.status_id IN (" + strings.Join(placeholders, ",") + ")"
+	}
+
+	// Multi-value priority filter
+	if len(params.Filters.PriorityIDs) > 0 {
+		placeholders := make([]string, len(params.Filters.PriorityIDs))
+		for i, id := range params.Filters.PriorityIDs {
+			placeholders[i] = "?"
+			args = append(args, id)
+		}
+		whereClause += " AND i.priority_id IN (" + strings.Join(placeholders, ",") + ")"
+	}
+
+	// Text search on title/description
+	if params.Filters.TextQuery != "" {
+		whereClause += " AND (LOWER(i.title) LIKE LOWER(?) OR LOWER(i.description) LIKE LOWER(?))"
+		searchPattern := "%" + params.Filters.TextQuery + "%"
+		args = append(args, searchPattern, searchPattern)
+	}
+
+	// Workspace key pattern match (e.g. "OK-40")
+	if params.Filters.ItemKeyQuery != "" {
+		parts := strings.Split(strings.ToUpper(params.Filters.ItemKeyQuery), "-")
+		if len(parts) == 2 {
+			if num, err := strconv.Atoi(parts[1]); err == nil && num > 0 {
+				whereClause += " AND (LOWER(w.key) = LOWER(?) AND i.workspace_item_number = ?)"
+				args = append(args, parts[0], num)
+			}
+		}
+	}
+
+	// Filter by specific item ID
+	if params.Filters.ItemID != nil {
+		whereClause += " AND i.id = ?"
+		args = append(args, *params.Filters.ItemID)
 	}
 
 	return whereClause, args
@@ -406,4 +402,49 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 	}
 
 	return items, nil
+}
+
+// GetBacklogStatusIDs returns status IDs for backlog items.
+// It first checks board_configurations for the workspace, then falls back to non-completed statuses.
+func (r *ItemRepository) GetBacklogStatusIDs(workspaceID int) ([]int, error) {
+	// First, check if there's a board configuration with backlog_status_ids
+	if workspaceID > 0 {
+		var backlogStatusIDsJSON sql.NullString
+		err := r.db.QueryRow(`
+			SELECT backlog_status_ids
+			FROM board_configurations
+			WHERE workspace_id = ?`, workspaceID).Scan(&backlogStatusIDsJSON)
+
+		if err == nil && backlogStatusIDsJSON.Valid && backlogStatusIDsJSON.String != "" {
+			var statusIDs []int
+			if err := json.Unmarshal([]byte(backlogStatusIDsJSON.String), &statusIDs); err != nil {
+				return nil, fmt.Errorf("failed to parse backlog configuration: %w", err)
+			}
+			if len(statusIDs) > 0 {
+				return statusIDs, nil
+			}
+		}
+	}
+
+	// Fall back to global non-completed statuses
+	rows, err := r.db.Query(`
+		SELECT DISTINCT s.id
+		FROM statuses s
+		JOIN status_categories sc ON s.category_id = sc.id
+		WHERE COALESCE(sc.is_completed, FALSE) = FALSE`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query backlog statuses: %w", err)
+	}
+	defer rows.Close()
+
+	var statusIDs []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan backlog status: %w", err)
+		}
+		statusIDs = append(statusIDs, id)
+	}
+
+	return statusIDs, rows.Err()
 }

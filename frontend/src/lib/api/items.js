@@ -45,9 +45,14 @@ export const items = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
-  getBacklog: (workspaceId, vql = null) => {
-    const params = new URLSearchParams({ workspace_id: workspaceId });
-    if (vql) params.append('vql', vql);
+  getBacklog: (workspaceId, ql = null, collectionId = null) => {
+    const params = new URLSearchParams();
+    if (collectionId) {
+      params.append('collection_id', collectionId);
+    } else if (workspaceId) {
+      params.append('workspace_id', workspaceId);
+    }
+    if (ql) params.append('ql', ql);
     return fetchAPI(`/items/backlog?${params}`);
   },
   getChildren: (itemId) => fetchAPI(`/items/${itemId}/children`),

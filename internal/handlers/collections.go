@@ -10,15 +10,17 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/services"
 	"windshift/internal/utils"
 )
 
 type CollectionHandler struct {
-	db database.Database
+	db                database.Database
+	permissionService *services.PermissionService
 }
 
-func NewCollectionHandler(db database.Database) *CollectionHandler {
-	return &CollectionHandler{db: db}
+func NewCollectionHandler(db database.Database, permissionService *services.PermissionService) *CollectionHandler {
+	return &CollectionHandler{db: db, permissionService: permissionService}
 }
 
 // GetAll returns all collections accessible to the user
@@ -204,16 +206,10 @@ func (h *CollectionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate workspace_id if provided
+	// Validate workspace_id if provided — check user has view permission
 	if collection.WorkspaceID != nil {
-		var exists bool
-		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", *collection.WorkspaceID).Scan(&exists)
-		if err != nil {
-			respondInternalError(w, r, fmt.Errorf("failed to validate workspace: %w", err))
-			return
-		}
-		if !exists {
-			respondValidationError(w, r, "Workspace not found")
+		if !RequireWorkspacePermission(w, r, currentUser.ID, *collection.WorkspaceID,
+			models.PermissionItemView, h.permissionService) {
 			return
 		}
 	}
@@ -336,16 +332,10 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Validate workspace_id if provided
+	// Validate workspace_id if provided — check user has view permission
 	if workspaceProvided && collection.WorkspaceID != nil {
-		var exists bool
-		err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", *collection.WorkspaceID).Scan(&exists)
-		if err != nil {
-			respondInternalError(w, r, fmt.Errorf("failed to validate workspace: %w", err))
-			return
-		}
-		if !exists {
-			respondValidationError(w, r, "Workspace not found")
+		if !RequireWorkspacePermission(w, r, currentUser.ID, *collection.WorkspaceID,
+			models.PermissionItemView, h.permissionService) {
 			return
 		}
 	}

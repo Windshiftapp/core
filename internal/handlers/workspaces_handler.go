@@ -477,6 +477,10 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Sanitize user input for defense in depth
+	req.Name = utils.SanitizeName(req.Name)
+	req.Description = utils.SanitizeDescription(req.Description)
+
 	// If key is not provided, use the existing key
 	keyToUse := req.Key
 	if keyToUse == "" {

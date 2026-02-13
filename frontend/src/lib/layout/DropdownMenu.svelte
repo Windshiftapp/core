@@ -3,6 +3,7 @@
   import { ChevronDown } from 'lucide-svelte';
   import { getTextColorForBackground } from '../utils/statusColors.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { sanitizeHtml } from '../utils/sanitize.ts';
   import { tick } from 'svelte';
   import Checkbox from '../components/Checkbox.svelte';
 
@@ -252,7 +253,7 @@
               {#if groupItem.content}
                 <!-- Custom content slot -->
                 <div class="flex-1 text-left">
-                  {@html groupItem.content}
+                  {@html sanitizeHtml(groupItem.content)}
                 </div>
               {:else}
                 <!-- Simple text content -->
@@ -297,7 +298,7 @@
             <div class="flex-1 text-left">
               {#if itemData.content}
                 <!-- Custom content slot -->
-                {@html itemData.content}
+                {@html sanitizeHtml(itemData.content)}
               {:else}
                 <!-- Simple text content -->
                 <div class="font-medium">{itemData.title}</div>

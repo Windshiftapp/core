@@ -165,8 +165,8 @@
       await loadWorkspace();
       await loadStatusCategories();
       await Promise.all([
-        loadStats(filter),
-        loadChartData(filter),
+        loadStats(),
+        loadChartData(),
         loadHomepageLayout()
       ]);
     } catch (error) {
@@ -188,7 +188,7 @@
       const collection = await getCollection(collectionId);
       if (collection) {
         currentCollectionName = collection.name || 'Collection';
-        const query = (collection.cql_query || '').trim();
+        const query = (collection.ql_query || '').trim();
         return query.length > 0 ? query : null;
       }
       currentCollectionName = 'Default';
@@ -216,12 +216,10 @@
     }
   }
 
-  async function loadStats(vqlFilter = null) {
+  async function loadStats() {
     try {
       const params = {};
-      if (vqlFilter) {
-        params.vql = vqlFilter;
-      } else if (collectionId) {
+      if (collectionId) {
         params.collection_id = collectionId;
       }
       const statsData = await api.workspaces.getStats(workspaceId, params);
@@ -234,14 +232,11 @@
     }
   }
 
-  async function loadChartData(vqlFilter = null) {
+  async function loadChartData() {
     try {
       const filters = { workspace_id: workspaceId, limit: 5000 };
       if (collectionId) {
         filters.collection_id = collectionId;
-      }
-      if (vqlFilter) {
-        filters.vql = vqlFilter;
       }
 
       const itemsResponse = await api.items.getAll(filters);
@@ -775,9 +770,9 @@
                     {:else if widget.type === 'milestone-progress'}
                       <MilestoneProgressWidget {milestones} />
                     {:else if widget.type === 'recent-items'}
-                      <RecentItemsWidget {workspaceId} />
+                      <RecentItemsWidget {workspaceId} {collectionFilter} />
                     {:else if widget.type === 'my-tasks'}
-                      <MyTasksWidget {workspaceId} />
+                      <MyTasksWidget {workspaceId} {collectionFilter} />
                     {:else if widget.type === 'overdue-items'}
                       <OverdueItemsWidget {workspaceId} collectionFilter={collectionFilter} />
                     {:else if widget.type === 'item-filter'}

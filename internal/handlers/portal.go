@@ -620,7 +620,7 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 
 	// Sanitize user input to prevent XSS
 	submission.Title = utils.StripHTMLTags(submission.Title)
-	submission.Description = utils.StripHTMLTags(submission.Description)
+	submission.Description = utils.SanitizeCommentContent(submission.Description)
 
 	// Get auth info from context (middleware already validated)
 	authenticatedUserID, portalCustomerID := h.getAuthFromContext(r)
@@ -792,6 +792,12 @@ func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Defense in depth: re-validate the URL before making the request
+	if err := utils.ValidateExternalURL(config.KnowledgeBaseURL); err != nil {
+		respondError(w, r, restapi.NewAPIError(http.StatusBadGateway, "BAD_GATEWAY", "Failed to connect to knowledge base"))
+		return
+	}
+
 	// Prepare Docmost API request
 	docmostURL := fmt.Sprintf("%s/api/search/share-search", config.KnowledgeBaseURL)
 	requestBody, err := json.Marshal(map[string]string{
@@ -811,10 +817,10 @@ func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Reque
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := utils.NewSSRFSafeHTTPClient(10 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
-		respondError(w, r, restapi.NewAPIError(http.StatusBadGateway, "BAD_GATEWAY", fmt.Sprintf("Failed to search knowledge base: %v", err)))
+		respondError(w, r, restapi.NewAPIError(http.StatusBadGateway, "BAD_GATEWAY", "Failed to connect to knowledge base"))
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()
@@ -828,7 +834,7 @@ func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Reque
 
 	// Check response status
 	if resp.StatusCode != http.StatusOK {
-		respondError(w, r, restapi.NewAPIError(http.StatusBadGateway, "BAD_GATEWAY", fmt.Sprintf("Knowledge base search failed: %s", string(body))))
+		respondError(w, r, restapi.NewAPIError(http.StatusBadGateway, "BAD_GATEWAY", "Knowledge base search failed"))
 		return
 	}
 
@@ -1084,8 +1090,8 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Sanitize comment content to prevent XSS
-	sanitizedContent := utils.StripHTMLTags(commentData.Content)
+	// Sanitize comment content to prevent XSS (strips HTML tags + dangerous Markdown URLs)
+	sanitizedContent := utils.SanitizeCommentContent(commentData.Content)
 
 	// Insert comment based on auth type
 	now := time.Now()

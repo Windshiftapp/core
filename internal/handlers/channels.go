@@ -24,6 +24,7 @@ import (
 	"windshift/internal/restapi"
 	"windshift/internal/scheduler"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 	windshiftsmtp "windshift/internal/smtp"
 	"windshift/internal/webhook"
 )
@@ -633,6 +634,14 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 	if err = json.Unmarshal(configJSON, &finalConfig); err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	// Validate knowledge base URL if set
+	if finalConfig.KnowledgeBaseURL != "" {
+		if err := utils.ValidateExternalURL(finalConfig.KnowledgeBaseURL); err != nil {
+			respondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeValidationFailed, "Knowledge base URL must be a valid public HTTPS URL"))
+			return
+		}
 	}
 
 	// Determine status based solely on whether the feature is enabled
