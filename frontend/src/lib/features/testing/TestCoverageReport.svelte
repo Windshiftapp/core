@@ -6,6 +6,7 @@
   import DataTable from '../../components/DataTable.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import Modal from '../../dialogs/Modal.svelte';
+  import { escapeHtml } from '../../utils/sanitize.ts';
   import {
     ShieldCheck,
     ShieldX,
@@ -77,7 +78,7 @@
       width: '120px',
       html: true,
       render: (item) =>
-        `<a href="${workspaceTestBase}/${item.item_id}" style="color: var(--ds-text-link);" class="hover:underline font-medium">${item.workspace_key}-${item.workspace_item_number}</a>`
+        `<a href="${workspaceTestBase}/${item.item_id}" style="color: var(--ds-text-link);" class="hover:underline font-medium">${escapeHtml(item.workspace_key)}-${escapeHtml(item.workspace_item_number)}</a>`
     },
     {
       key: 'title',
@@ -90,7 +91,7 @@
       width: '140px',
       html: true,
       render: (item) =>
-        `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium" style="background-color: ${item.item_type_color}20; color: ${item.item_type_color};">${item.item_type_name}</span>`
+        `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium" style="background-color: ${escapeHtml(item.item_type_color)}20; color: ${escapeHtml(item.item_type_color)};">${escapeHtml(item.item_type_name)}</span>`
     },
     {
       key: 'status_name',

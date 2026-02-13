@@ -88,12 +88,12 @@
     {
       key: 'test_case_title',
       label: t('testing.testCase'),
-      render: (failure) => `<a href="${workspaceTestBase}/cases/${failure.test_case_id}" style="color: var(--ds-text-link);" class="hover:underline">${failure.test_case_title}</a>`
+      slot: 'test_case_link'
     },
     {
       key: 'run_name',
       label: t('testing.run'),
-      render: (failure) => `<a href="${workspaceTestBase}/runs/${failure.run_id}?from=reports" style="color: var(--ds-text-link);" class="hover:underline">${failure.run_name}</a>`
+      slot: 'run_link'
     },
     {
       key: 'failed_at',
@@ -107,17 +107,18 @@
     {
       key: 'test_case_title',
       label: t('testing.testCase'),
-      render: (blocked) => `<a href="${workspaceTestBase}/cases/${blocked.test_case_id}" style="color: var(--ds-text-link);" class="hover:underline">${blocked.test_case_title}</a>`
+      slot: 'test_case_link'
     },
     {
       key: 'run_name',
       label: t('testing.run'),
-      render: (blocked) => `<a href="${workspaceTestBase}/runs/${blocked.run_id}?from=reports" style="color: var(--ds-text-link);" class="hover:underline">${blocked.run_name}</a>`
+      slot: 'run_link'
     },
     {
       key: 'reason',
       label: t('testing.reason'),
-      render: (blocked) => blocked.reason || `<span style="color: var(--ds-text-subtle);">${t('testing.noReasonProvided')}</span>`
+      render: (blocked) => blocked.reason || t('testing.noReasonProvided'),
+      textColor: (blocked) => blocked.reason ? 'var(--ds-text)' : 'var(--ds-text-subtle)'
     },
     {
       key: 'blocked_at',
@@ -323,7 +324,14 @@
             data={reportData.recent_failures}
             keyField="test_case_id"
             emptyMessage={t('testing.noFailuresToShow')}
-          />
+          >
+            {#snippet test_case_link({ item })}
+              <a href="{workspaceTestBase}/cases/{item.test_case_id}" style="color: var(--ds-text-link);" class="hover:underline">{item.test_case_title}</a>
+            {/snippet}
+            {#snippet run_link({ item })}
+              <a href="{workspaceTestBase}/runs/{item.run_id}?from=reports" style="color: var(--ds-text-link);" class="hover:underline">{item.run_name}</a>
+            {/snippet}
+          </DataTable>
         {:else}
           <EmptyState
             icon={CheckCircle}
@@ -350,7 +358,14 @@
             data={reportData.recent_blocked}
             keyField="test_case_id"
             emptyMessage={t('testing.noBlockedTests')}
-          />
+          >
+            {#snippet test_case_link({ item })}
+              <a href="{workspaceTestBase}/cases/{item.test_case_id}" style="color: var(--ds-text-link);" class="hover:underline">{item.test_case_title}</a>
+            {/snippet}
+            {#snippet run_link({ item })}
+              <a href="{workspaceTestBase}/runs/{item.run_id}?from=reports" style="color: var(--ds-text-link);" class="hover:underline">{item.run_name}</a>
+            {/snippet}
+          </DataTable>
         {:else}
           <EmptyState
             icon={CheckCircle}

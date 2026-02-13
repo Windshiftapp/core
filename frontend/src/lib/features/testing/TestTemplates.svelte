@@ -6,6 +6,7 @@
   import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { FileStack } from 'lucide-svelte';
+  import { escapeHtml } from '../../utils/sanitize.ts';
   import Button from '../../components/Button.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
   import Input from '../../components/Input.svelte';
@@ -49,20 +50,20 @@
       key: 'name',
       label: t('testing.templateName'),
       html: true,
-      render: (template) => `<a href="${workspaceTestBase}/templates/${template.id}" style="color: var(--ds-text-link);" class="hover:underline">${template.name}</a>`
+      render: (template) => `<a href="${workspaceTestBase}/templates/${template.id}" style="color: var(--ds-text-link);" class="hover:underline">${escapeHtml(template.name)}</a>`
     },
     {
       key: 'testSetName',
       label: t('testing.testPlan'),
       html: true,
-      render: (template) => `<a href="${workspaceTestBase}/sets?milestone=${template.milestoneId || ''}" style="color: var(--ds-text-link);" class="hover:underline">${template.testSetName}</a>`
+      render: (template) => `<a href="${workspaceTestBase}/sets?milestone=${template.milestoneId || ''}" style="color: var(--ds-text-link);" class="hover:underline">${escapeHtml(template.testSetName)}</a>`
     },
     {
       key: 'milestoneName',
       label: t('milestones.milestone'),
       html: true,
       render: (template) => template.milestoneId
-        ? `<a href="/milestones" style="color: var(--ds-text-link);" class="hover:underline">${template.milestoneName}</a>`
+        ? `<a href="/milestones" style="color: var(--ds-text-link);" class="hover:underline">${escapeHtml(template.milestoneName)}</a>`
         : `<span style="color: var(--ds-text-subtle);">${t('testing.noMilestone')}</span>`
     },
     { key: 'description', label: t('common.description'), render: (template) => template.description || '-' },

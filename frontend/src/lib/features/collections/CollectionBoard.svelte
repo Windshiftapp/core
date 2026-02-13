@@ -4,7 +4,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
-  import { getCollection } from '../collections/collectionService.js';
+  import { collectionData, reloadCollection } from '../../stores/collectionContext.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { Plus, GripVertical } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
@@ -53,8 +53,12 @@
     if (event.detail?.itemId) {
       try {
         const newItem = await api.items.get(event.detail.itemId);
-        // Add the new item if it belongs to this workspace
-        if (Number(newItem.workspace_id) === Number(workspaceId)) {
+        // When viewing a collection, accept items from any workspace (the collection defines scope).
+        // Otherwise fall back to current-workspace check.
+        const belongsToView = collectionId
+          ? true
+          : Number(newItem.workspace_id) === Number(workspaceId);
+        if (belongsToView) {
           if (newItem.status_id) {
             // Item has a status, add it to the board (at the end, since board is ordered by rank)
             items = [...items, newItem];
@@ -80,78 +84,41 @@
   onMount(async () => {
     if (workspaceId) {
       await loadWorkspaceGradient(workspaceId);
-      await loadData();
+      await workspaceDataStore.initialize(workspaceId);
     }
     loading = false;
   });
 
-  // Effect to reload when workspaceId or collectionId changes
+  // Sync items from central store
   $effect(() => {
-    if (workspaceId) {
-      // Track dependencies
-      workspaceId;
-      collectionId;
-      loadData();
+    items = $collectionData.items;
+    backlogItems = $collectionData.backlogItems;
+    currentCollectionName = $collectionData.collectionName;
+    backlogStore.setCount(workspaceId, $collectionData.backlogItems.length);
+  });
+
+  // Reload view-specific data (board config, transitions) when items update
+  $effect(() => {
+    if ($collectionData.items.length > 0 && !$collectionData.loading) {
+      loadBoardConfig();
+      statusTransitionStore.initialize(workspaceId);
+      statusTransitionStore.preloadForItems([...$collectionData.items, ...$collectionData.backlogItems]);
     }
   });
 
-  async function loadData() {
+  async function loadBoardConfig() {
     try {
-      // Ensure workspace reference data is available
-      await workspaceDataStore.initialize(workspaceId);
-
-      // Build filters based on collection
-      const filters = { workspace_id: workspaceId, limit: 100 };
-
-      if (collectionId) {
-        const collection = await getCollection(collectionId);
-        if (collection) {
-          currentCollectionName = collection.name;
-          if (collection.cql_query) {
-            filters.vql = collection.cql_query;
-          }
-        }
-      } else {
-        currentCollectionName = 'Default';
-      }
-
-      // Only fetch dynamic data — reference data comes from workspaceDataStore
-      const [itemsData, backlogData] = await Promise.all([
-        api.items.getAll(filters),
-        api.items.getBacklog(workspaceId, filters.cql || null),
-      ]);
-
-      // Handle paginated response from items API
-      if (itemsData && itemsData.items) {
-        items = itemsData.items;
-      } else {
-        items = itemsData || [];
-      }
-
-      backlogItems = backlogData || [];
-      backlogStore.setCount(workspaceId, backlogItems.length);
-
-      // Load board configuration if exists
-      try {
-        boardConfig = await api.collections.getBoardConfiguration(collectionId, workspaceId);
-      } catch (error) {
-        if (error.status !== 404) {
-          console.error('Failed to load board configuration:', error);
-        }
-        boardConfig = null;
-      }
-
-      // Preload transitions for all items so drag validation works correctly
-      statusTransitionStore.initialize(workspaceId);
-      await statusTransitionStore.preloadForItems([...items, ...backlogItems]);
-
+      boardConfig = await api.collections.getBoardConfiguration(collectionId, workspaceId);
     } catch (error) {
-      console.error('Failed to load data:', error);
+      if (error.status !== 404) {
+        console.error('Failed to load board configuration:', error);
+      }
+      boardConfig = null;
     }
   }
 
   // Adaptive polling for board items
-  const poller = useWorkItemPoller(() => loadData());
+  const poller = useWorkItemPoller(() => reloadCollection());
 
   function getItemsByStatus(statusId) {
     // Filter items by status_id
@@ -244,11 +211,7 @@
 
     // If changes were made in the modal, reload data
     if (event?.hasChanges) {
-      await loadData();
-      // Re-setup drag and drop after data reload
-      setTimeout(() => {
-        setupDragAndDrop();
-      }, 100);
+      reloadCollection();
     }
   }
 
@@ -416,13 +379,8 @@
               // Update status on backend
               await api.items.update(data.item.id, { status_id: statusId });
 
-              // Reload data from backend to get correct ordering and state
-              await loadData();
-
-              // Re-setup drag and drop
-              setTimeout(() => {
-                setupDragAndDrop();
-              }, 100);
+              // Reload data from central store
+              reloadCollection();
             }
           }
         }
@@ -560,22 +518,16 @@
       };
       const updatedItem = await api.items.updateFracIndex(draggedItem.id, indexData);
 
-      // Reload data from backend to get the correct ordering
-      // The backend is the single source of truth for item order
-      await loadData();
-
-      // Re-setup drag and drop
-      setTimeout(() => {
-        setupDragAndDrop();
-      }, 100);
+      // Reload data from central store to get the correct ordering
+      reloadCollection();
 
     } catch (error) {
       console.error('Failed to handle edge-based drop:', error);
       console.error('Error details:', error.message);
 
-      // If we get a rank ordering error, reload fresh data from the API
+      // If we get a rank ordering error, reload fresh data
       if (error.message.includes('Internal Server Error')) {
-        await loadData();
+        reloadCollection();
       }
     } finally {
       // Always remove from pending drops

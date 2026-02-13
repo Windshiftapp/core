@@ -4,7 +4,10 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"strconv"
+	"strings"
 
+	"windshift/internal/cql"
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -12,15 +15,17 @@ import (
 
 // ItemCRUDService handles item CRUD operations
 type ItemCRUDService struct {
-	db   database.Database
-	repo *repository.ItemRepository
+	db            database.Database
+	repo          *repository.ItemRepository
+	workspaceRepo *repository.WorkspaceRepository
 }
 
 // NewItemCRUDService creates a new item CRUD service
 func NewItemCRUDService(db database.Database) *ItemCRUDService {
 	return &ItemCRUDService{
-		db:   db,
-		repo: repository.NewItemRepository(db),
+		db:            db,
+		repo:          repository.NewItemRepository(db),
+		workspaceRepo: repository.NewWorkspaceRepository(db),
 	}
 }
 
@@ -239,6 +244,194 @@ func (s *ItemCRUDService) List(params ItemListParams) ([]models.Item, int, error
 // Search searches items by title and description
 func (s *ItemCRUDService) Search(query string, workspaceIDs []int, pagination PaginationParams) ([]models.Item, int, error) {
 	return s.repo.Search(query, workspaceIDs, pagination)
+}
+
+// SearchParams contains parameters for the advanced Search handler
+type SearchParams struct {
+	TextQuery    string
+	WorkspaceIDs []int
+	StatusIDs    []int
+	PriorityIDs  []int
+	Pagination   PaginationParams
+}
+
+// SearchWithFilters searches items with multiple filter criteria
+func (s *ItemCRUDService) SearchWithFilters(params SearchParams) ([]models.Item, int, error) {
+	if len(params.WorkspaceIDs) == 0 {
+		return []models.Item{}, 0, nil
+	}
+
+	filters := ItemFilters{
+		StatusIDs:   params.StatusIDs,
+		PriorityIDs: params.PriorityIDs,
+	}
+
+	// Detect workspace key pattern (e.g. "OK-40")
+	if params.TextQuery != "" {
+		parts := strings.Split(strings.ToUpper(params.TextQuery), "-")
+		isKeyPattern := len(parts) == 2 && len(parts[0]) > 0 && len(parts[1]) > 0
+		if isKeyPattern {
+			if _, err := strconv.Atoi(parts[1]); err == nil {
+				filters.ItemKeyQuery = params.TextQuery
+			} else {
+				filters.TextQuery = params.TextQuery
+			}
+		} else {
+			filters.TextQuery = params.TextQuery
+		}
+	}
+
+	return s.repo.FindAllWithDetails(ItemListParams{
+		WorkspaceIDs: params.WorkspaceIDs,
+		Filters:      filters,
+		Pagination:   params.Pagination,
+		SortBy:       "updated_at",
+	})
+}
+
+// BacklogParams contains parameters for retrieving backlog items
+type BacklogParams struct {
+	WorkspaceID  int    // 0 if not specified (collection-only query)
+	CollectionID int    // 0 if not specified
+	QLQuery      string // Direct QL query, overrides collection
+	WorkspaceIDs []int  // Accessible workspace IDs for security filtering
+	Pagination   PaginationParams
+}
+
+// GetBacklogItems retrieves items with non-completed statuses for a workspace/collection
+func (s *ItemCRUDService) GetBacklogItems(params BacklogParams) ([]models.Item, int, error) {
+	if len(params.WorkspaceIDs) == 0 {
+		return []models.Item{}, 0, nil
+	}
+
+	// Resolve backlog status IDs
+	backlogStatusIDs, err := s.repo.GetBacklogStatusIDs(params.WorkspaceID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get backlog statuses: %w", err)
+	}
+	if len(backlogStatusIDs) == 0 {
+		return []models.Item{}, 0, nil
+	}
+
+	filters := ItemFilters{
+		StatusIDs: backlogStatusIDs,
+	}
+
+	// Resolve QL query from collection or direct parameter
+	qlQuery := params.QLQuery
+	collectionResolved := false
+	if qlQuery == "" && params.CollectionID > 0 {
+		collectionResolved = true
+		_, collectionQL, err := s.workspaceRepo.GetCollectionQuery(params.CollectionID)
+		if err != nil {
+			if err == repository.ErrNotFound {
+				return nil, 0, fmt.Errorf("collection not found")
+			}
+			return nil, 0, fmt.Errorf("failed to get collection query: %w", err)
+		}
+		if strings.TrimSpace(collectionQL) != "" {
+			qlQuery = collectionQL
+		}
+	}
+
+	// Apply QL query if present
+	if qlQuery != "" {
+		workspaceMap, err := s.workspaceRepo.BuildWorkspaceMap()
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to build workspace map: %w", err)
+		}
+
+		evaluator := cql.NewEvaluator(workspaceMap)
+		qlSQL, qlArgs, err := evaluator.EvaluateToSQL(qlQuery)
+		if err != nil {
+			return nil, 0, fmt.Errorf("QL query error: %w", err)
+		}
+
+		if qlSQL != "" {
+			filters.QLQuery = qlSQL
+			filters.QLArgs = qlArgs
+		}
+	}
+
+	// Apply workspace_id filter only when no collection was resolved
+	if !collectionResolved && params.WorkspaceID > 0 {
+		filters.WorkspaceID = &params.WorkspaceID
+	}
+
+	return s.repo.FindAllWithDetails(ItemListParams{
+		WorkspaceIDs: params.WorkspaceIDs,
+		Filters:      filters,
+	})
+}
+
+// ListWithQLParams contains parameters for listing items with QL support
+type ListWithQLParams struct {
+	WorkspaceID  int    // Single workspace filter (0 = all accessible)
+	CollectionID int    // Collection to resolve QL from (0 = none)
+	QLQuery      string // Direct QL query (overrides collection)
+	WorkspaceIDs []int  // Accessible workspace IDs for security filtering
+	Filters      ItemFilters
+	Pagination   PaginationParams
+	SortBy       string
+	SortAsc      bool
+}
+
+// ListWithQL retrieves items with QL evaluation and collection resolution
+func (s *ItemCRUDService) ListWithQL(params ListWithQLParams) ([]models.Item, int, error) {
+	if len(params.WorkspaceIDs) == 0 {
+		return []models.Item{}, 0, nil
+	}
+
+	filters := params.Filters
+
+	// Resolve QL query from collection or direct parameter
+	qlQuery := params.QLQuery
+	collectionResolved := false
+	if qlQuery == "" && params.CollectionID > 0 {
+		collectionResolved = true
+		_, collectionQL, err := s.workspaceRepo.GetCollectionQuery(params.CollectionID)
+		if err != nil {
+			if err == repository.ErrNotFound {
+				return nil, 0, fmt.Errorf("collection not found")
+			}
+			return nil, 0, fmt.Errorf("failed to get collection query: %w", err)
+		}
+		if strings.TrimSpace(collectionQL) != "" {
+			qlQuery = collectionQL
+		}
+	}
+
+	// Evaluate QL query
+	if qlQuery != "" {
+		workspaceMap, err := s.workspaceRepo.BuildWorkspaceMap()
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to build workspace map: %w", err)
+		}
+
+		evaluator := cql.NewEvaluator(workspaceMap)
+		qlSQL, qlArgs, err := evaluator.EvaluateToSQL(qlQuery)
+		if err != nil {
+			return nil, 0, fmt.Errorf("QL query error: %w", err)
+		}
+
+		if qlSQL != "" {
+			filters.QLQuery = qlSQL
+			filters.QLArgs = qlArgs
+		}
+	}
+
+	// Apply workspace_id filter only when no collection was resolved
+	if !collectionResolved && params.WorkspaceID > 0 {
+		filters.WorkspaceID = &params.WorkspaceID
+	}
+
+	return s.repo.FindAllWithDetails(ItemListParams{
+		WorkspaceIDs: params.WorkspaceIDs,
+		Filters:      filters,
+		Pagination:   params.Pagination,
+		SortBy:       params.SortBy,
+		SortAsc:      params.SortAsc,
+	})
 }
 
 // GetWithEffectiveProject retrieves an item with effective project calculated

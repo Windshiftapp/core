@@ -106,3 +106,8 @@ export { workspacePermissions } from './workspacePermissions.svelte.js';
 // workspacesStore.allWorkspaces, workspacesStore.regularWorkspaces,
 // workspacesStore.personalWorkspace, workspacesStore.loaded, workspacesStore.loading
 export { currentWorkspace, workspacesStore } from './workspaces.svelte.js';
+// Collection context store
+// Access via: $collectionData.items, $collectionData.backlogItems, $collectionData.collectionName, $collectionData.loading
+// Methods: reloadCollection() to trigger a re-fetch
+// Derives from currentRoute — automatically loads items when navigating to collection views
+export { collectionData, reloadCollection } from './collectionContext.js';

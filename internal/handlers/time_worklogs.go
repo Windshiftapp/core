@@ -90,7 +90,59 @@ type WorklogRequest struct {
 	DurationInput string `json:"duration"`   // "1h", "30m", "2h15m" etc
 }
 
+// filterWorklogsByPermission checks permissions and hides item info if user doesn't have access
+func (h *TimeWorklogHandler) filterWorklogsByPermission(worklogs []models.Worklog, userID int) []models.Worklog {
+	if h.permissionService == nil {
+		// No permission service configured - return all worklogs as-is
+		return worklogs
+	}
+
+	// Check if user is system admin first
+	isAdmin, err := h.permissionService.IsSystemAdmin(userID)
+	if err != nil {
+		slog.Warn("error checking system admin status", slog.String("component", "time_tracking"), slog.Any("error", err))
+		// On error, fall through to per-item checking
+	} else if isAdmin {
+		// System admin can see everything
+		return worklogs
+	}
+
+	// Filter each worklog based on item permissions
+	for i := range worklogs {
+		worklog := &worklogs[i]
+
+		// Only check permission if worklog has an associated item
+		if worklog.ItemID == nil || worklog.WorkspaceID == nil {
+			continue
+		}
+
+		// Check if user has permission to view this workspace
+		hasPermission, err := h.permissionService.HasWorkspacePermission(userID, *worklog.WorkspaceID, models.PermissionItemView)
+		if err != nil {
+			slog.Warn("error checking workspace permission", slog.String("component", "time_tracking"), slog.Int("user_id", userID), slog.Int("workspace_id", *worklog.WorkspaceID), slog.Any("error", err))
+			// On error, hide item info to be safe
+			hasPermission = false
+		}
+
+		// If no permission, clear item-related fields
+		if !hasPermission {
+			worklog.ItemID = nil
+			worklog.ItemTitle = ""
+			worklog.WorkspaceID = nil
+			worklog.WorkspaceKey = ""
+			worklog.WorkspaceItemNumber = 0
+		}
+	}
+
+	return worklogs
+}
+
 func (h *TimeWorklogHandler) GetAll(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	// Support filtering by date range, customer, project
 	//nolint:misspell // database table name uses British spelling (customer_organisations)
 	query := `
@@ -178,10 +230,17 @@ func (h *TimeWorklogHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		worklogs = append(worklogs, worklog)
 	}
 
+	worklogs = h.filterWorklogsByPermission(worklogs, user.ID)
+
 	respondJSONOK(w, worklogs)
 }
 
 func (h *TimeWorklogHandler) Get(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
@@ -234,7 +293,9 @@ func (h *TimeWorklogHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSONOK(w, wl)
+	// Filter item info by permission
+	filtered := h.filterWorklogsByPermission([]models.Worklog{wl}, user.ID)
+	respondJSONOK(w, filtered[0])
 }
 
 // validateAndParseWorklog validates a WorklogRequest and returns parsed values

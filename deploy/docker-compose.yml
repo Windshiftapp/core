@@ -75,7 +75,7 @@ services:
   #   5. Uncomment postgres-data volume below
   # ---------------------------------------------------------------------------
   # postgres:
-  #   image: postgres:17-alpine
+  #   image: postgres:18
   #   container_name: windshift-postgres
   #   environment:
   #     POSTGRES_USER: windshift
@@ -153,12 +153,75 @@ services:
   #     retries: 3
   #     start_period: 120s
 
+  # ---------------------------------------------------------------------------
+  # Logbook Service (uncomment for knowledge management / document ingestion)
+  # ---------------------------------------------------------------------------
+  # When using the Logbook service:
+  #   1. Uncomment this service and the logbook-postgres service below
+  #   2. Add LOGBOOK_ENDPOINT=http://logbook:8090 to windshift environment above
+  #   3. Optionally configure LOGBOOK_LLM_ENDPOINT for article generation
+  #   4. The main server authenticates users and proxies to logbook with trusted headers
+  # Note: Requires system tools (poppler, kreuzberg-cli) for text extraction
+  # ---------------------------------------------------------------------------
+  # logbook:
+  #   build:
+  #     context: ..
+  #     dockerfile: Dockerfile.logbook
+  #   # image: ghcr.io/windshiftapp/logbook:latest
+  #   container_name: windshift-logbook
+  #   environment:
+  #     LOGBOOK_DATABASE_URL: postgresql://logbook:${LOGBOOK_POSTGRES_PASSWORD}@logbook-postgres:5432/logbook?sslmode=disable
+  #     LOGBOOK_LLM_ENDPOINT: http://llm:8081
+  #     LOGBOOK_ARTICLE_ENDPOINT: http://windshift:8080/api/internal/llm
+  #     SSO_SECRET: ${SSO_SECRET}
+  #     LOGBOOK_PORT: 8090
+  #     LOGBOOK_STORAGE_PATH: /data/logbook
+  #     LOG_LEVEL: info
+  #   volumes:
+  #     - logbook-data:/data/logbook
+  #   depends_on:
+  #     logbook-postgres:
+  #       condition: service_healthy
+  #   expose:
+  #     - "8090"
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8090/api/logbook/health"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # Logbook PostgreSQL (uncomment when using logbook service)
+  # ---------------------------------------------------------------------------
+  # logbook-postgres:
+  #   image: postgres:18
+  #   container_name: windshift-logbook-postgres
+  #   environment:
+  #     POSTGRES_USER: logbook
+  #     POSTGRES_PASSWORD: ${LOGBOOK_POSTGRES_PASSWORD}
+  #     POSTGRES_DB: logbook
+  #   volumes:
+  #     - logbook-postgres-data:/var/lib/postgresql/data
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U logbook -d logbook"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 5
+
 volumes:
   windshift-data:
     name: windshift-data
   # --- PostgreSQL volume (uncomment when using postgres service) ---
   # postgres-data:
   #   name: windshift-postgres-data
+  # --- Logbook volumes (uncomment when using logbook service) ---
+  # logbook-data:
+  #   name: windshift-logbook-data
+  # logbook-postgres-data:
+  #   name: windshift-logbook-postgres-data
   # --- Traefik certificates volume (uncomment when using traefik service) ---
   # traefik-certs:
   #   name: windshift-traefik-certs

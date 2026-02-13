@@ -11,7 +11,8 @@
   import NotificationTray from '../features/notifications/NotificationTray.svelte';
   import {
     Search, Settings, Plus, Grip, Clock, Calendar, LifeBuoy,
-    Milestone, Library, Package, Users, PanelLeftOpen, PanelLeftClose
+    Milestone, Library, Package, Users, PanelLeftOpen, PanelLeftClose,
+    BookOpen
   } from 'lucide-svelte';
 
   let {
@@ -107,6 +108,7 @@
     { id: 'time', icon: Clock, labelKey: 'nav.timeAndProjects', href: '/time', activeViews: ['time'] },
     { id: 'milestones', icon: Milestone, labelKey: 'nav.milestones', href: '/milestones', activeViews: ['milestones', 'milestone-detail'] },
     { id: 'iterations', icon: Calendar, labelKey: 'nav.iterations', href: '/iterations', activeViews: ['iterations', 'iteration-detail'] },
+    { id: 'logbook', icon: BookOpen, labelKey: 'nav.knowledgeBase', href: '/logbook', activeViews: ['logbook', 'logbook-document'], permission: 'canAccessLogbook' },
     { id: 'assets', icon: Package, labelKey: 'nav.assets', href: '/assets', activeViews: ['assets', 'asset-detail'], permission: 'canAccessAssets' },
     { id: 'portal-hub', icon: LifeBuoy, labelKey: 'nav.portalHub', href: '/channels', activeViews: ['hub', 'hub-inbox', 'channels'], permission: 'canAccessPortalHub' },
     { id: 'customers', icon: Users, labelKey: 'nav.customers', href: '/customers', activeViews: ['customers'], permission: 'canAccessCustomers' }

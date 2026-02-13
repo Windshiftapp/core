@@ -31,6 +31,7 @@ export default {
     loadingCreateForm: 'Loading Create Form...',
     loading: 'Loading...',
     retry: 'Retry',
+    knowledgeBase: 'Knowledge Base',
   },
 
   commandPalette: {

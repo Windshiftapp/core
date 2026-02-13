@@ -168,8 +168,8 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Sanitize user input to prevent XSS
-	cf.Name = utils.StripHTMLTags(cf.Name)
-	cf.Description = utils.StripHTMLTags(cf.Description)
+	cf.Name = utils.SanitizeName(cf.Name)
+	cf.Description = utils.SanitizeCommentContent(cf.Description)
 
 	now := time.Now()
 	var id int64
@@ -313,8 +313,8 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Sanitize user input to prevent XSS
-	cf.Name = utils.StripHTMLTags(cf.Name)
-	cf.Description = utils.StripHTMLTags(cf.Description)
+	cf.Name = utils.SanitizeName(cf.Name)
+	cf.Description = utils.SanitizeCommentContent(cf.Description)
 
 	now := time.Now()
 	//nolint:misspell // customer_organisations is a database table name

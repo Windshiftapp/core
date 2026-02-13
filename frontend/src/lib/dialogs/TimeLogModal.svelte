@@ -1,7 +1,5 @@
 <script>
-  import { createCombobox, melt } from '@melt-ui/svelte';
-  import { fly } from 'svelte/transition';
-  import { Check } from 'lucide-svelte';
+  import { BasePicker } from '../pickers';
   import Input from '../components/Input.svelte';
   import Label from '../components/Label.svelte';
   import {
@@ -91,98 +89,6 @@
     item
   })));
 
-  // Project combobox setup
-  const {
-    elements: { menu: projectMenu, input: projectInput, option: projectOption },
-    states: { open: projectOpen, inputValue: projectInputValue, touchedInput: projectTouchedInput, selected: projectSelected },
-    helpers: { isSelected: isProjectSelected }
-  } = createCombobox({
-    forceVisible: true,
-    preventScroll: false
-  });
-
-  // Work item combobox setup
-  const {
-    elements: { menu: workItemMenu, input: workItemInput, option: workItemOption },
-    states: { open: workItemOpen, inputValue: workItemInputValue, touchedInput: workItemTouchedInput, selected: workItemSelected },
-    helpers: { isSelected: isWorkItemSelected }
-  } = createCombobox({
-    forceVisible: true,
-    preventScroll: false
-  });
-
-  // Handle project selection
-  $effect(() => {
-    if ($projectSelected) {
-      const selectedProject = projectOptions.find(p => p.id === $projectSelected.value);
-      if (selectedProject) {
-        formData.project_id = selectedProject.id;
-      }
-    }
-  });
-
-  // Handle work item selection
-  $effect(() => {
-    if ($workItemSelected) {
-      const selectedItem = workItemOptions.find(w => w.id === $workItemSelected.value);
-      if (selectedItem) {
-        formData.item_id = selectedItem.id;
-        // Auto-populate description with item title if description is empty
-        if (!formData.description.trim()) {
-          formData.description = selectedItem.title;
-        }
-      }
-    }
-  });
-
-  // Set display value when project is selected externally
-  $effect(() => {
-    if (!$projectTouchedInput && formData.project_id) {
-      const selectedProject = projectOptions.find(p => p.id === formData.project_id);
-      if (selectedProject) {
-        $projectInputValue = selectedProject.name;
-      }
-    } else if (!formData.project_id) {
-      $projectInputValue = '';
-    }
-  });
-
-  // Set display value when work item is selected externally
-  $effect(() => {
-    if (!$workItemTouchedInput && formData.item_id) {
-      const selectedItem = workItemOptions.find(w => w.id === formData.item_id);
-      if (selectedItem) {
-        $workItemInputValue = selectedItem.title;
-      }
-    } else if (!formData.item_id) {
-      $workItemInputValue = '';
-    }
-  });
-
-  // Filter projects based on search input
-  const filteredProjectsForDisplay = $derived.by(() => {
-    if (!$projectTouchedInput || !$projectInputValue) {
-      return projectOptions;
-    }
-    const search = $projectInputValue.toLowerCase();
-    return projectOptions.filter(project =>
-      project.name.toLowerCase().includes(search) ||
-      project.subtitle?.toLowerCase().includes(search)
-    );
-  });
-
-  // Filter work items based on search input
-  const filteredWorkItemsForDisplay = $derived.by(() => {
-    if (!$workItemTouchedInput || !$workItemInputValue) {
-      return workItemOptions.slice(0, 20);
-    }
-    const search = $workItemInputValue.toLowerCase();
-    return workItemOptions.filter(item =>
-      item.title.toLowerCase().includes(search) ||
-      item.subtitle?.toLowerCase().includes(search)
-    ).slice(0, 20);
-  });
-
   // Handle start time changes
   function onStartTimeChange() {
     durationSync.guard(() => {
@@ -268,56 +174,24 @@
     {#if showProjectField}
       <div>
         <Label color="default" required={!defaultItemId} class="mb-2">{t('time.timeTrackingProject')}</Label>
-        <div class="relative">
-          <input
-            use:melt={$projectInput}
-            type="text"
-            placeholder={t('placeholders.searchProjects')}
-            disabled={!allowProjectChange}
-            class="w-full px-3 py-2.5 pr-8 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 text-sm"
-            style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-          />
-
-          <div class="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-            <svg class="w-4 h-4 transition-transform duration-200 {$projectOpen ? 'rotate-180' : ''}"
-                 fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                 style="color: var(--ds-text-subtle);">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
-
-          {#if $projectOpen && filteredProjectsForDisplay.length > 0 && allowProjectChange}
-            <div
-              use:melt={$projectMenu}
-              class="absolute z-50 w-full mt-2 rounded border shadow-lg max-h-60 overflow-y-auto"
-              style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
-              transition:fly={{ duration: 150, y: -5 }}
-            >
-              {#each filteredProjectsForDisplay as project (project.id)}
-                <div
-                  use:melt={$projectOption({ value: project.id, label: project.name, item: project })}
-                  class="px-4 py-3 cursor-pointer border-b last:border-b-0 transition-colors duration-150"
-                  style="border-color: var(--ds-border);
-                         {$isProjectSelected({ value: project.id, label: project.name, item: project })
-                           ? 'background-color: var(--ds-background-selected); color: var(--ds-text);'
-                           : 'color: var(--ds-text); hover:background-color: var(--ds-background-neutral-hovered);'}"
-                >
-                  <div class="flex items-center justify-between">
-                    <div class="flex flex-col">
-                      <span class="font-medium">{project.name}</span>
-                      {#if project.subtitle}
-                        <span class="text-sm mt-1" style="color: var(--ds-text-subtle);">{project.subtitle}</span>
-                      {/if}
-                    </div>
-                    {#if $isProjectSelected({ value: project.id, label: project.name, item: project })}
-                      <Check class="w-4 h-4 text-blue-600" />
-                    {/if}
-                  </div>
-                </div>
-              {/each}
+        <BasePicker
+          bind:value={formData.project_id}
+          items={projectOptions}
+          placeholder={t('placeholders.searchProjects')}
+          disabled={!allowProjectChange}
+          searchFields={['name', 'subtitle']}
+          getValue={(project) => project?.id}
+          getLabel={(project) => project?.name ?? ''}
+        >
+          {#snippet itemSnippet({ item: project })}
+            <div class="flex flex-col min-w-0">
+              <span class="font-medium">{project.name}</span>
+              {#if project.subtitle}
+                <span class="text-xs" style="color: var(--ds-text-subtle);">{project.subtitle}</span>
+              {/if}
             </div>
-          {/if}
-        </div>
+          {/snippet}
+        </BasePicker>
       </div>
     {/if}
 
@@ -325,60 +199,34 @@
     {#if showWorkItemField}
       <div>
         <Label color="default" class="mb-2">{t('time.workItemOptional')}</Label>
-        <div class="relative">
-          <input
-            use:melt={$workItemInput}
-            type="text"
-            placeholder={t('placeholders.searchWorkItems')}
-            class="w-full px-3 py-2.5 pr-8 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 text-sm"
-            style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-          />
-
-          <div class="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-            <svg class="w-4 h-4 transition-transform duration-200 {$workItemOpen ? 'rotate-180' : ''}"
-                 fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                 style="color: var(--ds-text-subtle);">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
-
-          {#if $workItemOpen && filteredWorkItemsForDisplay.length > 0}
-            <div
-              use:melt={$workItemMenu}
-              class="absolute z-50 w-full mt-2 rounded border shadow-lg max-h-60 overflow-y-auto"
-              style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
-              transition:fly={{ duration: 150, y: -5 }}
-            >
-              {#each filteredWorkItemsForDisplay as workItem (workItem.id)}
-                <div
-                  use:melt={$workItemOption({ value: workItem.id, label: workItem.title, item: workItem })}
-                  class="px-4 py-3 cursor-pointer border-b last:border-b-0 transition-colors duration-150"
-                  style="border-color: var(--ds-border);
-                         {$isWorkItemSelected({ value: workItem.id, label: workItem.title, item: workItem })
-                           ? 'background-color: var(--ds-background-selected); color: var(--ds-text);'
-                           : 'color: var(--ds-text); hover:background-color: var(--ds-background-neutral-hovered);'}"
-                >
-                  <div class="flex items-center justify-between">
-                    <div class="flex flex-col flex-1 min-w-0">
-                      <span class="font-medium text-sm truncate">{workItem.title}</span>
-                      {#if workItem.subtitle}
-                        <span class="text-xs mt-1 truncate" style="color: var(--ds-text-subtle);">{workItem.subtitle}</span>
-                      {/if}
-                      {#if workItem.status}
-                        <span class="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded mt-1 inline-block w-fit">
-                          {workItem.status}
-                        </span>
-                      {/if}
-                    </div>
-                    {#if $isWorkItemSelected({ value: workItem.id, label: workItem.title, item: workItem })}
-                      <Check class="w-4 h-4 text-blue-600 flex-shrink-0 ml-2" />
-                    {/if}
-                  </div>
-                </div>
-              {/each}
+        <BasePicker
+          bind:value={formData.item_id}
+          items={workItemOptions}
+          placeholder={t('placeholders.searchWorkItems')}
+          allowClear={true}
+          searchFields={['title', 'subtitle']}
+          getValue={(item) => item?.id}
+          getLabel={(item) => item?.title ?? ''}
+          onSelect={(item) => {
+            if (item && !formData.description.trim()) {
+              formData.description = item.title;
+            }
+          }}
+        >
+          {#snippet itemSnippet({ item: workItem })}
+            <div class="flex flex-col min-w-0">
+              <span class="font-medium text-sm truncate">{workItem.title}</span>
+              {#if workItem.subtitle}
+                <span class="text-xs truncate" style="color: var(--ds-text-subtle);">{workItem.subtitle}</span>
+              {/if}
+              {#if workItem.status}
+                <span class="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded mt-1 inline-block w-fit">
+                  {workItem.status}
+                </span>
+              {/if}
             </div>
-          {/if}
-        </div>
+          {/snippet}
+        </BasePicker>
       </div>
     {/if}
 

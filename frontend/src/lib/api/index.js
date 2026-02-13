@@ -30,6 +30,7 @@ import { del, get, post, put } from './core.js';
 import { hub } from './hub.js';
 // Domain imports
 import { items } from './items.js';
+import { logbook } from './logbook.js';
 import { iterations, iterationTypes, milestoneCategories, milestones } from './milestones.js';
 import {
   attachmentSettings,
@@ -329,6 +330,9 @@ export const api = {
 
   // Workspace Actions (automation)
   actions,
+
+  // Knowledge Base / Logbook
+  logbook,
 
   // AI features
   ai,

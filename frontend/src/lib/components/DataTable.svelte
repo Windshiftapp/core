@@ -3,6 +3,7 @@
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import EmptyState from './EmptyState.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { sanitizeHtml } from '../utils/sanitize.ts';
 
   export let columns = []; // Array of column definitions: { key, label, width?, align?, sortable? }
   export let data = []; // Array of data objects
@@ -274,7 +275,7 @@
                     <!-- Default cell content -->
                     {#if column.render && column.html}
                       <!-- Only render as HTML if explicitly opted-in with html:true -->
-                      {@html getCellValue(item, column) || '—'}
+                      {@html sanitizeHtml(getCellValue(item, column)) || '—'}
                     {:else if column.render}
                       <!-- Render function output as text (safe by default) -->
                       {getCellValue(item, column) || '—'}

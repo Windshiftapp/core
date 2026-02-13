@@ -1,7 +1,7 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { api } from '../../api.js';
-  import { getCollection } from '../collections/collectionService.js';
+  import { collectionData } from '../../stores/collectionContext.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { ChevronRight, ChevronDown, GitBranch, Circle, AlertCircle, Calendar, FileCheck, Minus } from 'lucide-svelte';
@@ -55,19 +55,17 @@
     await loadData();
   });
 
-  // Watch for changes to workspaceId or collectionId after initial mount
-  let lastWorkspaceId = workspaceId;
-  let lastCollectionId = collectionId;
+  // Sync items from central store
   $effect(() => {
-    const nextWorkspaceId = workspaceId;
-    const nextCollectionId = collectionId;
-    if (!nextWorkspaceId) {
-      return;
-    }
-    if (nextWorkspaceId !== lastWorkspaceId || nextCollectionId !== lastCollectionId) {
-      lastWorkspaceId = nextWorkspaceId;
-      lastCollectionId = nextCollectionId;
-      loadData();
+    if (!$collectionData.loading && $collectionData.items.length >= 0) {
+      currentCollectionName = $collectionData.collectionName;
+      const sorted = [...$collectionData.items].sort((a, b) => a.level - b.level || a.id - b.id);
+      // untrack to avoid tracking reads of allItems/expandedItems via getRootItems/hasChildren
+      untrack(() => {
+        allItems = sorted;
+        const rootItems = getRootItems();
+        expandedItems = new Set(rootItems.filter(i => hasChildren(i.id)).map(i => i.id));
+      });
     }
   });
 
@@ -78,20 +76,11 @@
 
       await Promise.all([
         loadWorkspace(),
-        loadAllItems(),
         loadItemTypes(),
         loadStatusData(),
         loadPriorities()
       ]);
 
-      // Expand root items by default for better initial UX
-      const rootItems = getRootItems();
-      rootItems.forEach(item => {
-        if (hasChildren(item.id)) {
-          expandedItems.add(item.id);
-        }
-      });
-      expandedItems = new Set(expandedItems);
       if (showTestCases) {
         await loadPendingTestCases();
       }
@@ -119,46 +108,6 @@
     } catch (error) {
       console.error('[CollectionTree] Failed to load item types:', error);
       itemTypes = [];
-    }
-  }
-
-  async function loadAllItems() {
-    try {
-      // Build filters based on collection
-      const filters = { workspace_id: workspaceId };
-      
-      if (collectionId) {
-        const collection = await getCollection(collectionId);
-      if (collection) {
-        currentCollectionName = collection.name;
-        if (collection.cql_query) {
-          filters.vql = collection.cql_query;
-        }
-        }
-      } else {
-        currentCollectionName = 'Default';
-      }
-      
-      // Load all items for this workspace
-      const response = await api.items.getAll(filters);
-      
-      // Handle different response formats
-      let items = [];
-      if (Array.isArray(response)) {
-        items = response;
-      } else if (response && Array.isArray(response.items)) {
-        items = response.items;
-      } else if (response && response.data && Array.isArray(response.data)) {
-        items = response.data;
-      } else {
-        console.warn('Unexpected response format from api.items.getAll:', response);
-        items = [];
-      }
-      
-      allItems = items.sort((a, b) => a.level - b.level || a.id - b.id);
-    } catch (error) {
-      console.error('[CollectionTree] Failed to load items:', error);
-      allItems = [];
     }
   }
 

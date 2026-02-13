@@ -14,6 +14,7 @@ function createPermissionStore() {
   const error = writable(null);
   const hasAssetSets = writable(false);
   const hasActivePortals = writable(false);
+  const logbookAvailable = writable(false);
 
   const canAccessAdmin = derived(
     [authStore, permissions, userPermissions],
@@ -69,6 +70,15 @@ function createPermissionStore() {
     }
   );
 
+  const canAccessLogbook = derived(
+    [authStore, logbookAvailable],
+    ([$authStore, $logbookAvailable]) => {
+      const user = $authStore.currentUser;
+      if (!user) return false;
+      return $logbookAvailable;
+    }
+  );
+
   // Create a combined derived store for easy subscription
   const combined = derived(
     [
@@ -81,6 +91,7 @@ function createPermissionStore() {
       canAccessCustomers,
       canAccessAssets,
       canAccessPortalHub,
+      canAccessLogbook,
     ],
     ([
       $permissions,
@@ -92,6 +103,7 @@ function createPermissionStore() {
       $canAccessCustomers,
       $canAccessAssets,
       $canAccessPortalHub,
+      $canAccessLogbook,
     ]) => ({
       permissions: $permissions,
       userPermissions: $userPermissions,
@@ -102,6 +114,7 @@ function createPermissionStore() {
       canAccessCustomers: $canAccessCustomers,
       canAccessAssets: $canAccessAssets,
       canAccessPortalHub: $canAccessPortalHub,
+      canAccessLogbook: $canAccessLogbook,
     })
   );
 
@@ -140,6 +153,12 @@ function createPermissionStore() {
       return value;
     },
 
+    get canAccessLogbook() {
+      let value;
+      canAccessLogbook.subscribe((v) => (value = v))();
+      return value;
+    },
+
     // Set whether asset sets exist
     setHasAssetSets(value) {
       hasAssetSets.set(value);
@@ -148,6 +167,11 @@ function createPermissionStore() {
     // Set whether active portals exist
     setHasActivePortals(value) {
       hasActivePortals.set(value);
+    },
+
+    // Set whether logbook service is available
+    setLogbookAvailable(value) {
+      logbookAvailable.set(value);
     },
 
     // Load user permissions

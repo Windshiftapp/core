@@ -4,6 +4,7 @@
   import { writable } from 'svelte/store';
   import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
   import { X, Package, FileText, Play } from 'lucide-svelte';
+  import { escapeHtml } from '../../utils/sanitize.ts';
   import { navigate } from '../../router.js';
   import Button from '../../components/Button.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
@@ -215,8 +216,8 @@
       label: t('common.name'),
       html: true,
       render: (set) => {
-        const description = set.description ? `<div class="text-xs mt-1" style="color: var(--ds-text-subtle);">${set.description}</div>` : '';
-        return `<div class="font-medium" style="color: var(--ds-text);">${set.name}</div>${description}`;
+        const description = set.description ? `<div class="text-xs mt-1" style="color: var(--ds-text-subtle);">${escapeHtml(set.description)}</div>` : '';
+        return `<div class="font-medium" style="color: var(--ds-text);">${escapeHtml(set.name)}</div>${description}`;
       }
     },
     {

@@ -258,6 +258,9 @@ func main() {
 	// LLM endpoint for AI features
 	llmEndpoint := os.Getenv("LLM_ENDPOINT")
 
+	// Logbook sidecar endpoint
+	logbookEndpoint := os.Getenv("LOGBOOK_ENDPOINT")
+
 	// LLM providers file override
 	if envLLMProviders := os.Getenv("LLM_PROVIDERS_FILE"); envLLMProviders != "" && llmProvidersFile == "" {
 		llmProvidersFile = envLLMProviders
@@ -301,6 +304,7 @@ func main() {
 		BaseURL:             baseURL,
 		LLMEndpoint:         llmEndpoint,
 		LLMProvidersFile:    llmProvidersFile,
+		LogbookEndpoint:     logbookEndpoint,
 		FrontendFiles:       frontendFiles,
 		ShutdownChan:        shutdownChan,
 	}

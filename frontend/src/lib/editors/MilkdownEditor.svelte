@@ -5,6 +5,7 @@
   import { commonmark, toggleStrongCommand, toggleEmphasisCommand, wrapInBulletListCommand, wrapInOrderedListCommand, toggleInlineCodeCommand } from '@milkdown/kit/preset/commonmark';
   import { gfm, toggleStrikethroughCommand } from '@milkdown/kit/preset/gfm';
   import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
+  import { clipboard } from '@milkdown/kit/plugin/clipboard';
   import { upload, uploadConfig } from '@milkdown/kit/plugin/upload';
   import { insert, callCommand } from '@milkdown/kit/utils';
   import { replaceAll } from '@milkdown/utils';
@@ -15,19 +16,24 @@
   import { api } from '../api.js';
   import MentionPicker from '../pickers/MentionPicker.svelte';
   import { mentionDecorationPlugin } from './milkdown-mention-mark.js';
+  import { linkSanitizerPlugin } from './milkdown-link-sanitizer.js';
   import { t } from '../stores/i18n.svelte.js';
   import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
 
   let {
     content = $bindable(''), placeholder = '', readonly = false,
     showToolbar = false, itemId = null, entityType = null,
-    entityId = null, onImageInsert = null, isPersonalWorkspace = false, compact = false
+    entityId = null, onImageInsert = null, isPersonalWorkspace = false, compact = false,
+    customUploadFn = null, downloadUrlBase = '/api/attachments'
   } = $props();
 
   const effectivePlaceholder = $derived(placeholder || t('editors.enterText'));
 
   // Derive attachments enabled from store (falls back to true if not yet loaded to avoid flash)
   const attachmentsEnabled = $derived(attachmentStatus.loaded ? attachmentStatus.enabled : true);
+
+  // Allow uploads when either the main attachment system is enabled OR a custom upload function is provided
+  const canUploadImages = $derived(attachmentsEnabled || !!customUploadFn);
 
   // Compute effective entity info (supports both old itemId and new entityType/entityId)
   const effectiveEntityType = $derived(entityType || (itemId ? 'item' : null));
@@ -251,7 +257,7 @@
 
   // Shared uploader logic for drag/drop/paste and the toolbar button
   async function uploadImages(files, schema, shouldInsertMarkdown = false) {
-    if (!attachmentsEnabled) {
+    if (!canUploadImages) {
       console.log('[MilkdownEditor] Attachments disabled, skipping upload');
       return { nodes: [], attachments: [] };
     }
@@ -282,11 +288,13 @@
             formData.append('entity_type', effectiveEntityType);
           }
 
-          const result = await api.attachments.upload(formData);
+          const result = customUploadFn
+            ? await customUploadFn(formData)
+            : await api.attachments.upload(formData);
           console.log('[MilkdownEditor] Upload result:', result);
 
           if (result.success && result.attachment) {
-            const src = `/api/attachments/${result.attachment.id}/download`;
+            const src = `${downloadUrlBase}/${result.attachment.id}/download`;
             const node = schema?.nodes?.image?.createAndFill({
               src,
               alt: image.name,
@@ -372,7 +380,7 @@
           });
 
           // Configure upload plugin following official docs pattern (only if attachments enabled)
-          if (!readonly && attachmentsEnabled) {
+          if (!readonly && canUploadImages) {
             console.log('[MilkdownEditor] Configuring uploadConfig with uploader');
             ctx.update(uploadConfig.key, (prev) => ({
               ...prev,
@@ -384,9 +392,11 @@
         .use(commonmark)
         .use(gfm)
         .use(listener)
+        .use(clipboard)
         .use(upload)  // Include upload in main chain per docs
         .use(imageBlockComponent)  // Enable image resizing
         .use(mentionDecorationPlugin)  // Add mention chip decorations
+        .use(linkSanitizerPlugin)  // Sanitize dangerous URL schemes in links/images
         .create();
 
       console.log('[MilkdownEditor] Editor created successfully');
@@ -535,7 +545,7 @@
       <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleOrderedList} title={t('editors.numberedList')}>
         <ListOrdered size={14} />
       </button>
-      {#if attachmentsEnabled}
+      {#if canUploadImages}
         <button type="button" class="toolbar-btn" tabindex="-1" onclick={openFilePicker} title={t('editors.insertImage')}>
           <ImageIcon size={14} />
         </button>

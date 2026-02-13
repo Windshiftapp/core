@@ -53,6 +53,18 @@ html[data-color-mode="light"] {
   --ds-interactive-subtle: var(--color-primary-50);
 
   /* =================================================================
+     FEEDBACK COLORS - SUCCESS (Green)
+     ================================================================= */
+  --ds-success: var(--color-green-600);
+  --ds-success-subtle: #dcfce7;
+
+  /* =================================================================
+     FEEDBACK COLORS - WARNING (Yellow/Orange)
+     ================================================================= */
+  --ds-warning: var(--color-yellow-600);
+  --ds-warning-subtle: #fef3c7;
+
+  /* =================================================================
      FEEDBACK COLORS - DANGER (Red)
      ================================================================= */
   --ds-danger: var(--color-red-600);
