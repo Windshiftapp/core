@@ -24,8 +24,7 @@
   });
 
   function startCreate() {
-    window.dispatchEvent(new CustomEvent('set-create-type', { detail: { type: 'workspace' } }));
-    window.dispatchEvent(new CustomEvent('open-create-modal'));
+    window.dispatchEvent(new CustomEvent('show-create-modal', { detail: { type: 'workspace' } }));
   }
 
   async function deleteWorkspace(workspace) {
