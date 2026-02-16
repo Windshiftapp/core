@@ -16,7 +16,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build Go binary
-FROM golang:1.25.7-alpine AS builder
+FROM golang:1.26.0-alpine AS builder
 
 # Install build dependencies (no gcc/musl-dev needed - pure Go SQLite driver)
 RUN apk add --no-cache git tzdata
