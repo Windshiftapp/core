@@ -97,17 +97,17 @@ export const customFields = {
   },
   get: (id) => fetchAPI(`/custom-fields/${id}`),
   create: (data) =>
-    fetchAPI('/custom-fields', {
+    fetchAPI('/admin/custom-fields', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   update: (id, data) =>
-    fetchAPI(`/custom-fields/${id}`, {
+    fetchAPI(`/admin/custom-fields/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
   delete: (id) =>
-    fetchAPI(`/custom-fields/${id}`, {
+    fetchAPI(`/admin/custom-fields/${id}`, {
       method: 'DELETE',
     }),
 };
@@ -204,17 +204,17 @@ export const linkTypes = {
   },
   get: (id) => fetchAPI(`/link-types/${id}`),
   create: (data) =>
-    fetchAPI('/link-types', {
+    fetchAPI('/admin/link-types', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   update: (id, data) =>
-    fetchAPI(`/link-types/${id}`, {
+    fetchAPI(`/admin/link-types/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
   delete: (id) =>
-    fetchAPI(`/link-types/${id}`, {
+    fetchAPI(`/admin/link-types/${id}`, {
       method: 'DELETE',
     }),
 };

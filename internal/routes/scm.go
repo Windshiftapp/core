@@ -13,33 +13,33 @@ func RegisterSCMRoutes(deps *Deps) {
 	admin := deps.PermissionMiddleware.RequireSystemAdmin()
 
 	// SCM Provider endpoints
-	api.HandleH("GET /scm-providers", admin(http.HandlerFunc(deps.SCM.Provider.GetProviders)))
-	api.HandleH("POST /scm-providers", admin(http.HandlerFunc(deps.SCM.Provider.CreateProvider)))
-	api.HandleH("GET /scm-providers/{id}", admin(http.HandlerFunc(deps.SCM.Provider.GetProvider)))
-	api.HandleH("PUT /scm-providers/{id}", admin(http.HandlerFunc(deps.SCM.Provider.UpdateProvider)))
-	api.HandleH("DELETE /scm-providers/{id}", admin(http.HandlerFunc(deps.SCM.Provider.DeleteProvider)))
-	api.HandleH("POST /scm-providers/{id}/test", admin(http.HandlerFunc(deps.SCM.Provider.TestProvider)))
+	api.HandleH("GET /admin/scm-providers", admin(http.HandlerFunc(deps.SCM.Provider.GetProviders)))
+	api.HandleH("POST /admin/scm-providers", admin(http.HandlerFunc(deps.SCM.Provider.CreateProvider)))
+	api.HandleH("GET /admin/scm-providers/{id}", admin(http.HandlerFunc(deps.SCM.Provider.GetProvider)))
+	api.HandleH("PUT /admin/scm-providers/{id}", admin(http.HandlerFunc(deps.SCM.Provider.UpdateProvider)))
+	api.HandleH("DELETE /admin/scm-providers/{id}", admin(http.HandlerFunc(deps.SCM.Provider.DeleteProvider)))
+	api.HandleH("POST /admin/scm-providers/{id}/test", admin(http.HandlerFunc(deps.SCM.Provider.TestProvider)))
 
 	// SCM Provider workspace allowlist endpoints
-	api.HandleH("GET /scm-providers/{id}/allowed-workspaces", admin(http.HandlerFunc(deps.SCM.Provider.GetProviderAllowedWorkspaces)))
-	api.HandleH("PUT /scm-providers/{id}/allowed-workspaces", admin(http.HandlerFunc(deps.SCM.Provider.UpdateProviderAllowedWorkspaces)))
-	api.HandleH("POST /scm-providers/{id}/allowed-workspaces", admin(http.HandlerFunc(deps.SCM.Provider.AddWorkspaceToProviderAllowlist)))
-	api.HandleH("DELETE /scm-providers/{id}/allowed-workspaces/{workspace_id}", admin(http.HandlerFunc(deps.SCM.Provider.RemoveWorkspaceFromProviderAllowlist)))
+	api.HandleH("GET /admin/scm-providers/{id}/allowed-workspaces", admin(http.HandlerFunc(deps.SCM.Provider.GetProviderAllowedWorkspaces)))
+	api.HandleH("PUT /admin/scm-providers/{id}/allowed-workspaces", admin(http.HandlerFunc(deps.SCM.Provider.UpdateProviderAllowedWorkspaces)))
+	api.HandleH("POST /admin/scm-providers/{id}/allowed-workspaces", admin(http.HandlerFunc(deps.SCM.Provider.AddWorkspaceToProviderAllowlist)))
+	api.HandleH("DELETE /admin/scm-providers/{id}/allowed-workspaces/{workspace_id}", admin(http.HandlerFunc(deps.SCM.Provider.RemoveWorkspaceFromProviderAllowlist)))
 
 	// SCM GitHub App discovery endpoints
-	api.HandleH("POST /scm-providers/github-app/discover-installations", admin(http.HandlerFunc(deps.SCM.Provider.DiscoverGitHubAppInstallations)))
-	api.HandleH("POST /scm-providers/{id}/github-app/refresh-installation", admin(http.HandlerFunc(deps.SCM.Provider.RefreshGitHubAppInstallation)))
+	api.HandleH("POST /admin/scm-providers/github-app/discover-installations", admin(http.HandlerFunc(deps.SCM.Provider.DiscoverGitHubAppInstallations)))
+	api.HandleH("POST /admin/scm-providers/{id}/github-app/refresh-installation", admin(http.HandlerFunc(deps.SCM.Provider.RefreshGitHubAppInstallation)))
 
 	// SCM OAuth endpoints
 	api.HandleH("GET /scm/oauth/{slug}/start", auth(http.HandlerFunc(deps.SCM.Provider.StartOAuth)))
 	api.Handle("GET /scm/oauth/{slug}/callback", deps.SCM.Provider.OAuthCallback)
 
 	// Email Provider endpoints
-	api.HandleH("GET /email-providers", admin(http.HandlerFunc(deps.SCM.EmailProvider.GetEmailProviders)))
-	api.HandleH("POST /email-providers", admin(http.HandlerFunc(deps.SCM.EmailProvider.CreateEmailProvider)))
-	api.HandleH("GET /email-providers/{id}", admin(http.HandlerFunc(deps.SCM.EmailProvider.GetEmailProvider)))
-	api.HandleH("PUT /email-providers/{id}", admin(http.HandlerFunc(deps.SCM.EmailProvider.UpdateEmailProvider)))
-	api.HandleH("DELETE /email-providers/{id}", admin(http.HandlerFunc(deps.SCM.EmailProvider.DeleteEmailProvider)))
+	api.HandleH("GET /admin/email-providers", admin(http.HandlerFunc(deps.SCM.EmailProvider.GetEmailProviders)))
+	api.HandleH("POST /admin/email-providers", admin(http.HandlerFunc(deps.SCM.EmailProvider.CreateEmailProvider)))
+	api.HandleH("GET /admin/email-providers/{id}", admin(http.HandlerFunc(deps.SCM.EmailProvider.GetEmailProvider)))
+	api.HandleH("PUT /admin/email-providers/{id}", admin(http.HandlerFunc(deps.SCM.EmailProvider.UpdateEmailProvider)))
+	api.HandleH("DELETE /admin/email-providers/{id}", admin(http.HandlerFunc(deps.SCM.EmailProvider.DeleteEmailProvider)))
 	api.HandleH("POST /channels/{channel_id}/email-oauth/start", auth(http.HandlerFunc(deps.SCM.EmailProvider.StartEmailOAuth)))
 	api.Handle("GET /email/oauth/{provider_slug}/callback", http.HandlerFunc(deps.SCM.EmailProvider.EmailOAuthCallback))
 	api.HandleH("POST /channels/{id}/test-email", auth(http.HandlerFunc(deps.SCM.EmailProvider.TestEmailChannel)))

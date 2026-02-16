@@ -373,7 +373,7 @@
     discoveredInstallations = [];
 
     try {
-      const result = await api.post('/scm-providers/github-app/discover-installations', {
+      const result = await api.post('/admin/scm-providers/github-app/discover-installations', {
         app_id: formData.github_app_id,
         private_key: formData.github_app_private_key
       });

@@ -121,16 +121,21 @@ type Server struct {
 	pluginManager         *plugins.Manager
 
 	// Rate limiters that need cleanup
-	loginRateLimiter    *middleware.RateLimiter
-	fidoRateLimiter     *middleware.RateLimiter
-	authRateLimiter     *middleware.RateLimiter
-	scimRateLimiter     *middleware.RateLimiter
-	portalSubmitLimiter *middleware.RateLimiter
-	portalSearchLimiter *middleware.RateLimiter
-	emailVerifyLimiter  *middleware.RateLimiter
-	setupLimiter        *middleware.RateLimiter
-	ssoRateLimiter      *middleware.RateLimiter
-	portalAuthLimiter   *middleware.RateLimiter
+	loginRateLimiter       *middleware.RateLimiter
+	fidoRateLimiter        *middleware.RateLimiter
+	authRateLimiter        *middleware.RateLimiter
+	scimRateLimiter        *middleware.RateLimiter
+	portalSubmitLimiter    *middleware.RateLimiter
+	portalSearchLimiter    *middleware.RateLimiter
+	emailVerifyLimiter     *middleware.RateLimiter
+	setupLimiter           *middleware.RateLimiter
+	ssoRateLimiter         *middleware.RateLimiter
+	portalAuthLimiter      *middleware.RateLimiter
+	aiRateLimiter          *middleware.RateLimiter
+	uploadLimiter          *middleware.RateLimiter
+	webhookLimiter         *middleware.RateLimiter
+	searchLimiter          *middleware.RateLimiter
+	calendarFeedLimiter    *middleware.RateLimiter
 
 	// Server state
 	actualPort   int
@@ -259,6 +264,11 @@ func (s *Server) initialize() error {
 	s.setupLimiter = middleware.NewRateLimiter(5.0/60.0, 10, cfg.UseProxy, additionalProxyList)
 	s.ssoRateLimiter = middleware.NewRateLimiter(10.0/60.0, 5, cfg.UseProxy, additionalProxyList)
 	s.portalAuthLimiter = middleware.NewRateLimiter(3.0/60.0, 3, cfg.UseProxy, additionalProxyList)
+	s.aiRateLimiter = middleware.NewRateLimiter(5.0/60.0, 8, cfg.UseProxy, additionalProxyList)
+	s.uploadLimiter = middleware.NewRateLimiter(10.0/60.0, 15, cfg.UseProxy, additionalProxyList)
+	s.webhookLimiter = middleware.NewRateLimiter(10.0/60.0, 15, cfg.UseProxy, additionalProxyList)
+	s.searchLimiter = middleware.NewRateLimiter(20.0/60.0, 30, cfg.UseProxy, additionalProxyList)
+	s.calendarFeedLimiter = middleware.NewRateLimiter(10.0/60.0, 15, cfg.UseProxy, additionalProxyList)
 
 	// Initialize token tracker
 	s.tokenTracker = services.NewTokenTracker(s.db, services.DefaultTokenTrackerConfig())
@@ -702,9 +712,14 @@ func (s *Server) initialize() error {
 		SCIMRateLimiter:     s.scimRateLimiter,
 		PortalSubmitLimiter: s.portalSubmitLimiter,
 		PortalSearchLimiter: s.portalSearchLimiter,
-		PortalAuthLimiter:   s.portalAuthLimiter,
-		EmailVerifyLimiter:  s.emailVerifyLimiter,
-		SetupLimiter:        s.setupLimiter,
+		PortalAuthLimiter:      s.portalAuthLimiter,
+		EmailVerifyLimiter:     s.emailVerifyLimiter,
+		SetupLimiter:           s.setupLimiter,
+		AIRateLimiter:          s.aiRateLimiter,
+		UploadLimiter:          s.uploadLimiter,
+		WebhookLimiter:         s.webhookLimiter,
+		SearchLimiter:          s.searchLimiter,
+		CalendarFeedLimiter:    s.calendarFeedLimiter,
 
 		Auth: routes.AuthHandlers{
 			Auth:     authHandler,
@@ -1042,6 +1057,21 @@ func (s *Server) cleanup() {
 	}
 	if s.portalAuthLimiter != nil {
 		s.portalAuthLimiter.Stop()
+	}
+	if s.aiRateLimiter != nil {
+		s.aiRateLimiter.Stop()
+	}
+	if s.uploadLimiter != nil {
+		s.uploadLimiter.Stop()
+	}
+	if s.webhookLimiter != nil {
+		s.webhookLimiter.Stop()
+	}
+	if s.searchLimiter != nil {
+		s.searchLimiter.Stop()
+	}
+	if s.calendarFeedLimiter != nil {
+		s.calendarFeedLimiter.Stop()
 	}
 
 	// Close activity tracker

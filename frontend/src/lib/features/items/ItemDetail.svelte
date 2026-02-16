@@ -2,7 +2,7 @@
   import { onMount, onDestroy, untrack } from 'svelte';
   import { useEventListener } from 'runed';
   import { api } from '../../api.js';
-  import { navigate } from '../../router.js';
+  import { navigate, currentRoute } from '../../router.js';
   import { workspacePermissions, itemDetailStore } from '../../stores';
   import { t } from '../../stores/i18n.svelte.js';
   import { toHotkeyString, getShortcut, matchesShortcut, isTypingInField } from '../../utils/keyboardShortcuts.js';
@@ -160,7 +160,11 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     if (isModal && onclose) {
       onclose({ hasChanges: itemDetailStore.hasChanges });
     } else if (!isModal) {
-      navigate(`/workspaces/${workspaceId}`);
+      const collectionId = $currentRoute.params?.collectionId;
+      const url = collectionId
+        ? `/workspaces/${workspaceId}/collections/${collectionId}`
+        : `/workspaces/${workspaceId}`;
+      navigate(url);
     }
   }
 
@@ -233,7 +237,11 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   }
 
   function openFullDetails() {
-    navigate(`/workspaces/${workspaceId}/items/${itemId}`);
+    const collectionId = $currentRoute.params?.collectionId;
+    const url = collectionId
+      ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${itemId}`
+      : `/workspaces/${workspaceId}/items/${itemId}`;
+    navigate(url);
   }
 
   function tryHandleModalItemNavigation(path) {
@@ -293,7 +301,11 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   }
   
   function handleGoBack() {
-    navigate(`/workspaces/${workspaceId}/collections/default/list`);
+    const collectionId = $currentRoute.params?.collectionId;
+    const url = collectionId
+      ? `/workspaces/${workspaceId}/collections/${collectionId}/list`
+      : `/workspaces/${workspaceId}/list`;
+    navigate(url);
   }
   
   function showError(title, message) {
@@ -592,7 +604,11 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
         duration: 15000,
         clickable: true,
         onClick: () => {
-          navigate(`/workspaces/${workspaceId}/items/${copiedItem.id}`);
+          const collectionId = $currentRoute.params?.collectionId;
+          const url = collectionId
+            ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${copiedItem.id}`
+            : `/workspaces/${workspaceId}/items/${copiedItem.id}`;
+          navigate(url);
         }
       });
 
@@ -624,13 +640,20 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   }
 
   function handleDeleteComplete(result) {
+    const collectionId = $currentRoute.params?.collectionId;
     // Navigate based on deletion result
     if (result?.mode === 'reparent' && result?.newParentId) {
       // If reparenting, navigate to the new parent item
-      navigate(`/workspaces/${workspaceId}/items/${result.newParentId}`);
+      const url = collectionId
+        ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${result.newParentId}`
+        : `/workspaces/${workspaceId}/items/${result.newParentId}`;
+      navigate(url);
     } else {
       // Otherwise, navigate to workspace list
-      navigate(`/workspaces/${workspaceId}/list`);
+      const url = collectionId
+        ? `/workspaces/${workspaceId}/collections/${collectionId}/list`
+        : `/workspaces/${workspaceId}/list`;
+      navigate(url);
     }
   }
 

@@ -14,15 +14,15 @@ func RegisterPortalRoutes(deps *Deps) {
 	api.Handle("GET /portal/{slug}", deps.Portal.Portal.GetPortal)
 	api.Handle("GET /portal/{slug}/request-types", deps.Portal.Portal.GetRequestTypes)
 	api.Handle("GET /portal/{slug}/asset-reports", deps.Portal.Portal.GetAssetReports)
-	api.Handle("GET /portal/{slug}/asset-reports/{id}/execute", deps.Portal.Portal.ExecuteAssetReport)
+	api.HandleH("GET /portal/{slug}/asset-reports/{id}/execute", deps.PortalSearchLimiter.Limit(http.HandlerFunc(deps.Portal.Portal.ExecuteAssetReport)))
 	api.HandleH("POST /portal/{slug}/knowledge-base/search", deps.PortalSearchLimiter.Limit(http.HandlerFunc(deps.Portal.Portal.SearchKnowledgeBase)))
 
 	// Portal customer authentication endpoints (magic link)
 	if deps.Portal.PortalAuth != nil {
 		api.HandleH("POST /portal/{slug}/auth/request", deps.PortalAuthLimiter.Limit(http.HandlerFunc(deps.Portal.PortalAuth.RequestMagicLink)))
-		api.Handle("GET /portal/{slug}/auth/verify", deps.Portal.PortalAuth.VerifyMagicLink)
-		api.Handle("POST /portal/{slug}/auth/logout", deps.Portal.PortalAuth.Logout)
-		api.Handle("GET /portal/{slug}/auth/me", deps.Portal.PortalAuth.GetCurrentCustomer)
+		api.HandleH("GET /portal/{slug}/auth/verify", deps.PortalAuthLimiter.Limit(http.HandlerFunc(deps.Portal.PortalAuth.VerifyMagicLink)))
+		api.HandleH("POST /portal/{slug}/auth/logout", deps.PortalAuthLimiter.Limit(http.HandlerFunc(deps.Portal.PortalAuth.Logout)))
+		api.HandleH("GET /portal/{slug}/auth/me", deps.PortalAuthLimiter.Limit(http.HandlerFunc(deps.Portal.PortalAuth.GetCurrentCustomer)))
 	}
 
 	// Portal-authenticated endpoints (accept both internal and portal sessions)
@@ -40,7 +40,7 @@ func RegisterPortalRoutes(deps *Deps) {
 		api.HandleH("GET /portal/{slug}/my-requests", portalAuth(http.HandlerFunc(deps.Portal.Portal.GetMyRequests)))
 		api.HandleH("GET /portal/{slug}/requests/{itemId}", portalAuth(http.HandlerFunc(deps.Portal.Portal.GetRequestDetail)))
 		api.HandleH("GET /portal/{slug}/requests/{itemId}/comments", portalAuth(http.HandlerFunc(deps.Portal.Portal.GetRequestComments)))
-		api.HandleH("POST /portal/{slug}/requests/{itemId}/comments", portalAuth(http.HandlerFunc(deps.Portal.Portal.AddRequestComment)))
+		api.HandleH("POST /portal/{slug}/requests/{itemId}/comments", deps.PortalSubmitLimiter.Limit(portalAuth(http.HandlerFunc(deps.Portal.Portal.AddRequestComment))))
 	}
 
 	// Portal Customer Management

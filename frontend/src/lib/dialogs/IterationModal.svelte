@@ -25,7 +25,7 @@
     end_date: iteration?.end_date ? iteration.end_date.split('T')[0] : '',
     status: iteration?.status || 'planned',
     type_id: iteration?.type_id || null,
-    is_global: iteration?.is_global || false,
+    is_global: iteration ? iteration.is_global : !workspaceId,
     workspace_id: iteration?.workspace_id || (workspaceId ? parseInt(workspaceId) : null)
   });
 
@@ -126,6 +126,7 @@
         </div>
       {/if}
 
+      {#if workspaceId}
       <!-- Scope Toggle -->
       <div class="p-4 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
         <div class="flex items-center justify-between">
@@ -156,6 +157,7 @@
           {/if}
         </div>
       </div>
+      {/if}
 
       <!-- Name -->
       <div>

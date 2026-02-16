@@ -24,7 +24,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// GetJobStatus handles GET /api/jira-import/jobs/{jobId}
+// GetJobStatus handles GET /api/admin/jira-import/jobs/{jobId}
 func (h *JiraImportHandler) GetJobStatus(w http.ResponseWriter, r *http.Request) {
 	jobID := r.PathValue("jobId")
 
@@ -68,7 +68,7 @@ func (h *JiraImportHandler) GetJobStatus(w http.ResponseWriter, r *http.Request)
 	_ = json.NewEncoder(w).Encode(response)
 }
 
-// GetImportJobs handles GET /api/jira-import/jobs
+// GetImportJobs handles GET /api/admin/jira-import/jobs
 func (h *JiraImportHandler) GetImportJobs(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(`
 		SELECT j.id, j.connection_id, c.instance_url, c.instance_name, j.status, j.phase, j.scope,
@@ -134,7 +134,7 @@ func (h *JiraImportHandler) GetImportJobs(w http.ResponseWriter, r *http.Request
 	_ = json.NewEncoder(w).Encode(jobs)
 }
 
-// StartImport handles POST /api/jira-import/start
+// StartImport handles POST /api/admin/jira-import/start
 // Starts a background import job and returns immediately with the job ID
 func (h *JiraImportHandler) StartImport(w http.ResponseWriter, r *http.Request) {
 	var req StartImportRequest
@@ -1311,7 +1311,7 @@ func generateUUID() string {
 	return uuid.New().String()
 }
 
-// DeleteImportedData handles DELETE /api/jira-import/jobs/{jobId}/data
+// DeleteImportedData handles DELETE /api/admin/jira-import/jobs/{jobId}/data
 // Deletes all entities created during an import job for re-import purposes
 func (h *JiraImportHandler) DeleteImportedData(w http.ResponseWriter, r *http.Request) {
 	jobID := r.PathValue("jobId")
@@ -1425,7 +1425,7 @@ func (h *JiraImportHandler) DeleteImportedData(w http.ResponseWriter, r *http.Re
 	})
 }
 
-// GetPreviousImports handles GET /api/jira-import/previous-imports
+// GetPreviousImports handles GET /api/admin/jira-import/previous-imports
 // Returns previous imports for the same projects to enable re-import
 func (h *JiraImportHandler) GetPreviousImports(w http.ResponseWriter, r *http.Request) {
 	projectKeys := r.URL.Query()["project_key"]

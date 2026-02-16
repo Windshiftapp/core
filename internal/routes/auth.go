@@ -29,7 +29,7 @@ func RegisterAuthRoutes(deps *Deps) {
 	// Email verification endpoints
 	api.HandleH("GET /auth/verify-email", deps.EmailVerifyLimiter.Limit(http.HandlerFunc(deps.Auth.Auth.VerifyEmail)))
 	api.HandleH("POST /auth/resend-verification", deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Auth.Auth.ResendVerification)))
-	api.Handle("GET /auth/verification-status", deps.Auth.Auth.GetVerificationStatus)
+	api.HandleH("GET /auth/verification-status", deps.EmailVerifyLimiter.Limit(http.HandlerFunc(deps.Auth.Auth.GetVerificationStatus)))
 
 	// WebAuthn (FIDO) authentication endpoints
 	api.HandleH("POST /auth/webauthn/login/start", deps.FIDORateLimiter.Limit(http.HandlerFunc(deps.Auth.WebAuthn.StartFIDOLoginNew)))
@@ -37,7 +37,7 @@ func RegisterAuthRoutes(deps *Deps) {
 
 	// SSO (Single Sign-On) endpoints - Public with rate limiting
 	// Rate limiting prevents brute force attacks and DoS on SSO endpoints
-	api.Handle("GET /sso/status", deps.Auth.SSO.GetStatus)
+	api.HandleH("GET /sso/status", deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Auth.SSO.GetStatus)))
 	api.HandleH("GET /sso/login/{slug}", deps.SSORateLimiter.Limit(http.HandlerFunc(deps.Auth.SSO.StartLogin)))
 	api.HandleH("GET /sso/callback/{slug}", deps.SSORateLimiter.Limit(http.HandlerFunc(deps.Auth.SSO.Callback)))
 

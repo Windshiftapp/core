@@ -30,16 +30,21 @@ type Deps struct {
 	DisableCSRF          bool
 
 	// Rate limiters
-	LoginRateLimiter    RateLimiter
-	AuthRateLimiter     RateLimiter
-	FIDORateLimiter     RateLimiter
-	SSORateLimiter      RateLimiter // Rate limiter for SSO login/callback endpoints
-	SCIMRateLimiter     RateLimiter // Rate limiter for SCIM provisioning endpoints (10 req/sec)
-	PortalSubmitLimiter RateLimiter
-	PortalSearchLimiter RateLimiter
-	PortalAuthLimiter   RateLimiter // Rate limiter for portal magic link requests (3 req/min per IP)
-	EmailVerifyLimiter  RateLimiter
-	SetupLimiter        RateLimiter
+	LoginRateLimiter       RateLimiter
+	AuthRateLimiter        RateLimiter
+	FIDORateLimiter        RateLimiter
+	SSORateLimiter         RateLimiter // Rate limiter for SSO login/callback endpoints
+	SCIMRateLimiter        RateLimiter // Rate limiter for SCIM provisioning endpoints (10 req/sec)
+	PortalSubmitLimiter    RateLimiter
+	PortalSearchLimiter    RateLimiter
+	PortalAuthLimiter      RateLimiter // Rate limiter for portal magic link requests (3 req/min per IP)
+	EmailVerifyLimiter     RateLimiter
+	SetupLimiter           RateLimiter
+	AIRateLimiter          RateLimiter // Rate limiter for AI/LLM endpoints (5 req/min per IP)
+	UploadLimiter          RateLimiter // Rate limiter for file uploads (10 req/min per IP)
+	WebhookLimiter         RateLimiter // Rate limiter for webhook triggers (10 req/min per IP)
+	SearchLimiter          RateLimiter // Rate limiter for full-text search (20 req/min per IP)
+	CalendarFeedLimiter    RateLimiter // Rate limiter for public calendar feeds (10 req/min per IP)
 
 	// Handler groups organized by domain
 	Auth         AuthHandlers

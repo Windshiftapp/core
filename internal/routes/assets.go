@@ -7,12 +7,14 @@ func RegisterAssetRoutes(deps *Deps) {
 	api := deps.API
 	auth := deps.AuthMiddleware.RequireAuth
 
+	admin := deps.PermissionMiddleware.RequireSystemAdmin()
+
 	// Asset Sets
 	api.HandleH("GET /asset-sets", auth(http.HandlerFunc(deps.Assets.Asset.GetAssetSets)))
-	api.HandleH("POST /asset-sets", auth(http.HandlerFunc(deps.Assets.Asset.CreateAssetSet)))
 	api.HandleH("GET /asset-sets/{id}", auth(http.HandlerFunc(deps.Assets.Asset.GetAssetSet)))
-	api.HandleH("PUT /asset-sets/{id}", auth(http.HandlerFunc(deps.Assets.Asset.UpdateAssetSet)))
-	api.HandleH("DELETE /asset-sets/{id}", auth(http.HandlerFunc(deps.Assets.Asset.DeleteAssetSet)))
+	api.HandleH("POST /admin/asset-sets", admin(http.HandlerFunc(deps.Assets.Asset.CreateAssetSet)))
+	api.HandleH("PUT /admin/asset-sets/{id}", admin(http.HandlerFunc(deps.Assets.Asset.UpdateAssetSet)))
+	api.HandleH("DELETE /admin/asset-sets/{id}", admin(http.HandlerFunc(deps.Assets.Asset.DeleteAssetSet)))
 
 	// Asset Roles
 	api.HandleH("GET /asset-roles", auth(http.HandlerFunc(deps.Assets.Asset.GetAssetRoles)))

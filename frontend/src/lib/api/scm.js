@@ -3,34 +3,34 @@ import { fetchAPI } from './core.js';
 // SCM (Source Control Management) providers - GitHub, GitLab, Gitea, Bitbucket
 export const scmProviders = {
   // List all providers
-  getAll: () => fetchAPI('/scm-providers'),
+  getAll: () => fetchAPI('/admin/scm-providers'),
 
   // Get a specific provider
-  get: (id) => fetchAPI(`/scm-providers/${id}`),
+  get: (id) => fetchAPI(`/admin/scm-providers/${id}`),
 
   // Create a new provider
   create: (data) =>
-    fetchAPI('/scm-providers', {
+    fetchAPI('/admin/scm-providers', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
   // Update a provider
   update: (id, data) =>
-    fetchAPI(`/scm-providers/${id}`, {
+    fetchAPI(`/admin/scm-providers/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
 
   // Delete a provider
   delete: (id) =>
-    fetchAPI(`/scm-providers/${id}`, {
+    fetchAPI(`/admin/scm-providers/${id}`, {
       method: 'DELETE',
     }),
 
   // Test provider connection
   test: (id) =>
-    fetchAPI(`/scm-providers/${id}/test`, {
+    fetchAPI(`/admin/scm-providers/${id}/test`, {
       method: 'POST',
     }),
 
@@ -38,25 +38,25 @@ export const scmProviders = {
   startOAuth: (slug) => fetchAPI(`/scm/oauth/${slug}/start`),
 
   // Get allowed workspaces for a provider
-  getAllowedWorkspaces: (id) => fetchAPI(`/scm-providers/${id}/allowed-workspaces`),
+  getAllowedWorkspaces: (id) => fetchAPI(`/admin/scm-providers/${id}/allowed-workspaces`),
 
   // Update allowed workspaces (replace entire list)
   updateAllowedWorkspaces: (id, workspaceIds) =>
-    fetchAPI(`/scm-providers/${id}/allowed-workspaces`, {
+    fetchAPI(`/admin/scm-providers/${id}/allowed-workspaces`, {
       method: 'PUT',
       body: JSON.stringify({ workspace_ids: workspaceIds }),
     }),
 
   // Add a workspace to the allowlist
   addAllowedWorkspace: (id, workspaceId) =>
-    fetchAPI(`/scm-providers/${id}/allowed-workspaces`, {
+    fetchAPI(`/admin/scm-providers/${id}/allowed-workspaces`, {
       method: 'POST',
       body: JSON.stringify({ workspace_id: workspaceId }),
     }),
 
   // Remove a workspace from the allowlist
   removeAllowedWorkspace: (id, workspaceId) =>
-    fetchAPI(`/scm-providers/${id}/allowed-workspaces/${workspaceId}`, {
+    fetchAPI(`/admin/scm-providers/${id}/allowed-workspaces/${workspaceId}`, {
       method: 'DELETE',
     }),
 };

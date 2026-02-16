@@ -36,6 +36,9 @@ const (
 	ErrCodeConflict                = "CONFLICT"
 	ErrCodeAlreadyExists           = "ALREADY_EXISTS"
 
+	// Feature flags
+	ErrCodePluginsDisabled = "PLUGINS_DISABLED"
+
 	// Rate limiting
 	ErrCodeRateLimited = "RATE_LIMITED"
 
@@ -99,6 +102,7 @@ var (
 	ErrTestSetNotFound         = NewAPIError(http.StatusNotFound, ErrCodeTestSetNotFound, "Test set not found")
 	ErrPortalNotFound          = NewAPIError(http.StatusNotFound, ErrCodePortalNotFound, "Portal not found")
 	ErrAssetNotFound           = NewAPIError(http.StatusNotFound, ErrCodeAssetNotFound, "Asset not found")
+	ErrPluginsDisabled         = NewAPIError(http.StatusForbidden, ErrCodePluginsDisabled, "Plugin system is disabled")
 	ErrValidationFailed        = NewAPIError(http.StatusBadRequest, ErrCodeValidationFailed, "Validation failed")
 	ErrInvalidInput            = NewAPIError(http.StatusBadRequest, ErrCodeInvalidInput, "Invalid input")
 	ErrRateLimited             = NewAPIError(http.StatusTooManyRequests, ErrCodeRateLimited, "Rate limit exceeded")
