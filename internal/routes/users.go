@@ -10,11 +10,11 @@ func RegisterUserRoutes(deps *Deps) {
 
 	// User endpoints
 	api.HandleH("GET /users", auth(http.HandlerFunc(deps.Users.User.GetAll)))
-	api.HandleH("POST /users", admin(http.HandlerFunc(deps.Users.User.Create)))
+	api.HandleH("POST /users", admin(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.User.Create))))
 	api.HandleH("GET /users/{id}", auth(http.HandlerFunc(deps.Users.User.Get)))
 	api.HandleH("PUT /users/{id}", admin(http.HandlerFunc(deps.Users.User.Update)))
 	api.HandleH("DELETE /users/{id}", admin(http.HandlerFunc(deps.Users.User.Delete)))
-	api.HandleH("POST /users/{id}/reset-password", admin(http.HandlerFunc(deps.Users.User.ResetPassword)))
+	api.HandleH("POST /users/{id}/reset-password", admin(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.User.ResetPassword))))
 	api.HandleH("PUT /users/{id}/avatar", auth(http.HandlerFunc(deps.Users.User.UpdateAvatar)))
 	api.HandleH("PUT /users/{id}/regional-settings", auth(http.HandlerFunc(deps.Users.User.UpdateRegionalSettings)))
 	api.HandleH("POST /users/{id}/activate", admin(http.HandlerFunc(deps.Users.User.ActivateUser)))
@@ -61,8 +61,8 @@ func RegisterUserRoutes(deps *Deps) {
 
 	// User Credential endpoints
 	api.HandleH("GET /users/{userId}/credentials", auth(http.HandlerFunc(deps.Users.Credential.GetUserCredentials)))
-	api.HandleH("POST /users/{userId}/credentials/webauthn/register/start", auth(http.HandlerFunc(deps.Auth.WebAuthn.StartFIDORegistrationNew)))
-	api.HandleH("POST /users/{userId}/credentials/webauthn/register/complete", auth(http.HandlerFunc(deps.Auth.WebAuthn.CompleteFIDORegistrationNew)))
+	api.HandleH("POST /users/{userId}/credentials/webauthn/register/start", auth(deps.FIDORateLimiter.Limit(http.HandlerFunc(deps.Auth.WebAuthn.StartFIDORegistrationNew))))
+	api.HandleH("POST /users/{userId}/credentials/webauthn/register/complete", auth(deps.FIDORateLimiter.Limit(http.HandlerFunc(deps.Auth.WebAuthn.CompleteFIDORegistrationNew))))
 	api.HandleH("GET /users/{userId}/credentials/webauthn", auth(http.HandlerFunc(deps.Auth.WebAuthn.GetWebAuthnCredentials)))
 	api.HandleH("DELETE /users/{userId}/credentials/webauthn/{credentialId}", auth(http.HandlerFunc(deps.Auth.WebAuthn.RemoveWebAuthnCredential)))
 	api.HandleH("POST /users/{userId}/credentials/ssh", auth(http.HandlerFunc(deps.Users.Credential.CreateSSHKey)))
@@ -70,12 +70,12 @@ func RegisterUserRoutes(deps *Deps) {
 
 	// App Token endpoints
 	api.HandleH("GET /users/{userId}/tokens", auth(http.HandlerFunc(deps.Users.AppToken.GetUserAppTokens)))
-	api.HandleH("POST /users/{userId}/tokens", auth(http.HandlerFunc(deps.Users.AppToken.CreateAppToken)))
+	api.HandleH("POST /users/{userId}/tokens", auth(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.AppToken.CreateAppToken))))
 	api.HandleH("PUT /users/{userId}/tokens/{tokenId}", auth(http.HandlerFunc(deps.Users.AppToken.UpdateAppToken)))
 	api.HandleH("DELETE /users/{userId}/tokens/{tokenId}", auth(http.HandlerFunc(deps.Users.AppToken.RevokeAppToken)))
 
 	// API Token endpoints
-	api.HandleH("POST /api-tokens", auth(http.HandlerFunc(deps.Users.APIToken.CreateToken)))
+	api.HandleH("POST /api-tokens", auth(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.APIToken.CreateToken))))
 	api.HandleH("GET /api-tokens", auth(http.HandlerFunc(deps.Users.APIToken.GetUserTokens)))
 	api.HandleH("GET /api-tokens/{id}", auth(http.HandlerFunc(deps.Users.APIToken.GetToken)))
 	api.HandleH("DELETE /api-tokens/{id}", auth(http.HandlerFunc(deps.Users.APIToken.RevokeToken)))

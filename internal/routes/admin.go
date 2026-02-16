@@ -35,7 +35,7 @@ func RegisterAdminRoutes(deps *Deps) {
 
 	// Plugin management endpoints
 	api.HandleH("GET /plugins", admin(http.HandlerFunc(deps.Admin.Plugin.ListPlugins)))
-	api.HandleH("POST /plugins/upload", admin(http.HandlerFunc(deps.Admin.Plugin.UploadPlugin)))
+	api.HandleH("POST /plugins/upload", admin(deps.UploadLimiter.Limit(http.HandlerFunc(deps.Admin.Plugin.UploadPlugin))))
 	api.HandleH("GET /plugins/extensions", auth(http.HandlerFunc(deps.Admin.Plugin.GetExtensions)))
 	api.HandleH("GET /plugins/{name}/assets/{asset...}", http.HandlerFunc(deps.Admin.Plugin.GetAsset))
 	api.HandleH("PUT /plugins/{name}/toggle", admin(http.HandlerFunc(deps.Admin.Plugin.TogglePlugin)))
@@ -46,16 +46,16 @@ func RegisterAdminRoutes(deps *Deps) {
 	api.HandleH("POST /admin/api-tokens/cleanup", admin(http.HandlerFunc(deps.Users.APIToken.CleanupExpiredTokens)))
 
 	// Jira Import endpoints
-	api.HandleH("GET /jira-import/connections", admin(http.HandlerFunc(deps.Admin.JiraImport.GetConnections)))
-	api.HandleH("DELETE /jira-import/connections/{connectionId}", admin(http.HandlerFunc(deps.Admin.JiraImport.DeleteConnection)))
-	api.HandleH("POST /jira-import/connect", admin(http.HandlerFunc(deps.Admin.JiraImport.Connect)))
-	api.HandleH("GET /jira-import/projects", admin(http.HandlerFunc(deps.Admin.JiraImport.GetProjects)))
-	api.HandleH("POST /jira-import/analyze", admin(http.HandlerFunc(deps.Admin.JiraImport.Analyze)))
-	api.HandleH("GET /jira-import/assets", admin(http.HandlerFunc(deps.Admin.JiraImport.GetAssetSchemas)))
-	api.HandleH("GET /jira-import/assets/{schemaId}/types", admin(http.HandlerFunc(deps.Admin.JiraImport.GetAssetTypes)))
-	api.HandleH("GET /jira-import/jobs", admin(http.HandlerFunc(deps.Admin.JiraImport.GetImportJobs)))
-	api.HandleH("GET /jira-import/jobs/{jobId}", admin(http.HandlerFunc(deps.Admin.JiraImport.GetJobStatus)))
-	api.HandleH("DELETE /jira-import/jobs/{jobId}/data", admin(http.HandlerFunc(deps.Admin.JiraImport.DeleteImportedData)))
-	api.HandleH("POST /jira-import/start", admin(http.HandlerFunc(deps.Admin.JiraImport.StartImport)))
-	api.HandleH("GET /jira-import/previous-imports", admin(http.HandlerFunc(deps.Admin.JiraImport.GetPreviousImports)))
+	api.HandleH("GET /admin/jira-import/connections", admin(http.HandlerFunc(deps.Admin.JiraImport.GetConnections)))
+	api.HandleH("DELETE /admin/jira-import/connections/{connectionId}", admin(http.HandlerFunc(deps.Admin.JiraImport.DeleteConnection)))
+	api.HandleH("POST /admin/jira-import/connect", admin(http.HandlerFunc(deps.Admin.JiraImport.Connect)))
+	api.HandleH("GET /admin/jira-import/projects", admin(http.HandlerFunc(deps.Admin.JiraImport.GetProjects)))
+	api.HandleH("POST /admin/jira-import/analyze", admin(http.HandlerFunc(deps.Admin.JiraImport.Analyze)))
+	api.HandleH("GET /admin/jira-import/assets", admin(http.HandlerFunc(deps.Admin.JiraImport.GetAssetSchemas)))
+	api.HandleH("GET /admin/jira-import/assets/{schemaId}/types", admin(http.HandlerFunc(deps.Admin.JiraImport.GetAssetTypes)))
+	api.HandleH("GET /admin/jira-import/jobs", admin(http.HandlerFunc(deps.Admin.JiraImport.GetImportJobs)))
+	api.HandleH("GET /admin/jira-import/jobs/{jobId}", admin(http.HandlerFunc(deps.Admin.JiraImport.GetJobStatus)))
+	api.HandleH("DELETE /admin/jira-import/jobs/{jobId}/data", admin(http.HandlerFunc(deps.Admin.JiraImport.DeleteImportedData)))
+	api.HandleH("POST /admin/jira-import/start", admin(deps.SetupLimiter.Limit(http.HandlerFunc(deps.Admin.JiraImport.StartImport))))
+	api.HandleH("GET /admin/jira-import/previous-imports", admin(http.HandlerFunc(deps.Admin.JiraImport.GetPreviousImports)))
 }

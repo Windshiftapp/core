@@ -11,7 +11,7 @@ func RegisterItemRoutes(deps *Deps) {
 	// Item endpoints
 	api.HandleH("GET /items", auth(http.HandlerFunc(deps.Items.Item.GetAll)))
 	api.HandleH("POST /items", auth(http.HandlerFunc(deps.Items.Item.Create)))
-	api.HandleH("GET /items/search", auth(http.HandlerFunc(deps.Items.Item.Search)))
+	api.HandleH("GET /items/search", auth(deps.SearchLimiter.Limit(http.HandlerFunc(deps.Items.Item.Search))))
 	api.HandleH("GET /items/backlog", auth(http.HandlerFunc(deps.Items.Item.GetBacklogItems)))
 	api.HandleH("GET /items/cache-stats", auth(http.HandlerFunc(deps.Items.Item.GetCacheStats)))
 	api.HandleH("GET /items/{id}", auth(http.HandlerFunc(deps.Items.Item.Get)))
@@ -25,12 +25,10 @@ func RegisterItemRoutes(deps *Deps) {
 	api.HandleH("GET /items/{id}/history", auth(http.HandlerFunc(deps.Items.Item.GetItemHistory)))
 
 	// Item hierarchy endpoints
-	api.HandleH("GET /items/{id}/children", auth(http.HandlerFunc(deps.Items.Item.GetChildren)))
+	api.HandleH("GET /items/{id}/children", auth(http.HandlerFunc(deps.Items.Item.GetChildrenNew)))
 	api.HandleH("GET /items/{id}/ancestors", auth(http.HandlerFunc(deps.Items.Item.GetAncestors)))
-	api.HandleH("GET /items/{id}/descendants-new", auth(http.HandlerFunc(deps.Items.Item.GetDescendantsNew)))
-	api.HandleH("GET /items/{id}/descendants", auth(http.HandlerFunc(deps.Items.Item.GetDescendantsNew))) // Alias for backwards compatibility
+	api.HandleH("GET /items/{id}/descendants", auth(http.HandlerFunc(deps.Items.Item.GetDescendantsNew)))
 	api.HandleH("GET /items/{id}/tree", auth(http.HandlerFunc(deps.Items.Item.GetTree)))
-	api.HandleH("GET /items/{id}/children-new", auth(http.HandlerFunc(deps.Items.Item.GetChildrenNew)))
 
 	// Item watch endpoints
 	api.HandleH("POST /items/{id}/watch", auth(http.HandlerFunc(deps.Items.Item.AddWatch)))
@@ -66,7 +64,7 @@ func RegisterItemRoutes(deps *Deps) {
 
 	// Attachment endpoints (only if enabled)
 	if deps.Items.Attachment != nil {
-		api.HandleH("POST /attachments/upload", auth(http.HandlerFunc(deps.Items.Attachment.Upload)))
+		api.HandleH("POST /attachments/upload", auth(deps.UploadLimiter.Limit(http.HandlerFunc(deps.Items.Attachment.Upload))))
 		api.HandleH("GET /attachments/{id}/download", auth(http.HandlerFunc(deps.Items.Attachment.Download)))
 		api.HandleH("GET /attachments/{id}/thumbnail", auth(http.HandlerFunc(deps.Items.Attachment.Thumbnail)))
 		api.HandleH("DELETE /attachments/{id}", auth(http.HandlerFunc(deps.Items.Attachment.Delete)))

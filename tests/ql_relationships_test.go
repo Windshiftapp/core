@@ -291,7 +291,7 @@ func TestQLLinkedOf(t *testing.T) {
 			"description":   "Blocking relationship",
 		}
 
-		linkTypeResp := MakeAuthRequest(t, server, http.MethodPost, "/link-types", linkTypeData)
+		linkTypeResp := MakeAuthRequest(t, server, http.MethodPost, "/admin/link-types", linkTypeData)
 		defer linkTypeResp.Body.Close()
 
 		AssertStatusCode(t, linkTypeResp, http.StatusCreated)

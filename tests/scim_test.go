@@ -105,7 +105,7 @@ func TestSCIM_TokenManagement(t *testing.T) {
 			"name": "Test SCIM Token",
 		}
 
-		resp := MakeAuthRequest(t, server, http.MethodPost, "/scim-tokens", tokenData)
+		resp := MakeAuthRequest(t, server, http.MethodPost, "/admin/scim-tokens", tokenData)
 		defer resp.Body.Close()
 
 		AssertStatusCode(t, resp, http.StatusCreated)
@@ -138,7 +138,7 @@ func TestSCIM_TokenManagement(t *testing.T) {
 	})
 
 	t.Run("ListTokens", func(t *testing.T) {
-		resp := MakeAuthRequest(t, server, http.MethodGet, "/scim-tokens", nil)
+		resp := MakeAuthRequest(t, server, http.MethodGet, "/admin/scim-tokens", nil)
 		defer resp.Body.Close()
 
 		AssertStatusCode(t, resp, http.StatusOK)
@@ -159,7 +159,7 @@ func TestSCIM_TokenManagement(t *testing.T) {
 	})
 
 	t.Run("GetToken", func(t *testing.T) {
-		resp := MakeAuthRequest(t, server, http.MethodGet, fmt.Sprintf("/scim-tokens/%d", tokenID), nil)
+		resp := MakeAuthRequest(t, server, http.MethodGet, fmt.Sprintf("/admin/scim-tokens/%d", tokenID), nil)
 		defer resp.Body.Close()
 
 		AssertStatusCode(t, resp, http.StatusOK)
@@ -171,13 +171,13 @@ func TestSCIM_TokenManagement(t *testing.T) {
 	})
 
 	t.Run("RevokeToken", func(t *testing.T) {
-		resp := MakeAuthRequest(t, server, http.MethodDelete, fmt.Sprintf("/scim-tokens/%d", tokenID), nil)
+		resp := MakeAuthRequest(t, server, http.MethodDelete, fmt.Sprintf("/admin/scim-tokens/%d", tokenID), nil)
 		defer resp.Body.Close()
 
 		AssertStatusCode(t, resp, http.StatusNoContent)
 
 		// Verify token is revoked
-		getResp := MakeAuthRequest(t, server, http.MethodGet, fmt.Sprintf("/scim-tokens/%d", tokenID), nil)
+		getResp := MakeAuthRequest(t, server, http.MethodGet, fmt.Sprintf("/admin/scim-tokens/%d", tokenID), nil)
 		defer getResp.Body.Close()
 
 		// Either 404 or inactive token

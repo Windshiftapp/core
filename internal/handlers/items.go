@@ -235,6 +235,7 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	// Determine sort order
 	sortBy := r.URL.Query().Get("order_by")
+	sortAsc := strings.EqualFold(r.URL.Query().Get("sort_direction"), "asc")
 
 	// Call service
 	items, totalCount, err := h.itemCRUD.ListWithQL(services.ListWithQLParams{
@@ -247,7 +248,8 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			Limit:  limit,
 			Offset: offset,
 		},
-		SortBy: sortBy,
+		SortBy:  sortBy,
+		SortAsc: sortAsc,
 	})
 	if err != nil {
 		// Check for QL-specific errors to return as validation errors

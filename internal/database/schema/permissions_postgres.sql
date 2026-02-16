@@ -196,7 +196,7 @@ CREATE INDEX IF NOT EXISTS idx_group_global_permissions_permission_id ON group_g
 INSERT INTO permissions (permission_key, permission_name, description, scope, is_system) VALUES
 	('system.admin', 'System Administrator', 'Full system administration access', 'global', true),
 	('workspace.create', 'Create Workspaces', 'Can create new workspaces', 'global', false),
-	('milestone.create', 'Create Milestones', 'Can create milestones', 'global', false),
+	('milestone.create', 'Manage Global Milestones', 'Can create and manage global milestones visible across all workspaces', 'global', false),
 	('iteration.manage', 'Manage Global Iterations', 'Can create and manage global iterations visible across all workspaces', 'global', false),
 	('user.list', 'List Users', 'Can view the user directory', 'global', false),
 	('asset.manage', 'Manage Asset Sets', 'Can create and manage asset management sets', 'global', false),

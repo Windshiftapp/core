@@ -10,7 +10,7 @@ import (
 	"windshift/internal/jira"
 )
 
-// GetProjects handles GET /api/jira-import/projects?connection_id={id}&open_issues_only=true
+// GetProjects handles GET /api/admin/jira-import/projects?connection_id={id}&open_issues_only=true
 func (h *JiraImportHandler) GetProjects(w http.ResponseWriter, r *http.Request) {
 	connectionID := r.URL.Query().Get("connection_id")
 	if connectionID == "" {
@@ -65,7 +65,7 @@ func (h *JiraImportHandler) GetProjects(w http.ResponseWriter, r *http.Request) 
 	_ = json.NewEncoder(w).Encode(projectInfos)
 }
 
-// Analyze handles POST /api/jira-import/analyze
+// Analyze handles POST /api/admin/jira-import/analyze
 func (h *JiraImportHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 	var req JiraAnalyzeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -325,7 +325,7 @@ func (h *JiraImportHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(result)
 }
 
-// GetAssetSchemas handles GET /api/jira-import/assets?connection_id={id}
+// GetAssetSchemas handles GET /api/admin/jira-import/assets?connection_id={id}
 func (h *JiraImportHandler) GetAssetSchemas(w http.ResponseWriter, r *http.Request) {
 	connectionID := r.URL.Query().Get("connection_id")
 	if connectionID == "" {
@@ -366,7 +366,7 @@ func (h *JiraImportHandler) GetAssetSchemas(w http.ResponseWriter, r *http.Reque
 	_ = json.NewEncoder(w).Encode(schemaInfos)
 }
 
-// GetAssetTypes handles GET /api/jira-import/assets/{schemaId}/types?connection_id={id}
+// GetAssetTypes handles GET /api/admin/jira-import/assets/{schemaId}/types?connection_id={id}
 func (h *JiraImportHandler) GetAssetTypes(w http.ResponseWriter, r *http.Request) {
 	schemaID := r.PathValue("schemaId")
 	connectionID := r.URL.Query().Get("connection_id")

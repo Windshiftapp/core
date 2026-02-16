@@ -30,7 +30,7 @@ func RegisterChannelRoutes(deps *Deps) {
 	api.HandleH("POST /channels/{id}/managers", channelMgmt(http.HandlerFunc(deps.Channels.Channel.AddChannelManager)))
 	api.HandleH("DELETE /channels/{id}/managers/{managerId}", channelMgmt(http.HandlerFunc(deps.Channels.Channel.RemoveChannelManager)))
 	api.HandleH("POST /channels/{id}/test-config", channelMgmt(http.HandlerFunc(deps.Channels.Channel.TestChannelConfig)))
-	api.HandleH("POST /channels/{id}/process-emails", auth(http.HandlerFunc(deps.Channels.Channel.ProcessEmailsNow)))
+	api.HandleH("POST /channels/{id}/process-emails", auth(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Channels.Channel.ProcessEmailsNow))))
 	api.HandleH("GET /channels/{id}/email-log", channelMgmt(http.HandlerFunc(deps.Channels.Channel.GetEmailLog)))
 
 	// Channel email OAuth endpoints
@@ -70,6 +70,6 @@ func RegisterChannelRoutes(deps *Deps) {
 	api.HandleH("DELETE /notification-templates/{id}", admin(http.HandlerFunc(deps.Channels.NotificationTemplate.DeleteTemplate)))
 
 	// Webhook manual trigger endpoints
-	api.HandleH("POST /webhooks/{webhookId}/trigger", auth(http.HandlerFunc(deps.Channels.Webhook.TriggerWebhook)))
+	api.HandleH("POST /webhooks/{webhookId}/trigger", auth(deps.WebhookLimiter.Limit(http.HandlerFunc(deps.Channels.Webhook.TriggerWebhook))))
 	api.HandleH("GET /items/{id}/webhooks", auth(http.HandlerFunc(deps.Channels.Webhook.GetWebhooksForItem)))
 }

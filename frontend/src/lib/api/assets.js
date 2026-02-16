@@ -4,17 +4,17 @@ export const assetSets = {
   getAll: () => fetchAPI('/asset-sets'),
   get: (id) => fetchAPI(`/asset-sets/${id}`),
   create: (data) =>
-    fetchAPI('/asset-sets', {
+    fetchAPI('/admin/asset-sets', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   update: (id, data) =>
-    fetchAPI(`/asset-sets/${id}`, {
+    fetchAPI(`/admin/asset-sets/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
   delete: (id) =>
-    fetchAPI(`/asset-sets/${id}`, {
+    fetchAPI(`/admin/asset-sets/${id}`, {
       method: 'DELETE',
     }),
   // Set role assignments

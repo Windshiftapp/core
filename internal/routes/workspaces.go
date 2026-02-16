@@ -50,9 +50,9 @@ func RegisterWorkspaceRoutes(deps *Deps) {
 	api.HandleH("PUT /configuration-sets/{id}", admin(http.HandlerFunc(deps.Workspaces.ConfigSet.Update)))
 	api.HandleH("DELETE /configuration-sets/{id}", admin(http.HandlerFunc(deps.Workspaces.ConfigSet.Delete)))
 	api.HandleH("GET /configuration-sets/{id}/analyze-migration", auth(http.HandlerFunc(deps.Workspaces.ConfigSet.AnalyzeMigration)))
-	api.HandleH("POST /configuration-sets/execute-migration", admin(http.HandlerFunc(deps.Workspaces.ConfigSet.ExecuteMigration)))
+	api.HandleH("POST /configuration-sets/execute-migration", admin(deps.SetupLimiter.Limit(http.HandlerFunc(deps.Workspaces.ConfigSet.ExecuteMigration))))
 	api.HandleH("GET /configuration-sets/{id}/analyze-comprehensive-migration", auth(http.HandlerFunc(deps.Workspaces.ConfigSet.AnalyzeComprehensiveMigration)))
-	api.HandleH("POST /configuration-sets/execute-comprehensive-migration", admin(http.HandlerFunc(deps.Workspaces.ConfigSet.ExecuteComprehensiveMigration)))
+	api.HandleH("POST /configuration-sets/execute-comprehensive-migration", admin(deps.SetupLimiter.Limit(http.HandlerFunc(deps.Workspaces.ConfigSet.ExecuteComprehensiveMigration))))
 
 	// Notification Settings endpoints
 	api.HandleH("GET /notification-settings", auth(http.HandlerFunc(deps.Workspaces.NotificationSettings.GetNotificationSettings)))

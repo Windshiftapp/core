@@ -56,13 +56,11 @@ export const items = {
     return fetchAPI(`/items/backlog?${params}`);
   },
   getChildren: (itemId) => fetchAPI(`/items/${itemId}/children`),
-  // New hierarchy endpoints using parent-only approach
   getAncestors: (itemId) => fetchAPI(`/items/${itemId}/ancestors`),
-  getDescendantsNew: (itemId, maxDepth = null) => {
+  getDescendants: (itemId, maxDepth = null) => {
     const params = maxDepth ? `?max_depth=${maxDepth}` : '';
-    return fetchAPI(`/items/${itemId}/descendants-new${params}`);
+    return fetchAPI(`/items/${itemId}/descendants${params}`);
   },
-  getChildrenNew: (itemId) => fetchAPI(`/items/${itemId}/children-new`),
   // Get available status transitions for a specific item based on workflow configuration
   getAvailableStatusTransitions: (itemId) =>
     fetchAPI(`/items/${itemId}/available-status-transitions`),

@@ -111,7 +111,7 @@ CREATE INDEX idx_permissions_key ON permissions(permission_key);
 INSERT INTO permissions (permission_key, permission_name, description, scope, is_system) VALUES
 ('system.admin', 'System Administrator', 'Full system administration access', 'global', 1),
 ('workspace.create', 'Create Workspaces', 'Can create new workspaces', 'global', 0),
-('milestone.create', 'Create Milestones', 'Can create milestones', 'global', 0),
+('milestone.create', 'Manage Global Milestones', 'Can create and manage global milestones visible across all workspaces', 'global', 0),
 ('user.list', 'List Users', 'Can view the user directory', 'global', 0),
 ('workspace.admin', 'Manage Workspace', 'Full administration access to a workspace including settings and configuration', 'workspace', 0),
 ('item.view', 'View Workspace & Items', 'Can view workspace and work items', 'workspace', 0),

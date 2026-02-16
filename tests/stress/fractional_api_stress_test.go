@@ -211,7 +211,7 @@ func testFracAPI_Phase2_RerankingOperations(t *testing.T, server *tests.TestServ
 	for i := 0; i < numReranks; i++ {
 		// Get ALL items globally sorted by frac_index (matching how fractional indexing works)
 		// frac_index is globally unique, not per-workspace
-		itemsResp := tests.MakeAuthRequest(t, server, http.MethodGet, "/items?limit=10000&order_by=frac_index", nil)
+		itemsResp := tests.MakeAuthRequest(t, server, http.MethodGet, "/items?limit=10000&order_by=frac_index&sort_direction=asc", nil)
 
 		var itemsResult map[string]interface{}
 		tests.DecodeJSON(t, itemsResp, &itemsResult)

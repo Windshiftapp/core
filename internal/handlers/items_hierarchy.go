@@ -11,64 +11,6 @@ import (
 	"windshift/internal/repository"
 )
 
-// GetChildren returns direct children of an item
-func (h *ItemHandler) GetChildren(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// Require authentication
-	user := h.getUserFromContext(r)
-	if user == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	// Get parent workspace for permission check
-	repo := repository.NewItemRepository(h.db)
-	parentWorkspaceID, err := repo.GetWorkspaceID(id)
-	if err != nil {
-		if err == repository.ErrNotFound {
-			respondNotFound(w, r, "item")
-			return
-		}
-		respondInternalError(w, r, fmt.Errorf("failed to fetch parent item: %w", err))
-		return
-	}
-
-	// Check permission
-	canView, err := h.canViewItem(user.ID, parentWorkspaceID)
-	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
-		return
-	}
-	if !canView {
-		respondNotFound(w, r, "Item")
-		return
-	}
-
-	// Get children using repository
-	children, err := repo.GetChildren(id)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Convert to slice (non-pointer) for JSON encoding
-	result := make([]models.Item, len(children))
-	for i, child := range children {
-		result[i] = *child
-	}
-
-	// Load labels
-	if err := LoadLabelsForItems(h.db, result); err != nil {
-		slog.Warn("failed to load labels for children", slog.Any("error", err))
-	}
-
-	respondJSONOK(w, result)
-}
-
 // GetAncestors returns all ancestors of an item (for breadcrumbs)
 func (h *ItemHandler) GetAncestors(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")

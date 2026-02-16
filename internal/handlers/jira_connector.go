@@ -40,7 +40,7 @@ func NewJiraImportHandler(db database.Database) *JiraImportHandler {
 	}
 }
 
-// Connect handles POST /api/jira-import/connect
+// Connect handles POST /api/admin/jira-import/connect
 func (h *JiraImportHandler) Connect(w http.ResponseWriter, r *http.Request) {
 	var req JiraConnectRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -108,7 +108,7 @@ func (h *JiraImportHandler) Connect(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GetConnections handles GET /api/jira-import/connections
+// GetConnections handles GET /api/admin/jira-import/connections
 func (h *JiraImportHandler) GetConnections(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(`
 		SELECT id, instance_url, email, instance_name, deployment_type, created_at, last_used_at
@@ -150,7 +150,7 @@ func (h *JiraImportHandler) GetConnections(w http.ResponseWriter, r *http.Reques
 	_ = json.NewEncoder(w).Encode(connections)
 }
 
-// DeleteConnection handles DELETE /api/jira-import/connections/{connectionId}
+// DeleteConnection handles DELETE /api/admin/jira-import/connections/{connectionId}
 func (h *JiraImportHandler) DeleteConnection(w http.ResponseWriter, r *http.Request) {
 	connectionID := r.PathValue("connectionId")
 

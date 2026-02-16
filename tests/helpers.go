@@ -439,7 +439,7 @@ func CreateTestCustomField(t *testing.T, testServer *TestServer, name, fieldType
 		fieldData["options"] = options
 	}
 
-	resp := MakeAuthRequest(t, testServer, http.MethodPost, "/custom-fields", fieldData)
+	resp := MakeAuthRequest(t, testServer, http.MethodPost, "/admin/custom-fields", fieldData)
 	defer resp.Body.Close()
 
 	AssertStatusCode(t, resp, http.StatusCreated)
@@ -968,7 +968,7 @@ func CreateSCIMToken(t *testing.T, testServer *TestServer, name string) string {
 		"name": name,
 	}
 
-	resp := MakeAuthRequest(t, testServer, http.MethodPost, "/scim-tokens", tokenData)
+	resp := MakeAuthRequest(t, testServer, http.MethodPost, "/admin/scim-tokens", tokenData)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {

@@ -10,6 +10,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/plugins"
+	"windshift/internal/restapi"
 )
 
 // PluginHandler handles plugin-related HTTP requests
@@ -43,6 +44,11 @@ type PluginInfo struct {
 
 // ListPlugins returns all installed plugins
 func (h *PluginHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
+	if h.pluginsDisabled {
+		respondError(w, r, restapi.ErrPluginsDisabled)
+		return
+	}
+
 	// Get plugins from database
 	rows, err := h.db.Query(`
 		SELECT id, name, version, description, author, enabled, routes, extensions, installed_at
@@ -127,7 +133,7 @@ func (h *PluginHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
 // UploadPlugin handles plugin upload
 func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
 	if h.pluginsDisabled {
-		respondForbidden(w, r)
+		respondError(w, r, restapi.ErrPluginsDisabled)
 		return
 	}
 
@@ -195,6 +201,11 @@ func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
 
 // GetExtensions returns all extensions from enabled plugins
 func (h *PluginHandler) GetExtensions(w http.ResponseWriter, r *http.Request) {
+	if h.pluginsDisabled {
+		respondError(w, r, restapi.ErrPluginsDisabled)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 
 	if h.manager == nil {
@@ -208,6 +219,11 @@ func (h *PluginHandler) GetExtensions(w http.ResponseWriter, r *http.Request) {
 
 // GetAsset serves a static asset from a plugin
 func (h *PluginHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
+	if h.pluginsDisabled {
+		respondError(w, r, restapi.ErrPluginsDisabled)
+		return
+	}
+
 	if h.manager == nil {
 		respondNotFound(w, r, "Plugin system")
 		return
@@ -231,7 +247,7 @@ func (h *PluginHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
 // TogglePlugin enables or disables a plugin
 func (h *PluginHandler) TogglePlugin(w http.ResponseWriter, r *http.Request) {
 	if h.pluginsDisabled {
-		respondForbidden(w, r)
+		respondError(w, r, restapi.ErrPluginsDisabled)
 		return
 	}
 
@@ -271,7 +287,7 @@ func (h *PluginHandler) TogglePlugin(w http.ResponseWriter, r *http.Request) {
 // DeletePlugin removes a plugin
 func (h *PluginHandler) DeletePlugin(w http.ResponseWriter, r *http.Request) {
 	if h.pluginsDisabled {
-		respondForbidden(w, r)
+		respondError(w, r, restapi.ErrPluginsDisabled)
 		return
 	}
 
@@ -297,7 +313,7 @@ func (h *PluginHandler) DeletePlugin(w http.ResponseWriter, r *http.Request) {
 // ReloadPlugin reloads a plugin
 func (h *PluginHandler) ReloadPlugin(w http.ResponseWriter, r *http.Request) {
 	if h.pluginsDisabled {
-		respondForbidden(w, r)
+		respondError(w, r, restapi.ErrPluginsDisabled)
 		return
 	}
 

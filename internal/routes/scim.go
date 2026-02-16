@@ -12,11 +12,11 @@ func RegisterSCIMRoutes(deps *Deps) {
 	h := deps.SCIM                          // SCIM handlers
 
 	// SCIM token management (admin API)
-	api.HandleH("GET /scim-tokens", admin(http.HandlerFunc(h.SCIMToken.ListTokens)))
-	api.HandleH("POST /scim-tokens", admin(http.HandlerFunc(h.SCIMToken.CreateToken)))
-	api.HandleH("GET /scim-tokens/{id}", admin(http.HandlerFunc(h.SCIMToken.GetToken)))
-	api.HandleH("DELETE /scim-tokens/{id}", admin(http.HandlerFunc(h.SCIMToken.RevokeToken)))
-	api.HandleH("GET /scim-tokens/count", admin(http.HandlerFunc(h.SCIMToken.GetActiveTokenCount)))
+	api.HandleH("GET /admin/scim-tokens", admin(http.HandlerFunc(h.SCIMToken.ListTokens)))
+	api.HandleH("POST /admin/scim-tokens", admin(http.HandlerFunc(h.SCIMToken.CreateToken)))
+	api.HandleH("GET /admin/scim-tokens/{id}", admin(http.HandlerFunc(h.SCIMToken.GetToken)))
+	api.HandleH("DELETE /admin/scim-tokens/{id}", admin(http.HandlerFunc(h.SCIMToken.RevokeToken)))
+	api.HandleH("GET /admin/scim-tokens/count", admin(http.HandlerFunc(h.SCIMToken.GetActiveTokenCount)))
 
 	// SCIM 2.0 routes (separate from /api, uses SCIM token authentication)
 	// Service provider endpoints (public per SCIM spec - needed for IdP discovery)

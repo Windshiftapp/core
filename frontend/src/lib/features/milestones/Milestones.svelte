@@ -128,8 +128,8 @@
       name: milestone.name,
       description: milestone.description || '',
       target_date: milestone.target_date ? milestone.target_date.split('T')[0] : '',
-      status: milestone.status,
-      category_id: milestone.category_id,
+      status: milestone.status ?? 'planning',
+      category_id: milestone.category_id ?? null,
       is_global: milestone.is_global !== false, // Default to true if undefined
       workspace_id: milestone.workspace_id ? parseInt(milestone.workspace_id, 10) : null
     };
@@ -162,6 +162,9 @@
         ...formData,
         target_date: formData.target_date || null
       };
+      if (dataToSave.is_global) {
+        dataToSave.workspace_id = null;
+      }
 
       if (editingMilestone) {
         // Update existing milestone
@@ -245,6 +248,15 @@
 
   async function handleDeleteCategory(categoryId) {
     await categoriesStore.delete(categoryId);
+  }
+
+  function toggleScope() {
+    formData.is_global = !formData.is_global;
+    if (formData.is_global) {
+      formData.workspace_id = null;
+    } else {
+      formData.workspace_id = workspaceId ? parseInt(workspaceId, 10) : null;
+    }
   }
 
   // Filter milestones based on active category (only applies in global view)
@@ -511,51 +523,37 @@
           />
         </div>
 
-        <!-- Scope Toggle (only shown when editing existing milestone) -->
-        {#if editingMilestone}
-          <div>
-            <Label class="mb-2">{t('milestones.scope')}</Label>
-            <div class="flex rounded-lg overflow-hidden border" style="border-color: var(--ds-border);">
-              <button
-                type="button"
-                onclick={() => formData = { ...formData, is_global: true, workspace_id: null }}
-                class="flex-1 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors"
-                style="
-                  background-color: {formData.is_global ? 'var(--ds-interactive-primary)' : 'var(--ds-background-input)'};
-                  color: {formData.is_global ? 'white' : 'var(--ds-text)'};
-                "
-              >
-                <Globe class="w-4 h-4" />
-                {t('milestones.global')}
-              </button>
-              <button
-                type="button"
-                onclick={() => formData = { ...formData, is_global: false }}
-                class="flex-1 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors"
-                style="
-                  background-color: {!formData.is_global ? 'var(--ds-interactive-primary)' : 'var(--ds-background-input)'};
-                  color: {!formData.is_global ? 'white' : 'var(--ds-text)'};
-                "
-              >
-                <Building2 class="w-4 h-4" />
-                {t('milestones.local')}
-              </button>
+        {#if !isGlobalView}
+          <!-- Scope Toggle -->
+          <div class="md:col-span-2">
+            <div class="p-4 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  {#if formData.is_global}
+                    <Globe class="w-5 h-5" style="color: var(--ds-interactive);" />
+                    <div>
+                      <p class="font-medium text-sm" style="color: var(--ds-text);">{t('milestones.globalMilestone')}</p>
+                      <p class="text-xs" style="color: var(--ds-text-subtle);">{t('milestones.globalMilestoneDescription')}</p>
+                    </div>
+                  {:else}
+                    <Building2 class="w-5 h-5" style="color: var(--ds-interactive);" />
+                    <div>
+                      <p class="font-medium text-sm" style="color: var(--ds-text);">{t('milestones.localMilestone')}</p>
+                      <p class="text-xs" style="color: var(--ds-text-subtle);">{t('milestones.localMilestoneDescription')}</p>
+                    </div>
+                  {/if}
+                </div>
+                <button
+                  type="button"
+                  class="px-3 py-1.5 text-sm rounded border transition-colors"
+                  style="border-color: var(--ds-border); color: var(--ds-interactive);"
+                  onclick={toggleScope}
+                >
+                  {t('milestones.switchTo', { scope: formData.is_global ? t('milestones.local') : t('milestones.global') })}
+                </button>
+              </div>
             </div>
           </div>
-
-          <!-- Workspace Picker (only shown for local milestones when editing) -->
-          {#if !formData.is_global}
-            <div>
-              <Label required class="mb-2">{t('milestones.workspace')}</Label>
-              <BasePicker
-                bind:value={formData.workspace_id}
-                items={workspaces}
-                placeholder={t('milestones.selectWorkspace')}
-                getValue={(item) => item.id}
-                getLabel={(item) => item.name}
-              />
-            </div>
-          {/if}
         {/if}
 
         <div class="md:col-span-2">

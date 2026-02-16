@@ -252,9 +252,22 @@
 
       const url = getNavigationUrl(viewName);
       navigate(url);
+    } else if (currentView === 'item-detail') {
+      const currentItemId = $currentRoute.params.itemId;
+      if (currentItemId) {
+        const url = currentCollectionId
+          ? `/workspaces/${workspaceId}/collections/${currentCollectionId}/items/${currentItemId}`
+          : `/workspaces/${workspaceId}/items/${currentItemId}`;
+        navigate(url);
+      }
     } else if (currentView && workspaceTestViewIds.has(currentView)) {
-      const url = getTestNavigationUrl(getTestNavIdFromView(currentView));
-      navigate(url);
+      // Test views are not collection-sensitive, redirect to default collection view
+      if (currentCollectionId !== null) {
+        navigate(getNavigationUrl(defaultCollectionView));
+      } else {
+        const url = getTestNavigationUrl(getTestNavIdFromView(currentView));
+        navigate(url);
+      }
     }
   }
 
@@ -469,7 +482,7 @@
       </div>
     {/if}
 
-    {#if canViewTests}
+    {#if canViewTests && !currentCollectionId}
     <div class="mt-4 pt-4 border-t space-y-2" style="border-color: var(--ds-border);">
       <div class="text-xs font-semibold uppercase tracking-wide" style="color: var(--ds-text-subtle);">
         Tests

@@ -279,23 +279,23 @@ export const personalLabels = {
 // Jira Cloud Import
 export const jiraImport = {
   // List saved connections
-  getConnections: () => fetchAPI('/jira-import/connections'),
+  getConnections: () => fetchAPI('/admin/jira-import/connections'),
   // List import jobs
-  getImportJobs: () => fetchAPI('/jira-import/jobs'),
+  getImportJobs: () => fetchAPI('/admin/jira-import/jobs'),
   // Test connection and store credentials
   testConnection: (data) =>
-    fetchAPI('/jira-import/connect', {
+    fetchAPI('/admin/jira-import/connect', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   // Get available Jira projects
   getProjects: (connectionId, openIssuesOnly = false) =>
     fetchAPI(
-      `/jira-import/projects?connection_id=${connectionId}&open_issues_only=${openIssuesOnly}`
+      `/admin/jira-import/projects?connection_id=${connectionId}&open_issues_only=${openIssuesOnly}`
     ),
   // Analyze selected projects
   analyzeProjects: (connectionId, projectKeys, openIssuesOnly = false) =>
-    fetchAPI('/jira-import/analyze', {
+    fetchAPI('/admin/jira-import/analyze', {
       method: 'POST',
       body: JSON.stringify({
         connection_id: connectionId,
@@ -304,20 +304,20 @@ export const jiraImport = {
       }),
     }),
   // Get asset schemas
-  getAssetSchemas: (connectionId) => fetchAPI(`/jira-import/assets?connection_id=${connectionId}`),
+  getAssetSchemas: (connectionId) => fetchAPI(`/admin/jira-import/assets?connection_id=${connectionId}`),
   // Get object types for a schema
   getAssetTypes: (connectionId, schemaId) =>
-    fetchAPI(`/jira-import/assets/${schemaId}/types?connection_id=${connectionId}`),
+    fetchAPI(`/admin/jira-import/assets/${schemaId}/types?connection_id=${connectionId}`),
   // Get import job status
-  getJobStatus: (jobId) => fetchAPI(`/jira-import/jobs/${jobId}`),
+  getJobStatus: (jobId) => fetchAPI(`/admin/jira-import/jobs/${jobId}`),
   // Delete connection
   deleteConnection: (connectionId) =>
-    fetchAPI(`/jira-import/connections/${connectionId}`, {
+    fetchAPI(`/admin/jira-import/connections/${connectionId}`, {
       method: 'DELETE',
     }),
   // Start import
   startImport: (data) =>
-    fetchAPI('/jira-import/start', {
+    fetchAPI('/admin/jira-import/start', {
       method: 'POST',
       body: JSON.stringify(data),
     }),

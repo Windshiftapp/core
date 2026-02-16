@@ -117,7 +117,7 @@ func TestCustomFieldOperations(t *testing.T) {
 			"required":    false,
 		}
 
-		resp := MakeAuthRequest(t, server, http.MethodPost, "/custom-fields", fieldData)
+		resp := MakeAuthRequest(t, server, http.MethodPost, "/admin/custom-fields", fieldData)
 		defer resp.Body.Close()
 
 		AssertStatusCode(t, resp, http.StatusCreated)
@@ -142,7 +142,7 @@ func TestCustomFieldOperations(t *testing.T) {
 			"options":     `["Low", "Medium", "High", "Critical"]`,
 		}
 
-		resp := MakeAuthRequest(t, server, http.MethodPost, "/custom-fields", fieldData)
+		resp := MakeAuthRequest(t, server, http.MethodPost, "/admin/custom-fields", fieldData)
 		defer resp.Body.Close()
 
 		AssertStatusCode(t, resp, http.StatusCreated)

@@ -128,7 +128,7 @@ type ImportJobStatus struct {
 	CompletedAt  *time.Time             `json:"completed_at,omitempty"`
 }
 
-// StartImportRequest is the request body for POST /api/jira-import/start
+// StartImportRequest is the request body for POST /api/admin/jira-import/start
 type StartImportRequest struct {
 	ConnectionID   string         `json:"connection_id"`
 	ProjectKeys    []string       `json:"project_keys"`
