@@ -228,12 +228,7 @@
         <div class="space-y-2">
           <button
             onclick={() => {
-              window.dispatchEvent(new CustomEvent('open-create-modal'));
-              setTimeout(() => {
-                window.dispatchEvent(new CustomEvent('set-create-type', {
-                  detail: { type: 'work-item' }
-                }));
-              }, 50);
+              window.dispatchEvent(new CustomEvent('show-create-modal', { detail: { type: 'work-item' } }));
             }}
             class="w-full text-left px-3 py-2.5 rounded-md border transition-colors group hover-bg"
             style="border-color: var(--ds-border);"
