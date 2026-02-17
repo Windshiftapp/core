@@ -4,6 +4,8 @@
    *
    * Consolidates the 4 identical gradient cards pattern from Dashboard.svelte
    */
+  import Card from './Card.svelte';
+
   let {
     icon: Icon,
     label,
@@ -37,47 +39,22 @@
   };
 
   const gradientStyle = $derived(
-    `background: linear-gradient(135deg, var(--ds-surface-raised) 0%, ${gradientColors[color]} 100%); border-color: var(--ds-border);`
+    `background: linear-gradient(135deg, var(--ds-surface-raised) 0%, ${gradientColors[color]} 100%);`
   );
 </script>
 
-{#if href}
-  <a
-    {href}
-    class="block rounded p-4 border shadow-sm hover:shadow-md transition-shadow"
-    style={gradientStyle}
-  >
-    <div class="flex items-center">
-      <div class="flex-shrink-0">
-        <div class="w-6 h-6 {iconBgColors[color]} rounded-md flex items-center justify-center">
-          <Icon class="w-3.5 h-3.5 {iconColors[color]}" />
-        </div>
-      </div>
-      <div class="ml-3 w-0 flex-1">
-        <dl>
-          <dt class="text-xs font-medium truncate" style="color: var(--ds-text-subtle);">{label}</dt>
-          <dd class="text-xl font-semibold" style="color: var(--ds-text);">{value}</dd>
-        </dl>
+<Card shadow hoverable {href} style={gradientStyle}>
+  <div class="flex items-center">
+    <div class="flex-shrink-0">
+      <div class="w-6 h-6 {iconBgColors[color]} rounded-md flex items-center justify-center">
+        <Icon class="w-3.5 h-3.5 {iconColors[color]}" />
       </div>
     </div>
-  </a>
-{:else}
-  <div
-    class="rounded p-4 border shadow-sm hover:shadow-md transition-shadow"
-    style={gradientStyle}
-  >
-    <div class="flex items-center">
-      <div class="flex-shrink-0">
-        <div class="w-6 h-6 {iconBgColors[color]} rounded-md flex items-center justify-center">
-          <Icon class="w-3.5 h-3.5 {iconColors[color]}" />
-        </div>
-      </div>
-      <div class="ml-3 w-0 flex-1">
-        <dl>
-          <dt class="text-xs font-medium truncate" style="color: var(--ds-text-subtle);">{label}</dt>
-          <dd class="text-xl font-semibold" style="color: var(--ds-text);">{value}</dd>
-        </dl>
-      </div>
+    <div class="ml-3 w-0 flex-1">
+      <dl>
+        <dt class="text-xs font-medium truncate" style="color: var(--ds-text-subtle);">{label}</dt>
+        <dd class="text-xl font-semibold" style="color: var(--ds-text);">{value}</dd>
+      </dl>
     </div>
   </div>
-{/if}
+</Card>

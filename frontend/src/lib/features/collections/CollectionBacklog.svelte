@@ -4,7 +4,7 @@
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { collectionData, reloadCollection } from '../../stores/collectionContext.js';
+  import { collectionStore, reloadCollection } from '../../stores/collectionContext.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { GripVertical, List } from 'lucide-svelte';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -76,9 +76,9 @@
 
   // Sync items from central store
   $effect(() => {
-    items = $collectionData.backlogItems;
-    currentCollectionName = $collectionData.collectionName;
-    backlogStore.setCount(workspaceId, $collectionData.backlogItems.length);
+    items = collectionStore.backlogItems;
+    currentCollectionName = collectionStore.collectionName;
+    backlogStore.setCount(workspaceId, collectionStore.backlogPagination?.total ?? collectionStore.backlogItems.length);
   });
 
   // Adaptive polling for backlog items
@@ -376,10 +376,27 @@
             {/each}
           </div>
           
+          <!-- Load More -->
+          {#if collectionStore.backlogHasMore}
+            <div class="mt-6 text-center">
+              <button
+                onclick={() => collectionStore.loadMoreBacklog()}
+                disabled={collectionStore.backlogLoadingMore}
+                class="px-4 py-2 text-sm font-medium rounded-lg border transition-colors"
+                style="{styles.glassStyle?.(12) ?? ''} {styles.glassTextStyle ?? ''}"
+              >
+                {collectionStore.backlogLoadingMore ? t('common.loading') : t('common.loadMore')}
+                {#if collectionStore.backlogPagination?.total}
+                  ({collectionStore.backlogPagination.total - collectionStore.backlogItems.length} {t('common.remaining')})
+                {/if}
+              </button>
+            </div>
+          {/if}
+
           <!-- Summary -->
           <div class="mt-8 text-center">
             <p class="text-sm" style={styles.subtleTextStyle}>
-              {t('collections.showingItemsFromBacklog', { count: backlogItems.length })}
+              {t('collections.showingItemsFromBacklog', { count: collectionStore.backlogPagination?.total ?? backlogItems.length })}
             </p>
           </div>
         </div>

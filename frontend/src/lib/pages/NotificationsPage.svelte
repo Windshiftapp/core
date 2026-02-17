@@ -8,6 +8,7 @@
   import Select from '../components/Select.svelte';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import SearchInput from '../components/SearchInput.svelte';
+  import Card from '../components/Card.svelte';
   import { slide } from 'svelte/transition';
 
   let filteredNotifications = [];
@@ -242,7 +243,7 @@
 
     <!-- Notifications List -->
     {#if filteredNotifications.length === 0}
-      <div class="rounded-xl border shadow-sm p-12 text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+      <Card rounded="xl" shadow padding="generous" class="text-center">
         <Bell class="w-12 h-12 mx-auto mb-4 opacity-50" style="color: var(--ds-text-subtle);" />
         <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">
           {$notifications.length === 0 ? t('notifications.noNotifications') : t('common.noResults')}
@@ -266,16 +267,16 @@
             {t('common.clear')}
           </Button>
         {/if}
-      </div>
+      </Card>
     {:else}
       <!-- Notifications Cards -->
-      <div class="rounded-xl border shadow-sm overflow-hidden" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+      <Card rounded="xl" shadow padding="none" class="overflow-hidden">
         {#each filteredNotifications as notification, index (notification.id)}
           <div class="notification-wrapper" class:border-b={index < filteredNotifications.length - 1} style={index < filteredNotifications.length - 1 ? 'border-color: var(--ds-border);' : ''}>
             <NotificationCard {notification} />
           </div>
         {/each}
-      </div>
+      </Card>
 
       <!-- Footer Actions -->
       {#if $notifications.length > 10}

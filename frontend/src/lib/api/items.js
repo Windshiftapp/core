@@ -45,7 +45,7 @@ export const items = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
-  getBacklog: (workspaceId, ql = null, collectionId = null) => {
+  getBacklog: (workspaceId, ql = null, collectionId = null, { page, limit } = {}) => {
     const params = new URLSearchParams();
     if (collectionId) {
       params.append('collection_id', collectionId);
@@ -53,6 +53,8 @@ export const items = {
       params.append('workspace_id', workspaceId);
     }
     if (ql) params.append('ql', ql);
+    if (page) params.append('page', page);
+    if (limit) params.append('limit', limit);
     return fetchAPI(`/items/backlog?${params}`);
   },
   getChildren: (itemId) => fetchAPI(`/items/${itemId}/children`),

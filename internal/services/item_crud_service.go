@@ -361,6 +361,7 @@ func (s *ItemCRUDService) GetBacklogItems(params BacklogParams) ([]models.Item, 
 	return s.repo.FindAllWithDetails(ItemListParams{
 		WorkspaceIDs: params.WorkspaceIDs,
 		Filters:      filters,
+		Pagination:   params.Pagination,
 	})
 }
 

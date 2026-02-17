@@ -107,7 +107,8 @@ export { workspacePermissions } from './workspacePermissions.svelte.js';
 // workspacesStore.personalWorkspace, workspacesStore.loaded, workspacesStore.loading
 export { currentWorkspace, workspacesStore } from './workspaces.svelte.js';
 // Collection context store
-// Access via: $collectionData.items, $collectionData.backlogItems, $collectionData.collectionName, $collectionData.loading
-// Methods: reloadCollection() to trigger a re-fetch
-// Derives from currentRoute — automatically loads items when navigating to collection views
-export { collectionData, reloadCollection } from './collectionContext.js';
+// Access via: collectionStore.items, collectionStore.backlogItems, collectionStore.collectionName, collectionStore.loading
+// Methods: collectionStore.loadMoreItems(), collectionStore.loadMoreBacklog(), collectionStore.setItemsPage(page, limit)
+// Also: reloadCollection() to trigger a re-fetch, collectionData for backward compatibility
+// Class-based store with server-side pagination support
+export { collectionData, collectionStore, reloadCollection } from './collectionContext.js';

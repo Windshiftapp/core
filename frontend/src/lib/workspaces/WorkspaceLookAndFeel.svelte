@@ -12,6 +12,7 @@
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Label from '../components/Label.svelte';
+  import Card from '../components/Card.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
 
@@ -283,14 +284,14 @@
 </script>
 
 {#if loading}
-  <div class="rounded-xl p-6 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+  <Card rounded="xl" shadow padding="spacious">
     <div class="animate-pulse">
       <div class="h-4 rounded w-1/4 mb-4" style="background-color: var(--ds-surface);"></div>
       <div class="h-4 rounded w-3/4" style="background-color: var(--ds-surface);"></div>
     </div>
-  </div>
+  </Card>
 {:else if !canAdmin}
-  <div class="rounded-xl p-8 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+  <Card rounded="xl" shadow padding="loose">
     <div class="text-center py-8">
       <Shield class="w-12 h-12 mx-auto mb-4 text-amber-500" />
       <h2 class="text-lg font-semibold mb-2" style="color: var(--ds-text);">{t('workspaceSettings.accessDenied')}</h2>
@@ -299,7 +300,7 @@
         {t('workspaceSettings.backToWorkspace')}
       </Button>
     </div>
-  </div>
+  </Card>
 {:else if workspace}
   <div class="look-and-feel-wrapper" style="{backgroundStyle()}">
   <div class="p-6">
@@ -315,7 +316,7 @@
 
     <!-- Section 1: Display Mode (hide for personal workspaces) -->
     {#if !workspace.is_personal}
-      <div class="rounded-xl p-6 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: {hasCustomBackground ? 'transparent' : 'var(--ds-border)'};">
+      <Card rounded="xl" shadow padding="spacious" style="border-color: {hasCustomBackground ? 'transparent' : ''};">
         <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">{t('lookAndFeel.displayModeTitle')}</h3>
         <p class="text-sm mb-6" style="color: var(--ds-text-subtle);">{t('lookAndFeel.displayModeDescription')}</p>
 
@@ -408,11 +409,11 @@
             <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('workspaceSettings.modeItsmDescription')}</p>
           </div>
         </div>
-      </div>
+      </Card>
     {/if}
 
     <!-- Section 2: Background & Gradient -->
-    <div class="rounded-xl p-6 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: {hasCustomBackground ? 'transparent' : 'var(--ds-border)'};">
+    <Card rounded="xl" shadow padding="spacious" style="border-color: {hasCustomBackground ? 'transparent' : ''};">
       <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">{t('lookAndFeel.gradientTitle')}</h3>
       <p class="text-sm mb-6" style="color: var(--ds-text-subtle);">{t('lookAndFeel.gradientDescription')}</p>
 
@@ -548,10 +549,10 @@
           {/if}
         </div>
       </div>
-    </div>
+    </Card>
 
     <!-- Section 3: Workspace Identity -->
-    <div class="rounded-xl p-6 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: {hasCustomBackground ? 'transparent' : 'var(--ds-border)'};">
+    <Card rounded="xl" shadow padding="spacious" style="border-color: {hasCustomBackground ? 'transparent' : ''};">
       <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">{t('lookAndFeel.identityTitle')}</h3>
       <p class="text-sm mb-6" style="color: var(--ds-text-subtle);">{t('lookAndFeel.identityDescription')}</p>
 
@@ -641,7 +642,7 @@
           </p>
         </div>
       </div>
-    </div>
+    </Card>
 
   </div>
   </div>

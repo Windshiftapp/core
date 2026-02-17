@@ -10,6 +10,7 @@
   import { searchStore } from '../stores/searchStore.svelte.js';
   import Spinner from '../components/Spinner.svelte';
   import EmptyState from '../components/EmptyState.svelte';
+  import Card from '../components/Card.svelte';
   import { getStatusStyle } from '../utils/statusColors.js';
 
   // Subscribe to the entire store state
@@ -115,28 +116,28 @@
 
     <!-- Search Results -->
     {#if loading}
-      <div class="rounded-xl border shadow-sm p-8 text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+      <Card rounded="xl" shadow padding="loose" class="text-center">
         <Spinner class="mx-auto mb-4" />
         <div style="color: var(--ds-text-subtle);">{t('common.loading')}</div>
-      </div>
+      </Card>
     {:else if searchResults.length === 0 && hasFilters}
-      <div class="rounded-xl border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+      <Card rounded="xl" shadow>
         <EmptyState
           icon={Search}
           title={t('search.noSearchResults')}
           description={t('search.configureFilter')}
         />
-      </div>
+      </Card>
     {:else if searchResults.length === 0}
-      <div class="rounded-xl border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+      <Card rounded="xl" shadow>
         <EmptyState
           icon={Search}
           title={t('search.title')}
           description={t('search.searchPlaceholder')}
         />
-      </div>
+      </Card>
     {:else}
-      <div class="rounded-xl border shadow-sm overflow-hidden" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+      <Card rounded="xl" shadow padding="none" class="overflow-hidden">
         <!-- Table Header -->
         <div class="px-6 py-4 border-b" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
           <div class="grid grid-cols-12 gap-4 font-medium text-sm" style="color: var(--ds-text-subtle);">
@@ -216,7 +217,7 @@
             </div>
           {/each}
         </div>
-      </div>
+      </Card>
     {/if}
   </div>
 </div>

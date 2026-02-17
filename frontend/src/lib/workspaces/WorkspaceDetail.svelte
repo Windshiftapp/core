@@ -11,6 +11,7 @@
   import Lozenge from '../components/Lozenge.svelte';
   import Label from '../components/Label.svelte';
   import Checkbox from '../components/Checkbox.svelte';
+  import Card from '../components/Card.svelte';
 
   export let workspaceId;
 
@@ -177,11 +178,11 @@
         </div>
 
     {#if showCreateForm}
-      <div class="rounded-xl p-6 mb-8 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+      <Card rounded="xl" shadow padding="spacious" class="mb-8">
         <h3 class="text-xl font-semibold mb-6" style="color: var(--ds-text);">
           New Project
         </h3>
-        
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <Label required class="mb-2">Project Name</Label>
@@ -206,7 +207,7 @@
             />
           </div>
         </div>
-        
+
         <div class="mt-6">
           <Checkbox
             bind:checked={formData.active}
@@ -231,11 +232,11 @@
             Cancel
           </button>
         </div>
-      </div>
+      </Card>
     {/if}
 
     <!-- Projects List -->
-    <div class="rounded-xl border shadow-sm overflow-hidden" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+    <Card rounded="xl" shadow padding="none" class="overflow-hidden">
       {#if projects.length === 0}
         <div class="p-8 text-center" style="color: var(--ds-text-subtle);">
           No projects found in this workspace. Create your first project to get started.
@@ -282,7 +283,7 @@
           </table>
         </div>
       {/if}
-    </div>
+    </Card>
       </div>
     </div>
   {/if}

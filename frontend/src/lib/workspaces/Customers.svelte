@@ -19,6 +19,7 @@
   import Modal from '../dialogs/Modal.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import TextField from '../components/TextField.svelte';
+  import Card from '../components/Card.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   // State
@@ -449,7 +450,7 @@
       </div>
 
       <!-- Customer List -->
-      <div class="rounded shadow-sm border overflow-hidden" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+      <Card shadow padding="none" class="overflow-hidden">
         {#if displayedCustomers.length === 0}
           <div class="p-8 text-center" style="color: var(--ds-text-subtle);">
             <Users class="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -522,7 +523,7 @@
             </div>
           {/if}
         {/if}
-      </div>
+      </Card>
     {/if}
   </div>
 </div>

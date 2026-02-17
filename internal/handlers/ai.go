@@ -373,8 +373,8 @@ func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
 
 	// Load comments (last 20)
 	commentRows, err := h.db.Query(
-		`SELECT c.content, u.name, c.created_at FROM comments c
-		 LEFT JOIN users u ON c.user_id = u.id
+		`SELECT c.content, COALESCE(u.first_name || ' ' || u.last_name, 'Unknown'), c.created_at FROM comments c
+		 LEFT JOIN users u ON c.author_id = u.id
 		 WHERE c.item_id = ? ORDER BY c.created_at DESC LIMIT 20`, itemID)
 	if err == nil {
 		defer func() { _ = commentRows.Close() }()
@@ -592,7 +592,7 @@ func (h *AIHandler) FindSimilarItems(w http.ResponseWriter, r *http.Request) {
 			if len(desc) > 100 {
 				desc = desc[:100] + "..."
 			}
-			candidateLines = append(candidateLines, fmt.Sprintf("- [%s] %s | %s", c.ItemKey, c.Title, desc))
+			candidateLines = append(candidateLines, fmt.Sprintf("- %s | %s | %s", c.ItemKey, c.Title, desc))
 		}
 	}
 
@@ -617,7 +617,7 @@ Return a JSON object with:
 
 Only include genuinely similar items. If none are similar, return an empty array. Maximum 10 results.`
 
-	userPrompt := fmt.Sprintf(`Current item [%s]: %s
+	userPrompt := fmt.Sprintf(`Current item %s: %s
 Description: %s
 
 Candidate items in the same workspace:
@@ -649,7 +649,8 @@ Find similar items.`, itemKey, item.Title, currentDesc, strings.Join(candidateLi
 	// Enrich results from our candidate data (don't trust LLM for titles/IDs)
 	enriched := make([]SimilarItem, 0, len(result.SimilarItems))
 	for _, si := range result.SimilarItems {
-		if candidate, ok := candidateMap[si.ItemKey]; ok {
+		key := strings.TrimPrefix(strings.TrimSuffix(si.ItemKey, "]"), "[")
+		if candidate, ok := candidateMap[key]; ok {
 			enriched = append(enriched, SimilarItem{
 				ItemID:      candidate.ID,
 				ItemKey:     candidate.ItemKey,

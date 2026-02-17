@@ -6,6 +6,7 @@
   import Modal from '../../dialogs/Modal.svelte';
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import DataTable from '../../components/DataTable.svelte';
+  import Card from '../../components/Card.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import ColorDot from '../../components/ColorDot.svelte';
@@ -501,7 +502,7 @@
     </Button>
   {/snippet}
 
-  <div class="rounded-xl border shadow-sm p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+  <Card rounded="xl" shadow padding="spacious">
   {#if assetSets.length === 0}
     <EmptyState
       icon={Package}
@@ -778,7 +779,7 @@
       {/if}
     {/if}
   {/if}
-  </div>
+  </Card>
 </div>
 
 <!-- Asset Set Form Modal -->

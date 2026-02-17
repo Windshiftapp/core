@@ -3,6 +3,7 @@
   import { api } from '../../api.js';
   import { Plus, Check, X, Trash2, ChevronDown, MoreHorizontal, Calendar, Edit, ClipboardList } from 'lucide-svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
+  import Card from '../../components/Card.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import DeleteItemDialog from '../../dialogs/DeleteItemDialog.svelte';
@@ -346,13 +347,13 @@
 <div style="background-color: var(--ds-surface);">
   <div class="p-6">
     {#if loading}
-      <div class="rounded-xl border shadow-sm p-8 text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+      <Card rounded="xl" shadow padding="loose" class="text-center">
         <div class="animate-pulse" style="color: var(--ds-text-subtle);">{t('todo.loadingTasks')}</div>
-      </div>
+      </Card>
     {:else}
       <div class="flex flex-col gap-6 max-w-4xl">
         <!-- Personal Tasks -->
-        <div class="rounded border shadow-sm overflow-hidden" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+        <Card shadow padding="none" class="overflow-hidden">
           <!-- Header -->
           <div class="px-5 py-4 border-b flex items-center" style="border-color: var(--ds-border);">
             <h2 class="text-lg font-semibold" style="color: var(--ds-text);">{t('todo.myPersonalTasks')}</h2>
@@ -457,7 +458,7 @@
               </div>
             {/if}
           </div>
-        </div>
+        </Card>
 
         <!-- Assigned Work Items -->
         <div>

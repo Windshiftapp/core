@@ -8,6 +8,7 @@
   import Input from '../../components/Input.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import DataTable from '../../components/DataTable.svelte';
+  import Card from '../../components/Card.svelte';
   import TimeTrackingOnboarding from './TimeTrackingOnboarding.svelte';
   import TimeLogModal from '../../dialogs/TimeLogModal.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
@@ -162,7 +163,7 @@
 {/if}
 
 <!-- Filters -->
-<div class="rounded-xl p-6 mb-6 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+<Card rounded="xl" shadow padding="spacious" class="mb-6">
   <h3 class="text-sm font-semibold mb-4" style="color: var(--ds-text);">{t('time.reports.filters')}</h3>
   <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
     <div>
@@ -219,10 +220,10 @@
       {t('common.clear')}
     </Button>
   </div>
-</div>
+</Card>
 
 <!-- Time Entries -->
-<div class="rounded-xl border shadow-sm overflow-hidden" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+<Card rounded="xl" shadow padding="none" class="overflow-hidden">
   <DataTable
     columns={worklogColumns}
     data={worklogs}
@@ -271,7 +272,7 @@
       </div>
     </div>
   {/if}
-</div>
+</Card>
 
 <!-- Onboarding Modal -->
 {#if showOnboarding}

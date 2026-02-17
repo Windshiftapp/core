@@ -15,6 +15,7 @@
   } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
   import EmptyState from '../components/EmptyState.svelte';
+  import Card from '../components/Card.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import MigrationAssistant from '../pages/MigrationAssistant.svelte';
   import Modal from '../dialogs/Modal.svelte';
@@ -409,9 +410,9 @@
 </div>
 
   {#if loading}
-    <div class="rounded-xl border shadow-sm p-8 text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+    <Card rounded="xl" shadow padding="loose" class="text-center">
       <div class="animate-pulse" style="color: var(--ds-text-subtle);">{t('settings.configSets.loading')}</div>
-    </div>
+    </Card>
   {:else}
     <!-- Create Form -->
     <Modal isOpen={creating} onclose={cancelCreating} maxWidth="max-w-2xl" onSubmit={createConfigurationSet} let:submitHint>
@@ -557,7 +558,7 @@
 
     <!-- Configuration Sets List -->
     {#if configurationSets.filter(cs => cs && cs.id && cs.name !== 'Personal Tasks Configuration').length === 0}
-      <div class="rounded-xl border shadow-sm p-12" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+      <Card rounded="xl" shadow padding="generous">
         <EmptyState
           icon={Settings}
           title={t('settings.configSets.noConfigSets')}
@@ -569,11 +570,11 @@
             </Button>
           {/snippet}
         </EmptyState>
-      </div>
+      </Card>
     {:else}
       <div class="space-y-3">
         {#each (configurationSets || []).filter(cs => cs && cs.id && cs.name !== 'Personal Tasks Configuration') as configSet (configSet.id)}
-            <div class="rounded-xl border shadow-sm p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+            <Card rounded="xl" shadow padding="spacious">
               <!-- Display Mode -->
               <div class="flex items-center justify-between">
                 <div class="flex-1">
@@ -704,7 +705,7 @@
                   </Button>
                 </div>
               </div>
-            </div>
+            </Card>
         {/each}
       </div>
 

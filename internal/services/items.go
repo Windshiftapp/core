@@ -3,7 +3,6 @@ package services
 import (
 	"database/sql"
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
 
@@ -106,7 +105,39 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 		return 0, fmt.Errorf("failed to generate frac_index: %w", err)
 	}
 
-	// Start transaction for atomic item creation
+	// Resolve status ID BEFORE starting the transaction to avoid holding the TX open during lookups
+	// Direct ID takes precedence, then text mapping, then workflow initial status (cached)
+	var statusID *int
+	if params.StatusID != nil {
+		statusID = params.StatusID
+	} else if params.Status != "" {
+		statusID = mapTextStatusToID(params.Status)
+	}
+
+	// If status is still nil, resolve from workflow initial status using cache
+	if statusID == nil {
+		workflowService := NewWorkflowService(db)
+		statusID, _ = workflowService.GetInitialStatusIDCached(params.WorkspaceID, params.ItemTypeID)
+	}
+
+	// Resolve priority ID BEFORE transaction: direct ID takes precedence, then text mapping, then default
+	var priorityID *int
+	if params.PriorityID != nil {
+		priorityID = params.PriorityID
+	} else if params.Priority != "" {
+		priorityID = mapTextPriorityToID(params.Priority)
+	}
+
+	// If priority is still nil, get the default priority
+	if priorityID == nil {
+		var defaultPriorityID int
+		err = db.QueryRow("SELECT id FROM priorities WHERE is_default = true LIMIT 1").Scan(&defaultPriorityID)
+		if err == nil {
+			priorityID = &defaultPriorityID
+		}
+	}
+
+	// Start transaction for atomic item creation (minimal scope: number gen + INSERT)
 	tx, err := db.Begin()
 	if err != nil {
 		return 0, fmt.Errorf("failed to start transaction: %w", err)
@@ -124,44 +155,6 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 		return 0, fmt.Errorf("failed to generate workspace item number: %w", err)
 	}
 
-	// Resolve status ID: direct ID takes precedence, then text mapping, then workflow initial status
-	var statusID *int
-	if params.StatusID != nil {
-		statusID = params.StatusID
-	} else if params.Status != "" {
-		statusID = mapTextStatusToID(params.Status)
-	}
-
-	// If status is still nil, resolve from workflow initial status
-	if statusID == nil {
-		workflowService := NewWorkflowService(db)
-		workflowID, wfErr := workflowService.GetWorkflowIDForItem(params.WorkspaceID, params.ItemTypeID)
-		if wfErr == nil && workflowID != nil {
-			var initialStatusID *int
-			initialStatusID, err = workflowService.GetInitialStatusID(*workflowID)
-			if err == nil && initialStatusID != nil {
-				statusID = initialStatusID
-			}
-		}
-	}
-
-	// Resolve priority ID: direct ID takes precedence, then text mapping, then default priority
-	var priorityID *int
-	if params.PriorityID != nil {
-		priorityID = params.PriorityID
-	} else if params.Priority != "" {
-		priorityID = mapTextPriorityToID(params.Priority)
-	}
-
-	// If priority is still nil, get the default priority
-	if priorityID == nil {
-		var defaultPriorityID int
-		err = db.QueryRow("SELECT id FROM priorities WHERE is_default = true LIMIT 1").Scan(&defaultPriorityID)
-		if err == nil {
-			priorityID = &defaultPriorityID
-		}
-	}
-
 	// Insert item with all fields
 	// Note: Uses RETURNING id for both SQLite (3.35+) and PostgreSQL
 	insertQuery := `
@@ -170,8 +163,8 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 			milestone_id, iteration_id, project_id, inherit_project, time_project_id, assignee_id, reporter_id, creator_id, creator_portal_customer_id,
 			channel_id, request_type_id, due_date, related_work_item_id,
 			custom_field_values, parent_id,
-			frac_index, created_at, updated_at, path
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			frac_index, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING id
 	`
 
@@ -203,18 +196,10 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 		fracIndex,
 		now,
 		now,
-		"/", // Initial path, will be updated below
 	).Scan(&itemID)
 
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert item: %w", err)
-	}
-
-	// Update item path to include its own ID
-	path := fmt.Sprintf("/%d/", itemID)
-	_, err = tx.Exec(`UPDATE items SET path = ? WHERE id = ?`, path, itemID)
-	if err != nil {
-		return 0, fmt.Errorf("failed to update item path: %w", err)
 	}
 
 	// Commit transaction
@@ -222,12 +207,10 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 		return 0, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	// Record item creation history if a creator is specified
+	// Record item creation history asynchronously if a creator is specified
 	if params.CreatorID != nil {
-		updateService := NewItemUpdateService(db)
-		if err := updateService.recordItemCreationHistory(db, int(itemID), *params.CreatorID); err != nil {
-			slog.Warn("failed to record item creation history", "error", err, "item_id", itemID)
-		}
+		historyService := GetHistoryService(db)
+		historyService.RecordItemCreationHistoryAsync(db, int(itemID), *params.CreatorID)
 	}
 
 	return itemID, nil

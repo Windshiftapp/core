@@ -19,6 +19,7 @@
   import Label from '../components/Label.svelte';
   import Toggle from '../components/Toggle.svelte';
   import Tabs from '../components/Tabs.svelte';
+  import Card from '../components/Card.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
 
@@ -206,14 +207,14 @@
 </script>
 
 {#if loading}
-  <div class="rounded-xl p-6 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+  <Card rounded="xl" shadow padding="spacious">
     <div class="animate-pulse">
       <div class="h-4 rounded w-1/4 mb-4" style="background-color: var(--ds-surface);"></div>
       <div class="h-4 rounded w-3/4" style="background-color: var(--ds-surface);"></div>
     </div>
-  </div>
+  </Card>
 {:else if !canAdmin}
-  <div class="rounded-xl p-8 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+  <Card rounded="xl" shadow padding="loose">
     <div class="text-center py-8">
       <Shield class="w-12 h-12 mx-auto mb-4 text-amber-500" />
       <h2 class="text-lg font-semibold mb-2" style="color: var(--ds-text);">{t('workspaceSettings.accessDenied')}</h2>
@@ -222,7 +223,7 @@
         {t('workspaceSettings.backToWorkspace')}
       </Button>
     </div>
-  </div>
+  </Card>
 {:else if workspace}
   <div class="space-y-6">
     <!-- Header -->

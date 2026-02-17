@@ -136,6 +136,12 @@ export default {
     uploading: 'Wird hochgeladen...',
     downloading: 'Wird heruntergeladen...',
 
+    // Pagination / load more
+    loadMore: 'Mehr laden',
+    loadingMore: 'Wird geladen...',
+    remaining: 'verbleibend',
+    showingOfTotal: '{count} von {total} angezeigt',
+
     // Results
     noResults: 'Keine Ergebnisse gefunden',
     noData: 'Keine Daten',

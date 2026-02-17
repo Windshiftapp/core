@@ -581,7 +581,7 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Emit side effects via EventCoordinator (notifications, webhooks, action events)
 	notifyStart := time.Now()
 	if h.eventCoordinator != nil {
-		h.eventCoordinator.EmitItemCreated(&createdItem, user.ID)
+		h.eventCoordinator.EmitItemCreated(&createdItem, user.ID, user.Username)
 	} else {
 		// Fallback to individual services if EventCoordinator not set
 		if h.notificationService != nil {
@@ -769,7 +769,7 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Emit side effects via EventCoordinator (notifications, webhooks, action events)
 	if h.eventCoordinator != nil {
-		h.eventCoordinator.EmitItemUpdated(originalItem, updatedItem, result.StatusChanged, assigneeChanged, user.ID)
+		h.eventCoordinator.EmitItemUpdated(originalItem, updatedItem, result.StatusChanged, assigneeChanged, user.ID, user.Username)
 	} else {
 		// Fallback to individual services if EventCoordinator not set
 		if h.notificationService != nil {
@@ -961,7 +961,7 @@ func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	// Emit side effects via EventCoordinator (notifications, webhooks)
 	if h.eventCoordinator != nil {
-		h.eventCoordinator.EmitItemDeleted(item, user.ID, 0)
+		h.eventCoordinator.EmitItemDeleted(item, user.ID, 0, user.Username)
 	} else {
 		// Fallback to individual services if EventCoordinator not set
 		if h.notificationService != nil {
@@ -1195,7 +1195,7 @@ func (h *ItemHandler) DeleteCascade(w http.ResponseWriter, r *http.Request) {
 
 	// Emit side effects via EventCoordinator (notifications, webhooks)
 	if h.eventCoordinator != nil {
-		h.eventCoordinator.EmitItemDeleted(item, user.ID, result.DeletedCount-1)
+		h.eventCoordinator.EmitItemDeleted(item, user.ID, result.DeletedCount-1, user.Username)
 	} else {
 		// Fallback to individual services if EventCoordinator not set
 		if h.notificationService != nil {

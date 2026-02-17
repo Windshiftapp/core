@@ -19,6 +19,7 @@
   } from 'lucide-svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import StatCard from '../components/StatCard.svelte';
+  import Card from '../components/Card.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   let stats = {
@@ -184,7 +185,7 @@
 
     <!-- Work Item Status Overview -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-      <div class="rounded p-5 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+      <Card shadow padding="spacious">
         <div class="flex items-center mb-4">
           <BarChart3 class="w-4 h-4 mr-2" style="color: var(--ds-text-subtle);" />
           <h3 class="text-base font-semibold" style="color: var(--ds-text);">{t('dashboard.workItemStatusOverview')}</h3>
@@ -218,9 +219,9 @@
             </div>
           </div>
         </div>
-      </div>
+      </Card>
 
-      <div class="rounded p-5 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+      <Card shadow padding="spacious">
         <div class="flex items-center mb-4">
           <Plus class="w-4 h-4 mr-2" style="color: var(--ds-text-subtle);" />
           <h3 class="text-base font-semibold" style="color: var(--ds-text);">{t('dashboard.quickActions')}</h3>
@@ -268,18 +269,18 @@
             </div>
           </button>
         </div>
-      </div>
+      </Card>
     </div>
 
     <!-- Recent Work Items -->
     {#if recentItems.length > 0}
-      <div class="rounded border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-        <div class="px-5 py-3 border-b" style="border-color: var(--ds-border);">
+      <Card shadow padding="none">
+        {#snippet header()}
           <div class="flex items-center">
             <Clock class="w-4 h-4 mr-2" style="color: var(--ds-text-subtle);" />
             <h3 class="text-base font-semibold" style="color: var(--ds-text);">{t('dashboard.recentWorkItems')}</h3>
           </div>
-        </div>
+        {/snippet}
         <div class="overflow-x-auto">
           <table class="w-full">
             <thead style="background-color: var(--ds-background-neutral);">
@@ -319,7 +320,7 @@
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
     {/if}
   {/if}
 </div>

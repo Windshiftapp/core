@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { fade, slide } from 'svelte/transition';
   import { currentRoute, navigate, isWorkspaceRoute } from '../router.js';
-  import { testingStore, authStore, permissionStore, uiStore, currentWorkspace, workspacesStore, workspacePermissions, ssoStore, workspaceDataStore, activityStore, collectionData } from '../stores';
+  import { testingStore, authStore, permissionStore, uiStore, currentWorkspace, workspacesStore, workspacePermissions, ssoStore, workspaceDataStore, activityStore } from '../stores';
   import EmailVerificationBanner from '../features/notifications/EmailVerificationBanner.svelte';
   import { moduleSettings } from '../stores/moduleSettings.js';
   import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
@@ -563,8 +563,7 @@
     }
   });
 
-  // Activate collection data store — pre-fetches items when navigating to collection views
-  $effect(() => { $collectionData; });
+  // Collection store is self-activating via route subscription in constructor — no need to manually activate
 
   // Track display mode changes to enable transitions only after an actual mode switch
   $effect(() => {

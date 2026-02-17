@@ -143,6 +143,12 @@ export default {
     note: 'Note',
     unknown: 'Unknown',
 
+    // Pagination / load more
+    loadMore: 'Load more',
+    loadingMore: 'Loading more...',
+    remaining: 'remaining',
+    showingOfTotal: 'Showing {count} of {total}',
+
     // Results
     noResults: 'No results found',
     noData: 'No data',

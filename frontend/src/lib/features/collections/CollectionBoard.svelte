@@ -4,7 +4,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
-  import { collectionData, reloadCollection } from '../../stores/collectionContext.js';
+  import { collectionStore, reloadCollection } from '../../stores/collectionContext.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { Plus, GripVertical } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
@@ -91,18 +91,18 @@
 
   // Sync items from central store
   $effect(() => {
-    items = $collectionData.items;
-    backlogItems = $collectionData.backlogItems;
-    currentCollectionName = $collectionData.collectionName;
-    backlogStore.setCount(workspaceId, $collectionData.backlogItems.length);
+    items = collectionStore.items;
+    backlogItems = collectionStore.backlogItems;
+    currentCollectionName = collectionStore.collectionName;
+    backlogStore.setCount(workspaceId, collectionStore.backlogPagination?.total ?? collectionStore.backlogItems.length);
   });
 
   // Reload view-specific data (board config, transitions) when items update
   $effect(() => {
-    if ($collectionData.items.length > 0 && !$collectionData.loading) {
+    if (collectionStore.items.length > 0 && !collectionStore.loading) {
       loadBoardConfig();
       statusTransitionStore.initialize(workspaceId);
-      statusTransitionStore.preloadForItems([...$collectionData.items, ...$collectionData.backlogItems]);
+      statusTransitionStore.preloadForItems([...collectionStore.items, ...collectionStore.backlogItems]);
     }
   });
 
@@ -689,6 +689,23 @@
             </div>
           {/each}
         </div>
+
+        <!-- Load More -->
+        {#if collectionStore.itemsHasMore}
+          <div class="mt-6 text-center">
+            <button
+              onclick={() => collectionStore.loadMoreItems()}
+              disabled={collectionStore.itemsLoadingMore}
+              class="px-4 py-2 text-sm font-medium rounded-lg border transition-colors"
+              style="{styles.glassStyle?.(12) ?? ''} {styles.glassTextStyle ?? ''}"
+            >
+              {collectionStore.itemsLoadingMore ? t('common.loading') : t('common.loadMore')}
+              {#if collectionStore.itemsPagination?.total}
+                ({collectionStore.itemsPagination.total - collectionStore.items.length} {t('common.remaining')})
+              {/if}
+            </button>
+          </div>
+        {/if}
 
         <!-- Summary -->
         <div class="mt-8 text-center">

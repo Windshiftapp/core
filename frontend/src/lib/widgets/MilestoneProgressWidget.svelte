@@ -74,9 +74,9 @@
             <div class="title-group">
               <div
                 class="icon-pill"
-                style={`background-color: ${milestone.category_color || 'rgba(37,99,235,0.12)'};`}
+                style={`background-color: color-mix(in srgb, ${milestone.category_color || '#2563eb'} 12%, transparent);`}
               >
-                <Flag class="icon" />
+                <Flag class="icon" style={`color: ${milestone.category_color || '#2563eb'};`} />
               </div>
               <div class="title-text">
                 <p class="milestone-name">{milestone.milestone_name}</p>
@@ -213,7 +213,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #1e3a8a;
   }
 
   .icon {

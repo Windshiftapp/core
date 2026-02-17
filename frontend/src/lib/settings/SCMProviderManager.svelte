@@ -22,6 +22,7 @@
   import BasePicker from '../pickers/BasePicker.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import SectionHeader from '../layout/SectionHeader.svelte';
+  import Card from '../components/Card.svelte';
 
   // Workspace access options
   const workspaceAccessOptions = $derived([
@@ -474,7 +475,7 @@
     </div>
   {:else if providers.length === 0}
     <!-- Empty State -->
-    <div class="text-center py-12 rounded-lg border border-dashed" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+    <Card variant="dashed" class="text-center py-12">
       <GitBranch class="mx-auto h-12 w-12" style="color: var(--ds-text-subtlest);" />
       <h3 class="mt-2 text-sm font-medium" style="color: var(--ds-text);">{t('settings.scmProviders.noProviders')}</h3>
       <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">
@@ -486,10 +487,10 @@
           {t('settings.scmProviders.addProvider')}
         </Button>
       </div>
-    </div>
+    </Card>
   {:else}
     <!-- Providers List -->
-    <div class="shadow rounded-lg divide-y" style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);">
+    <Card shadow padding="none" class="divide-y">
       {#each providers as provider}
         <div class="p-4 flex items-center justify-between" style="border-color: var(--ds-border);">
           <div class="flex items-center space-x-4">
@@ -578,7 +579,7 @@
           </div>
         </div>
       {/each}
-    </div>
+    </Card>
   {/if}
 </div>
 

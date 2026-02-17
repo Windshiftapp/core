@@ -8,6 +8,7 @@
   import { useGradientStyles, loadWorkspaceGradient } from '../stores/workspaceGradient.svelte.js';
   import ViewHeader from '../layout/ViewHeader.svelte';
   import Button from '../components/Button.svelte';
+  import Card from '../components/Card.svelte';
   import CollectionViewSwitcher from '../features/collections/CollectionViewSwitcher.svelte';
 
   let { workspaceId, collectionId = null } = $props();
@@ -301,7 +302,7 @@
         </ViewHeader>
 
         <!-- Configuration content in raised box -->
-        <div class="w-full rounded-xl p-6 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: {styles.hasCustomBackground ? 'transparent' : 'var(--ds-border)'};">
+        <Card rounded="xl" shadow padding="spacious" class="w-full" style="border-color: {styles.hasCustomBackground ? 'transparent' : 'var(--ds-border)'};">
         <!-- Tab Navigation -->
         <div class="border-b" style="border-color: var(--ds-border);">
           <div class="flex gap-4">
@@ -513,7 +514,7 @@
             </Button>
           </div>
         </div>
-        </div>
+        </Card>
       </div>
     </div>
   </div>

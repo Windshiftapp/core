@@ -266,6 +266,14 @@
       : $milestonesStore
   );
 
+  let localMilestones = $derived(
+    filteredMilestones.filter(m => !m.is_global)
+  );
+
+  let globalMilestones = $derived(
+    filteredMilestones.filter(m => m.is_global)
+  );
+
   // DataTable configuration
   let milestoneColumns = $derived([
     {
@@ -333,9 +341,12 @@
             {/if}
           </h1>
           <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">
-            {filteredMilestones.length} milestone{filteredMilestones.length !== 1 ? 's' : ''}
-            {#if isGlobalView && activeCategoryId}in this category{/if}
-            {#if !isGlobalView}(local + global){/if}
+            {#if !isGlobalView}
+              {localMilestones.length} {t('milestones.local').toLowerCase()}, {globalMilestones.length} {t('milestones.global').toLowerCase()}
+            {:else}
+              {filteredMilestones.length} milestone{filteredMilestones.length !== 1 ? 's' : ''}
+              {#if activeCategoryId}in this category{/if}
+            {/if}
           </p>
         </div>
         <Button
@@ -350,6 +361,80 @@
       </div>
 
 
+      {#snippet nameCell(item)}
+        {#if item}
+          {#key item.id}
+            <a
+              href="/milestones/{item.id}{workspaceId ? `?workspaceId=${workspaceId}` : ''}"
+              class="font-medium hover:underline cursor-pointer"
+              style="color: var(--ds-text);"
+              title={item.description || ''}
+            >
+              {item.name}
+            </a>
+          {/key}
+        {/if}
+      {/snippet}
+
+      {#snippet statusCell(item)}
+        {#if item}
+          {#key item.id}
+            {@const statusInfo = getStatusInfo(item.status)}
+            {@const overdue = isOverdue(item.target_date, item.status)}
+            <Lozenge color={statusInfo.lozengeColor} text={statusInfo.label} />
+            {#if overdue}
+              <Lozenge color="red" text={t('milestones.overdue')} />
+            {/if}
+          {/key}
+        {/if}
+      {/snippet}
+
+      {#snippet categoryCell(item)}
+        {#if item}
+          {#key item.id}
+            {@const category = getCategoryById(item.category_id, $categoriesStore)}
+            {#if category}
+              <ColorDot color={category.color} size="md" />
+              <span class="text-sm">{category.name}</span>
+            {:else}
+              <span class="text-sm text-gray-500">{t('milestones.noCategory')}</span>
+            {/if}
+          {/key}
+        {/if}
+      {/snippet}
+
+      {#snippet daysRemainingCell(item)}
+        {#if item}
+          {#key item.id}
+            {@const overdue = isOverdue(item.target_date, item.status)}
+            {@const daysText = getDaysUntil(item.target_date)}
+            <span class="text-sm font-medium {overdue ? 'text-red-600' : item.status === 'completed' ? 'text-green-600' : 'text-blue-600'}">
+              {item.status === 'completed' ? t('milestones.status.completed') : item.status === 'cancelled' ? t('milestones.status.cancelled') : daysText || t('milestones.openEnded')}
+            </span>
+          {/key}
+        {/if}
+      {/snippet}
+
+      {#snippet testsCell(item)}
+        {#if item && $moduleSettings.test_management_enabled}
+          {#key item.id}
+            {@const stats = testStatistics[item.id]}
+            {#if stats}
+              <div class="flex flex-col">
+                <span class="text-green-600">{stats.successful_test_runs} ✓</span>
+                {#if stats.failed_test_runs > 0}
+                  <span class="text-red-600">{stats.failed_test_runs} ✗</span>
+                {/if}
+              </div>
+            {:else}
+              <span class="text-gray-400">—</span>
+            {/if}
+          {/key}
+        {:else}
+          <span class="text-gray-400">—</span>
+        {/if}
+      {/snippet}
+
       <!-- Empty State or DataTable -->
       {#if filteredMilestones.length === 0}
         <EmptyState
@@ -363,7 +448,7 @@
             </Button>
           {/snippet}
         </EmptyState>
-      {:else}
+      {:else if isGlobalView}
         <DataTable
           columns={milestoneColumns}
           data={filteredMilestones}
@@ -371,85 +456,65 @@
           actionItems={buildMilestoneDropdownItems}
           class="rounded-xl border shadow-sm"
         >
-        <!-- Custom Name Cell with Description Tooltip -->
-        <div slot="name" let:item>
-          {#if item}
-            {#key item.id}
-              <a
-                href="/milestones/{item.id}{workspaceId ? `?workspaceId=${workspaceId}` : ''}"
-                class="font-medium hover:underline cursor-pointer"
-                style="color: var(--ds-text);"
-                title={item.description || ''}
-              >
-                {item.name}
-              </a>
-            {/key}
-          {/if}
-        </div>
-
-        <!-- Custom Status Cell -->
-        <div slot="status" let:item class="flex items-center gap-2">
-          {#if item}
-            {#key item.id}
-              {@const statusInfo = getStatusInfo(item.status)}
-              {@const overdue = isOverdue(item.target_date, item.status)}
-              <Lozenge color={statusInfo.lozengeColor} text={statusInfo.label} />
-              {#if overdue}
-                <Lozenge color="red" text={t('milestones.overdue')} />
-              {/if}
-            {/key}
-          {/if}
-        </div>
-
-        <!-- Custom Category Cell -->
-        <div slot="category" let:item class="flex items-center gap-2">
-          {#if item}
-            {#key item.id}
-              {@const category = getCategoryById(item.category_id, $categoriesStore)}
-              {#if category}
-                <ColorDot color={category.color} size="md" />
-                <span class="text-sm">{category.name}</span>
-              {:else}
-                <span class="text-sm text-gray-500">{t('milestones.noCategory')}</span>
-              {/if}
-            {/key}
-          {/if}
-        </div>
-
-        <!-- Custom Timeline Cell -->
-        <div slot="days_remaining" let:item>
-          {#if item}
-            {#key item.id}
-              {@const overdue = isOverdue(item.target_date, item.status)}
-              {@const daysText = getDaysUntil(item.target_date)}
-              <span class="text-sm font-medium {overdue ? 'text-red-600' : item.status === 'completed' ? 'text-green-600' : 'text-blue-600'}">
-                {item.status === 'completed' ? t('milestones.status.completed') : item.status === 'cancelled' ? t('milestones.status.cancelled') : daysText || t('milestones.openEnded')}
-              </span>
-            {/key}
-          {/if}
-        </div>
-
-        <!-- Custom Tests Cell -->
-        <div slot="tests" let:item class="text-sm">
-          {#if item && $moduleSettings.test_management_enabled}
-            {#key item.id}
-              {@const stats = testStatistics[item.id]}
-              {#if stats}
-                <div class="flex flex-col">
-                  <span class="text-green-600">{stats.successful_test_runs} ✓</span>
-                  {#if stats.failed_test_runs > 0}
-                    <span class="text-red-600">{stats.failed_test_runs} ✗</span>
-                  {/if}
-                </div>
-              {:else}
-                <span class="text-gray-400">—</span>
-              {/if}
-            {/key}
-          {:else}
-            <span class="text-gray-400">—</span>
-          {/if}
-        </div>
+        <div slot="name" let:item>{@render nameCell(item)}</div>
+        <div slot="status" let:item class="flex items-center gap-2">{@render statusCell(item)}</div>
+        <div slot="category" let:item class="flex items-center gap-2">{@render categoryCell(item)}</div>
+        <div slot="days_remaining" let:item>{@render daysRemainingCell(item)}</div>
+        <div slot="tests" let:item class="text-sm">{@render testsCell(item)}</div>
         </DataTable>
+      {:else}
+        <!-- Workspace view: split into Local and Global sections -->
+        <div class="space-y-6">
+          {#if localMilestones.length > 0}
+            <section class="mt-4">
+              <div class="flex items-center gap-3 mb-3">
+                <Building2 class="w-5 h-5" style="color: var(--ds-interactive);" />
+                <div>
+                  <p class="font-semibold text-base" style="color: var(--ds-text);">{t('milestones.localMilestones')}</p>
+                  <p class="text-sm" style="color: var(--ds-text-subtle);">{t('milestones.localMilestoneDescription')}</p>
+                </div>
+              </div>
+              <DataTable
+                columns={milestoneColumns}
+                data={localMilestones}
+                keyField="id"
+                actionItems={buildMilestoneDropdownItems}
+                class="rounded-xl border shadow-sm"
+              >
+              <div slot="name" let:item>{@render nameCell(item)}</div>
+              <div slot="status" let:item class="flex items-center gap-2">{@render statusCell(item)}</div>
+              <div slot="category" let:item class="flex items-center gap-2">{@render categoryCell(item)}</div>
+              <div slot="days_remaining" let:item>{@render daysRemainingCell(item)}</div>
+              <div slot="tests" let:item class="text-sm">{@render testsCell(item)}</div>
+              </DataTable>
+            </section>
+          {/if}
+
+          {#if globalMilestones.length > 0}
+            <section class="mt-12">
+              <div class="flex items-center gap-3 mb-3">
+                <Globe class="w-5 h-5" style="color: var(--ds-interactive);" />
+                <div>
+                  <p class="font-semibold text-base" style="color: var(--ds-text);">{t('milestones.globalMilestones')}</p>
+                  <p class="text-sm" style="color: var(--ds-text-subtle);">{t('milestones.globalMilestoneDescription')}</p>
+                </div>
+              </div>
+              <DataTable
+                columns={milestoneColumns}
+                data={globalMilestones}
+                keyField="id"
+                actionItems={buildMilestoneDropdownItems}
+                class="rounded-xl border shadow-sm"
+              >
+              <div slot="name" let:item>{@render nameCell(item)}</div>
+              <div slot="status" let:item class="flex items-center gap-2">{@render statusCell(item)}</div>
+              <div slot="category" let:item class="flex items-center gap-2">{@render categoryCell(item)}</div>
+              <div slot="days_remaining" let:item>{@render daysRemainingCell(item)}</div>
+              <div slot="tests" let:item class="text-sm">{@render testsCell(item)}</div>
+              </DataTable>
+            </section>
+          {/if}
+        </div>
       {/if}
     </div>
   </div>

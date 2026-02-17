@@ -290,7 +290,7 @@
           </div>
           <div class="p-3 space-y-3">
             {#each upcomingMilestones as milestone}
-              <div class="p-2 rounded border" style="border-color: var(--ds-border);">
+              <a href="/milestones/{milestone.milestone_id}" class="block p-2 rounded border hover:border-[var(--ds-border-focused)] transition-colors" style="border-color: var(--ds-border);">
                 <div class="flex items-start justify-between mb-2">
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 mb-0.5">
@@ -326,7 +326,7 @@
                     style="width: {milestone.percent_complete}%; background-color: {milestone.category_color || 'rgb(59, 130, 246)'};"
                   ></div>
                 </div>
-              </div>
+              </a>
             {/each}
           </div>
         </div>

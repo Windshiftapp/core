@@ -5,7 +5,7 @@
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { getCollection, checkItemVisibility } from '../collections/collectionService.js';
-  import { collectionData, reloadCollection } from '../../stores/collectionContext.js';
+  import { collectionStore, reloadCollection } from '../../stores/collectionContext.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { FileText, Plus, ChevronDown, Package, ChevronRight, Home, MapPin } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
@@ -76,14 +76,16 @@
 
   onMount(async () => {
     await loadWorkspaceGradient(workspaceId);
+    // Request a large page for map (needs all items for spatial layout)
+    await collectionStore.setItemsPage(1, 500);
     await loadAllData();
   });
 
   // Sync items from central store
   $effect(() => {
-    if (!$collectionData.loading) {
-      currentCollectionName = $collectionData.collectionName;
-      untrack(() => processMapItems($collectionData.items));
+    if (!collectionStore.loading) {
+      currentCollectionName = collectionStore.collectionName;
+      untrack(() => processMapItems(collectionStore.items));
     }
   });
 
@@ -275,7 +277,7 @@ async function loadStatuses() {
       currentParentId = parentId;
 
       // Process items from the store
-      processMapItems($collectionData.items);
+      processMapItems(collectionStore.items);
     } catch (error) {
       console.error('Failed to load story map data:', error);
     }

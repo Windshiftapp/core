@@ -926,31 +926,49 @@ async function getItemTypes(baseURL, token) {
   }
 }
 
+// Get statuses from the API (returns name → id map)
+async function getStatuses(baseURL, token) {
+  try {
+    const response = await makeAuthRequest(baseURL, 'GET', '/api/statuses', null, token);
+
+    if (response.status === 200) {
+      const statusMap = {};
+      for (const status of response.data) {
+        statusMap[status.name] = status.id;
+      }
+      return statusMap;
+    }
+
+    logError('Failed to fetch statuses');
+    return {};
+  } catch (error) {
+    logError(`Error fetching statuses: ${error.message}`);
+    return {};
+  }
+}
+
 // Determine appropriate item type based on item characteristics
 function determineItemType(item, depth, itemTypes) {
-  // Check if title suggests it's a bug
   const title = item.title.toLowerCase();
   const description = (item.description || '').toLowerCase();
   const isBugRelated = title.includes('bug') || title.includes('fix') ||
     description.includes('bug') || description.includes('defect');
 
-  // Assign type based on hierarchy depth and characteristics
-  if (isBugRelated && itemTypes['Bug']) {
-    return itemTypes['Bug'];
-  }
-
   if (depth === 0) {
-    // Top-level items are Epics
+    // Top-level: use Bug if detected, otherwise Epic
+    if (isBugRelated && itemTypes['Bug']) {
+      return itemTypes['Bug'];
+    }
     return itemTypes['Epic'] || null;
   } else if (depth === 1) {
-    // First-level children are Stories
+    // Children of Epic (level 1) — must be Story (level 2) for hierarchy
     return itemTypes['Story'] || null;
   } else if (depth === 2) {
-    // Second-level children
-    if (item.is_task) {
-      return itemTypes['Task'] || null;
+    // Children of Story (level 2) — Bug (level 3) or Task (level 3) both valid
+    if (isBugRelated && itemTypes['Bug']) {
+      return itemTypes['Bug'];
     }
-    return itemTypes['Story'] || null;
+    return itemTypes['Task'] || null;
   } else {
     // Deep nesting (depth 3+) - Sub-tasks
     return itemTypes['Sub-task'] || itemTypes['Task'] || null;
@@ -1041,7 +1059,7 @@ async function createWorkLogs(baseURL, token, itemMap, projectMap) {
 }
 
 // Create work items recursively
-async function createWorkItem(baseURL, token, item, workspaceId, workspaceKey, itemMap, parentId = null, projectMap = {}, priorityMap = {}, itemTypes = {}, milestoneMap = {}, iterationMap = {}, depth = 0) {
+async function createWorkItem(baseURL, token, item, workspaceId, workspaceKey, itemMap, parentId = null, projectMap = {}, priorityMap = {}, itemTypes = {}, milestoneMap = {}, iterationMap = {}, statusMap = {}, depth = 0) {
   try {
     const indent = '  '.repeat(depth);
 
@@ -1080,7 +1098,7 @@ async function createWorkItem(baseURL, token, item, workspaceId, workspaceKey, i
       item_type_id: itemTypeId,
       title: item.title,
       description: item.description || '',
-      status_id: item.status_id || 1, // Default to 1 (Open)
+      status_id: item.status_name ? (statusMap[item.status_name] || null) : (item.status_id || null),
       is_task: item.is_task || false,
       project_id: projectId,
       priority_id: priorityId,
@@ -1105,13 +1123,14 @@ async function createWorkItem(baseURL, token, item, workspaceId, workspaceKey, i
       // Create children recursively
       if (item.children && item.children.length > 0) {
         for (const child of item.children) {
-          await createWorkItem(baseURL, token, child, workspaceId, workspaceKey, itemMap, itemId, projectMap, priorityMap, itemTypes, milestoneMap, iterationMap, depth + 1);
+          await createWorkItem(baseURL, token, child, workspaceId, workspaceKey, itemMap, itemId, projectMap, priorityMap, itemTypes, milestoneMap, iterationMap, statusMap, depth + 1);
         }
       }
 
       return itemId;
     } else {
-      logError(`${indent}Failed to create item "${item.title}": ${response.status}`);
+      const errMsg = response.data?.error || response.data?.message || JSON.stringify(response.data);
+      logError(`${indent}Failed to create item "${item.title}": ${response.status} - ${errMsg}`);
       return null;
     }
   } catch (error) {
@@ -1121,7 +1140,7 @@ async function createWorkItem(baseURL, token, item, workspaceId, workspaceKey, i
 }
 
 // Create all work items for all workspaces
-async function createWorkItems(baseURL, token, workspaceMap, projectMap, priorityMap, itemTypes, milestoneMap = {}, iterationMap = {}, workItemsData = workItems) {
+async function createWorkItems(baseURL, token, workspaceMap, projectMap, priorityMap, itemTypes, milestoneMap = {}, iterationMap = {}, statusMap = {}, workItemsData = workItems) {
   logSection('Creating Work Items');
 
   const itemMap = {};
@@ -1145,7 +1164,7 @@ async function createWorkItems(baseURL, token, workspaceMap, projectMap, priorit
     }
 
     for (const item of items) {
-      await createWorkItem(baseURL, token, item, workspaceId, workspaceKey, itemMap, null, wsProjectMap, priorityMap, itemTypes, milestoneMap, iterationMap, 0);
+      await createWorkItem(baseURL, token, item, workspaceId, workspaceKey, itemMap, null, wsProjectMap, priorityMap, itemTypes, milestoneMap, iterationMap, statusMap, 0);
     }
   }
 
@@ -1963,13 +1982,13 @@ async function createComments(baseURL, token, itemMap, userMap, scaleModule) {
     if (!itemId) continue;
 
     for (const comment of comments) {
-      const userId = userMap[comment.username];
-      if (!userId) continue;
+      const user = userMap[comment.username];
+      if (!user) continue;
 
       try {
         const response = await makeAuthRequest(baseURL, 'POST', `/api/items/${itemId}/comments`, {
           content: comment.content,
-          author_id: userId,
+          author_id: user.id,
           is_private: comment.is_private
         }, token);
 
@@ -2098,7 +2117,8 @@ ${colors.reset}`);
     const milestoneMap = await createMilestones(options.baseURL, token, workspaceMap, categoryMap, getMergedData(milestones, 'challengeMilestones', 'scaleMilestones'));
     const iterationMap = await createIterations(options.baseURL, token, workspaceMap, getMergedData(iterations, 'challengeIterations', 'scaleIterations'));
     const itemTypes = await getItemTypes(options.baseURL, token);
-    const itemMap = await createWorkItems(options.baseURL, token, workspaceMap, projectMap, priorityMap, itemTypes, milestoneMap, iterationMap, getMergedData(workItems, 'challengeWorkItems', 'scaleWorkItems'));
+    const statusMap = await getStatuses(options.baseURL, token);
+    const itemMap = await createWorkItems(options.baseURL, token, workspaceMap, projectMap, priorityMap, itemTypes, milestoneMap, iterationMap, statusMap, getMergedData(workItems, 'challengeWorkItems', 'scaleWorkItems'));
     const worklogCount = await createWorkLogs(options.baseURL, token, itemMap, projectMap);
 
     // Create comments (scale mode only)
@@ -2234,6 +2254,7 @@ export {
   createPriorities,
   createMilestones,
   createIterations,
+  getStatuses,
   createWorkItems,
   createComments,
   createPersonalTasks,

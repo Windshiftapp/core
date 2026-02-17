@@ -552,9 +552,9 @@ function pickPriority(rng) {
 
 function pickStatus(rng) {
   const r = rng();
-  if (r < 0.3) return 1;  // Open
-  if (r < 0.6) return 3;  // In Progress
-  return 5;                // Done
+  if (r < 0.3) return 'Open';
+  if (r < 0.6) return 'In Progress';
+  return 'Done';
 }
 
 export function generateWorkspaceItems(wsKey, seed) {
@@ -585,7 +585,7 @@ export function generateWorkspaceItems(wsKey, seed) {
     const epic = {
       title: epicTitle,
       description: generateDescription(rng, ws, epicTitle),
-      status_id: pickStatus(rng),
+      status_name: pickStatus(rng),
       priority: pickPriority(rng),
       milestoneName: rng() < 0.4 ? `${wsKey} Alpha Release` : (rng() < 0.5 ? `${wsKey} Beta Release` : undefined),
       iterationName: rng() < 0.3 ? `${wsKey} Sprint 1` : (rng() < 0.3 ? `${wsKey} Sprint 2` : undefined),
@@ -599,7 +599,7 @@ export function generateWorkspaceItems(wsKey, seed) {
       const story = {
         title: storyTitle,
         description: generateStoryDescription(rng, ws),
-        status_id: pickStatus(rng),
+        status_name: pickStatus(rng),
         priority: pickPriority(rng),
         iterationName: rng() < 0.4 ? `${wsKey} Sprint 1` : (rng() < 0.3 ? `${wsKey} Sprint 2` : undefined),
         children: []
@@ -612,7 +612,7 @@ export function generateWorkspaceItems(wsKey, seed) {
           story.children.push({
             title: uniqueTitle(generateSubtaskTitle(rng, ws)),
             description: generateSubtaskDescription(rng, ws),
-            status_id: pickStatus(rng),
+            status_name: pickStatus(rng),
             priority: pickPriority(rng),
           });
         }
@@ -631,7 +631,7 @@ export function generateWorkspaceItems(wsKey, seed) {
       items.push({
         title: uniqueTitle(generateBugTitle(rng, ws)),
         description: generateBugDescription(rng, ws),
-        status_id: pickStatus(rng),
+        status_name: pickStatus(rng),
         priority: pickPriority(rng),
       });
     } else {
@@ -639,7 +639,7 @@ export function generateWorkspaceItems(wsKey, seed) {
       items.push({
         title: uniqueTitle(`${pick(rng, actionVerbs)} ${pick(rng, ws.nouns)}`),
         description: generateShortDescription(rng, ws),
-        status_id: rng() < 0.5 ? 1 : 3,
+        status_name: rng() < 0.5 ? 'Open' : 'Done',
         priority: pickPriority(rng),
         is_task: true,
       });
