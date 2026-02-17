@@ -6,6 +6,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import Button from '../../components/Button.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import Card from '../../components/Card.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import Textarea from '../../components/Textarea.svelte';
@@ -235,7 +236,7 @@
   </PageHeader>
 
   {#if statuses.length === 0 && !loadingStatuses}
-    <div class="rounded-xl border shadow-sm p-12" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+    <Card rounded="xl" shadow padding="generous">
       <EmptyState
         icon={Workflow}
         title={t('workflows.noStatusesAvailable')}
@@ -247,7 +248,7 @@
           </Button>
         {/snippet}
       </EmptyState>
-    </div>
+    </Card>
   {:else}
     <!-- Workflows Table -->
     <DataTable

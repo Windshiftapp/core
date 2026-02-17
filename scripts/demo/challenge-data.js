@@ -209,23 +209,23 @@ export const challengeWorkItems = {
     {
       title: '<script>alert("XSS")</script> Test Item',
       description: 'Testing XSS in title - this should be escaped and display as text',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false,
       children: [
         {
           title: '<img src=x onerror=alert("XSS")> Image XSS Test',
           description: 'Image tag XSS payload in title',
-          status_id: 1
+          status_name: 'Open'
         },
         {
           title: '<svg onload=alert("XSS")> SVG XSS Test',
           description: 'SVG onload XSS payload',
-          status_id: 1
+          status_name: 'Open'
         },
         {
           title: 'javascript:alert("XSS") Link Test',
           description: 'JavaScript protocol in title',
-          status_id: 1
+          status_name: 'Open'
         }
       ]
     },
@@ -233,18 +233,18 @@ export const challengeWorkItems = {
     {
       title: "SQL Test: ' OR '1'='1",
       description: "Testing SQL injection payload: '; DROP TABLE users; --",
-      status_id: 1,
+      status_name: 'Open',
       is_task: false,
       children: [
         {
           title: "'; DELETE FROM items WHERE '1'='1",
           description: 'DELETE injection test',
-          status_id: 1
+          status_name: 'Open'
         },
         {
           title: '1; SELECT * FROM users--',
           description: 'SELECT injection test',
-          status_id: 1
+          status_name: 'Open'
         }
       ]
     },
@@ -252,49 +252,49 @@ export const challengeWorkItems = {
     {
       title: 'This is an extremely long title that exceeds the typical length limits and tests how the UI handles very long text content without any word breaks or natural wrapping points which could cause layout issues in various components',
       description: 'Testing long title truncation and display',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false
     },
     // Continuous string without spaces
     {
       title: 'ThisIsAContinuousStringWithNoSpacesOrBreakPointsThatCouldCauseHorizontalOverflowInTheUIWhenDisplayed',
       description: 'Testing word-break and overflow handling',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false
     },
     // Very long description
     {
       title: 'Item with very long description',
       description: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. '.repeat(200) + 'End of description.',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false
     },
     // Unicode edge cases
     {
       title: 'Unicode Test: Mixed RTL/LTR שלום Hello مرحبا',
       description: 'Testing bidirectional text: This is English שזו עברית and this هذا عربي',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false,
       children: [
         {
           title: 'Zero-width chars: test\u200Bhidden\u200Btext',
           description: 'Contains zero-width space characters (U+200B)',
-          status_id: 1
+          status_name: 'Open'
         },
         {
           title: 'RTL Override: test\u202Eesrever',
           description: 'Contains RTL override character (U+202E)',
-          status_id: 1
+          status_name: 'Open'
         },
         {
           title: 'Combining chars: e\u0301 vs é (cafe\u0301 vs café)',
           description: 'Testing combining diacritical marks',
-          status_id: 1
+          status_name: 'Open'
         },
         {
           title: 'Surrogate pairs: 𝕳𝖊𝖑𝖑𝖔 (Mathematical Bold Fraktur)',
           description: 'Testing Unicode surrogate pairs and mathematical symbols',
-          status_id: 1
+          status_name: 'Open'
         }
       ]
     },
@@ -302,89 +302,89 @@ export const challengeWorkItems = {
     {
       title: 'Path Test: ../../../etc/passwd',
       description: 'Testing path traversal: ..\\..\\..\\windows\\system32\\config\\sam',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false
     },
     // CRLF injection
     {
       title: 'CRLF Test\r\nX-Injected-Header: value',
       description: 'Testing CRLF injection:\r\nSet-Cookie: malicious=true',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false
     },
     // Null bytes
     {
       title: 'Null byte test\x00hidden',
       description: 'Testing null byte handling: before\x00after',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false
     },
     // Markdown/HTML in description
     {
       title: 'Markdown Test Item',
       description: '# Heading\n\n**Bold text** and *italic text*\n\n- List item 1\n- List item 2\n\n```javascript\nconst code = "test";\n```\n\n[Link text](https://example.com)\n\n![Image alt](https://example.com/image.png)',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false
     },
     // HTML in description
     {
       title: 'HTML Content Test',
       description: '<h1>HTML Heading</h1><p>Paragraph with <strong>bold</strong> and <em>italic</em></p><script>alert("XSS")</script><img src="x" onerror="alert(1)"><a href="javascript:alert(1)">Click me</a>',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false
     },
     // Emoji-heavy content
     {
       title: '🚀 Launch 🎉 Party 💻 Coding 🔥 Fire 💯 Perfect',
       description: '🎯 Goal: Ship features!\n\n📋 Tasks:\n- ✅ Complete\n- ⏳ In progress\n- ❌ Blocked\n\n👨‍💻 Team: 🧑‍🔬 Scientists 🧑‍🎨 Designers',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false
     },
     // International characters in title
     {
       title: '日本語タイトル - Japanese Title Test',
       description: 'テストの説明: This tests Japanese characters in work items',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false
     },
     {
       title: 'العنوان العربي - Arabic Title Test',
       description: 'وصف الاختبار: Testing Arabic RTL text handling',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false
     },
     {
       title: 'כותרת עברית - Hebrew Title Test',
       description: 'תיאור הבדיקה: Testing Hebrew RTL text handling',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false
     },
     // Special characters
     {
       title: 'Special chars: @#$%^&*()_+-=[]{}|;:\'",.<>?/',
       description: 'Testing all keyboard special characters: `~!@#$%^&*()_+-=[]{}\\|;:\'",.<>?/',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false
     },
     // Whitespace edge cases
     {
       title: '   Leading and trailing spaces   ',
       description: '   Description with leading/trailing whitespace   \n\n   And extra newlines   ',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false
     },
     // Tab characters
     {
       title: 'Tab\tcharacter\tin\ttitle',
       description: 'Tab\tcharacters\tin\tdescription\ttoo',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false
     },
     // Newlines in title (should probably be stripped)
     {
       title: 'Line\nbreak\nin\ntitle',
       description: 'Testing newline characters in title field',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false
     }
   ],
@@ -393,13 +393,13 @@ export const challengeWorkItems = {
     {
       title: 'Customer report: "App crashes" <needs review>',
       description: 'Customer said: "When I click <button> it shows error \'undefined\'"',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false,
       children: [
         {
           title: "Customer email: test@example.com' OR '1'='1",
           description: 'Testing customer email field handling',
-          status_id: 1
+          status_name: 'Open'
         }
       ]
     },
@@ -407,7 +407,7 @@ export const challengeWorkItems = {
     {
       title: '😡 URGENT: Customer very upset about 🐛 bug',
       description: '⚠️ Priority: HIGH\n\n📞 Customer called 3 times today!\n\n💔 Losing patience with us',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false
     }
   ],
@@ -416,14 +416,14 @@ export const challengeWorkItems = {
     {
       title: 'Campaign: "Summer Sale" & 50% OFF!!!',
       description: 'Marketing copy with <special> formatting & "quotes"',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false
     },
     // Long campaign name
     {
       title: 'Multi-Channel Integrated Digital Marketing Campaign for Q4 2025 Holiday Season with Social Media, Email, and PPC Components Across All Target Demographics and Geographic Regions',
       description: 'Testing very long marketing campaign names',
-      status_id: 1,
+      status_name: 'Open',
       is_task: false
     }
   ],
@@ -432,14 +432,14 @@ export const challengeWorkItems = {
     {
       title: 'Test Case: Special Characters <>&"\'',
       description: 'Testing special character handling in various fields',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'High',
       is_task: false
     },
     {
       title: 'Performance Benchmark Suite',
       description: 'Automated performance testing framework',
-      status_id: 5,
+      status_name: 'Done',
       priority: 'Medium',
       is_task: false
     }
@@ -449,14 +449,14 @@ export const challengeWorkItems = {
     {
       title: '品質テスト計画',
       description: 'Quality test planning with Japanese text: テスト仕様書の作成',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'High',
       is_task: false
     },
     {
       title: 'ローカライゼーション検証',
       description: 'Localization verification: 日本語UIの確認',
-      status_id: 5,
+      status_name: 'Done',
       priority: 'Medium',
       is_task: false
     }

@@ -2,6 +2,7 @@
   import { Lock, Home, ArrowLeft, Info } from 'lucide-svelte';
   import { navigate } from '../router.js';
   import Button from '../components/Button.svelte';
+  import Card from '../components/Card.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   export let requiredPermission = null;
@@ -14,7 +15,7 @@
 
 <div class="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8" style="background-color: var(--ds-surface);">
   <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-    <div class="py-8 px-4 shadow-sm sm:rounded sm:px-10 border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+    <Card shadow padding="none" rounded="none" class="py-8 px-4 sm:rounded sm:px-10">
       <div class="text-center">
         <div class="mx-auto h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
           <Lock class="h-8 w-8 text-blue-600" />
@@ -69,6 +70,6 @@
           If you believe you should have access to this page, please contact your administrator.
         </p>
       </div>
-    </div>
+    </Card>
   </div>
 </div>

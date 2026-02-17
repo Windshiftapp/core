@@ -4,7 +4,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
-  import { collectionData, reloadCollection } from '../../stores/collectionContext.js';
+  import { collectionStore, reloadCollection } from '../../stores/collectionContext.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { workspaceDataStore } from '../../stores/index.js';
@@ -33,9 +33,8 @@
   let customFieldDefinitions = $derived(workspaceDataStore.customFieldDefinitions);
 
   // Dynamic view-specific state
-  let workItems = $state([]);
-  let allItems = $state([]); // Store all items for search filtering
-  let itemsPagination = $state(null);
+  let workItems = $derived(collectionStore.items);
+  let itemsPagination = $derived(collectionStore.itemsPagination);
 
   // Board configuration for list columns
   let boardConfig = $state(null);
@@ -80,16 +79,11 @@
 
   useEventListener(() => window, 'refresh-work-items', () => reloadCollection());
 
-  // Sync items from central store
+  // Sync collection name and load board config from central store
   $effect(() => {
-    if (!$collectionData.loading) {
-      currentCollectionName = $collectionData.collectionName;
-      const items = $collectionData.items;
-      // untrack to avoid tracking reads of allItems, searchQuery, currentPage,
-      // itemsPerPage, boardConfig, listColumns inside these calls
+    if (!collectionStore.loading) {
+      currentCollectionName = collectionStore.collectionName;
       untrack(() => {
-        allItems = items;
-        updatePaginatedResults();
         loadBoardConfiguration();
         loading = false;
       });
@@ -157,31 +151,7 @@
   async function loadWorkItems(page = 1, limit = itemsPerPage) {
     currentPage = page;
     itemsPerPage = limit;
-    updatePaginatedResults();
-  }
-
-  function updatePaginatedResults() {
-    // Filter the items based on search query
-    const filteredItems = allItems.filter(item => {
-      const query = searchQuery.toLowerCase();
-      return item.title.toLowerCase().includes(query) ||
-             (item.description && item.description.toLowerCase().includes(query));
-    });
-
-    // Calculate pagination for filtered results
-    const totalFiltered = filteredItems.length;
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-
-    workItems = filteredItems.slice(startIndex, endIndex);
-
-    // Create custom pagination object for filtered results
-    itemsPagination = {
-      page: currentPage,
-      limit: itemsPerPage,
-      total: totalFiltered,
-      totalPages: Math.ceil(totalFiltered / itemsPerPage)
-    };
+    await collectionStore.setItemsPage(page, limit);
   }
 
   // Handle pagination events
@@ -193,17 +163,14 @@
     await loadWorkItems(event.detail.page, event.detail.itemsPerPage);
   }
 
-  // For display purposes, we now use workItems directly (no additional client-side filtering needed)
-  let filteredItems = $derived(workItems);
-
-  // Reload items when search query changes
-  let lastSearchQuery = searchQuery;
-  $effect(() => {
-    if (searchQuery !== lastSearchQuery) {
-      lastSearchQuery = searchQuery;
-      currentPage = 1; // Reset to first page when search changes
-      loadWorkItems(1, itemsPerPage);
-    }
+  // Client-side search filtering on current page of items
+  let filteredItems = $derived.by(() => {
+    if (!searchQuery.trim()) return workItems;
+    const query = searchQuery.toLowerCase();
+    return workItems.filter(item =>
+      item.title.toLowerCase().includes(query) ||
+      (item.description && item.description.toLowerCase().includes(query))
+    );
   });
 
   function viewItem(item) {
@@ -250,29 +217,9 @@
     ];
   }
 
-  // Handle inline editing events
+  // Handle inline editing events — reload from server to get fresh data
   function handleItemUpdated(event) {
-    const { item: updatedItem, field, value } = event.detail;
-
-    // Update the item in the local workItems array
-    const index = workItems.findIndex(item => item.id === updatedItem.id);
-    if (index !== -1) {
-      workItems[index] = {
-        ...updatedItem,
-        item_type_id: updatedItem.item_type_id ?? workItems[index].item_type_id,
-        item_type: itemTypes.find(type => type.id === (updatedItem.item_type_id ?? workItems[index].item_type_id))
-      };
-      workItems = [...workItems]; // Trigger reactivity
-    }
-
-    // Also update in allItems if we're in search mode
-    if (searchQuery.trim() && allItems.length > 0) {
-      const allIndex = allItems.findIndex(item => item.id === updatedItem.id);
-      if (allIndex !== -1) {
-        allItems[allIndex] = updatedItem;
-        allItems = [...allItems]; // Trigger reactivity
-      }
-    }
+    reloadCollection();
   }
 
   function handleUpdateError(event) {
@@ -320,7 +267,7 @@
           workspaceName={workspace.name}
           collection={currentCollectionName}
           viewName="List"
-          itemCount={itemsPagination?.total || workItems.length}
+          itemCount={itemsPagination?.total ?? workItems.length}
           hasGradient={styles.hasCustomBackground}
           textStyle={styles.textStyle}
           subtleTextStyle={styles.subtleTextStyle}
@@ -437,7 +384,7 @@
               currentPage={itemsPagination.page}
               totalItems={itemsPagination.total}
               itemsPerPage={itemsPagination.limit}
-              maxItems={100}
+              maxItems={10000}
               hasGradient={styles.hasCustomBackground}
               on:pageChange={handlePageChange}
               on:pageSizeChange={handlePageSizeChange}

@@ -3,6 +3,7 @@
   import { api } from '../api.js';
   import { Settings } from 'lucide-svelte';
   import Label from '../components/Label.svelte';
+  import Card from '../components/Card.svelte';
   import ConfigurationSetPicker from '../pickers/ConfigurationSetPicker.svelte';
   import MigrationAssistant from '../pages/MigrationAssistant.svelte';
 
@@ -230,11 +231,11 @@
   </div>
 
   {#if loading}
-    <div class="rounded-xl border shadow-sm p-8 text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+    <Card rounded="xl" shadow padding="loose" class="text-center">
       <div class="animate-pulse" style="color: var(--ds-text-subtle);">Loading configuration sets...</div>
-    </div>
+    </Card>
   {:else}
-    <div class="rounded-xl border shadow-sm p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+    <Card rounded="xl" shadow padding="spacious">
       <div class="space-y-6">
         <!-- Configuration Set Selection -->
         <div>
@@ -255,7 +256,7 @@
           </div>
         {/if}
       </div>
-    </div>
+    </Card>
 
   {/if}
 </div>

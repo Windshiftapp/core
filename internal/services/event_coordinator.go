@@ -52,13 +52,8 @@ func (ec *EventCoordinator) SetActionService(as ActionEventEmitter) {
 }
 
 // EmitItemCreated emits events for a newly created item.
-func (ec *EventCoordinator) EmitItemCreated(item *models.Item, actorUserID int) {
-	// Get actor username for notification
-	var actorName string
-	_ = ec.db.QueryRow("SELECT username FROM users WHERE id = ?", actorUserID).Scan(&actorName)
-	if actorName == "" {
-		actorName = fmt.Sprintf("User #%d", actorUserID)
-	}
+func (ec *EventCoordinator) EmitItemCreated(item *models.Item, actorUserID int, actorUsername ...string) {
+	actorName := resolveActorName(actorUserID, actorUsername)
 
 	// Construct the item key (e.g., "TST-1")
 	itemKey := fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
@@ -109,13 +104,8 @@ func (ec *EventCoordinator) EmitItemCreated(item *models.Item, actorUserID int) 
 }
 
 // EmitItemUpdated emits events for an updated item.
-func (ec *EventCoordinator) EmitItemUpdated(original, updated *models.Item, statusChanged, assigneeChanged bool, actorUserID int) {
-	// Get actor username for notification
-	var actorName string
-	_ = ec.db.QueryRow("SELECT username FROM users WHERE id = ?", actorUserID).Scan(&actorName)
-	if actorName == "" {
-		actorName = fmt.Sprintf("User #%d", actorUserID)
-	}
+func (ec *EventCoordinator) EmitItemUpdated(original, updated *models.Item, statusChanged, assigneeChanged bool, actorUserID int, actorUsername ...string) {
+	actorName := resolveActorName(actorUserID, actorUsername)
 
 	// Construct the item key (e.g., "TST-1")
 	itemKey := fmt.Sprintf("%s-%d", updated.WorkspaceKey, updated.WorkspaceItemNumber)
@@ -242,13 +232,8 @@ func (ec *EventCoordinator) EmitItemUpdated(original, updated *models.Item, stat
 }
 
 // EmitItemDeleted emits events for a deleted item.
-func (ec *EventCoordinator) EmitItemDeleted(item *models.Item, actorUserID, descendantCount int) {
-	// Get actor username for notification
-	var actorName string
-	_ = ec.db.QueryRow("SELECT username FROM users WHERE id = ?", actorUserID).Scan(&actorName)
-	if actorName == "" {
-		actorName = fmt.Sprintf("User #%d", actorUserID)
-	}
+func (ec *EventCoordinator) EmitItemDeleted(item *models.Item, actorUserID, descendantCount int, actorUsername ...string) {
+	actorName := resolveActorName(actorUserID, actorUsername)
 
 	// Emit notification event
 	if ec.notificationService != nil {
@@ -276,13 +261,9 @@ func (ec *EventCoordinator) EmitItemDeleted(item *models.Item, actorUserID, desc
 }
 
 // EmitStatusChanged emits events specifically for status changes.
-func (ec *EventCoordinator) EmitStatusChanged(item *models.Item, oldStatusID, newStatusID *int, actorUserID int) {
-	// Get actor username and status names
-	var actorName, newStatusName string
-	_ = ec.db.QueryRow("SELECT username FROM users WHERE id = ?", actorUserID).Scan(&actorName)
-	if actorName == "" {
-		actorName = fmt.Sprintf("User #%d", actorUserID)
-	}
+func (ec *EventCoordinator) EmitStatusChanged(item *models.Item, oldStatusID, newStatusID *int, actorUserID int, actorUsername ...string) {
+	actorName := resolveActorName(actorUserID, actorUsername)
+	var newStatusName string
 	if newStatusID != nil {
 		_ = ec.db.QueryRow("SELECT name FROM statuses WHERE id = ?", *newStatusID).Scan(&newStatusName)
 	}
@@ -354,4 +335,12 @@ func (ec *EventCoordinator) TrackItemActivity(userID, itemID int, activityType A
 func (ec *EventCoordinator) GetItemForWebhook(itemID int) (*models.Item, error) {
 	itemRepo := repository.NewItemRepository(ec.db)
 	return itemRepo.FindByIDWithDetails(itemID)
+}
+
+// resolveActorName returns the username from the variadic param, or a fallback.
+func resolveActorName(actorUserID int, actorUsername []string) string {
+	if len(actorUsername) > 0 && actorUsername[0] != "" {
+		return actorUsername[0]
+	}
+	return fmt.Sprintf("User #%d", actorUserID)
 }

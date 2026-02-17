@@ -3,19 +3,83 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"sync"
 	"time"
 
 	"windshift/internal/database"
 )
 
+// initialStatusCacheEntry holds a cached initial status ID with expiry
+type initialStatusCacheEntry struct {
+	statusID  *int
+	expiresAt time.Time
+}
+
+const initialStatusCacheTTL = 5 * time.Minute
+
 // WorkflowService provides centralized workflow lookup logic with proper fallback chain
 type WorkflowService struct {
-	db database.Database
+	db                 database.Database
+	initialStatusCache sync.Map // key: string "ws:{id}:it:{id|nil}" → value: *initialStatusCacheEntry
 }
 
 // NewWorkflowService creates a new workflow service
 func NewWorkflowService(db database.Database) *WorkflowService {
 	return &WorkflowService{db: db}
+}
+
+// GetInitialStatusIDCached returns the initial status ID for a workspace+itemType,
+// using an in-memory cache to avoid repeated DB lookups.
+func (s *WorkflowService) GetInitialStatusIDCached(workspaceID int, itemTypeID *int) (*int, error) {
+	key := initialStatusCacheKey(workspaceID, itemTypeID)
+
+	// Check cache
+	if val, ok := s.initialStatusCache.Load(key); ok {
+		entry := val.(*initialStatusCacheEntry)
+		if time.Now().Before(entry.expiresAt) {
+			return entry.statusID, nil
+		}
+		// Expired, delete and fall through
+		s.initialStatusCache.Delete(key)
+	}
+
+	// Cache miss: resolve via DB
+	workflowID, err := s.GetWorkflowIDForItem(workspaceID, itemTypeID)
+	if err != nil {
+		return nil, err
+	}
+
+	var statusID *int
+	if workflowID != nil {
+		statusID, err = s.GetInitialStatusID(*workflowID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Store in cache
+	s.initialStatusCache.Store(key, &initialStatusCacheEntry{
+		statusID:  statusID,
+		expiresAt: time.Now().Add(initialStatusCacheTTL),
+	})
+
+	return statusID, nil
+}
+
+// InvalidateInitialStatusCache clears the initial status cache.
+// Call this when workflow configuration changes.
+func (s *WorkflowService) InvalidateInitialStatusCache() {
+	s.initialStatusCache.Range(func(key, _ any) bool {
+		s.initialStatusCache.Delete(key)
+		return true
+	})
+}
+
+func initialStatusCacheKey(workspaceID int, itemTypeID *int) string {
+	if itemTypeID != nil {
+		return fmt.Sprintf("ws:%d:it:%d", workspaceID, *itemTypeID)
+	}
+	return fmt.Sprintf("ws:%d:it:nil", workspaceID)
 }
 
 // GetWorkflowIDForItem returns workflow ID with proper fallback chain:

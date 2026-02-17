@@ -4,9 +4,11 @@ import { api } from '../../api.js';
  * Fetches items for a collection (or all workspace items if no collection).
  * Handles QL query resolution and correct API parameter naming.
  */
-export async function fetchCollectionItems(workspaceId, collectionId, extraFilters = {}) {
+export async function fetchCollectionItems(workspaceId, collectionId, { page, limit, ...extraFilters } = {}) {
   let collectionName = 'Default';
   const filters = { ...extraFilters };
+  if (page) filters.page = page;
+  if (limit) filters.limit = limit;
 
   if (collectionId) {
     const collection = await getCollection(collectionId);
@@ -31,7 +33,7 @@ export async function fetchCollectionItems(workspaceId, collectionId, extraFilte
 /**
  * Fetches backlog items for a collection.
  */
-export async function fetchCollectionBacklog(workspaceId, collectionId) {
+export async function fetchCollectionBacklog(workspaceId, collectionId, { page, limit } = {}) {
   let collectionName = 'Default';
 
   if (collectionId) {
@@ -41,8 +43,10 @@ export async function fetchCollectionBacklog(workspaceId, collectionId) {
     }
   }
 
-  const items = await api.items.getBacklog(workspaceId, null, collectionId || null);
-  return { items: items || [], collectionName };
+  const response = await api.items.getBacklog(workspaceId, null, collectionId || null, { page, limit });
+  const items = response?.items ?? (Array.isArray(response) ? response : []);
+  const pagination = response?.pagination ?? null;
+  return { items, collectionName, pagination };
 }
 
 // Cache for collection data to avoid redundant API calls

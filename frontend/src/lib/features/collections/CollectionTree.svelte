@@ -1,7 +1,7 @@
 <script>
   import { onMount, untrack } from 'svelte';
   import { api } from '../../api.js';
-  import { collectionData } from '../../stores/collectionContext.js';
+  import { collectionStore } from '../../stores/collectionContext.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { ChevronRight, ChevronDown, GitBranch, Circle, AlertCircle, Calendar, FileCheck, Minus } from 'lucide-svelte';
@@ -44,6 +44,7 @@
   // Centralized gradient styling
   const styles = useGradientStyles();
 
+  // On mount, request a large page to get full hierarchy
   onMount(async () => {
     // Load test case toggle preference from localStorage
     const saved = localStorage.getItem('collectionTree_showTestCases');
@@ -52,14 +53,16 @@
     }
 
     await loadWorkspaceGradient(workspaceId);
+    // Request a large page for tree (needs full hierarchy)
+    await collectionStore.setItemsPage(1, 500);
     await loadData();
   });
 
   // Sync items from central store
   $effect(() => {
-    if (!$collectionData.loading && $collectionData.items.length >= 0) {
-      currentCollectionName = $collectionData.collectionName;
-      const sorted = [...$collectionData.items].sort((a, b) => a.level - b.level || a.id - b.id);
+    if (!collectionStore.loading && collectionStore.items.length >= 0) {
+      currentCollectionName = collectionStore.collectionName;
+      const sorted = [...collectionStore.items].sort((a, b) => a.level - b.level || a.id - b.id);
       // untrack to avoid tracking reads of allItems/expandedItems via getRootItems/hasChildren
       untrack(() => {
         allItems = sorted;

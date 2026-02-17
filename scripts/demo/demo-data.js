@@ -396,7 +396,7 @@ export const workItems = {
     {
       title: 'Mobile App Rewrite',
       description: 'Complete rewrite of the mobile application using React Native for iOS and Android',
-      status_id: 3,
+      status_name: 'In Progress',
       priority: 'High',
       is_task: false,
       project: 'Mobile App Rewrite',
@@ -410,7 +410,7 @@ export const workItems = {
         {
           title: 'Setup React Native project structure',
           description: 'Initialize new React Native project with TypeScript and necessary dependencies',
-          status_id: 5,
+          status_name: 'Done',
           priority: 'Medium',
           milestoneName: 'MVP Release',
           iterationName: 'Sprint 2025-01',  // Local sprint
@@ -422,7 +422,7 @@ export const workItems = {
             {
               title: 'Configure ESLint and Prettier',
               description: 'Setup code quality tools',
-              status_id: 5,
+              status_name: 'Done',
               priority: 'Medium',
               milestoneName: 'MVP Release',
               iterationName: 'Sprint 2025-01'
@@ -430,7 +430,7 @@ export const workItems = {
             {
               title: 'Setup CI/CD pipeline',
               description: 'Configure automated builds',
-              status_id: 5,
+              status_name: 'Done',
               priority: 'Medium',
               milestoneName: 'MVP Release',
               iterationName: 'Sprint 2025-01'
@@ -440,7 +440,7 @@ export const workItems = {
         {
           title: 'Implement authentication flow',
           description: 'Build login, registration, and password reset screens with secure token management',
-          status_id: 1,
+          status_name: 'Open',
           priority: 'High',
           milestoneName: 'MVP Release',
           iterationName: 'Sprint 2025-02',  // Next sprint
@@ -452,7 +452,7 @@ export const workItems = {
             {
               title: 'Design login screen UI',
               description: 'Create responsive login form',
-              status_id: 5,
+              status_name: 'Done',
               priority: 'Medium',
               milestoneName: 'Beta Launch',
               iterationName: 'Sprint 2025-01'
@@ -460,7 +460,7 @@ export const workItems = {
             {
               title: 'Integrate OAuth providers',
               description: 'Add Google and Apple sign-in',
-              status_id: 1,
+              status_name: 'Open',
               priority: 'Critical',
               milestoneName: 'Beta Launch',
               iterationName: 'Sprint 2025-02'
@@ -468,7 +468,7 @@ export const workItems = {
             {
               title: 'Implement secure token storage',
               description: 'Use keychain for token storage',
-              status_id: 1,
+              status_name: 'Open',
               priority: 'Critical',
               milestoneName: 'Beta Launch',
               iterationName: 'Sprint 2025-02'
@@ -478,7 +478,7 @@ export const workItems = {
         {
           title: 'Build dashboard and navigation',
           description: 'Create main dashboard with bottom tab navigation',
-          status_id: 1,
+          status_name: 'Open',
           priority: 'Medium',
           milestoneName: 'MVP Release',
           iterationName: 'Sprint 2025-02',
@@ -493,7 +493,7 @@ export const workItems = {
     {
       title: 'API v2 with GraphQL Support',
       description: 'Develop next generation API with GraphQL alongside REST endpoints',
-      status_id: 3,
+      status_name: 'In Progress',
       priority: 'Medium',
       project: 'API v2 Development',
       milestoneName: 'API v2 Release',
@@ -506,7 +506,7 @@ export const workItems = {
         {
           title: 'Design GraphQL schema',
           description: 'Define types, queries, and mutations for core entities',
-          status_id: 5,
+          status_name: 'Done',
           priority: 'Medium',
           milestoneName: 'API v2 Release',
           iterationName: 'Sprint 2025-01',
@@ -517,7 +517,7 @@ export const workItems = {
         {
           title: 'Implement GraphQL resolvers',
           description: 'Build resolver functions with DataLoader for N+1 optimization',
-          status_id: 1,
+          status_name: 'Open',
           priority: 'Medium',
           milestoneName: 'API v2 Release',
           iterationName: 'Sprint 2025-02',
@@ -529,7 +529,7 @@ export const workItems = {
             {
               title: 'User resolver with authentication',
               description: 'Implement user queries and mutations',
-              status_id: 5,
+              status_name: 'Done',
               priority: 'Medium',
               milestoneName: 'API v2 Release',
               iterationName: 'Sprint 2025-01'
@@ -537,7 +537,7 @@ export const workItems = {
             {
               title: 'Workspace resolver',
               description: 'Implement workspace CRUD operations',
-              status_id: 1,
+              status_name: 'Open',
               priority: 'Low',
               milestoneName: 'API v2 Release',
               iterationName: 'Sprint 2025-02'
@@ -547,7 +547,7 @@ export const workItems = {
         {
           title: 'Add GraphQL playground for development',
           description: 'Setup GraphiQL interface for API exploration',
-          status_id: 1,
+          status_name: 'Open',
           priority: 'Low',
           milestoneName: 'API v2 Release',
           iterationName: 'v1.5 Release',  // Part of release iteration
@@ -562,7 +562,7 @@ export const workItems = {
     {
       title: 'Fix login redirect loop on Safari',
       description: 'Users on Safari experience infinite redirect loop after successful login',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Critical',
       milestoneName: 'Beta Launch',
       iterationName: 'Company Sprint 1',  // Global sprint - urgent fix
@@ -577,7 +577,7 @@ export const workItems = {
     {
       title: 'Setup monitoring dashboards',
       description: 'Create Grafana dashboards for API performance and error tracking',
-      status_id: 3,
+      status_name: 'In Progress',
       priority: 'High',
       milestoneName: 'Platform Reliability',
       iterationName: 'Sprint 2025-01',
@@ -586,7 +586,7 @@ export const workItems = {
     {
       title: 'Configure alerting rules',
       description: 'Define PagerDuty alerts for critical services and SLA thresholds',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'High',
       milestoneName: 'Platform Reliability',
       iterationName: 'Sprint 2025-01',
@@ -595,7 +595,7 @@ export const workItems = {
     {
       title: 'Setup log aggregation',
       description: 'Configure centralized logging with structured JSON output',
-      status_id: 5,
+      status_name: 'Done',
       priority: 'Medium',
       iterationName: 'Sprint 2025-01',
       custom_fields: { 'Story Points': 5 }
@@ -603,7 +603,7 @@ export const workItems = {
     {
       title: 'Database backup automation',
       description: 'Implement automated daily backups with offsite replication',
-      status_id: 5,
+      status_name: 'Done',
       priority: 'High',
       milestoneName: 'Platform Reliability',
       iterationName: 'Sprint 2025-01',
@@ -612,7 +612,7 @@ export const workItems = {
     {
       title: 'User profile page redesign',
       description: 'Modernize user profile page with new design system components',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Medium',
       milestoneName: 'MVP Release',
       iterationName: 'Sprint 2025-01',
@@ -621,7 +621,7 @@ export const workItems = {
     {
       title: 'Search functionality improvements',
       description: 'Add fuzzy search and search history to global search',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Medium',
       milestoneName: 'MVP Release',
       iterationName: 'Sprint 2025-01',
@@ -630,7 +630,7 @@ export const workItems = {
     {
       title: 'Fix timezone handling in reports',
       description: 'Ensure all reports display times in user-configured timezone',
-      status_id: 3,
+      status_name: 'In Progress',
       priority: 'High',
       iterationName: 'Sprint 2025-01',
       custom_fields: { 'Severity': 'High', 'Story Points': 3 }
@@ -638,7 +638,7 @@ export const workItems = {
     {
       title: 'Resolve memory leak in worker',
       description: 'Background worker memory consumption grows unbounded over time',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Critical',
       milestoneName: 'Platform Reliability',
       iterationName: 'Sprint 2025-01',
@@ -648,7 +648,7 @@ export const workItems = {
     {
       title: 'API rate limiting implementation',
       description: 'Implement configurable rate limits per API key with Redis backend',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'High',
       milestoneName: 'API v2 Release',
       iterationName: 'Sprint 2025-02',
@@ -657,7 +657,7 @@ export const workItems = {
     {
       title: 'Webhook retry mechanism',
       description: 'Add exponential backoff retry for failed webhook deliveries',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Medium',
       milestoneName: 'API v2 Release',
       iterationName: 'Sprint 2025-02',
@@ -666,7 +666,7 @@ export const workItems = {
     {
       title: 'Bulk import functionality',
       description: 'Allow CSV/Excel import for work items with field mapping',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Medium',
       milestoneName: 'MVP Release',
       iterationName: 'Sprint 2025-02',
@@ -675,7 +675,7 @@ export const workItems = {
     {
       title: 'Export to PDF feature',
       description: 'Generate PDF reports from dashboards and work item lists',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Low',
       iterationName: 'Sprint 2025-02',
       custom_fields: { 'Story Points': 8 }
@@ -683,7 +683,7 @@ export const workItems = {
     {
       title: 'Fix pagination on large datasets',
       description: 'Pagination breaks when dataset exceeds 10000 items',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'High',
       iterationName: 'Sprint 2025-02',
       custom_fields: { 'Severity': 'High', 'Story Points': 3 }
@@ -691,7 +691,7 @@ export const workItems = {
     {
       title: 'Implement request caching layer',
       description: 'Add Redis caching for frequently accessed API endpoints',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Medium',
       milestoneName: 'Platform Reliability',
       iterationName: 'Sprint 2025-02',
@@ -700,7 +700,7 @@ export const workItems = {
     {
       title: 'Add API versioning support',
       description: 'Implement API versioning with deprecation warnings',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Medium',
       milestoneName: 'API v2 Release',
       iterationName: 'Sprint 2025-02',
@@ -709,7 +709,7 @@ export const workItems = {
     {
       title: 'Performance profiling for mobile',
       description: 'Profile and optimize React Native app startup time',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Medium',
       milestoneName: 'MVP Release',
       iterationName: 'Sprint 2025-02',
@@ -722,7 +722,7 @@ export const workItems = {
     {
       title: 'Enterprise Customer Onboarding',
       description: 'Onboarding and setup for new enterprise customers',
-      status_id: 3,
+      status_name: 'In Progress',
       priority: 'Medium',
       project: 'Customer Onboarding',
       iterationName: 'Support Onboarding Sprint',  // Local sprint
@@ -730,7 +730,7 @@ export const workItems = {
         {
           title: 'Acme Corp - Initial Setup',
           description: 'Setup workspace and configure SSO for Acme Corporation',
-          status_id: 1,
+          status_name: 'Open',
           priority: 'Critical',
           due_date: '2025-01-25',
           iterationName: 'Support Onboarding Sprint',
@@ -742,14 +742,14 @@ export const workItems = {
             {
               title: 'Configure SAML SSO',
               description: 'Setup SAML integration with their IdP',
-              status_id: 1,
+              status_name: 'Open',
               priority: 'High',
               iterationName: 'Support Onboarding Sprint'
             },
             {
               title: 'Import user list',
               description: 'Bulk import 200 users from CSV',
-              status_id: 1,
+              status_name: 'Open',
               priority: 'Medium',
               iterationName: 'Support Onboarding Sprint'
             }
@@ -758,7 +758,7 @@ export const workItems = {
         {
           title: 'TechStart Inc - Migration Assistance',
           description: 'Help customer migrate from competitor platform',
-          status_id: 1,
+          status_name: 'Open',
           priority: 'Medium',
           iterationName: 'Support Onboarding Sprint',
           custom_fields: {
@@ -772,7 +772,7 @@ export const workItems = {
     {
       title: 'Technical Support Queue',
       description: 'Active technical support requests',
-      status_id: 3,
+      status_name: 'In Progress',
       priority: 'Medium',
       project: 'Technical Support',
       iterationName: 'Company Sprint 1',  // Global sprint - support issues
@@ -780,7 +780,7 @@ export const workItems = {
         {
           title: 'Email notifications not sending',
           description: 'Customer reports not receiving email notifications for mentions',
-          status_id: 1,
+          status_name: 'Open',
           priority: 'Medium',
           iterationName: 'Company Sprint 1',
           custom_fields: {
@@ -792,7 +792,7 @@ export const workItems = {
         {
           title: 'Export to CSV feature broken',
           description: 'CSV export returns empty file',
-          status_id: 1,
+          status_name: 'Open',
           priority: 'Low',
           iterationName: 'Cross-team Alignment',  // Global - next sprint
           custom_fields: {
@@ -805,7 +805,7 @@ export const workItems = {
         {
           title: 'How to setup custom workflows?',
           description: 'Customer needs guidance on configuring custom workflow for their process',
-          status_id: 1,
+          status_name: 'Open',
           priority: 'Low',
           iterationName: 'Support Onboarding Sprint',
           custom_fields: {
@@ -819,7 +819,7 @@ export const workItems = {
     {
       title: 'Feature Request: Dark mode',
       description: 'Multiple customers requesting dark mode support for the application',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Low',
       milestoneName: 'Customer Success Goals',  // Global milestone
       iterationName: 'H1 Planning',  // Global PI iteration
@@ -832,7 +832,7 @@ export const workItems = {
     {
       title: 'Create onboarding checklist template',
       description: 'Standardized checklist for all new enterprise customer onboarding',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'High',
       milestoneName: 'Customer Success Goals',
       iterationName: 'Support Onboarding Sprint',
@@ -841,7 +841,7 @@ export const workItems = {
     {
       title: 'Write knowledge base articles',
       description: 'Create 10 new KB articles covering common questions',
-      status_id: 3,
+      status_name: 'In Progress',
       priority: 'Medium',
       iterationName: 'Support Onboarding Sprint',
       custom_fields: { 'Request Type': 'How-to Question' }
@@ -849,7 +849,7 @@ export const workItems = {
     {
       title: 'Setup automated welcome emails',
       description: 'Configure drip campaign for new user onboarding',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Medium',
       iterationName: 'Support Onboarding Sprint',
       custom_fields: { 'Request Type': 'Account Issue' }
@@ -857,7 +857,7 @@ export const workItems = {
     {
       title: 'Train new support team members',
       description: 'Conduct training sessions for 3 new hires on product features',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'High',
       iterationName: 'Support Onboarding Sprint',
       custom_fields: { 'Customer Tier': 'Professional', 'Request Type': 'How-to Question' }
@@ -865,7 +865,7 @@ export const workItems = {
     {
       title: 'Update support SLA documentation',
       description: 'Revise SLA documents to reflect new response time commitments',
-      status_id: 5,
+      status_name: 'Done',
       priority: 'Medium',
       iterationName: 'Support Onboarding Sprint',
       custom_fields: { 'Customer Tier': 'Enterprise', 'Request Type': 'Account Issue' }
@@ -873,7 +873,7 @@ export const workItems = {
     {
       title: 'Setup customer health score dashboard',
       description: 'Create dashboard to track customer engagement metrics',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Medium',
       milestoneName: 'Customer Success Goals',
       iterationName: 'Support Onboarding Sprint',
@@ -882,7 +882,7 @@ export const workItems = {
     {
       title: 'Implement ticket tagging system',
       description: 'Add auto-tagging for support tickets based on content',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Low',
       iterationName: 'Support Onboarding Sprint',
       custom_fields: { 'Request Type': 'Feature Request' }
@@ -890,7 +890,7 @@ export const workItems = {
     {
       title: 'Review and close stale tickets',
       description: 'Audit tickets older than 30 days and follow up or close',
-      status_id: 3,
+      status_name: 'In Progress',
       priority: 'Low',
       iterationName: 'Support Onboarding Sprint',
       custom_fields: { 'Customer Tier': 'Basic', 'Request Type': 'Account Issue' }
@@ -898,7 +898,7 @@ export const workItems = {
     {
       title: 'GlobalTech Ltd - Workspace Migration',
       description: 'Migrate customer from legacy system to new platform',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'High',
       iterationName: 'Support Onboarding Sprint',
       custom_fields: { 'Customer Tier': 'Enterprise', 'Request Type': 'Account Issue' }
@@ -906,7 +906,7 @@ export const workItems = {
     {
       title: 'Create video tutorial series',
       description: 'Record 5 getting-started videos for new users',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Medium',
       milestoneName: 'Customer Success Goals',
       iterationName: 'Support Onboarding Sprint',
@@ -919,7 +919,7 @@ export const workItems = {
     {
       title: 'Q1 2025 Product Launch Campaign',
       description: 'Multi-channel campaign for new product features',
-      status_id: 3,
+      status_name: 'In Progress',
       priority: 'High',
       project: 'Q1 2025 Campaign',
       milestoneName: 'Q1 Campaign Launch',
@@ -932,7 +932,7 @@ export const workItems = {
         {
           title: 'Email announcement series',
           description: 'Design and schedule 3-part email campaign',
-          status_id: 1,
+          status_name: 'Open',
           priority: 'High',
           milestoneName: 'Q1 Campaign Launch',
           iterationName: 'Q1 Campaign Sprint',
@@ -944,7 +944,7 @@ export const workItems = {
             {
               title: 'Design email templates',
               description: 'Create responsive email templates',
-              status_id: 5,
+              status_name: 'Done',
               priority: 'Medium',
               milestoneName: 'Q1 Campaign Launch',
               iterationName: 'Q1 Campaign Sprint'
@@ -952,7 +952,7 @@ export const workItems = {
             {
               title: 'Write email copy',
               description: 'Draft compelling copy for all emails',
-              status_id: 1,
+              status_name: 'Open',
               priority: 'Medium',
               milestoneName: 'Q1 Campaign Launch',
               iterationName: 'Q1 Campaign Sprint'
@@ -960,7 +960,7 @@ export const workItems = {
             {
               title: 'Setup A/B tests',
               description: 'Configure subject line variants',
-              status_id: 1,
+              status_name: 'Open',
               priority: 'Low',
               milestoneName: 'Q1 Campaign Launch',
               iterationName: 'Q1 Campaign Sprint'
@@ -970,7 +970,7 @@ export const workItems = {
         {
           title: 'Social media content',
           description: 'Create social media posts for all platforms',
-          status_id: 1,
+          status_name: 'Open',
           priority: 'Medium',
           milestoneName: 'Q1 Campaign Launch',
           iterationName: 'Q1 Campaign Sprint',
@@ -982,7 +982,7 @@ export const workItems = {
             {
               title: 'LinkedIn posts',
               description: 'Create 5 LinkedIn posts',
-              status_id: 1,
+              status_name: 'Open',
               priority: 'Medium',
               milestoneName: 'Q1 Campaign Launch',
               iterationName: 'Q1 Campaign Sprint'
@@ -990,7 +990,7 @@ export const workItems = {
             {
               title: 'Twitter thread',
               description: 'Write announcement thread',
-              status_id: 1,
+              status_name: 'Open',
               priority: 'Low',
               milestoneName: 'Q1 Campaign Launch',
               iterationName: 'Q1 Campaign Sprint'
@@ -1000,7 +1000,7 @@ export const workItems = {
         {
           title: 'Blog post announcement',
           description: 'Write detailed blog post about new features',
-          status_id: 1,
+          status_name: 'Open',
           priority: 'Medium',
           milestoneName: 'Q1 Campaign Launch',
           iterationName: 'Q1 Campaign Sprint',
@@ -1015,7 +1015,7 @@ export const workItems = {
     {
       title: 'Webinar Series: Best Practices',
       description: 'Monthly webinar series on product best practices',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Medium',
       project: 'Q1 2025 Campaign',
       milestoneName: 'Company Q1 Goals',  // Global milestone
@@ -1027,7 +1027,7 @@ export const workItems = {
         {
           title: 'Plan webinar topics',
           description: 'Research and finalize 3 webinar topics',
-          status_id: 1,
+          status_name: 'Open',
           priority: 'Low',
           iterationName: 'Q1 Campaign Sprint',
           is_task: false
@@ -1035,7 +1035,7 @@ export const workItems = {
         {
           title: 'Book guest speakers',
           description: 'Invite and confirm 2 industry experts',
-          status_id: 1,
+          status_name: 'Open',
           priority: 'Low',
           iterationName: 'Cross-team Alignment',  // Global sprint
           is_task: false
@@ -1046,7 +1046,7 @@ export const workItems = {
     {
       title: 'Design social media assets',
       description: 'Create branded graphics for Instagram, LinkedIn, and Twitter',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'High',
       milestoneName: 'Q1 Campaign Launch',
       iterationName: 'Q1 Campaign Sprint',
@@ -1055,7 +1055,7 @@ export const workItems = {
     {
       title: 'Create landing page',
       description: 'Build dedicated landing page for product launch campaign',
-      status_id: 3,
+      status_name: 'In Progress',
       priority: 'High',
       milestoneName: 'Q1 Campaign Launch',
       iterationName: 'Q1 Campaign Sprint',
@@ -1064,7 +1064,7 @@ export const workItems = {
     {
       title: 'Write blog series',
       description: 'Create 4-part blog series on product features',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Medium',
       iterationName: 'Q1 Campaign Sprint',
       custom_fields: { 'Campaign Type': 'Content Marketing' }
@@ -1072,7 +1072,7 @@ export const workItems = {
     {
       title: 'Setup UTM tracking',
       description: 'Configure UTM parameters for all campaign links',
-      status_id: 5,
+      status_name: 'Done',
       priority: 'Medium',
       iterationName: 'Q1 Campaign Sprint',
       custom_fields: { 'Campaign Type': 'Email' }
@@ -1080,7 +1080,7 @@ export const workItems = {
     {
       title: 'Design infographic',
       description: 'Create shareable infographic summarizing key features',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Medium',
       milestoneName: 'Q1 Campaign Launch',
       iterationName: 'Q1 Campaign Sprint',
@@ -1089,7 +1089,7 @@ export const workItems = {
     {
       title: 'Coordinate press release',
       description: 'Draft and distribute press release to media outlets',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'High',
       iterationName: 'Q1 Campaign Sprint',
       custom_fields: { 'Campaign Type': 'Event' }
@@ -1097,7 +1097,7 @@ export const workItems = {
     {
       title: 'Setup retargeting ads',
       description: 'Configure Google and LinkedIn retargeting campaigns',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Medium',
       iterationName: 'Q1 Campaign Sprint',
       custom_fields: { 'Campaign Type': 'Social Media' }
@@ -1106,7 +1106,7 @@ export const workItems = {
     {
       title: 'Update website homepage',
       description: 'Refresh homepage copy and images for Q1',
-      status_id: 1,
+      status_name: 'Open',
       priority: 'Low',
       iterationName: 'v2.0 Release',  // Global release iteration
       due_date: '2025-02-01'

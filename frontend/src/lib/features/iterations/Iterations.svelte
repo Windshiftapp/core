@@ -46,6 +46,14 @@
     return iterations.filter(i => i.type_id === parseInt(activeTypeId));
   });
 
+  let localIterations = $derived(
+    filteredIterations.filter(i => !i.is_global)
+  );
+
+  let globalIterations = $derived(
+    filteredIterations.filter(i => i.is_global)
+  );
+
   let statusOptions = $derived([
     { value: 'planned', label: t('iterations.status.planned'), lozengeColor: 'grey', icon: Clock },
     { value: 'active', label: t('iterations.status.active'), lozengeColor: 'blue', icon: Target },
@@ -254,7 +262,7 @@
           ? (activeTypeId
               ? `Showing ${iterationTypes.find(type => type.id === parseInt(activeTypeId))?.name || 'filtered'} iterations`
               : t('iterations.subtitle'))
-          : t('iterations.subtitle')}
+          : `${localIterations.length} ${t('sprints.local').toLowerCase()}, ${globalIterations.length} ${t('sprints.global').toLowerCase()}`}
         class="mb-6"
       >
         {#snippet actions()}
@@ -270,6 +278,48 @@
           </Button>
         {/snippet}
       </SectionHeader>
+
+      {#snippet nameCell(item)}
+        <span class="inline-block w-2 h-2 rounded-full {isActive(item) ? 'bg-green-500' : ''}" title={isActive(item) ? 'Currently active' : ''}></span>
+        {#if item.is_global}
+          <Globe class="w-4 h-4" style="color: var(--ds-text-subtle); min-width: 16px;" />
+        {:else}
+          <Building2 class="w-4 h-4" style="color: var(--ds-text-subtle); min-width: 16px;" />
+        {/if}
+        <span class="font-medium hover:underline cursor-pointer" style="color: var(--ds-text);">{item.name}</span>
+      {/snippet}
+
+      {#snippet typeCell(item)}
+        {#if item.type_name}
+          <span
+            class="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium"
+            style="background-color: {item.type_color || '#6b7280'}20; color: {item.type_color || '#6b7280'};"
+          >
+            <ColorDot color={item.type_color || '#6b7280'} />
+            {item.type_name}
+          </span>
+        {:else}
+          <span class="text-gray-400">-</span>
+        {/if}
+      {/snippet}
+
+      {#snippet dateRangeCell(item)}
+        <span class="text-sm" style="color: var(--ds-text);">{getDateRange(item)}</span>
+        {#if getDaysRemaining(item)}
+          <span class="text-xs text-gray-500">{getDaysRemaining(item)}</span>
+        {/if}
+      {/snippet}
+
+      {#snippet statusCell(item)}
+        {#if item}
+          {@const statusInfo = getStatusInfo(item.status)}
+          {@const overdue = isOverdue(item.end_date, item.status)}
+          <Lozenge color={statusInfo.lozengeColor} text={statusInfo.label} />
+          {#if overdue}
+            <Lozenge color="red" text={t('iterations.overdue')} />
+          {/if}
+        {/if}
+      {/snippet}
 
       <!-- Iterations Table -->
       {#if loading}
@@ -290,59 +340,77 @@
             </Button>
           {/snippet}
         </EmptyState>
-      {:else}
-        <div class="flex-1 overflow-hidden">
+      {:else if isGlobalView}
+        <div class="flex-1">
           {#key filteredIterations.length}
             <DataTable
               {columns}
               data={filteredIterations}
               actionItems={buildIterationDropdownItems}
               onRowClick={handleIterationClick}
+              class="rounded-xl border shadow-sm"
             >
-              <div slot="name" let:item class="flex items-center gap-2">
-                <!-- Always reserve space for active indicator for consistent alignment -->
-                <span class="inline-block w-2 h-2 rounded-full {isActive(item) ? 'bg-green-500' : ''}" title={isActive(item) ? 'Currently active' : ''}></span>
-                {#if item.is_global}
-                  <Globe class="w-4 h-4" style="color: var(--ds-text-subtle); min-width: 16px;" />
-                {:else}
-                  <Building2 class="w-4 h-4" style="color: var(--ds-text-subtle); min-width: 16px;" />
-                {/if}
-                <span class="font-medium hover:underline cursor-pointer" style="color: var(--ds-text);">{item.name}</span>
-              </div>
-
-              <div slot="type" let:item>
-                {#if item.type_name}
-                  <span
-                    class="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium"
-                    style="background-color: {item.type_color || '#6b7280'}20; color: {item.type_color || '#6b7280'};"
-                  >
-                    <ColorDot color={item.type_color || '#6b7280'} />
-                    {item.type_name}
-                  </span>
-                {:else}
-                  <span class="text-gray-400">-</span>
-                {/if}
-              </div>
-
-              <div slot="date_range" let:item class="flex flex-col">
-                <span class="text-sm" style="color: var(--ds-text);">{getDateRange(item)}</span>
-                {#if getDaysRemaining(item)}
-                  <span class="text-xs text-gray-500">{getDaysRemaining(item)}</span>
-                {/if}
-              </div>
-
-              <div slot="status" let:item class="flex items-center gap-2">
-                {#if item}
-                  {@const statusInfo = getStatusInfo(item.status)}
-                  {@const overdue = isOverdue(item.end_date, item.status)}
-                  <Lozenge color={statusInfo.lozengeColor} text={statusInfo.label} />
-                  {#if overdue}
-                    <Lozenge color="red" text={t('iterations.overdue')} />
-                  {/if}
-                {/if}
-              </div>
+              <div slot="name" let:item class="flex items-center gap-2">{@render nameCell(item)}</div>
+              <div slot="type" let:item>{@render typeCell(item)}</div>
+              <div slot="date_range" let:item class="flex flex-col">{@render dateRangeCell(item)}</div>
+              <div slot="status" let:item class="flex items-center gap-2">{@render statusCell(item)}</div>
             </DataTable>
           {/key}
+        </div>
+      {:else}
+        <!-- Workspace view: split into local and global sections -->
+        <div class="flex-1 space-y-6">
+          {#if localIterations.length > 0}
+            <section>
+              <div class="flex items-center gap-3 mb-3">
+                <Building2 class="w-5 h-5" style="color: var(--ds-interactive);" />
+                <div>
+                  <p class="font-semibold text-base" style="color: var(--ds-text);">{t('sprints.localIterations')}</p>
+                  <p class="text-sm" style="color: var(--ds-text-subtle);">{t('sprints.localIterationDescription')}</p>
+                </div>
+              </div>
+              {#key localIterations.length}
+                <DataTable
+                  {columns}
+                  data={localIterations}
+                  actionItems={buildIterationDropdownItems}
+                  onRowClick={handleIterationClick}
+                  class="rounded-xl border shadow-sm"
+                >
+                  <div slot="name" let:item class="flex items-center gap-2">{@render nameCell(item)}</div>
+                  <div slot="type" let:item>{@render typeCell(item)}</div>
+                  <div slot="date_range" let:item class="flex flex-col">{@render dateRangeCell(item)}</div>
+                  <div slot="status" let:item class="flex items-center gap-2">{@render statusCell(item)}</div>
+                </DataTable>
+              {/key}
+            </section>
+          {/if}
+
+          {#if globalIterations.length > 0}
+            <section>
+              <div class="flex items-center gap-3 mb-3">
+                <Globe class="w-5 h-5" style="color: var(--ds-interactive);" />
+                <div>
+                  <p class="font-semibold text-base" style="color: var(--ds-text);">{t('sprints.globalIterations')}</p>
+                  <p class="text-sm" style="color: var(--ds-text-subtle);">{t('sprints.globalIterationDescription')}</p>
+                </div>
+              </div>
+              {#key globalIterations.length}
+                <DataTable
+                  {columns}
+                  data={globalIterations}
+                  actionItems={buildIterationDropdownItems}
+                  onRowClick={handleIterationClick}
+                  class="rounded-xl border shadow-sm"
+                >
+                  <div slot="name" let:item class="flex items-center gap-2">{@render nameCell(item)}</div>
+                  <div slot="type" let:item>{@render typeCell(item)}</div>
+                  <div slot="date_range" let:item class="flex flex-col">{@render dateRangeCell(item)}</div>
+                  <div slot="status" let:item class="flex items-center gap-2">{@render statusCell(item)}</div>
+                </DataTable>
+              {/key}
+            </section>
+          {/if}
         </div>
       {/if}
     </div>

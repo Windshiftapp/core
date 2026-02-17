@@ -16,7 +16,7 @@
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { getDefaultWidth } from '../services/widgetRegistry.js';
   import Button from '../components/Button.svelte';
-  import BaseContainer from '../components/BaseContainer.svelte';
+  import Card from '../components/Card.svelte';
   import ViewHeader from '../layout/ViewHeader.svelte';
 
   // Widget components
@@ -671,7 +671,7 @@
     <div class="space-y-6">
       {#each sections as section (section.id)}
         {@const sectionWidgets = getWidgetsForSection(section.id)}
-        <BaseContainer padding="spacious" glass>
+        <Card glass padding="spacious">
           <!-- Section header -->
           <div class="flex items-center justify-between mb-4">
             {#if editingSectionId === section.id}
@@ -796,7 +796,7 @@
               </div>
             {/if}
           </div>
-        </BaseContainer>
+        </Card>
       {/each}
     </div>
 

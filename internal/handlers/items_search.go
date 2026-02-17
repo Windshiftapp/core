@@ -331,12 +331,35 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 
 	qlQuery := r.URL.Query().Get("ql")
 
+	// Parse pagination parameters
+	page := 1
+	limit := 50
+	maxLimit := 1000
+
+	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
+		if p, parseErr := strconv.Atoi(pageStr); parseErr == nil && p > 0 {
+			page = p
+		}
+	}
+
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, parseErr := strconv.Atoi(limitStr); parseErr == nil && l > 0 {
+			limit = l
+			if limit > maxLimit {
+				limit = maxLimit
+			}
+		}
+	}
+
+	offset := (page - 1) * limit
+
 	// Call service
-	items, _, err := h.itemCRUD.GetBacklogItems(services.BacklogParams{
+	items, totalCount, err := h.itemCRUD.GetBacklogItems(services.BacklogParams{
 		WorkspaceID:  wsID,
 		CollectionID: collectionID,
 		QLQuery:      qlQuery,
 		WorkspaceIDs: accessibleWorkspaceIDs,
+		Pagination:   services.PaginationParams{Limit: limit, Offset: offset, Page: page},
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "QL query error:") {
@@ -358,5 +381,19 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSONOK(w, filteredItems)
+	totalPages := 0
+	if limit > 0 {
+		totalPages = (totalCount + limit - 1) / limit
+	}
+
+	response := models.PaginatedItemsResponse{
+		Items: filteredItems,
+		Pagination: models.PaginationMeta{
+			Page:       page,
+			Limit:      limit,
+			Total:      totalCount,
+			TotalPages: totalPages,
+		},
+	}
+	respondJSONOK(w, response)
 }

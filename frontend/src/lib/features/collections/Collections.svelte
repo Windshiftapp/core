@@ -6,6 +6,7 @@
   import { Filter, Search, MoreHorizontal, Calendar, User, AlertCircle, Trash2, Eye, Save, SquareKanban } from 'lucide-svelte';
   import { escapeHtml } from '../../utils/sanitize.ts';
   import Button from '../../components/Button.svelte';
+  import Card from '../../components/Card.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import CollectionsSidebar from '../collections/CollectionsSidebar.svelte';
@@ -773,19 +774,19 @@
 
     <!-- Results Section -->
     {#if loading}
-      <div class="rounded-xl border shadow-sm p-8 text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+      <Card rounded="xl" shadow padding="loose" class="text-center">
         <div class="animate-pulse" style="color: var(--ds-text-subtle);">{t('collections.loadingWorkspaces')}</div>
-      </div>
+      </Card>
     {:else if !qlQuery.trim() && dynamicFilters.length === 0 && !currentCollection}
-      <div class="rounded-xl border shadow-sm p-12 text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+      <Card rounded="xl" shadow padding="generous" class="text-center">
         <Filter class="w-12 h-12 mx-auto mb-4" style="color: var(--ds-icon-subtle);" />
         <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">{t('collections.addFiltersToStart')}</h3>
         <p style="color: var(--ds-text-subtle);">{t('collections.addFiltersDesc')}</p>
-      </div>
+      </Card>
     {:else if loadingItems}
-      <div class="rounded-xl border shadow-sm p-8 text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+      <Card rounded="xl" shadow padding="loose" class="text-center">
         <div class="animate-pulse" style="color: var(--ds-text-subtle);">{t('collections.loadingWorkItems')}</div>
-      </div>
+      </Card>
     {:else}
       <!-- Work Items Table -->
       <DataTable
@@ -806,7 +807,7 @@
             currentPage={itemsPagination.page}
             totalItems={itemsPagination.total}
             itemsPerPage={itemsPagination.limit}
-            maxItems={100}
+            maxItems={10000}
             on:pageChange={handlePageChange}
             on:pageSizeChange={handlePageSizeChange}
           />

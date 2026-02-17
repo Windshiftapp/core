@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../../api.js';
   import Button from '../../components/Button.svelte';
+  import Card from '../../components/Card.svelte';
   import Input from '../../components/Input.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import { Filter, Download, FileText } from 'lucide-svelte';
@@ -394,7 +395,7 @@
   </div>
 
   <!-- Filters -->
-  <div class="rounded-xl p-6 mb-8 border shadow-sm" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+  <Card rounded="xl" shadow padding="spacious" class="mb-8">
     <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">{t('time.reports.filters')}</h3>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
       <div>
@@ -455,23 +456,23 @@
         {t('common.clear')}
       </Button>
     </div>
-  </div>
+  </Card>
 
   <!-- Summary Cards -->
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-    <div class="rounded-xl p-6 border shadow-sm text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+    <Card rounded="xl" shadow padding="spacious" class="text-center">
       <div class="text-3xl font-bold text-blue-600 mb-2">{summary.totalHours}h</div>
       <div class="text-sm" style="color: var(--ds-text-subtle);">{t('time.reports.totalHours')}</div>
-    </div>
-    <div class="rounded-xl p-6 border shadow-sm text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+    </Card>
+    <Card rounded="xl" shadow padding="spacious" class="text-center">
       <div class="text-3xl font-bold text-green-600 mb-2">{summary.totalEntries}</div>
       <div class="text-sm" style="color: var(--ds-text-subtle);">{t('time.reports.totalEntries')}</div>
-    </div>
-    <div class="rounded-xl p-6 border shadow-sm text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+    </Card>
+    <Card rounded="xl" shadow padding="spacious" class="text-center">
       <div class="text-3xl font-bold text-purple-600 mb-2">{summary.averageHoursPerDay}h</div>
       <div class="text-sm" style="color: var(--ds-text-subtle);">{t('time.reports.averagePerDay')}</div>
-    </div>
-    <div class="rounded-xl p-6 border shadow-sm text-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+    </Card>
+    <Card rounded="xl" shadow padding="spacious" class="text-center">
       {#if summary.topProject}
         <div class="text-lg font-semibold mb-1" style="color: var(--ds-text);">{summary.topProject.name}</div>
         <div class="text-sm text-orange-600 font-medium">{summary.topProject.hours}h</div>
@@ -480,11 +481,11 @@
         <div class="text-lg" style="color: var(--ds-text-subtle);">{t('common.noData')}</div>
         <div class="text-xs" style="color: var(--ds-text-subtle);">{t('time.reports.topProject')}</div>
       {/if}
-    </div>
+    </Card>
   </div>
 
   <!-- Results Table -->
-  <div class="rounded-xl border shadow-sm overflow-hidden" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+  <Card rounded="xl" shadow padding="none" class="overflow-hidden">
     {#if filteredWorklogs.length === 0}
       <div class="p-8 text-center" style="color: var(--ds-text-subtle);">
         {#if loading}
@@ -541,4 +542,4 @@
         </div>
       </div>
     {/if}
-  </div>
+  </Card>

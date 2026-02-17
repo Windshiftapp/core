@@ -10,9 +10,9 @@
   export let currentPage = 1;
   export let totalItems = 0;
   export let itemsPerPage = 50;
-  export let maxItems = 100; // Maximum items to show from API
+  export let maxItems = 10000; // Maximum items to show from API
   export let showPageSizes = true;
-  export let pageSizeOptions = [10, 25, 50];
+  export let pageSizeOptions = [10, 25, 50, 100];
   export let compact = false; // For smaller spaces
   export let hasGradient = false; // Gradient background awareness
 

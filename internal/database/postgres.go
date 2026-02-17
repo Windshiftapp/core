@@ -437,11 +437,8 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 		isDefault   bool
 	}{
 		{"Open", "New work item, not yet started", "To Do", true},
-		{"To Do", "Ready to be worked on", "To Do", false},
 		{"In Progress", "Currently being worked on", "In Progress", false},
-		{"Under Review", "Completed and waiting for review", "In Progress", false},
 		{"Done", "Work has been completed", "Done", false},
-		{"Closed", "Work item is finished and closed", "Done", false},
 	}
 
 	statusIDs := make(map[string]int64)
@@ -473,17 +470,10 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 		from string // empty string means initial status
 		to   string
 	}{
-		{"", "Open"}, // Initial transition
-		{"Open", "To Do"},
+		{"", "Open"},                 // Initial transition
 		{"Open", "In Progress"},
-		{"To Do", "In Progress"},
-		{"In Progress", "Under Review"},
-		{"Under Review", "In Progress"}, // Back to work
-		{"Under Review", "Done"},
-		{"In Progress", "Done"}, // Direct completion
-		{"Done", "Closed"},
-		{"Open", "Closed"},  // Cancel/reject
-		{"To Do", "Closed"}, // Cancel before starting
+		{"Open", "Done"},             // Direct completion from Open
+		{"In Progress", "Done"},
 	}
 
 	for i, transition := range transitions {
@@ -602,6 +592,7 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 		{"setup_completed", "false", "boolean", "Whether initial setup has been completed", "setup"},
 		{"admin_user_created", "false", "boolean", "Whether admin user has been created", "setup"},
 		{"calendar_feed_enabled", "true", "boolean", "Allow users to generate ICS calendar feed URLs", "security"},
+		{"plugin_cli_exec_enabled", "false", "boolean", "Allow plugins to execute CLI commands", "security"},
 	}
 
 	for _, setting := range systemSettings {

@@ -49,7 +49,7 @@
   
   // Default styling classes
   let tableClass = 'w-full';
-  let containerClass = 'rounded border shadow-sm overflow-hidden';
+  let containerClass = 'rounded border shadow-sm';
   let theadClass = '';
   let tbodyClass = 'divide-y';
   let trClass = 'transition-colors duration-150';
@@ -114,7 +114,7 @@
   }
 </script>
 
-<div class="{containerClass}" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+<div class="overflow-hidden {containerClass}" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
   {#if displayData.length === 0}
     <EmptyState
       icon={emptyIcon}
