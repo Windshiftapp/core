@@ -8,21 +8,24 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/scm"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
 
 type MilestoneHandler struct {
-	db                database.Database
-	permissionService *services.PermissionService
-	planningService   *services.PlanningService
+	db                 database.Database
+	permissionService  *services.PermissionService
+	planningService    *services.PlanningService
+	credentialResolver *scm.CredentialResolver
 }
 
-func NewMilestoneHandler(db database.Database, permissionService *services.PermissionService) *MilestoneHandler {
+func NewMilestoneHandler(db database.Database, permissionService *services.PermissionService, credentialResolver *scm.CredentialResolver) *MilestoneHandler {
 	return &MilestoneHandler{
-		db:                db,
-		permissionService: permissionService,
-		planningService:   services.NewPlanningService(db),
+		db:                 db,
+		permissionService:  permissionService,
+		planningService:    services.NewPlanningService(db),
+		credentialResolver: credentialResolver,
 	}
 }
 
@@ -89,23 +92,7 @@ func (h *MilestoneHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Convert service results to models for response
 	milestones := make([]models.Milestone, 0, len(results))
 	for _, r := range results {
-		milestone := models.Milestone{
-			ID:            r.ID,
-			Name:          r.Name,
-			Description:   r.Description,
-			Status:        r.Status,
-			CategoryID:    r.CategoryID,
-			CategoryName:  r.CategoryName,
-			CategoryColor: r.CategoryColor,
-			IsGlobal:      r.IsGlobal,
-			WorkspaceID:   r.WorkspaceID,
-			WorkspaceName: r.WorkspaceName,
-			CreatedAt:     r.CreatedAt,
-			UpdatedAt:     r.UpdatedAt,
-		}
-		if r.TargetDate != "" {
-			milestone.TargetDate = &r.TargetDate
-		}
+		milestone := h.milestoneResultToModel(&r, user.ID)
 		milestones = append(milestones, milestone)
 	}
 
@@ -147,25 +134,7 @@ func (h *MilestoneHandler) Get(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Convert service result to model for response
-	milestone := models.Milestone{
-		ID:            result.ID,
-		Name:          result.Name,
-		Description:   result.Description,
-		Status:        result.Status,
-		CategoryID:    result.CategoryID,
-		CategoryName:  result.CategoryName,
-		CategoryColor: result.CategoryColor,
-		IsGlobal:      result.IsGlobal,
-		WorkspaceID:   result.WorkspaceID,
-		WorkspaceName: result.WorkspaceName,
-		CreatedAt:     result.CreatedAt,
-		UpdatedAt:     result.UpdatedAt,
-	}
-	if result.TargetDate != "" {
-		milestone.TargetDate = &result.TargetDate
-	}
-
+	milestone := h.milestoneResultToModel(result, user.ID)
 	respondJSONOK(w, milestone)
 }
 
@@ -278,25 +247,7 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert service result to model for response
-	createdMilestone := models.Milestone{
-		ID:            result.ID,
-		Name:          result.Name,
-		Description:   result.Description,
-		Status:        result.Status,
-		CategoryID:    result.CategoryID,
-		CategoryName:  result.CategoryName,
-		CategoryColor: result.CategoryColor,
-		IsGlobal:      result.IsGlobal,
-		WorkspaceID:   result.WorkspaceID,
-		WorkspaceName: result.WorkspaceName,
-		CreatedAt:     result.CreatedAt,
-		UpdatedAt:     result.UpdatedAt,
-	}
-	if result.TargetDate != "" {
-		createdMilestone.TargetDate = &result.TargetDate
-	}
-
+	createdMilestone := h.milestoneResultToModel(result, user.ID)
 	respondJSONCreated(w, createdMilestone)
 }
 
@@ -416,25 +367,7 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert service result to model for response
-	updatedMilestone := models.Milestone{
-		ID:            result.ID,
-		Name:          result.Name,
-		Description:   result.Description,
-		Status:        result.Status,
-		CategoryID:    result.CategoryID,
-		CategoryName:  result.CategoryName,
-		CategoryColor: result.CategoryColor,
-		IsGlobal:      result.IsGlobal,
-		WorkspaceID:   result.WorkspaceID,
-		WorkspaceName: result.WorkspaceName,
-		CreatedAt:     result.CreatedAt,
-		UpdatedAt:     result.UpdatedAt,
-	}
-	if result.TargetDate != "" {
-		updatedMilestone.TargetDate = &result.TargetDate
-	}
-
+	updatedMilestone := h.milestoneResultToModel(result, user.ID)
 	respondJSONOK(w, updatedMilestone)
 }
 
@@ -577,4 +510,210 @@ func (h *MilestoneHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSONOK(w, report)
+}
+
+// milestoneResultToModel converts a MilestoneResult to a models.Milestone, applying SCM field
+// visibility rules: scm_connection_id and scm_repository on the release are redacted unless the
+// user has workspace access to the connection's workspace.
+func (h *MilestoneHandler) milestoneResultToModel(r *services.MilestoneResult, userID int) models.Milestone {
+	milestone := models.Milestone{
+		ID:            r.ID,
+		Name:          r.Name,
+		Description:   r.Description,
+		Status:        r.Status,
+		CategoryID:    r.CategoryID,
+		CategoryName:  r.CategoryName,
+		CategoryColor: r.CategoryColor,
+		IsGlobal:      r.IsGlobal,
+		WorkspaceID:   r.WorkspaceID,
+		WorkspaceName: r.WorkspaceName,
+		CreatedAt:     r.CreatedAt,
+		UpdatedAt:     r.UpdatedAt,
+	}
+	if r.TargetDate != "" {
+		milestone.TargetDate = &r.TargetDate
+	}
+
+	if r.LatestRelease != nil {
+		rel := &models.MilestoneRelease{
+			ID:              r.LatestRelease.ID,
+			MilestoneID:     r.LatestRelease.MilestoneID,
+			TagName:         r.LatestRelease.TagName,
+			Name:            r.LatestRelease.Name,
+			Body:            r.LatestRelease.Body,
+			IsDraft:         r.LatestRelease.IsDraft,
+			IsPrerelease:    r.LatestRelease.IsPrerelease,
+			TargetCommitish: r.LatestRelease.TargetCommitish,
+			SCMReleaseID:    r.LatestRelease.SCMReleaseID,
+			SCMReleaseURL:   r.LatestRelease.SCMReleaseURL,
+			CreatedBy:       r.LatestRelease.CreatedBy,
+			CreatedAt:       r.LatestRelease.CreatedAt,
+		}
+		// Expose scm_connection_id and scm_repository only if user has access to the connection's workspace
+		if r.LatestRelease.SCMConnectionID != nil {
+			connectionWorkspaceID, err := h.planningService.GetSCMConnectionWorkspaceID(*r.LatestRelease.SCMConnectionID)
+			if err == nil && connectionWorkspaceID > 0 {
+				hasPerm, permErr := h.permissionService.HasWorkspacePermission(userID, connectionWorkspaceID, models.PermissionItemEdit)
+				if permErr == nil && hasPerm {
+					rel.SCMConnectionID = r.LatestRelease.SCMConnectionID
+					rel.SCMRepository = r.LatestRelease.SCMRepository
+				}
+			}
+		}
+		milestone.LatestRelease = rel
+	}
+
+	return milestone
+}
+
+// releaseRequest is the request body for the Release endpoint.
+type releaseRequest struct {
+	ConnectionID    int    `json:"connection_id"`
+	Repository      string `json:"repository"`       // "owner/repo"
+	TagName         string `json:"tag_name"`
+	Name            string `json:"name"`
+	Body            string `json:"body"`
+	IsDraft         bool   `json:"is_draft"`
+	IsPrerelease    bool   `json:"is_prerelease"`
+	TargetCommitish string `json:"target_commitish"` // optional branch or SHA
+}
+
+// Release handles POST /milestones/{id}/release — creates an SCM release and marks the milestone completed.
+func (h *MilestoneHandler) Release(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	// Load the milestone to determine its scope for permission checking
+	isGlobal, workspaceID, err := h.planningService.IsMilestoneGlobal(id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondNotFound(w, r, "milestone")
+			return
+		}
+		respondInternalError(w, r, err)
+		return
+	}
+
+	// Verify the user can mutate this milestone
+	if isGlobal {
+		hasGlobalPerm, permErr := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
+		if permErr != nil || !hasGlobalPerm {
+			respondForbidden(w, r)
+			return
+		}
+	} else if workspaceID != nil {
+		if !RequireWorkspacePermission(w, r, user.ID, *workspaceID, models.PermissionItemEdit, h.permissionService) {
+			return
+		}
+	}
+
+	var req releaseRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondBadRequest(w, r, "Invalid request body")
+		return
+	}
+
+	if req.TagName == "" {
+		respondValidationError(w, r, "tag_name is required")
+		return
+	}
+
+	// If a connection_id was provided, verify the user also has access to that connection's workspace
+	var scmConnectionID *int
+	var scmRepository *string
+	var scmReleaseID *string
+	var scmReleaseURL *string
+
+	if req.ConnectionID > 0 {
+		if req.Repository == "" {
+			respondValidationError(w, r, "repository is required when connection_id is provided")
+			return
+		}
+
+		connectionWorkspaceID, wsErr := h.planningService.GetSCMConnectionWorkspaceID(req.ConnectionID)
+		if wsErr != nil || connectionWorkspaceID == 0 {
+			respondBadRequest(w, r, "SCM connection not found")
+			return
+		}
+		if !RequireWorkspacePermission(w, r, user.ID, connectionWorkspaceID, models.PermissionItemEdit, h.permissionService) {
+			return
+		}
+
+		if h.credentialResolver != nil {
+			// Load the SCM provider
+			provider, provErr := h.credentialResolver.GetProviderForConnection(r.Context(), req.ConnectionID)
+			if provErr != nil {
+				respondBadRequest(w, r, "Failed to load SCM provider: "+provErr.Error())
+				return
+			}
+
+			// Ensure the provider supports releases
+			releaseProvider, supportsReleases := provider.(scm.ReleaseProvider)
+			if !supportsReleases {
+				respondBadRequest(w, r, "This SCM provider does not support releases")
+				return
+			}
+
+			// Parse "owner/repo"
+			parts := strings.SplitN(req.Repository, "/", 2)
+			if len(parts) != 2 {
+				respondValidationError(w, r, "repository must be in 'owner/repo' format")
+				return
+			}
+			owner, repo := parts[0], parts[1]
+
+			// Create the release on the SCM provider
+			release, releaseErr := releaseProvider.CreateRelease(r.Context(), owner, repo, scm.CreateReleaseOptions{
+				TagName:         req.TagName,
+				TargetCommitish: req.TargetCommitish,
+				Name:            req.Name,
+				Body:            req.Body,
+				IsDraft:         req.IsDraft,
+				IsPrerelease:    req.IsPrerelease,
+			})
+			if releaseErr != nil {
+				respondBadRequest(w, r, "Failed to create SCM release: "+releaseErr.Error())
+				return
+			}
+
+			cid := req.ConnectionID
+			scmConnectionID = &cid
+			repoStr := req.Repository
+			scmRepository = &repoStr
+			scmReleaseID = &release.ID
+			scmReleaseURL = &release.URL
+		}
+	}
+
+	createdBy := user.ID
+
+	// Persist the release record and mark milestone as completed
+	result, err := h.planningService.ReleaseMilestone(services.ReleaseMilestoneParams{
+		ID:              id,
+		TagName:         req.TagName,
+		Name:            req.Name,
+		Body:            req.Body,
+		IsDraft:         req.IsDraft,
+		IsPrerelease:    req.IsPrerelease,
+		TargetCommitish: req.TargetCommitish,
+		SCMConnectionID: scmConnectionID,
+		SCMRepository:   scmRepository,
+		SCMReleaseID:    scmReleaseID,
+		SCMReleaseURL:   scmReleaseURL,
+		CreatedBy:       &createdBy,
+	})
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	milestone := h.milestoneResultToModel(result, user.ID)
+	respondJSONOK(w, milestone)
 }

@@ -23,9 +23,28 @@ CREATE TABLE IF NOT EXISTS milestones (
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS milestone_releases (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	milestone_id INTEGER NOT NULL REFERENCES milestones(id) ON DELETE CASCADE,
+	tag_name TEXT NOT NULL,
+	name TEXT,
+	body TEXT,
+	is_draft INTEGER NOT NULL DEFAULT 0,
+	is_prerelease INTEGER NOT NULL DEFAULT 0,
+	target_commitish TEXT,
+	scm_connection_id INTEGER REFERENCES workspace_scm_connections(id) ON DELETE SET NULL,
+	scm_repository TEXT,
+	scm_release_id TEXT,
+	scm_release_url TEXT,
+	created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+	created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes for milestone system
 CREATE INDEX IF NOT EXISTS idx_milestones_category_id ON milestones(category_id);
 CREATE INDEX IF NOT EXISTS idx_milestones_status ON milestones(status);
 CREATE INDEX IF NOT EXISTS idx_milestones_target_date ON milestones(target_date);
 CREATE INDEX IF NOT EXISTS idx_milestones_workspace_id ON milestones(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_milestones_is_global ON milestones(is_global);
+CREATE INDEX IF NOT EXISTS idx_milestone_releases_milestone_id ON milestone_releases(milestone_id);

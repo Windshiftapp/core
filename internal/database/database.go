@@ -255,6 +255,42 @@ func (db *DB) Initialize() error {
 			slog.Warn("llm migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Create milestone_releases table if it doesn't exist and drop legacy SCM columns from milestones
+		if _, err := db.Exec(milestonesSchema); err != nil {
+			slog.Warn("milestones migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Drop legacy SCM columns from milestones table (moved to milestone_releases)
+		scmColumnDrops := []struct {
+			check string
+			alter string
+		}{
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('milestones') WHERE name='scm_connection_id'",
+				alter: "ALTER TABLE milestones DROP COLUMN scm_connection_id",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('milestones') WHERE name='scm_repository'",
+				alter: "ALTER TABLE milestones DROP COLUMN scm_repository",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('milestones') WHERE name='scm_release_id'",
+				alter: "ALTER TABLE milestones DROP COLUMN scm_release_id",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('milestones') WHERE name='scm_release_url'",
+				alter: "ALTER TABLE milestones DROP COLUMN scm_release_url",
+			},
+		}
+		for _, m := range scmColumnDrops {
+			var count int
+			if err := db.QueryRow(m.check).Scan(&count); err == nil && count > 0 {
+				if _, err := db.Exec(m.alter); err != nil {
+					slog.Warn("milestone scm column drop failed", slog.String("component", "database"), slog.String("sql", m.alter), slog.Any("error", err))
+				}
+			}
+		}
+
 		return nil
 	}
 

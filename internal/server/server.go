@@ -414,7 +414,6 @@ func (s *Server) initialize() error {
 	milestoneCategoryHandler := handlers.NewEnumHandler(
 		services.NewEnumService(s.db, services.NewMilestoneCategoryConfig()),
 		func() interface{} { return &models.MilestoneCategory{} })
-	milestoneHandler := handlers.NewMilestoneHandler(s.db, permService)
 	channelCategoryHandler := handlers.NewEnumHandler(
 		services.NewEnumService(s.db, services.NewChannelCategoryConfig()),
 		func() interface{} { return &models.ChannelCategory{} })
@@ -465,6 +464,7 @@ func (s *Server) initialize() error {
 	scmWorkspaceHandler := handlers.NewSCMWorkspaceHandler(s.db, scmProviderHandler.GetEncryption(), scmProviderHandler, permService)
 	scmItemLinksHandler := handlers.NewSCMItemLinksHandler(s.db, scmProviderHandler.GetEncryption(), permService)
 	userSCMTokenHandler := handlers.NewUserSCMTokenHandler(s.db, scmProviderHandler.GetEncryption())
+	milestoneHandler := handlers.NewMilestoneHandler(s.db, permService, scm.NewCredentialResolver(s.db, scmProviderHandler.GetEncryption()))
 
 	// Asset management handlers
 	assetHandler := handlers.NewAssetHandler(s.db, permService)

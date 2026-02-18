@@ -294,6 +294,45 @@ func (p *PostgresDB) Initialize() error {
 			}
 		}
 
+		// Create milestone_releases table if it doesn't exist and drop legacy SCM columns from milestones
+		milestonesContent := strings.TrimSpace(milestonesSchemaPostgres)
+		if milestonesContent != "" {
+			if _, err = p.db.Exec(milestonesContent); err != nil {
+				slog.Warn("milestones postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Drop legacy SCM columns from milestones table (moved to milestone_releases)
+		pgScmColumnDrops := []struct {
+			check string
+			alter string
+		}{
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='milestones' AND column_name='scm_connection_id'",
+				alter: "ALTER TABLE milestones DROP COLUMN scm_connection_id",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='milestones' AND column_name='scm_repository'",
+				alter: "ALTER TABLE milestones DROP COLUMN scm_repository",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='milestones' AND column_name='scm_release_id'",
+				alter: "ALTER TABLE milestones DROP COLUMN scm_release_id",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='milestones' AND column_name='scm_release_url'",
+				alter: "ALTER TABLE milestones DROP COLUMN scm_release_url",
+			},
+		}
+		for _, m := range pgScmColumnDrops {
+			var count int
+			if err = p.db.QueryRow(m.check).Scan(&count); err == nil && count > 0 {
+				if _, err = p.db.Exec(m.alter); err != nil {
+					slog.Warn("milestone scm column drop failed", slog.String("component", "database"), slog.String("sql", m.alter), slog.Any("error", err))
+				}
+			}
+		}
+
 		return nil
 	}
 

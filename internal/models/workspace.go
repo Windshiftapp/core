@@ -106,6 +106,24 @@ type MilestoneCategory struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+// MilestoneRelease represents a release record for a milestone
+type MilestoneRelease struct {
+	ID              int     `json:"id"`
+	MilestoneID     int     `json:"milestone_id"`
+	TagName         string  `json:"tag_name"`
+	Name            string  `json:"name,omitempty"`
+	Body            string  `json:"body,omitempty"`
+	IsDraft         bool    `json:"is_draft"`
+	IsPrerelease    bool    `json:"is_prerelease"`
+	TargetCommitish string  `json:"target_commitish,omitempty"`
+	SCMConnectionID *int    `json:"scm_connection_id,omitempty"` // Visible only to users with connection workspace access
+	SCMRepository   *string `json:"scm_repository,omitempty"`    // "owner/repo"; same visibility as SCMConnectionID
+	SCMReleaseID    *string `json:"scm_release_id,omitempty"`
+	SCMReleaseURL   *string `json:"scm_release_url,omitempty"`
+	CreatedBy       *int    `json:"created_by,omitempty"`
+	CreatedAt       string  `json:"created_at"`
+}
+
 // Milestone represents a project milestone
 type Milestone struct {
 	ID          int     `json:"id"`
@@ -120,9 +138,10 @@ type Milestone struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	// Joined fields for API responses
-	CategoryName  string `json:"category_name,omitempty"`
-	CategoryColor string `json:"category_color,omitempty"`
-	WorkspaceName string `json:"workspace_name,omitempty"`
+	CategoryName  string            `json:"category_name,omitempty"`
+	CategoryColor string            `json:"category_color,omitempty"`
+	WorkspaceName string            `json:"workspace_name,omitempty"`
+	LatestRelease *MilestoneRelease `json:"latest_release,omitempty"`
 }
 
 // IterationType represents a type of iteration (sprint, week, etc.)

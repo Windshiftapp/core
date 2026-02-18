@@ -578,6 +578,88 @@ func (g *GitHubProvider) CreatePullRequest(ctx context.Context, owner, repo stri
 	return &pr, nil
 }
 
+// CreateRelease creates a new release in a repository
+func (g *GitHubProvider) CreateRelease(ctx context.Context, owner, repo string, opts CreateReleaseOptions) (*Release, error) {
+	if err := g.ensureInstallationToken(ctx); err != nil {
+		return nil, err
+	}
+
+	createURL := fmt.Sprintf("%s/repos/%s/%s/releases", g.baseURL, owner, repo)
+
+	body := map[string]interface{}{
+		"tag_name":   opts.TagName,
+		"name":       opts.Name,
+		"body":       opts.Body,
+		"draft":      opts.IsDraft,
+		"prerelease": opts.IsPrerelease,
+	}
+	if opts.TargetCommitish != "" {
+		body["target_commitish"] = opts.TargetCommitish
+	}
+	bodyJSON, _ := json.Marshal(body)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)))
+	if err != nil {
+		return nil, err
+	}
+	g.setAuthHeader(req)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := g.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, g.handleErrorResponse(resp)
+	}
+
+	var ghRelease githubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&ghRelease); err != nil {
+		return nil, err
+	}
+
+	release := ghRelease.toRelease()
+	return &release, nil
+}
+
+// ListReleases lists releases for a repository
+func (g *GitHubProvider) ListReleases(ctx context.Context, owner, repo string) ([]Release, error) {
+	if err := g.ensureInstallationToken(ctx); err != nil {
+		return nil, err
+	}
+
+	reqURL := fmt.Sprintf("%s/repos/%s/%s/releases", g.baseURL, owner, repo)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+	g.setAuthHeader(req)
+
+	resp, err := g.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, g.handleErrorResponse(resp)
+	}
+
+	var ghReleases []githubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&ghReleases); err != nil {
+		return nil, err
+	}
+
+	releases := make([]Release, 0, len(ghReleases))
+	for _, r := range ghReleases {
+		releases = append(releases, r.toRelease())
+	}
+	return releases, nil
+}
+
 // GetCommit gets details about a specific commit
 func (g *GitHubProvider) GetCommit(ctx context.Context, owner, repo, sha string) (*Commit, error) {
 	reqURL := fmt.Sprintf("%s/repos/%s/%s/commits/%s", g.baseURL, owner, repo, sha)
@@ -959,6 +1041,32 @@ func (pr githubPullRequest) toPullRequest() PullRequest {
 		UpdatedAt:  pr.UpdatedAt,
 		MergedAt:   pr.MergedAt,
 		ClosedAt:   pr.ClosedAt,
+	}
+}
+
+type githubRelease struct {
+	ID          int        `json:"id"`
+	TagName     string     `json:"tag_name"`
+	Name        string     `json:"name"`
+	Body        string     `json:"body"`
+	HTMLURL     string     `json:"html_url"`
+	Draft       bool       `json:"draft"`
+	Prerelease  bool       `json:"prerelease"`
+	CreatedAt   time.Time  `json:"created_at"`
+	PublishedAt *time.Time `json:"published_at"`
+}
+
+func (r githubRelease) toRelease() Release {
+	return Release{
+		ID:           strconv.Itoa(r.ID),
+		TagName:      r.TagName,
+		Name:         r.Name,
+		Body:         r.Body,
+		URL:          r.HTMLURL,
+		IsDraft:      r.Draft,
+		IsPrerelease: r.Prerelease,
+		CreatedAt:    r.CreatedAt,
+		PublishedAt:  r.PublishedAt,
 	}
 }
 

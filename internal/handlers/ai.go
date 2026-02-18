@@ -795,3 +795,161 @@ Suggest 3-8 meaningful, actionable sub-tasks. Don't create trivially small tasks
 
 	respondJSONOK(w, *result)
 }
+
+// GenerateReleaseNotesResponse is the structured LLM response for release notes generation.
+type GenerateReleaseNotesResponse struct {
+	TagName string `json:"tag_name"`
+	Name    string `json:"name"`
+	Notes   string `json:"notes"`
+}
+
+// GenerateReleaseNotes generates release notes for a milestone using the LLM.
+func (h *AIHandler) GenerateReleaseNotes(w http.ResponseWriter, r *http.Request) {
+	user := h.getUserFromContext(r)
+	if user == nil {
+		respondUnauthorized(w, r)
+		return
+	}
+
+	milestoneID, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	// Load the milestone
+	planningService := services.NewPlanningService(h.db)
+	milestone, err := planningService.GetMilestone(milestoneID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondNotFound(w, r, "milestone")
+			return
+		}
+		respondInternalError(w, r, fmt.Errorf("failed to load milestone: %w", err))
+		return
+	}
+
+	// Check permission based on milestone scope
+	if milestone.IsGlobal {
+		hasPerm, permErr := h.permService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
+		if permErr != nil || !hasPerm {
+			respondForbidden(w, r)
+			return
+		}
+	} else if milestone.WorkspaceID != nil {
+		canView, permErr := h.permService.HasWorkspacePermission(user.ID, *milestone.WorkspaceID, models.PermissionItemView)
+		if permErr != nil || !canView {
+			respondForbidden(w, r)
+			return
+		}
+	}
+
+	// Load progress report for item counts and breakdown
+	progress, err := planningService.GetMilestoneProgress(milestoneID)
+	if err != nil {
+		respondInternalError(w, r, fmt.Errorf("failed to load milestone progress: %w", err))
+		return
+	}
+
+	// Resolve LLM client
+	var connectionID int
+	if cidStr := r.URL.Query().Get("connection_id"); cidStr != "" {
+		fmt.Sscan(cidStr, &connectionID) //nolint:errcheck // connection ID parsing is best-effort
+	}
+
+	llmClient, err := h.llmManager.ResolveForFeature("release_notes_generation", connectionID)
+	if err != nil {
+		respondInternalError(w, r, fmt.Errorf("failed to resolve LLM connection: %w", err))
+		return
+	}
+	if !llmClient.Available() {
+		respondServiceUnavailable(w, r, "AI features are not available. LLM service is not configured.")
+		return
+	}
+
+	// Build prompt context
+	var contextLines []string
+	contextLines = append(contextLines, fmt.Sprintf("Milestone: %s", milestone.Name))
+	if milestone.Description != "" {
+		contextLines = append(contextLines, fmt.Sprintf("Description: %s", milestone.Description))
+	}
+	if milestone.TargetDate != "" {
+		contextLines = append(contextLines, fmt.Sprintf("Target Date: %s", milestone.TargetDate))
+	}
+	contextLines = append(contextLines, fmt.Sprintf("Progress: %d/%d items completed (%.0f%%)",
+		progress.CompletedItems, progress.TotalItems, progress.PercentComplete))
+
+	// Include status breakdown
+	if len(progress.StatusBreakdown) > 0 {
+		contextLines = append(contextLines, "\nStatus breakdown:")
+		for _, bd := range progress.StatusBreakdown {
+			contextLines = append(contextLines, fmt.Sprintf("  - %s: %d items", bd.CategoryName, bd.ItemCount))
+		}
+	}
+
+	// Include completed item titles (cap at 50 total)
+	totalItemsListed := 0
+	if len(progress.ItemsByCategory) > 0 {
+		contextLines = append(contextLines, "\nCompleted work items:")
+		for categoryName, items := range progress.ItemsByCategory {
+			// Only include completed-category items
+			isCompleted := false
+			for _, bd := range progress.StatusBreakdown {
+				if bd.CategoryName == categoryName && bd.IsCompleted {
+					isCompleted = true
+					break
+				}
+			}
+			if !isCompleted {
+				continue
+			}
+			for _, item := range items {
+				if totalItemsListed >= 50 {
+					break
+				}
+				contextLines = append(contextLines, fmt.Sprintf("  - %s-%d: %s", item.WorkspaceKey, item.ItemNumber, item.Title))
+				totalItemsListed++
+			}
+			if totalItemsListed >= 50 {
+				break
+			}
+		}
+	}
+
+	// Load test stats if available
+	testStats, testErr := planningService.GetMilestoneTestStatistics(milestoneID)
+	if testErr == nil && testStats.TotalTestPlans > 0 {
+		contextLines = append(contextLines, fmt.Sprintf("\nTest coverage: %d test plans, %d runs (%d successful, %d failed)",
+			testStats.TotalTestPlans, testStats.TotalTestRuns, testStats.SuccessfulTestRuns, testStats.FailedTestRuns))
+	}
+
+	systemPrompt := `You are a software release manager. Given information about a project milestone, write professional release notes in markdown format.
+
+Include an introductory paragraph summarising the release, then use ## section headers (e.g. "## What's New", "## Bug Fixes", "## Improvements") with bullet points under each. Write in a professional tone with enough detail that users understand the impact of each change.
+
+Return ONLY the markdown text — no JSON, no code block fences, no preamble.`
+
+	userPrompt := fmt.Sprintf("Generate release notes for this milestone:\n\n%s", strings.Join(contextLines, "\n"))
+
+	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
+	defer cancel()
+
+	resp, err := llmClient.ChatCompletion(ctx, llm.ChatCompletionRequest{
+		Messages: []llm.Message{
+			{Role: "system", Content: systemPrompt},
+			{Role: "user", Content: userPrompt},
+		},
+		Temperature: 0.7,
+	})
+	if err != nil {
+		slog.Error("LLM chat completion failed", slog.Any("error", err))
+		respondServiceUnavailable(w, r, "AI service is temporarily unavailable. Please try again later.")
+		return
+	}
+	if len(resp.Choices) == 0 {
+		respondServiceUnavailable(w, r, "AI service is temporarily unavailable. Please try again later.")
+		return
+	}
+
+	notes := strings.TrimSpace(resp.Choices[0].Message.Content)
+	respondJSONOK(w, GenerateReleaseNotesResponse{Notes: notes})
+}

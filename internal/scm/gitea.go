@@ -420,6 +420,83 @@ func (g *GiteaProvider) CreatePullRequest(ctx context.Context, owner, repo strin
 	return &pr, nil
 }
 
+// CreateRelease creates a new release in a repository
+func (g *GiteaProvider) CreateRelease(ctx context.Context, owner, repo string, opts CreateReleaseOptions) (*Release, error) {
+	createURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/releases", owner, repo))
+
+	body := map[string]interface{}{
+		"tag_name":   opts.TagName,
+		"name":       opts.Name,
+		"body":       opts.Body,
+		"draft":      opts.IsDraft,
+		"prerelease": opts.IsPrerelease,
+	}
+	if opts.TargetCommitish != "" {
+		body["target_commitish"] = opts.TargetCommitish
+	}
+	bodyJSON, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request body: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)))
+	if err != nil {
+		return nil, err
+	}
+	g.setAuthHeader(req)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := g.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, g.handleErrorResponse(resp)
+	}
+
+	var giteaRel giteaRelease
+	if err := json.NewDecoder(resp.Body).Decode(&giteaRel); err != nil {
+		return nil, err
+	}
+
+	release := giteaRel.toRelease()
+	return &release, nil
+}
+
+// ListReleases lists releases for a repository
+func (g *GiteaProvider) ListReleases(ctx context.Context, owner, repo string) ([]Release, error) {
+	reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/releases", owner, repo))
+
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+	g.setAuthHeader(req)
+
+	resp, err := g.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, g.handleErrorResponse(resp)
+	}
+
+	var giteaReleases []giteaRelease
+	if err := json.NewDecoder(resp.Body).Decode(&giteaReleases); err != nil {
+		return nil, err
+	}
+
+	releases := make([]Release, 0, len(giteaReleases))
+	for _, r := range giteaReleases {
+		releases = append(releases, r.toRelease())
+	}
+	return releases, nil
+}
+
 // RegisterWebhook registers a webhook for repository events
 func (g *GiteaProvider) RegisterWebhook(ctx context.Context, owner, repo string, opts WebhookOptions) (*WebhookRegistration, error) {
 	createURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/hooks", owner, repo))
@@ -677,6 +754,32 @@ func (u giteaUser) toUser() User {
 		Name:      name,
 		Email:     u.Email,
 		AvatarURL: u.AvatarURL,
+	}
+}
+
+type giteaRelease struct {
+	ID          int64      `json:"id"`
+	TagName     string     `json:"tag_name"`
+	Name        string     `json:"name"`
+	Body        string     `json:"body"`
+	HTMLURL     string     `json:"html_url"`
+	Draft       bool       `json:"draft"`
+	Prerelease  bool       `json:"prerelease"`
+	CreatedAt   time.Time  `json:"created_at"`
+	PublishedAt *time.Time `json:"published_at"`
+}
+
+func (r giteaRelease) toRelease() Release {
+	return Release{
+		ID:           fmt.Sprintf("%d", r.ID),
+		TagName:      r.TagName,
+		Name:         r.Name,
+		Body:         r.Body,
+		URL:          r.HTMLURL,
+		IsDraft:      r.Draft,
+		IsPrerelease: r.Prerelease,
+		CreatedAt:    r.CreatedAt,
+		PublishedAt:  r.PublishedAt,
 	}
 }
 

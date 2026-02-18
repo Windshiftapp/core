@@ -14,6 +14,7 @@ func RegisterAIRoutes(deps *Deps) {
 	api.HandleH("POST /ai/items/{id}/catch-me-up", auth(deps.AIRateLimiter.Limit(http.HandlerFunc(deps.AI.AI.CatchMeUp))))
 	api.HandleH("POST /ai/items/{id}/find-similar", auth(deps.AIRateLimiter.Limit(http.HandlerFunc(deps.AI.AI.FindSimilarItems))))
 	api.HandleH("POST /ai/items/{id}/decompose", auth(deps.AIRateLimiter.Limit(http.HandlerFunc(deps.AI.AI.DecomposeItem))))
+	api.HandleH("POST /ai/milestones/{id}/generate-release-notes", auth(deps.AIRateLimiter.Limit(http.HandlerFunc(deps.AI.AI.GenerateReleaseNotes))))
 
 	// LLM provider info (user)
 	api.HandleH("GET /llm/providers", auth(http.HandlerFunc(deps.AI.LLMConnection.GetProviders)))
