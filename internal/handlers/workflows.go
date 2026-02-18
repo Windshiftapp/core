@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -51,6 +52,7 @@ func (h *WorkflowHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		workflows = []models.Workflow{}
 	}
 
+	slog.Info("workflows listed", "count", len(workflows))
 	respondJSONOK(w, workflows)
 }
 
@@ -114,16 +116,22 @@ func (h *WorkflowHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now()
-	var id int64
-	err = h.db.QueryRow(`
+	result, err := h.db.ExecWrite(`
 		INSERT INTO workflows (name, description, is_default, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?) RETURNING id
-	`, workflow.Name, workflow.Description, workflow.IsDefault, now, now).Scan(&id)
-
+		VALUES (?, ?, ?, ?, ?)
+	`, workflow.Name, workflow.Description, workflow.IsDefault, now, now)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	slog.Info("workflow created", "id", id, "name", workflow.Name)
 
 	// Return the created workflow
 	var createdWorkflow models.Workflow

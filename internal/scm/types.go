@@ -224,6 +224,36 @@ type GitHubAppInstallation struct {
 	AccountAvatarURL string `json:"account_avatar_url,omitempty"`
 }
 
+// Release represents a release from an SCM provider
+type Release struct {
+	ID           string     `json:"id"`
+	TagName      string     `json:"tag_name"`
+	Name         string     `json:"name"`
+	Body         string     `json:"body"`
+	URL          string     `json:"url"`
+	IsDraft      bool       `json:"is_draft"`
+	IsPrerelease bool       `json:"is_prerelease"`
+	CreatedAt    time.Time  `json:"created_at"`
+	PublishedAt  *time.Time `json:"published_at,omitempty"`
+}
+
+// CreateReleaseOptions contains options for creating a release
+type CreateReleaseOptions struct {
+	TagName         string `json:"tag_name"`
+	TargetCommitish string `json:"target_commitish,omitempty"` // branch or commit SHA
+	Name            string `json:"name"`
+	Body            string `json:"body"`
+	IsDraft         bool   `json:"is_draft"`
+	IsPrerelease    bool   `json:"is_prerelease"`
+}
+
+// ReleaseProvider is an optional interface for providers that support releases.
+type ReleaseProvider interface {
+	Provider
+	CreateRelease(ctx context.Context, owner, repo string, opts CreateReleaseOptions) (*Release, error)
+	ListReleases(ctx context.Context, owner, repo string) ([]Release, error)
+}
+
 // GitHubAppProvider extends Provider for GitHub App specific functionality
 type GitHubAppProvider interface {
 	Provider

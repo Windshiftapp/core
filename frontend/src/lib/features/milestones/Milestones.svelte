@@ -1,16 +1,17 @@
 <script>
   import { onMount } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
-  import { errorToast } from '../../stores/toasts.svelte.js';
+  import { errorToast, successToast } from '../../stores/toasts.svelte.js';
   import {
     Milestone, Calendar, CheckCircle, Clock, Plus, Edit, Trash2,
-    MoreHorizontal, Tag, MessageSquare, Globe, Building2
+    MoreHorizontal, Tag, MessageSquare, Globe, Building2, GitBranch
   } from 'lucide-svelte';
   import DataTable from '../../components/DataTable.svelte';
   import Button from '../../components/Button.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import CategoryModal from '../../dialogs/CategoryModal.svelte';
   import MilestoneNavigation from './MilestoneNavigation.svelte';
+  import MilestoneReleaseModal from './MilestoneReleaseModal.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import { categoriesStore } from '../../stores/categories.js';
@@ -38,6 +39,8 @@
   let showCategoryForm = $state(false);
   let testStatistics = $state({}); // Store test stats by milestone ID
   let workspaces = $state([]); // For workspace picker when creating local milestones
+  let showReleaseModal = $state(false);
+  let releasingMilestone = $state(null);
   let formData = $state({
     name: '',
     description: '',
@@ -199,6 +202,14 @@
   function buildMilestoneDropdownItems(milestone) {
     return [
       {
+        id: 'release',
+        type: 'regular',
+        icon: Tag,
+        title: 'Release',
+        hoverClass: 'hover-bg',
+        onClick: () => { releasingMilestone = milestone; showReleaseModal = true; }
+      },
+      {
         id: 'edit',
         type: 'regular',
         icon: Edit,
@@ -216,6 +227,19 @@
         onClick: () => deleteMilestone(milestone)
       }
     ];
+  }
+
+  async function handleReleased(event) {
+    showReleaseModal = false;
+    releasingMilestone = null;
+    // Refresh milestones to show updated status
+    const filters = isGlobalView ? {} : { workspace_id: workspaceId, include_global: true };
+    try {
+      const milestones = await api.milestones.getAll(filters);
+      milestonesStore.set(milestones || []);
+    } catch (err) {
+      console.error('Failed to refresh milestones:', err);
+    }
   }
 
   function isOverdue(targetDate, status) {
@@ -643,6 +667,23 @@
     confirmKeyboardHint={submitHint}
   />
 </Modal>
+
+<!-- Release Modal -->
+{#if showReleaseModal && releasingMilestone}
+  <Modal
+    isOpen={showReleaseModal}
+    onclose={() => { showReleaseModal = false; releasingMilestone = null; }}
+    maxWidth="max-w-4xl"
+    maxHeight="85vh"
+  >
+    <MilestoneReleaseModal
+      milestone={releasingMilestone}
+      workspaceId={releasingMilestone.workspace_id ?? workspaceId}
+      on:released={handleReleased}
+      on:close={() => { showReleaseModal = false; releasingMilestone = null; }}
+    />
+  </Modal>
+{/if}
 
 <!-- Category Management Modal -->
 <CategoryModal

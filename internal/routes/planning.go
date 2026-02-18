@@ -22,6 +22,7 @@ func RegisterPlanningRoutes(deps *Deps) {
 	api.HandleH("DELETE /milestones/{id}", auth(http.HandlerFunc(deps.Planning.Milestone.Delete)))
 	api.HandleH("GET /milestones/{id}/test-statistics", auth(http.HandlerFunc(deps.Planning.Milestone.GetTestStatistics)))
 	api.HandleH("GET /milestones/{id}/progress", auth(http.HandlerFunc(deps.Planning.Milestone.GetProgress)))
+	api.HandleH("POST /milestones/{id}/release", auth(http.HandlerFunc(deps.Planning.Milestone.Release)))
 
 	// Iteration type endpoints
 	api.HandleH("GET /iteration-types", auth(http.HandlerFunc(deps.Planning.IterationType.GetAll)))

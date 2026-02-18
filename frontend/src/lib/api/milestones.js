@@ -47,6 +47,11 @@ export const milestones = {
     }),
   getTestStatistics: (id) => fetchAPI(`/milestones/${id}/test-statistics`),
   getProgress: (id) => fetchAPI(`/milestones/${id}/progress`),
+  release: (id, data) =>
+    fetchAPI(`/milestones/${id}/release`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
 
 export const iterationTypes = {

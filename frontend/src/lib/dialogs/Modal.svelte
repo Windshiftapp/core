@@ -9,6 +9,7 @@
   export let isOpen = false;
   export let preventClose = false;
   export let maxWidth = 'max-w-lg';
+  export let maxHeight = '';
   export let autoFocus = true;
   export let onSubmit = null; // Optional submit handler
   export let submitDisabled = false; // Whether submit is disabled
@@ -124,8 +125,8 @@
     <div
       bind:this={modalContentElement}
       transition:scale={{ duration: 200, start: 0.95, easing: backOut }}
-      class="relative rounded-xl overflow-hidden {maxWidth} w-full mx-4 mb-8 modal-content"
-      style="background-color: var(--ds-surface-raised, var(--ds-surface, white)); box-shadow: var(--shadow-float, 0 20px 50px rgba(0, 0, 0, 0.18));"
+      class="relative rounded-xl overflow-hidden {maxWidth} w-full mx-4 mb-8 modal-content {maxHeight ? 'flex flex-col' : ''}"
+      style="background-color: var(--ds-surface-raised, var(--ds-surface, white)); box-shadow: var(--shadow-float, 0 20px 50px rgba(0, 0, 0, 0.18));{maxHeight ? ` max-height: ${maxHeight};` : ''}"
     >
       <slot {submitHint}></slot>
     </div>

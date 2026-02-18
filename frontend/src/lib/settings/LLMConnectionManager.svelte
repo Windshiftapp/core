@@ -27,6 +27,7 @@
   const knownFeatures = [
     { id: 'plan_my_day', label: 'Plan My Day' },
     { id: 'item_analysis', label: 'Item Analysis' },
+    { id: 'release_notes_generation', label: 'Release Notes Generation' },
   ];
 
   // Form state

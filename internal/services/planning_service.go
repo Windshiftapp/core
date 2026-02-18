@@ -22,6 +22,24 @@ func NewPlanningService(db database.Database) *PlanningService {
 // Milestones
 // ========================================
 
+// MilestoneReleaseResult represents a release record for a milestone.
+type MilestoneReleaseResult struct {
+	ID              int
+	MilestoneID     int
+	TagName         string
+	Name            string
+	Body            string
+	IsDraft         bool
+	IsPrerelease    bool
+	TargetCommitish string
+	SCMConnectionID *int
+	SCMRepository   *string
+	SCMReleaseID    *string
+	SCMReleaseURL   *string
+	CreatedBy       *int
+	CreatedAt       string
+}
+
 // MilestoneResult represents a milestone with category details.
 type MilestoneResult struct {
 	ID            int
@@ -35,6 +53,7 @@ type MilestoneResult struct {
 	IsGlobal      bool
 	WorkspaceID   *int
 	WorkspaceName string
+	LatestRelease *MilestoneReleaseResult
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -55,10 +74,19 @@ func (s *PlanningService) ListMilestones(params MilestoneListParams) ([]Mileston
 		SELECT m.id, m.name, m.description, m.target_date, m.status, m.category_id,
 		       mc.name as category_name, mc.color as category_color,
 		       m.is_global, m.workspace_id, w.name as workspace_name,
+		       mr.id, mr.tag_name, mr.name, mr.body, mr.is_draft, mr.is_prerelease,
+		       mr.target_commitish, mr.scm_connection_id, mr.scm_repository,
+		       mr.scm_release_id, mr.scm_release_url, mr.created_by, mr.created_at,
 		       m.created_at, m.updated_at
 		FROM milestones m
 		LEFT JOIN milestone_categories mc ON m.category_id = mc.id
 		LEFT JOIN workspaces w ON m.workspace_id = w.id
+		LEFT JOIN (
+			SELECT * FROM milestone_releases
+			WHERE id IN (
+				SELECT MAX(id) FROM milestone_releases GROUP BY milestone_id
+			)
+		) mr ON mr.milestone_id = m.id
 		WHERE 1=1`
 
 	countQuery := "SELECT COUNT(*) FROM milestones m WHERE 1=1"
@@ -122,8 +150,17 @@ func (s *PlanningService) ListMilestones(params MilestoneListParams) ([]Mileston
 		var m MilestoneResult
 		var description, targetDate, categoryName, categoryColor, workspaceName sql.NullString
 		var categoryID, workspaceID sql.NullInt64
+		// Release columns
+		var mrID, mrCreatedBy, mrSCMConnectionID sql.NullInt64
+		var mrTagName, mrName, mrBody, mrTargetCommitish sql.NullString
+		var mrSCMRepository, mrSCMReleaseID, mrSCMReleaseURL sql.NullString
+		var mrIsDraft, mrIsPrerelease sql.NullBool
+		var mrCreatedAt sql.NullString
 		err := rows.Scan(&m.ID, &m.Name, &description, &targetDate, &m.Status, &categoryID,
 			&categoryName, &categoryColor, &m.IsGlobal, &workspaceID, &workspaceName,
+			&mrID, &mrTagName, &mrName, &mrBody, &mrIsDraft, &mrIsPrerelease,
+			&mrTargetCommitish, &mrSCMConnectionID, &mrSCMRepository,
+			&mrSCMReleaseID, &mrSCMReleaseURL, &mrCreatedBy, &mrCreatedAt,
 			&m.CreatedAt, &m.UpdatedAt)
 		if err != nil {
 			continue
@@ -140,6 +177,41 @@ func (s *PlanningService) ListMilestones(params MilestoneListParams) ([]Mileston
 		if workspaceID.Valid {
 			id := int(workspaceID.Int64)
 			m.WorkspaceID = &id
+		}
+		if mrID.Valid {
+			rel := &MilestoneReleaseResult{
+				ID:          int(mrID.Int64),
+				MilestoneID: m.ID,
+				TagName:     mrTagName.String,
+				Name:        mrName.String,
+				Body:        mrBody.String,
+				CreatedAt:   mrCreatedAt.String,
+			}
+			if mrIsDraft.Valid {
+				rel.IsDraft = mrIsDraft.Bool
+			}
+			if mrIsPrerelease.Valid {
+				rel.IsPrerelease = mrIsPrerelease.Bool
+			}
+			rel.TargetCommitish = mrTargetCommitish.String
+			if mrSCMConnectionID.Valid {
+				cid := int(mrSCMConnectionID.Int64)
+				rel.SCMConnectionID = &cid
+			}
+			if mrSCMRepository.Valid {
+				rel.SCMRepository = &mrSCMRepository.String
+			}
+			if mrSCMReleaseID.Valid {
+				rel.SCMReleaseID = &mrSCMReleaseID.String
+			}
+			if mrSCMReleaseURL.Valid {
+				rel.SCMReleaseURL = &mrSCMReleaseURL.String
+			}
+			if mrCreatedBy.Valid {
+				cb := int(mrCreatedBy.Int64)
+				rel.CreatedBy = &cb
+			}
+			m.LatestRelease = rel
 		}
 		milestones = append(milestones, m)
 	}
@@ -159,17 +231,35 @@ func (s *PlanningService) GetMilestone(id int) (*MilestoneResult, error) {
 	var m MilestoneResult
 	var description, targetDate, categoryName, categoryColor, workspaceName sql.NullString
 	var categoryID, workspaceID sql.NullInt64
+	// Release columns
+	var mrID, mrCreatedBy, mrSCMConnectionID sql.NullInt64
+	var mrTagName, mrName, mrBody, mrTargetCommitish sql.NullString
+	var mrSCMRepository, mrSCMReleaseID, mrSCMReleaseURL sql.NullString
+	var mrIsDraft, mrIsPrerelease sql.NullBool
+	var mrCreatedAt sql.NullString
 	err := s.db.QueryRow(`
 		SELECT m.id, m.name, m.description, m.target_date, m.status, m.category_id,
 		       mc.name as category_name, mc.color as category_color,
 		       m.is_global, m.workspace_id, w.name as workspace_name,
+		       mr.id, mr.tag_name, mr.name, mr.body, mr.is_draft, mr.is_prerelease,
+		       mr.target_commitish, mr.scm_connection_id, mr.scm_repository,
+		       mr.scm_release_id, mr.scm_release_url, mr.created_by, mr.created_at,
 		       m.created_at, m.updated_at
 		FROM milestones m
 		LEFT JOIN milestone_categories mc ON m.category_id = mc.id
 		LEFT JOIN workspaces w ON m.workspace_id = w.id
+		LEFT JOIN (
+			SELECT * FROM milestone_releases
+			WHERE id IN (
+				SELECT MAX(id) FROM milestone_releases GROUP BY milestone_id
+			)
+		) mr ON mr.milestone_id = m.id
 		WHERE m.id = ?
 	`, id).Scan(&m.ID, &m.Name, &description, &targetDate, &m.Status, &categoryID,
 		&categoryName, &categoryColor, &m.IsGlobal, &workspaceID, &workspaceName,
+		&mrID, &mrTagName, &mrName, &mrBody, &mrIsDraft, &mrIsPrerelease,
+		&mrTargetCommitish, &mrSCMConnectionID, &mrSCMRepository,
+		&mrSCMReleaseID, &mrSCMReleaseURL, &mrCreatedBy, &mrCreatedAt,
 		&m.CreatedAt, &m.UpdatedAt)
 
 	if err == sql.ErrNoRows {
@@ -192,8 +282,57 @@ func (s *PlanningService) GetMilestone(id int) (*MilestoneResult, error) {
 		wid := int(workspaceID.Int64)
 		m.WorkspaceID = &wid
 	}
+	if mrID.Valid {
+		rel := &MilestoneReleaseResult{
+			ID:          int(mrID.Int64),
+			MilestoneID: m.ID,
+			TagName:     mrTagName.String,
+			Name:        mrName.String,
+			Body:        mrBody.String,
+			CreatedAt:   mrCreatedAt.String,
+		}
+		if mrIsDraft.Valid {
+			rel.IsDraft = mrIsDraft.Bool
+		}
+		if mrIsPrerelease.Valid {
+			rel.IsPrerelease = mrIsPrerelease.Bool
+		}
+		rel.TargetCommitish = mrTargetCommitish.String
+		if mrSCMConnectionID.Valid {
+			cid := int(mrSCMConnectionID.Int64)
+			rel.SCMConnectionID = &cid
+		}
+		if mrSCMRepository.Valid {
+			rel.SCMRepository = &mrSCMRepository.String
+		}
+		if mrSCMReleaseID.Valid {
+			rel.SCMReleaseID = &mrSCMReleaseID.String
+		}
+		if mrSCMReleaseURL.Valid {
+			rel.SCMReleaseURL = &mrSCMReleaseURL.String
+		}
+		if mrCreatedBy.Valid {
+			cb := int(mrCreatedBy.Int64)
+			rel.CreatedBy = &cb
+		}
+		m.LatestRelease = rel
+	}
 
 	return &m, nil
+}
+
+// GetSCMConnectionWorkspaceID returns the workspace_id for a given SCM connection ID.
+// Returns 0 and no error if the connection doesn't exist.
+func (s *PlanningService) GetSCMConnectionWorkspaceID(connectionID int) (int, error) {
+	var workspaceID int
+	err := s.db.QueryRow(`SELECT workspace_id FROM workspace_scm_connections WHERE id = ?`, connectionID).Scan(&workspaceID)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to get SCM connection workspace: %w", err)
+	}
+	return workspaceID, nil
 }
 
 // CreateMilestoneParams contains parameters for creating a milestone.
@@ -248,6 +387,48 @@ func (s *PlanningService) UpdateMilestone(params UpdateMilestoneParams) (*Milest
 		params.IsGlobal, params.WorkspaceID, params.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update milestone: %w", err)
+	}
+
+	return s.GetMilestone(params.ID)
+}
+
+// ReleaseMilestoneParams contains parameters for releasing a milestone.
+type ReleaseMilestoneParams struct {
+	ID              int
+	TagName         string
+	Name            string
+	Body            string
+	IsDraft         bool
+	IsPrerelease    bool
+	TargetCommitish string
+	SCMConnectionID *int
+	SCMRepository   *string
+	SCMReleaseID    *string
+	SCMReleaseURL   *string
+	CreatedBy       *int
+}
+
+// ReleaseMilestone inserts a release record and marks the milestone as completed.
+func (s *PlanningService) ReleaseMilestone(params ReleaseMilestoneParams) (*MilestoneResult, error) {
+	_, err := s.db.ExecWrite(`
+		INSERT INTO milestone_releases (
+			milestone_id, tag_name, name, body, is_draft, is_prerelease,
+			target_commitish, scm_connection_id, scm_repository, scm_release_id,
+			scm_release_url, created_by
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, params.ID, params.TagName, params.Name, params.Body, params.IsDraft, params.IsPrerelease,
+		params.TargetCommitish, params.SCMConnectionID, params.SCMRepository, params.SCMReleaseID,
+		params.SCMReleaseURL, params.CreatedBy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert milestone release: %w", err)
+	}
+
+	_, err = s.db.ExecWrite(`
+		UPDATE milestones SET status = 'completed', updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, params.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update milestone status: %w", err)
 	}
 
 	return s.GetMilestone(params.ID)

@@ -74,6 +74,24 @@ var SchemaFindSimilar = json.RawMessage(`{
 	"additionalProperties": false
 }`)
 
+// SchemaGenerateReleaseNotes is the JSON Schema for the GenerateReleaseNotes response.
+var SchemaGenerateReleaseNotes = json.RawMessage(`{
+	"type": "object",
+	"properties": {
+		"tag_name": {
+			"type": "string"
+		},
+		"name": {
+			"type": "string"
+		},
+		"notes": {
+			"type": "string"
+		}
+	},
+	"required": ["tag_name", "name", "notes"],
+	"additionalProperties": false
+}`)
+
 // SchemaDecompose is the JSON Schema for the DecomposeItem response.
 var SchemaDecompose = json.RawMessage(`{
 	"type": "object",

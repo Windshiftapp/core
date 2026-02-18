@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
-  import { ArrowLeft, Calendar, Flag, Edit, Trash2, ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-svelte';
+  import { ArrowLeft, Calendar, Flag, Edit, Trash2, ChevronDown, ChevronRight, MoreHorizontal, Tag } from 'lucide-svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
@@ -16,14 +16,17 @@
   import { formatDateShort } from '../../utils/dateFormatter.js';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
+  import MilestoneReleaseModal from './MilestoneReleaseModal.svelte';
 
   let { milestoneId, workspaceId = null } = $props();
 
   let loading = $state(true);
   let error = $state(null);
   let progress = $state(null);
+  let milestone = $state(null); // full milestone record (includes latest_release)
   let expandedCategories = $state({});
   let showEditModal = $state(false);
+  let showReleaseModal = $state(false);
   let formData = $state({
     name: '',
     description: '',
@@ -51,7 +54,10 @@
     loading = true;
     error = null;
     try {
-      progress = await api.milestones.getProgress(milestoneId);
+      [progress, milestone] = await Promise.all([
+        api.milestones.getProgress(milestoneId),
+        api.milestones.get(milestoneId)
+      ]);
       // Expand all categories by default
       if (progress?.status_breakdown) {
         progress.status_breakdown.forEach(cat => {
@@ -175,6 +181,14 @@
   function buildDropdownItems() {
     return [
       {
+        id: 'release',
+        type: 'regular',
+        icon: Tag,
+        title: 'Release',
+        hoverClass: 'hover-bg',
+        onClick: () => { showReleaseModal = true; }
+      },
+      {
         id: 'edit',
         type: 'regular',
         icon: Edit,
@@ -192,6 +206,11 @@
         onClick: deleteMilestone
       }
     ];
+  }
+
+  async function handleReleased(event) {
+    showReleaseModal = false;
+    await loadProgress();
   }
 </script>
 
@@ -264,6 +283,20 @@
                 {daysInfo.text}
               </span>
             {/if}
+          </div>
+        {/if}
+        {#if milestone?.latest_release?.scm_release_url}
+          <div class="flex items-center gap-2 text-sm mt-2">
+            <Tag class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+            <a
+              href={milestone.latest_release.scm_release_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="hover:underline"
+              style="color: var(--ds-link);"
+            >
+              View release
+            </a>
           </div>
         {/if}
       </div>
@@ -429,6 +462,23 @@
     {/if}
   </div>
 </div>
+
+<!-- Release Modal -->
+{#if showReleaseModal && progress}
+  <Modal
+    isOpen={showReleaseModal}
+    onclose={() => showReleaseModal = false}
+    maxWidth="max-w-4xl"
+    maxHeight="85vh"
+  >
+    <MilestoneReleaseModal
+      milestone={milestone ?? { id: milestoneId, name: progress.milestone_name, description: progress.description }}
+      {workspaceId}
+      on:released={handleReleased}
+      on:close={() => showReleaseModal = false}
+    />
+  </Modal>
+{/if}
 
 <!-- Edit Modal -->
 <Modal

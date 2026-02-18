@@ -8,6 +8,8 @@ export const ai = {
   catchMeUp: (itemId) => post(`/ai/items/${itemId}/catch-me-up`),
   findSimilar: (itemId) => post(`/ai/items/${itemId}/find-similar`),
   decompose: (itemId) => post(`/ai/items/${itemId}/decompose`),
+  generateReleaseNotes: (milestoneId, connectionId) =>
+    post(`/ai/milestones/${milestoneId}/generate-release-notes${connectionId ? `?connection_id=${connectionId}` : ''}`),
 };
 
 export const llmConnections = {
