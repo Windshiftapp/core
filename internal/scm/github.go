@@ -948,6 +948,9 @@ func (g *GitHubProvider) handleErrorResponse(resp *http.Response) error {
 		if strings.Contains(bodyStr, "rate limit") {
 			return ErrRateLimited
 		}
+		if bodyStr != "" {
+			return fmt.Errorf("%w: %s", ErrForbidden, bodyStr)
+		}
 		return ErrForbidden
 	case http.StatusNotFound:
 		return ErrNotFound

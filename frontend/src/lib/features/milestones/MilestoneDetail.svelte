@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
-  import { ArrowLeft, Calendar, Flag, Edit, Trash2, ChevronDown, ChevronRight, MoreHorizontal, Tag } from 'lucide-svelte';
+  import { ArrowLeft, Calendar, Flag, Edit, Trash2, ChevronDown, ChevronRight, MoreHorizontal, Tag, ExternalLink } from 'lucide-svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
@@ -285,7 +285,38 @@
             {/if}
           </div>
         {/if}
-        {#if milestone?.latest_release?.scm_release_url}
+        {#if milestone?.releases?.length > 0}
+          <div class="flex flex-col gap-1.5 mt-2">
+            {#each milestone.releases as release}
+              <div class="flex items-center gap-2 text-sm">
+                <Tag class="w-4 h-4 shrink-0" style="color: var(--ds-text-subtle);" />
+                <span class="font-mono text-xs" style="color: var(--ds-text);">{release.tag_name}</span>
+                {#if release.name && release.name !== release.tag_name}
+                  <span style="color: var(--ds-text-subtle);">—</span>
+                  <span style="color: var(--ds-text-subtle);">{release.name}</span>
+                {/if}
+                {#if release.is_draft}
+                  <Lozenge color="grey" size="sm">Draft</Lozenge>
+                {/if}
+                {#if release.is_prerelease}
+                  <Lozenge color="yellow" size="sm">Pre-release</Lozenge>
+                {/if}
+                {#if release.scm_release_url}
+                  <a
+                    href={release.scm_release_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="hover:underline inline-flex items-center gap-1"
+                    style="color: var(--ds-link);"
+                  >
+                    <ExternalLink class="w-3 h-3" />
+                  </a>
+                {/if}
+                <span class="text-xs" style="color: var(--ds-text-subtlest);">{formatDateShort(release.created_at)}</span>
+              </div>
+            {/each}
+          </div>
+        {:else if milestone?.latest_release?.scm_release_url}
           <div class="flex items-center gap-2 text-sm mt-2">
             <Tag class="w-4 h-4" style="color: var(--ds-text-subtle);" />
             <a
@@ -474,6 +505,7 @@
     <MilestoneReleaseModal
       milestone={milestone ?? { id: milestoneId, name: progress.milestone_name, description: progress.description }}
       {workspaceId}
+      hasExistingRelease={milestone?.releases?.length > 0 || milestone?.latest_release != null}
       on:released={handleReleased}
       on:close={() => showReleaseModal = false}
     />

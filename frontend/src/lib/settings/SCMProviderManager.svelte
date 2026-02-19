@@ -79,7 +79,7 @@
   // Default OAuth scopes per provider type
   const defaultScopes = {
     github: 'repo read:user user:email',
-    gitea: 'read:repository write:repository',
+    gitea: 'read:user read:repository write:repository',
   };
 
   // Form state
@@ -697,6 +697,39 @@
 
       <!-- GitHub App Settings -->
       {#if formData.auth_method === 'github_app'}
+        <!-- Callback URL -->
+        <div class="p-3 rounded-lg border" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-sm font-medium" style="color: var(--ds-text);">{t('settings.scmProviders.callbackUrl')}</label>
+            {#if oauthCallbackUrl}
+              <button
+                type="button"
+                class="flex items-center text-xs px-2 py-1 rounded hover:bg-opacity-80 transition-colors"
+                style="background-color: var(--ds-surface-raised); color: var(--ds-text-subtle);"
+                onclick={copyCallbackUrl}
+              >
+                {#if callbackCopied}
+                  <Check class="w-3 h-3 mr-1" style="color: var(--ds-text-success);" />
+                  {t('settings.scmProviders.copied')}
+                {:else}
+                  <Copy class="w-3 h-3 mr-1" />
+                  {t('settings.scmProviders.copy')}
+                {/if}
+              </button>
+            {/if}
+          </div>
+          {#if oauthCallbackUrl}
+            <code class="block text-xs p-2 rounded break-all" style="background-color: var(--ds-background-input); color: var(--ds-text);">
+              {oauthCallbackUrl}
+            </code>
+          {:else}
+            <p class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.scmProviders.enterSlugForCallback')}</p>
+          {/if}
+          <p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">
+            {t('settings.scmProviders.useThisUrl')} {formData.provider_type === 'github' ? 'GitHub' : 'Gitea'}
+          </p>
+        </div>
+
         <FormField label={t('settings.scmProviders.githubAppId')} error={formErrors.github_app_id}>
           <Input bind:value={formData.github_app_id} />
         </FormField>

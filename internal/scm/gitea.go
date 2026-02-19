@@ -91,6 +91,9 @@ func (g *GiteaProvider) handleErrorResponse(resp *http.Response) error {
 	case http.StatusUnauthorized:
 		return ErrInvalidCredentials
 	case http.StatusForbidden:
+		if bodyStr != "" {
+			return fmt.Errorf("%w: %s", ErrForbidden, bodyStr)
+		}
 		return ErrForbidden
 	case http.StatusNotFound:
 		return ErrNotFound

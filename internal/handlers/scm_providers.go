@@ -775,11 +775,7 @@ func (h *SCMProviderHandler) StartOAuth(w http.ResponseWriter, r *http.Request) 
 	var authURL string
 	switch providerType {
 	case models.SCMProviderTypeGitHub:
-		// Use configured scopes or default to repo read:user user:email
-		scopes := "repo read:user user:email"
-		if oauthScopes.Valid && oauthScopes.String != "" {
-			scopes = oauthScopes.String
-		}
+		scopes := oauthScopes.String
 		authURL = fmt.Sprintf(
 			"https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=%s&state=%s",
 			clientID.String,
@@ -793,11 +789,7 @@ func (h *SCMProviderHandler) StartOAuth(w http.ResponseWriter, r *http.Request) 
 			respondBadRequest(w, r, "Base URL not configured for this provider")
 			return
 		}
-		// Use configured scopes or default to read:repository write:repository
-		scopes := "read:repository write:repository"
-		if oauthScopes.Valid && oauthScopes.String != "" {
-			scopes = oauthScopes.String
-		}
+		scopes := oauthScopes.String
 		// Gitea OAuth URL format: {base_url}/login/oauth/authorize
 		authURL = fmt.Sprintf(
 			"%s/login/oauth/authorize?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s",
@@ -918,6 +910,19 @@ func (h *SCMProviderHandler) OAuthCallback(w http.ResponseWriter, r *http.Reques
 	}
 
 	slog.Info("OAuth token stored successfully at user level", slog.String("component", "scm"), slog.Int("user_id", userID), slog.String("slug", providerSlug), slog.String("scm_username", userInfo.username))
+
+	// Also store at provider level (for admin status display and TestProvider)
+	if _, err := h.db.Exec(`
+		UPDATE scm_providers SET
+			oauth_access_token_encrypted = ?,
+			oauth_refresh_token_encrypted = ?,
+			oauth_token_expires_at = ?,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, encTokens.accessToken, nullString(encTokens.refreshToken), tokenResult.expiresAt, providerID); err != nil {
+		slog.Warn("failed to store provider-level OAuth token", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Any("error", err))
+		// Non-fatal: user-level token was already stored successfully
+	}
 
 	// Redirect based on context
 	if workspaceID.Valid {
