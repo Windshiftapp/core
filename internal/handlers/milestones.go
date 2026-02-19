@@ -135,6 +135,42 @@ func (h *MilestoneHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	milestone := h.milestoneResultToModel(result, user.ID)
+
+	// Populate all releases for the detail view
+	releaseResults, err := h.planningService.ListMilestoneReleases(id)
+	if err == nil && len(releaseResults) > 0 {
+		releases := make([]models.MilestoneRelease, 0, len(releaseResults))
+		for _, rr := range releaseResults {
+			rel := models.MilestoneRelease{
+				ID:              rr.ID,
+				MilestoneID:     rr.MilestoneID,
+				TagName:         rr.TagName,
+				Name:            rr.Name,
+				Body:            rr.Body,
+				IsDraft:         rr.IsDraft,
+				IsPrerelease:    rr.IsPrerelease,
+				TargetCommitish: rr.TargetCommitish,
+				SCMReleaseID:    rr.SCMReleaseID,
+				SCMReleaseURL:   rr.SCMReleaseURL,
+				CreatedBy:       rr.CreatedBy,
+				CreatedAt:       rr.CreatedAt,
+			}
+			// Apply same SCM field visibility rules as milestoneResultToModel
+			if rr.SCMConnectionID != nil {
+				connectionWorkspaceID, err := h.planningService.GetSCMConnectionWorkspaceID(*rr.SCMConnectionID)
+				if err == nil && connectionWorkspaceID > 0 {
+					hasPerm, permErr := h.permissionService.HasWorkspacePermission(user.ID, connectionWorkspaceID, models.PermissionItemEdit)
+					if permErr == nil && hasPerm {
+						rel.SCMConnectionID = rr.SCMConnectionID
+						rel.SCMRepository = rr.SCMRepository
+					}
+				}
+			}
+			releases = append(releases, rel)
+		}
+		milestone.Releases = releases
+	}
+
 	respondJSONOK(w, milestone)
 }
 
@@ -648,7 +684,7 @@ func (h *MilestoneHandler) Release(w http.ResponseWriter, r *http.Request) {
 
 		if h.credentialResolver != nil {
 			// Load the SCM provider
-			provider, provErr := h.credentialResolver.GetProviderForConnection(r.Context(), req.ConnectionID)
+			provider, provErr := h.credentialResolver.GetProviderForUser(r.Context(), req.ConnectionID, user.ID)
 			if provErr != nil {
 				respondBadRequest(w, r, "Failed to load SCM provider: "+provErr.Error())
 				return

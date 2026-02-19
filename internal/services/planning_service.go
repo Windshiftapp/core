@@ -392,6 +392,68 @@ func (s *PlanningService) UpdateMilestone(params UpdateMilestoneParams) (*Milest
 	return s.GetMilestone(params.ID)
 }
 
+// ListMilestoneReleases fetches all releases for a given milestone, ordered by created_at DESC.
+func (s *PlanningService) ListMilestoneReleases(milestoneID int) ([]MilestoneReleaseResult, error) {
+	rows, err := s.db.Query(`
+		SELECT id, milestone_id, tag_name, name, body, is_draft, is_prerelease,
+		       target_commitish, scm_connection_id, scm_repository,
+		       scm_release_id, scm_release_url, created_by, created_at
+		FROM milestone_releases
+		WHERE milestone_id = ?
+		ORDER BY created_at DESC
+	`, milestoneID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list milestone releases: %w", err)
+	}
+	defer rows.Close()
+
+	var releases []MilestoneReleaseResult
+	for rows.Next() {
+		var r MilestoneReleaseResult
+		var name, body, targetCommitish sql.NullString
+		var scmConnectionID, createdBy sql.NullInt64
+		var scmRepository, scmReleaseID, scmReleaseURL sql.NullString
+		var isDraft, isPrerelease sql.NullBool
+
+		if err := rows.Scan(&r.ID, &r.MilestoneID, &r.TagName, &name, &body,
+			&isDraft, &isPrerelease, &targetCommitish, &scmConnectionID, &scmRepository,
+			&scmReleaseID, &scmReleaseURL, &createdBy, &r.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan milestone release: %w", err)
+		}
+
+		r.Name = name.String
+		r.Body = body.String
+		r.TargetCommitish = targetCommitish.String
+		if isDraft.Valid {
+			r.IsDraft = isDraft.Bool
+		}
+		if isPrerelease.Valid {
+			r.IsPrerelease = isPrerelease.Bool
+		}
+		if scmConnectionID.Valid {
+			cid := int(scmConnectionID.Int64)
+			r.SCMConnectionID = &cid
+		}
+		if scmRepository.Valid {
+			r.SCMRepository = &scmRepository.String
+		}
+		if scmReleaseID.Valid {
+			r.SCMReleaseID = &scmReleaseID.String
+		}
+		if scmReleaseURL.Valid {
+			r.SCMReleaseURL = &scmReleaseURL.String
+		}
+		if createdBy.Valid {
+			cb := int(createdBy.Int64)
+			r.CreatedBy = &cb
+		}
+
+		releases = append(releases, r)
+	}
+
+	return releases, nil
+}
+
 // ReleaseMilestoneParams contains parameters for releasing a milestone.
 type ReleaseMilestoneParams struct {
 	ID              int

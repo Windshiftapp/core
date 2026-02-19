@@ -1,27 +1,25 @@
 <script>
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import Button from '../components/Button.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { X, Search, Loader2, Check, GitBranch, Lock, Globe, ChevronLeft, ChevronRight } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  export let workspaceId;
-  export let connection;
+  let { workspaceId, connection, onclose, onlinked } = $props();
 
-  const dispatch = createEventDispatcher();
-
-  let loading = true;
-  let linking = false;
-  let searchQuery = '';
-  let repositories = [];
-  let selectedRepos = new Set();
-  let error = null;
+  let loading = $state(true);
+  let linking = $state(false);
+  let searchQuery = $state('');
+  let repositories = $state([]);
+  let selectedRepos = $state(new Set());
+  let error = $state(null);
+  let errorCode = $state(null);
 
   // Pagination
-  let page = 1;
+  let page = $state(1);
   let perPage = 30;
-  let hasMore = true;
+  let hasMore = $state(true);
 
   onMount(async () => {
     await loadRepositories();
@@ -34,6 +32,7 @@
     }
     loading = true;
     error = null;
+    errorCode = null;
 
     try {
       const result = await api.workspaceSCM.getAvailableRepos(workspaceId, connection.id, {
@@ -43,6 +42,7 @@
 
       if (result.error) {
         error = result.error;
+        errorCode = result.error_code || null;
         repositories = [];
       } else {
         const newRepos = result.repositories || [];
@@ -70,12 +70,13 @@
   function toggleRepo(repo) {
     if (repo.is_linked) return; // Already linked, can't select
 
-    if (selectedRepos.has(repo.id)) {
-      selectedRepos.delete(repo.id);
+    const next = new Set(selectedRepos);
+    if (next.has(repo.id)) {
+      next.delete(repo.id);
     } else {
-      selectedRepos.add(repo.id);
+      next.add(repo.id);
     }
-    selectedRepos = selectedRepos;
+    selectedRepos = next;
   }
 
   async function linkSelectedRepos() {
@@ -98,7 +99,7 @@
         }
       }
 
-      dispatch('linked', { repos: linkedRepos });
+      onlinked?.({ repos: linkedRepos });
     } catch (err) {
       console.error('Failed to link repositories:', err);
       error = 'Failed to link some repositories';
@@ -107,17 +108,28 @@
     }
   }
 
+  function startOAuthConnect() {
+    sessionStorage.setItem('scm_oauth_return', window.location.href);
+    api.scmProviders.startOAuth(connection.provider_slug).then(result => {
+      if (result?.auth_url) {
+        window.location.href = result.auth_url;
+      }
+    }).catch(err => {
+      error = 'Failed to start OAuth connection';
+    });
+  }
+
   function close() {
-    dispatch('close');
+    onclose?.();
   }
 
   // Filter repos by search
-  $: filteredRepos = searchQuery
+  let filteredRepos = $derived(searchQuery
     ? repositories.filter(r =>
         r.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (r.description && r.description.toLowerCase().includes(searchQuery.toLowerCase()))
       )
-    : repositories;
+    : repositories);
 
   function getProviderLabel(providerType) {
     const labels = {
@@ -187,10 +199,20 @@
         </div>
       {:else if error}
         <div class="text-center py-12">
-          <p class="text-sm" style="color: var(--ds-text-danger);">{error}</p>
-          <Button size="sm" variant="secondary" class="mt-3" onclick={() => loadRepositories()}>
-            {t('common.tryAgain')}
-          </Button>
+          {#if errorCode === 'user_scm_not_connected'}
+            <GitBranch class="w-8 h-8 mx-auto mb-2" style="color: var(--ds-text-subtlest);" />
+            <p class="text-sm mb-3" style="color: var(--ds-text-subtle);">
+              Connect your account to browse repositories
+            </p>
+            <Button size="sm" variant="primary" onclick={startOAuthConnect}>
+              Connect {getProviderLabel(connection.provider_type)} Account
+            </Button>
+          {:else}
+            <p class="text-sm" style="color: var(--ds-text-danger);">{error}</p>
+            <Button size="sm" variant="secondary" class="mt-3" onclick={() => loadRepositories()}>
+              {t('common.retry')}
+            </Button>
+          {/if}
         </div>
       {:else if filteredRepos.length === 0}
         <div class="text-center py-12">

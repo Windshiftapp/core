@@ -141,7 +141,8 @@ type Milestone struct {
 	CategoryName  string            `json:"category_name,omitempty"`
 	CategoryColor string            `json:"category_color,omitempty"`
 	WorkspaceName string            `json:"workspace_name,omitempty"`
-	LatestRelease *MilestoneRelease `json:"latest_release,omitempty"`
+	LatestRelease *MilestoneRelease  `json:"latest_release,omitempty"`
+	Releases      []MilestoneRelease `json:"releases,omitempty"`
 }
 
 // IterationType represents a type of iteration (sprint, week, etc.)

@@ -117,8 +117,7 @@
     showRepoSelector = true;
   }
 
-  async function handleReposLinked(event) {
-    const { repos } = event.detail;
+  async function handleReposLinked({ repos }) {
     if (selectedConnection && repos.length > 0) {
       // Refresh the linked repos for this connection
       await loadLinkedRepos(selectedConnection.id);

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -461,9 +462,22 @@ func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r
 		}
 	}
 
-	// Get provider with workspace credentials using CredentialResolver
-	provider, err := h.credentialResolver.GetProviderForConnection(r.Context(), connID)
+	// Get provider with user-level credentials (falls back to workspace/provider for PAT/GitHub App)
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+	provider, err := h.credentialResolver.GetProviderForUser(r.Context(), connID, user.ID)
 	if err != nil {
+		if errors.Is(err, scm.ErrUserSCMNotConnected) {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"error":        "Please connect your SCM account first",
+				"error_code":   "user_scm_not_connected",
+				"repositories": []interface{}{},
+			})
+			return
+		}
 		slog.Error("failed to get provider", slog.String("component", "scm"), slog.Any("error", err))
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
@@ -471,6 +485,20 @@ func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r
 			"repositories": []interface{}{},
 		})
 		return
+	}
+
+	// Attempt token refresh if needed (for OAuth providers with expiring tokens)
+	creds, err := h.credentialResolver.GetCredentialsForUser(r.Context(), connID, user.ID)
+	if err == nil && creds.AuthMethod == models.SCMAuthMethodOAuth {
+		if newToken, refreshErr := h.credentialResolver.RefreshOAuthTokenIfNeeded(r.Context(), connID, creds); refreshErr != nil {
+			slog.Warn("token refresh failed, continuing with existing token", slog.String("component", "scm"), slog.Any("error", refreshErr))
+		} else if newToken != creds.OAuthAccessToken {
+			// Token was refreshed, recreate provider with new token
+			provider, err = h.credentialResolver.GetProviderForUser(r.Context(), connID, user.ID)
+			if err != nil {
+				slog.Error("failed to recreate provider after refresh", slog.String("component", "scm"), slog.Any("error", err))
+			}
+		}
 	}
 
 	// Parse query params
@@ -971,7 +999,7 @@ func (h *SCMWorkspaceHandler) StartWorkspaceOAuth(w http.ResponseWriter, r *http
 			respondBadRequest(w, r, "Base URL not configured for this provider")
 			return
 		}
-		scopes := "read:repository write:repository"
+		scopes := "read:user read:repository write:repository"
 		if oauthScopes.Valid && oauthScopes.String != "" {
 			scopes = oauthScopes.String
 		}
@@ -1153,6 +1181,11 @@ func (h *SCMWorkspaceHandler) GetWorkspaceConnectionAuthStatus(w http.ResponseWr
 		return
 	}
 
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	// Get connection with workspace-level credentials info
 	var connWorkspaceID, providerID int
 	var wsOAuthTokenEnc, wsPATEnc sql.NullString
@@ -1181,25 +1214,40 @@ func (h *SCMWorkspaceHandler) GetWorkspaceConnectionAuthStatus(w http.ResponseWr
 	// Get provider info
 	var authMethod models.SCMAuthMethod
 	var providerPATEnc, ghAppPrivateKeyEnc sql.NullString
+	var providerSlug string
 	err = h.db.QueryRow(`
-		SELECT auth_method, personal_access_token_encrypted, github_app_private_key_encrypted
+		SELECT auth_method, personal_access_token_encrypted, github_app_private_key_encrypted, slug
 		FROM scm_providers WHERE id = ?
-	`, providerID).Scan(&authMethod, &providerPATEnc, &ghAppPrivateKeyEnc)
+	`, providerID).Scan(&authMethod, &providerPATEnc, &ghAppPrivateKeyEnc, &providerSlug)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
 	response := map[string]interface{}{
-		"auth_method":      authMethod,
+		"auth_method":   authMethod,
 		"is_authenticated": false,
+		"provider_slug": providerSlug,
 	}
 
 	switch authMethod {
 	case models.SCMAuthMethodOAuth:
-		hasToken := wsOAuthTokenEnc.Valid && wsOAuthTokenEnc.String != ""
-		response["has_workspace_token"] = hasToken
-		response["is_authenticated"] = hasToken
+		hasWorkspaceToken := wsOAuthTokenEnc.Valid && wsOAuthTokenEnc.String != ""
+		// Also check user-level token
+		var hasUserToken bool
+		var scmUsername sql.NullString
+		_ = h.db.QueryRow(`
+			SELECT CASE WHEN oauth_access_token_encrypted IS NOT NULL AND oauth_access_token_encrypted != '' THEN 1 ELSE 0 END,
+			       scm_username
+			FROM user_scm_oauth_tokens WHERE user_id = ? AND scm_provider_id = ?
+		`, currentUser.ID, providerID).Scan(&hasUserToken, &scmUsername)
+
+		response["has_workspace_token"] = hasWorkspaceToken
+		response["has_user_token"] = hasUserToken
+		response["is_authenticated"] = hasWorkspaceToken || hasUserToken
+		if scmUsername.Valid {
+			response["scm_username"] = scmUsername.String
+		}
 		if wsOAuthExpiresAt.Valid {
 			response["token_expires_at"] = wsOAuthExpiresAt.Time
 			response["token_expired"] = wsOAuthExpiresAt.Time.Before(time.Now())

@@ -6,9 +6,9 @@
   import Textarea from '../../components/Textarea.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
-  import { Tag, Loader2, Sparkles } from 'lucide-svelte';
+  import { Tag, Loader2, Sparkles, AlertTriangle } from 'lucide-svelte';
 
-  let { milestone, workspaceId = null } = $props();
+  let { milestone, workspaceId = null, hasExistingRelease = false } = $props();
 
   const dispatch = createEventDispatcher();
 
@@ -104,7 +104,7 @@
       const repos = await api.workspaceSCM.getLinkedRepos(wsId, connectionId) || [];
       repositories = repos;
       if (repos.length === 1) {
-        selectedRepository = repos[0].full_name ?? repos[0].name ?? '';
+        selectedRepository = repos[0].repository_name ?? '';
       } else {
         selectedRepository = '';
       }
@@ -195,6 +195,13 @@
     <h2 class="text-base font-semibold" style="color: var(--ds-text);">Release Milestone</h2>
   </div>
 
+  {#if hasExistingRelease}
+    <div class="flex items-start gap-2 text-sm px-3 py-2.5 rounded" style="background: var(--ds-background-warning, #fef3c7); color: var(--ds-text-warning, #92400e);">
+      <AlertTriangle class="w-4 h-4 shrink-0 mt-0.5" />
+      <span>This milestone already has a release. Creating another will add a new release to the SCM provider.</span>
+    </div>
+  {/if}
+
   {#if loading}
     <div class="flex items-center justify-center py-8 gap-2" style="color: var(--ds-text-subtle);">
       <Loader2 class="w-5 h-5 animate-spin" />
@@ -237,8 +244,8 @@
               bind:value={selectedRepository}
               items={repositories}
               placeholder="Select a repository"
-              getValue={(r) => r.full_name ?? r.name ?? ''}
-              getLabel={(r) => r.full_name ?? r.name ?? ''}
+              getValue={(r) => r.repository_name ?? ''}
+              getLabel={(r) => r.repository_name ?? ''}
             />
           {/if}
         </div>
