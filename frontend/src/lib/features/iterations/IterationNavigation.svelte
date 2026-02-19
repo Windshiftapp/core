@@ -4,6 +4,7 @@
   import { api } from '../../api.js';
   import { getHexFromColorName } from '../../utils/colors.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import SidebarHeader from '../../layout/SidebarHeader.svelte';
 
   let iterationTypes = $state([]);
 
@@ -37,12 +38,7 @@
 <!-- Iteration Navigation Sidebar -->
 <div class="w-64 border-r flex flex-col p-6" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
   <!-- Header -->
-  <div class="mb-6">
-    <div class="flex items-center gap-3 mb-2">
-      <h2 class="text-xl font-semibold" style="color: var(--ds-text);">{t('iterations.title')}</h2>
-    </div>
-    <p class="text-sm" style="color: var(--ds-text-subtle);">{t('iterations.subtitle')}</p>
-  </div>
+  <SidebarHeader title={t('iterations.title')} description={t('iterations.subtitle')} noBorder />
 
   <!-- Navigation -->
   <nav class="flex-1 space-y-1">

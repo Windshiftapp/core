@@ -6,6 +6,7 @@
   import { t } from '../stores/i18n.svelte.js';
 
   // Components
+  import ModalBackdrop from '../components/ModalBackdrop.svelte';
   import Spinner from '../components/Spinner.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import PortalHeader from '../portal/PortalHeader.svelte';
@@ -649,21 +650,19 @@
     <PortalLoginModal on:loginsuccess={handleLoginSuccess} />
 
     <!-- Magic Link Verification - always accessible -->
-    {#if verifyToken}
-      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-        <div
-          class="relative w-full max-w-md rounded-xl shadow-2xl overflow-hidden"
-          style="background-color: var(--ds-surface-card);"
-        >
-          <PortalVerifyLink
-            slug={$currentRoute.params?.slug}
-            token={verifyToken}
-            onSuccess={handleVerifySuccess}
-            onError={handleVerifyError}
-          />
-        </div>
+    <ModalBackdrop show={!!verifyToken} blur={4} closeOnClick={false} closeOnEscape={false}>
+      <div
+        class="relative w-full max-w-md rounded-xl shadow-2xl overflow-hidden"
+        style="background-color: var(--ds-surface-card);"
+      >
+        <PortalVerifyLink
+          slug={$currentRoute.params?.slug}
+          token={verifyToken}
+          onSuccess={handleVerifySuccess}
+          onError={handleVerifyError}
+        />
       </div>
-    {/if}
+    </ModalBackdrop>
   {/if}
 </div>
 

@@ -143,8 +143,6 @@
         href={collectionId
           ? `/workspaces/${workspace.id}/collections/${collectionId}/items/${item.id}`
           : `/workspaces/${workspace.id}/items/${item.id}`}
-        className="text-xs font-mono px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0 transition-colors cursor-pointer item-key"
-        style="background-color: var(--ds-interactive-subtle); color: var(--ds-text-subtle);"
       />
     </div>
 
@@ -500,8 +498,3 @@
   <span class="text-sm" style="color: var(--ds-text-subtle);">-</span>
 {/if}
 
-<style>
-  :global(.item-key:hover) {
-    background-color: var(--ds-surface-hovered) !important;
-  }
-</style>

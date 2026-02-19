@@ -25,9 +25,7 @@
 </script>
 
 <div
-  class="portal-card group relative rounded-lg overflow-hidden shadow-lg transition-all cursor-pointer"
-  class:hover:shadow-xl={!hubStore.isEditing}
-  class:hover:-translate-y-1={!hubStore.isEditing}
+  class="portal-card group relative rounded-lg overflow-hidden cursor-pointer"
   class:border-2={hubStore.isEditing}
   class:border-dashed={hubStore.isEditing}
   onclick={handleClick}
@@ -67,7 +65,7 @@
 
   <!-- Card Content -->
   <div class="p-4" style="background-color: var(--ds-surface-card);">
-    <h3 class="font-semibold text-lg mb-1 truncate" style="color: var(--ds-text);">
+    <h3 class="text-lg mb-1 truncate" style="color: var(--ds-text);">
       {portal.name}
     </h3>
 
@@ -100,6 +98,12 @@
 <style>
   .portal-card {
     min-width: 0;
+    box-shadow: var(--ds-shadow-raised);
+    transition: background-color 140ms ease-in-out, box-shadow 140ms ease-in-out;
+  }
+
+  .portal-card:hover {
+    background-color: var(--ds-surface-raised-hovered) !important;
   }
 
   .line-clamp-2 {

@@ -1,6 +1,5 @@
 <script>
   import { X } from 'lucide-svelte';
-  import Button from '../components/Button.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   let {
@@ -25,11 +24,17 @@
     </div>
   </div>
   {#if showCloseButton && onClose}
-    <Button
+    <button
       onclick={onClose}
+      class="p-1.5 rounded transition-colors"
+      style="color: var(--ds-text-subtle);"
+      onmouseover={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
+      onmouseout={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+      onfocus={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
+      onblur={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
       aria-label={t('aria.close')}
     >
-      <X class="w-5 h-5" style="color: var(--ds-text-subtle);" />
-    </Button>
+      <X size={16} />
+    </button>
   {/if}
 </div>

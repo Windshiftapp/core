@@ -734,7 +734,7 @@ async function loadStatuses() {
                   <!-- Title -->
                   <button
                     onclick={() => navigateToItem(backboneItem.id)}
-                    class="font-medium text-sm mb-2 leading-snug text-left w-full line-clamp-3 transition-colors"
+                    class="text-sm mb-2 leading-snug text-left w-full line-clamp-3 transition-colors"
                     style="{styles.glassTextStyle}"
                   >
                     {backboneItem.title}
@@ -743,13 +743,6 @@ async function loadStatuses() {
                   <!-- Bottom row: Key, Icon, Status, Drill Down -->
                   <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                      <button
-                        class="text-xs font-mono flex-shrink-0 hover:underline cursor-pointer"
-                        style="{styles.glassSubtleTextStyle}"
-                        onclick={(e) => handleKeyClick(backboneItem, e)}
-                      >
-                        <ItemKey item={backboneItem} {workspace} className="" />
-                      </button>
                       {#if itemType}
                         <div
                           class="w-4 h-4 rounded flex items-center justify-center text-white text-xs flex-shrink-0"
@@ -759,28 +752,38 @@ async function loadStatuses() {
                           <svelte:component this={iconMap[itemType.icon] || FileText} class="w-3 h-3" />
                         </div>
                       {/if}
-                      <Lozenge
-                        text={(backboneItem.status_name || backboneItem.status)?.replace('_', ' ') || 'Status'}
-                        customBg={getStatusCategory(backboneItem.status_name || backboneItem.status, statuses, statusCategories)?.color || 'var(--ds-text-subtle)'}
+                      <ItemKey item={backboneItem} {workspace}
+                        onClick={(e) => handleKeyClick(backboneItem, e)}
+                        style="{styles.glassSubtleTextStyle}"
                       />
                     </div>
 
-                    <!-- Drill Down Arrow (only show if item has children) -->
-                    {#if childItemsByParent[backboneItem.id]?.length > 0}
-                      <Tooltip content={t('collections.drillDown')}>
+                    <div class="flex items-center gap-1.5">
+                      <Tooltip class="flex items-center" content={(backboneItem.status_name || backboneItem.status)?.replace('_', ' ') || 'Status'}>
                         {#snippet children()}
-                          <button
-                            onclick={() => drillDown(backboneItem.id)}
-                            class="p-1.5 rounded-full transition-colors group"
-                            style="color: var(--ds-interactive);"
-                            onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
-                            onmouseleave={(e) => e.currentTarget.style.background = ''}
-                          >
-                            <ChevronDown class="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
-                          </button>
+                          <Lozenge
+                            square
+                            customBg={getStatusCategory(backboneItem.status_name || backboneItem.status, statuses, statusCategories)?.color || 'var(--ds-text-subtle)'}
+                          />
                         {/snippet}
                       </Tooltip>
-                    {/if}
+                      <!-- Drill Down Arrow (only show if item has children) -->
+                      {#if childItemsByParent[backboneItem.id]?.length > 0}
+                        <Tooltip content={t('collections.drillDown')}>
+                          {#snippet children()}
+                            <button
+                              onclick={() => drillDown(backboneItem.id)}
+                              class="p-1.5 rounded-full transition-colors group"
+                              style="color: var(--ds-interactive);"
+                              onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
+                              onmouseleave={(e) => e.currentTarget.style.background = ''}
+                            >
+                              <ChevronDown class="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+                            </button>
+                          {/snippet}
+                        </Tooltip>
+                      {/if}
+                    </div>
                   </div>
                 </ItemCard>
               </div>
@@ -801,8 +804,8 @@ async function loadStatuses() {
                   {#each childItemsByParent[backboneItem.id] || [] as childItem}
                     {@const childItemType = getItemTypeInfo(childItem.item_type_id)}
                     <div
-                      class="item-card rounded-lg border p-2 cursor-move"
-                      style="{styles.hasGradient ? 'backdrop-filter: blur(12px); background-color: var(--ds-glass-bg);' : 'background-color: var(--ds-surface-card);'} {styles.hasGradient ? 'border-color: var(--ds-glass-border);' : 'border-color: var(--ds-border);'}"
+                      class="item-card rounded-lg border p-3 cursor-move"
+                      style="{styles.hasGradient ? 'backdrop-filter: blur(12px); background-color: var(--ds-glass-bg);' : 'background-color: var(--ds-surface-card);'} {styles.hasGradient ? 'border-color: var(--ds-glass-border);' : 'border-color: transparent;'} box-shadow: var(--ds-shadow-raised);"
                       data-item-id={childItem.id}
                       data-testid="draggable-item-{childItem.id}"
                       ondblclick={(e) => startEditingItem(childItem, e)}
@@ -812,7 +815,7 @@ async function loadStatuses() {
                         <textarea
                           bind:value={editingTitle}
                           data-item-id={childItem.id}
-                          class="font-medium text-sm mb-2 leading-snug w-full resize-none overflow-hidden bg-transparent border-none outline-none p-0 m-0"
+                          class="text-sm mb-2 leading-snug w-full resize-none overflow-hidden bg-transparent border-none outline-none p-0 m-0"
                           style="color: var(--ds-text); caret-color: var(--ds-text);"
                           rows="3"
                           onblur={() => saveEditingItem(childItem)}
@@ -828,33 +831,36 @@ async function loadStatuses() {
                           onclick={(e) => e.stopPropagation()}
                         />
                       {:else}
-                        <h4 class="font-medium text-sm mb-2 leading-snug line-clamp-3" style="{styles.glassTextStyle}">
+                        <h4 class="text-sm mb-2 leading-snug line-clamp-3" style="{styles.glassTextStyle}">
                           {childItem.title}
                         </h4>
                       {/if}
 
                       <!-- Bottom row: Key, Icon, Status -->
-                      <div class="flex items-center gap-2 flex-wrap">
-                        <button
-                          class="text-xs font-mono flex-shrink-0 hover:underline cursor-pointer"
-                          style="{styles.glassSubtleTextStyle}"
-                          onclick={(e) => handleKeyClick(childItem, e)}
-                        >
-                          <ItemKey item={childItem} {workspace} className="" />
-                        </button>
-                        {#if childItemType}
-                          <div
-                            class="w-4 h-4 rounded flex items-center justify-center text-white text-xs flex-shrink-0"
-                            style="background-color: {childItemType.color};"
-                            title={childItemType.name}
-                          >
-                            <svelte:component this={iconMap[childItemType.icon] || FileText} class="w-3 h-3" />
-                          </div>
-                        {/if}
-                        <Lozenge
-                          text={(childItem.status_name || childItem.status)?.replace('_', ' ') || 'Status'}
-                          customBg={getStatusCategory(childItem.status_name || childItem.status, statuses, statusCategories)?.color || 'var(--ds-text-subtle)'}
-                        />
+                      <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                          {#if childItemType}
+                            <div
+                              class="w-4 h-4 rounded flex items-center justify-center text-white text-xs flex-shrink-0"
+                              style="background-color: {childItemType.color};"
+                              title={childItemType.name}
+                            >
+                              <svelte:component this={iconMap[childItemType.icon] || FileText} class="w-3 h-3" />
+                            </div>
+                          {/if}
+                          <ItemKey item={childItem} {workspace}
+                            onClick={(e) => handleKeyClick(childItem, e)}
+                            style="{styles.glassSubtleTextStyle}"
+                          />
+                        </div>
+                        <Tooltip class="flex items-center" content={(childItem.status_name || childItem.status)?.replace('_', ' ') || 'Status'}>
+                          {#snippet children()}
+                            <Lozenge
+                              square
+                              customBg={getStatusCategory(childItem.status_name || childItem.status, statuses, statusCategories)?.color || 'var(--ds-text-subtle)'}
+                            />
+                          {/snippet}
+                        </Tooltip>
                       </div>
                     </div>
                   {/each}
@@ -889,19 +895,25 @@ async function loadStatuses() {
                           {t('collections.noChildItemsLowest')}
                         {/if}
                       </div>
-                      {#if canAddChildren(backboneItem.id)}
-                        <button
-                          onclick={() => initQuickAdd(backboneItem.id)}
-                          class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded border-2 border-dashed transition-colors {styles.hasGradient ? 'backdrop-blur-sm' : ''}"
-                          style="{styles.hasGradient ? 'border-color: var(--ds-glass-border); background-color: var(--ds-glass-bg);' : 'border-color: var(--ds-border); background-color: var(--ds-surface-overlay);'} color: var(--ds-interactive);"
-                          onmouseenter={(e) => e.currentTarget.style.borderColor = 'var(--ds-border-focused)'}
-                          onmouseleave={(e) => e.currentTarget.style.borderColor = styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'}
-                        >
-                          <Plus class="w-4 h-4" />
-                          {t('collections.addCard')}
-                        </button>
-                      {/if}
                     </div>
+                    {#if canAddChildren(backboneItem.id)}
+                      <button
+                        onclick={() => initQuickAdd(backboneItem.id)}
+                        class="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded border-2 border-dashed transition-colors"
+                        style="{styles.hasGradient ? 'border-color: var(--ds-glass-border);' : 'border-color: var(--ds-border);'} background-color: transparent; color: var(--ds-text-subtle);"
+                        onmouseenter={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--ds-border-focused)';
+                          e.currentTarget.style.color = 'var(--ds-interactive)';
+                        }}
+                        onmouseleave={(e) => {
+                          e.currentTarget.style.borderColor = styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
+                          e.currentTarget.style.color = 'var(--ds-text-subtle)';
+                        }}
+                      >
+                        <Plus class="w-4 h-4" />
+                        {t('collections.addCard')}
+                      </button>
+                    {/if}
                   {/if}
 
                   <!-- Quick Add Form -->
@@ -1110,8 +1122,12 @@ async function loadStatuses() {
 
 <style>
   /* Enhanced drag and drop styles */
+  [data-testid^="draggable-item"] {
+    transition: background-color 140ms ease-in-out;
+  }
+
   [data-testid^="draggable-item"]:hover {
-    transform: translateY(-1px);
+    background-color: var(--ds-surface-raised-hovered) !important;
   }
 
   [data-testid^="drop-zone"] {

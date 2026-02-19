@@ -6,13 +6,13 @@
     : 'background-color: var(--ds-surface-card);');
   let borderStyle = $derived(hasGradient
     ? 'border-color: var(--ds-glass-border);'
-    : 'border-color: var(--ds-border);');
+    : 'border-color: transparent;');
 </script>
 
 {#if href}
   <a
     {href}
-    class="item-card block {compact ? 'p-2' : 'p-3'} rounded-lg border no-underline text-inherit group"
+    class="item-card block p-3 rounded-lg border no-underline text-inherit group"
     style="{bgStyle} {borderStyle}"
     {onclick}
   >
@@ -22,7 +22,7 @@
   </a>
 {:else}
   <div
-    class="item-card block {compact ? 'p-2' : 'p-3'} rounded-lg border group"
+    class="item-card block p-3 rounded-lg border group"
     style="{bgStyle} {borderStyle}"
     role={onclick ? 'button' : undefined}
     tabindex={onclick ? 0 : undefined}
@@ -38,54 +38,20 @@
 <style>
   .item-card {
     position: relative;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    box-shadow: var(--ds-shadow-raised);
     transition:
-      transform var(--duration-fast, 100ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
-      box-shadow var(--duration-normal, 200ms) var(--ease-smooth, ease),
+      background-color 140ms ease-in-out,
+      box-shadow 140ms ease-in-out,
       border-color var(--duration-fast, 100ms) var(--ease-smooth, ease);
   }
 
   .item-card:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    border-color: var(--ds-border-bold);
+    box-shadow: var(--ds-shadow-raised);
+    background-color: var(--ds-surface-raised-hovered) !important;
   }
 
   .item-card:active {
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    box-shadow: var(--ds-shadow-raised);
   }
 
-  /* Subtle gradient overlay on hover */
-  .item-card::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: linear-gradient(
-      135deg,
-      transparent 0%,
-      transparent 50%,
-      rgba(59, 130, 246, 0.03) 100%
-    );
-    opacity: 0;
-    transition: opacity var(--duration-normal, 200ms) var(--ease-smooth, ease);
-    pointer-events: none;
-  }
-
-  .item-card:hover::after {
-    opacity: 1;
-  }
-
-  /* Content stays above overlay */
-  .item-card-content {
-    position: relative;
-    z-index: 1;
-  }
-
-  /* Reduced motion support */
-  @media (prefers-reduced-motion: reduce) {
-    .item-card:hover,
-    .item-card:active {
-      transform: none;
-    }
-  }
 </style>

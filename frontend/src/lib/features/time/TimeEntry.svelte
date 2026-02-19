@@ -13,6 +13,7 @@
   import TimeLogModal from '../../dialogs/TimeLogModal.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import PageHeader from '../../layout/PageHeader.svelte';
 
   // Bind to store values
   let worklogs = $derived(timeEntryStore.worklogs);
@@ -130,25 +131,24 @@
 </script>
 
 <!-- Header -->
-<div class="mb-6 flex justify-between items-start">
-  <div>
-    <h2 class="text-lg font-semibold" style="color: var(--ds-text);">{t('time.entry.title')}</h2>
-    <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-      {t('time.entry.subtitle')}
-    </div>
-  </div>
-  <Button
-    variant="primary"
-    size="medium"
-    icon={Plus}
-    onclick={openLogTimeModal}
-    keyboardHint="A"
-    hotkeyConfig={{ key: toHotkeyString('timeEntry', 'openLog'), guard: () => !showTimeLogModal }}
-    title={t('time.entry.addTimeEntry')}
-  >
-    {t('time.logTime')}
-  </Button>
-</div>
+<PageHeader
+  title={t('time.entry.title')}
+  subtitle={t('time.entry.subtitle')}
+>
+  {#snippet actions()}
+    <Button
+      variant="primary"
+      size="medium"
+      icon={Plus}
+      onclick={openLogTimeModal}
+      keyboardHint="A"
+      hotkeyConfig={{ key: toHotkeyString('timeEntry', 'openLog'), guard: () => !showTimeLogModal }}
+      title={t('time.entry.addTimeEntry')}
+    >
+      {t('time.logTime')}
+    </Button>
+  {/snippet}
+</PageHeader>
 
 {#if activeProjects.length === 0 && !showOnboarding}
   <AlertBox variant="warning" class="mb-6">

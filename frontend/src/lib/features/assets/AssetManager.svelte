@@ -17,6 +17,7 @@
   import ColorPicker from '../../editors/ColorPicker.svelte';
   import Label from '../../components/Label.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
+  import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
   // State for asset sets
@@ -474,7 +475,7 @@
   ];
 </script>
 
-<div class="p-6">
+<div>
   <PageHeader title={t('assets.title')} icon={Package} subtitle={t('assets.subtitle')}>
     {#snippet actions()}
       <div class="flex items-center gap-2">
@@ -783,10 +784,10 @@
 </div>
 
 <!-- Asset Set Form Modal -->
-<Modal isOpen={showSetForm} onclose={() => showSetForm = false}>
-  <ModalHeader title={editingSet ? t('assets.editSet') : t('assets.createAssetSet')} onClose={() => showSetForm = false} />
-  <form onsubmit={(e) => { e.preventDefault(); handleSetSubmit(); }} class="p-6">
-    <div class="space-y-4">
+<Modal isOpen={showSetForm} onclose={() => showSetForm = false} onSubmit={handleSetSubmit} submitDisabled={!setFormData.name.trim()}>
+  {#snippet children({ submitHint })}
+    <ModalHeader title={editingSet ? t('assets.editSet') : t('assets.createAssetSet')} onClose={() => showSetForm = false} />
+    <div class="p-6 space-y-4">
       <div>
         <Label color="default" class="mb-1">{t('common.name')}</Label>
         <input
@@ -808,18 +809,22 @@
       </div>
       <Checkbox bind:checked={setFormData.is_default} label={t('assets.default')} />
     </div>
-    <div class="flex justify-end gap-2 mt-6">
-      <Button variant="outline" type="button" onclick={() => showSetForm = false}>{t('common.cancel')}</Button>
-      <Button type="submit">{editingSet ? t('common.save') : t('common.create')}</Button>
-    </div>
-  </form>
+    <DialogFooter
+      onCancel={() => showSetForm = false}
+      onConfirm={handleSetSubmit}
+      confirmLabel={editingSet ? t('common.save') : t('common.create')}
+      disabled={!setFormData.name.trim()}
+      showKeyboardHint={true}
+      confirmKeyboardHint={submitHint}
+    />
+  {/snippet}
 </Modal>
 
 <!-- Asset Type Form Modal -->
-<Modal isOpen={showTypeForm} onclose={() => showTypeForm = false}>
-  <ModalHeader title={editingType ? t('assets.editType') : t('assets.createType')} onClose={() => showTypeForm = false} />
-  <form onsubmit={(e) => { e.preventDefault(); handleTypeSubmit(); }} class="p-6">
-    <div class="space-y-4">
+<Modal isOpen={showTypeForm} onclose={() => showTypeForm = false} onSubmit={handleTypeSubmit} submitDisabled={!typeFormData.name.trim()}>
+  {#snippet children({ submitHint })}
+    <ModalHeader title={editingType ? t('assets.editType') : t('assets.createType')} onClose={() => showTypeForm = false} />
+    <div class="p-6 space-y-4">
       <div>
         <Label color="default" class="mb-1">{t('common.name')}</Label>
         <input
@@ -844,18 +849,22 @@
       </div>
       <Checkbox bind:checked={typeFormData.is_active} label={t('common.active')} />
     </div>
-    <div class="flex justify-end gap-2 mt-6">
-      <Button variant="outline" type="button" onclick={() => showTypeForm = false}>{t('common.cancel')}</Button>
-      <Button type="submit">{editingType ? t('common.save') : t('common.create')}</Button>
-    </div>
-  </form>
+    <DialogFooter
+      onCancel={() => showTypeForm = false}
+      onConfirm={handleTypeSubmit}
+      confirmLabel={editingType ? t('common.save') : t('common.create')}
+      disabled={!typeFormData.name.trim()}
+      showKeyboardHint={true}
+      confirmKeyboardHint={submitHint}
+    />
+  {/snippet}
 </Modal>
 
 <!-- Category Form Modal -->
-<Modal isOpen={showCategoryForm} onclose={() => showCategoryForm = false}>
-  <ModalHeader title={editingCategory ? t('assets.editCategory') : t('assets.createCategory')} onClose={() => showCategoryForm = false} />
-  <form onsubmit={(e) => { e.preventDefault(); handleCategorySubmit(); }} class="p-6">
-    <div class="space-y-4">
+<Modal isOpen={showCategoryForm} onclose={() => showCategoryForm = false} onSubmit={handleCategorySubmit} submitDisabled={!categoryFormData.name.trim()}>
+  {#snippet children({ submitHint })}
+    <ModalHeader title={editingCategory ? t('assets.editCategory') : t('assets.createCategory')} onClose={() => showCategoryForm = false} />
+    <div class="p-6 space-y-4">
       <div>
         <Label color="default" class="mb-1">{t('common.name')}</Label>
         <input
@@ -885,18 +894,22 @@
         </Select>
       </div>
     </div>
-    <div class="flex justify-end gap-2 mt-6">
-      <Button variant="outline" type="button" onclick={() => showCategoryForm = false}>{t('common.cancel')}</Button>
-      <Button type="submit">{editingCategory ? t('common.save') : t('common.create')}</Button>
-    </div>
-  </form>
+    <DialogFooter
+      onCancel={() => showCategoryForm = false}
+      onConfirm={handleCategorySubmit}
+      confirmLabel={editingCategory ? t('common.save') : t('common.create')}
+      disabled={!categoryFormData.name.trim()}
+      showKeyboardHint={true}
+      confirmKeyboardHint={submitHint}
+    />
+  {/snippet}
 </Modal>
 
 <!-- Role Assignment Form Modal -->
-<Modal isOpen={showRoleForm} onclose={() => showRoleForm = false}>
-  <ModalHeader title={t('assets.assignRole')} onClose={() => showRoleForm = false} />
-  <form onsubmit={(e) => { e.preventDefault(); handleRoleSubmit(); }} class="p-6">
-    <div class="space-y-4">
+<Modal isOpen={showRoleForm} onclose={() => showRoleForm = false} onSubmit={handleRoleSubmit} submitDisabled={roleFormData.type === 'user' ? !roleFormData.user_id : !roleFormData.group_id}>
+  {#snippet children({ submitHint })}
+    <ModalHeader title={t('assets.assignRole')} onClose={() => showRoleForm = false} />
+    <div class="p-6 space-y-4">
       <!-- Assignee Type Toggle -->
       <div>
         <Label color="default" class="mb-2">{t('common.assignTo')}</Label>
@@ -953,11 +966,15 @@
         </Select>
       </div>
     </div>
-    <div class="flex justify-end gap-2 mt-6">
-      <Button variant="outline" type="button" onclick={() => showRoleForm = false}>{t('common.cancel')}</Button>
-      <Button type="submit">{t('common.assign')}</Button>
-    </div>
-  </form>
+    <DialogFooter
+      onCancel={() => showRoleForm = false}
+      onConfirm={handleRoleSubmit}
+      confirmLabel={t('common.assign')}
+      disabled={roleFormData.type === 'user' ? !roleFormData.user_id : !roleFormData.group_id}
+      showKeyboardHint={true}
+      confirmKeyboardHint={submitHint}
+    />
+  {/snippet}
 </Modal>
 
 <!-- Field Assignment Modal -->

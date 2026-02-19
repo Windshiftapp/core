@@ -31,6 +31,7 @@
   import FloatingTimer from '../features/time/FloatingTimer.svelte';
   import ToastContainer from '../features/notifications/ToastContainer.svelte';
   import Spinner from '../components/Spinner.svelte';
+  import ModalBackdrop from '../components/ModalBackdrop.svelte';
   import Button from '../components/Button.svelte';
   import PermissionGuard from '../layout/PermissionGuard.svelte';
   import UnauthorizedAccess from './UnauthorizedAccess.svelte';
@@ -108,8 +109,12 @@
     const schedulePreload = window.requestIdleCallback || ((cb) => setTimeout(cb, 1000));
 
     schedulePreload(() => {
-      Object.values(componentLoaders).forEach(loader => {
-        loader().catch(() => {}); // Silently preload, ignore errors
+      Object.entries(componentLoaders).forEach(([view, loader]) => {
+        loader().then(module => {
+          if (!componentRegistry.has(view)) {
+            componentRegistry = new Map(componentRegistry).set(view, module.default);
+          }
+        }).catch(() => {});
       });
     });
   }
@@ -904,12 +909,12 @@
   {@const commandPaletteLoading = isComponentLoading('command-palette')}
 
   {#if commandPaletteLoading}
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded p-6">
+    <ModalBackdrop show={true} opacity={0.4} blur={8} extraFilter="saturate(120%)" zIndex={60} align="top" paddingTop="pt-[20vh]" closeOnClick={false} closeOnEscape={false} transition={false}>
+      <div class="rounded-xl p-6" style="background-color: var(--ds-surface-raised); color: var(--ds-text-subtle);">
         <Spinner class="mx-auto mb-4" />
-        <p class="text-gray-600">{t('nav.loadingSearch')}</p>
+        <p>{t('nav.loadingSearch')}</p>
       </div>
-    </div>
+    </ModalBackdrop>
   {:else if commandPaletteComponent && showCommandPalette}
     <svelte:component
       this={commandPaletteComponent}
@@ -931,12 +936,12 @@
   {@const createModalLoading = isComponentLoading('create-modal')}
 
   {#if createModalLoading}
-    <div class="fixed inset-0 flex items-center justify-center z-50" style="background-color: rgba(0, 0, 0, 0.4); backdrop-filter: blur(2px);">
-      <div class="bg-white rounded p-6">
+    <ModalBackdrop show={true} opacity={0.4} closeOnClick={false} closeOnEscape={false} transition={false}>
+      <div class="rounded-xl p-6" style="background-color: var(--ds-surface-raised); color: var(--ds-text-subtle);">
         <Spinner class="mx-auto mb-4" />
-        <p class="text-gray-600">{t('nav.loadingCreateForm')}</p>
+        <p>{t('nav.loadingCreateForm')}</p>
       </div>
-    </div>
+    </ModalBackdrop>
   {:else if createModalComponent && showCreateModal}
     <svelte:component
       this={createModalComponent}

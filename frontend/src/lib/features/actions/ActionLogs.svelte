@@ -6,6 +6,7 @@
   import Button from '../../components/Button.svelte';
   import ExecutionTraceModal from './ExecutionTraceModal.svelte';
   import { ArrowLeft, CheckCircle, XCircle, Clock, SkipForward, Eye } from 'lucide-svelte';
+  import PageHeader from '../../layout/PageHeader.svelte';
 
   let { workspaceId, action, onBack } = $props();
 
@@ -73,9 +74,8 @@
   <!-- Header with back button -->
   <div class="flex items-center gap-4 p-4 border-b header">
     <Button variant="ghost" icon={ArrowLeft} onclick={onBack} />
-    <div>
-      <h2 class="text-lg font-semibold title">{t('actions.logs.title')}</h2>
-      <p class="text-sm subtitle">{action.name}</p>
+    <div class="flex-1">
+      <PageHeader title={t('actions.logs.title')} subtitle={action.name} />
     </div>
   </div>
 

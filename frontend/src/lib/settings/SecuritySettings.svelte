@@ -5,6 +5,7 @@
   import Toggle from '../components/Toggle.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
+  import PageHeader from '../layout/PageHeader.svelte';
 
   let loading = $state(true);
   let saving = $state(false);
@@ -142,15 +143,7 @@
 </script>
 
 <div>
-  <div class="mb-6">
-    <div class="flex items-center gap-3 mb-2">
-      <Shield class="w-6 h-6" style="color: var(--ds-icon);" />
-      <h2 class="text-2xl font-semibold" style="color: var(--ds-text);">{t('settings.security.title')}</h2>
-    </div>
-    <p class="text-sm" style="color: var(--ds-text-subtle);">
-      {t('settings.security.subtitle')}
-    </p>
-  </div>
+  <PageHeader title={t('settings.security.title')} subtitle={t('settings.security.subtitle')} icon={Shield} />
 
   {#if loading}
     <div class="flex items-center justify-center py-12">

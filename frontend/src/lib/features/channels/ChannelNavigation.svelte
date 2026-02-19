@@ -6,6 +6,7 @@
   import Button from '../../components/Button.svelte';
   import { getHexFromColorName } from '../../utils/colors.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import SidebarHeader from '../../layout/SidebarHeader.svelte';
 
   // Get active filters from URL params
   let activeCategoryId = $derived($currentRoute.params?.categoryId || null);
@@ -51,12 +52,7 @@
 <!-- Channel Navigation Sidebar -->
 <div class="w-64 border-r flex flex-col p-6" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
   <!-- Header -->
-  <div class="mb-6">
-    <div class="flex items-center gap-3 mb-2">
-      <h2 class="text-xl font-semibold" style="color: var(--ds-text);">{t('channels.title')}</h2>
-    </div>
-    <p class="text-sm" style="color: var(--ds-text-subtle);">{t('channels.subtitle')}</p>
-  </div>
+  <SidebarHeader title={t('channels.title')} description={t('channels.subtitle')} noBorder />
 
   <!-- Navigation -->
   <nav class="flex-1 space-y-4">

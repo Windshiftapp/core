@@ -3,6 +3,7 @@
   import Button from '../components/Button.svelte';
   import Avatar from '../components/Avatar.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import SidebarHeader from '../layout/SidebarHeader.svelte';
 
   let {
     organisations = [],
@@ -34,10 +35,7 @@
 
 <div class="w-64 min-w-64 flex-shrink-0 border-r flex flex-col p-6" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
   <!-- Header -->
-  <div class="mb-6">
-    <h2 class="text-xl font-semibold" style="color: var(--ds-text);">{t('workspaces.customers.title')}</h2>
-    <p class="text-sm" style="color: var(--ds-text-subtle);">{t('workspaces.customers.subtitle')}</p>
-  </div>
+  <SidebarHeader title={t('workspaces.customers.title')} description={t('workspaces.customers.subtitle')} noBorder />
 
   <!-- Search -->
   <div class="relative mb-4">

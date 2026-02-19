@@ -2,8 +2,8 @@
   let {
     variant = 'raised',    // 'raised', 'flat', 'outlined', 'dashed'
     padding = 'default',   // 'none', 'compact', 'default', 'spacious', 'loose', 'generous'
-    shadow = false,        // Add shadow-sm
-    hoverable = false,     // Add hover effects (shadow-md, translate-y)
+    shadow = false,        // Add raised shadow
+    hoverable = false,     // Add hover background effect
     glass = false,         // Glassmorphism effect
     href = null,           // If provided, renders as <a>
     onclick = null,        // Click handler
@@ -17,7 +17,7 @@
 
   // Variant styles using design tokens
   const variantStyles = {
-    raised: 'background-color: var(--ds-surface-raised); border-color: var(--ds-border);',
+    raised: 'background-color: var(--ds-surface-raised); border-color: transparent; box-shadow: var(--ds-shadow-raised);',
     flat: 'background-color: var(--ds-surface); border-color: var(--ds-border);',
     outlined: 'background-color: transparent; border-color: var(--ds-border);',
     dashed: 'background-color: var(--ds-surface-raised); border-color: var(--ds-border); border-style: dashed;'
@@ -38,6 +38,7 @@
   // Rounded classes
   const roundedClasses = {
     none: '',
+    xs: 'rounded-[3px]',
     sm: 'rounded-sm',
     md: 'rounded-md',
     lg: 'rounded-lg',
@@ -49,8 +50,7 @@
   const baseClasses = $derived([
     'border',
     roundedClasses[rounded],
-    shadow ? 'shadow-sm' : '',
-    hoverable ? 'transition-all duration-150 hover:shadow-md hover:-translate-y-px' : '',
+    hoverable ? 'card-hoverable' : '',
     // When no header/footer, apply padding directly on outer element
     !hasStructure ? paddingClasses[padding] : '',
     className
@@ -60,6 +60,7 @@
 
   const computedStyle = $derived([
     glass ? glassStyle : variantStyles[variant],
+    shadow && variant !== 'raised' ? 'box-shadow: var(--ds-shadow-raised);' : '',
     userStyle
   ].filter(Boolean).join(' '));
 </script>
@@ -112,5 +113,13 @@
   .glass {
     backdrop-filter: blur(12px) saturate(180%);
     -webkit-backdrop-filter: blur(12px) saturate(180%);
+  }
+
+  .card-hoverable {
+    transition: background-color 140ms ease-in-out, box-shadow 140ms ease-in-out;
+  }
+
+  .card-hoverable:hover {
+    background-color: var(--ds-surface-raised-hovered) !important;
   }
 </style>

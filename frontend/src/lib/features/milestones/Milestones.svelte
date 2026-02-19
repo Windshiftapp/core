@@ -26,6 +26,7 @@
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import EmptyState from '../../components/EmptyState.svelte';
+  import PageHeader from '../../layout/PageHeader.svelte';
   import { useEventListener } from 'runed';
 
   // Props for workspace-scoped view (optional)
@@ -350,39 +351,28 @@
   <div class="flex-1">
     <div class="p-6">
       <!-- Header -->
-      <div class="flex justify-between items-center mb-6">
-        <div>
-          <h1 class="text-xl font-semibold" style="color: var(--ds-text);">
-            {#if isGlobalView}
-              {#if activeCategoryId}
-                {@const category = getCategoryById(parseInt(activeCategoryId), $categoriesStore)}
-                {category ? category.name : t('common.category')} {t('milestones.title')}
-              {:else}
-                {t('milestones.allMilestones')}
-              {/if}
-            {:else}
-              {t('milestones.workspaceMilestones')}
-            {/if}
-          </h1>
-          <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">
-            {#if !isGlobalView}
-              {localMilestones.length} {t('milestones.local').toLowerCase()}, {globalMilestones.length} {t('milestones.global').toLowerCase()}
-            {:else}
-              {filteredMilestones.length} milestone{filteredMilestones.length !== 1 ? 's' : ''}
-              {#if activeCategoryId}in this category{/if}
-            {/if}
-          </p>
-        </div>
-        <Button
-          variant="primary"
-          icon={Plus}
-          onclick={startCreate}
-          keyboardHint="A"
-          hotkeyConfig={{ key: toHotkeyString('milestones', 'add'), guard: () => !showCreateForm }}
-        >
-          {t('milestones.addMilestone')}
-        </Button>
-      </div>
+      <PageHeader
+        title={isGlobalView
+          ? (activeCategoryId
+              ? `${getCategoryById(parseInt(activeCategoryId), $categoriesStore)?.name || t('common.category')} ${t('milestones.title')}`
+              : t('milestones.allMilestones'))
+          : t('milestones.workspaceMilestones')}
+        subtitle={!isGlobalView
+          ? `${localMilestones.length} ${t('milestones.local').toLowerCase()}, ${globalMilestones.length} ${t('milestones.global').toLowerCase()}`
+          : `${filteredMilestones.length} milestone${filteredMilestones.length !== 1 ? 's' : ''}${activeCategoryId ? ' in this category' : ''}`}
+      >
+        {#snippet actions()}
+          <Button
+            variant="primary"
+            icon={Plus}
+            onclick={startCreate}
+            keyboardHint="A"
+            hotkeyConfig={{ key: toHotkeyString('milestones', 'add'), guard: () => !showCreateForm }}
+          >
+            {t('milestones.addMilestone')}
+          </Button>
+        {/snippet}
+      </PageHeader>
 
 
       {#snippet nameCell(item)}

@@ -3,6 +3,7 @@
   import { Tag, FolderOpen } from 'lucide-svelte';
   import { navigate, currentRoute } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import SidebarHeader from '../../layout/SidebarHeader.svelte';
   import { collectionCategoriesStore } from '../../stores/collectionCategories.js';
   import Button from '../../components/Button.svelte';
   import { getHexFromColorName } from '../../utils/colors.js';
@@ -35,12 +36,7 @@
 </script>
 
 <div class="w-64 border-r flex flex-col p-6" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-  <div class="mb-6">
-    <div class="flex items-center gap-3 mb-2">
-      <h2 class="text-xl font-semibold" style="color: var(--ds-text);">{t('collections.title')}</h2>
-    </div>
-    <p class="text-sm" style="color: var(--ds-text-subtle);">{t('collections.subtitle')}</p>
-  </div>
+  <SidebarHeader title={t('collections.title')} description={t('collections.subtitle')} noBorder />
 
   <nav class="flex-1 space-y-1">
     <!-- All Global Collections -->

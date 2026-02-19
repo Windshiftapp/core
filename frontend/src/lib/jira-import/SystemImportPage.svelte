@@ -10,6 +10,7 @@
     Cloud, Plus, Trash2, ExternalLink, Link, Clock,
     CheckCircle, XCircle, Loader, PlayCircle
   } from 'lucide-svelte';
+  import PageHeader from '../layout/PageHeader.svelte';
   import { addToast } from '../stores/toasts.svelte.js';
 
   // State
@@ -91,24 +92,14 @@
 
 <div class="space-y-8">
   <!-- Page Header -->
-  <div class="flex items-center justify-between">
-    <div class="flex items-center gap-4">
-      <div class="w-12 h-12 rounded-lg flex items-center justify-center"
-           style="background: var(--ds-background-accent-blue-subtler);">
-        <Cloud class="w-6 h-6" style="color: var(--ds-text-accent-blue);" />
-      </div>
-      <div>
-        <h1 class="text-2xl font-semibold" style="color: var(--ds-text);">System Import</h1>
-        <p class="text-sm" style="color: var(--ds-text-subtle);">
-          Import data from Jira Cloud and other external systems
-        </p>
-      </div>
-    </div>
-    <Button variant="primary" onclick={() => openWizard()} keyboardHint={getShortcutDisplay('systemImport', 'add')} hotkeyConfig={{ key: toHotkeyString('systemImport', 'add'), guard: () => !showWizard }}>
-      <Plus size={16} class="mr-2" />
-      New Import
-    </Button>
-  </div>
+  <PageHeader title="System Import" subtitle="Import data from Jira Cloud and other external systems" icon={Cloud}>
+    {#snippet actions()}
+      <Button variant="primary" onclick={() => openWizard()} keyboardHint={getShortcutDisplay('systemImport', 'add')} hotkeyConfig={{ key: toHotkeyString('systemImport', 'add'), guard: () => !showWizard }}>
+        <Plus size={16} class="mr-2" />
+        New Import
+      </Button>
+    {/snippet}
+  </PageHeader>
 
   <!-- Saved Connections Section -->
   <div class="rounded-lg border" style="border-color: var(--ds-border); background: var(--ds-surface-raised);">

@@ -7,17 +7,19 @@
   import { t } from '../stores/i18n.svelte.js';
   import { navigate } from '../router.js';
   import LogoUploader from '../components/LogoUploader.svelte';
+  import ModalBackdrop from '../components/ModalBackdrop.svelte';
 
   let showCustomizePanelHover = $state(false);
 </script>
 
 <!-- Customization Panel Overlay (hide when editing sections so sections are visible) -->
-{#if hubStore.showCustomizePanel && hubStore.activeSection !== 'sections'}
-  <div
-    class="fixed inset-0 bg-black/30 z-50 transition-opacity"
-    onclick={() => hubStore.showCustomizePanel = false}
-  ></div>
-{/if}
+<ModalBackdrop
+  show={hubStore.showCustomizePanel && hubStore.activeSection !== 'sections'}
+  opacity={0.3}
+  blur={0}
+  align="none"
+  onclose={() => hubStore.showCustomizePanel = false}
+/>
 
 <!-- Customization Slide-in Panel -->
 {#if hubStore.showCustomizePanel}

@@ -17,6 +17,12 @@ html[data-color-mode="light"] {
   --ds-surface-overlay: #ffffff;
   --ds-surface-selected: #e3f2fd;
   --ds-surface-card: #ffffff;
+  --ds-surface-raised-hovered: #f5f6f7;
+
+  /* =================================================================
+     SHADOW TOKENS
+     ================================================================= */
+  --ds-shadow-raised: 0px 1px 1px #1E1F2140, 0px 0px 1px #1E1F214F;
 
   /* =================================================================
      TEXT COLORS

@@ -539,8 +539,7 @@
                     href={collectionId
                       ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
                       : `/workspaces/${workspaceId}/items/${item.id}`}
-                    className="text-xs font-mono px-1.5 py-0.5 rounded cursor-pointer transition-colors item-key"
-                    style="background-color: var(--ds-interactive-subtle); {styles.glassSubtleTextStyle}"
+                    style="{styles.glassSubtleTextStyle}"
                   />
 
                   <!-- Test Case Count Badge -->
@@ -558,7 +557,7 @@
                     href={collectionId
                       ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
                       : `/workspaces/${workspaceId}/items/${item.id}`}
-                    class="text-left w-full font-medium transition-colors truncate cursor-pointer summary-link"
+                    class="text-left w-full transition-colors truncate cursor-pointer summary-link"
                     style="{styles.glassTextStyle}"
                   >
                     {item.title}
@@ -628,10 +627,6 @@
 
   .expand-btn:hover {
     background-color: var(--ds-surface-hovered);
-  }
-
-  :global(.item-key:hover) {
-    background-color: var(--ds-surface-hovered) !important;
   }
 
   :global(.summary-link:hover) {

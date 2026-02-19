@@ -5,6 +5,7 @@
   import Button from '../../components/Button.svelte';
   import TestActionModal from './TestActionModal.svelte';
   import { Plus, Play } from 'lucide-svelte';
+  import PageHeader from '../../layout/PageHeader.svelte';
 
   export let workspaceId;
   export let actions = [];
@@ -60,21 +61,22 @@
 </script>
 
 <div class="actions-manager">
-  <div class="flex items-center justify-between mb-6">
-    <div>
-      <h2 class="text-xl font-semibold title">{t('actions.title')}</h2>
-      <p class="text-sm subtitle mt-1">{t('actions.description')}</p>
-    </div>
-    <Button
-      variant="primary"
-      icon={Plus}
-      keyboardHint={getShortcutDisplay('actions', 'add')}
-      hotkeyConfig={{ key: toHotkeyString('actions', 'add') }}
-      onclick={handleCreate}
-    >
-      {t('actions.create')}
-    </Button>
-  </div>
+  <PageHeader
+    title={t('actions.title')}
+    subtitle={t('actions.description')}
+  >
+    {#snippet actions()}
+      <Button
+        variant="primary"
+        icon={Plus}
+        keyboardHint={getShortcutDisplay('actions', 'add')}
+        hotkeyConfig={{ key: toHotkeyString('actions', 'add') }}
+        onclick={handleCreate}
+      >
+        {t('actions.create')}
+      </Button>
+    {/snippet}
+  </PageHeader>
 
   {#if loading}
     <div class="flex items-center justify-center py-12">
@@ -206,14 +208,6 @@
 <style>
   .actions-manager {
     padding: 1.5rem;
-  }
-
-  .title {
-    color: var(--ds-text);
-  }
-
-  .subtitle {
-    color: var(--ds-text-subtle);
   }
 
   .empty-state {

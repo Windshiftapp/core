@@ -15,6 +15,7 @@
   import ViewHeader from '../../layout/ViewHeader.svelte';
   import ItemKey from '../items/ItemKey.svelte';
   import CollectionViewSwitcher from './CollectionViewSwitcher.svelte';
+  import Tooltip from '../../components/Tooltip.svelte';
   import { backlogStore, workspaceDataStore, statusTransitionStore } from '../../stores/index.js';
   import { useWorkItemPoller } from '../../composables/useWorkItemPoller.svelte.js';
 
@@ -585,7 +586,7 @@
           <div class="mb-4" style={styles.emptyStateStyle}>
             <Plus class="w-16 h-16 mx-auto" />
           </div>
-          <h3 class="text-lg font-medium mb-2" style={styles.textStyle}>{t('items.noItemsInFilter')}</h3>
+          <h3 class="text-lg font mb-2" style={styles.textStyle}>{t('items.noItemsInFilter')}</h3>
           <p class="text-sm mb-4" style={styles.subtleTextStyle}>
             {t('items.createToStart')}
           </p>
@@ -636,7 +637,8 @@
                       {@const itemStatus = statuses.find(s => s.name.toLowerCase().replace(/ /g, '_') === item.status)}
                       <!-- Item card with edge-based drop detection -->
                       <div
-                        class="relative border rounded px-3 py-3 shadow-sm hover:shadow-md transition-shadow"
+                        class="relative border rounded px-3 py-3 board-card"
+                        style:box-shadow="var(--ds-shadow-raised)"
                         style="{styles.cardStyle(4)}"
                         data-item-card
                         data-item-id={item.id}
@@ -650,22 +652,16 @@
                           <DropIndicator edge={dragState.get(item.id)?.closestEdge} />
                         {/if}
 
-                        <div class="flex gap-2">
-                          <!-- Drag handle -->
-                          <div class="cursor-grab active:cursor-grabbing flex-shrink-0" style={styles.dragHandleStyle}>
-                            <GripVertical class="w-4 h-4" />
-                          </div>
-
+                        <div class="cursor-grab active:cursor-grabbing">
                           <!-- Content -->
-                          <div class="flex-1 min-w-0">
+                          <div class="min-w-0">
                             <!-- Title - allows wrapping -->
-                            <h4 class="font-medium text-sm mb-2 leading-snug" style={styles.glassTextStyle}>
+                            <h4 class="text-sm mb-2 leading-snug" style={styles.glassTextStyle}>
                               {item.title}
                             </h4>
 
-                            <!-- Bottom row: Key, Icon, Priority -->
+                            <!-- Bottom row: Icon, Key, Status dot -->
                             <div class="flex items-center gap-2">
-                              <ItemKey {item} {workspace} className="text-xs font-mono flex-shrink-0" style="color: var(--ds-text-subtle);" />
                               {#if item.item_type_id && itemTypes.length > 0}
                                 {@const itemType = itemTypes.find(type => type.id === item.item_type_id)}
                                 {#if itemType}
@@ -677,6 +673,17 @@
                                     <svelte:component this={itemTypeIconMap[itemType.icon] || itemTypeIconMap.FileText} class="w-3 h-3" />
                                   </div>
                                 {/if}
+                              {/if}
+                              <ItemKey {item} {workspace} />
+                              <span class="flex-1"></span>
+                              {#if false && statuses.find(s => s.id === item.status_id)}
+                                {@const itemStatusObj = statuses.find(s => s.id === item.status_id)}
+                                <Tooltip content={itemStatusObj.name} placement="top">
+                                  <div
+                                    class="w-4 h-4 rounded flex-shrink-0"
+                                    style="background-color: {itemStatusObj.category_color};"
+                                  ></div>
+                                </Tooltip>
                               {/if}
                             </div>
                           </div>
@@ -696,7 +703,7 @@
             <button
               onclick={() => collectionStore.loadMoreItems()}
               disabled={collectionStore.itemsLoadingMore}
-              class="px-4 py-2 text-sm font-medium rounded-lg border transition-colors"
+              class="px-4 py-2 text-sm  rounded-lg border transition-colors"
               style="{styles.glassStyle?.(12) ?? ''} {styles.glassTextStyle ?? ''}"
             >
               {collectionStore.itemsLoadingMore ? t('common.loading') : t('common.loadMore')}
@@ -735,9 +742,12 @@
 {/if}
 
 <style>
-  /* Improve drag feedback without layout shifts */
-  [data-item-card]:hover {
-    transform: translateY(-1px);
+  /* Board card hover: uses !important to override inline background-color from cardStyle */
+  .board-card {
+    transition: background-color 140ms ease-in-out, box-shadow 140ms ease-in-out;
+  }
+  .board-card:hover {
+    background-color: var(--ds-surface-raised-hovered) !important;
   }
 
   /* During drag, reduce opacity of non-dragged items slightly */

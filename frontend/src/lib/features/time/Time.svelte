@@ -6,6 +6,7 @@
   import { User, Briefcase, Clock, BarChart3 } from 'lucide-svelte';
   import { currentRoute, navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import SidebarHeader from '../../layout/SidebarHeader.svelte';
 
   let activeTab = $state('time-entry');
 
@@ -42,10 +43,7 @@
   <!-- Left Sidebar -->
   <div class="w-64 border-r flex-shrink-0" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
     <div class="p-6">
-      <div class="mb-6">
-        <h1 class="text-xl font-semibold" style="color: var(--ds-text);">{t('time.title')}</h1>
-        <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">{t('time.subtitle')}</p>
-      </div>
+      <SidebarHeader title={t('time.title')} description={t('time.subtitle')} noBorder />
       
       <!-- Navigation -->
       <nav class="space-y-1">

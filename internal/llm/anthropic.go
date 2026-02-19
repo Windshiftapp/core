@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"windshift/internal/utils"
 )
 
 // anthropicClient implements Client for the Anthropic Messages API.
@@ -92,7 +94,7 @@ func newAnthropicClient(baseURL, model, apiKey string, timeout time.Duration) *a
 		endpoint: endpoint,
 		model:    model,
 		apiKey:   apiKey,
-		http:     &http.Client{Timeout: timeout},
+		http:     utils.NewSSRFSafeHTTPClient(timeout),
 	}
 }
 

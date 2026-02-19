@@ -52,7 +52,7 @@
                   <Lozenge color="gray" size="sm">{item.status_name}</Lozenge>
                 {/if}
               </div>
-              <p class="text-sm font-medium truncate" style="color: var(--ds-text);">{item.title}</p>
+              <p class="text-sm truncate" style="color: var(--ds-text);">{item.title}</p>
               {#if item.reason}
                 <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{item.reason}</p>
               {/if}

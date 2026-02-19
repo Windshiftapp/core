@@ -11,6 +11,7 @@
   import Label from '../../components/Label.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import { Plus, FolderOpen } from 'lucide-svelte';
+  import SidebarHeader from '../../layout/SidebarHeader.svelte';
 
   let { activeBucketId = null } = $props();
 
@@ -48,12 +49,7 @@
 <!-- Bucket Navigation Sidebar -->
 <div class="w-64 border-r flex flex-col p-6 flex-shrink-0" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
   <!-- Header -->
-  <div class="mb-6">
-    <div class="flex items-center gap-3 mb-2">
-      <h2 class="text-xl font-semibold" style="color: var(--ds-text);">{t('logbook.title')}</h2>
-    </div>
-    <p class="text-sm" style="color: var(--ds-text-subtle);">{t('logbook.subtitle')}</p>
-  </div>
+  <SidebarHeader title={t('logbook.title')} description={t('logbook.subtitle')} noBorder />
 
   <!-- Navigation -->
   <nav class="flex-1 space-y-1">

@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"windshift/internal/utils"
 )
 
 // openaiClient implements Client for OpenAI-compatible APIs (OpenAI, Z.AI, local).
@@ -35,7 +37,7 @@ func newOpenAIClient(baseURL, model, apiKey string, timeout time.Duration, chatP
 		chatPath: chatPath,
 		model:    model,
 		apiKey:   apiKey,
-		http:     &http.Client{Timeout: timeout},
+		http:     utils.NewSSRFSafeHTTPClient(timeout),
 	}
 }
 

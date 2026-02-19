@@ -17,6 +17,7 @@
   import {
     Plus, Upload, FileText, StickyNote, Mail, BookOpen, Trash2, ExternalLink
   } from 'lucide-svelte';
+  import PageHeader from '../../layout/PageHeader.svelte';
   import { formatDateShort } from '../../utils/dateFormatter.js';
   import LazyMilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
 
@@ -157,37 +158,31 @@
 
 <div class="p-6">
   <!-- Header -->
-  <div class="flex justify-between items-center mb-6">
-    <div>
-      <h1 class="text-xl font-semibold" style="color: var(--ds-text);">
-        {activeBucket ? activeBucket.name : t('logbook.allDocuments')}
-      </h1>
-      <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">
-        {logbookStore.totalDocuments} document{logbookStore.totalDocuments !== 1 ? 's' : ''}
-        {#if activeBucket?.description}
-          &middot; {activeBucket.description}
-        {/if}
-      </p>
-    </div>
-    {#if activeBucketId}
-      <div class="flex items-center gap-2">
-        <Button
-          variant="default"
-          icon={StickyNote}
-          onclick={() => { showNoteModal = true; }}
-        >
-          {t('logbook.newNote')}
-        </Button>
-        <Button
-          variant="primary"
-          icon={Upload}
-          onclick={() => { showUploadModal = true; }}
-        >
-          {t('logbook.uploadDocument')}
-        </Button>
-      </div>
-    {/if}
-  </div>
+  <PageHeader
+    title={activeBucket ? activeBucket.name : t('logbook.allDocuments')}
+    subtitle="{logbookStore.totalDocuments} document{logbookStore.totalDocuments !== 1 ? 's' : ''}{activeBucket?.description ? ` · ${activeBucket.description}` : ''}"
+  >
+    {#snippet actions()}
+      {#if activeBucketId}
+        <div class="flex items-center gap-2">
+          <Button
+            variant="default"
+            icon={StickyNote}
+            onclick={() => { showNoteModal = true; }}
+          >
+            {t('logbook.newNote')}
+          </Button>
+          <Button
+            variant="primary"
+            icon={Upload}
+            onclick={() => { showUploadModal = true; }}
+          >
+            {t('logbook.uploadDocument')}
+          </Button>
+        </div>
+      {/if}
+    {/snippet}
+  </PageHeader>
 
   <!-- Search -->
   <div class="mb-6">

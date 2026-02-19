@@ -346,12 +346,12 @@
 
                   <!-- Item Key -->
                   <div class="flex-shrink-0">
-                    <ItemKey item={result} workspace={result.workspace_key ? { key: result.workspace_key } : workspace} style="color: var(--ds-text-subtle);" />
+                    <ItemKey item={result} workspace={result.workspace_key ? { key: result.workspace_key } : workspace} />
                   </div>
 
                   <!-- Title -->
                   <div class="flex-1 min-w-0">
-                    <div class="text-sm font-medium truncate" style="color: var(--ds-text);">{result.title}</div>
+                    <div class="text-sm truncate" style="color: var(--ds-text);">{result.title}</div>
                   </div>
                 </div>
               </button>

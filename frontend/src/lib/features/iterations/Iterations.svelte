@@ -15,7 +15,7 @@
   import { currentRoute, navigate } from '../../router.js';
   import ColorDot from '../../components/ColorDot.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
-  import SectionHeader from '../../layout/SectionHeader.svelte';
+  import PageHeader from '../../layout/PageHeader.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import EmptyState from '../../components/EmptyState.svelte';
 
@@ -256,14 +256,13 @@
   <div class="flex-1">
     <div class="p-6">
       <!-- Header -->
-      <SectionHeader
+      <PageHeader
         title={t('iterations.title')}
         subtitle={isGlobalView
           ? (activeTypeId
               ? `Showing ${iterationTypes.find(type => type.id === parseInt(activeTypeId))?.name || 'filtered'} iterations`
               : t('iterations.subtitle'))
           : `${localIterations.length} ${t('sprints.local').toLowerCase()}, ${globalIterations.length} ${t('sprints.global').toLowerCase()}`}
-        class="mb-6"
       >
         {#snippet actions()}
           <Button
@@ -277,7 +276,7 @@
             {t('iterations.createIteration')}
           </Button>
         {/snippet}
-      </SectionHeader>
+      </PageHeader>
 
       {#snippet nameCell(item)}
         <span class="inline-block w-2 h-2 rounded-full {isActive(item) ? 'bg-green-500' : ''}" title={isActive(item) ? 'Currently active' : ''}></span>

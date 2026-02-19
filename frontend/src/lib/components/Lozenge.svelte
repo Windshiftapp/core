@@ -9,6 +9,7 @@
     rounded = 'rounded', // 'rounded' | 'rounded-md'
     size = 'sm', // 'sm' | 'md'
     icon = null, // Optional Lucide icon component
+    square = false, // Compact square indicator (no text)
     // Custom color props for dynamic colors (e.g., item type colors)
     customBg = null, // Hex color for background
     customBorder = null, // Hex color for border (defaults to customBg)
@@ -84,7 +85,7 @@
 </script>
 
 <span
-  class="inline-flex items-center gap-1 font-semibold border {rounded} {sizeClass}"
+  class="inline-flex items-center {square ? '' : 'gap-1'} font-semibold border {rounded} {square ? 'w-4 h-4 flex-shrink-0' : sizeClass}"
   style={computedStyle}
 >
   {#if icon}

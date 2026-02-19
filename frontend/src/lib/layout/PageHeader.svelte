@@ -6,8 +6,8 @@
     count = null, // Optional count to display (e.g., "12 items")
     textStyle = '',
     subtitleStyle = '',
-    children,
-    actions
+    children = null,
+    actions = null
   } = $props();
 </script>
 

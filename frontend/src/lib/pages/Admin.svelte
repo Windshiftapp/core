@@ -34,6 +34,7 @@
   import IframePluginLoader from '../services/IframePluginLoader.svelte';
   import PluginModalContainer from '../layout/PluginModalContainer.svelte';
   import LinkComponent from '../components/Link.svelte';
+  import SidebarHeader from '../layout/SidebarHeader.svelte';
   import {
     Settings, UserStar, Layout, Database, GitBranch,
     Workflow, Package, Link, Paperclip, Puzzle,
@@ -328,10 +329,7 @@
   <!-- Left Sidebar -->
   <div class="w-64 border-r flex-shrink-0" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
     <div class="p-6">
-      <div class="mb-6">
-        <h1 class="text-xl font-semibold" style="color: var(--ds-text);">{t('settings.admin')}</h1>
-        <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">{t('settings.systemSettings')}</p>
-      </div>
+      <SidebarHeader title={t('settings.admin')} description={t('settings.systemSettings')} noBorder />
       
       <!-- Search -->
       <div class="mb-4 relative">

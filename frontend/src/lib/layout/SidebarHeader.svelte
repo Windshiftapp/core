@@ -3,11 +3,12 @@
     title,
     description = '',
     icon = null,
+    noBorder = false,
     class: className = ''
   } = $props();
 </script>
 
-<div class="px-4 py-5 border-b {className}" style="border-color: var(--ds-border);">
+<div class="{noBorder ? 'mb-6' : 'px-4 py-5 border-b'} {className}" style="{noBorder ? '' : 'border-color: var(--ds-border);'}">
   <div class="flex items-center gap-3">
     {#if icon}
       <svelte:component this={icon} class="w-8 h-8 flex-shrink-0" style="color: var(--ds-interactive);" />

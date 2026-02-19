@@ -1,8 +1,8 @@
 <script>
   import { createEventDispatcher } from 'svelte';  // Keep for backward compatibility
-  import { fade } from 'svelte/transition';
   import { AlertTriangle, X, Trash2, Check } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
+  import ModalBackdrop from '../components/ModalBackdrop.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { getShortcut, matchesShortcut } from '../utils/keyboardShortcuts.js';
 
@@ -20,30 +20,7 @@
     oncancel = null
   } = $props();
 
-  // Get shortcut configurations
   const submitShortcut = getShortcut('modal', 'submit');
-  const cancelShortcut = getShortcut('modal', 'cancel');
-
-  // Focus management
-  let backdropRef = $state(null);
-  let previouslyFocusedElement = null;
-
-  // Store previously focused element when show becomes true
-  $effect(() => {
-    if (show && !previouslyFocusedElement) {
-      previouslyFocusedElement = document.activeElement;
-    }
-    if (!show && previouslyFocusedElement) {
-      // Restore focus when modal closes
-      previouslyFocusedElement?.focus();
-      previouslyFocusedElement = null;
-    }
-  });
-
-  // Focus backdrop after intro transition completes
-  function handleIntroEnd() {
-    backdropRef?.focus();
-  }
 
   // Use translations for defaults
   const resolvedTitle = $derived(title ?? t('common.areYouSure'));
@@ -51,13 +28,9 @@
   const resolvedConfirmText = $derived(confirmText ?? t('common.confirm'));
   const resolvedCancelText = $derived(cancelText ?? t('common.cancel'));
 
-  // Handle keyboard navigation using standard shortcuts
+  // Handle keyboard navigation for submit shortcuts
   function handleKeydown(event) {
-    // Check for cancel shortcut (Escape)
-    if (matchesShortcut(event, cancelShortcut)) {
-      cancel();
-      return;
-    }
+    if (!show) return;
 
     // Check for submit shortcut (Cmd/Ctrl+Enter)
     if (matchesShortcut(event, submitShortcut)) {
@@ -89,13 +62,6 @@
     show = false;
   }
 
-  // Click outside to close
-  function handleBackdropClick(event) {
-    if (event.target === event.currentTarget) {
-      cancel();
-    }
-  }
-
   // Get styles based on variant
   function getVariantStyles(variant) {
     switch (variant) {
@@ -125,21 +91,9 @@
   let styles = $derived(getVariantStyles(variant));
 </script>
 
-{#if show}
-  <!-- Modal backdrop -->
-  <div
-    bind:this={backdropRef}
-    transition:fade={{ duration: 150 }}
-    onintroend={handleIntroEnd}
-    class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 focus:outline-none"
-    onclick={handleBackdropClick}
-    onkeydown={handleKeydown}
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="dialog-title"
-    aria-describedby="dialog-description"
-    tabindex="-1"
-  >
+<svelte:window onkeydown={handleKeydown} />
+
+<ModalBackdrop bind:show onclose={cancel} ariaLabelledBy="dialog-title">
     <!-- Modal content -->
     <div
       class="bg-white rounded shadow-xl max-w-md w-full transform transition-all"
@@ -206,15 +160,9 @@
         </Button>
       </div>
     </div>
-  </div>
-{/if}
+</ModalBackdrop>
 
 <style>
-  .modal-backdrop {
-    background-color: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(2px);
-  }
-
   /* Custom button styling for different variants */
   :global(.confirm-button-danger) {
     background-color: var(--ds-background-danger-bold) !important;
