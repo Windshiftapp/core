@@ -1,7 +1,6 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { useEventListener } from 'runed';
-  import { fade } from 'svelte/transition';
   import { navigate, currentRoute } from '../router.js';
   import { milestonesStore } from '../stores/milestones.js';
   import { workspacesStore, shouldNavigateAfterCreate, workItemFormStore } from '../stores';
@@ -9,6 +8,7 @@
   import { X, Target, Building, FolderOpen, ChevronRight, FileText } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
   import Button from '../components/Button.svelte';
+  import ModalBackdrop from '../components/ModalBackdrop.svelte';
   import CompactWorkspaceSelector from '../pickers/CompactWorkspaceSelector.svelte';
   import FieldChip from '../components/FieldChip.svelte';
   import { getShortcut, matchesShortcut, getDisplayString } from '../utils/keyboardShortcuts.js';
@@ -46,9 +46,7 @@
 
   const dispatch = createEventDispatcher();
 
-  // Get shortcut configurations
   const submitShortcut = getShortcut('modal', 'submit');
-  const cancelShortcut = getShortcut('modal', 'cancel');
 
   let {
     isOpen = $bindable(false),
@@ -230,16 +228,8 @@
     }
   }
 
-  function handleBackdropClick(e) {
-    if (e.target === e.currentTarget) {
-      close();
-    }
-  }
-
   function handleKeydown(e) {
-    if (matchesShortcut(e, cancelShortcut)) {
-      close();
-    }
+    if (!isOpen) return;
     if (matchesShortcut(e, submitShortcut)) {
       e.preventDefault();
       if (isFormValid) {
@@ -340,18 +330,9 @@
   useEventListener(() => window, 'set-create-parent', handleSetCreateParent);
 </script>
 
-{#if isOpen}
-  <!-- Backdrop -->
-  <div
-    transition:fade={{ duration: 150 }}
-    class="fixed inset-0 flex items-start justify-center pt-16 overflow-y-auto z-50"
-    style="background-color: rgba(0, 0, 0, 0.4); backdrop-filter: blur(2px);"
-    tabindex="-1"
-    onclick={handleBackdropClick}
-    onkeydown={handleKeydown}
-    role="dialog"
-    aria-modal="true"
-  >
+<svelte:window onkeydown={handleKeydown} />
+
+<ModalBackdrop bind:show={isOpen} opacity={0.4} align="top" paddingTop="pt-16" scrollable onclose={close}>
     <!-- Modal -->
     <div class="rounded-xl shadow-2xl w-full max-w-lg mx-4 mb-8 flex flex-col" style="background-color: var(--ds-surface-raised);">
       <!-- Compact Header -->
@@ -468,5 +449,4 @@
         </Button>
       </div>
     </div>
-  </div>
-{/if}
+</ModalBackdrop>

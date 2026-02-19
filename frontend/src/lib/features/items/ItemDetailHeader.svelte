@@ -87,7 +87,7 @@
 
         <button
           onclick={startEditingTitle}
-          class="text-2xl font-medium pr-4 py-1 rounded transition-colors text-left cursor-pointer w-full title-button break-words"
+          class="text-2xl pr-4 py-1 rounded transition-colors text-left cursor-pointer w-full title-button break-words"
           style="color: var(--ds-text); word-wrap: break-word; overflow-wrap: break-word;"
           title={t('items.clickToEditTitle')}
         >

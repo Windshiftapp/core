@@ -102,14 +102,11 @@
     <div class="flex flex-col gap-2">
       {#each tasks as task}
         <a
-          class="flex items-center justify-between gap-4 rounded-xl border px-4 py-3 transition hover:-translate-y-px hover:shadow-sm"
-          style="border-color: var(--ds-border);"
+          class="task-card flex items-center justify-between gap-4 rounded-xl border px-4 py-3"
           href={`/workspaces/${task.workspace_id}/items/${task.id}`}
-          onmouseenter={(e) => e.currentTarget.style.borderColor = 'var(--ds-border-focused)'}
-          onmouseleave={(e) => e.currentTarget.style.borderColor = 'var(--ds-border)'}
         >
           <div class="min-w-0 flex-1">
-            <p class="truncate text-sm font-semibold" style="color: var(--ds-text);">{task.title}</p>
+            <p class="truncate text-sm" style="color: var(--ds-text);">{task.title}</p>
             <p class="mt-0.5 flex items-center gap-1 text-xs" style="color: var(--ds-text-subtle);">
               <span>{task.workspace_key}-{task.workspace_item_number}</span>
               {#if task.status_name}
@@ -133,3 +130,15 @@
     </div>
   {/snippet}
 </WidgetState>
+
+<style>
+  .task-card {
+    box-shadow: var(--ds-shadow-raised);
+    border-color: transparent;
+    transition: background-color 140ms ease-in-out, box-shadow 140ms ease-in-out;
+  }
+
+  .task-card:hover {
+    background-color: var(--ds-surface-raised-hovered) !important;
+  }
+</style>

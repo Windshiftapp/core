@@ -21,7 +21,7 @@
   import WorkspacePicker from '../pickers/WorkspacePicker.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
-  import SectionHeader from '../layout/SectionHeader.svelte';
+  import PageHeader from '../layout/PageHeader.svelte';
   import Card from '../components/Card.svelte';
 
   // Workspace access options
@@ -441,14 +441,14 @@
 
 <div class="space-y-6">
   <!-- Header -->
-  <SectionHeader title={t('settings.scmProviders.title')} subtitle={t('settings.scmProviders.subtitle')}>
+  <PageHeader title={t('settings.scmProviders.title')} subtitle={t('settings.scmProviders.subtitle')} icon={GitBranch}>
     {#snippet actions()}
       <Button variant="primary" onclick={openCreateModal} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('scmProviders', 'addProvider'), guard: () => !showCreateModal && !showEditModal && !showDeleteModal }}>
         <Plus class="w-4 h-4 mr-2" />
         {t('settings.scmProviders.addProvider')}
       </Button>
     {/snippet}
-  </SectionHeader>
+  </PageHeader>
 
   <!-- OAuth Status Messages -->
   {#if oauthStatus}

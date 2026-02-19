@@ -1,8 +1,9 @@
 <script>
   import { X } from 'lucide-svelte';
-  import { fade, scale } from 'svelte/transition';
+  import { scale } from 'svelte/transition';
   import { backOut } from 'svelte/easing';
   import Spinner from '../components/Spinner.svelte';
+  import ModalBackdrop from '../components/ModalBackdrop.svelte';
 
   let {
     show = $bindable(false),
@@ -18,32 +19,9 @@
     show = false;
     onclose?.();
   }
-
-  function handleBackdropClick(e) {
-    if (e.target === e.currentTarget) {
-      close();
-    }
-  }
-
-  function handleKeydown(e) {
-    if (e.key === 'Escape') {
-      close();
-    }
-  }
 </script>
 
-{#if show}
-  <div
-    transition:fade={{ duration: 150 }}
-    class="fixed inset-0 flex items-start justify-center pt-8 overflow-y-auto z-50"
-    style="background-color: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px);"
-    tabindex="-1"
-    onclick={handleBackdropClick}
-    onkeydown={handleKeydown}
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="ai-modal-title"
-  >
+<ModalBackdrop bind:show opacity={0.4} blur={4} align="top" paddingTop="pt-8" scrollable onclose={close} ariaLabelledBy="ai-modal-title">
     <div
       transition:scale={{ duration: 200, start: 0.95, easing: backOut }}
       class="relative rounded-xl overflow-hidden max-w-2xl w-full mx-4 mb-8"
@@ -98,5 +76,4 @@
         </button>
       </div>
     </div>
-  </div>
-{/if}
+</ModalBackdrop>

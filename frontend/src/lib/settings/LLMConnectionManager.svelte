@@ -5,6 +5,7 @@
     Plus, Edit, Trash2, X, TestTube, CheckCircle, XCircle, Power, PowerOff, Star
   } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
+  import PageHeader from '../layout/PageHeader.svelte';
   import Modal from '../dialogs/Modal.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import Spinner from '../components/Spinner.svelte';
@@ -179,15 +180,13 @@
 </script>
 
 <div class="space-y-4">
-  <div class="flex items-center justify-between">
-    <div>
-      <h2 class="text-lg font-semibold" style="color: var(--ds-text);">AI Connections</h2>
-      <p class="text-sm" style="color: var(--ds-text-subtle);">Configure AI model providers for intelligent features</p>
-    </div>
-    <Button variant="primary" onclick={openCreate} icon={Plus}>
-      Add Connection
-    </Button>
-  </div>
+  <PageHeader title="AI Connections" subtitle="Configure AI model providers for intelligent features">
+    {#snippet actions()}
+      <Button variant="primary" onclick={openCreate} icon={Plus}>
+        Add Connection
+      </Button>
+    {/snippet}
+  </PageHeader>
 
   {#if loading}
     <div class="flex items-center justify-center py-12">
@@ -425,7 +424,7 @@
       <input
         type="text"
         bind:value={form.base_url}
-        placeholder="e.g. http://localhost:8081"
+        placeholder="e.g. https://llm.example.com"
         class="w-full px-3 py-2 text-sm rounded-md border"
         style="border-color: var(--ds-border); background: var(--ds-surface); color: var(--ds-text);"
       />

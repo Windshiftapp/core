@@ -10,6 +10,7 @@
   import SearchInput from '../components/SearchInput.svelte';
   import Card from '../components/Card.svelte';
   import { slide } from 'svelte/transition';
+  import PageHeader from '../layout/PageHeader.svelte';
 
   let filteredNotifications = [];
   let unreadCount = 0;
@@ -129,36 +130,30 @@
   <!-- Content Container -->
   <div class="p-6">
     <!-- Header -->
-    <div class="mb-6 flex items-start justify-between">
-      <div>
-        <h1 class="text-2xl font-bold mb-2" style="color: var(--ds-text);">
-          {t('notifications.title')}
-        </h1>
-        <p class="text-base" style="color: var(--ds-text-subtle);">
-          {t('notifications.subtitle')}
-          {#if unreadCount > 0}
-            • <span class="font-medium text-blue-600">{unreadCount} unread</span>
-          {/if}
-        </p>
-      </div>
-      <div class="flex items-center gap-2">
-        <Button
-          onclick={toggleFilters}
-          variant="secondary"
-          size="sm"
-        >
-          <Filter class="w-4 h-4 mr-2" />
-          Filters
-        </Button>
-        <DropdownMenu
-          triggerText=""
-          triggerIcon={MoreHorizontal}
-          triggerClass="p-2 rounded hover-bg transition-colors"
-          items={buildActionItems()}
-          placement="bottom-end"
-        />
-      </div>
-    </div>
+    <PageHeader
+      title={t('notifications.title')}
+      subtitle={unreadCount > 0 ? `${t('notifications.subtitle')} • ${unreadCount} unread` : t('notifications.subtitle')}
+    >
+      {#snippet actions()}
+        <div class="flex items-center gap-2">
+          <Button
+            onclick={toggleFilters}
+            variant="secondary"
+            size="sm"
+          >
+            <Filter class="w-4 h-4 mr-2" />
+            Filters
+          </Button>
+          <DropdownMenu
+            triggerText=""
+            triggerIcon={MoreHorizontal}
+            triggerClass="p-2 rounded hover-bg transition-colors"
+            items={buildActionItems()}
+            placement="bottom-end"
+          />
+        </div>
+      {/snippet}
+    </PageHeader>
 
     <!-- Filters Section -->
     {#if showFilters}

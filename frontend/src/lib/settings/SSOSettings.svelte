@@ -20,6 +20,7 @@
   import Label from '../components/Label.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import PageHeader from '../layout/PageHeader.svelte';
 
   let providers = $state([]);
   let loading = $state(true);
@@ -249,23 +250,16 @@
 
 <div class="space-y-6">
   <!-- Header -->
-  <div class="flex items-center justify-between">
-    <div>
-      <Text as="h2" size="lg" weight="semibold" class="flex items-center gap-2">
-        <KeyRound class="w-5 h-5" style="color: var(--ds-icon-subtle);" />
-        {t('settings.sso.title')}
-      </Text>
-      <Text as="p" size="sm" variant="subtle" class="mt-1">
-        {t('settings.sso.subtitle')}
-      </Text>
-    </div>
-    {#if providers.length === 0}
-      <Button variant="primary" onclick={openCreateModal} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('sso', 'addProvider'), guard: () => !showCreateModal && !showEditModal && !showDeleteModal }}>
-        <Plus class="w-4 h-4 mr-2" />
-        {t('settings.sso.addProvider')}
-      </Button>
-    {/if}
-  </div>
+  <PageHeader title={t('settings.sso.title')} subtitle={t('settings.sso.subtitle')} icon={KeyRound}>
+    {#snippet actions()}
+      {#if providers.length === 0}
+        <Button variant="primary" onclick={openCreateModal} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('sso', 'addProvider'), guard: () => !showCreateModal && !showEditModal && !showDeleteModal }}>
+          <Plus class="w-4 h-4 mr-2" />
+          {t('settings.sso.addProvider')}
+        </Button>
+      {/if}
+    {/snippet}
+  </PageHeader>
 
   <!-- Error Message -->
   {#if error}

@@ -140,7 +140,7 @@
                   <svelte:component this={getNotificationIcon(notification.type)} class="w-4 h-4" style="color: var(--ds-text-subtle);" />
                 </div>
                 <div class="flex-1 min-w-0">
-                  <p class="text-base font-medium mb-1" style="color: var(--ds-text);">{notification.title}</p>
+                  <p class="text-base mb-1" style="color: var(--ds-text);">{notification.title}</p>
                   <p class="text-sm mb-2" style="color: var(--ds-text-subtle);">{notification.message}</p>
                   <p class="text-xs" style="color: var(--ds-text-subtle);">{formatRelativeTime(notification.timestamp)}</p>
                 </div>
@@ -297,7 +297,7 @@
                       {#if milestone.category_color}
                         <ColorDot color={milestone.category_color} />
                       {/if}
-                      <h3 class="text-sm font-medium truncate" style="color: var(--ds-text);">{milestone.milestone_name}</h3>
+                      <h3 class="text-sm truncate" style="color: var(--ds-text);">{milestone.milestone_name}</h3>
                     </div>
                     <p class="text-xs" style="color: var(--ds-text-subtle);">
                       {#if milestone.target_date}
@@ -354,7 +354,7 @@
                       </span>
                     {/if}
                   </div>
-                  <h4 class="text-sm font-medium mb-1" style="color: var(--ds-text);">{item.title}</h4>
+                  <h4 class="text-sm mb-1" style="color: var(--ds-text);">{item.title}</h4>
                   <div class="flex items-center justify-between text-xs" style="color: var(--ds-text-subtle);">
                     <span>{item.status}</span>
                     <span>{formatRelativeTime(item.last_activity)}</span>
@@ -392,7 +392,7 @@
                         <svelte:component this={workspaceIconMap[workspace.icon] || Grip} size={14} color="white" />
                       </div>
                       <div>
-                        <h3 class="text-sm font-medium" style="color: var(--ds-text);">
+                        <h3 class="text-sm" style="color: var(--ds-text);">
                           {workspace.workspace_name}
                         </h3>
                         <p class="text-xs" style="color: var(--ds-text-subtle);">

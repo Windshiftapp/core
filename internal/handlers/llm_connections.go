@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"windshift/internal/llm"
+	"windshift/internal/utils"
 )
 
 // LLMConnectionHandler handles admin CRUD for LLM connections and user queries.
@@ -56,6 +57,12 @@ func (h *LLMConnectionHandler) CreateConnection(w http.ResponseWriter, r *http.R
 		respondBadRequest(w, r, "name, provider_type, and model are required")
 		return
 	}
+	if req.BaseURL != "" {
+		if err := utils.ValidateExternalURL(req.BaseURL); err != nil {
+			respondBadRequest(w, r, "invalid base URL: "+err.Error())
+			return
+		}
+	}
 
 	conn, err := h.manager.CreateConnection(req)
 	if err != nil {
@@ -80,6 +87,12 @@ func (h *LLMConnectionHandler) UpdateConnection(w http.ResponseWriter, r *http.R
 	if req.Name == "" || req.ProviderType == "" || req.Model == "" {
 		respondBadRequest(w, r, "name, provider_type, and model are required")
 		return
+	}
+	if req.BaseURL != "" {
+		if err := utils.ValidateExternalURL(req.BaseURL); err != nil {
+			respondBadRequest(w, r, "invalid base URL: "+err.Error())
+			return
+		}
 	}
 
 	conn, err := h.manager.UpdateConnection(id, req)

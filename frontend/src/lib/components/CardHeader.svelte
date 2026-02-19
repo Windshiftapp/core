@@ -29,7 +29,7 @@
       <svelte:component this={icon} class="{iconSizeClasses[size]} flex-shrink-0" style="color: var(--ds-icon);" />
     {/if}
     <div class="min-w-0">
-      <h3 class="{sizeClasses[size]} font-medium truncate" style="color: var(--ds-text);">
+      <h3 class="{sizeClasses[size]} truncate" style="color: var(--ds-text);">
         {title}
       </h3>
       {#if subtitle}

@@ -16,6 +16,7 @@
   import LogoUploader from '../components/LogoUploader.svelte';
   import Label from '../components/Label.svelte';
   import { portalStore, gradients, iconMap } from '../stores/portal.svelte.js';
+  import ModalBackdrop from '../components/ModalBackdrop.svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
 
@@ -194,12 +195,13 @@
 </script>
 
 <!-- Customization Panel Overlay (hide when editing request types so sections are visible) -->
-{#if portalStore.showCustomizePanel && portalStore.activeSection !== 'request-types'}
-  <div
-    class="fixed inset-0 bg-black/30 z-50 transition-opacity"
-    onclick={() => portalStore.showCustomizePanel = false}
-  ></div>
-{/if}
+<ModalBackdrop
+  show={portalStore.showCustomizePanel && portalStore.activeSection !== 'request-types'}
+  opacity={0.3}
+  blur={0}
+  align="none"
+  onclose={() => portalStore.showCustomizePanel = false}
+/>
 
 <!-- Customization Panel - Slides from Left -->
 <div

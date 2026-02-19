@@ -1,7 +1,7 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { createCombobox, melt } from '@melt-ui/svelte';
-  import { fade, scale } from 'svelte/transition';
+  import { scale } from 'svelte/transition';
   import { backOut } from 'svelte/easing';
   import { navigate, currentRoute } from '../router.js';
   import { api } from '../api.js';
@@ -9,6 +9,7 @@
   import { isSystemAdmin } from '../stores';
   import { timerStore } from '../stores/timerStore.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import ModalBackdrop from '../components/ModalBackdrop.svelte';
 
   const dispatch = createEventDispatcher();
   
@@ -454,11 +455,10 @@
     dispatch('close');
   }
   
-  // Handle keyboard interactions
+  // Handle keyboard interactions (Escape handled by ModalBackdrop)
   function handleKeydown(e) {
-    if (e.key === 'Escape') {
-      close();
-    } else if (e.key === 'Enter' && $selected) {
+    if (!isOpen) return;
+    if (e.key === 'Enter' && $selected) {
       e.preventDefault();
       const command = commands.find(cmd => cmd.id === $selected.value);
       if (command) {
@@ -466,13 +466,6 @@
       }
     } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       userInteracted = true;
-    }
-  }
-  
-  // Handle click outside
-  function handleBackdropClick(e) {
-    if (e.target === e.currentTarget) {
-      close();
     }
   }
   
@@ -542,18 +535,9 @@
   }
 </style>
 
-{#if isOpen}
-  <!-- Backdrop with enhanced blur -->
-  <div
-    transition:fade={{ duration: 150 }}
-    class="fixed inset-0 flex items-start justify-center pt-[20vh] z-[60]"
-    style="background-color: rgba(0, 0, 0, 0.4); backdrop-filter: blur(8px) saturate(120%);"
-    tabindex="-1"
-    onclick={handleBackdropClick}
-    onkeydown={handleKeydown}
-    role="dialog"
-    aria-modal="true"
-  >
+<svelte:window on:keydown={handleKeydown} />
+
+<ModalBackdrop bind:show={isOpen} opacity={0.4} blur={8} extraFilter="saturate(120%)" zIndex={60} align="top" paddingTop="pt-[20vh]" onclose={close}>
     <!-- Input Container with scale entrance -->
     <div
       class="relative w-full max-w-2xl mx-4"
@@ -643,5 +627,4 @@
         {/if}
       </div>
     </div>
-  </div>
-{/if}
+</ModalBackdrop>

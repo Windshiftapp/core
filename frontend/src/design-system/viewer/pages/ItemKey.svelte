@@ -6,6 +6,8 @@
   <h1 class="text-2xl font-bold mb-2" style="color: var(--ds-text);">ItemKey</h1>
   <p class="mb-8" style="color: var(--ds-text-subtle);">
     Standard display component for work item keys. Shows the workspace key with the item number in a consistent format.
+    Styling is baked in: <code>text-xs font-mono</code> with <code>var(--ds-text-subtle)</code> color by default.
+    Interactive variants (href or onClick) automatically add <code>hover:underline cursor-pointer</code>.
   </p>
 
   <!-- Basic Usage -->
@@ -43,42 +45,52 @@
   <section class="mb-10">
     <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">As Link</h2>
     <p class="mb-4 text-sm" style="color: var(--ds-text-subtle);">
-      When <code>href</code> is provided, renders as a clickable link.
+      When <code>href</code> is provided, renders as a clickable link with hover:underline.
     </p>
     <div class="flex items-center gap-4">
       <ItemKey
         item={{ workspace_item_number: 42 }}
         workspace={{ key: 'PROJ' }}
         href="#/workspace/PROJ/item/42"
-        className="text-xs font-mono text-blue-600 hover:underline"
       />
       <ItemKey
         item={{ workspace_item_number: 123 }}
         workspace={{ key: 'WIND' }}
         href="#/workspace/WIND/item/123"
-        className="text-xs font-mono text-blue-600 hover:underline"
       />
     </div>
   </section>
 
-  <!-- Custom Styling -->
+  <!-- With onClick (Button) -->
   <section class="mb-10">
-    <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">Custom Styling</h2>
-    <div class="flex items-center gap-4">
+    <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">With onClick (Button)</h2>
+    <p class="mb-4 text-sm" style="color: var(--ds-text-subtle);">
+      When <code>onClick</code> is provided without <code>href</code>, renders as a <code>&lt;button&gt;</code> with hover:underline.
+    </p>
+    <ItemKey
+      item={{ workspace_item_number: 42 }}
+      workspace={{ key: 'PROJ' }}
+      onClick={() => alert('Clicked PROJ-42')}
+    />
+  </section>
+
+  <!-- Custom Style Override -->
+  <section class="mb-10">
+    <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">Custom Style Override</h2>
+    <p class="mb-4 text-sm" style="color: var(--ds-text-subtle);">
+      Use the <code>style</code> prop to override the default color (e.g. for gradient backgrounds).
+    </p>
+    <div class="flex items-center gap-4 p-4 rounded-lg" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
       <ItemKey
         item={{ workspace_item_number: 42 }}
         workspace={{ key: 'PROJ' }}
-        className="text-sm font-mono text-gray-900 font-semibold"
+        style="color: rgba(255,255,255,0.7);"
       />
       <ItemKey
-        item={{ workspace_item_number: 42 }}
-        workspace={{ key: 'PROJ' }}
-        className="text-xs font-mono bg-gray-100 px-2 py-1 rounded"
-      />
-      <ItemKey
-        item={{ workspace_item_number: 42 }}
-        workspace={{ key: 'PROJ' }}
-        className="text-xs font-mono bg-blue-100 text-blue-800 px-2 py-1 rounded"
+        item={{ workspace_item_number: 123 }}
+        workspace={{ key: 'WIND' }}
+        href="#"
+        style="color: rgba(255,255,255,0.7);"
       />
     </div>
   </section>
@@ -99,30 +111,11 @@
           <ItemKey
             item={{ workspace_item_number: item.number }}
             workspace={{ key: 'PROJ' }}
-            className="text-xs font-mono text-gray-500"
           />
           <span class="text-sm" style="color: var(--ds-text);">{item.title}</span>
         </div>
       {/each}
     </div>
-  </section>
-
-  <!-- With Click Handler -->
-  <section class="mb-10">
-    <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">With Click Handler</h2>
-    <p class="mb-4 text-sm" style="color: var(--ds-text-subtle);">
-      Use <code>onClick</code> for custom behavior like opening a modal while preserving link benefits.
-    </p>
-    <ItemKey
-      item={{ workspace_item_number: 42 }}
-      workspace={{ key: 'PROJ' }}
-      href="#/item/42"
-      onClick={(e) => {
-        e.preventDefault()
-        alert('Would open item modal for PROJ-42')
-      }}
-      className="text-xs font-mono text-blue-600 hover:underline cursor-pointer"
-    />
   </section>
 
   <!-- Props Reference -->
@@ -162,9 +155,9 @@
             <td class="p-2">null</td>
           </tr>
           <tr>
-            <td class="p-2"><code>className</code></td>
+            <td class="p-2"><code>style</code></td>
             <td class="p-2">string</td>
-            <td class="p-2">'text-xs font-mono text-gray-500'</td>
+            <td class="p-2">"color: var(--ds-text-subtle);"</td>
           </tr>
         </tbody>
       </table>

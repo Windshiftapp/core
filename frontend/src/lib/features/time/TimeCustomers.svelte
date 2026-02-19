@@ -11,6 +11,7 @@
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { Plus, Trash2, Edit, Users } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import PageHeader from '../../layout/PageHeader.svelte';
   import { confirm } from '../../composables/useConfirm.js';
 
   let customers = $state([]);
@@ -155,13 +156,11 @@
 </script>
 
 <!-- Header -->
-<div class="mb-6 flex justify-between items-start">
-  <div>
-    <Text as="h2" size="lg" weight="semibold">{t('time.organizations.title')}</Text>
-    <Text as="div" size="xs" variant="subtle" class="mt-1">
-      {t('time.organizations.subtitle')}
-    </Text>
-  </div>
+<PageHeader
+  title={t('time.organizations.title')}
+  subtitle={t('time.organizations.subtitle')}
+>
+  {#snippet actions()}
     <Button
       variant="primary"
       onclick={startCreate}
@@ -172,7 +171,8 @@
     >
       {t('time.organizations.addOrganization')}
     </Button>
-  </div>
+  {/snippet}
+</PageHeader>
 
 <!-- Customer Modal -->
 <TimeCustomerModal

@@ -1,8 +1,8 @@
 <script>
   import { createEventDispatcher } from 'svelte';
-  import { fade } from 'svelte/transition';
   import { AlertTriangle, X, Trash2, Users } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
+  import ModalBackdrop from '../components/ModalBackdrop.svelte';
   import Spinner from '../components/Spinner.svelte';
   import ItemPicker from '../pickers/ItemPicker.svelte';
   import { t } from '../stores/i18n.svelte.js';
@@ -155,31 +155,10 @@
     show = false;
   }
 
-  function handleBackdropClick(event) {
-    if (event.target === event.currentTarget && !loading) {
-      handleCancel();
-    }
-  }
 
-  function handleKeydown(event) {
-    if (event.key === 'Escape' && show && !loading) {
-      handleCancel();
-    }
-  }
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
-{#if show}
-  <div
-    transition:fade={{ duration: 150 }}
-    class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
-    onclick={handleBackdropClick}
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="dialog-title"
-    tabindex="-1"
-  >
+<ModalBackdrop bind:show closeOnClick={!loading} closeOnEscape={!loading} onclose={handleCancel} ariaLabelledBy="dialog-title">
     <div
       class="bg-white rounded-xl shadow-xl max-w-md w-full transform transition-all"
       style="background-color: var(--ds-surface-raised);"
@@ -380,12 +359,4 @@
         {/if}
       </div>
     </div>
-  </div>
-{/if}
-
-<style>
-  .modal-backdrop {
-    background-color: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(2px);
-  }
-</style>
+</ModalBackdrop>

@@ -21,6 +21,7 @@
   import TextField from '../components/TextField.svelte';
   import Card from '../components/Card.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import PageHeader from '../layout/PageHeader.svelte';
 
   // State
   let customerOrganisations = $state([]);
@@ -397,42 +398,37 @@
       </div>
     {:else}
       <!-- Header -->
-      <div class="flex justify-between items-start mb-6">
-        <div class="flex items-center gap-4">
-          {#if selectedOrgId !== null}
-            {@const selectedOrg = customerOrganisations.find(o => o.id === selectedOrgId)}
-            {#if selectedOrg}
-              <Avatar
-                src={selectedOrg.avatar_url}
-                name={selectedOrg.name}
-                size="lg"
-                variant="blue"
-                rounded="md"
-              />
-            {/if}
+      <div class="flex items-center gap-4">
+        {#if selectedOrgId !== null}
+          {@const selectedOrg = customerOrganisations.find(o => o.id === selectedOrgId)}
+          {#if selectedOrg}
+            <Avatar
+              src={selectedOrg.avatar_url}
+              name={selectedOrg.name}
+              size="lg"
+              variant="blue"
+              rounded="md"
+            />
           {/if}
-          <div>
-            <h1 class="text-xl font-semibold" style="color: var(--ds-text);">
-              {#if selectedOrgId === null}
-                {t('workspaces.customers.unassignedCustomers')}
-              {:else}
-                {customerOrganisations.find(o => o.id === selectedOrgId)?.name || t('workspaces.customers.title')}
-              {/if}
-            </h1>
-            <p class="text-sm" style="color: var(--ds-text-subtle);">
-              {t('workspaces.customers.customerCount', { count: filteredCustomers.length })}
-            </p>
-          </div>
+        {/if}
+        <div class="flex-1">
+          <PageHeader
+            title={selectedOrgId === null ? t('workspaces.customers.unassignedCustomers') : (customerOrganisations.find(o => o.id === selectedOrgId)?.name || t('workspaces.customers.title'))}
+            subtitle={t('workspaces.customers.customerCount', { count: filteredCustomers.length })}
+          >
+            {#snippet actions()}
+              <Button
+                variant="primary"
+                icon={Plus}
+                onclick={startCreate}
+                keyboardHint="A"
+                hotkeyConfig={{ key: toHotkeyString('customers', 'add'), guard: () => !showCreateModal }}
+              >
+                {t('workspaces.customers.addCustomer')}
+              </Button>
+            {/snippet}
+          </PageHeader>
         </div>
-        <Button
-          variant="primary"
-          icon={Plus}
-          onclick={startCreate}
-          keyboardHint="A"
-          hotkeyConfig={{ key: toHotkeyString('customers', 'add'), guard: () => !showCreateModal }}
-        >
-          {t('workspaces.customers.addCustomer')}
-        </Button>
       </div>
 
       <!-- Customer Search -->

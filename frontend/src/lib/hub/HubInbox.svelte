@@ -4,6 +4,7 @@
   import { hubStore, gradients } from '../stores/hub.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import Spinner from '../components/Spinner.svelte';
+  import PageHeader from '../layout/PageHeader.svelte';
 
   // Format date for display
   function formatDate(dateStr) {
@@ -39,50 +40,37 @@
 
 <div>
   <!-- Inbox Header -->
-  <div class="flex items-center justify-between mb-4">
-    <div class="flex items-center gap-2">
-      <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background-color: var(--ds-background-neutral);">
-        <InboxIcon class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-      </div>
-      <div>
-        <h1 class="text-lg font-semibold" style="color: var(--ds-text);">
-          {t('hub.inbox', 'Inbox')}
-        </h1>
-        <p class="text-xs" style="color: var(--ds-text-subtle);">
-          {t('hub.inboxDescription', 'Requests from all portals')}
-        </p>
-      </div>
-    </div>
+  <PageHeader title={t('hub.inbox', 'Inbox')} subtitle={t('hub.inboxDescription', 'Requests from all portals')}>
+    {#snippet actions()}
+      <div class="flex items-center gap-2">
+        <!-- Portal Filter -->
+        <select
+          value={hubStore.inboxPortalFilter}
+          onchange={(e) => hubStore.setInboxFilters(e.target.value, hubStore.inboxStatusFilter)}
+          class="px-2 py-1.5 rounded border text-xs"
+          style="background-color: var(--ds-surface-card); border-color: var(--ds-border); color: var(--ds-text);"
+        >
+          <option value="">{t('hub.allPortals', 'All Portals')}</option>
+          {#each hubStore.portals as portal}
+            <option value={portal.id}>{portal.name}</option>
+          {/each}
+        </select>
 
-    <!-- Filters -->
-    <div class="flex items-center gap-2">
-      <!-- Portal Filter -->
-      <select
-        value={hubStore.inboxPortalFilter}
-        onchange={(e) => hubStore.setInboxFilters(e.target.value, hubStore.inboxStatusFilter)}
-        class="px-2 py-1.5 rounded border text-xs"
-        style="background-color: var(--ds-surface-card); border-color: var(--ds-border); color: var(--ds-text);"
-      >
-        <option value="">{t('hub.allPortals', 'All Portals')}</option>
-        {#each hubStore.portals as portal}
-          <option value={portal.id}>{portal.name}</option>
-        {/each}
-      </select>
-
-      <!-- Status Filter -->
-      <select
-        value={hubStore.inboxStatusFilter}
-        onchange={(e) => hubStore.setInboxFilters(hubStore.inboxPortalFilter, e.target.value)}
-        class="px-2 py-1.5 rounded border text-xs"
-        style="background-color: var(--ds-surface-card); border-color: var(--ds-border); color: var(--ds-text);"
-      >
-        <option value="">{t('hub.allStatuses', 'All Statuses')}</option>
-        <option value="Open">{t('status.open', 'Open')}</option>
-        <option value="In Progress">{t('status.inProgress', 'In Progress')}</option>
-        <option value="Closed">{t('status.closed', 'Closed')}</option>
-      </select>
-    </div>
-  </div>
+        <!-- Status Filter -->
+        <select
+          value={hubStore.inboxStatusFilter}
+          onchange={(e) => hubStore.setInboxFilters(hubStore.inboxPortalFilter, e.target.value)}
+          class="px-2 py-1.5 rounded border text-xs"
+          style="background-color: var(--ds-surface-card); border-color: var(--ds-border); color: var(--ds-text);"
+        >
+          <option value="">{t('hub.allStatuses', 'All Statuses')}</option>
+          <option value="Open">{t('status.open', 'Open')}</option>
+          <option value="In Progress">{t('status.inProgress', 'In Progress')}</option>
+          <option value="Closed">{t('status.closed', 'Closed')}</option>
+        </select>
+      </div>
+    {/snippet}
+  </PageHeader>
 
   <!-- Inbox Content -->
   {#if hubStore.inboxLoading}
