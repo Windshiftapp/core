@@ -122,6 +122,7 @@ CREATE TABLE active_timers (
 	workspace_id INTEGER NOT NULL,
 	item_id INTEGER,
 	project_id INTEGER NOT NULL,
+	user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 	description TEXT NOT NULL,
 	start_time_utc INTEGER NOT NULL,
 	created_at INTEGER NOT NULL,
@@ -133,6 +134,7 @@ CREATE TABLE active_timers (
 CREATE INDEX IF NOT EXISTS idx_active_timers_workspace_id ON active_timers(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_active_timers_item_id ON active_timers(item_id);
 CREATE INDEX IF NOT EXISTS idx_active_timers_project_id ON active_timers(project_id);
+CREATE INDEX IF NOT EXISTS idx_active_timers_user_id ON active_timers(user_id);
 
 -- Themes table
 CREATE TABLE IF NOT EXISTS themes (

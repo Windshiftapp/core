@@ -9,19 +9,26 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/services"
 	"windshift/internal/utils"
 )
 
 type ActiveTimerHandler struct {
-	db database.Database
+	db                    database.Database
+	timePermissionService *services.TimePermissionService
 }
 
-func NewActiveTimerHandler(db database.Database) *ActiveTimerHandler {
-	return &ActiveTimerHandler{db: db}
+func NewActiveTimerHandler(db database.Database, timePermissionService *services.TimePermissionService) *ActiveTimerHandler {
+	return &ActiveTimerHandler{db: db, timePermissionService: timePermissionService}
 }
 
 // StartTimer starts a new active timer
 func (h *ActiveTimerHandler) StartTimer(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	var req struct {
 		WorkspaceID int    `json:"workspace_id"`
 		ItemID      *int   `json:"item_id,omitempty"`
@@ -48,6 +55,19 @@ func (h *ActiveTimerHandler) StartTimer(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Check booking permission on project
+	if h.timePermissionService != nil {
+		canBook, err := h.timePermissionService.CanBookTimeOnProject(user.ID, req.ProjectID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if !canBook {
+			respondForbidden(w, r)
+			return
+		}
+	}
+
 	// Validate project exists and is Active
 	var projectStatus string
 	err := h.db.QueryRow("SELECT status FROM time_projects WHERE id = ?", req.ProjectID).Scan(&projectStatus)
@@ -64,9 +84,9 @@ func (h *ActiveTimerHandler) StartTimer(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Check if there's already an active timer (only one timer allowed at a time)
+	// Check if there's already an active timer for this user (only one timer per user)
 	var existingID int
-	err = h.db.QueryRow("SELECT id FROM active_timers LIMIT 1").Scan(&existingID)
+	err = h.db.QueryRow("SELECT id FROM active_timers WHERE user_id = ? LIMIT 1", user.ID).Scan(&existingID)
 	if err != sql.ErrNoRows {
 		if err != nil {
 			respondInternalError(w, r, err)
@@ -82,9 +102,9 @@ func (h *ActiveTimerHandler) StartTimer(w http.ResponseWriter, r *http.Request) 
 
 	var id int64
 	err = h.db.QueryRow(`
-		INSERT INTO active_timers (workspace_id, item_id, project_id, description, start_time_utc, created_at)
-		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
-	`, req.WorkspaceID, req.ItemID, req.ProjectID, req.Description, now, now).Scan(&id)
+		INSERT INTO active_timers (workspace_id, item_id, project_id, user_id, description, start_time_utc, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
+	`, req.WorkspaceID, req.ItemID, req.ProjectID, user.ID, req.Description, now, now).Scan(&id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -101,14 +121,19 @@ func (h *ActiveTimerHandler) StartTimer(w http.ResponseWriter, r *http.Request) 
 	_ = json.NewEncoder(w).Encode(timer)
 }
 
-// GetActiveTimer gets the currently active timer
+// GetActiveTimer gets the currently active timer for the authenticated user
 func (h *ActiveTimerHandler) GetActiveTimer(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	var timer *models.ActiveTimer
 
 	//nolint:misspell // customer_organisations is a database table name
 	query := `
-		SELECT 
-			at.id, at.workspace_id, at.item_id, at.project_id, at.description, 
+		SELECT
+			at.id, at.workspace_id, at.item_id, at.project_id, at.user_id, at.description,
 			at.start_time_utc, at.created_at,
 			tp.name as project_name,
 			tc.name as customer_name,
@@ -120,17 +145,18 @@ func (h *ActiveTimerHandler) GetActiveTimer(w http.ResponseWriter, r *http.Reque
 		LEFT JOIN customer_organisations tc ON tp.customer_id = tc.id
 		LEFT JOIN items i ON at.item_id = i.id
 		LEFT JOIN workspaces ws ON at.workspace_id = ws.id
+		WHERE at.user_id = ?
 		LIMIT 1
 	`
 
-	row := h.db.QueryRow(query)
+	row := h.db.QueryRow(query, user.ID)
 	timer = &models.ActiveTimer{}
 
 	// Use sql.NullString for nullable joined fields
 	var projectName, customerName, itemTitle, workspaceName, workspaceKey sql.NullString
 
 	err := row.Scan(
-		&timer.ID, &timer.WorkspaceID, &timer.ItemID, &timer.ProjectID, &timer.Description,
+		&timer.ID, &timer.WorkspaceID, &timer.ItemID, &timer.ProjectID, &timer.UserID, &timer.Description,
 		&timer.StartTimeUTC, &timer.CreatedAt,
 		&projectName, &customerName, &itemTitle, &workspaceName, &workspaceKey,
 	)
@@ -157,6 +183,11 @@ func (h *ActiveTimerHandler) GetActiveTimer(w http.ResponseWriter, r *http.Reque
 
 // StopTimer stops the active timer and creates a worklog entry
 func (h *ActiveTimerHandler) StopTimer(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	timerIDStr := r.PathValue("id")
 	timerID, err := strconv.Atoi(timerIDStr)
 	if err != nil {
@@ -175,6 +206,12 @@ func (h *ActiveTimerHandler) StopTimer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Verify ownership
+	if timer.UserID != user.ID {
+		respondForbidden(w, r)
+		return
+	}
+
 	// Calculate duration
 	endTimeUTC := time.Now().UTC().Unix()
 	durationSeconds := endTimeUTC - timer.StartTimeUTC
@@ -189,8 +226,8 @@ func (h *ActiveTimerHandler) StopTimer(w http.ResponseWriter, r *http.Request) {
 
 	// Create worklog entry
 	worklogQuery := `
-		INSERT INTO time_worklogs (project_id, customer_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO time_worklogs (project_id, customer_id, user_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	// Convert timestamps to integers for the database
@@ -200,7 +237,7 @@ func (h *ActiveTimerHandler) StopTimer(w http.ResponseWriter, r *http.Request) {
 
 	nowUnix := time.Now().UTC().Unix()
 	_, err = h.db.ExecWrite(worklogQuery,
-		timer.ProjectID, customerID, timer.ItemID, timer.Description,
+		timer.ProjectID, customerID, user.ID, timer.ItemID, timer.Description,
 		dateInt, int(timer.StartTimeUTC), int(endTimeUTC),
 		durationMinutes, nowUnix, nowUnix)
 	if err != nil {
@@ -245,7 +282,7 @@ func (h *ActiveTimerHandler) getActiveTimerByID(id int) (*models.ActiveTimer, er
 	//nolint:misspell // database uses British spelling (customer_organisations)
 	query := `
 		SELECT
-			at.id, at.workspace_id, at.item_id, at.project_id, at.description,
+			at.id, at.workspace_id, at.item_id, at.project_id, at.user_id, at.description,
 			at.start_time_utc, at.created_at,
 			tp.name as project_name,
 			tc.name as customer_name,
@@ -266,7 +303,7 @@ func (h *ActiveTimerHandler) getActiveTimerByID(id int) (*models.ActiveTimer, er
 	var projectName, customerName, itemTitle, workspaceName, workspaceKey sql.NullString
 
 	err := h.db.QueryRow(query, id).Scan(
-		&timer.ID, &timer.WorkspaceID, &timer.ItemID, &timer.ProjectID, &timer.Description,
+		&timer.ID, &timer.WorkspaceID, &timer.ItemID, &timer.ProjectID, &timer.UserID, &timer.Description,
 		&timer.StartTimeUTC, &timer.CreatedAt,
 		&projectName, &customerName, &itemTitle, &workspaceName, &workspaceKey,
 	)

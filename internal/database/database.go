@@ -234,6 +234,10 @@ func (db *DB) Initialize() error {
 				check: "SELECT COUNT(*) FROM pragma_table_info('workspaces') WHERE name='display_mode'",
 				alter: "ALTER TABLE workspaces ADD COLUMN display_mode TEXT DEFAULT 'default'",
 			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('active_timers') WHERE name='user_id'",
+				alter: "ALTER TABLE active_timers ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE",
+			},
 		}
 
 		for _, m := range migrations {
