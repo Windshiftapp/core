@@ -91,8 +91,12 @@ export default {
       email: 'Email',
       phone: 'Phone',
       textarea: 'Text Area',
+      textArea: 'Text Area',
       user: 'User',
       rating: 'Rating',
+      boolean: 'Boolean',
+      reference: 'Reference',
+      identifier: 'Identifier',
     },
     fieldCategories: {
       basic: 'Basic Fields',
