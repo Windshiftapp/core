@@ -255,10 +255,12 @@
     });
   }
 
-  function handleFieldNameChange(e) {
-    actionFlowStore.updateNodeConfig(selectedNode.id, {
-      field_name: e.target.value
-    });
+  function handleSetFieldSelect(e) {
+    actionFlowStore.updateNodeConfig(selectedNode.id, { field_name: e.detail.id });
+  }
+
+  function handleSetFieldClear() {
+    actionFlowStore.updateNodeConfig(selectedNode.id, { field_name: '' });
   }
 
   function handleFieldValueChange(e) {
@@ -520,12 +522,10 @@
         {:else if selectedNode.type === 'set_field'}
           <div>
             <label class="block text-xs font-medium mb-1">{t('actions.config.fieldName')}</label>
-            <input
-              type="text"
-              class="w-full px-3 py-2 border rounded-md text-sm config-input"
-              value={selectedNode.data?.config?.field_name || ''}
-              oninput={handleFieldNameChange}
-              placeholder="assignee_id, priority_id, etc."
+            <FieldSelector
+              selectedField={selectedNode.data?.config?.field_name ? { id: selectedNode.data.config.field_name, name: selectedNode.data.config.field_name } : null}
+              onselect={handleSetFieldSelect}
+              onclear={handleSetFieldClear}
             />
           </div>
           <div>

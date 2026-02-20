@@ -90,8 +90,12 @@ export default {
       email: 'E-Mail',
       phone: 'Telefon',
       textarea: 'Textbereich',
+      textArea: 'Textbereich',
       user: 'Benutzer',
       rating: 'Bewertung',
+      boolean: 'Boolesch',
+      reference: 'Referenz',
+      identifier: 'Bezeichner',
     },
     fieldCategories: {
       basic: 'Grundfelder',
