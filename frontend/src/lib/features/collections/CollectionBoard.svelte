@@ -8,7 +8,7 @@
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import QuickAddForm from './QuickAddForm.svelte';
   import { getCollection, checkItemVisibility } from './collectionService.js';
-  import { infoToast } from '../../stores/toasts.svelte.js';
+  import { infoToast, successToast, warningToast } from '../../stores/toasts.svelte.js';
   import { Plus, GripVertical } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
@@ -162,8 +162,21 @@
         }
       }
 
+      // Optimistic local add: fetch full item and add to store directly
+      const fullItem = await api.items.get(newItem.id);
+      collectionStore.items = [...collectionStore.items, fullItem];
+      await statusTransitionStore.preloadForItems([fullItem]);
+      setTimeout(() => setupDragAndDrop(), 100);
+
+      // Toast feedback
+      const total = collectionStore.itemsPagination?.total ?? 0;
+      if (total > collectionStore.items.length) {
+        warningToast('Item created but the board has more items than can be displayed. Use "Load More" to see all items.');
+      } else {
+        successToast('Item created');
+      }
+
       cancelQuickAdd(columnId);
-      reloadCollection();
     } catch (error) {
       console.error('Failed to create item:', error);
       quickAddState[columnId].error = 'Failed to create item: ' + (error.message || error);

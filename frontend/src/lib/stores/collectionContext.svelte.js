@@ -6,7 +6,7 @@ const COLLECTION_VIEWS = new Set([
   'workspace-list', 'workspace-tree', 'workspace-map'
 ]);
 
-const DEFAULT_PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 250;
 
 class CollectionStore {
   // Reactive state
@@ -190,14 +190,21 @@ class CollectionStore {
       ]);
       if (loadId !== this.#loadId) return;
 
-      this.items = itemsResult.items;
+      // Merge: preserve locally-present items that are beyond the server's pagination window
+      const serverItemIds = new Set(itemsResult.items.map(i => i.id));
+      const localOnlyItems = this.items.filter(i => !serverItemIds.has(i.id));
+      this.items = [...itemsResult.items, ...localOnlyItems];
+
       this.collectionName = itemsResult.collectionName;
       this.itemsPagination = itemsResult.pagination;
       this.itemsHasMore = itemsResult.pagination
         ? itemsResult.pagination.page < itemsResult.pagination.total_pages
         : false;
 
-      this.backlogItems = backlogResult.items;
+      const serverBacklogIds = new Set(backlogResult.items.map(i => i.id));
+      const localOnlyBacklog = this.backlogItems.filter(i => !serverBacklogIds.has(i.id));
+      this.backlogItems = [...backlogResult.items, ...localOnlyBacklog];
+
       this.backlogPagination = backlogResult.pagination;
       this.backlogHasMore = backlogResult.pagination
         ? backlogResult.pagination.page < backlogResult.pagination.total_pages
