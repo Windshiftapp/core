@@ -249,7 +249,7 @@ export default {
     editComment: 'Kommentar bearbeiten',
     deleteComment: 'Kommentar löschen',
     editPlaceholder: 'Kommentar bearbeiten...',
-    writePlaceholder: 'Kommentar schreiben...',
+    writePlaceholder: 'Kommentar hinzufügen...',
     markdownSupported: 'Markdown unterstützt',
     posting: 'Wird gepostet...',
     comment: 'Kommentar',

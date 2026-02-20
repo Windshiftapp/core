@@ -22,7 +22,7 @@
 
   let {
     content = $bindable(''), placeholder = '', readonly = false,
-    showToolbar = false, itemId = null, entityType = null,
+    showToolbar = false, hideToolbarUntilFocus = false, itemId = null, entityType = null,
     entityId = null, onImageInsert = null, isPersonalWorkspace = false, compact = false,
     customUploadFn = null, downloadUrlBase = '/api/attachments'
   } = $props();
@@ -38,6 +38,9 @@
   // Compute effective entity info (supports both old itemId and new entityType/entityId)
   const effectiveEntityType = $derived(entityType || (itemId ? 'item' : null));
   const effectiveEntityId = $derived(entityId || itemId);
+
+  let isFocused = $state(false);
+  const toolbarVisible = $derived(showToolbar && !readonly && (!hideToolbarUntilFocus || isFocused));
 
   let editorElement = $state(null);
   let fileInput = $state(null);
@@ -523,8 +526,11 @@
   $effect(() => { if (editor && readonly) { editor.action(replaceAll(content || '')); } });
 </script>
 
-<div class="milkdown-wrapper" class:has-toolbar={showToolbar && !readonly}>
-  {#if showToolbar && !readonly}
+<div class="milkdown-wrapper" class:has-toolbar={toolbarVisible}
+  onfocusin={() => isFocused = true}
+  onfocusout={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) isFocused = false; }}
+>
+  {#if toolbarVisible}
     <div class="milkdown-toolbar" tabindex="-1" aria-hidden="true">
       <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleBold} title={t('editors.bold')}>
         <Bold size={14} />
@@ -552,7 +558,7 @@
       {/if}
     </div>
   {/if}
-  <div bind:this={editorElement} class="milkdown-editor" class:readonly class:compact class:has-toolbar={showToolbar && !readonly} onclick={handleClick}></div>
+  <div bind:this={editorElement} class="milkdown-editor" class:readonly class:compact class:has-toolbar={toolbarVisible} onclick={handleClick}></div>
 </div>
 <input
   bind:this={fileInput}
@@ -708,7 +714,8 @@
     outline: none;
   }
 
-  :global(.milkdown-editor .ProseMirror p.is-empty:first-child::before) {
+  :global(.milkdown-editor:not(.readonly) .ProseMirror[data-placeholder]:has(> p:first-child:last-child:empty)::before),
+  :global(.milkdown-editor:not(.readonly) .ProseMirror[data-placeholder]:has(> p:first-child:last-child > br:only-child)::before) {
     content: attr(data-placeholder);
     float: left;
     color: var(--ds-text-subtlest, #9ca3af);

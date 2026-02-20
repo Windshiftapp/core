@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import Button from '../components/Button.svelte';
-  import { GitMerge, Plus, Trash2, ExternalLink, ChevronDown, ChevronRight, Settings, RefreshCw, Loader2, Check, X } from 'lucide-svelte';
+  import { GitMerge, Plus, Trash2, ExternalLink, ChevronDown, ChevronRight, Settings, RefreshCw, Loader2, Check, X, KeyRound } from 'lucide-svelte';
   import RepositorySelector from '../pickers/RepositorySelector.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
 
@@ -14,6 +14,7 @@
   let expandedConnections = new Set();
   let linkedRepos = {}; // connId -> repos array
   let loadingRepos = new Set();
+  let authStatuses = {}; // connId -> auth status object
 
   // Modal state
   let showRepoSelector = false;
@@ -33,11 +34,39 @@
       ]);
       availableProviders = providersRes || [];
       connections = connectionsRes || [];
+      if (connections.length > 0) {
+        await loadAuthStatuses(connections);
+      }
     } catch (error) {
       console.error('Failed to load SCM data:', error);
       showNotification('Failed to load SCM settings', 'error');
     } finally {
       loading = false;
+    }
+  }
+
+  async function loadAuthStatuses(conns) {
+    const results = await Promise.allSettled(
+      conns.map(c => api.workspaceSCM.getAuthStatus(workspaceId, c.id))
+    );
+    results.forEach((res, i) => {
+      if (res.status === 'fulfilled' && res.value) {
+        authStatuses[conns[i].id] = res.value;
+      }
+    });
+    authStatuses = authStatuses;
+  }
+
+  async function reconnectOAuth(conn) {
+    try {
+      sessionStorage.setItem('scm_oauth_return', window.location.href);
+      const result = await api.workspaceSCM.startOAuth(workspaceId, conn.id);
+      if (result?.auth_url) {
+        window.location.href = result.auth_url;
+      }
+    } catch (error) {
+      console.error('Failed to start OAuth:', error);
+      showNotification('Failed to start OAuth reconnection', 'error');
     }
   }
 
@@ -276,6 +305,12 @@
                 </span>
               </div>
               <div class="flex items-center gap-2" onclick={e => e.stopPropagation()}>
+                {#if authStatuses[conn.id]?.auth_method === 'oauth' && !authStatuses[conn.id]?.has_workspace_token}
+                  <Button size="sm" variant="ghost" onclick={() => reconnectOAuth(conn)}>
+                    <KeyRound class="w-4 h-4 mr-1" />
+                    Reconnect
+                  </Button>
+                {/if}
                 <Button size="sm" variant="ghost" onclick={() => openRepoSelector(conn)}>
                   <Plus class="w-4 h-4 mr-1" />
                   Link Repositories

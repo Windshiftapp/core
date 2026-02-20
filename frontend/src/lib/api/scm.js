@@ -122,6 +122,16 @@ export const workspaceSCM = {
     fetchAPI(`/workspace-repositories/${repoId}/sync`, {
       method: 'POST',
     }),
+
+  // Start workspace OAuth flow (returns auth URL with workspace context)
+  startOAuth: (workspaceId, connId) =>
+    fetchAPI(`/workspaces/${workspaceId}/scm-connections/${connId}/auth/start`, {
+      method: 'POST',
+    }),
+
+  // Get auth status for a workspace connection
+  getAuthStatus: (workspaceId, connId) =>
+    fetchAPI(`/workspaces/${workspaceId}/scm-connections/${connId}/auth/status`),
 };
 
 // Item SCM Links - PRs, branches, commits linked to items

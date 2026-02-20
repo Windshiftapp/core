@@ -270,7 +270,7 @@ export default {
     editComment: 'Edit comment',
     deleteComment: 'Delete comment',
     editPlaceholder: 'Edit your comment...',
-    writePlaceholder: 'Write a comment...',
+    writePlaceholder: 'Add a comment...',
     markdownSupported: 'Markdown supported',
     posting: 'Posting...',
     comment: 'Comment',

@@ -4,7 +4,7 @@
   // All props that MilkdownEditor accepts
   let {
     content = $bindable(''), placeholder = '', readonly = false,
-    showToolbar = false, itemId = null, entityType = null,
+    showToolbar = false, hideToolbarUntilFocus = false, itemId = null, entityType = null,
     entityId = null, onImageInsert = null, isPersonalWorkspace = false, compact = false,
     customUploadFn = null, downloadUrlBase = '/api/attachments'
   } = $props();
@@ -88,6 +88,7 @@
     {placeholder}
     {readonly}
     {showToolbar}
+    {hideToolbarUntilFocus}
     {itemId}
     {entityType}
     {entityId}

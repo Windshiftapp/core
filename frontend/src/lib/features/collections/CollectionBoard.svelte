@@ -6,6 +6,9 @@
   import { navigate } from '../../router.js';
   import { collectionStore, reloadCollection } from '../../stores/collectionContext.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
+  import QuickAddForm from './QuickAddForm.svelte';
+  import { getCollection, checkItemVisibility } from './collectionService.js';
+  import { infoToast } from '../../stores/toasts.svelte.js';
   import { Plus, GripVertical } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
@@ -39,6 +42,10 @@
   let pendingDrops = new Set(); // Track pending drop operations to prevent duplicates
   let showItemModal = $state(false);
   let selectedItemId = $state(null);
+
+  // Quick-add state per column
+  let quickAddState = $state({});
+  let workspaces = $state([]);
 
   // Backlog functionality
   let backlogItems = $state([]);
@@ -82,10 +89,107 @@
 
   useEventListener(() => window, 'refresh-work-items', handleRefreshWorkItems);
 
+  // Quick-add functions
+  function initQuickAdd(columnId, statusId) {
+    const availableTypes = (itemTypes || []).slice().sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    if (availableTypes.length === 0) return;
+
+    let preselectedWorkspaceId = workspaceId ? parseInt(workspaceId) : (workspaces.length === 1 ? workspaces[0].id : null);
+
+    quickAddState = {
+      ...quickAddState,
+      [columnId]: {
+        show: true,
+        workspaceId: preselectedWorkspaceId,
+        itemTypeId: availableTypes[0]?.id ?? null,
+        availableTypes,
+        statusId,
+        title: '',
+        error: null
+      }
+    };
+
+    setTimeout(() => {
+      const textarea = document.querySelector(`textarea[data-quick-add-parent="${columnId}"]`);
+      if (textarea) textarea.focus();
+    }, 0);
+  }
+
+  function cancelQuickAdd(columnId) {
+    const newState = { ...quickAddState };
+    delete newState[columnId];
+    quickAddState = newState;
+  }
+
+  function updateQuickAddField(columnId, field, value) {
+    if (quickAddState[columnId]) {
+      quickAddState[columnId][field] = value;
+      quickAddState[columnId].error = null;
+      quickAddState = { ...quickAddState };
+    }
+  }
+
+  async function createColumnItem(columnId) {
+    const state = quickAddState[columnId];
+    if (!state) return;
+
+    if (!state.workspaceId) {
+      quickAddState[columnId].error = 'Please select a workspace';
+      quickAddState = { ...quickAddState };
+      return;
+    }
+    if (!state.itemTypeId) {
+      quickAddState[columnId].error = 'Please select an item type';
+      quickAddState = { ...quickAddState };
+      return;
+    }
+    if (!state.title?.trim()) {
+      quickAddState[columnId].error = 'Please enter a title';
+      quickAddState = { ...quickAddState };
+      return;
+    }
+
+    try {
+      const newItem = await api.items.create({
+        workspace_id: state.workspaceId,
+        item_type_id: state.itemTypeId,
+        title: state.title.trim(),
+        description: '',
+        status_id: state.statusId
+      });
+
+      if (collectionId) {
+        const collection = await getCollection(collectionId);
+        if (collection) {
+          const filters = { collection_id: collectionId };
+          const isVisible = await checkItemVisibility(newItem.id, filters);
+          if (!isVisible) {
+            const selectedWorkspace = workspaces.find(w => w.id === state.workspaceId);
+            const workspaceName = selectedWorkspace?.name || 'another workspace';
+            infoToast(`Card created in ${workspaceName} but won't appear here due to collection filters`, 'Card created successfully');
+          }
+        }
+      }
+
+      cancelQuickAdd(columnId);
+      reloadCollection();
+    } catch (error) {
+      console.error('Failed to create item:', error);
+      quickAddState[columnId].error = 'Failed to create item: ' + (error.message || error);
+      quickAddState = { ...quickAddState };
+    }
+  }
+
   onMount(async () => {
     if (workspaceId) {
       await loadWorkspaceGradient(workspaceId);
       await workspaceDataStore.initialize(workspaceId);
+    }
+    try {
+      workspaces = await api.workspaces.getAll() || [];
+    } catch (error) {
+      console.error('Failed to load workspaces:', error);
+      workspaces = [];
     }
     loading = false;
   });
@@ -611,7 +715,19 @@
               data-status-id={column.status_ids[0]}
             >
               <div class="p-4 border-b border-t-4" style="border-bottom-color: {styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'}; border-top-color: {column.color};">
-                <h3 class="font-semibold" style={styles.glassTextStyle}>{column.name}</h3>
+                <div class="flex items-center justify-between">
+                  <h3 class="font-semibold" style={styles.glassTextStyle}>{column.name}</h3>
+                  <button
+                    onclick={() => initQuickAdd(column.id, column.status_ids[0])}
+                    class="p-1 rounded transition-colors"
+                    style="color: var(--ds-text-subtle);"
+                    onmouseenter={(e) => e.currentTarget.style.color = 'var(--ds-text)'}
+                    onmouseleave={(e) => e.currentTarget.style.color = 'var(--ds-text-subtle)'}
+                    title={t('collections.addCard')}
+                  >
+                    <Plus class="w-4 h-4" />
+                  </button>
+                </div>
                 <div class="flex items-center justify-between">
                   <span class="text-sm" style={styles.glassSubtleTextStyle}>{columnItems.length} {t('items.item')}</span>
                   {#if column.wip_limit}
@@ -625,7 +741,21 @@
                 </div>
               </div>
               <div class="p-4 min-h-32">
-                {#if columnItems.length === 0}
+                {#if quickAddState[column.id]?.show}
+                  <div class="mb-3">
+                    <QuickAddForm
+                      parentId={column.id}
+                      state={quickAddState[column.id]}
+                      {workspaces}
+                      hasGradient={styles.hasCustomBackground}
+                      cardBgStyle={styles.cardStyle(8)}
+                      onUpdateField={updateQuickAddField}
+                      onCreate={createColumnItem}
+                      onCancel={cancelQuickAdd}
+                    />
+                  </div>
+                {/if}
+                {#if columnItems.length === 0 && !quickAddState[column.id]?.show}
                   <!-- Empty column state -->
                   <div class="text-center py-8" style={styles.glassSubtleTextStyle}>
                     <Plus class="w-8 h-8 mx-auto mb-2" />

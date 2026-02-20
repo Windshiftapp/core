@@ -60,7 +60,7 @@
               type="text"
               bind:value={editTitle}
               onkeydown={handleKeydown}
-              class="w-full text-2xl font-medium bg-transparent border-0 py-1 focus:outline-none break-words"
+              class="w-full text-2xl font-semibold bg-transparent border-0 py-1 focus:outline-none break-words"
               style="color: var(--ds-text); word-wrap: break-word; overflow-wrap: break-word;"
               placeholder={t('items.enterTitle')}
               autofocus
@@ -87,7 +87,7 @@
 
         <button
           onclick={startEditingTitle}
-          class="text-2xl pr-4 py-1 rounded transition-colors text-left cursor-pointer w-full title-button break-words"
+          class="text-2xl font-semibold pr-4 py-1 rounded transition-colors text-left cursor-pointer w-full title-button break-words"
           style="color: var(--ds-text); word-wrap: break-word; overflow-wrap: break-word;"
           title={t('items.clickToEditTitle')}
         >

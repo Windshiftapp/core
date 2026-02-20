@@ -110,7 +110,7 @@
 
   function startOAuthConnect() {
     sessionStorage.setItem('scm_oauth_return', window.location.href);
-    api.scmProviders.startOAuth(connection.provider_slug).then(result => {
+    api.workspaceSCM.startOAuth(workspaceId, connection.id).then(result => {
       if (result?.auth_url) {
         window.location.href = result.auth_url;
       }

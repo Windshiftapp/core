@@ -296,6 +296,7 @@ type ActiveTimer struct {
 	WorkspaceID  int    `json:"workspace_id"`
 	ItemID       *int   `json:"item_id,omitempty"` // Optional link to work item
 	ProjectID    int    `json:"project_id"`
+	UserID       int    `json:"user_id"`
 	Description  string `json:"description"`
 	StartTimeUTC int64  `json:"start_time_utc"` // Unix timestamp in UTC
 	CreatedAt    int64  `json:"created_at"`     // Unix timestamp

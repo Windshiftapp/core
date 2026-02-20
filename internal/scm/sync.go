@@ -41,11 +41,13 @@ func (s *SyncService) SyncAllRepositories(ctx context.Context) error {
 		SELECT
 			wr.id, wr.repository_name, wr.default_branch,
 			wsc.workspace_id, wsc.scm_provider_id, wsc.item_key_pattern,
-			w.key as workspace_key
+			w.key as workspace_key, wsc.id as connection_id
 		FROM workspace_repositories wr
 		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
 		JOIN workspaces w ON w.id = wsc.workspace_id
+		JOIN scm_providers sp ON sp.id = wsc.scm_provider_id
 		WHERE wr.is_active = 1 AND wsc.enabled = 1
+		  AND sp.auth_method != 'oauth'
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to query repositories: %w", err)
@@ -60,6 +62,7 @@ func (s *SyncService) SyncAllRepositories(ctx context.Context) error {
 		ProviderID     int
 		ItemKeyPattern string
 		WorkspaceKey   string
+		ConnectionID   int
 	}
 
 	var repos []repoInfo
@@ -67,7 +70,7 @@ func (s *SyncService) SyncAllRepositories(ctx context.Context) error {
 		var r repoInfo
 		var itemKeyPattern sql.NullString
 		err := rows.Scan(&r.ID, &r.RepositoryName, &r.DefaultBranch,
-			&r.WorkspaceID, &r.ProviderID, &itemKeyPattern, &r.WorkspaceKey)
+			&r.WorkspaceID, &r.ProviderID, &itemKeyPattern, &r.WorkspaceKey, &r.ConnectionID)
 		if err != nil {
 			slog.Error("Failed to scan repository", slog.String("component", "scm"), slog.Any("error", err))
 			continue
@@ -80,21 +83,38 @@ func (s *SyncService) SyncAllRepositories(ctx context.Context) error {
 
 	slog.Debug("Found active repositories to sync", slog.String("component", "scm"), slog.Int("count", len(repos)))
 
-	// Group repos by provider to minimize provider instance creation
-	providerRepos := make(map[int][]repoInfo)
+	// Group repos by connection to minimize provider instance creation
+	connectionRepos := make(map[int][]repoInfo)
 	for _, r := range repos {
-		providerRepos[r.ProviderID] = append(providerRepos[r.ProviderID], r)
+		connectionRepos[r.ConnectionID] = append(connectionRepos[r.ConnectionID], r)
 	}
 
-	// Sync each provider's repos
-	for providerID, providerRepoList := range providerRepos {
-		provider, err := s.getProviderInstance(providerID)
+	// Sync each connection's repos using CredentialResolver for proper token resolution
+	credResolver := NewCredentialResolver(s.db, s.encryption)
+	for connectionID, connectionRepoList := range connectionRepos {
+		creds, err := credResolver.GetCredentialsByConnectionID(ctx, connectionID)
 		if err != nil {
-			slog.Error("Failed to get provider", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Any("error", err))
+			slog.Error("Failed to get credentials", slog.String("component", "scm"), slog.Int("connection_id", connectionID), slog.Any("error", err))
 			continue
 		}
 
-		for _, repo := range providerRepoList {
+		// Refresh OAuth token if needed (e.g., expired Gitea tokens)
+		if creds.OAuthAccessToken != "" {
+			newToken, err := credResolver.RefreshOAuthTokenIfNeeded(ctx, connectionID, creds)
+			if err != nil {
+				slog.Warn("Failed to refresh OAuth token, using existing", slog.String("component", "scm"), slog.Int("connection_id", connectionID), slog.Any("error", err))
+			} else {
+				creds.OAuthAccessToken = newToken
+			}
+		}
+
+		provider, err := credResolver.CreateProvider(creds)
+		if err != nil {
+			slog.Error("Failed to create provider", slog.String("component", "scm"), slog.Int("connection_id", connectionID), slog.Any("error", err))
+			continue
+		}
+
+		for _, repo := range connectionRepoList {
 			if err := s.syncRepository(ctx, provider, repo.ID, repo.RepositoryName, repo.WorkspaceID, repo.WorkspaceKey, repo.ItemKeyPattern); err != nil {
 				slog.Error("Failed to sync repository", slog.String("component", "scm"), slog.String("repository", repo.RepositoryName), slog.Any("error", err))
 			}
@@ -109,26 +129,43 @@ func (s *SyncService) SyncAllRepositories(ctx context.Context) error {
 func (s *SyncService) SyncRepository(ctx context.Context, repoID int) error {
 	// Get repository info
 	var repositoryName, defaultBranch, workspaceKey string
-	var workspaceID, providerID int
+	var workspaceID, connectionID int
 	var itemKeyPattern sql.NullString
 
 	err := s.db.QueryRowContext(ctx, `
 		SELECT
 			wr.repository_name, wr.default_branch,
-			wsc.workspace_id, wsc.scm_provider_id, wsc.item_key_pattern,
-			w.key as workspace_key
+			wsc.workspace_id, wsc.item_key_pattern,
+			w.key as workspace_key, wsc.id as connection_id
 		FROM workspace_repositories wr
 		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
 		JOIN workspaces w ON w.id = wsc.workspace_id
 		WHERE wr.id = ?
-	`, repoID).Scan(&repositoryName, &defaultBranch, &workspaceID, &providerID, &itemKeyPattern, &workspaceKey)
+	`, repoID).Scan(&repositoryName, &defaultBranch, &workspaceID, &itemKeyPattern, &workspaceKey, &connectionID)
 	if err != nil {
 		return fmt.Errorf("failed to get repository info: %w", err)
 	}
 
-	provider, err := s.getProviderInstance(providerID)
+	// Use CredentialResolver for proper workspace-level token resolution
+	credResolver := NewCredentialResolver(s.db, s.encryption)
+	creds, err := credResolver.GetCredentialsByConnectionID(ctx, connectionID)
 	if err != nil {
-		return fmt.Errorf("failed to get provider: %w", err)
+		return fmt.Errorf("failed to get credentials: %w", err)
+	}
+
+	// Refresh OAuth token if needed (e.g., expired Gitea tokens)
+	if creds.OAuthAccessToken != "" {
+		newToken, refreshErr := credResolver.RefreshOAuthTokenIfNeeded(ctx, connectionID, creds)
+		if refreshErr != nil {
+			slog.Warn("Failed to refresh OAuth token, using existing", slog.String("component", "scm"), slog.Int("connection_id", connectionID), slog.Any("error", refreshErr))
+		} else {
+			creds.OAuthAccessToken = newToken
+		}
+	}
+
+	provider, err := credResolver.CreateProvider(creds)
+	if err != nil {
+		return fmt.Errorf("failed to create provider: %w", err)
 	}
 
 	pattern := ""
@@ -708,15 +745,152 @@ func (s *SyncService) getConnectionIDForRepo(ctx context.Context, workspaceRepoI
 	return connID
 }
 
+// RefreshItemSCMLinkForUser refreshes a specific SCM link using the user's personal credentials.
+// For OAuth connections, this uses the user's personal OAuth token instead of the workspace-level token.
+func (s *SyncService) RefreshItemSCMLinkForUser(ctx context.Context, linkID, userID int) error {
+	// Get link info including connection ID for proper credential resolution
+	var itemID, repoID, connectionID int
+	var linkType models.SCMLinkType
+	var externalID, repositoryName string
+
+	err := s.db.QueryRowContext(ctx, `
+		SELECT isl.item_id, isl.workspace_repository_id, isl.link_type, isl.external_id,
+			   wr.repository_name, wr.workspace_scm_connection_id
+		FROM item_scm_links isl
+		JOIN workspace_repositories wr ON wr.id = isl.workspace_repository_id
+		WHERE isl.id = ?
+	`, linkID).Scan(&itemID, &repoID, &linkType, &externalID, &repositoryName, &connectionID)
+	if err != nil {
+		return fmt.Errorf("failed to get link info: %w", err)
+	}
+
+	// Use CredentialResolver with user-specific credentials
+	credResolver := NewCredentialResolver(s.db, s.encryption)
+	provider, err := credResolver.GetProviderForUser(ctx, connectionID, userID)
+	if err != nil {
+		return fmt.Errorf("failed to get provider for user: %w", err)
+	}
+
+	// Parse owner/repo
+	parts := strings.SplitN(repositoryName, "/", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid repository name format: %s", repositoryName)
+	}
+	owner, repo := parts[0], parts[1]
+
+	switch linkType {
+	case models.SCMLinkTypePullRequest:
+		prNumber, _ := strconv.Atoi(externalID)
+		pr, err := provider.GetPullRequest(ctx, owner, repo, prNumber)
+		if err != nil {
+			return fmt.Errorf("failed to get PR: %w", err)
+		}
+
+		state := models.SCMLinkStateOpen
+		if pr.IsMerged {
+			state = models.SCMLinkStateMerged
+		} else if pr.State == "closed" {
+			state = models.SCMLinkStateClosed
+		}
+
+		_, err = s.db.ExecContext(ctx, `
+			UPDATE item_scm_links SET
+				external_url = ?, title = ?, state = ?,
+				author_external_id = ?, author_name = ?,
+				updated_at = CURRENT_TIMESTAMP
+			WHERE id = ?
+		`, pr.URL, pr.Title, state, pr.Author.ID, pr.Author.Name, linkID)
+		return err
+
+	case models.SCMLinkTypeCommit:
+		commit, err := provider.GetCommit(ctx, owner, repo, externalID)
+		if err != nil {
+			return fmt.Errorf("failed to get commit: %w", err)
+		}
+
+		title := strings.SplitN(commit.Message, "\n", 2)[0]
+
+		_, err = s.db.ExecContext(ctx, `
+			UPDATE item_scm_links SET
+				external_url = ?, title = ?,
+				author_external_id = ?, author_name = ?,
+				updated_at = CURRENT_TIMESTAMP
+			WHERE id = ?
+		`, commit.URL, title, commit.Author.ID, commit.Author.Name, linkID)
+		return err
+
+	case models.SCMLinkTypeBranch:
+		_, err = s.db.ExecContext(ctx, `
+			UPDATE item_scm_links SET updated_at = CURRENT_TIMESTAMP WHERE id = ?
+		`, linkID)
+		return err
+	}
+
+	return nil
+}
+
+// RefreshOAuthLinksForItem refreshes all non-merged PR links for an item that use OAuth connections,
+// using the specified user's personal OAuth token.
+func (s *SyncService) RefreshOAuthLinksForItem(ctx context.Context, itemID, userID int) error {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT isl.id
+		FROM item_scm_links isl
+		JOIN workspace_repositories wr ON wr.id = isl.workspace_repository_id
+		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
+		JOIN scm_providers sp ON sp.id = wsc.scm_provider_id
+		WHERE isl.item_id = ?
+		  AND isl.link_type = 'pull_request'
+		  AND (isl.state IS NULL OR isl.state != 'merged')
+		  AND sp.auth_method = 'oauth'
+	`, itemID)
+	if err != nil {
+		return fmt.Errorf("failed to query OAuth PR links: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var linkIDs []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			continue
+		}
+		linkIDs = append(linkIDs, id)
+	}
+
+	if len(linkIDs) == 0 {
+		return nil
+	}
+
+	slog.Debug("Refreshing OAuth PR links for item", slog.String("component", "scm"), slog.Int("item_id", itemID), slog.Int("user_id", userID), slog.Int("count", len(linkIDs)))
+
+	for _, linkID := range linkIDs {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
+		if err := s.RefreshItemSCMLinkForUser(ctx, linkID, userID); err != nil {
+			slog.Warn("Failed to refresh OAuth PR link for user", slog.String("component", "scm"), slog.Int("link_id", linkID), slog.Int("user_id", userID), slog.Any("error", err))
+			// Continue with other links
+		}
+	}
+
+	return nil
+}
+
 // RefreshAllPRLinkStates refreshes the state of all non-merged PR links.
 // This should be called periodically (e.g., every 5 minutes) by the scheduler.
 func (s *SyncService) RefreshAllPRLinkStates(ctx context.Context) error {
 	// Query all PR links that aren't already merged (merged is a final state)
+	// Skip links from OAuth connections — those are refreshed on-demand per user
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT isl.id
 		FROM item_scm_links isl
+		JOIN workspace_repositories wr ON wr.id = isl.workspace_repository_id
+		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
+		JOIN scm_providers sp ON sp.id = wsc.scm_provider_id
 		WHERE isl.link_type = 'pull_request'
 		AND (isl.state IS NULL OR isl.state != 'merged')
+		AND sp.auth_method != 'oauth'
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to query PR links: %w", err)

@@ -317,6 +317,7 @@
 					bind:content={newCommentContent}
 					placeholder={t('comments.writePlaceholder')}
 					showToolbar={true}
+					hideToolbarUntilFocus={true}
 					compact={true}
 					{itemId}
 					{isPersonalWorkspace}

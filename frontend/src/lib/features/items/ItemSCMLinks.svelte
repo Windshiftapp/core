@@ -74,6 +74,17 @@
 
     try {
       links = await api.itemSCMLinks.get(itemId) || [];
+      // Re-fetch after short delay to pick up background OAuth refresh
+      if (links.some(l => l.link_type === 'pull_request' && l.state !== 'merged')) {
+        setTimeout(async () => {
+          try {
+            const updated = await api.itemSCMLinks.get(itemId) || [];
+            if (JSON.stringify(updated) !== JSON.stringify(links)) {
+              links = updated;
+            }
+          } catch (_) { /* silent */ }
+        }, 3000);
+      }
     } catch (err) {
       console.error('Failed to load SCM links:', err);
       error = t('scm.failedToLoadLinks');
