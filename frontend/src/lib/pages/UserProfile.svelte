@@ -146,16 +146,7 @@
 			formData.append('item_id', '0'); // Use 0 for avatar uploads
 			formData.append('category', 'avatar');
 
-			const response = await fetch('/api/attachments/upload', {
-				method: 'POST',
-				body: formData,
-			});
-
-			if (!response.ok) {
-				throw new Error(`Upload failed: ${response.statusText}`);
-			}
-
-			const uploadResult = await response.json();
+			const uploadResult = await api.attachments.upload(formData);
 			
 			if (uploadResult && uploadResult.success && uploadResult.avatar_url) {
 				// Use the avatar_url directly from the upload response

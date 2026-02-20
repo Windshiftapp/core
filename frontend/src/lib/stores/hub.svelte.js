@@ -152,16 +152,7 @@ async function handleLogoUpload(files) {
     uploadFormData.append('file', file);
     uploadFormData.append('category', 'hub_logo');
 
-    const response = await fetch('/api/attachments/upload', {
-      method: 'POST',
-      body: uploadFormData,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Upload failed: ${response.statusText}`);
-    }
-
-    const uploadResult = await response.json();
+    const uploadResult = await api.attachments.upload(uploadFormData);
 
     if (uploadResult?.success && uploadResult.logo_url) {
       logoUrl = uploadResult.logo_url;

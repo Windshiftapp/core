@@ -62,6 +62,8 @@ export async function fetchAPI(endpoint, options = {}) {
     if (token) {
       headers['X-CSRF-Token'] = token;
     }
+    // Token is one-time use on the server; clear cache so the next request fetches a fresh one
+    csrfToken = null;
   }
 
   const response = await fetch(`${API_BASE}${endpoint}`, {
