@@ -73,7 +73,7 @@
 
   // Computed: Generate grid-template-columns CSS
   let gridTemplateColumns = $derived(
-    listColumns.map(col => `${col.width}fr`).join(' ') + ' auto'
+    listColumns.map(col => col.field_identifier === 'key' ? 'max-content' : `${col.width}fr`).join(' ') + ' auto'
   );
 
 
@@ -291,6 +291,7 @@
             columns={listColumns}
             {customFieldDefinitions}
             canConfigure={canConfigureColumns}
+            hasGradient={styles.hasCustomBackground}
             on:change={handleColumnChange}
           />
         </div>

@@ -13,7 +13,8 @@
   let {
     columns = [],
     customFieldDefinitions = [],
-    canConfigure = true
+    canConfigure = true,
+    hasGradient = false
   } = $props();
 
   // Available system fields
@@ -225,8 +226,8 @@
 {#if canConfigure}
   <button
     use:melt={$trigger}
-    class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors hover:bg-[var(--ds-surface-hovered)]"
-    style="color: var(--ds-text-subtle);"
+    class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors"
+    style="color: {hasGradient ? 'rgba(255,255,255,0.85)' : 'var(--ds-text-subtle)'}; {hasGradient ? 'background: rgba(255,255,255,0.12);' : ''}"
     title="Configure columns"
   >
     <Columns3 class="w-4 h-4" />

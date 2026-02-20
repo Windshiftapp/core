@@ -211,7 +211,7 @@
       key: 'status',
       label: t('common.status'),
       sortable: true,
-      width: 'w-40',
+      width: 'w-24',
       slot: 'status'
     },
     {
@@ -224,20 +224,20 @@
       key: 'type',
       label: t('common.type'),
       sortable: true,
-      width: 'w-32',
+      width: 'w-28',
       slot: 'type'
     },
     {
       key: 'date_range',
       label: t('iterations.dateRange'),
       sortable: true,
-      width: 'w-48',
+      width: 'w-72',
       slot: 'date_range'
     },
     {
       key: 'actions',
       label: '',
-      width: 'w-16',
+      width: 'w-12',
       sortable: false
     }
   ]);
@@ -303,9 +303,9 @@
       {/snippet}
 
       {#snippet dateRangeCell(item)}
-        <span class="text-sm" style="color: var(--ds-text);">{getDateRange(item)}</span>
+        <span class="text-sm whitespace-nowrap" style="color: var(--ds-text);">{getDateRange(item)}</span>
         {#if getDaysRemaining(item)}
-          <span class="text-xs text-gray-500">{getDaysRemaining(item)}</span>
+          <span class="text-xs whitespace-nowrap" style="color: var(--ds-text-subtle);">{getDaysRemaining(item)}</span>
         {/if}
       {/snippet}
 
@@ -351,7 +351,7 @@
             >
               <div slot="name" let:item class="flex items-center gap-2">{@render nameCell(item)}</div>
               <div slot="type" let:item>{@render typeCell(item)}</div>
-              <div slot="date_range" let:item class="flex flex-col">{@render dateRangeCell(item)}</div>
+              <div slot="date_range" let:item class="flex items-baseline gap-2">{@render dateRangeCell(item)}</div>
               <div slot="status" let:item class="flex items-center gap-2">{@render statusCell(item)}</div>
             </DataTable>
           {/key}
@@ -378,7 +378,7 @@
                 >
                   <div slot="name" let:item class="flex items-center gap-2">{@render nameCell(item)}</div>
                   <div slot="type" let:item>{@render typeCell(item)}</div>
-                  <div slot="date_range" let:item class="flex flex-col">{@render dateRangeCell(item)}</div>
+                  <div slot="date_range" let:item class="flex items-baseline gap-2">{@render dateRangeCell(item)}</div>
                   <div slot="status" let:item class="flex items-center gap-2">{@render statusCell(item)}</div>
                 </DataTable>
               {/key}
@@ -404,7 +404,7 @@
                 >
                   <div slot="name" let:item class="flex items-center gap-2">{@render nameCell(item)}</div>
                   <div slot="type" let:item>{@render typeCell(item)}</div>
-                  <div slot="date_range" let:item class="flex flex-col">{@render dateRangeCell(item)}</div>
+                  <div slot="date_range" let:item class="flex items-baseline gap-2">{@render dateRangeCell(item)}</div>
                   <div slot="status" let:item class="flex items-center gap-2">{@render statusCell(item)}</div>
                 </DataTable>
               {/key}
