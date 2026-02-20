@@ -267,6 +267,10 @@ func (p *PostgresDB) Initialize() error {
 				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='workspaces' AND column_name='display_mode'",
 				alter: "ALTER TABLE workspaces ADD COLUMN display_mode TEXT DEFAULT 'default'",
 			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='active_timers' AND column_name='user_id'",
+				alter: "ALTER TABLE active_timers ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE",
+			},
 		}
 
 		for _, m := range pgMigrations {

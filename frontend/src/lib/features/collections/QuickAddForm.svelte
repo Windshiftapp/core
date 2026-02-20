@@ -1,7 +1,8 @@
 <script>
   import { Plus, Package, ChevronDown } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
-  import { iconMap } from '../../utils/iconMap.js';
+  import { itemTypeIconMap, workspaceIconMap } from '../../utils/icons.js';
+  const iconMap = { ...workspaceIconMap, ...itemTypeIconMap };
 
   let {
     parentId,

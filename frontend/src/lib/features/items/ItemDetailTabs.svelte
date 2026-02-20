@@ -113,7 +113,7 @@
     <!-- Tab Navigation -->
     <div class="flex border-b" style="border-color: var(--ds-border);">
       <button
-        class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative"
+        class="flex items-center gap-2 pl-0 pr-4 py-3 text-sm font-medium transition-all relative"
         style="{tab === 'comments' ? 'background-color: var(--ds-surface-raised); color: var(--ds-interactive); margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : 'color: var(--ds-text-subtle);'}"
         onclick={() => switchTab('comments')}
       >
@@ -155,7 +155,7 @@
     </div>
 
     <!-- Tab Content -->
-    <div class="pt-4">
+    <div class="pt-6">
       {#if tab === 'comments'}
         <Comments itemId={item.id} isPersonalWorkspace={workspace?.is_personal} isPortalRequest={!!item.request_type_id} onCommentsLoaded={handleCommentsLoaded} />
       {:else if tab === 'details'}

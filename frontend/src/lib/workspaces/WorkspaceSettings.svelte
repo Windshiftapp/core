@@ -65,7 +65,7 @@
     // Redirect from base settings route to general tab
     if (window.location.pathname === `/workspaces/${workspaceId}/settings`) {
       navigate(`/workspaces/${workspaceId}/settings/general`);
-      return;
+      // Don't return — still load data so the component isn't stuck in loading state
     }
 
     // Load all required data

@@ -132,10 +132,6 @@
 </script>
 
 <div class="pt-2">
-  <div class="mb-4">
-    <h3 class="text-sm font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle); font-size: 11px;">{t('common.description')}</h3>
-  </div>
-  
   {#if editingDescription}
     <div class="space-y-3" onkeydown={handleKeydown}>
       <MilkdownEditor

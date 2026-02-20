@@ -924,6 +924,25 @@ func (h *SCMProviderHandler) OAuthCallback(w http.ResponseWriter, r *http.Reques
 		// Non-fatal: user-level token was already stored successfully
 	}
 
+	// Store at workspace connection level when initiated from workspace settings
+	if workspaceID.Valid {
+		if _, err := h.db.Exec(`
+			UPDATE workspace_scm_connections SET
+				oauth_access_token_encrypted = ?,
+				oauth_refresh_token_encrypted = ?,
+				oauth_token_expires_at = ?,
+				updated_at = CURRENT_TIMESTAMP
+			WHERE workspace_id = ? AND scm_provider_id = ?
+		`, encTokens.accessToken, nullString(encTokens.refreshToken), tokenResult.expiresAt,
+			workspaceID.Int64, providerID); err != nil {
+			slog.Warn("failed to store workspace-level OAuth token",
+				slog.String("component", "scm"),
+				slog.Int64("workspace_id", workspaceID.Int64),
+				slog.Int("provider_id", providerID),
+				slog.Any("error", err))
+		}
+	}
+
 	// Redirect based on context
 	if workspaceID.Valid {
 		// Came from workspace settings - redirect back there
@@ -931,7 +950,7 @@ func (h *SCMProviderHandler) OAuthCallback(w http.ResponseWriter, r *http.Reques
 		if err := h.db.QueryRow("SELECT key FROM workspaces WHERE id = ?", workspaceID.Int64).Scan(&workspaceKey); err != nil {
 			slog.Warn("failed to get workspace key for redirect", slog.String("component", "scm"), slog.Any("error", err))
 		}
-		http.Redirect(w, r, fmt.Sprintf("/workspaces/%s/settings?tab=scm&oauth=success&provider=%s",
+		http.Redirect(w, r, fmt.Sprintf("/workspaces/%s/settings/source-control?oauth=success&provider=%s",
 			url.QueryEscape(workspaceKey), url.QueryEscape(providerSlug)), http.StatusFound)
 		return
 	}

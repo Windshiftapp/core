@@ -724,17 +724,20 @@ async function loadStatuses() {
     <div class="p-6 overflow-x-auto">
       <div class="min-w-max">
         <!-- Backbone (Horizontal) -->
-        <div class="flex gap-6 mb-8">
+        <div
+          class="grid gap-x-6 gap-y-10 mb-8"
+          style="grid-template-columns: repeat({backboneItems.length}, 16rem); grid-template-rows: auto 1fr;"
+        >
           {#each backboneItems as backboneItem}
             {@const itemType = getItemTypeInfo(backboneItem.item_type_id)}
-            <div class="flex-none w-64">
+            <div class="row-span-2 grid grid-rows-subgrid">
               <!-- Backbone Item -->
-              <div class="mb-3">
+              <div class="self-start">
                 <ItemCard hasGradient={styles.hasCustomBackground} compact>
                   <!-- Title -->
                   <button
                     onclick={() => navigateToItem(backboneItem.id)}
-                    class="text-sm mb-2 leading-snug text-left w-full line-clamp-3 transition-colors"
+                    class="text-sm mb-2 leading-snug text-left w-full line-clamp-2 transition-colors"
                     style="{styles.glassTextStyle}"
                   >
                     {backboneItem.title}
@@ -817,7 +820,7 @@ async function loadStatuses() {
                           data-item-id={childItem.id}
                           class="text-sm mb-2 leading-snug w-full resize-none overflow-hidden bg-transparent border-none outline-none p-0 m-0"
                           style="color: var(--ds-text); caret-color: var(--ds-text);"
-                          rows="3"
+                          rows="2"
                           onblur={() => saveEditingItem(childItem)}
                           onkeydown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
@@ -831,7 +834,7 @@ async function loadStatuses() {
                           onclick={(e) => e.stopPropagation()}
                         />
                       {:else}
-                        <h4 class="text-sm mb-2 leading-snug line-clamp-3" style="{styles.glassTextStyle}">
+                        <h4 class="text-sm mb-2 leading-snug line-clamp-2" style="{styles.glassTextStyle}">
                           {childItem.title}
                         </h4>
                       {/if}
@@ -1149,4 +1152,3 @@ async function loadStatuses() {
     onclose={closeItemModal}
   />
 {/if}
-

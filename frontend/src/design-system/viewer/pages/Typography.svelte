@@ -44,10 +44,10 @@
       style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
     >
       <p class="text-lg mb-2" style="color: var(--ds-text);">
-        Geist Sans - Primary Font
+        Inter - Primary Font
       </p>
       <code class="text-sm" style="color: var(--ds-text-subtle);">
-        'Geist', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif
+        'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif
       </code>
       <div class="mt-4 pt-4" style="border-top: 1px solid var(--ds-border);">
         <p style="color: var(--ds-text);">

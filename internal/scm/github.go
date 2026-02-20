@@ -363,6 +363,10 @@ func (g *GitHubProvider) ListRepositories(ctx context.Context, opts ListReposito
 
 // GetRepository gets details about a specific repository
 func (g *GitHubProvider) GetRepository(ctx context.Context, owner, repo string) (*Repository, error) {
+	if err := g.ensureInstallationToken(ctx); err != nil {
+		return nil, err
+	}
+
 	reqURL := fmt.Sprintf("%s/repos/%s/%s", g.baseURL, owner, repo)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
@@ -395,6 +399,10 @@ func (g *GitHubProvider) GetRepository(ctx context.Context, owner, repo string) 
 
 // ListPullRequests lists pull requests for a repository
 func (g *GitHubProvider) ListPullRequests(ctx context.Context, owner, repo string, opts ListPROptions) ([]PullRequest, error) {
+	if err := g.ensureInstallationToken(ctx); err != nil {
+		return nil, err
+	}
+
 	page := opts.Page
 	if page == 0 {
 		page = 1
@@ -442,6 +450,10 @@ func (g *GitHubProvider) ListPullRequests(ctx context.Context, owner, repo strin
 
 // GetPullRequest gets details about a specific pull request
 func (g *GitHubProvider) GetPullRequest(ctx context.Context, owner, repo string, number int) (*PullRequest, error) {
+	if err := g.ensureInstallationToken(ctx); err != nil {
+		return nil, err
+	}
+
 	reqURL := fmt.Sprintf("%s/repos/%s/%s/pulls/%d", g.baseURL, owner, repo, number)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
@@ -662,6 +674,10 @@ func (g *GitHubProvider) ListReleases(ctx context.Context, owner, repo string) (
 
 // GetCommit gets details about a specific commit
 func (g *GitHubProvider) GetCommit(ctx context.Context, owner, repo, sha string) (*Commit, error) {
+	if err := g.ensureInstallationToken(ctx); err != nil {
+		return nil, err
+	}
+
 	reqURL := fmt.Sprintf("%s/repos/%s/%s/commits/%s", g.baseURL, owner, repo, sha)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
@@ -694,6 +710,10 @@ func (g *GitHubProvider) GetCommit(ctx context.Context, owner, repo, sha string)
 
 // ListBranches lists branches for a repository
 func (g *GitHubProvider) ListBranches(ctx context.Context, owner, repo string) ([]Branch, error) {
+	if err := g.ensureInstallationToken(ctx); err != nil {
+		return nil, err
+	}
+
 	reqURL := fmt.Sprintf("%s/repos/%s/%s/branches", g.baseURL, owner, repo)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
@@ -736,6 +756,10 @@ func (g *GitHubProvider) ListBranches(ctx context.Context, owner, repo string) (
 
 // RegisterWebhook registers a webhook for repository events
 func (g *GitHubProvider) RegisterWebhook(ctx context.Context, owner, repo string, opts WebhookOptions) (*WebhookRegistration, error) {
+	if err := g.ensureInstallationToken(ctx); err != nil {
+		return nil, err
+	}
+
 	createURL := fmt.Sprintf("%s/repos/%s/%s/hooks", g.baseURL, owner, repo)
 
 	contentType := opts.ContentType
@@ -794,6 +818,10 @@ func (g *GitHubProvider) RegisterWebhook(ctx context.Context, owner, repo string
 
 // DeleteWebhook removes a registered webhook
 func (g *GitHubProvider) DeleteWebhook(ctx context.Context, owner, repo, webhookID string) error {
+	if err := g.ensureInstallationToken(ctx); err != nil {
+		return err
+	}
+
 	deleteURL := fmt.Sprintf("%s/repos/%s/%s/hooks/%s", g.baseURL, owner, repo, webhookID)
 
 	req, err := http.NewRequestWithContext(ctx, "DELETE", deleteURL, http.NoBody)

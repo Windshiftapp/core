@@ -63,6 +63,7 @@ type ItemSCMLinkResponse struct {
 	RepositoryName string `json:"repository_name,omitempty"`
 	RepositoryURL  string `json:"repository_url,omitempty"`
 	ProviderType   string `json:"provider_type,omitempty"`
+	AuthMethod     string `json:"auth_method,omitempty"`
 }
 
 // CreateItemSCMLinkRequest represents a request to create an SCM link
@@ -124,7 +125,7 @@ func (h *SCMItemLinksHandler) GetItemSCMLinks(w http.ResponseWriter, r *http.Req
 			isl.author_external_id, isl.author_name, isl.detection_source,
 			isl.created_at, isl.updated_at,
 			wr.repository_name, wr.repository_url,
-			sp.provider_type
+			sp.provider_type, sp.auth_method
 		FROM item_scm_links isl
 		JOIN workspace_repositories wr ON wr.id = isl.workspace_repository_id
 		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
@@ -140,6 +141,7 @@ func (h *SCMItemLinksHandler) GetItemSCMLinks(w http.ResponseWriter, r *http.Req
 	defer func() { _ = rows.Close() }()
 
 	links := []ItemSCMLinkResponse{}
+	hasOAuthPRLinks := false
 	for rows.Next() {
 		var link ItemSCMLinkResponse
 		var externalURL, title, state, authorExternalID, authorName, detectionSource sql.NullString
@@ -150,7 +152,7 @@ func (h *SCMItemLinksHandler) GetItemSCMLinks(w http.ResponseWriter, r *http.Req
 			&authorExternalID, &authorName, &detectionSource,
 			&link.CreatedAt, &link.UpdatedAt,
 			&link.RepositoryName, &link.RepositoryURL,
-			&link.ProviderType,
+			&link.ProviderType, &link.AuthMethod,
 		)
 		if err != nil {
 			slog.Error("failed to scan link", slog.String("component", "scm_item_links"), slog.Any("error", err))
@@ -176,11 +178,29 @@ func (h *SCMItemLinksHandler) GetItemSCMLinks(w http.ResponseWriter, r *http.Req
 			link.DetectionSource = detectionSource.String
 		}
 
+		// Track if there are OAuth PR links that need background refresh
+		if link.AuthMethod == string(models.SCMAuthMethodOAuth) && link.LinkType == "pull_request" && link.State != "merged" {
+			hasOAuthPRLinks = true
+		}
+
 		links = append(links, link)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(links)
+
+	// Fire background refresh for OAuth PR links if the user is authenticated
+	if hasOAuthPRLinks {
+		if user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User); ok {
+			go func() {
+				bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				if err := h.syncService.RefreshOAuthLinksForItem(bgCtx, itemID, user.ID); err != nil {
+					slog.Warn("Background OAuth link refresh failed", slog.String("component", "scm_item_links"), slog.Int("item_id", itemID), slog.Any("error", err))
+				}
+			}()
+		}
+	}
 }
 
 // CreateItemSCMLink creates a new SCM link for an item
@@ -360,11 +380,46 @@ func (h *SCMItemLinksHandler) RefreshItemSCMLink(w http.ResponseWriter, r *http.
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 
-	err = h.syncService.RefreshItemSCMLink(ctx, linkID)
-	if err != nil {
-		slog.Error("failed to refresh link", slog.String("component", "scm_item_links"), slog.Any("error", err))
-		respondInternalError(w, r, fmt.Errorf("failed to refresh link: %w", err))
-		return
+	// Check if this link uses OAuth — if so, route through user credentials
+	var authMethod string
+	_ = h.db.QueryRow(`
+		SELECT sp.auth_method
+		FROM item_scm_links isl
+		JOIN workspace_repositories wr ON wr.id = isl.workspace_repository_id
+		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
+		JOIN scm_providers sp ON sp.id = wsc.scm_provider_id
+		WHERE isl.id = ?
+	`, linkID).Scan(&authMethod)
+
+	if authMethod == string(models.SCMAuthMethodOAuth) {
+		user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+		if !ok {
+			respondUnauthorized(w, r)
+			return
+		}
+
+		err = h.syncService.RefreshItemSCMLinkForUser(ctx, linkID, user.ID)
+		if err != nil {
+			if errors.Is(err, scm.ErrUserSCMNotConnected) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusForbidden)
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"error":   "scm_not_connected",
+					"message": "You need to connect your SCM account to refresh this link",
+				})
+				return
+			}
+			slog.Error("failed to refresh link for user", slog.String("component", "scm_item_links"), slog.Any("error", err))
+			respondInternalError(w, r, fmt.Errorf("failed to refresh link: %w", err))
+			return
+		}
+	} else {
+		err = h.syncService.RefreshItemSCMLink(ctx, linkID)
+		if err != nil {
+			slog.Error("failed to refresh link", slog.String("component", "scm_item_links"), slog.Any("error", err))
+			respondInternalError(w, r, fmt.Errorf("failed to refresh link: %w", err))
+			return
+		}
 	}
 
 	// Return the updated link
