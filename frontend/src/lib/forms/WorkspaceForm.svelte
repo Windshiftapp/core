@@ -11,6 +11,28 @@
     nameInputRef = $bindable(null)
   } = $props();
 
+  let keyManuallyEdited = false;
+
+  function generateKey(name) {
+    const words = name.trim().split(/\s+/).filter(Boolean);
+    if (words.length === 0) return '';
+    if (words.length === 1) {
+      return words[0].substring(0, 2).toUpperCase();
+    }
+    return words.map(w => w[0]).join('').substring(0, 5).toUpperCase();
+  }
+
+  function onNameInput() {
+    if (!keyManuallyEdited) {
+      formData.key = generateKey(formData.name);
+    }
+  }
+
+  function onKeyInput(e) {
+    keyManuallyEdited = true;
+    formData.key = e.target.value.toUpperCase();
+  }
+
   export function validate() {
     return formData.name.trim() !== '' && formData.key.trim() !== '';
   }
@@ -30,6 +52,7 @@
       key: '',
       description: ''
     };
+    keyManuallyEdited = false;
   }
 
   export function isValid() {
@@ -42,6 +65,7 @@
   <input
     bind:this={nameInputRef}
     bind:value={formData.name}
+    oninput={onNameInput}
     type="text"
     class="w-full text-lg font-medium border-0 outline-none bg-transparent"
     style="color: var(--ds-text);"
@@ -51,6 +75,7 @@
   <!-- Workspace Key -->
   <input
     bind:value={formData.key}
+    oninput={onKeyInput}
     type="text"
     class="w-full text-sm border-0 outline-none bg-transparent"
     style="color: var(--ds-text-subtle);"

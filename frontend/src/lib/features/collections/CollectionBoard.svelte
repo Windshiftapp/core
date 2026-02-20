@@ -96,17 +96,14 @@
 
     let preselectedWorkspaceId = workspaceId ? parseInt(workspaceId) : (workspaces.length === 1 ? workspaces[0].id : null);
 
-    quickAddState = {
-      ...quickAddState,
-      [columnId]: {
-        show: true,
-        workspaceId: preselectedWorkspaceId,
-        itemTypeId: availableTypes[0]?.id ?? null,
-        availableTypes,
-        statusId,
-        title: '',
-        error: null
-      }
+    quickAddState[columnId] = {
+      show: true,
+      workspaceId: preselectedWorkspaceId,
+      itemTypeId: availableTypes[0]?.id ?? null,
+      availableTypes,
+      statusId,
+      title: '',
+      error: null
     };
 
     setTimeout(() => {
@@ -116,16 +113,13 @@
   }
 
   function cancelQuickAdd(columnId) {
-    const newState = { ...quickAddState };
-    delete newState[columnId];
-    quickAddState = newState;
+    delete quickAddState[columnId];
   }
 
   function updateQuickAddField(columnId, field, value) {
     if (quickAddState[columnId]) {
       quickAddState[columnId][field] = value;
       quickAddState[columnId].error = null;
-      quickAddState = { ...quickAddState };
     }
   }
 
@@ -135,17 +129,14 @@
 
     if (!state.workspaceId) {
       quickAddState[columnId].error = 'Please select a workspace';
-      quickAddState = { ...quickAddState };
       return;
     }
     if (!state.itemTypeId) {
       quickAddState[columnId].error = 'Please select an item type';
-      quickAddState = { ...quickAddState };
       return;
     }
     if (!state.title?.trim()) {
       quickAddState[columnId].error = 'Please enter a title';
-      quickAddState = { ...quickAddState };
       return;
     }
 
@@ -176,7 +167,6 @@
     } catch (error) {
       console.error('Failed to create item:', error);
       quickAddState[columnId].error = 'Failed to create item: ' + (error.message || error);
-      quickAddState = { ...quickAddState };
     }
   }
 
@@ -745,7 +735,7 @@
                   <div class="mb-3">
                     <QuickAddForm
                       parentId={column.id}
-                      state={quickAddState[column.id]}
+                      formState={quickAddState[column.id]}
                       {workspaces}
                       hasGradient={styles.hasCustomBackground}
                       cardBgStyle={styles.cardStyle(8)}

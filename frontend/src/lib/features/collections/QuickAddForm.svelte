@@ -1,22 +1,23 @@
 <script>
-  import { Plus, Package, ChevronDown } from 'lucide-svelte';
+  import { Plus, X, Package, ChevronDown } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { itemTypeIconMap, workspaceIconMap } from '../../utils/icons.js';
   const iconMap = { ...workspaceIconMap, ...itemTypeIconMap };
 
   let {
     parentId,
-    state,
+    formState,
     workspaces = [],
     hasGradient = false,
+    compact = false,
     cardBgStyle = '',
     onUpdateField = () => {},
     onCreate = () => {},
     onCancel = () => {}
   } = $props();
 
-  let selectedWorkspace = $derived(workspaces.find(w => w.id === state.workspaceId));
-  let selectedItemType = $derived(state.availableTypes?.find(t => t.id === state.itemTypeId));
+  let selectedWorkspace = $derived(workspaces.find(w => w.id === formState.workspaceId));
+  let selectedItemType = $derived(formState.availableTypes?.find(it => it.id === formState.itemTypeId));
 
   // Dropdown management
   let showWorkspaceDropdown = $state(false);
@@ -46,7 +47,7 @@
   <!-- Textarea area -->
   <div class="p-3 pb-2">
     <textarea
-      value={state.title}
+      value={formState.title}
       data-quick-add-parent={parentId}
       oninput={(e) => onUpdateField(parentId, 'title', e.target.value)}
       onkeydown={handleKeydown}
@@ -61,8 +62,8 @@
   <div class="border-t mx-3" style="border-color: {hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'};"></div>
 
   <!-- Actions Footer -->
-  <div class="p-3 pt-2 flex items-center gap-2 flex-wrap">
-    <div class="flex items-center gap-2 flex-wrap">
+  <div class="p-3 pt-2 flex items-center gap-2" class:flex-wrap={!compact}>
+    <div class="flex items-center gap-2" class:flex-wrap={!compact}>
       <!-- Workspace Selector -->
       <div class="relative">
         <button
@@ -71,16 +72,16 @@
             showWorkspaceDropdown = !showWorkspaceDropdown;
             showItemTypeDropdown = false;
           }}
-          class="w-7 h-7 rounded-md flex items-center justify-center border overflow-hidden transition-all hover:scale-105"
+          class="{compact ? 'w-7 h-7' : 'w-8 h-8'} rounded-md flex items-center justify-center border overflow-hidden transition-all hover:scale-105"
           style="{selectedWorkspace?.avatar_url ? '' : `background-color: ${selectedWorkspace?.color || 'var(--ds-interactive)'};`} border-color: var(--ds-border);"
           title={selectedWorkspace?.name || 'Select workspace'}
         >
           {#if selectedWorkspace?.avatar_url}
             <img src={selectedWorkspace.avatar_url} alt="{selectedWorkspace.name} avatar" class="w-full h-full object-cover" />
           {:else if selectedWorkspace?.icon}
-            <svelte:component this={iconMap[selectedWorkspace.icon] || Package} class="w-3 h-3 text-white" />
+            <svelte:component this={iconMap[selectedWorkspace.icon] || Package} class="{compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-white" />
           {:else}
-            <Package class="w-3 h-3 text-white" />
+            <Package class="{compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-white" />
           {/if}
         </button>
 
@@ -116,38 +117,57 @@
       </div>
 
       <!-- Item Type Selector -->
-      {#if state.availableTypes?.length > 0}
+      {#if formState.availableTypes?.length > 0}
         <div class="relative">
-          <button
-            type="button"
-            onclick={() => {
-              showItemTypeDropdown = !showItemTypeDropdown;
-              showWorkspaceDropdown = false;
-            }}
-            class="h-7 px-2 rounded-md flex items-center gap-1.5 border text-sm transition-all hover:scale-105"
-            style="border-color: var(--ds-border); color: var(--ds-text);"
-            title={selectedItemType?.name || 'Select type'}
-          >
-            {#if selectedItemType}
-              <div
-                class="w-4 h-4 rounded flex items-center justify-center"
-                style="background-color: {selectedItemType.color};"
-              >
-                <svelte:component this={iconMap[selectedItemType.icon] || Package} class="w-2.5 h-2.5 text-white" />
-              </div>
-              <span class="text-xs">{selectedItemType.name}</span>
-            {:else}
-              <span class="text-xs" style="color: var(--ds-text-subtle);">{t('collections.selectType')}</span>
-            {/if}
-            <ChevronDown class="w-3 h-3" style="color: var(--ds-text-subtle);" />
-          </button>
+          {#if compact}
+            <button
+              type="button"
+              onclick={() => {
+                showItemTypeDropdown = !showItemTypeDropdown;
+                showWorkspaceDropdown = false;
+              }}
+              class="w-7 h-7 rounded-md flex items-center justify-center border overflow-hidden transition-all hover:scale-105"
+              style="background-color: {selectedItemType?.color || 'var(--ds-surface)'}; border-color: var(--ds-border);"
+              title={selectedItemType?.name || 'Select type'}
+            >
+              {#if selectedItemType}
+                <svelte:component this={iconMap[selectedItemType.icon] || Package} class="w-3 h-3 text-white" />
+              {:else}
+                <Package class="w-3 h-3" style="color: var(--ds-text-subtle);" />
+              {/if}
+            </button>
+          {:else}
+            <button
+              type="button"
+              onclick={() => {
+                showItemTypeDropdown = !showItemTypeDropdown;
+                showWorkspaceDropdown = false;
+              }}
+              class="h-8 px-2 rounded-md flex items-center gap-1.5 border text-sm transition-all hover:scale-105"
+              style="border-color: var(--ds-border); color: var(--ds-text);"
+              title={selectedItemType?.name || 'Select type'}
+            >
+              {#if selectedItemType}
+                <div
+                  class="w-4 h-4 rounded flex items-center justify-center"
+                  style="background-color: {selectedItemType.color};"
+                >
+                  <svelte:component this={iconMap[selectedItemType.icon] || Package} class="w-2.5 h-2.5 text-white" />
+                </div>
+                <span class="text-xs">{selectedItemType.name}</span>
+              {:else}
+                <span class="text-xs" style="color: var(--ds-text-subtle);">{t('collections.selectType')}</span>
+              {/if}
+              <ChevronDown class="w-3 h-3" style="color: var(--ds-text-subtle);" />
+            </button>
+          {/if}
 
           {#if showItemTypeDropdown}
             <div
               class="absolute z-50 mt-1 w-48 rounded-md shadow-lg border py-1"
               style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
             >
-              {#each state.availableTypes as itemType}
+              {#each formState.availableTypes as itemType}
                 <button
                   type="button"
                   onclick={() => selectItemType(itemType.id)}
@@ -171,36 +191,64 @@
       {/if}
 
       <!-- Create Button -->
-      <button
-        type="button"
-        onclick={() => onCreate(parentId)}
-        class="h-7 px-3 rounded-md text-sm font-medium text-white transition-colors flex items-center gap-1"
-        style="background-color: var(--ds-interactive);"
-        onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-interactive-hovered)'}
-        onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-interactive)'}
-      >
-        <Plus class="w-3.5 h-3.5" />
-        {t('common.create')}
-      </button>
+      {#if compact}
+        <button
+          type="button"
+          onclick={() => onCreate(parentId)}
+          class="w-7 h-7 rounded-md font-medium text-white transition-colors flex items-center justify-center"
+          style="background-color: var(--ds-interactive);"
+          onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-interactive-hovered)'}
+          onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-interactive)'}
+          title={t('common.create')}
+        >
+          <Plus class="w-3.5 h-3.5" />
+        </button>
+      {:else}
+        <button
+          type="button"
+          onclick={() => onCreate(parentId)}
+          class="h-8 px-3 rounded-md text-sm font-medium text-white transition-colors flex items-center gap-1"
+          style="background-color: var(--ds-interactive);"
+          onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-interactive-hovered)'}
+          onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-interactive)'}
+        >
+          <Plus class="w-3.5 h-3.5" />
+          {t('common.create')}
+        </button>
+      {/if}
 
       <!-- Cancel Button -->
-      <button
-        type="button"
-        onclick={() => onCancel(parentId)}
-        class="h-7 px-2 rounded-md text-sm transition-colors"
-        style="color: var(--ds-text-subtle);"
-        onmouseenter={(e) => e.currentTarget.style.color = 'var(--ds-text)'}
-        onmouseleave={(e) => e.currentTarget.style.color = 'var(--ds-text-subtle)'}
-      >
-        {t('common.cancel')}
-      </button>
+      {#if compact}
+        <button
+          type="button"
+          onclick={() => onCancel(parentId)}
+          class="w-7 h-7 rounded-md transition-colors flex items-center justify-center"
+          style="color: var(--ds-text-subtle);"
+          onmouseenter={(e) => e.currentTarget.style.color = 'var(--ds-text)'}
+          onmouseleave={(e) => e.currentTarget.style.color = 'var(--ds-text-subtle)'}
+          title={t('common.cancel')}
+        >
+          <X class="w-3.5 h-3.5" />
+        </button>
+      {:else}
+        <button
+          type="button"
+          onclick={() => onCancel(parentId)}
+          class="h-8 px-2 rounded-md text-sm transition-colors"
+          style="color: var(--ds-text-subtle);"
+          onmouseenter={(e) => e.currentTarget.style.color = 'var(--ds-text)'}
+          onmouseleave={(e) => e.currentTarget.style.color = 'var(--ds-text-subtle)'}
+        >
+          {t('common.cancel')}
+        </button>
+      {/if}
     </div>
   </div>
 
   <!-- Error message -->
-  {#if state.error}
+  {#if formState.error}
     <div class="px-3 pb-3 text-xs" style="color: var(--ds-text-danger);">
-      {state.error}
+      {formState.error}
     </div>
   {/if}
 </div>

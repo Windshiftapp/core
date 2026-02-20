@@ -7,7 +7,7 @@
   import { getCollection, checkItemVisibility } from '../collections/collectionService.js';
   import { collectionStore, reloadCollection } from '../../stores/collectionContext.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
-  import { FileText, Plus, ChevronDown, Package, ChevronRight, Home, MapPin } from 'lucide-svelte';
+  import { FileText, Plus, ChevronDown, ChevronRight, Home, MapPin } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import EmptyState from '../../components/EmptyState.svelte';
   import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
@@ -21,6 +21,7 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import { getStatusCategory } from '../../utils/statusColors.js';
   import CollectionViewSwitcher from './CollectionViewSwitcher.svelte';
+  import QuickAddForm from './QuickAddForm.svelte';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -61,18 +62,7 @@
     loadStoryMapDataFromURL();
   }
 
-  // Close dropdowns when clicking outside
-  function handleClickOutside(event) {
-    const dropdowns = document.querySelectorAll('[id^="workspace-dropdown-"], [id^="itemtype-dropdown-"]');
-    dropdowns.forEach(dropdown => {
-      if (!dropdown.classList.contains('hidden') && !dropdown.contains(event.target) && !event.target.closest('button')) {
-        dropdown.classList.add('hidden');
-      }
-    });
-  }
-
   useEventListener(() => window, 'popstate', handlePopState);
-  useEventListener(() => document, 'click', handleClickOutside);
 
   onMount(async () => {
     await loadWorkspaceGradient(workspaceId);
@@ -85,7 +75,8 @@
   $effect(() => {
     if (!collectionStore.loading) {
       currentCollectionName = collectionStore.collectionName;
-      untrack(() => processMapItems(collectionStore.items));
+      const currentItems = collectionStore.items;
+      untrack(() => processMapItems(currentItems));
     }
   });
 
@@ -467,16 +458,13 @@ async function loadStatuses() {
       preselectedWorkspaceId = workspaces[0].id;
     }
 
-    quickAddState = {
-      ...quickAddState,
-      [parentId]: {
-        show: true,
-        workspaceId: preselectedWorkspaceId,
-        itemTypeId: availableTypes.length > 0 ? availableTypes[0].id : null,
-        availableTypes: availableTypes,
-        title: '',
-        error: null
-      }
+    quickAddState[parentId] = {
+      show: true,
+      workspaceId: preselectedWorkspaceId,
+      itemTypeId: availableTypes.length > 0 ? availableTypes[0].id : null,
+      availableTypes: availableTypes,
+      title: '',
+      error: null
     };
 
     // Focus the textarea after it's rendered
@@ -489,9 +477,7 @@ async function loadStatuses() {
   }
 
   function cancelQuickAdd(parentId) {
-    const newState = { ...quickAddState };
-    delete newState[parentId];
-    quickAddState = newState;
+    delete quickAddState[parentId];
   }
 
   async function createChildItem(parentId) {
@@ -501,17 +487,14 @@ async function loadStatuses() {
     // Validate
     if (!state.workspaceId) {
       quickAddState[parentId].error = 'Please select a workspace';
-      quickAddState = { ...quickAddState };
       return;
     }
     if (!state.itemTypeId) {
       quickAddState[parentId].error = 'Please select an item type';
-      quickAddState = { ...quickAddState };
       return;
     }
     if (!state.title?.trim()) {
       quickAddState[parentId].error = 'Please enter a title';
-      quickAddState = { ...quickAddState };
       return;
     }
 
@@ -552,7 +535,6 @@ async function loadStatuses() {
     } catch (error) {
       console.error('Failed to create child item:', error);
       quickAddState[parentId].error = 'Failed to create item: ' + (error.message || error);
-      quickAddState = { ...quickAddState };
     }
   }
 
@@ -560,7 +542,6 @@ async function loadStatuses() {
     if (quickAddState[parentId]) {
       quickAddState[parentId][field] = value;
       quickAddState[parentId].error = null;
-      quickAddState = { ...quickAddState };
     }
   }
 
@@ -807,8 +788,8 @@ async function loadStatuses() {
                   {#each childItemsByParent[backboneItem.id] || [] as childItem}
                     {@const childItemType = getItemTypeInfo(childItem.item_type_id)}
                     <div
-                      class="item-card rounded-lg border p-3 cursor-move"
-                      style="{styles.hasGradient ? 'backdrop-filter: blur(12px); background-color: var(--ds-glass-bg);' : 'background-color: var(--ds-surface-card);'} {styles.hasGradient ? 'border-color: var(--ds-glass-border);' : 'border-color: transparent;'} box-shadow: var(--ds-shadow-raised);"
+                      class="item-card rounded border p-3 cursor-move"
+                      style="box-shadow: var(--ds-shadow-raised); {styles.cardStyle(4)}"
                       data-item-id={childItem.id}
                       data-testid="draggable-item-{childItem.id}"
                       ondblclick={(e) => startEditingItem(childItem, e)}
@@ -890,15 +871,6 @@ async function loadStatuses() {
 
                   <!-- Quick Add / Empty State -->
                   {#if !quickAddState[backboneItem.id]?.show && (!childItemsByParent[backboneItem.id] || childItemsByParent[backboneItem.id].length === 0)}
-                    <div class="text-center py-8">
-                      <div class="text-sm mb-3" style={styles.glassSubtleTextStyle}>
-                        {#if canAddChildren(backboneItem.id)}
-                          {t('collections.noChildItems')}
-                        {:else}
-                          {t('collections.noChildItemsLowest')}
-                        {/if}
-                      </div>
-                    </div>
                     {#if canAddChildren(backboneItem.id)}
                       <button
                         onclick={() => initQuickAdd(backboneItem.id)}
@@ -921,176 +893,17 @@ async function loadStatuses() {
 
                   <!-- Quick Add Form -->
                   {#if quickAddState[backboneItem.id]?.show}
-                    {@const state = quickAddState[backboneItem.id]}
-                    {@const selectedWorkspace = workspaces.find(w => w.id === state.workspaceId)}
-                    {@const selectedItemType = state.availableTypes?.find(t => t.id === state.itemTypeId)}
-                    <div class="rounded shadow-md border" style="{styles.cardStyle(8)}">
-                      <!-- Textarea area -->
-                      <div class="p-3 pb-2">
-                        <!-- Title Textarea - Full width, blends in -->
-                        <textarea
-                          bind:value={state.title}
-                          data-quick-add-parent={backboneItem.id}
-                          oninput={(e) => updateQuickAddField(backboneItem.id, 'title', e.target.value)}
-                          onkeydown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              createChildItem(backboneItem.id);
-                            } else if (e.key === 'Escape') {
-                              cancelQuickAdd(backboneItem.id);
-                            }
-                          }}
-                          placeholder={t('collections.enterSummary')}
-                          rows="2"
-                          class="w-full px-0 py-0 text-sm resize-none border-0 focus:outline-none focus:ring-0"
-                          style="background-color: transparent; color: var(--ds-text); caret-color: var(--ds-text);"
-                        ></textarea>
-                      </div>
-
-                      <!-- Divider -->
-                      <div class="border-t mx-3" style="border-color: {styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'};">
-</div>
-
-                      <!-- Actions Footer -->
-                      <div class="p-3 pt-2 flex items-center gap-2 flex-wrap">
-                        <!-- Icon buttons + Create/Cancel -->
-                        <div class="flex items-center gap-2 flex-wrap">
-                          <!-- Workspace Selector - Icon Only Button -->
-                          <div class="relative">
-                            <button
-                              type="button"
-                              onclick={() => {
-                                const dropdownId = `workspace-dropdown-${backboneItem.id}`;
-                                const dropdown = document.getElementById(dropdownId);
-                                if (dropdown) {
-                                  dropdown.classList.toggle('hidden');
-                                }
-                              }}
-                              class="w-7 h-7 rounded-md flex items-center justify-center border overflow-hidden transition-all hover:scale-105"
-                              style="{selectedWorkspace?.avatar_url ? '' : `background-color: ${selectedWorkspace?.color || 'var(--ds-interactive)'};`} border-color: var(--ds-border);"
-                              title={selectedWorkspace?.name || 'Select workspace'}
-                            >
-                              {#if selectedWorkspace?.avatar_url}
-                                <img src={selectedWorkspace.avatar_url} alt="{selectedWorkspace.name} avatar" class="w-full h-full object-cover" />
-                              {:else if selectedWorkspace?.icon}
-                                <svelte:component this={iconMap[selectedWorkspace.icon] || Package} class="w-3 h-3 text-white" />
-                              {:else}
-                                <Package class="w-3 h-3 text-white" />
-                              {/if}
-                            </button>
-
-                            <!-- Workspace Dropdown -->
-                            <div
-                              id="workspace-dropdown-{backboneItem.id}"
-                              class="hidden absolute bottom-full left-0 mb-1 w-48 rounded border shadow-lg z-50"
-                              style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
-                            >
-                              <div class="max-h-48 overflow-y-auto">
-                                {#each workspaces as ws}
-                                  <button
-                                    type="button"
-                                    onclick={() => {
-                                      updateQuickAddField(backboneItem.id, 'workspaceId', ws.id);
-                                      const dropdownId = `workspace-dropdown-${backboneItem.id}`;
-                                      const dropdown = document.getElementById(dropdownId);
-                                      if (dropdown) dropdown.classList.add('hidden');
-                                    }}
-                                    class="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors"
-                                    style="color: var(--ds-text);"
-                                    onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
-                                    onmouseleave={(e) => e.currentTarget.style.background = ''}
-                                  >
-                                    {#if ws.avatar_url}
-                                      <img src={ws.avatar_url} alt="{ws.name} avatar" class="w-5 h-5 rounded object-cover flex-shrink-0" />
-                                    {:else}
-                                      <div class="w-5 h-5 rounded flex items-center justify-center flex-shrink-0" style="background-color: {ws.color || 'var(--ds-interactive)'};">
-                                        {#if ws.icon}
-                                          <svelte:component this={iconMap[ws.icon] || Package} class="w-3 h-3 text-white" />
-                                        {:else}
-                                          <Package class="w-3 h-3 text-white" />
-                                        {/if}
-                                      </div>
-                                    {/if}
-                                    <span class="truncate">{ws.name}</span>
-                                  </button>
-                                {/each}
-                              </div>
-                            </div>
-                          </div>
-
-                          <!-- Item Type Selector - Icon Only Button -->
-                          <div class="relative">
-                            <button
-                              type="button"
-                              onclick={() => {
-                                const dropdownId = `itemtype-dropdown-${backboneItem.id}`;
-                                const dropdown = document.getElementById(dropdownId);
-                                if (dropdown) {
-                                  dropdown.classList.toggle('hidden');
-                                }
-                              }}
-                              class="w-7 h-7 rounded-md flex items-center justify-center border transition-all hover:scale-105"
-                              style="background-color: {selectedItemType?.color || '#6b7280'}; border-color: var(--ds-border);"
-                              title={selectedItemType?.name || 'Select item type'}
-                            >
-                              {#if selectedItemType?.icon}
-                                <svelte:component this={iconMap[selectedItemType.icon] || FileText} class="w-3 h-3 text-white" />
-                              {:else}
-                                <FileText class="w-3 h-3 text-white" />
-                              {/if}
-                            </button>
-
-                            <!-- Item Type Dropdown -->
-                            <div
-                              id="itemtype-dropdown-{backboneItem.id}"
-                              class="hidden absolute bottom-full left-0 mb-1 w-40 rounded border shadow-lg z-50"
-                              style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
-                            >
-                              <div class="max-h-48 overflow-y-auto">
-                                {#if state.availableTypes && state.availableTypes.length > 0}
-                                  {#each state.availableTypes as type}
-                                    <button
-                                      type="button"
-                                      onclick={() => {
-                                        updateQuickAddField(backboneItem.id, 'itemTypeId', type.id);
-                                        const dropdownId = `itemtype-dropdown-${backboneItem.id}`;
-                                        const dropdown = document.getElementById(dropdownId);
-                                        if (dropdown) dropdown.classList.add('hidden');
-                                      }}
-                                      class="w-full flex items-center gap-2 px-3 py-2 text-sm hover-bg transition-colors"
-                                      style="color: var(--ds-text);"
-                                    >
-                                      <div class="w-5 h-5 rounded flex items-center justify-center flex-shrink-0" style="background-color: {type.color};">
-                                        <svelte:component this={iconMap[type.icon] || FileText} class="w-3 h-3 text-white" />
-                                      </div>
-                                      <span class="truncate">{type.name}</span>
-                                    </button>
-                                  {/each}
-                                {:else}
-                                  <div class="px-3 py-2 text-sm" style="color: var(--ds-text-subtle);">{t('collections.noTypesAvailable')}</div>
-                                {/if}
-                              </div>
-                            </div>
-                          </div>
-
-                          <!-- Cancel Button -->
-                          <button
-                            onclick={() => cancelQuickAdd(backboneItem.id)}
-                            class="px-2.5 py-1.5 text-sm font-medium rounded transition-colors"
-                            style="color: var(--ds-text-subtle); background-color: var(--ds-background-neutral);"
-                          >
-                            {t('common.cancel')}
-                          </button>
-                        </div>
-
-                        <!-- Right side: Error Message -->
-                        {#if state.error}
-                          <div class="text-xs text-red-600">
-                            {state.error}
-                          </div>
-                        {/if}
-                      </div>
-                    </div>
+                    <QuickAddForm
+                      parentId={backboneItem.id}
+                      formState={quickAddState[backboneItem.id]}
+                      {workspaces}
+                      hasGradient={styles.hasCustomBackground}
+                      compact={true}
+                      cardBgStyle={styles.cardStyle(8)}
+                      onUpdateField={updateQuickAddField}
+                      onCreate={createChildItem}
+                      onCancel={cancelQuickAdd}
+                    />
                   {/if}
                 </div>
               </div>
