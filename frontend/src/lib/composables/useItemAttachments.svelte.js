@@ -141,17 +141,7 @@ export function useItemAttachments(getItemId, showError = console.error) {
         formData.append('file', file);
         formData.append('item_id', itemId.toString());
 
-        const response = await fetch('/api/attachments/upload', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || 'Upload failed');
-        }
-
-        const result = await response.json();
+        const result = await api.attachments.upload(formData);
         if (!result.success) {
           throw new Error(result.message || 'Upload failed');
         }

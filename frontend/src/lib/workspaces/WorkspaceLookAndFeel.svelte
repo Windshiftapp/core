@@ -175,16 +175,7 @@
       uploadFormData.append('item_id', workspaceId.toString());
       uploadFormData.append('category', 'workspace_avatar');
 
-      const response = await fetch('/api/attachments/upload', {
-        method: 'POST',
-        body: uploadFormData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
-
-      const uploadResult = await response.json();
+      const uploadResult = await api.attachments.upload(uploadFormData);
 
       if (uploadResult && uploadResult.success && uploadResult.avatar_url) {
         avatarUrl = uploadResult.avatar_url;
@@ -259,16 +250,7 @@
       uploadFormData.append('item_id', workspaceId.toString());
       uploadFormData.append('category', 'workspace_background');
 
-      const response = await fetch('/api/attachments/upload', {
-        method: 'POST',
-        body: uploadFormData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
-
-      const uploadResult = await response.json();
+      const uploadResult = await api.attachments.upload(uploadFormData);
 
       if (uploadResult && uploadResult.success && uploadResult.background_url) {
         selectBackgroundImage(uploadResult.background_url);

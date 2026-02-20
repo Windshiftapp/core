@@ -26,7 +26,7 @@ import {
   projectFieldRequirements,
   screens,
 } from './configuration.js';
-import { del, get, post, put } from './core.js';
+import { del, fetchAPI, get, getCSRFToken, post, put } from './core.js';
 import { hub } from './hub.js';
 // Domain imports
 import { items } from './items.js';
@@ -344,6 +344,8 @@ export const api = {
   llmProviders,
 };
 
+// Core utilities
+export { fetchAPI, getCSRFToken };
 // Security settings exports
 export {
   authPolicy,

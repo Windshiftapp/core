@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { useEventListener } from 'runed';
   import { ChevronLeft, ChevronRight, Calendar, CheckSquare, X, ChevronDown, Download, ExternalLink, MoreHorizontal } from 'lucide-svelte';
-  import { api } from '../../api.js';
+  import { api, fetchAPI } from '../../api.js';
   import PageHeader from '../../layout/PageHeader.svelte';
   import PersonalTaskDetail from '../personal/PersonalTaskDetail.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
@@ -441,17 +441,10 @@
         duration_minutes: durationMinutes
       };
 
-      const response = await fetch(`/api/items/${item.id}/schedule`, {
+      await fetchAPI(`/items/${item.id}/schedule`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(scheduleRequest)
       });
-
-      if (!response.ok) {
-        throw new Error(`Failed to schedule item: ${response.status} ${response.statusText}`);
-      }
     } catch (error) {
       console.error('Failed to schedule item:', error);
       throw error;
@@ -475,17 +468,10 @@
         duration_minutes: durationMinutes
       };
 
-      const response = await fetch(`/api/items/${itemId}/schedule`, {
+      await fetchAPI(`/items/${itemId}/schedule`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(scheduleRequest)
       });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update schedule: ${response.status} ${response.statusText}`);
-      }
     } catch (error) {
       console.error('Failed to update schedule:', error);
       throw error;
@@ -499,16 +485,9 @@
         throw new Error('No authenticated user found');
       }
 
-      const response = await fetch(`/api/items/${itemId}/unschedule?user_id=${user.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        }
+      await fetchAPI(`/items/${itemId}/unschedule?user_id=${user.id}`, {
+        method: 'DELETE'
       });
-
-      if (!response.ok) {
-        throw new Error(`Failed to unschedule item: ${response.status} ${response.statusText}`);
-      }
     } catch (error) {
       console.error('Failed to unschedule item:', error);
       throw error;
@@ -526,18 +505,7 @@
       const startDate = formatDateKey(new Date(currentWeekStart));
       const endDate = formatDateKey(new Date(currentWeekStart.getTime() + 6 * 24 * 60 * 60 * 1000));
 
-      const response = await fetch(`/api/calendar/scheduled-items?user_id=${user.id}&start_date=${startDate}&end_date=${endDate}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to load scheduled items: ${response.status} ${response.statusText}`);
-      }
-
-      const scheduledData = await response.json();
+      const scheduledData = await fetchAPI(`/calendar/scheduled-items?user_id=${user.id}&start_date=${startDate}&end_date=${endDate}`);
 
       // Transform scheduled data back into workItems format
       workItems = {};

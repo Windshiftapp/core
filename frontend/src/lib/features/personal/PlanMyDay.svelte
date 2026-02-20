@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../../api.js';
+  import { api, fetchAPI } from '../../api.js';
   import { Sparkles, CalendarPlus, RotateCcw, CheckCircle, AlertCircle } from 'lucide-svelte';
   import { authStore } from '../../stores';
   import { navigate } from '../../router.js';
@@ -68,22 +68,21 @@
       String(today.getDate()).padStart(2, '0');
 
     const promises = plan.activities.map(async (activity) => {
-      const res = await fetch(`/api/items/${activity.item_id}/schedule`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: user.id,
-          workspace_id: activity.workspace_id,
-          scheduled_date: scheduledDate,
-          scheduled_time: activity.time,
-          duration_minutes: activity.duration_minutes,
-        }),
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => 'Unknown error');
-        throw new Error(`Failed to schedule ${activity.item_key}: ${text}`);
+      try {
+        await fetchAPI(`/items/${activity.item_id}/schedule`, {
+          method: 'POST',
+          body: JSON.stringify({
+            user_id: user.id,
+            workspace_id: activity.workspace_id,
+            scheduled_date: scheduledDate,
+            scheduled_time: activity.time,
+            duration_minutes: activity.duration_minutes,
+          }),
+        });
+        return activity;
+      } catch (err) {
+        throw new Error(`Failed to schedule ${activity.item_key}: ${err.message}`);
       }
-      return activity;
     });
 
     const results = await Promise.allSettled(promises);

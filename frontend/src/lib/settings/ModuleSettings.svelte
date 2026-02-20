@@ -7,7 +7,7 @@
   import PageHeader from '../layout/PageHeader.svelte';
   import Spinner from '../components/Spinner.svelte';
   import AlertBox from '../components/AlertBox.svelte';
-  import { api, getSecuritySettings } from '../api.js';
+  import { api, getSecuritySettings, fetchAPI, getCSRFToken } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
 
   let saving = $state(false);
@@ -60,13 +60,8 @@
   async function loadPlugins() {
     loadingPlugins = true;
     try {
-      const response = await fetch('/api/plugins');
-      if (response.ok) {
-        const data = await response.json();
-        plugins = Array.isArray(data) ? data : [];
-      } else {
-        plugins = [];
-      }
+      const data = await fetchAPI('/plugins');
+      plugins = Array.isArray(data) ? data : [];
     } catch (err) {
       console.error('Failed to load plugins:', err);
       plugins = [];
@@ -127,24 +122,32 @@
     }
 
     try {
+      const token = await getCSRFToken();
+      const headers = {};
+      if (token) {
+        headers['X-CSRF-Token'] = token;
+      }
+
       const response = await fetch('/api/plugins/upload', {
         method: 'POST',
+        credentials: 'same-origin',
+        headers,
         body: formData
       });
 
-      if (response.ok) {
-        successMessage = t('settings.modules.pluginUploadedSuccess');
-        selectedFile = null;
-        selectedManifest = null;
-        await loadPlugins();
-
-        setTimeout(() => {
-          successMessage = '';
-        }, 3000);
-      } else {
+      if (!response.ok) {
         const errorData = await response.text();
-        error = t('settings.modules.failedToUpload', { error: errorData });
+        throw new Error(errorData || 'Upload failed');
       }
+
+      successMessage = t('settings.modules.pluginUploadedSuccess');
+      selectedFile = null;
+      selectedManifest = null;
+      await loadPlugins();
+
+      setTimeout(() => {
+        successMessage = '';
+      }, 3000);
     } catch (err) {
       error = t('settings.modules.failedToUpload', { error: err.message });
     } finally {
@@ -154,15 +157,11 @@
   
   async function togglePlugin(plugin) {
     try {
-      const response = await fetch(`/api/plugins/${plugin.name}/toggle`, {
+      await fetchAPI(`/plugins/${plugin.name}/toggle`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: !plugin.enabled })
       });
-      
-      if (response.ok) {
-        await loadPlugins();
-      }
+      await loadPlugins();
     } catch (err) {
       console.error(`Failed to toggle plugin ${plugin.name}:`, err);
     }
@@ -170,15 +169,13 @@
   
   async function reloadPlugin(plugin) {
     try {
-      const response = await fetch(`/api/plugins/${plugin.name}/reload`, {
+      await fetchAPI(`/plugins/${plugin.name}/reload`, {
         method: 'POST'
       });
 
-      if (response.ok) {
-        successMessage = t('settings.modules.pluginReloadedSuccess', { name: plugin.name });
-        await loadPlugins();
-        setTimeout(() => successMessage = '', 3000);
-      }
+      successMessage = t('settings.modules.pluginReloadedSuccess', { name: plugin.name });
+      await loadPlugins();
+      setTimeout(() => successMessage = '', 3000);
     } catch (err) {
       error = t('settings.modules.failedToReload', { error: err.message });
     }
@@ -190,15 +187,13 @@
     }
 
     try {
-      const response = await fetch(`/api/plugins/${plugin.name}`, {
+      await fetchAPI(`/plugins/${plugin.name}`, {
         method: 'DELETE'
       });
 
-      if (response.ok) {
-        successMessage = t('settings.modules.pluginDeletedSuccess', { name: plugin.name });
-        await loadPlugins();
-        setTimeout(() => successMessage = '', 3000);
-      }
+      successMessage = t('settings.modules.pluginDeletedSuccess', { name: plugin.name });
+      await loadPlugins();
+      setTimeout(() => successMessage = '', 3000);
     } catch (err) {
       error = t('settings.modules.failedToDelete', { error: err.message });
     }
