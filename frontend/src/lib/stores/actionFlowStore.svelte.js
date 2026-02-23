@@ -11,6 +11,7 @@ class ActionFlowStore {
   triggerType = $state('status_transition');
   statuses = $state([]);
   saving = $state(false);
+  direction = $state('horizontal');
 
   // Original action reference for API format conversion
   #action = null;
@@ -166,17 +167,25 @@ class ActionFlowStore {
   }
 
   /**
+   * Toggle flow direction between horizontal and vertical.
+   */
+  toggleDirection() {
+    this.direction = this.direction === 'horizontal' ? 'vertical' : 'horizontal';
+  }
+
+  /**
    * Add a new node to the flow.
    * @param {string} nodeType - Type of node to add
    * @param {Object} position - Optional position, defaults to random offset
    */
   addNode(nodeType, position = null) {
+    const isVertical = this.direction === 'vertical';
     const newNode = {
       id: `node-${Date.now()}`,
       type: nodeType,
       position: position || {
-        x: 300 + Math.random() * 200,
-        y: 100 + Math.random() * 300,
+        x: isVertical ? 100 + Math.random() * 300 : 300 + Math.random() * 200,
+        y: isVertical ? 300 + Math.random() * 200 : 100 + Math.random() * 300,
       },
       data: {
         config: this.#getDefaultConfig(nodeType),
@@ -356,6 +365,7 @@ class ActionFlowStore {
     this.triggerType = 'status_transition';
     this.statuses = [];
     this.saving = false;
+    this.direction = 'horizontal';
     this.#action = null;
   }
 

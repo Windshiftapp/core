@@ -542,7 +542,8 @@
 		label: loc.code === 'en' ? 'English' :
 		       loc.code === 'de' ? 'Deutsch (German)' :
 		       loc.code === 'es' ? 'Español (Spanish)' :
-		       loc.code === 'ar' ? 'العربية (Arabic)' : loc.name
+		       loc.code === 'ar' ? 'العربية (Arabic)' :
+		       loc.code === 'pt-BR' ? 'Português (Brasil)' : loc.name
 	}));
 </script>
 

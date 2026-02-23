@@ -2,9 +2,13 @@
   import { Handle, Position } from '@xyflow/svelte';
   import { Zap } from 'lucide-svelte';
   import { t } from '../../../stores/i18n.svelte.js';
+  import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
+  import { getHandlePositions } from './flowDirection.js';
 
   export let data = {};
   export let selected = false;
+
+  $: positions = getHandlePositions(actionFlowStore.direction);
 
   function getTriggerLabel(triggerType) {
     const labels = {
@@ -44,7 +48,7 @@
     {/if}
   </div>
 
-  <Handle type="source" position={Position.Right} id="output" />
+  <Handle type="source" position={positions.output} id="output" />
 </div>
 
 <style>

@@ -2,9 +2,14 @@
   import { Handle, Position } from '@xyflow/svelte';
   import { HelpCircle } from 'lucide-svelte';
   import { t } from '../../../stores/i18n.svelte.js';
+  import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
+  import { getConditionOutputPositions } from './flowDirection.js';
 
   export let data = {};
   export let selected = false;
+
+  $: condPositions = getConditionOutputPositions(actionFlowStore.direction);
+  $: isVertical = actionFlowStore.direction === 'vertical';
 
   function getOperatorSymbol(operator) {
     const symbols = {
@@ -22,7 +27,7 @@
 </script>
 
 <div class="condition-node action-flow-node" class:selected>
-  <Handle type="target" position={Position.Left} id="input" />
+  <Handle type="target" position={condPositions.input} id="input" />
 
   <div class="node-header">
     <HelpCircle size={16} class="node-icon" />
@@ -42,13 +47,13 @@
     {/if}
   </div>
 
-  <div class="branch-labels">
+  <div class="branch-labels" class:branch-labels-vertical={isVertical}>
     <span class="branch-true">{t('actions.condition.true')}</span>
     <span class="branch-false">{t('actions.condition.false')}</span>
   </div>
 
-  <Handle type="source" position={Position.Right} id="true" style="top: 35%;" />
-  <Handle type="source" position={Position.Right} id="false" style="top: 65%;" />
+  <Handle type="source" position={condPositions.trueOutput} id="true" style={condPositions.trueStyle} />
+  <Handle type="source" position={condPositions.falseOutput} id="false" style={condPositions.falseStyle} />
 </div>
 
 <style>
@@ -122,6 +127,16 @@
     gap: 16px;
     font-size: 10px;
     font-weight: 500;
+  }
+
+  .branch-labels-vertical {
+    flex-direction: row;
+    right: auto;
+    top: auto;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    gap: 32px;
   }
 
   .branch-true {
