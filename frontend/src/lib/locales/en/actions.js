@@ -209,5 +209,7 @@ export default {
         workspaceId: 'Workspace ID',
       },
     },
+    switchToVertical: 'Switch to vertical layout',
+    switchToHorizontal: 'Switch to horizontal layout',
   },
 };

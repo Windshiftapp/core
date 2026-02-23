@@ -159,5 +159,7 @@ export default {
         workspaceId: 'معرّف مساحة العمل',
       },
     },
+    switchToVertical: 'التبديل إلى التخطيط العمودي',
+    switchToHorizontal: 'التبديل إلى التخطيط الأفقي',
   },
 };
