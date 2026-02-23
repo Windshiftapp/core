@@ -19,6 +19,7 @@ export const SUPPORTED_LOCALES = [
   { code: 'de', name: 'Deutsch', direction: 'ltr' },
   { code: 'es', name: 'Español', direction: 'ltr' },
   { code: 'ar', name: 'العربية', direction: 'rtl' },
+  { code: 'pt-BR', name: 'Português (Brasil)', direction: 'ltr' },
 ];
 
 // Reactive state using Svelte 5 runes

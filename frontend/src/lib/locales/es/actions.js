@@ -160,5 +160,7 @@ export default {
         workspaceId: 'ID del espacio de trabajo',
       },
     },
+    switchToVertical: 'Cambiar a diseño vertical',
+    switchToHorizontal: 'Cambiar a diseño horizontal',
   },
 };

@@ -199,5 +199,7 @@ export default {
         workspaceId: 'Arbeitsbereich-ID',
       },
     },
+    switchToVertical: 'Zum vertikalen Layout wechseln',
+    switchToHorizontal: 'Zum horizontalen Layout wechseln',
   },
 };
