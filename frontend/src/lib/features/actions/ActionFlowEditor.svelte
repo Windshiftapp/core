@@ -9,7 +9,7 @@
     addEdge
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
-  import { Pencil, RefreshCw, MessageSquare, Bell, HelpCircle, Zap, Database, PlusSquare } from 'lucide-svelte';
+  import { Pencil, RefreshCw, MessageSquare, Bell, HelpCircle, Zap, Database, PlusSquare, ArrowRight, ArrowDown } from 'lucide-svelte';
   import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import Button from '../../components/Button.svelte';
   import FieldSelector from '../../pickers/FieldSelector.svelte';
@@ -433,11 +433,24 @@
     </div>
 
     <!-- Action info header -->
-    <div class="absolute top-4 left-4 z-10 action-header px-3 py-2 rounded-lg border">
-      <div class="text-sm font-medium">{action?.name || t('actions.newAction')}</div>
-      <div class="text-xs sidebar-subtitle">
-        {triggerTypes.find(tt => tt.value === action?.trigger_type)?.label || action?.trigger_type}
+    <div class="absolute top-4 left-4 z-10 flex items-start gap-2">
+      <div class="action-header px-3 py-2 rounded-lg border">
+        <div class="text-sm font-medium">{action?.name || t('actions.newAction')}</div>
+        <div class="text-xs sidebar-subtitle">
+          {triggerTypes.find(tt => tt.value === action?.trigger_type)?.label || action?.trigger_type}
+        </div>
       </div>
+      <button
+        class="direction-toggle rounded-lg border p-2"
+        onclick={() => actionFlowStore.toggleDirection()}
+        title={actionFlowStore.direction === 'horizontal' ? t('actions.switchToVertical') : t('actions.switchToHorizontal')}
+      >
+        {#if actionFlowStore.direction === 'horizontal'}
+          <ArrowRight size={16} />
+        {:else}
+          <ArrowDown size={16} />
+        {/if}
+      </button>
     </div>
   </div>
 
@@ -703,6 +716,19 @@
   .action-header {
     background-color: var(--ds-surface-raised);
     border-color: var(--ds-border);
+    color: var(--ds-text);
+  }
+
+  .direction-toggle {
+    background-color: var(--ds-surface-raised);
+    border-color: var(--ds-border);
+    color: var(--ds-text-subtle);
+    cursor: pointer;
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+
+  .direction-toggle:hover {
+    background-color: var(--ds-surface-hovered);
     color: var(--ds-text);
   }
 
