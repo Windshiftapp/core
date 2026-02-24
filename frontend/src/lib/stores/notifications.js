@@ -132,3 +132,49 @@ export const notificationActions = {
     return timestamp.toLocaleDateString();
   },
 };
+
+// --- Desktop notification bridge (Tauri only) ---
+if (typeof window !== 'undefined' && window.__TAURI__?.core) {
+  const _seenIds = new Set();
+
+  function _seedAndStartPoll() {
+    import('svelte/store').then(({ get }) => {
+      // Seed with already-loaded notifications
+      for (const n of get(notifications)) _seenIds.add(n.id);
+
+      // Poll every 30 seconds
+      setInterval(async () => {
+        try {
+          await notificationActions.refresh();
+          for (const n of get(notifications)) {
+            if (!n.read && !_seenIds.has(n.id)) {
+              _sendDesktopNotification(n.title, n.message || '');
+            }
+            _seenIds.add(n.id);
+          }
+        } catch (e) {
+          console.warn('[desktop-notifications] poll failed:', e);
+        }
+      }, 30_000);
+    });
+  }
+
+  async function _sendDesktopNotification(title, body) {
+    try {
+      const invoke = window.__TAURI__.core.invoke;
+      let granted = await invoke('plugin:notification|is_permission_granted');
+      if (!granted) {
+        const perm = await invoke('plugin:notification|request_permission');
+        granted = perm === 'granted';
+      }
+      if (granted) {
+        await invoke('plugin:notification|notify', { title, body });
+      }
+    } catch (e) {
+      console.warn('[desktop-notifications] send failed:', e);
+    }
+  }
+
+  // Start after initial load completes
+  loadNotifications().then(() => _seedAndStartPoll());
+}

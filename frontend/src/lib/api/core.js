@@ -1,9 +1,6 @@
 // Use relative path for API calls - Vite proxy will handle dev, production uses same origin
 export const API_BASE = '/api';
 
-// CSRF token management
-let csrfToken = null;
-
 /**
  * Create an enhanced error object from an API response
  * @param {Response} response - Fetch Response object
@@ -32,86 +29,17 @@ function createApiError(response, responseText) {
   return error;
 }
 
-export async function getCSRFToken() {
-  if (!csrfToken) {
-    try {
-      const response = await fetch(`${API_BASE}/csrf-token`, {
-        method: 'GET',
-        credentials: 'same-origin',
-      });
-      if (response.ok) {
-        const data = await response.json();
-        csrfToken = data.csrf_token;
-      }
-    } catch (error) {
-      console.warn('Failed to get CSRF token:', error);
-    }
-  }
-  return csrfToken;
-}
-
 export async function fetchAPI(endpoint, options = {}) {
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
   };
 
-  // Add CSRF token for state-changing operations
-  if (options.method && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method.toUpperCase())) {
-    const token = await getCSRFToken();
-    if (token) {
-      headers['X-CSRF-Token'] = token;
-    }
-    // Token is one-time use on the server; clear cache so the next request fetches a fresh one
-    csrfToken = null;
-  }
-
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
-    credentials: 'same-origin', // Include cookies for CSRF token
+    credentials: 'same-origin', // Include cookies for session auth
     headers,
   });
-
-  // Handle CSRF token expiration (403 Forbidden)
-  if (response.status === 403) {
-    // Clear token and retry once
-    csrfToken = null;
-    const token = await getCSRFToken();
-    if (
-      token &&
-      options.method &&
-      ['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method.toUpperCase())
-    ) {
-      headers['X-CSRF-Token'] = token;
-      const retryResponse = await fetch(`${API_BASE}${endpoint}`, {
-        ...options,
-        credentials: 'same-origin',
-        headers,
-      });
-
-      if (!retryResponse.ok) {
-        // Try to get a more descriptive error message from the response body
-        let errorData = '';
-        try {
-          errorData = await retryResponse.text();
-        } catch (_e) {
-          // If we can't read the error body, use the status text
-        }
-        throw createApiError(retryResponse, errorData);
-      }
-
-      if (retryResponse.status === 204) {
-        return null;
-      }
-
-      const contentType = retryResponse.headers.get('content-type');
-      if (contentType?.includes('application/json')) {
-        return retryResponse.json();
-      }
-
-      return null;
-    }
-  }
 
   if (!response.ok) {
     // Handle authentication errors

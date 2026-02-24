@@ -63,11 +63,18 @@ type PortalSessionManager struct {
 	additionalProxies []net.IP // Additional proxy IPs beyond private ranges
 }
 
-// NewPortalSessionManager creates a new portal session manager with secure cookie handling
-func NewPortalSessionManager(db database.Database, useSecureCookies, useProxy bool, additionalProxies []string) *PortalSessionManager {
-	// Generate secure cookie keys (in production, these should be from config/env)
-	hashKey := generateSecureKey(64)  // 512-bit key for HMAC
-	blockKey := generateSecureKey(32) // 256-bit key for encryption
+// NewPortalSessionManager creates a new portal session manager with secure cookie handling.
+// If cookieSecret is non-empty, deterministic cookie keys are derived from it
+// so that sessions survive process restarts with the same secret.
+func NewPortalSessionManager(db database.Database, useSecureCookies, useProxy bool, additionalProxies []string, cookieSecret string) *PortalSessionManager {
+	var hashKey, blockKey []byte
+	if cookieSecret != "" {
+		hashKey = deriveKey(cookieSecret, "windshift-portal-cookie-hash", 64)
+		blockKey = deriveKey(cookieSecret, "windshift-portal-cookie-block", 32)
+	} else {
+		hashKey = generateSecureKey(64)  // 512-bit key for HMAC
+		blockKey = generateSecureKey(32) // 256-bit key for encryption
+	}
 
 	// Parse additional proxy IPs (beyond auto-trusted private ranges)
 	var additionalIPs []net.IP

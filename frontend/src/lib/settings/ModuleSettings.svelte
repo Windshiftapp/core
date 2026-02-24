@@ -7,7 +7,7 @@
   import PageHeader from '../layout/PageHeader.svelte';
   import Spinner from '../components/Spinner.svelte';
   import AlertBox from '../components/AlertBox.svelte';
-  import { api, getSecuritySettings, fetchAPI, getCSRFToken } from '../api.js';
+  import { api, getSecuritySettings, fetchAPI } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
 
   let saving = $state(false);
@@ -122,16 +122,9 @@
     }
 
     try {
-      const token = await getCSRFToken();
-      const headers = {};
-      if (token) {
-        headers['X-CSRF-Token'] = token;
-      }
-
       const response = await fetch('/api/plugins/upload', {
         method: 'POST',
         credentials: 'same-origin',
-        headers,
         body: formData
       });
 

@@ -234,7 +234,7 @@ func (s *Server) initialize() error {
 	ipExtractor := utils.NewIPExtractor(cfg.UseProxy, additionalProxyList)
 
 	// Authentication management
-	sessionManager := auth.NewSessionManager(s.db, enableHTTPS, cfg.UseProxy, additionalProxyList)
+	sessionManager := auth.NewSessionManager(s.db, enableHTTPS, cfg.UseProxy, additionalProxyList, os.Getenv("SESSION_SECRET"))
 
 	// Determine effective port for CORS
 	effectivePort := cfg.Port
@@ -333,7 +333,7 @@ func (s *Server) initialize() error {
 	emailVerificationService := services.NewEmailVerificationService(s.db, smtpSender, baseURL)
 
 	// Initialize portal session manager
-	portalSessionManager := auth.NewPortalSessionManager(s.db, enableHTTPS, cfg.UseProxy, additionalProxyList)
+	portalSessionManager := auth.NewPortalSessionManager(s.db, enableHTTPS, cfg.UseProxy, additionalProxyList, os.Getenv("SESSION_SECRET"))
 
 	// Initialize magic link service
 	magicLinkService := services.NewMagicLinkService(s.db, smtpSender, baseURL)
@@ -451,7 +451,6 @@ func (s *Server) initialize() error {
 	notificationTemplateHandler := handlers.NewNotificationTemplateHandlerWithPool(s.db)
 
 	permissionMiddleware := middleware.NewPermissionMiddleware(s.db, permService)
-	csrfMiddleware := middleware.NewCSRFMiddleware()
 
 	// Setup handler
 	setupHandler := handlers.NewSetupHandler(s.db, sessionManager, authMiddleware)
@@ -676,8 +675,8 @@ func (s *Server) initialize() error {
 	apiMiddleware := router.MiddlewareChain{corsMiddleware, authMiddleware.OptionalAuth}
 
 	if !cfg.DisableCSRF {
-		slog.Info("CSRF protection enabled with bearer token bypass")
-		apiMiddleware = append(apiMiddleware, csrfMiddleware.AddCSRFTokenToContext, csrfMiddleware.CSRFProtection)
+		slog.Info("CSRF protection enabled (Sec-Fetch-Site)")
+		apiMiddleware = append(apiMiddleware, middleware.SecFetchSiteProtection)
 	} else {
 		slog.Warn("CSRF protection disabled (development mode)")
 	}
@@ -701,9 +700,7 @@ func (s *Server) initialize() error {
 		AuthMiddleware:       authMiddleware,
 		PermissionMiddleware: permissionMiddleware,
 		SCIMAuthMiddleware:   scimAuthMiddleware,
-		CSRFMiddleware:       csrfMiddleware,
 		PortalAuthMiddleware: portalAuthMiddleware,
-		DisableCSRF:          cfg.DisableCSRF,
 
 		LoginRateLimiter:    s.loginRateLimiter,
 		AuthRateLimiter:     s.authRateLimiter,

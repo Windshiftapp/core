@@ -122,7 +122,7 @@ func main() {
 	flag.StringVar(&attachmentPath, "attachment-path", "", "Path to store attachments (enables attachment feature if specified)")
 	flag.BoolVar(&disableCSRF, "no-csrf", false, "Disable CSRF protection (for development only)")
 	flag.StringVar(&allowedHosts, "allowed-hosts", "", "Comma-separated list of allowed hostnames for CSRF (e.g., 192.168.1.30,myserver.local)")
-	flag.StringVar(&allowedPort, "allowed-port", "", "Port for CSRF trusted origins (defaults to server port, useful for reverse proxy setups)")
+	flag.StringVar(&allowedPort, "allowed-port", "", "Port for CORS/WebAuthn trusted origins (defaults to server port, useful for reverse proxy setups)")
 	flag.BoolVar(&useProxy, "use-proxy", false, "Enable proxy mode: trust X-Forwarded-Proto from private IPs. WARNING: Only enable when behind a reverse proxy that terminates TLS. Server must NOT be directly accessible from the internet.")
 	flag.StringVar(&additionalProxies, "additional-proxies", "", "Additional proxy IPs to trust beyond private ranges (requires --use-proxy)")
 	flag.BoolVar(&enableSSH, "ssh", false, "Enable SSH TUI server")
@@ -344,7 +344,7 @@ func main() {
 		if err != nil {
 			slog.Error("failed to create SSH database connection", "error", err)
 		} else {
-			sessionManager := auth.NewSessionManager(sshDB, enableHTTPS, useProxy, additionalProxyList)
+			sessionManager := auth.NewSessionManager(sshDB, enableHTTPS, useProxy, additionalProxyList, os.Getenv("SESSION_SECRET"))
 
 			serverOptions := make([]ssh.Option, 0, 4)
 			serverOptions = append(serverOptions,
