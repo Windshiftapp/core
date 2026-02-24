@@ -7,11 +7,6 @@ import { type APIRequestContext, test as base, expect, type Page } from '@playwr
 
 export interface AuthFixtures {
   /**
-   * Gets a CSRF token from the API
-   */
-  getCSRFToken: (request: APIRequestContext) => Promise<string>;
-
-  /**
    * Performs login via UI
    */
   loginViaUI: (page: Page, username: string, password: string) => Promise<void>;
@@ -39,20 +34,6 @@ export interface AuthFixtures {
 }
 
 export const test = base.extend<AuthFixtures>({
-  /**
-   * Get CSRF token from API
-   */
-  getCSRFToken: async ({ request }, use) => {
-    const getToken = async (requestContext: APIRequestContext): Promise<string> => {
-      const baseURL = process.env.BASE_URL || 'http://localhost:8080';
-      const response = await requestContext.get(`${baseURL}/api/csrf-token`);
-      expect(response.ok()).toBeTruthy();
-      const data = await response.json();
-      return data.csrf_token;
-    };
-    await use(getToken);
-  },
-
   /**
    * Login via UI (for testing login functionality)
    */
@@ -119,14 +100,10 @@ export const test = base.extend<AuthFixtures>({
     ): Promise<string> => {
       const baseURL = process.env.BASE_URL || 'http://localhost:8080';
 
-      // Get CSRF token
-      const csrfResponse = await requestContext.get(`${baseURL}/api/csrf-token`);
-      const csrfData = await csrfResponse.json();
-
-      // Create token
+      // Create token (Sec-Fetch-Site header needed for programmatic requests)
       const tokenResponse = await requestContext.post(`${baseURL}/api/api-tokens`, {
         headers: {
-          'X-CSRF-Token': csrfData.csrf_token,
+          'Sec-Fetch-Site': 'same-origin',
         },
         data: {
           name: name,

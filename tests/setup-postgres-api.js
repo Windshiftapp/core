@@ -78,7 +78,7 @@ async function setupPostgresTest() {
       })
     });
 
-    // Get session cookie and CSRF token from response
+    // Get session cookie from response
     const setCookieHeader = loginResponse.response.headers.get('set-cookie');
     if (!setCookieHeader) {
       throw new Error('No session cookie received from login');
@@ -91,29 +91,15 @@ async function setupPostgresTest() {
     }
     const sessionCookie = `session_id=${sessionMatch[1]}`;
 
-    // Extract CSRF token from cookie (it's set as a separate cookie)
-    const csrfMatch = setCookieHeader.match(/csrf_token=([^;]+)/);
-    let csrfToken = '';
-    if (csrfMatch) {
-      csrfToken = csrfMatch[1];
-    }
-
     console.log('   Login successful!');
 
     // Step 4: Create bearer token for testing
     console.log('4. Creating bearer token...');
-    const tokenHeaders = {
-      'Cookie': sessionCookie
-    };
-
-    // Include CSRF token if present
-    if (csrfToken) {
-      tokenHeaders['X-CSRF-Token'] = csrfToken;
-    }
-
     const tokenResponse = await request('/api/api-tokens', {
       method: 'POST',
-      headers: tokenHeaders,
+      headers: {
+        'Cookie': sessionCookie
+      },
       body: JSON.stringify({
         name: 'PostgreSQL Load Test Token',
         permissions: ['read', 'write', 'admin']

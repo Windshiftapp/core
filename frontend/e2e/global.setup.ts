@@ -23,15 +23,10 @@ setup('complete application setup and authenticate', async ({ page, request }) =
   if (!setupStatus.setup_completed) {
     console.log('🔧 Application setup not completed, running initial setup...');
 
-    // Get CSRF token for setup
-    const csrfResponse = await request.get(`${baseURL}/api/csrf-token`);
-    const csrfData = await csrfResponse.json();
-    const csrfToken = csrfData.csrf_token;
-
     // Complete initial setup
     const setupResponse = await request.post(`${baseURL}/api/setup/complete`, {
       headers: {
-        'X-CSRF-Token': csrfToken,
+        'Sec-Fetch-Site': 'same-origin',
       },
       data: {
         admin_user: {

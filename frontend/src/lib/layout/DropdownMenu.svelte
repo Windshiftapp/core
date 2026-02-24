@@ -246,7 +246,9 @@
                     <svelte:component this={groupItem.icon} class="w-4 h-4" style="color: white;" />
                   </div>
                 {:else}
-                  <svelte:component this={groupItem.icon} class="w-4 h-4 mr-3 {groupItem.iconClass || 'transition-colors'}" style="color: var(--ds-icon-subtle);" />
+                  <div class="w-6 h-6 mr-3 rounded flex items-center justify-center">
+                    <svelte:component this={groupItem.icon} class="w-4 h-4 {groupItem.iconClass || 'transition-colors'}" style="color: var(--ds-icon-subtle);" />
+                  </div>
                 {/if}
               {/if}
 
@@ -291,7 +293,9 @@
                   <svelte:component this={itemData.icon} class="w-4 h-4" style="color: white;" />
                 </div>
               {:else}
-                <svelte:component this={itemData.icon} class="w-4 h-4 mr-3 {itemData.iconClass || ''}" />
+                <div class="w-6 h-6 mr-3 rounded flex items-center justify-center">
+                  <svelte:component this={itemData.icon} class="w-4 h-4 {itemData.iconClass || ''}" />
+                </div>
               {/if}
             {/if}
 

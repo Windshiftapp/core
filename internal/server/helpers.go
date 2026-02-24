@@ -101,7 +101,7 @@ func createCORSMiddleware(allowedHosts, serverPort string, disableCSRF, useProxy
 	cfg := cors.Config{
 		Origins:         origins,
 		Methods:         []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete},
-		RequestHeaders:  []string{"Content-Type", "X-CSRF-Token", "Authorization"},
+		RequestHeaders:  []string{"Content-Type", "Authorization"},
 		Credentialed:    !disableCSRF,
 		MaxAgeInSeconds: 86400,
 	}

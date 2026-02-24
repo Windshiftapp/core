@@ -8,16 +8,6 @@ func RegisterAuthRoutes(deps *Deps) {
 	auth := deps.AuthMiddleware.RequireAuth
 	admin := deps.PermissionMiddleware.RequireSystemAdmin()
 
-	// CSRF token endpoint (OptionalAuth - works both authenticated and unauthenticated)
-	api.HandleH("GET /csrf-token", deps.AuthRateLimiter.Limit(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if deps.DisableCSRF {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"csrf_token": ""}`))
-		} else {
-			deps.CSRFMiddleware.GetTokenHandler(w, r)
-		}
-	})))
-
 	// Authentication endpoints with rate limiting
 	api.HandleH("POST /auth/login", deps.LoginRateLimiter.Limit(http.HandlerFunc(deps.Auth.Auth.Login)))
 	api.HandleH("POST /auth/logout", deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Auth.Auth.Logout)))

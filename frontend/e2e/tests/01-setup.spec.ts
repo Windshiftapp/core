@@ -113,14 +113,11 @@ test.describe('Application Setup', () => {
     }
 
     // Try to complete setup again via API
-    const csrfResponse = await request.get(`${baseURL}/api/csrf-token`);
-    const csrfData = await csrfResponse.json();
-
     const adminUser = generateUser('duplicate-setup');
 
     const setupResponse = await request.post(`${baseURL}/api/setup/complete`, {
       headers: {
-        'X-CSRF-Token': csrfData.csrf_token,
+        'Sec-Fetch-Site': 'same-origin',
       },
       data: {
         admin_user: {

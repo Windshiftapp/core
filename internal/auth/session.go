@@ -3,10 +3,12 @@ package auth
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -14,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gorilla/securecookie"
+	"golang.org/x/crypto/hkdf"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
@@ -55,11 +58,18 @@ type Session struct {
 	User      *models.User `json:"user,omitempty"`
 }
 
-// NewSessionManager creates a new session manager with secure cookie handling
-func NewSessionManager(db database.Database, useSecureCookies, useProxy bool, additionalProxies []string) *SessionManager {
-	// Generate secure cookie keys (in production, these should be from config/env)
-	hashKey := generateSecureKey(64)  // 512-bit key for HMAC
-	blockKey := generateSecureKey(32) // 256-bit key for encryption
+// NewSessionManager creates a new session manager with secure cookie handling.
+// If cookieSecret is non-empty, deterministic cookie keys are derived from it
+// so that sessions survive process restarts with the same secret.
+func NewSessionManager(db database.Database, useSecureCookies, useProxy bool, additionalProxies []string, cookieSecret string) *SessionManager {
+	var hashKey, blockKey []byte
+	if cookieSecret != "" {
+		hashKey = deriveKey(cookieSecret, "windshift-cookie-hash", 64)
+		blockKey = deriveKey(cookieSecret, "windshift-cookie-block", 32)
+	} else {
+		hashKey = generateSecureKey(64)  // 512-bit key for HMAC
+		blockKey = generateSecureKey(32) // 256-bit key for encryption
+	}
 
 	// Parse additional proxy IPs (beyond auto-trusted private ranges)
 	var additionalIPs []net.IP
@@ -83,6 +93,18 @@ func generateSecureKey(length int) []byte {
 	key := make([]byte, length)
 	if _, err := rand.Read(key); err != nil {
 		panic(fmt.Sprintf("Failed to generate secure key: %v", err))
+	}
+	return key
+}
+
+// deriveKey deterministically derives a key of the given length from a secret
+// using HKDF-SHA256. This allows cookie encryption keys to be stable across
+// process restarts when the same secret is provided.
+func deriveKey(secret, info string, length int) []byte {
+	r := hkdf.New(sha256.New, []byte(secret), nil, []byte(info))
+	key := make([]byte, length)
+	if _, err := io.ReadFull(r, key); err != nil {
+		panic(fmt.Sprintf("failed to derive key: %v", err))
 	}
 	return key
 }

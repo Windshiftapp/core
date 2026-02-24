@@ -180,6 +180,9 @@
       if (uploadResult && uploadResult.success && uploadResult.avatar_url) {
         avatarUrl = uploadResult.avatar_url;
         showAvatarUpload = false;
+        // Optimistic store update so sidebar dropdown reflects change immediately
+        workspacesStore.updateWorkspace(workspaceId, { avatar_url: avatarUrl });
+        currentWorkspace.patch({ avatar_url: avatarUrl });
         successToast(t('workspaceSettings.avatarUploadedSuccess'));
         save();
       }
@@ -192,12 +195,18 @@
 
   function removeAvatar() {
     avatarUrl = null;
+    // Optimistic store update so sidebar dropdown reflects change immediately
+    workspacesStore.updateWorkspace(workspaceId, { avatar_url: null });
+    currentWorkspace.patch({ avatar_url: null });
     debouncedSave();
   }
 
   function handleIconChange(event) {
     icon = event.detail.icon;
     color = event.detail.color;
+    // Optimistic store update so sidebar dropdown reflects change immediately
+    workspacesStore.updateWorkspace(workspaceId, { icon, color });
+    currentWorkspace.patch({ icon, color });
     debouncedSave();
   }
 

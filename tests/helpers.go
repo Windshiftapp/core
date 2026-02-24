@@ -132,7 +132,8 @@ func StartTestServer(t *testing.T, dbType string) (ts *TestServer, cleanup func(
 	return ts, cleanup
 }
 
-// CreateBearerToken completes the full authentication flow and returns a bearer token
+// CreateBearerToken completes the full authentication flow and returns a bearer token.
+// Tests run with DisableCSRF: true, so no CSRF headers are needed.
 func CreateBearerToken(t *testing.T, testServer *TestServer) string {
 	t.Helper()
 
@@ -151,12 +152,7 @@ func CreateBearerToken(t *testing.T, testServer *TestServer) string {
 		},
 	}
 
-	// Get CSRF token for setup
-	csrfToken1 := getCSRFToken(t, testServer.APIBase)
-
-	setupResp := makeRequest(t, http.MethodPost, testServer.APIBase+"/setup/complete", "", setupData, map[string]string{
-		"X-CSRF-Token": csrfToken1,
-	})
+	setupResp := makeRequest(t, http.MethodPost, testServer.APIBase+"/setup/complete", "", setupData, nil)
 
 	if setupResp.StatusCode != http.StatusOK && setupResp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(setupResp.Body)
@@ -165,16 +161,12 @@ func CreateBearerToken(t *testing.T, testServer *TestServer) string {
 	setupResp.Body.Close()
 
 	// Step 2: Login to get session cookie
-	csrfToken2 := getCSRFToken(t, testServer.APIBase)
-
 	loginData := map[string]string{
 		"email_or_username": "admin",
 		"password":          "testpass123",
 	}
 
-	loginResp := makeRequest(t, http.MethodPost, testServer.APIBase+"/auth/login", "", loginData, map[string]string{
-		"X-CSRF-Token": csrfToken2,
-	})
+	loginResp := makeRequest(t, http.MethodPost, testServer.APIBase+"/auth/login", "", loginData, nil)
 
 	if loginResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(loginResp.Body)
@@ -197,16 +189,13 @@ func CreateBearerToken(t *testing.T, testServer *TestServer) string {
 	loginResp.Body.Close()
 
 	// Step 3: Create API bearer token
-	csrfToken3 := getCSRFTokenWithCookie(t, testServer.APIBase, sessionCookie)
-
 	tokenData := map[string]interface{}{
 		"name":        "Test API Token",
 		"permissions": []string{"read", "write", "admin"},
 	}
 
 	tokenResp := makeRequest(t, http.MethodPost, testServer.APIBase+"/api-tokens", "", tokenData, map[string]string{
-		"X-CSRF-Token": csrfToken3,
-		"Cookie":       sessionCookie,
+		"Cookie": sessionCookie,
 	})
 
 	if tokenResp.StatusCode != http.StatusOK && tokenResp.StatusCode != http.StatusCreated {
@@ -229,55 +218,6 @@ func CreateBearerToken(t *testing.T, testServer *TestServer) string {
 
 	testServer.BearerToken = tokenResult.Token
 	return tokenResult.Token
-}
-
-// getCSRFToken fetches a CSRF token from the API
-func getCSRFToken(t *testing.T, apiBase string) string {
-	t.Helper()
-
-	resp, err := testHTTPClient.Get(apiBase + "/csrf-token")
-	if err != nil {
-		t.Fatalf("Failed to get CSRF token: %v", err)
-	}
-	defer resp.Body.Close()
-
-	var result struct {
-		CSRFToken string `json:"csrf_token"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("Failed to decode CSRF token: %v", err)
-	}
-
-	return result.CSRFToken
-}
-
-// getCSRFTokenWithCookie fetches a CSRF token with a session cookie
-func getCSRFTokenWithCookie(t *testing.T, apiBase, cookie string) string {
-	t.Helper()
-
-	req, err := http.NewRequest(http.MethodGet, apiBase+"/csrf-token", http.NoBody)
-	if err != nil {
-		t.Fatalf("Failed to create request: %v", err)
-	}
-
-	req.Header.Set("Cookie", cookie)
-
-	resp, err := testHTTPClient.Do(req)
-	if err != nil {
-		t.Fatalf("Failed to get CSRF token: %v", err)
-	}
-	defer resp.Body.Close()
-
-	var result struct {
-		CSRFToken string `json:"csrf_token"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("Failed to decode CSRF token: %v", err)
-	}
-
-	return result.CSRFToken
 }
 
 // makeRequest is a helper for making HTTP requests with optional auth
@@ -683,20 +623,17 @@ func CreateTestUserWithCredentials(t *testing.T, testServer *TestServer, usernam
 }
 
 // CreateBearerTokenForUser logs in as the specified user and creates a bearer token.
+// Tests run with DisableCSRF: true, so no CSRF headers are needed.
 func CreateBearerTokenForUser(t *testing.T, testServer *TestServer, username, password string) string {
 	t.Helper()
 
 	// Login to get session cookie
-	csrfToken := getCSRFToken(t, testServer.APIBase)
-
 	loginData := map[string]string{
 		"email_or_username": username,
 		"password":          password,
 	}
 
-	loginResp := makeRequest(t, http.MethodPost, testServer.APIBase+"/auth/login", "", loginData, map[string]string{
-		"X-CSRF-Token": csrfToken,
-	})
+	loginResp := makeRequest(t, http.MethodPost, testServer.APIBase+"/auth/login", "", loginData, nil)
 
 	if loginResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(loginResp.Body)
@@ -719,16 +656,13 @@ func CreateBearerTokenForUser(t *testing.T, testServer *TestServer, username, pa
 	loginResp.Body.Close()
 
 	// Create API bearer token
-	csrfToken2 := getCSRFTokenWithCookie(t, testServer.APIBase, sessionCookie)
-
 	tokenData := map[string]interface{}{
 		"name":        fmt.Sprintf("Test Token for %s", username),
 		"permissions": []string{"read", "write", "admin"},
 	}
 
 	tokenResp := makeRequest(t, http.MethodPost, testServer.APIBase+"/api-tokens", "", tokenData, map[string]string{
-		"X-CSRF-Token": csrfToken2,
-		"Cookie":       sessionCookie,
+		"Cookie": sessionCookie,
 	})
 
 	if tokenResp.StatusCode != http.StatusOK && tokenResp.StatusCode != http.StatusCreated {

@@ -192,15 +192,11 @@ test.describe('API Token Authentication', () => {
   test('should create API token', async ({ request }) => {
     const baseURL = process.env.BASE_URL || 'http://localhost:8080';
 
-    // Get CSRF token
-    const csrfResponse = await request.get(`${baseURL}/api/csrf-token`);
-    const csrfData = await csrfResponse.json();
-
     // Create token (requires session auth first)
     // This test assumes we have a valid session from global setup
     const tokenResponse = await request.post(`${baseURL}/api/api-tokens`, {
       headers: {
-        'X-CSRF-Token': csrfData.csrf_token,
+        'Sec-Fetch-Site': 'same-origin',
       },
       data: {
         name: 'E2E Test Token',
@@ -219,12 +215,9 @@ test.describe('API Token Authentication', () => {
     const baseURL = process.env.BASE_URL || 'http://localhost:8080';
 
     // Create a token first
-    const csrfResponse = await request.get(`${baseURL}/api/csrf-token`);
-    const csrfData = await csrfResponse.json();
-
     const tokenResponse = await request.post(`${baseURL}/api/api-tokens`, {
       headers: {
-        'X-CSRF-Token': csrfData.csrf_token,
+        'Sec-Fetch-Site': 'same-origin',
       },
       data: {
         name: 'E2E Auth Test Token',

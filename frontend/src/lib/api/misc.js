@@ -1,4 +1,4 @@
-import { API_BASE, fetchAPI, getCSRFToken } from './core.js';
+import { API_BASE, fetchAPI } from './core.js';
 
 export const projects = {
   getAll: () => fetchAPI('/projects'),
@@ -135,17 +135,11 @@ export const attachments = {
 
   // Upload attachment (uses FormData, no JSON)
   upload: async (formData) => {
-    const token = await getCSRFToken();
-    const headers = {};
-    if (token) {
-      headers['X-CSRF-Token'] = token;
-    }
-
     const response = await fetch(`${API_BASE}/attachments/upload`, {
       method: 'POST',
       body: formData, // Don't stringify FormData
       credentials: 'same-origin',
-      headers, // Don't set Content-Type for FormData
+      // Don't set Content-Type for FormData - browser sets it with boundary
     });
 
     if (!response.ok) {

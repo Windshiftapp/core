@@ -991,10 +991,39 @@ func (h *SCMItemLinksHandler) GetSCMConnectionStatus(w http.ResponseWriter, r *h
 		providers = append(providers, p)
 	}
 
+	// Check if any repositories are linked to this workspace
+	var repoCount int
+	_ = h.db.QueryRow(`
+		SELECT COUNT(*) FROM workspace_repositories wr
+		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
+		WHERE wsc.workspace_id = ? AND wr.is_active = 1 AND wsc.enabled = 1
+	`, workspaceID).Scan(&repoCount)
+
+	// Extract provider info for the OAuth connect prompt
+	var providerSlug, providerName string
+	for _, p := range providers {
+		if p.AuthMethod == models.SCMAuthMethodOAuth && !p.UserConnected {
+			providerSlug = p.ProviderSlug
+			providerName = p.ProviderName
+			break
+		}
+	}
+	// Fallback to first provider if all connected
+	if providerSlug == "" && len(providers) > 0 {
+		providerSlug = providers[0].ProviderSlug
+		providerName = providers[0].ProviderName
+	}
+
+	connected := allConnected || !hasOAuthProvider
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"providers":          providers,
-		"user_connected":     allConnected || !hasOAuthProvider, // Connected if all OAuth providers are connected or no OAuth providers
+		"user_connected":     connected,
+		"connected":          connected,
 		"has_oauth_provider": hasOAuthProvider,
+		"has_repositories":   repoCount > 0,
+		"provider_slug":      providerSlug,
+		"provider_name":      providerName,
 	})
 }

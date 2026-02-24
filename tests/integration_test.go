@@ -510,46 +510,38 @@ func TestErrorHandling(t *testing.T) {
 	})
 }
 
-// TestBearerTokenCSRFBypass verifies that bearer tokens with correct prefix bypass CSRF protection
-// This is a regression test for the token prefix validation issue
-func TestBearerTokenCSRFBypass(t *testing.T) {
+// TestBearerTokenAuth verifies that bearer tokens work for authentication,
+// including state-changing requests (which are CSRF-exempt for bearer token auth).
+func TestBearerTokenAuth(t *testing.T) {
 	server, _ := StartTestServer(t, "sqlite")
 	CreateBearerToken(t, server)
 
-	t.Run("BearerTokenBypassesCSRF", func(t *testing.T) {
+	t.Run("BearerTokenStateChangingRequest", func(t *testing.T) {
 		// Create a workspace using bearer token authentication (POST request)
-		// This should succeed WITHOUT a CSRF token because bearer auth bypasses CSRF
+		// Bearer auth is exempt from CSRF protection via ContextKeyCSRFExempt
 		workspaceData := map[string]interface{}{
-			"name":        "CSRF Bypass Test Workspace",
-			"key":         shortKey("CSRF"),
-			"description": "Testing bearer token CSRF bypass",
+			"name":        "Bearer Auth Test Workspace",
+			"key":         shortKey("BTKN"),
+			"description": "Testing bearer token auth on POST",
 		}
 
 		resp := MakeAuthRequest(t, server, http.MethodPost, "/workspaces", workspaceData)
 		defer resp.Body.Close()
 
-		// Should succeed (201 Created) - bearer token bypasses CSRF
 		AssertStatusCode(t, resp, http.StatusCreated)
 
 		var result map[string]interface{}
 		DecodeJSON(t, resp, &result)
 
-		AssertJSONField(t, result, "name", "CSRF Bypass Test Workspace")
-		AssertJSONField(t, result, "description", "Testing bearer token CSRF bypass")
+		AssertJSONField(t, result, "name", "Bearer Auth Test Workspace")
+		AssertJSONField(t, result, "description", "Testing bearer token auth on POST")
 	})
 
-	t.Run("BearerTokenPrefixFormat", func(t *testing.T) {
-		// Verify the token prefix is correctly formatted (12 characters + ellipsis)
-		// This guards against the regression where prefixes were truncated incorrectly
-
-		// The bearer token created by CreateBearerToken should have format: crw_XXXXXXXX...
-		// where XXXXXXXX is 8 hex characters, making the prefix "crw_test1234..." (12 chars + ...)
-
+	t.Run("BearerTokenReadRequest", func(t *testing.T) {
 		// Make a simple GET request to verify authentication works
 		resp := MakeAuthRequest(t, server, http.MethodGet, "/workspaces", nil)
 		defer resp.Body.Close()
 
-		// Should succeed - token validation works with correct prefix
 		AssertStatusCode(t, resp, http.StatusOK)
 	})
 }

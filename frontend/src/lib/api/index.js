@@ -26,7 +26,7 @@ import {
   projectFieldRequirements,
   screens,
 } from './configuration.js';
-import { del, fetchAPI, get, getCSRFToken, post, put } from './core.js';
+import { del, fetchAPI, get, post, put } from './core.js';
 import { hub } from './hub.js';
 // Domain imports
 import { items } from './items.js';
@@ -345,7 +345,7 @@ export const api = {
 };
 
 // Core utilities
-export { fetchAPI, getCSRFToken };
+export { fetchAPI };
 // Security settings exports
 export {
   authPolicy,

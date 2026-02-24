@@ -1,4 +1,4 @@
-import { fetchAPI, getCSRFToken, API_BASE } from './core.js';
+import { fetchAPI, API_BASE } from './core.js';
 
 export const logbook = {
   // Health check (determines availability)
@@ -54,16 +54,10 @@ export const logbook = {
       method: 'DELETE',
     }),
   uploadDocument: async (bucketId, formData) => {
-    const token = await getCSRFToken();
-    const headers = {};
-    if (token) {
-      headers['X-CSRF-Token'] = token;
-    }
     const response = await fetch(`${API_BASE}/logbook/buckets/${bucketId}/documents/upload`, {
       method: 'POST',
       body: formData,
       credentials: 'same-origin',
-      headers,
     });
     if (!response.ok) {
       let errorData = '';
@@ -93,16 +87,10 @@ export const logbook = {
 
   // Attachments
   uploadAttachment: async (documentId, formData) => {
-    const token = await getCSRFToken();
-    const headers = {};
-    if (token) {
-      headers['X-CSRF-Token'] = token;
-    }
     const response = await fetch(`${API_BASE}/logbook/documents/${documentId}/attachments`, {
       method: 'POST',
       body: formData,
       credentials: 'same-origin',
-      headers,
     });
     if (!response.ok) {
       let errorData = '';

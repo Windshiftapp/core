@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
-  import { workspacePermissions, attachmentStatus } from '../stores';
+  import { workspacePermissions, attachmentStatus, workspacesStore, currentWorkspace } from '../stores';
   import { Trash2, AlertTriangle, Settings, Clock, Shield } from 'lucide-svelte';
   import { moduleSettings } from '../stores/moduleSettings.js';
   import WorkspaceConfigurationAssigner from './WorkspaceConfigurationAssigner.svelte';
@@ -138,6 +138,10 @@
 
       // Update local workspace object
       workspace = { ...workspace, ...formData };
+
+      // Update stores so sidebar dropdown reflects name/description changes immediately
+      workspacesStore.updateWorkspace(workspaceId, { name: formData.name, description: formData.description });
+      currentWorkspace.patch({ name: formData.name, description: formData.description });
 
       successToast(t('workspaceSettings.savedSuccessfully'));
     } catch (error) {
