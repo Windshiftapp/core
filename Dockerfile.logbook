@@ -29,7 +29,7 @@ RUN mkdir -p /data/logbook && \
     chown -R 65534:65534 /data
 
 # Stage 2: Runtime (needs system tools for text extraction)
-FROM alpine:3.21
+FROM alpine:3.23
 
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates poppler-utils
