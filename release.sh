@@ -11,17 +11,13 @@ GHCR_REGISTRY="ghcr.io/windshiftapp/windshift"
 GITHUB_REPO="Windshiftapp/windshift"
 DOCKER_PLATFORMS="linux/amd64,linux/arm64"
 
-# Build configurations: GOOS/GOARCH/ZIG_TARGET
-NATIVE_PLATFORMS=(
-    "linux/amd64/x86_64-linux-musl"
-    "linux/arm64/aarch64-linux-musl"
-    "windows/amd64/x86_64-windows-gnu"
-)
-
-# Darwin platforms (only buildable on macOS)
-DARWIN_PLATFORMS=(
-    "darwin/amd64/x86_64-macos"
-    "darwin/arm64/aarch64-macos"
+# Build configurations: GOOS/GOARCH
+PLATFORMS=(
+    "linux/amd64"
+    "linux/arm64"
+    "windows/amd64"
+    "darwin/amd64"
+    "darwin/arm64"
 )
 
 # State variables
@@ -153,11 +149,6 @@ check_dependencies() {
         die "Missing required tools: ${missing[*]}"
     fi
 
-    # Zig is optional - only needed for cross-compilation
-    if ! command -v zig >/dev/null 2>&1; then
-        log_warn "Zig not found - only native platform builds available"
-    fi
-
     log_success "Dependencies OK"
 }
 
@@ -221,10 +212,6 @@ build_frontend() {
 build_binary() {
     local goos="$1"
     local goarch="$2"
-    local zig_target="$3"
-
-    local output_name="windshift"
-    [ "$goos" = "windows" ] && output_name="windshift.exe"
 
     local output_path="dist/binaries/windshift-${goos}-${goarch}"
     [ "$goos" = "windows" ] && output_path="${output_path}.exe"
@@ -236,25 +223,7 @@ build_binary() {
         return 0
     fi
 
-    # Darwin: use native toolchain (requires macOS)
-    if [ "$goos" = "darwin" ]; then
-        local current_os=$(uname -s | tr '[:upper:]' '[:lower:]')
-        if [ "$current_os" != "darwin" ]; then
-            log_warn "  Skipping darwin/${goarch} - requires macOS host"
-            return 0
-        fi
-        export CGO_ENABLED=1 GOOS="$goos" GOARCH="$goarch"
-        unset CC CXX
-    else
-        # Use Zig for cross-compilation (Linux, Windows)
-        if ! command -v zig >/dev/null 2>&1; then
-            log_warn "  Skipping ${goos}/${goarch} - Zig not installed"
-            return 0
-        fi
-        export CGO_ENABLED=1 GOOS="$goos" GOARCH="$goarch"
-        export CC="zig cc -target ${zig_target}"
-        export CXX="zig c++ -target ${zig_target}"
-    fi
+    export CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch"
 
     if go build -ldflags "-s -w" -o "$output_path" .; then
         local size=$(ls -lh "$output_path" | awk '{print $5}')
@@ -266,23 +235,14 @@ build_binary() {
 }
 
 build_binaries() {
-    log_step "2/6" "Building native binaries..."
+    log_step "2/6" "Building binaries..."
 
     dry_run_or_exec mkdir -p dist/binaries
 
-    # Build for standard platforms (Zig CC)
-    for platform in "${NATIVE_PLATFORMS[@]}"; do
-        IFS="/" read -r goos goarch zig_target <<< "$platform"
-        build_binary "$goos" "$goarch" "$zig_target" || true
+    for platform in "${PLATFORMS[@]}"; do
+        IFS="/" read -r goos goarch <<< "$platform"
+        build_binary "$goos" "$goarch" || true
     done
-
-    # Build for Darwin if on macOS
-    if [ "$(uname -s | tr '[:upper:]' '[:lower:]')" = "darwin" ]; then
-        for platform in "${DARWIN_PLATFORMS[@]}"; do
-            IFS="/" read -r goos goarch zig_target <<< "$platform"
-            build_binary "$goos" "$goarch" "$zig_target" || true
-        done
-    fi
 
     log_success "Binary builds complete"
 }

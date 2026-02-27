@@ -10,10 +10,10 @@
 # ============================================================
 # Stage 1: Build windshift server binary
 # ============================================================
-FROM golang:1.25-alpine AS builder
+FROM golang:1.26.0-alpine AS builder
 
 # Install build dependencies
-RUN apk add --no-cache gcc musl-dev nodejs npm git
+RUN apk add --no-cache nodejs npm git
 
 WORKDIR /build
 
@@ -30,9 +30,7 @@ RUN rm -rf node_modules && npm install --force && npm run build
 
 # Build backend with static linking
 WORKDIR /build
-RUN CGO_ENABLED=1 \
-    go build -ldflags '-s -w -linkmode external -extldflags "-static"' \
-    -o windshift main.go
+RUN CGO_ENABLED=0 go build -ldflags '-s -w' -o windshift main.go
 
 # ============================================================
 # Stage 2: Generate demo data (seeder)
