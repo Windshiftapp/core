@@ -875,6 +875,30 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 		}
 	}
 
+	// Apply implicit "Everyone = Viewer" default for active workspaces without explicit Everyone assignments.
+	// Mirrors GetEveryoneRole API (workspace_roles.go:497-512) which returns implicit Viewer when no row exists.
+	var viewerRoleID int
+	if err := ps.db.QueryRow(`SELECT id FROM workspace_roles WHERE name = ? LIMIT 1`, models.RoleViewer).Scan(&viewerRoleID); err == nil {
+		viewerPerms, ok := rolePermissionCache[viewerRoleID]
+		if !ok {
+			viewerPerms, err = ps.getRolePermissions(viewerRoleID)
+			if err == nil {
+				rolePermissionCache[viewerRoleID] = viewerPerms
+			}
+		}
+		if viewerPerms != nil {
+			for wsID, active := range activeWorkspaces {
+				if !active {
+					continue
+				}
+				if _, hasExplicit := cached.WorkspaceEveryone[wsID]; hasExplicit {
+					continue
+				}
+				cached.WorkspaceEveryone[wsID] = clonePermissionSet(viewerPerms)
+			}
+		}
+	}
+
 	// Load global permissions
 	globalRows, err := ps.db.Query(`
 		SELECT p.permission_key

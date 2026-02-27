@@ -102,6 +102,11 @@ func (h *WorkspaceHandler) GetOrCreatePersonalWorkspace(w http.ResponseWriter, r
 		slog.Warn("failed to create item sequence for personal workspace", slog.String("component", "workspaces"), slog.Int64("workspace_id", id), slog.Any("error", err))
 	}
 
+	// Invalidate permission cache so the user gets auto-granted permissions for the new workspace
+	if h.permissionService != nil {
+		_ = h.permissionService.InvalidateUserCache(userID)
+	}
+
 	// Return the created personal workspace
 	err = h.db.QueryRow(`
 		SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.created_at, w.updated_at,

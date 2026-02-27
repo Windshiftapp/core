@@ -49,12 +49,8 @@ func (h *MilestoneHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		// For global-only milestones, check global milestone permission
-		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
-		if err != nil || !hasGlobalPerm {
-			respondForbidden(w, r)
-			return
-		}
+		// No workspace_id: allow any authenticated user to list global milestones.
+		// Write operations (create/update/delete) still require PermissionMilestoneCreate.
 	}
 
 	// Build service params

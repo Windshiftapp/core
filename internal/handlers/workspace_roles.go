@@ -654,9 +654,9 @@ func (h *WorkspaceRoleHandler) getViewerRole() (*models.WorkspaceRole, error) {
 	err = db.QueryRow(`
 		SELECT id, name, description, is_system, display_order, created_at, updated_at
 		FROM workspace_roles
-		WHERE name = 'Viewer'
+		WHERE name = ?
 		LIMIT 1
-	`).Scan(&role.ID, &role.Name, &role.Description, &role.IsSystem, &role.DisplayOrder, &role.CreatedAt, &role.UpdatedAt)
+	`, models.RoleViewer).Scan(&role.ID, &role.Name, &role.Description, &role.IsSystem, &role.DisplayOrder, &role.CreatedAt, &role.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
