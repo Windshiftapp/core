@@ -163,8 +163,8 @@ class WorkspaceDataStore {
       api.workspaces.getStatuses(workspaceId),
       api.statusCategories.getAll(),
       api.getUsers(),
-      api.milestones.getAll(),
-      api.iterations.getAll(),
+      api.milestones.getAll({ workspace_id: workspaceId }),
+      api.iterations.getAll({ workspace_id: workspaceId }),
       api.priorities.getAll(),
       api.workspaces.getProjects ? api.workspaces.getProjects(workspaceId) : Promise.resolve([]),
     ]);

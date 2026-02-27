@@ -550,18 +550,20 @@
             </Tooltip>
           {/if}
 
-          <Tooltip content="Configure workspace settings and preferences" placement="right">
-            <button
-              onclick={() => navigate(`/workspaces/${workspaceId}/settings/general`)}
-              class="w-full text-left px-3 py-2 cursor-pointer rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item"
-              style={['workspace-settings', 'workspace-settings-general', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger'].includes($currentRoute.view) ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
-              onmouseenter={(e) => { if (!['workspace-settings', 'workspace-settings-general', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger'].includes($currentRoute.view)) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
-              onmouseleave={(e) => { if (!['workspace-settings', 'workspace-settings-general', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger'].includes($currentRoute.view)) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
-            >
-              <Settings class="w-4 h-4" />
-              Settings
-            </button>
-          </Tooltip>
+          {#if canAdmin}
+            <Tooltip content="Configure workspace settings and preferences" placement="right">
+              <button
+                onclick={() => navigate(`/workspaces/${workspaceId}/settings/general`)}
+                class="w-full text-left px-3 py-2 cursor-pointer rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item"
+                style={['workspace-settings', 'workspace-settings-general', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger'].includes($currentRoute.view) ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
+                onmouseenter={(e) => { if (!['workspace-settings', 'workspace-settings-general', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger'].includes($currentRoute.view)) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
+                onmouseleave={(e) => { if (!['workspace-settings', 'workspace-settings-general', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger'].includes($currentRoute.view)) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
+              >
+                <Settings class="w-4 h-4" />
+                Settings
+              </button>
+            </Tooltip>
+          {/if}
         </div>
       {/if}
     </div>

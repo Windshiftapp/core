@@ -248,6 +248,8 @@ export default {
     // Generic
     UNKNOWN: 'An unknown error occurred.',
     generic: 'Something went wrong. Please try again.',
+    failedToSave: 'Failed to save',
+    failedToDelete: 'Failed to delete',
   },
 
   // Validation messages

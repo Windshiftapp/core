@@ -21,6 +21,7 @@
   import { currentRoute, navigate } from '../../router.js';
   import { formatDateShort } from '../../utils/dateFormatter.js';
   import { api } from '../../api.js';
+  import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
   import ColorDot from '../../components/ColorDot.svelte';
   import Label from '../../components/Label.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
@@ -35,6 +36,10 @@
 
   // Determine if this is global view (no workspaceId) or workspace-scoped
   const isGlobalView = $derived(!workspaceId);
+
+  const canManageGlobal = $derived(
+    permissionStore.hasPermissionKey('milestone.create') || $isSystemAdmin
+  );
 
   let showCreateForm = $state(false);
   let editingMilestone = $state(null);
@@ -610,7 +615,7 @@
           />
         </div>
 
-        {#if !isGlobalView}
+        {#if !isGlobalView && canManageGlobal}
           <!-- Scope Toggle -->
           <div class="md:col-span-2">
             <div class="p-4 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">

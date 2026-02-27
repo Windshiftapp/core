@@ -189,6 +189,8 @@ export default {
     TIMEOUT: 'انتهت مهلة الطلب. يرجى المحاولة مرة أخرى.',
     UNKNOWN: 'حدث خطأ غير معروف.',
     generic: 'حدث خطأ ما. يرجى المحاولة مرة أخرى.',
+    failedToSave: 'فشل الحفظ',
+    failedToDelete: 'فشل الحذف',
   },
 
   // Validation messages
