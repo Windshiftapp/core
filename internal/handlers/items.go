@@ -233,6 +233,9 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Sub-filter QL (ANDed with collection/direct QL)
+	subQLQuery := r.URL.Query().Get("sub_ql")
+
 	// Determine sort order
 	sortBy := r.URL.Query().Get("order_by")
 	sortAsc := strings.EqualFold(r.URL.Query().Get("sort_direction"), "asc")
@@ -242,6 +245,7 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		WorkspaceID:  workspaceID,
 		CollectionID: collectionID,
 		QLQuery:      qlQuery,
+		SubQLQuery:   subQLQuery,
 		WorkspaceIDs: accessibleWorkspaceIDs,
 		Filters:      filters,
 		Pagination: services.PaginationParams{

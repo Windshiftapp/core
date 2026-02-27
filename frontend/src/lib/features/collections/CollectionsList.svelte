@@ -4,6 +4,7 @@
   import { api } from '../../api.js';
   import { navigate, currentRoute } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { confirm } from '../../composables/useConfirm.js';
   import { FolderOpen, Plus, Eye, Trash2 } from 'lucide-svelte';
   import Button from '../../components/Button.svelte';
   import DataTable from '../../components/DataTable.svelte';
@@ -148,9 +149,14 @@
   }
 
   async function deleteCollection(collection) {
-    if (!confirm(t('collections.confirmDeleteCollection', { name: collection.name }))) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('collections.confirmDeleteCollection', { name: collection.name }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       await api.collections.delete(collection.id);

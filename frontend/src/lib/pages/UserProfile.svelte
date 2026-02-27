@@ -12,6 +12,7 @@
 	import ConnectedAccountsTab from '../settings/ConnectedAccountsTab.svelte';
 	import { formatDate } from '../utils/dateFormatter.js';
 	import { t, i18n, SUPPORTED_LOCALES } from '../stores/i18n.svelte.js';
+	import { confirm } from '../composables/useConfirm.js';
 	import {
 		isWebAuthnSupported,
 		registerCredential,
@@ -165,7 +166,14 @@
 
 	async function removeAvatar() {
 		if (!currentUserId) return;
-		if (!confirm(t('dialogs.confirmations.removeAvatar'))) return;
+		const avatarConfirmed = await confirm({
+			title: t('common.remove'),
+			message: t('dialogs.confirmations.removeAvatar'),
+			confirmText: t('common.remove'),
+			cancelText: t('common.cancel'),
+			variant: 'danger'
+		});
+		if (!avatarConfirmed) return;
 
 		try {
 			await api.updateUserAvatar(currentUserId, null);
@@ -236,7 +244,14 @@
 	}
 
 	async function removeCredential(credentialId, credentialName) {
-		if (!confirm(t('dialogs.confirmations.deleteItem', { name: credentialName }))) return;
+		const credConfirmed = await confirm({
+			title: t('common.delete'),
+			message: t('dialogs.confirmations.deleteItem', { name: credentialName }),
+			confirmText: t('common.delete'),
+			cancelText: t('common.cancel'),
+			variant: 'danger'
+		});
+		if (!credConfirmed) return;
 
 		try {
 			await api.removeUserCredential(currentUserId, credentialId);
@@ -345,7 +360,14 @@
 	}
 
 	async function revokeAppToken(tokenId, tokenName) {
-		if (!confirm(t('security.confirmRevokeToken', { name: tokenName }))) return;
+		const tokenConfirmed = await confirm({
+			title: t('common.delete'),
+			message: t('security.confirmRevokeToken', { name: tokenName }),
+			confirmText: t('common.delete'),
+			cancelText: t('common.cancel'),
+			variant: 'danger'
+		});
+		if (!tokenConfirmed) return;
 
 		try {
 			await api.revokeAppToken(currentUserId, tokenId);
@@ -468,9 +490,14 @@
 	}
 
 	async function revokeCalendarFeed() {
-		if (!confirm(t('dialogs.confirmations.revokeCalendarFeed'))) {
-			return;
-		}
+		const feedConfirmed = await confirm({
+			title: t('common.delete'),
+			message: t('dialogs.confirmations.revokeCalendarFeed'),
+			confirmText: t('common.delete'),
+			cancelText: t('common.cancel'),
+			variant: 'danger'
+		});
+		if (!feedConfirmed) return;
 
 		revokingFeed = true;
 		calendarFeedError = '';

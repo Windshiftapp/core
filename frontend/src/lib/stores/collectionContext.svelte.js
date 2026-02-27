@@ -25,6 +25,9 @@ class CollectionStore {
   backlogHasMore = $state(false);
   backlogLoadingMore = $state(false);
 
+  // Sub-filter QL (clears on navigation)
+  subFilterQL = $state('');
+
   // Internal tracking
   #wsId = null;
   #colId = null;
@@ -52,6 +55,10 @@ class CollectionStore {
    * Initial load: fetches page 1 of items and backlog, resets all pagination state.
    */
   async load(wsId, colId) {
+    // Clear sub-filter on navigation (workspace or collection change)
+    if (wsId !== this.#wsId || colId !== this.#colId) {
+      this.subFilterQL = '';
+    }
     this.#wsId = wsId;
     this.#colId = colId;
     const loadId = ++this.#loadId;
@@ -60,7 +67,7 @@ class CollectionStore {
 
     try {
       const [itemsResult, backlogResult] = await Promise.all([
-        fetchCollectionItems(wsId, colId, { page: 1, limit: DEFAULT_PAGE_SIZE }),
+        fetchCollectionItems(wsId, colId, { page: 1, limit: DEFAULT_PAGE_SIZE, sub_ql: this.subFilterQL || undefined }),
         fetchCollectionBacklog(wsId, colId, { page: 1, limit: DEFAULT_PAGE_SIZE }),
       ]);
 
@@ -101,6 +108,7 @@ class CollectionStore {
       const result = await fetchCollectionItems(this.#wsId, this.#colId, {
         page: nextPage,
         limit: this.itemsPagination?.limit ?? DEFAULT_PAGE_SIZE,
+        sub_ql: this.subFilterQL || undefined,
       });
 
       this.items = [...this.items, ...result.items];
@@ -151,7 +159,7 @@ class CollectionStore {
     const loadId = ++this.#loadId;
 
     try {
-      const result = await fetchCollectionItems(this.#wsId, this.#colId, { page, limit });
+      const result = await fetchCollectionItems(this.#wsId, this.#colId, { page, limit, sub_ql: this.subFilterQL || undefined });
 
       if (loadId !== this.#loadId) return;
 
@@ -185,7 +193,7 @@ class CollectionStore {
 
     try {
       const [itemsResult, backlogResult] = await Promise.all([
-        fetchCollectionItems(this.#wsId, this.#colId, { page: 1, limit: itemsLimit }),
+        fetchCollectionItems(this.#wsId, this.#colId, { page: 1, limit: itemsLimit, sub_ql: this.subFilterQL || undefined }),
         fetchCollectionBacklog(this.#wsId, this.#colId, { page: 1, limit: backlogLimit }),
       ]);
       if (loadId !== this.#loadId) return;
@@ -212,6 +220,26 @@ class CollectionStore {
     } catch (error) {
       if (loadId !== this.#loadId) return;
       console.error('[collectionStore] Refresh failed:', error);
+    }
+  }
+
+  /**
+   * Apply a sub-filter QL query and reload items.
+   */
+  setSubFilter(ql) {
+    this.subFilterQL = ql;
+    if (this.#wsId) {
+      this.load(this.#wsId, this.#colId);
+    }
+  }
+
+  /**
+   * Clear the sub-filter and reload items.
+   */
+  clearSubFilter() {
+    this.subFilterQL = '';
+    if (this.#wsId) {
+      this.load(this.#wsId, this.#colId);
     }
   }
 

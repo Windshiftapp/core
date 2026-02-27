@@ -1,6 +1,7 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { confirm } from '../../composables/useConfirm.js';
   import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import Button from '../../components/Button.svelte';
   import TestActionModal from './TestActionModal.svelte';
@@ -49,8 +50,15 @@
     dispatch('toggle', action);
   }
 
-  function handleDelete(action) {
-    if (confirm(t('actions.confirmDelete', { name: action.name }))) {
+  async function handleDelete(action) {
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('actions.confirmDelete', { name: action.name }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (confirmed) {
       dispatch('delete', action);
     }
   }

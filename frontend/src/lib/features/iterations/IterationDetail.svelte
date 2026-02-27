@@ -15,6 +15,7 @@
   import BasePicker from '../../pickers/BasePicker.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { confirm } from '../../composables/useConfirm.js';
 
   let { iterationId, workspaceId = null } = $props();
 
@@ -165,7 +166,14 @@
   }
 
   async function deleteIteration() {
-    if (confirm(t('iterations.confirmDelete', { name: progress?.iteration_name }))) {
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('iterations.confirmDelete', { name: progress?.iteration_name }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (confirmed) {
       try {
         await api.iterations.delete(iterationId);
         goBack();

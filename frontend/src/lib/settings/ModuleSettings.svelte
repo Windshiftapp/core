@@ -9,6 +9,7 @@
   import AlertBox from '../components/AlertBox.svelte';
   import { api, getSecuritySettings, fetchAPI } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
 
   let saving = $state(false);
   let error = $state('');
@@ -175,9 +176,14 @@
   }
 
   async function deletePlugin(plugin) {
-    if (!confirm(t('settings.modules.confirmDeletePlugin', { name: plugin.name }))) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('settings.modules.confirmDeletePlugin', { name: plugin.name }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       await fetchAPI(`/plugins/${plugin.name}`, {

@@ -716,18 +716,26 @@ func (s *SyncService) CreatePullRequestForRepository(ctx context.Context, worksp
 		return nil, "", fmt.Errorf("failed to create pull request: %w", err)
 	}
 
-	// Build the PR URL based on provider type
-	repoBaseURL := baseURL.String
-	if repoBaseURL == "" {
+	// Build the PR URL — prefer the URL returned by the provider API
+	prURL := pr.URL
+	if prURL == "" {
+		// Fallback: construct URL manually
+		repoBaseURL := baseURL.String
+		if repoBaseURL == "" {
+			switch providerType {
+			case models.SCMProviderTypeGitHub:
+				repoBaseURL = "https://github.com"
+			case models.SCMProviderTypeGitea:
+				repoBaseURL = "https://gitea.com"
+			}
+		}
 		switch providerType {
-		case models.SCMProviderTypeGitHub:
-			repoBaseURL = "https://github.com"
 		case models.SCMProviderTypeGitea:
-			repoBaseURL = "https://gitea.com"
+			prURL = fmt.Sprintf("%s/%s/pulls/%d", repoBaseURL, repositoryName, pr.Number)
+		default:
+			prURL = fmt.Sprintf("%s/%s/pull/%d", repoBaseURL, repositoryName, pr.Number)
 		}
 	}
-
-	prURL := fmt.Sprintf("%s/%s/pull/%d", repoBaseURL, repositoryName, pr.Number)
 
 	slog.Debug("Created pull request", slog.String("component", "scm"), slog.Int("pr_number", pr.Number), slog.String("repository", repositoryName))
 	return pr, prURL, nil

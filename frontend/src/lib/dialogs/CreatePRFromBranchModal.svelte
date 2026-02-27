@@ -7,6 +7,7 @@
   import { X, GitMerge, Loader2 } from 'lucide-svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { portal } from '../actions/portal.js';
 
   export let branchLink;
   export let itemKey = '';
@@ -57,6 +58,7 @@
 
 <!-- Modal Backdrop -->
 <div
+  use:portal
   class="fixed inset-0 flex items-center justify-center p-4 z-50"
   style="background-color: rgba(0, 0, 0, 0.3); backdrop-filter: blur(2px);"
   onclick={(e) => e.target === e.currentTarget && close()}

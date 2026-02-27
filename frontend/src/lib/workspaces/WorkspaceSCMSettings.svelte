@@ -5,6 +5,8 @@
   import { GitMerge, Plus, Trash2, ExternalLink, ChevronDown, ChevronRight, Settings, RefreshCw, Loader2, Check, X, KeyRound } from 'lucide-svelte';
   import RepositorySelector from '../pickers/RepositorySelector.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
 
   export let workspaceId;
 
@@ -88,9 +90,14 @@
   }
 
   async function disconnectProvider(conn) {
-    if (!confirm(`Are you sure you want to disconnect ${conn.provider_name}? This will also unlink all repositories.`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('common.disconnect'),
+      message: `Are you sure you want to disconnect ${conn.provider_name}? This will also unlink all repositories.`,
+      confirmText: t('common.disconnect'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
     try {
       await api.workspaceSCM.deleteConnection(workspaceId, conn.id);
       connections = connections.filter(c => c.id !== conn.id);
@@ -163,9 +170,14 @@
   }
 
   async function unlinkRepo(connId, repo) {
-    if (!confirm(`Are you sure you want to unlink ${repo.repository_name}?`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('common.remove'),
+      message: `Are you sure you want to unlink ${repo.repository_name}?`,
+      confirmText: t('common.remove'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
     try {
       await api.workspaceSCM.unlinkRepo(repo.id);
       linkedRepos[connId] = linkedRepos[connId].filter(r => r.id !== repo.id);

@@ -289,22 +289,10 @@
       <FieldSelector
         selectedField={filter.field}
         placeholder="Choose field..."
-        onselect={handleFieldSelect}
-        onclear={handleFieldClear}
+        on:select={handleFieldSelect}
+        on:clear={handleFieldClear}
       />
     </div>
-    {#if compact}
-      <!-- Remove Button (in header for compact mode) -->
-      <button
-        type="button"
-        onclick={handleRemove}
-        class="p-2 rounded transition-colors flex-shrink-0"
-        style="color: var(--ds-text-subtle);"
-        title="Remove filter"
-      >
-        <X class="w-5 h-5" />
-      </button>
-    {/if}
   </div>
 
   {#if filter.field}
@@ -378,7 +366,7 @@
         <MilestoneCombobox
           value={filter.value}
           placeholder="Select milestone..."
-          onselect={handleMilestoneSelect}
+          on:select={handleMilestoneSelect}
         />
       {:else if filter.field.type === 'enum' || filter.field.type === 'select'}
         <!-- Dropdown for enum/select fields -->

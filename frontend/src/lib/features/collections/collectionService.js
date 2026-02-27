@@ -3,12 +3,16 @@ import { api } from '../../api.js';
 /**
  * Fetches items for a collection (or all workspace items if no collection).
  * Handles QL query resolution and correct API parameter naming.
+ * @param {string|number} workspaceId
+ * @param {string|number|null} collectionId
+ * @param {{ page?: number, limit?: number, sub_ql?: string, [key: string]: any }} [options]
  */
-export async function fetchCollectionItems(workspaceId, collectionId, { page, limit, ...extraFilters } = {}) {
+export async function fetchCollectionItems(workspaceId, collectionId, { page, limit, sub_ql, ...extraFilters } = {}) {
   let collectionName = 'Default';
   const filters = { ...extraFilters };
   if (page) filters.page = page;
   if (limit) filters.limit = limit;
+  if (sub_ql) filters.sub_ql = sub_ql;
 
   if (collectionId) {
     const collection = await getCollection(collectionId);
@@ -32,6 +36,9 @@ export async function fetchCollectionItems(workspaceId, collectionId, { page, li
 
 /**
  * Fetches backlog items for a collection.
+ * @param {string|number} workspaceId
+ * @param {string|number|null} collectionId
+ * @param {{ page?: number, limit?: number }} [options]
  */
 export async function fetchCollectionBacklog(workspaceId, collectionId, { page, limit } = {}) {
   let collectionName = 'Default';

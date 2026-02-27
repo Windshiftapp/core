@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
   import {
@@ -285,9 +286,14 @@
       return;
     }
 
-    if (!confirm(t('dialogs.confirmations.deleteItem', { name: configSet.name }))) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('dialogs.confirmations.deleteItem', { name: configSet.name }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       await api.configurationSets.delete(configSet.id);

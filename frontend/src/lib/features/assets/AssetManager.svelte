@@ -19,6 +19,7 @@
   import Checkbox from '../../components/Checkbox.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { confirm } from '../../composables/useConfirm.js';
 
   // State for asset sets
   let assetSets = $state([]);
@@ -131,7 +132,14 @@
   }
 
   async function deleteSet(id) {
-    if (confirm(t('dialogs.confirmations.deleteAssetSet'))) {
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('dialogs.confirmations.deleteAssetSet'),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (confirmed) {
       try {
         await api.assetSets.delete(id);
         if (selectedSetId === id) {
@@ -190,7 +198,14 @@
   }
 
   async function deleteType(id) {
-    if (confirm(t('dialogs.confirmations.deleteAssetType'))) {
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('dialogs.confirmations.deleteAssetType'),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (confirmed) {
       try {
         await api.assetTypes.delete(id);
         await loadAssetTypes();
@@ -331,7 +346,14 @@
   }
 
   async function deleteCategory(id) {
-    if (confirm(t('dialogs.confirmations.deleteCategory'))) {
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('dialogs.confirmations.deleteCategory'),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (confirmed) {
       try {
         await api.assetCategories.delete(id);
         await loadAssetCategories();
@@ -407,7 +429,14 @@
   }
 
   async function revokeRole(assignmentId, type) {
-    if (confirm(t('dialogs.confirmations.revokeRole'))) {
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('dialogs.confirmations.revokeRole'),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (confirmed) {
       try {
         await api.assetSets.revokeRole(selectedSetId, assignmentId, type);
         await loadSetRoles();

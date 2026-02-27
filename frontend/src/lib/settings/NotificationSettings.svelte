@@ -4,6 +4,7 @@
   import { api } from '../api.js';
   import { authStore } from '../stores/auth.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
   import {
     Bell, Plus, Edit, Trash2, Save, X, Check,
     AlertCircle, Settings, Power, PowerOff
@@ -123,9 +124,14 @@
   }
 
   async function handleDelete(setting) {
-    if (!confirm(t('settings.notifications.confirmDelete', { name: setting.name }))) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('settings.notifications.confirmDelete', { name: setting.name }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       await api.notificationSettings.delete(setting.id);

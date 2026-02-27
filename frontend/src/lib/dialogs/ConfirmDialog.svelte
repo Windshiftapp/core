@@ -93,7 +93,7 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<ModalBackdrop bind:show onclose={cancel} ariaLabelledBy="dialog-title">
+<ModalBackdrop bind:show onclose={cancel} ariaLabelledBy="dialog-title" zIndex={70}>
     <!-- Modal content -->
     <div
       class="bg-white rounded shadow-xl max-w-md w-full transform transition-all"

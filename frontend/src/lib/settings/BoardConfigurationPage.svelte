@@ -3,6 +3,7 @@
   import { navigate } from '../router.js';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
   import { getCollection } from '../features/collections/collectionService.js';
   import { Plus, GripVertical, Trash2, X } from 'lucide-svelte';
   import { useGradientStyles, loadWorkspaceGradient } from '../stores/workspaceGradient.svelte.js';
@@ -234,9 +235,14 @@
   }
 
   async function resetToDefault() {
-    if (!confirm(t('dialogs.confirmations.resetBoardConfig'))) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('common.reset'),
+      message: t('dialogs.confirmations.resetBoardConfig'),
+      confirmText: t('common.reset'),
+      cancelText: t('common.cancel'),
+      variant: 'warning'
+    });
+    if (!confirmed) return;
 
     if (boardConfig) {
       try {
@@ -258,9 +264,16 @@
     }
   }
 
-  function cancelChanges() {
-    if (hasChanges && !confirm(t('dialogs.confirmations.discardChanges'))) {
-      return;
+  async function cancelChanges() {
+    if (hasChanges) {
+      const confirmed = await confirm({
+        title: t('common.discardChanges'),
+        message: t('dialogs.confirmations.discardChanges'),
+        confirmText: t('common.discard'),
+        cancelText: t('common.cancel'),
+        variant: 'warning'
+      });
+      if (!confirmed) return;
     }
     goToBoard();
   }

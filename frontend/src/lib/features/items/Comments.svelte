@@ -9,6 +9,7 @@
 	import { formatRelativeTime } from '../../utils/dateFormatter.js';
 	import { getShortcut, matchesShortcut, getDisplayString } from '../../utils/keyboardShortcuts.js';
 	import { t } from '../../stores/i18n.svelte.js';
+	import { confirm } from '../../composables/useConfirm.js';
 
 	// Get shortcut configuration (use same as description save)
 	const submitShortcut = getShortcut('description', 'save');
@@ -99,7 +100,14 @@
 	}
 
 	async function deleteComment(commentId) {
-		if (!confirm(t('comments.confirmDelete'))) return;
+		const confirmed = await confirm({
+			title: t('common.delete'),
+			message: t('comments.confirmDelete'),
+			confirmText: t('common.delete'),
+			cancelText: t('common.cancel'),
+			variant: 'danger'
+		});
+		if (!confirmed) return;
 
 		try {
 			await api.deleteComment(commentId);

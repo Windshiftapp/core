@@ -4,6 +4,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
+  import { confirm } from '../../composables/useConfirm.js';
   import { collectionStore, reloadCollection } from '../../stores/collectionContext.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
@@ -17,6 +18,7 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import ListCellRenderer from './ListCellRenderer.svelte';
   import ColumnSelector from './ColumnSelector.svelte';
+  import SubFilterBar from './SubFilterBar.svelte';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -181,9 +183,14 @@
   }
 
   async function deleteItem(item) {
-    if (!confirm(t('collections.confirmDeleteItem', { title: item.title }))) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('collections.confirmDeleteItem', { title: item.title }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       await api.items.delete(item.id);
@@ -283,6 +290,7 @@
             placeholder={t('common.search')}
             hasGradient={styles.hasCustomBackground}
           />
+          <SubFilterBar {workspaceId} hasGradient={styles.hasCustomBackground} />
         </div>
 
         <div class="flex items-center gap-2">
@@ -369,7 +377,6 @@
                       triggerIcon={MoreHorizontal}
                       triggerClass="p-2 rounded action-btn transition-colors"
                       items={buildItemActions(item)}
-                      align="right"
                     />
                   </div>
                 </div>

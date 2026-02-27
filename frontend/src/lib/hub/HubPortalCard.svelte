@@ -37,10 +37,10 @@
   <!-- Gradient Header -->
   <div
     class="h-24 relative"
-    style="background: {gradients[portal.gradient || 0].value};"
+    style="background: {portal.background_image_url ? `url(${portal.background_image_url}) center/cover no-repeat` : gradients[portal.gradient || 0].value};"
   >
-    <!-- Dark mode overlay -->
-    {#if hubStore.isDarkMode}
+    <!-- Dark overlay for background image or dark mode -->
+    {#if portal.background_image_url || hubStore.isDarkMode}
       <div class="absolute inset-0 bg-black/30"></div>
     {/if}
 

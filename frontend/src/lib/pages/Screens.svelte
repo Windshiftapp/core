@@ -6,6 +6,7 @@
   import { SYSTEM_FIELDS, getSystemFieldName } from '../stores/fieldConfig.js';
   import { screenEditorStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import Textarea from '../components/Textarea.svelte';
@@ -197,7 +198,14 @@
       return;
     }
 
-    if (confirm(t('dialogs.confirmations.deleteScreen', { name: screen.name }))) {
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('dialogs.confirmations.deleteScreen', { name: screen.name }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (confirmed) {
       try {
         await screenEditorStore.deleteScreen(screen);
       } catch (error) {

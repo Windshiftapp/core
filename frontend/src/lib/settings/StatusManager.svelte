@@ -15,6 +15,7 @@
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
 
   // System-protected status IDs (cannot be deleted)
   const PROTECTED_STATUS_IDS = [1, 6]; // Open and Closed
@@ -164,9 +165,14 @@
       return;
     }
 
-    if (!confirm(t('dialogs.confirmations.deleteItem', { name: status.name }))) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('dialogs.confirmations.deleteItem', { name: status.name }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       await api.delete(`/statuses/${status.id}`);

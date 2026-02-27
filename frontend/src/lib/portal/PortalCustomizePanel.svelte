@@ -19,6 +19,7 @@
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
 
   let {
     onOpenFieldsModal = () => {},
@@ -71,7 +72,14 @@
   }
 
   async function deleteAssetReport(id) {
-    if (!confirm(t('portal.customize.confirmDeleteAssetReport'))) return;
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('portal.customize.confirmDeleteAssetReport'),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       await api.assetReports.delete(id);
@@ -84,7 +92,14 @@
   let showCustomizePanelHover = $state(false);
 
   async function deleteRequestType(id) {
-    if (!confirm(t('portal.customize.confirmDeleteRequestType'))) return;
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('portal.customize.confirmDeleteRequestType'),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       await api.requestTypes.delete(id);

@@ -4,6 +4,7 @@
   import { Plus, Trash2, X, Package, Table2 } from 'lucide-svelte';
   import { portalStore, iconMap } from '../stores/portal.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
   import AssetReportTable from './AssetReportTable.svelte';
 
   let {
@@ -148,7 +149,16 @@
               </svg>
             </button>
             <button
-              onclick={() => { if (confirm('Are you sure you want to delete this section?')) portalStore.deleteSection(section.id); }}
+              onclick={async () => {
+                const confirmed = await confirm({
+                  title: t('common.delete'),
+                  message: 'Are you sure you want to delete this section?',
+                  confirmText: t('common.delete'),
+                  cancelText: t('common.cancel'),
+                  variant: 'danger'
+                });
+                if (confirmed) portalStore.deleteSection(section.id);
+              }}
               class="p-1 rounded transition-all hover:bg-red-50"
               style="color: #dc2626;"
               title={t('layout.deleteSection')}
