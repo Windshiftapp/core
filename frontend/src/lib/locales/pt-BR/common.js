@@ -248,6 +248,8 @@ export default {
     // Genérico
     UNKNOWN: 'Ocorreu um erro desconhecido.',
     generic: 'Algo deu errado. Por favor, tente novamente.',
+    failedToSave: 'Falha ao salvar',
+    failedToDelete: 'Falha ao excluir',
   },
 
   // Mensagens de validação

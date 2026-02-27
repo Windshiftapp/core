@@ -186,6 +186,8 @@ export default {
     TIMEOUT: 'La solicitud expiro. Por favor, intente de nuevo.',
     UNKNOWN: 'Ocurrio un error desconocido.',
     generic: 'Algo salio mal. Por favor, intente de nuevo.',
+    failedToSave: 'Error al guardar',
+    failedToDelete: 'Error al eliminar',
   },
 
   // Validation messages

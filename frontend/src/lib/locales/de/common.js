@@ -229,6 +229,8 @@ export default {
     TIMEOUT: 'Die Anfrage ist abgelaufen. Bitte versuchen Sie es erneut.',
     UNKNOWN: 'Ein unbekannter Fehler ist aufgetreten.',
     generic: 'Etwas ist schief gelaufen. Bitte versuchen Sie es erneut.',
+    failedToSave: 'Speichern fehlgeschlagen',
+    failedToDelete: 'Löschen fehlgeschlagen',
   },
 
   // Validation messages
