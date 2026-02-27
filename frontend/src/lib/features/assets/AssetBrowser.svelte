@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { confirm } from '../../composables/useConfirm.js';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import Button from '../../components/Button.svelte';
@@ -290,7 +291,14 @@
   }
 
   async function deleteAsset(id) {
-    if (confirm(t('dialogs.confirmations.deleteAsset'))) {
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('dialogs.confirmations.deleteAsset'),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (confirmed) {
       try {
         await api.assets.delete(id);
         await loadAssets();

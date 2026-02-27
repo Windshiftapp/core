@@ -370,6 +370,7 @@ type ListWithQLParams struct {
 	WorkspaceID  int    // Single workspace filter (0 = all accessible)
 	CollectionID int    // Collection to resolve QL from (0 = none)
 	QLQuery      string // Direct QL query (overrides collection)
+	SubQLQuery   string // Sub-filter QL query (ANDed with base QL)
 	WorkspaceIDs []int  // Accessible workspace IDs for security filtering
 	Filters      ItemFilters
 	Pagination   PaginationParams
@@ -399,6 +400,15 @@ func (s *ItemCRUDService) ListWithQL(params ListWithQLParams) ([]models.Item, in
 		}
 		if strings.TrimSpace(collectionQL) != "" {
 			qlQuery = collectionQL
+		}
+	}
+
+	// Combine with sub-filter QL if provided
+	if subQL := strings.TrimSpace(params.SubQLQuery); subQL != "" {
+		if qlQuery != "" {
+			qlQuery = "(" + qlQuery + ") AND (" + subQL + ")"
+		} else {
+			qlQuery = subQL
 		}
 	}
 

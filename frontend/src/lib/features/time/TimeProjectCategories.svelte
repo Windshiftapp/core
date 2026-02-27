@@ -6,6 +6,7 @@
   import { Plus, GripVertical, Edit, Trash2 } from 'lucide-svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { confirm } from '../../composables/useConfirm.js';
 
   let categories = $state([]);
   let showCreateForm = $state(false);
@@ -84,7 +85,14 @@
   }
 
   async function deleteCategory(category) {
-    if (confirm(t('time.categories.confirmDelete', { name: category.name }))) {
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('time.categories.confirmDelete', { name: category.name }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (confirmed) {
       try {
         await api.time.projectCategories.delete(category.id);
         await loadCategories();

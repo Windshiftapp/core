@@ -9,6 +9,7 @@
   import { isSystemAdmin } from '../stores';
   import { timerStore } from '../stores/timerStore.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
 
   const dispatch = createEventDispatcher();
@@ -423,7 +424,14 @@
       // Handle system commands
       if (command.action === 'quit') {
         // Confirm before quitting
-        if (confirm(t('dialogs.confirmations.quitApplication'))) {
+        const quitConfirmed = await confirm({
+          title: t('common.confirm'),
+          message: t('dialogs.confirmations.quitApplication'),
+          confirmText: t('common.confirm'),
+          cancelText: t('common.cancel'),
+          variant: 'warning'
+        });
+        if (quitConfirmed) {
           try {
             await api.system.shutdown();
             // Show a message that the server is shutting down

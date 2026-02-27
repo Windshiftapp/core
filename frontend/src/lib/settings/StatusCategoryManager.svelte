@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
   import { Plus, Edit, Trash2, Palette, Circle, Folder } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';
@@ -111,9 +112,14 @@
   }
 
   async function deleteCategory(category) {
-    if (!confirm(`Are you sure you want to delete the status category "${category.name}"? This action cannot be undone.`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: `Are you sure you want to delete the status category "${category.name}"? This action cannot be undone.`,
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       await api.delete(`/status-categories/${category.id}`);

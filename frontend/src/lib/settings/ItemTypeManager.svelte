@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
   import { createEventDispatcher } from 'svelte';
   import { Plus, Edit, Trash2, FileText } from 'lucide-svelte';
   import { itemTypeIconMap, itemTypeIconOptions } from '../utils/icons.js';
@@ -143,9 +144,14 @@
   }
 
   async function deleteItemType(id, name) {
-    if (!confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: `Are you sure you want to delete "${name}"? This action cannot be undone.`,
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       await api.itemTypes.delete(id);

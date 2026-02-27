@@ -230,9 +230,9 @@
           <DynamicFieldFilter
             {filter}
             compact={true}
-            onchange={(event) => handleDynamicFilterChange(index, event)}
-            onremove={() => removeDynamicFilter(index)}
-            onexecute={handleDynamicFilterExecute}
+            on:change={(event) => handleDynamicFilterChange(index, event)}
+            on:remove={() => removeDynamicFilter(index)}
+            on:execute={handleDynamicFilterExecute}
           />
         {/each}
 

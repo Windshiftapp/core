@@ -3,6 +3,7 @@
   import { api } from '../api.js';
   import { writable } from 'svelte/store';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Modal from '../dialogs/Modal.svelte';
@@ -89,7 +90,14 @@
       return;
     }
 
-    if (confirm(t('dialogs.confirmations.deleteLinkType'))) {
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('dialogs.confirmations.deleteLinkType'),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (confirmed) {
       try {
         await api.linkTypes.delete(id);
         await loadLinkTypes();

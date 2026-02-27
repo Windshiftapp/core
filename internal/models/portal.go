@@ -571,8 +571,9 @@ type HubPortalInfo struct {
 	Description      string                 `json:"description"`
 	Status           string                 `json:"status"`
 	Slug             string                 `json:"slug"`
-	Gradient         int                    `json:"gradient"`
-	RequestTypeCount int                    `json:"request_type_count"`
+	Gradient           int                    `json:"gradient"`
+	BackgroundImageURL string                 `json:"background_image_url"`
+	RequestTypeCount   int                    `json:"request_type_count"`
 	RequestTypes     []HubPortalRequestType `json:"request_types,omitempty"`
 }
 

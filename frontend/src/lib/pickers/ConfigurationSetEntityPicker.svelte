@@ -2,6 +2,7 @@
   import { Search, Plus, X, AlertCircle } from 'lucide-svelte';
   import { itemTypeIconMap, priorityIconMap } from '../utils/icons.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
 
   // Entity type determines rendering behavior
   let {
@@ -30,13 +31,18 @@
   const assignedEntities = $derived(filteredEntities.filter(e => selectedIds.includes(e.id)));
   const availableEntities = $derived(filteredEntities.filter(e => !selectedIds.includes(e.id)));
 
-  function addEntity(entityId) {
+  async function addEntity(entityId) {
     // Check for conflicts (workspaces assigned elsewhere)
     if (entityAssignments[entityId]) {
       const assignment = entityAssignments[entityId];
-      if (!confirm(t('pickers.entityAlreadyAssigned', { entity: getEntityLabel(), configSetName: assignment.configSetName }))) {
-        return;
-      }
+      const confirmed = await confirm({
+        title: t('common.confirm'),
+        message: t('pickers.entityAlreadyAssigned', { entity: getEntityLabel(), configSetName: assignment.configSetName }),
+        confirmText: t('common.confirm'),
+        cancelText: t('common.cancel'),
+        variant: 'warning'
+      });
+      if (!confirmed) return;
     }
     onchange?.([...selectedIds, entityId]);
   }

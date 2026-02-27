@@ -5,6 +5,7 @@
   import ColorPicker from '../editors/ColorPicker.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
 
   let {
     isOpen = false,
@@ -40,9 +41,14 @@
   }
 
   async function deleteCategory(category) {
-    if (!confirm(t('categories.confirmDeleteCategory', { name: category.name }))) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('categories.confirmDeleteCategory', { name: category.name }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     loading = true;
     try {

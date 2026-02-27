@@ -390,12 +390,14 @@ func (h *HubHandler) getEnabledPortals(ctx context.Context, isAdmin bool, userGr
 		// Parse config to get slug and gradient
 		if configJSON != "" {
 			var config struct {
-				PortalSlug     string `json:"portal_slug"`
-				PortalGradient int    `json:"portal_gradient"`
+				PortalSlug               string `json:"portal_slug"`
+				PortalGradient           int    `json:"portal_gradient"`
+				PortalBackgroundImageURL string `json:"portal_background_image_url"`
 			}
 			if err = json.Unmarshal([]byte(configJSON), &config); err == nil {
 				portal.Slug = config.PortalSlug
 				portal.Gradient = config.PortalGradient
+				portal.BackgroundImageURL = config.PortalBackgroundImageURL
 			}
 		}
 

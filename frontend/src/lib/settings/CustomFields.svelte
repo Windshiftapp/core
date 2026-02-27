@@ -17,6 +17,7 @@
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
 
   let customFields = $state([]);
   let screens = $state([]);
@@ -247,7 +248,14 @@
   }
 
   async function deleteField(field) {
-    if (confirm(t('dialogs.confirmations.deleteCustomField', { name: field.name }))) {
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('dialogs.confirmations.deleteCustomField', { name: field.name }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (confirmed) {
       try {
         await api.customFields.delete(field.id);
         await loadCustomFields();

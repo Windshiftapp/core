@@ -5,6 +5,7 @@
   import Button from '../../components/Button.svelte';
   import Text from '../../components/Text.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { confirm } from '../../composables/useConfirm.js';
 
   export let itemId;
 
@@ -108,7 +109,14 @@
   }
 
   async function deleteLink(linkId) {
-    if (!confirm(t('scm.confirmRemoveLink'))) return;
+    const confirmed = await confirm({
+      title: t('common.remove'),
+      message: t('scm.confirmRemoveLink'),
+      confirmText: t('common.remove'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       await api.itemSCMLinks.delete(linkId);

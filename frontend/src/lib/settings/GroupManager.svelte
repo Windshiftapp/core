@@ -15,6 +15,7 @@
 	import Lozenge from '../components/Lozenge.svelte';
 	import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 	import { t } from '../stores/i18n.svelte.js';
+	import { confirm } from '../composables/useConfirm.js';
 
 	let groups = $state([]);
 	let users = $state([]);
@@ -74,7 +75,14 @@
 	}
 
 	async function deleteGroup(groupId) {
-		if (!confirm(t('settings.groups.confirmDelete'))) return;
+		const confirmed = await confirm({
+			title: t('common.delete'),
+			message: t('settings.groups.confirmDelete'),
+			confirmText: t('common.delete'),
+			cancelText: t('common.cancel'),
+			variant: 'danger'
+		});
+		if (!confirmed) return;
 
 		try {
 			await api.groups.delete(groupId);
@@ -142,7 +150,14 @@
 	}
 
 	async function removeMember(userId) {
-		if (!confirm(t('settings.groups.confirmRemoveMember'))) return;
+		const confirmed = await confirm({
+			title: t('common.remove'),
+			message: t('settings.groups.confirmRemoveMember'),
+			confirmText: t('common.remove'),
+			cancelText: t('common.cancel'),
+			variant: 'danger'
+		});
+		if (!confirmed) return;
 		
 		try {
 			await api.groups.removeMembers(selectedGroup.id, [userId]);

@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
+  import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
   import { Edit, Plus, Circle, Grip } from 'lucide-svelte';
   import { workspaceIconMap } from '../utils/icons.js';
   import Button from '../components/Button.svelte';
@@ -28,7 +30,14 @@
   }
 
   async function deleteWorkspace(workspace) {
-    if (confirm(`Are you sure you want to delete workspace "${workspace.name}"? This will affect all associated projects.`)) {
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: `Are you sure you want to delete workspace "${workspace.name}"? This will affect all associated projects.`,
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (confirmed) {
       try {
         await api.workspaces.delete(workspace.id);
         await workspacesStore.reload();

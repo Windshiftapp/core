@@ -13,6 +13,7 @@
   import TimeLogModal from '../../dialogs/TimeLogModal.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { confirm } from '../../composables/useConfirm.js';
   import PageHeader from '../../layout/PageHeader.svelte';
 
   // Bind to store values
@@ -82,7 +83,14 @@
   }
 
   async function deleteWorklog(worklog) {
-    if (confirm(t('time.entry.confirmDelete'))) {
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('time.entry.confirmDelete'),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (confirmed) {
       try {
         await timeEntryStore.deleteWorklog(worklog);
       } catch (error) {

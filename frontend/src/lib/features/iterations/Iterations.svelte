@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { confirm } from '../../composables/useConfirm.js';
   import {
     Calendar, CheckCircle, Clock, Plus, Edit, Trash2,
     Globe, Building2, Target
@@ -127,7 +128,14 @@
   }
 
   async function deleteIteration(iteration) {
-    if (confirm(t('iterations.confirmDelete', { name: iteration.name }))) {
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('iterations.confirmDelete', { name: iteration.name }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (confirmed) {
       try {
         await api.iterations.delete(iteration.id);
         await loadData();

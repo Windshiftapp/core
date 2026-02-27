@@ -4,6 +4,7 @@
   import { api } from '../api.js';
   import { themeStore } from '../stores/theme.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
   import { portal } from '../actions/portal.js';
 
   let { itemId, diagram = null, onClose = () => {}, onSave = () => {} } = $props();
@@ -57,9 +58,16 @@
     }
   }
 
-  function handleClose() {
-    if (hasChanges && !confirm(t('components.diagram.unsavedChangesConfirm'))) {
-      return;
+  async function handleClose() {
+    if (hasChanges) {
+      const confirmed = await confirm({
+        title: t('common.discardChanges'),
+        message: t('components.diagram.unsavedChangesConfirm'),
+        confirmText: t('common.discard'),
+        cancelText: t('common.cancel'),
+        variant: 'warning'
+      });
+      if (!confirmed) return;
     }
     onClose();
   }

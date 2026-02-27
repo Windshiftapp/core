@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { confirm } from '../../composables/useConfirm.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { ArrowLeft, Calendar, Flag, Edit, Trash2, ChevronDown, ChevronRight, MoreHorizontal, Tag, ExternalLink } from 'lucide-svelte';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -164,7 +165,14 @@
   }
 
   async function deleteMilestone() {
-    if (confirm(t('milestones.confirmDelete', { name: progress?.milestone_name }))) {
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('milestones.confirmDelete', { name: progress?.milestone_name }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (confirmed) {
       try {
         await milestonesStore.delete(milestoneId);
         goBack();

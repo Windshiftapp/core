@@ -3,6 +3,7 @@
   import { api } from '../api.js';
   import { Search, Calendar, User, Eye, Trash2, MoreHorizontal, Building, AlertCircle } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import WorkItemFilter from '../features/items/WorkItemFilter.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
@@ -55,9 +56,14 @@
   }
 
   async function deleteItem(item) {
-    if (!confirm(t('dialogs.confirmations.deleteItem', { name: item.title }))) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('dialogs.confirmations.deleteItem', { name: item.title }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       await api.items.delete(item.id);

@@ -8,6 +8,7 @@
   import { X, GitMerge, GitBranch, GitCommit, Loader2, Search } from 'lucide-svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { portal } from '../actions/portal.js';
 
   export let itemId;
 
@@ -91,8 +92,10 @@
     switch (type) {
       case 'pull_request':
         // GitHub/GitLab/Gitea pattern
-        if (repo.provider_type === 'github' || repo.provider_type === 'gitea') {
+        if (repo.provider_type === 'github') {
           return `${baseUrl}/pull/${id}`;
+        } else if (repo.provider_type === 'gitea') {
+          return `${baseUrl}/pulls/${id}`;
         } else if (repo.provider_type === 'gitlab') {
           return `${baseUrl}/-/merge_requests/${id}`;
         } else if (repo.provider_type === 'bitbucket') {
@@ -150,6 +153,7 @@
 
 <!-- Modal Backdrop -->
 <div
+  use:portal
   class="fixed inset-0 flex items-center justify-center p-4 z-50"
   style="background-color: rgba(0, 0, 0, 0.3); backdrop-filter: blur(2px);"
   onclick={(e) => e.target === e.currentTarget && close()}

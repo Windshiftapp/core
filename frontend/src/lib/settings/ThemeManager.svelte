@@ -13,6 +13,7 @@
   import Label from '../components/Label.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
 
   // State management
   let themes = $state([]);
@@ -99,9 +100,14 @@
   }
 
   async function deleteTheme(id) {
-    if (!confirm(t('dialogs.confirmations.deleteTheme'))) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('dialogs.confirmations.deleteTheme'),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       error = null;

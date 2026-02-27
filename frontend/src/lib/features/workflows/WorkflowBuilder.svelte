@@ -4,6 +4,7 @@
   import { navigate } from '../../router.js';
   import { Plus, Edit, Trash2, Workflow, ArrowRight } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { confirm } from '../../composables/useConfirm.js';
   import Button from '../../components/Button.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import Card from '../../components/Card.svelte';
@@ -135,9 +136,14 @@
   }
 
   async function deleteWorkflow(workflow) {
-    if (!confirm(t('workflows.confirmDeleteWorkflow', { name: workflow.name }))) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('workflows.confirmDeleteWorkflow', { name: workflow.name }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       await api.delete(`/workflows/${workflow.id}`);

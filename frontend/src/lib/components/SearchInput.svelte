@@ -8,8 +8,8 @@
   export let className = '';
   export let size = 'medium'; // 'small', 'medium', 'large'
   export let hasGradient = false;
-  export let on_input;
-  export let on_keydown;
+  export let on_input = undefined;
+  export let on_keydown = undefined;
 
   function handleInput(event) {
     value = event.target.value;

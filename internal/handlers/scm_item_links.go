@@ -775,6 +775,13 @@ func (h *SCMItemLinksHandler) CreatePRFromBranch(w http.ResponseWriter, r *http.
 		return
 	}
 
+	// Get authenticated user for per-user OAuth tokens
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	if !ok {
+		respondUnauthorized(w, r)
+		return
+	}
+
 	// Verify this is a branch link
 	if linkType != "branch" {
 		respondValidationError(w, r, "Can only create PR from a branch link")
@@ -808,15 +815,24 @@ func (h *SCMItemLinksHandler) CreatePRFromBranch(w http.ResponseWriter, r *http.
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
 
-	// Create the PR
+	// Create the PR using user's credentials
 	pr, prURL, err := h.syncService.CreatePullRequestForRepository(ctx, workspaceRepoID, scm.CreatePROptions{
 		Title:      prTitle,
 		Body:       prBody,
 		HeadBranch: branchName,
 		BaseBranch: baseBranch,
 		Draft:      false,
-	})
+	}, user.ID)
 	if err != nil {
+		if errors.Is(err, scm.ErrUserSCMNotConnected) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"error":   "scm_not_connected",
+				"message": "You need to connect your SCM account before creating branches or PRs",
+			})
+			return
+		}
 		slog.Error("failed to create PR", slog.String("component", "scm_item_links"), slog.Any("error", err))
 		if errors.Is(err, scm.ErrAlreadyExists) {
 			respondConflict(w, r, "A pull request already exists for this branch")

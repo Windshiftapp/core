@@ -3,6 +3,7 @@
   import { notifications, notificationActions } from '../stores/notifications.js';
   import { Bell, Check, Filter, Calendar, MoreHorizontal, X } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
   import NotificationCard from '../features/notifications/NotificationCard.svelte';
   import Button from '../components/Button.svelte';
   import Select from '../components/Select.svelte';
@@ -77,8 +78,15 @@
     notificationActions.markAllAsRead();
   }
 
-  function handleClearAll() {
-    if (confirm(t('dialogs.confirmations.dismissAllNotifications'))) {
+  async function handleClearAll() {
+    const confirmed = await confirm({
+      title: t('common.confirm'),
+      message: t('dialogs.confirmations.dismissAllNotifications'),
+      confirmText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      variant: 'warning'
+    });
+    if (confirmed) {
       notifications.set([]);
     }
   }

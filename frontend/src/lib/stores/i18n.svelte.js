@@ -157,17 +157,19 @@ async function loadTranslations(localeCode) {
  */
 async function init() {
   let initialLocale = DEFAULT_LOCALE;
+  let hasSavedPreference = false;
 
   // Check localStorage for saved preference
   if (typeof localStorage !== 'undefined') {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && SUPPORTED_LOCALES.some((l) => l.code === saved)) {
       initialLocale = saved;
+      hasSavedPreference = true;
     }
   }
 
-  // Check browser language preference
-  if (initialLocale === DEFAULT_LOCALE && typeof navigator !== 'undefined') {
+  // Only fall back to browser language when no preference was explicitly saved
+  if (!hasSavedPreference && typeof navigator !== 'undefined') {
     const browserLang = navigator.language?.split('-')[0];
     if (browserLang && SUPPORTED_LOCALES.some((l) => l.code === browserLang)) {
       initialLocale = browserLang;

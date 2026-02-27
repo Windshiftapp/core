@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { confirm } from '../../composables/useConfirm.js';
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
   import {
     Milestone, Calendar, CheckCircle, Clock, Plus, Edit, Trash2,
@@ -186,7 +187,14 @@
   }
 
   async function deleteMilestone(milestone) {
-    if (confirm(t('milestones.confirmDelete', { name: milestone.name }))) {
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('milestones.confirmDelete', { name: milestone.name }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (confirmed) {
       try {
         await milestonesStore.delete(milestone.id);
       } catch (error) {

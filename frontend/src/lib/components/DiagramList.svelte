@@ -5,6 +5,7 @@
   import Tooltip from './Tooltip.svelte';
   import Spinner from './Spinner.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
 
   export let itemId;
   export let onEdit = () => {};
@@ -28,9 +29,14 @@
   }
 
   async function handleDelete(diagramId) {
-    if (!confirm(t('components.diagram.confirmDelete'))) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('components.diagram.confirmDelete'),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       await api.deleteDiagram(diagramId);

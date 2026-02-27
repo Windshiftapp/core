@@ -3,6 +3,7 @@
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { confirm } from '../../composables/useConfirm.js';
   import { Filter, Search, MoreHorizontal, Calendar, User, AlertCircle, Trash2, Eye, Save, SquareKanban } from 'lucide-svelte';
   import { escapeHtml } from '../../utils/sanitize.ts';
   import Button from '../../components/Button.svelte';
@@ -589,9 +590,14 @@
   }
 
   async function deleteItem(item) {
-    if (!confirm(t('collections.confirmDeleteItem', { title: item.title }))) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: t('collections.confirmDeleteItem', { title: item.title }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
     
     try {
       await api.items.delete(item.id);

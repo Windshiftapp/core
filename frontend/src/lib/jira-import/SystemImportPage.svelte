@@ -12,6 +12,8 @@
   } from 'lucide-svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import { addToast } from '../stores/toasts.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
 
   // State
   let showWizard = $state(false);
@@ -47,9 +49,14 @@
   }
 
   async function deleteConnection(connectionId) {
-    if (!confirm('Are you sure you want to delete this connection? This action cannot be undone.')) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: 'Are you sure you want to delete this connection? This action cannot be undone.',
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
     const result = await jiraImport.deleteSavedConnection(connectionId);
     if (result.success) {
       addToast({ message: 'Connection deleted', variant: 'success' });

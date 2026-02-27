@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { currentRoute, navigate } from '../router.js';
+  import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
   import { currentWorkspace, workspacesStore } from '../stores';
   import { Plus, CheckSquare } from 'lucide-svelte';
   import WorkspaceNavigation from './WorkspaceNavigation.svelte';
@@ -99,7 +101,14 @@
   }
 
   async function deleteProject(project) {
-    if (confirm(`Are you sure you want to delete "${project.name}"?`)) {
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: `Are you sure you want to delete "${project.name}"?`,
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (confirmed) {
       try {
         await api.projects.delete(project.id);
         await loadProjects();

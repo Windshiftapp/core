@@ -17,6 +17,7 @@
   import Toggle from '../components/Toggle.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
 
   const dispatch = createEventDispatcher();
 
@@ -120,9 +121,14 @@
   }
 
   async function deletePriority(id, name) {
-    if (!confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('common.delete'),
+      message: `Are you sure you want to delete "${name}"? This action cannot be undone.`,
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       await api.priorities.delete(id);
