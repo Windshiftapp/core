@@ -129,7 +129,6 @@ make build-windows
 - **Go 1.25+** - Client compilation only
 
 ### For Cross-Compilation (release.sh)
-- **Zig** - Cross-compilation toolchain (optional, native builds work without it)
 - **Docker + Buildx** - Multi-arch Docker images
 
 ## Usage Examples
@@ -187,8 +186,6 @@ go clean -modcache
 ### Platform-Specific Issues
 
 **Windows**: If you don't have `zip` command available, Windows archives won't be created but binaries will still build.
-
-**macOS**: Darwin binaries can only be built on macOS hosts due to CGO requirements.
 
 **Linux**: Ensure you have sufficient disk space. Cross-compilation creates multiple large binaries.
 
