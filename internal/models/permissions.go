@@ -91,6 +91,14 @@ const (
 	PermissionActionManage = "action.manage" // Create, edit, delete, and execute workspace actions
 )
 
+// Workspace role names (seeded by schema)
+const (
+	RoleViewer        = "Viewer"
+	RoleEditor        = "Editor"
+	RoleAdministrator = "Administrator"
+	RoleTester        = "Tester"
+)
+
 // UserPermissionSummary provides a complete overview of a user's permissions
 type UserPermissionSummary struct {
 	UserID               int                       `json:"user_id"`

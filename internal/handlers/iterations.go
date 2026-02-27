@@ -45,12 +45,8 @@ func (h *IterationHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		// For global-only iterations, check global iteration permission
-		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
-		if err != nil || !hasGlobalPerm {
-			respondForbidden(w, r)
-			return
-		}
+		// No workspace_id: allow any authenticated user to list global iterations.
+		// Write operations (create/update/delete) still require PermissionIterationManage.
 	}
 
 	// Build service params
