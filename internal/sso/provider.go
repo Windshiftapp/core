@@ -12,7 +12,7 @@ import (
 
 const (
 	ProviderTypeOIDC = "oidc"
-	ProviderTypeSAML = "saml" // Future support
+	ProviderTypeSAML = "saml"
 )
 
 var (
@@ -39,8 +39,93 @@ type SSOProvider struct {
 	AllowPasswordLogin    bool      `json:"allow_password_login"`
 	RequireVerifiedEmail  bool      `json:"require_verified_email"` // Require email_verified=true from IdP (default: true)
 	AttributeMapping      string    `json:"attribute_mapping"`
-	CreatedAt             time.Time `json:"created_at"`
-	UpdatedAt             time.Time `json:"updated_at"`
+	// SAML-specific fields
+	SAMLIdPMetadataURL string `json:"saml_idp_metadata_url,omitempty"` // IdP metadata URL for auto-configuration
+	SAMLIdPSSOURL      string `json:"saml_idp_sso_url,omitempty"`      // IdP Single Sign-On URL
+	SAMLIdPCertificate string `json:"saml_idp_certificate,omitempty"`  // IdP X.509 certificate (PEM)
+	SAMLSPEntityID     string `json:"saml_sp_entity_id,omitempty"`     // SP Entity ID (defaults to base URL)
+	SAMLSignRequests   bool   `json:"saml_sign_requests"`              // Whether to sign AuthnRequests
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
+}
+
+// providerColumns is the standard SELECT column list for providers (with secret)
+const providerColumnsWithSecret = `id, slug, name, provider_type, enabled, is_default,
+	issuer_url, client_id, client_secret_encrypted, scopes,
+	auto_provision_users, allow_password_login, require_verified_email,
+	attribute_mapping,
+	saml_idp_metadata_url, saml_idp_sso_url, saml_idp_certificate, saml_sp_entity_id, saml_sign_requests,
+	created_at, updated_at`
+
+// providerColumnsWithoutSecret is the SELECT column list for listing (no secret)
+const providerColumnsWithoutSecret = `id, slug, name, provider_type, enabled, is_default,
+	issuer_url, client_id, scopes,
+	auto_provision_users, allow_password_login, require_verified_email,
+	attribute_mapping,
+	saml_idp_metadata_url, saml_idp_sso_url, saml_idp_certificate, saml_sp_entity_id, saml_sign_requests,
+	created_at, updated_at`
+
+// scanProvider scans a row into an SSOProvider (with secret)
+func scanProvider(row interface{ Scan(dest ...interface{}) error }) (*SSOProvider, error) {
+	var provider SSOProvider
+	var issuerURL, clientID, clientSecretEncrypted, scopes, attributeMapping sql.NullString
+	var samlIdPMetadataURL, samlIdPSSOURL, samlIdPCertificate, samlSPEntityID sql.NullString
+
+	err := row.Scan(
+		&provider.ID, &provider.Slug, &provider.Name, &provider.ProviderType,
+		&provider.Enabled, &provider.IsDefault,
+		&issuerURL, &clientID, &clientSecretEncrypted, &scopes,
+		&provider.AutoProvisionUsers, &provider.AllowPasswordLogin, &provider.RequireVerifiedEmail,
+		&attributeMapping,
+		&samlIdPMetadataURL, &samlIdPSSOURL, &samlIdPCertificate, &samlSPEntityID, &provider.SAMLSignRequests,
+		&provider.CreatedAt, &provider.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	provider.IssuerURL = issuerURL.String
+	provider.ClientID = clientID.String
+	provider.ClientSecretEncrypted = clientSecretEncrypted.String
+	provider.Scopes = scopes.String
+	provider.AttributeMapping = attributeMapping.String
+	provider.SAMLIdPMetadataURL = samlIdPMetadataURL.String
+	provider.SAMLIdPSSOURL = samlIdPSSOURL.String
+	provider.SAMLIdPCertificate = samlIdPCertificate.String
+	provider.SAMLSPEntityID = samlSPEntityID.String
+
+	return &provider, nil
+}
+
+// scanProviderNoSecret scans a row into an SSOProvider (without secret column)
+func scanProviderNoSecret(row interface{ Scan(dest ...interface{}) error }) (*SSOProvider, error) {
+	var provider SSOProvider
+	var issuerURL, clientID, scopes, attributeMapping sql.NullString
+	var samlIdPMetadataURL, samlIdPSSOURL, samlIdPCertificate, samlSPEntityID sql.NullString
+
+	err := row.Scan(
+		&provider.ID, &provider.Slug, &provider.Name, &provider.ProviderType,
+		&provider.Enabled, &provider.IsDefault,
+		&issuerURL, &clientID, &scopes,
+		&provider.AutoProvisionUsers, &provider.AllowPasswordLogin, &provider.RequireVerifiedEmail,
+		&attributeMapping,
+		&samlIdPMetadataURL, &samlIdPSSOURL, &samlIdPCertificate, &samlSPEntityID, &provider.SAMLSignRequests,
+		&provider.CreatedAt, &provider.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	provider.IssuerURL = issuerURL.String
+	provider.ClientID = clientID.String
+	provider.Scopes = scopes.String
+	provider.AttributeMapping = attributeMapping.String
+	provider.SAMLIdPMetadataURL = samlIdPMetadataURL.String
+	provider.SAMLIdPSSOURL = samlIdPSSOURL.String
+	provider.SAMLIdPCertificate = samlIdPCertificate.String
+	provider.SAMLSPEntityID = samlSPEntityID.String
+
+	return &provider, nil
 }
 
 // AttributeMap represents the claim/attribute mapping configuration
@@ -83,162 +168,37 @@ func NewProviderStore(db database.Database) *ProviderStore {
 
 // GetByID retrieves a provider by ID
 func (s *ProviderStore) GetByID(id int) (*SSOProvider, error) {
-	query := `
-		SELECT id, slug, name, provider_type, enabled, is_default,
-		       issuer_url, client_id, client_secret_encrypted, scopes,
-		       auto_provision_users, allow_password_login, require_verified_email,
-		       attribute_mapping, created_at, updated_at
-		FROM sso_providers
-		WHERE id = ?
-	`
-
-	var provider SSOProvider
-	var issuerURL, clientID, clientSecretEncrypted, scopes, attributeMapping sql.NullString
-
-	err := s.db.QueryRow(query, id).Scan(
-		&provider.ID,
-		&provider.Slug,
-		&provider.Name,
-		&provider.ProviderType,
-		&provider.Enabled,
-		&provider.IsDefault,
-		&issuerURL,
-		&clientID,
-		&clientSecretEncrypted,
-		&scopes,
-		&provider.AutoProvisionUsers,
-		&provider.AllowPasswordLogin,
-		&provider.RequireVerifiedEmail,
-		&attributeMapping,
-		&provider.CreatedAt,
-		&provider.UpdatedAt,
-	)
-
+	query := `SELECT ` + providerColumnsWithSecret + ` FROM sso_providers WHERE id = ?`
+	provider, err := scanProvider(s.db.QueryRow(query, id))
 	if err == sql.ErrNoRows {
 		return nil, ErrProviderNotFound
 	}
-	if err != nil {
-		return nil, err
-	}
-
-	provider.IssuerURL = issuerURL.String
-	provider.ClientID = clientID.String
-	provider.ClientSecretEncrypted = clientSecretEncrypted.String
-	provider.Scopes = scopes.String
-	provider.AttributeMapping = attributeMapping.String
-
-	return &provider, nil
+	return provider, err
 }
 
 // GetBySlug retrieves a provider by slug
 func (s *ProviderStore) GetBySlug(slug string) (*SSOProvider, error) {
-	query := `
-		SELECT id, slug, name, provider_type, enabled, is_default,
-		       issuer_url, client_id, client_secret_encrypted, scopes,
-		       auto_provision_users, allow_password_login, require_verified_email,
-		       attribute_mapping, created_at, updated_at
-		FROM sso_providers
-		WHERE slug = ?
-	`
-
-	var provider SSOProvider
-	var issuerURL, clientID, clientSecretEncrypted, scopes, attributeMapping sql.NullString
-
-	err := s.db.QueryRow(query, slug).Scan(
-		&provider.ID,
-		&provider.Slug,
-		&provider.Name,
-		&provider.ProviderType,
-		&provider.Enabled,
-		&provider.IsDefault,
-		&issuerURL,
-		&clientID,
-		&clientSecretEncrypted,
-		&scopes,
-		&provider.AutoProvisionUsers,
-		&provider.AllowPasswordLogin,
-		&provider.RequireVerifiedEmail,
-		&attributeMapping,
-		&provider.CreatedAt,
-		&provider.UpdatedAt,
-	)
-
+	query := `SELECT ` + providerColumnsWithSecret + ` FROM sso_providers WHERE slug = ?`
+	provider, err := scanProvider(s.db.QueryRow(query, slug))
 	if err == sql.ErrNoRows {
 		return nil, ErrProviderNotFound
 	}
-	if err != nil {
-		return nil, err
-	}
-
-	provider.IssuerURL = issuerURL.String
-	provider.ClientID = clientID.String
-	provider.ClientSecretEncrypted = clientSecretEncrypted.String
-	provider.Scopes = scopes.String
-	provider.AttributeMapping = attributeMapping.String
-
-	return &provider, nil
+	return provider, err
 }
 
 // GetDefault retrieves the default enabled provider
 func (s *ProviderStore) GetDefault() (*SSOProvider, error) {
-	query := `
-		SELECT id, slug, name, provider_type, enabled, is_default,
-		       issuer_url, client_id, client_secret_encrypted, scopes,
-		       auto_provision_users, allow_password_login, require_verified_email,
-		       attribute_mapping, created_at, updated_at
-		FROM sso_providers
-		WHERE enabled = 1 AND is_default = 1
-		LIMIT 1
-	`
-
-	var provider SSOProvider
-	var issuerURL, clientID, clientSecretEncrypted, scopes, attributeMapping sql.NullString
-
-	err := s.db.QueryRow(query).Scan(
-		&provider.ID,
-		&provider.Slug,
-		&provider.Name,
-		&provider.ProviderType,
-		&provider.Enabled,
-		&provider.IsDefault,
-		&issuerURL,
-		&clientID,
-		&clientSecretEncrypted,
-		&scopes,
-		&provider.AutoProvisionUsers,
-		&provider.AllowPasswordLogin,
-		&provider.RequireVerifiedEmail,
-		&attributeMapping,
-		&provider.CreatedAt,
-		&provider.UpdatedAt,
-	)
-
+	query := `SELECT ` + providerColumnsWithSecret + ` FROM sso_providers WHERE enabled = 1 AND is_default = 1 LIMIT 1`
+	provider, err := scanProvider(s.db.QueryRow(query))
 	if err == sql.ErrNoRows {
 		return nil, ErrNoDefaultProvider
 	}
-	if err != nil {
-		return nil, err
-	}
-
-	provider.IssuerURL = issuerURL.String
-	provider.ClientID = clientID.String
-	provider.ClientSecretEncrypted = clientSecretEncrypted.String
-	provider.Scopes = scopes.String
-	provider.AttributeMapping = attributeMapping.String
-
-	return &provider, nil
+	return provider, err
 }
 
 // List retrieves all providers
 func (s *ProviderStore) List() ([]*SSOProvider, error) {
-	query := `
-		SELECT id, slug, name, provider_type, enabled, is_default,
-		       issuer_url, client_id, scopes,
-		       auto_provision_users, allow_password_login, require_verified_email,
-		       attribute_mapping, created_at, updated_at
-		FROM sso_providers
-		ORDER BY created_at ASC
-	`
+	query := `SELECT ` + providerColumnsWithoutSecret + ` FROM sso_providers ORDER BY created_at ASC`
 
 	rows, err := s.db.Query(query)
 	if err != nil {
@@ -248,36 +208,11 @@ func (s *ProviderStore) List() ([]*SSOProvider, error) {
 
 	var providers []*SSOProvider
 	for rows.Next() {
-		var provider SSOProvider
-		var issuerURL, clientID, scopes, attributeMapping sql.NullString
-
-		err := rows.Scan(
-			&provider.ID,
-			&provider.Slug,
-			&provider.Name,
-			&provider.ProviderType,
-			&provider.Enabled,
-			&provider.IsDefault,
-			&issuerURL,
-			&clientID,
-			&scopes,
-			&provider.AutoProvisionUsers,
-			&provider.AllowPasswordLogin,
-			&provider.RequireVerifiedEmail,
-			&attributeMapping,
-			&provider.CreatedAt,
-			&provider.UpdatedAt,
-		)
+		provider, err := scanProviderNoSecret(rows)
 		if err != nil {
 			return nil, err
 		}
-
-		provider.IssuerURL = issuerURL.String
-		provider.ClientID = clientID.String
-		provider.Scopes = scopes.String
-		provider.AttributeMapping = attributeMapping.String
-
-		providers = append(providers, &provider)
+		providers = append(providers, provider)
 	}
 
 	return providers, nil
@@ -304,8 +239,10 @@ func (s *ProviderStore) Create(provider *SSOProvider) error {
 			slug, name, provider_type, enabled, is_default,
 			issuer_url, client_id, client_secret_encrypted, scopes,
 			auto_provision_users, allow_password_login, require_verified_email,
-			attribute_mapping, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+			attribute_mapping,
+			saml_idp_metadata_url, saml_idp_sso_url, saml_idp_certificate, saml_sp_entity_id, saml_sign_requests,
+			created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 	`
 
 	result, err := s.db.Exec(query,
@@ -322,6 +259,11 @@ func (s *ProviderStore) Create(provider *SSOProvider) error {
 		provider.AllowPasswordLogin,
 		provider.RequireVerifiedEmail,
 		nullString(provider.AttributeMapping),
+		nullString(provider.SAMLIdPMetadataURL),
+		nullString(provider.SAMLIdPSSOURL),
+		nullString(provider.SAMLIdPCertificate),
+		nullString(provider.SAMLSPEntityID),
+		provider.SAMLSignRequests,
 	)
 	if err != nil {
 		return err
@@ -351,7 +293,10 @@ func (s *ProviderStore) Update(provider *SSOProvider) error {
 			slug = ?, name = ?, provider_type = ?, enabled = ?, is_default = ?,
 			issuer_url = ?, client_id = ?, scopes = ?,
 			auto_provision_users = ?, allow_password_login = ?, require_verified_email = ?,
-			attribute_mapping = ?, updated_at = CURRENT_TIMESTAMP
+			attribute_mapping = ?,
+			saml_idp_metadata_url = ?, saml_idp_sso_url = ?, saml_idp_certificate = ?,
+			saml_sp_entity_id = ?, saml_sign_requests = ?,
+			updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
 
@@ -368,6 +313,11 @@ func (s *ProviderStore) Update(provider *SSOProvider) error {
 		provider.AllowPasswordLogin,
 		provider.RequireVerifiedEmail,
 		nullString(provider.AttributeMapping),
+		nullString(provider.SAMLIdPMetadataURL),
+		nullString(provider.SAMLIdPSSOURL),
+		nullString(provider.SAMLIdPCertificate),
+		nullString(provider.SAMLSPEntityID),
+		provider.SAMLSignRequests,
 		provider.ID,
 	)
 	return err

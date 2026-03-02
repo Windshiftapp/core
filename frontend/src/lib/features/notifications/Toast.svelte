@@ -56,20 +56,15 @@
 
   // Auto-hide effect
   $effect(() => {
-    console.log('[Toast] Effect running, show:', show, 'duration:', duration);
     if (show && duration > 0) {
-      console.log('[Toast] Setting up auto-hide timeout');
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
-        console.log('[Toast] Auto-hide timeout fired, calling onHide');
         onHide();
       }, duration);
     }
 
-    // Cleanup
     return () => {
       if (timeoutId) {
-        console.log('[Toast] Cleanup: clearing timeout');
         clearTimeout(timeoutId);
       }
     };
@@ -82,7 +77,6 @@
   }
 
   function handleClose(event) {
-    console.log('[Toast] Close button clicked');
     event?.stopPropagation();
     clearTimeout(timeoutId);
     onClose();

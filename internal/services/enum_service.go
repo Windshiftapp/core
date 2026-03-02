@@ -141,6 +141,7 @@ func NewServiceError(statusCode int, message string) *ServiceError {
 func (s *EnumService) GetAll() ([]EnumEntity, error) {
 	query := s.config.SelectQuery
 	if query == "" {
+		//nolint:gosec // G201: TableName, SelectColumns, DefaultOrderBy are from hardcoded EnumConfig, not user input
 		query = fmt.Sprintf("SELECT %s FROM %s ORDER BY %s",
 			s.config.SelectColumns, s.config.TableName, s.config.DefaultOrderBy)
 	}
@@ -172,6 +173,7 @@ func (s *EnumService) GetAll() ([]EnumEntity, error) {
 func (s *EnumService) GetByID(id int) (EnumEntity, error) {
 	query := s.config.GetByIDQuery
 	if query == "" {
+		//nolint:gosec // G201: TableName, SelectColumns are from hardcoded EnumConfig, not user input
 		query = fmt.Sprintf("SELECT %s FROM %s WHERE id = ?",
 			s.config.SelectColumns, s.config.TableName)
 	}
@@ -227,6 +229,7 @@ func (s *EnumService) Create(entity interface{}, r *http.Request) (EnumEntity, e
 	now := time.Now()
 	columns, placeholders, args := s.config.InsertArgs(entity, now)
 
+	//nolint:gosec // G201: TableName, columns, placeholders are from hardcoded EnumConfig, not user input
 	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)",
 		s.config.TableName, columns, placeholders)
 
@@ -304,6 +307,7 @@ func (s *EnumService) Update(id int, entity interface{}, r *http.Request) (EnumE
 	setClause, args := s.config.UpdateArgs(entity, now)
 	args = append(args, id) // Add ID at the end for WHERE clause
 
+	//nolint:gosec // G201: TableName, setClause are from hardcoded EnumConfig, not user input
 	query := fmt.Sprintf("UPDATE %s SET %s WHERE id = ?",
 		s.config.TableName, setClause)
 
@@ -351,7 +355,7 @@ func (s *EnumService) Delete(id int, r *http.Request) error {
 	}
 
 	// Delete
-	query := fmt.Sprintf("DELETE FROM %s WHERE id = ?", s.config.TableName)
+	query := fmt.Sprintf("DELETE FROM %s WHERE id = ?", s.config.TableName) //nolint:gosec // G201: TableName is from hardcoded EnumConfig, not user input
 	_, err = s.db.Exec(query, id)
 	if err != nil {
 		return err

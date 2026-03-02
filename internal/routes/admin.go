@@ -45,6 +45,28 @@ func RegisterAdminRoutes(deps *Deps) {
 	// Admin endpoint for token cleanup
 	api.HandleH("POST /admin/api-tokens/cleanup", admin(http.HandlerFunc(deps.Users.APIToken.CleanupExpiredTokens)))
 
+	// Audit log endpoints (admin-only)
+	api.HandleH("GET /admin/audit-logs", admin(http.HandlerFunc(deps.Admin.AuditLog.ListAuditLogs)))
+	api.HandleH("GET /admin/audit-logs/action-types", admin(http.HandlerFunc(deps.Admin.AuditLog.GetAuditLogActionTypes)))
+	api.HandleH("GET /admin/audit-logs/resource-types", admin(http.HandlerFunc(deps.Admin.AuditLog.GetAuditLogResourceTypes)))
+
+	// LDAP directory management endpoints (admin-only)
+	if deps.Admin.LDAP != nil {
+		api.HandleH("GET /admin/ldap/configs", admin(http.HandlerFunc(deps.Admin.LDAP.ListConfigs)))
+		api.HandleH("POST /admin/ldap/configs", admin(http.HandlerFunc(deps.Admin.LDAP.CreateConfig)))
+		api.HandleH("GET /admin/ldap/configs/{id}", admin(http.HandlerFunc(deps.Admin.LDAP.GetConfig)))
+		api.HandleH("PUT /admin/ldap/configs/{id}", admin(http.HandlerFunc(deps.Admin.LDAP.UpdateConfig)))
+		api.HandleH("DELETE /admin/ldap/configs/{id}", admin(http.HandlerFunc(deps.Admin.LDAP.DeleteConfig)))
+		api.HandleH("POST /admin/ldap/configs/{id}/test", admin(http.HandlerFunc(deps.Admin.LDAP.TestConnection)))
+		api.HandleH("POST /admin/ldap/configs/{id}/sync", admin(http.HandlerFunc(deps.Admin.LDAP.TriggerSync)))
+		api.HandleH("GET /admin/ldap/configs/{id}/sync-status", admin(http.HandlerFunc(deps.Admin.LDAP.GetSyncStatus)))
+	}
+
+	// Feature discovery endpoint (public, no auth required)
+	if deps.Admin.Features != nil {
+		api.HandleH("GET /features", http.HandlerFunc(deps.Admin.Features.GetFeatures))
+	}
+
 	// Jira Import endpoints
 	api.HandleH("GET /admin/jira-import/connections", admin(http.HandlerFunc(deps.Admin.JiraImport.GetConnections)))
 	api.HandleH("DELETE /admin/jira-import/connections/{connectionId}", admin(http.HandlerFunc(deps.Admin.JiraImport.DeleteConnection)))

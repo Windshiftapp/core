@@ -139,6 +139,9 @@ type AdminHandlers struct {
 	Plugin           *handlers.PluginHandler
 	Setup            *handlers.SetupHandler
 	System           *handlers.SystemHandler
+	AuditLog         *handlers.AuditLogHandler
+	LDAP             *handlers.LDAPHandler
+	Features         *handlers.FeaturesHandler
 }
 
 // PlanningHandlers groups planning-related handlers.

@@ -402,7 +402,6 @@ async function handleBackgroundUpload(files) {
 
     if (uploadResult?.success && uploadResult.background_url) {
       selectBackgroundImage(uploadResult.background_url);
-      console.log('Portal background uploaded successfully');
     }
   } catch (err) {
     console.error('Failed to upload portal background:', err);
@@ -434,7 +433,6 @@ async function handleLogoUpload(files) {
     if (uploadResult?.success && uploadResult.logo_url) {
       logoUrl = uploadResult.logo_url;
       saveCustomizations();
-      console.log('Portal logo uploaded successfully');
     }
   } catch (err) {
     console.error('Failed to upload portal logo:', err);
@@ -514,7 +512,6 @@ async function saveCustomizations() {
       };
 
       await api.channels.updateConfig(portalData.channel_id, config);
-      console.log('Portal customizations saved');
     } catch (err) {
       console.error('Failed to save customizations:', err);
     }
@@ -526,7 +523,6 @@ async function saveCustomizations() {
  */
 async function saveKnowledgeBaseConfig() {
   if (!portalData || !portalData.channel_id || !authStore.isAuthenticated) {
-    console.log('Cannot save: missing portal data, channel ID, or not authenticated');
     return;
   }
 
@@ -558,7 +554,6 @@ async function saveKnowledgeBaseConfig() {
     };
 
     await api.channels.updateConfig(portalData.channel_id, config);
-    console.log('Knowledge base configuration saved successfully');
   } catch (err) {
     console.error('Failed to save knowledge base configuration:', err);
     alert(`Failed to save knowledge base configuration: ${err.message || err}`);

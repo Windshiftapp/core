@@ -90,8 +90,14 @@ type SSOProviderResponse struct {
 	AllowPasswordLogin   bool      `json:"allow_password_login"`
 	RequireVerifiedEmail bool      `json:"require_verified_email"`
 	AttributeMapping     string    `json:"attribute_mapping"`
-	CreatedAt            time.Time `json:"created_at"`
-	UpdatedAt            time.Time `json:"updated_at"`
+	// SAML-specific fields
+	SAMLIdPMetadataURL string `json:"saml_idp_metadata_url,omitempty"`
+	SAMLIdPSSOURL      string `json:"saml_idp_sso_url,omitempty"`
+	HasSAMLIdPCert     bool   `json:"has_saml_idp_certificate"`
+	SAMLSPEntityID     string `json:"saml_sp_entity_id,omitempty"`
+	SAMLSignRequests   bool   `json:"saml_sign_requests"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 // SSOProviderRequest represents the request body for creating/updating a provider
@@ -109,6 +115,12 @@ type SSOProviderRequest struct {
 	AllowPasswordLogin   bool   `json:"allow_password_login"`
 	RequireVerifiedEmail *bool  `json:"require_verified_email"` // Pointer to distinguish between false and not set
 	AttributeMapping     string `json:"attribute_mapping"`
+	// SAML-specific fields
+	SAMLIdPMetadataURL string `json:"saml_idp_metadata_url,omitempty"`
+	SAMLIdPSSOURL      string `json:"saml_idp_sso_url,omitempty"`
+	SAMLIdPCertificate string `json:"saml_idp_certificate,omitempty"`
+	SAMLSPEntityID     string `json:"saml_sp_entity_id,omitempty"`
+	SAMLSignRequests   bool   `json:"saml_sign_requests"`
 }
 
 // NewSSOHandler creates a new SSO handler
@@ -466,23 +478,35 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 	if req.ProviderType == "" {
 		req.ProviderType = sso.ProviderTypeOIDC
 	}
-	if req.ProviderType != sso.ProviderTypeOIDC {
-		respondValidationError(w, r, "Only OIDC provider type is currently supported")
+	if req.ProviderType != sso.ProviderTypeOIDC && req.ProviderType != sso.ProviderTypeSAML {
+		respondValidationError(w, r, "Provider type must be 'oidc' or 'saml'")
 		return
 	}
 
-	// Validate OIDC-specific fields
-	if req.IssuerURL == "" {
-		respondValidationError(w, r, "Issuer URL is required for OIDC providers")
-		return
-	}
-	if req.ClientID == "" {
-		respondValidationError(w, r, "Client ID is required for OIDC providers")
-		return
-	}
-	if req.ClientSecret == "" {
-		respondValidationError(w, r, "Client secret is required for OIDC providers")
-		return
+	// Validate type-specific fields
+	var encryptedSecret string
+	if req.ProviderType == sso.ProviderTypeOIDC {
+		if req.IssuerURL == "" {
+			respondValidationError(w, r, "Issuer URL is required for OIDC providers")
+			return
+		}
+		if req.ClientID == "" {
+			respondValidationError(w, r, "Client ID is required for OIDC providers")
+			return
+		}
+		if req.ClientSecret == "" {
+			respondValidationError(w, r, "Client secret is required for OIDC providers")
+			return
+		}
+	} else if req.ProviderType == sso.ProviderTypeSAML {
+		if req.SAMLIdPMetadataURL == "" && req.SAMLIdPSSOURL == "" {
+			respondValidationError(w, r, "Either IdP metadata URL or IdP SSO URL is required for SAML providers")
+			return
+		}
+		if req.SAMLIdPSSOURL != "" && req.SAMLIdPCertificate == "" && req.SAMLIdPMetadataURL == "" {
+			respondValidationError(w, r, "IdP certificate is required when configuring SAML manually (without metadata URL)")
+			return
+		}
 	}
 
 	// MVP: Only allow one provider
@@ -496,15 +520,18 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Encrypt client secret
-	encryptedSecret, err := h.encryption.Encrypt(req.ClientSecret)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
+	// Encrypt client secret if provided (OIDC)
+	if req.ClientSecret != "" {
+		var encErr error
+		encryptedSecret, encErr = h.encryption.Encrypt(req.ClientSecret)
+		if encErr != nil {
+			respondInternalError(w, r, encErr)
+			return
+		}
 	}
 
-	// Set default scopes if not provided
-	if req.Scopes == "" {
+	// Set default scopes if not provided (OIDC)
+	if req.ProviderType == sso.ProviderTypeOIDC && req.Scopes == "" {
 		req.Scopes = "openid email profile"
 	}
 
@@ -528,6 +555,11 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 		AllowPasswordLogin:    req.AllowPasswordLogin,
 		RequireVerifiedEmail:  requireVerifiedEmail,
 		AttributeMapping:      req.AttributeMapping,
+		SAMLIdPMetadataURL:    req.SAMLIdPMetadataURL,
+		SAMLIdPSSOURL:         req.SAMLIdPSSOURL,
+		SAMLIdPCertificate:    req.SAMLIdPCertificate,
+		SAMLSPEntityID:        req.SAMLSPEntityID,
+		SAMLSignRequests:      req.SAMLSignRequests,
 	}
 
 	if err := h.providerStore.Create(provider); err != nil {
@@ -595,6 +627,20 @@ func (h *SSOHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
 	if req.AttributeMapping != "" {
 		existing.AttributeMapping = req.AttributeMapping
 	}
+	// Update SAML-specific fields
+	if req.SAMLIdPMetadataURL != "" {
+		existing.SAMLIdPMetadataURL = req.SAMLIdPMetadataURL
+	}
+	if req.SAMLIdPSSOURL != "" {
+		existing.SAMLIdPSSOURL = req.SAMLIdPSSOURL
+	}
+	if req.SAMLIdPCertificate != "" {
+		existing.SAMLIdPCertificate = req.SAMLIdPCertificate
+	}
+	if req.SAMLSPEntityID != "" {
+		existing.SAMLSPEntityID = req.SAMLSPEntityID
+	}
+	existing.SAMLSignRequests = req.SAMLSignRequests
 
 	if err := h.providerStore.Update(existing); err != nil {
 		respondInternalError(w, r, err)
@@ -864,9 +910,19 @@ func (h *SSOHandler) providerToResponse(p *sso.SSOProvider) *SSOProviderResponse
 		AllowPasswordLogin:   p.AllowPasswordLogin,
 		RequireVerifiedEmail: p.RequireVerifiedEmail,
 		AttributeMapping:     p.AttributeMapping,
+		SAMLIdPMetadataURL:   p.SAMLIdPMetadataURL,
+		SAMLIdPSSOURL:        p.SAMLIdPSSOURL,
+		HasSAMLIdPCert:       p.SAMLIdPCertificate != "",
+		SAMLSPEntityID:       p.SAMLSPEntityID,
+		SAMLSignRequests:     p.SAMLSignRequests,
 		CreatedAt:            p.CreatedAt,
 		UpdatedAt:            p.UpdatedAt,
 	}
+}
+
+// GetEncryption returns the encryption service (for reuse by LDAP handler).
+func (h *SSOHandler) GetEncryption() *sso.SecretEncryption {
+	return h.encryption
 }
 
 func generateRandomState() string {

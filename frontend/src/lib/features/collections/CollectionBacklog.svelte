@@ -54,7 +54,6 @@
         const belongsToView = collectionId
           ? true
           : Number(newItem.workspace_id) === Number(workspaceId);
-          console.log('belongstoview',belongsToView)
         if (belongsToView) {
           items = [...items, newItem];
         }
@@ -183,17 +182,14 @@
           const data = source.data;
           if (data.type === 'work-item' && data.item.id !== itemId) {
             const closestEdge = extractClosestEdge(self.data);
-            console.log('[Backlog DnD] onDragEnter', { itemId, closestEdge, selfData: self.data });
             const state = dragState.get(itemId) || {};
             // Create new Map to trigger Svelte 5 reactivity
             const newMap = new Map(dragState);
             newMap.set(itemId, { ...state, closestEdge });
             dragState = newMap;
-            console.log('[Backlog DnD] dragState after set', { itemId, newState: dragState.get(itemId), mapSize: dragState.size });
           }
         },
         onDragLeave: () => {
-          console.log('[Backlog DnD] onDragLeave', { itemId });
           const state = dragState.get(itemId) || {};
           // Create new Map to trigger Svelte 5 reactivity
           const newMap = new Map(dragState);

@@ -3,8 +3,8 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -369,7 +369,7 @@ func (h *PluginHandler) syncPluginToDatabase() {
 
 		if err != nil {
 			// Log error but continue
-			fmt.Printf("Failed to sync plugin %s to database: %v\n", p.Manifest.Name, err)
+			slog.Error("failed to sync plugin to database", slog.String("plugin", p.Manifest.Name), slog.Any("error", err))
 		}
 	}
 }

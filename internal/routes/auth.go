@@ -39,6 +39,11 @@ func RegisterAuthRoutes(deps *Deps) {
 	api.HandleH("DELETE /sso/providers/{id}", admin(http.HandlerFunc(deps.Auth.SSO.DeleteProvider)))
 	api.HandleH("POST /sso/providers/{id}/test", admin(http.HandlerFunc(deps.Auth.SSO.TestProvider)))
 
+	// SAML endpoints (public with rate limiting)
+	api.HandleH("GET /sso/{slug}/saml/metadata", deps.SSORateLimiter.Limit(http.HandlerFunc(deps.Auth.SSO.SAMLMetadata)))
+	api.HandleH("GET /sso/{slug}/saml/login", deps.SSORateLimiter.Limit(http.HandlerFunc(deps.Auth.SSO.SAMLLogin)))
+	api.HandleH("POST /sso/{slug}/saml/acs", deps.SSORateLimiter.Limit(http.HandlerFunc(deps.Auth.SSO.SAMLAssertionConsumerService)))
+
 	// User external account endpoints
 	api.HandleH("GET /sso/external-accounts", auth(http.HandlerFunc(deps.Auth.SSO.GetExternalAccounts)))
 	api.HandleH("DELETE /sso/external-accounts/{id}", auth(http.HandlerFunc(deps.Auth.SSO.UnlinkExternalAccount)))

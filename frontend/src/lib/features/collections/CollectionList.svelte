@@ -101,8 +101,6 @@
         ? [...config.list_columns].sort((a, b) => a.display_order - b.display_order)
         : [...defaultColumns];
     } catch (error) {
-      // If no config exists, use defaults
-      console.log('No board configuration found, using defaults');
       boardConfig = null;
       listColumns = [...defaultColumns];
     }

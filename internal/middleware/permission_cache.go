@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -34,7 +35,7 @@ func (pm *CachedPermissionMiddleware) RequireGlobalPermission(permissionKey stri
 			// Check permission using cached service
 			hasPermission, err := pm.permissionService.HasGlobalPermission(user.ID, permissionKey)
 			if err != nil {
-				fmt.Printf("Error checking global permission: %v\n", err)
+				slog.Error("failed to check global permission", slog.Any("error", err), slog.Int("user_id", user.ID), slog.String("permission", permissionKey))
 				http.Error(w, "Permission check failed", http.StatusInternalServerError)
 				return
 			}
@@ -69,7 +70,7 @@ func (pm *CachedPermissionMiddleware) RequireWorkspacePermission(permissionKey s
 			// Check permission using cached service
 			hasPermission, err := pm.permissionService.HasWorkspacePermission(user.ID, workspaceID, permissionKey)
 			if err != nil {
-				fmt.Printf("Error checking workspace permission: %v\n", err)
+				slog.Error("failed to check workspace permission", slog.Any("error", err), slog.Int("user_id", user.ID), slog.Int("workspace_id", workspaceID))
 				http.Error(w, "Permission check failed", http.StatusInternalServerError)
 				return
 			}
@@ -104,7 +105,7 @@ func (pm *CachedPermissionMiddleware) RequireWorkspacePermissions(permissions []
 			// Check multiple permissions in single cache lookup
 			hasPerms, err := pm.permissionService.HasWorkspacePermissions(user.ID, workspaceID, permissions)
 			if err != nil {
-				fmt.Printf("Error checking workspace permissions: %v\n", err)
+				slog.Error("failed to check workspace permissions", slog.Any("error", err), slog.Int("user_id", user.ID), slog.Int("workspace_id", workspaceID))
 				http.Error(w, "Permission check failed", http.StatusInternalServerError)
 				return
 			}
@@ -142,7 +143,7 @@ func (pm *CachedPermissionMiddleware) RequireAllWorkspacePermissions(permissions
 			// Check multiple permissions in single cache lookup
 			hasPerms, err := pm.permissionService.HasWorkspacePermissions(user.ID, workspaceID, permissions)
 			if err != nil {
-				fmt.Printf("Error checking workspace permissions: %v\n", err)
+				slog.Error("failed to check workspace permissions", slog.Any("error", err), slog.Int("user_id", user.ID), slog.Int("workspace_id", workspaceID))
 				http.Error(w, "Permission check failed", http.StatusInternalServerError)
 				return
 			}
@@ -173,7 +174,7 @@ func (pm *CachedPermissionMiddleware) RequireSystemAdmin() func(http.Handler) ht
 			// Check if user is system admin using cached service
 			isAdmin, err := pm.permissionService.IsSystemAdmin(user.ID)
 			if err != nil {
-				fmt.Printf("Error checking system admin status: %v\n", err)
+				slog.Error("failed to check system admin status", slog.Any("error", err), slog.Int("user_id", user.ID))
 				http.Error(w, "Permission check failed", http.StatusInternalServerError)
 				return
 			}
@@ -208,7 +209,7 @@ func (pm *CachedPermissionMiddleware) RequireAnyWorkspaceAccess() func(http.Hand
 			// Check if user has any workspace access (admin override handled in service)
 			hasAccess, err := pm.hasAnyWorkspaceAccess(user.ID, workspaceID)
 			if err != nil {
-				fmt.Printf("Error checking workspace access: %v\n", err)
+				slog.Error("failed to check workspace access", slog.Any("error", err), slog.Int("user_id", user.ID), slog.Int("workspace_id", workspaceID))
 				http.Error(w, "Permission check failed", http.StatusInternalServerError)
 				return
 			}

@@ -21,6 +21,12 @@ CREATE TABLE IF NOT EXISTS sso_providers (
 	require_verified_email BOOLEAN DEFAULT 1, -- Require email_verified=true from IdP (security)
 	-- Claim/attribute mappings (JSON for flexibility)
 	attribute_mapping TEXT DEFAULT '{"email":"email","name":"name","given_name":"given_name","family_name":"family_name","username":"preferred_username"}',
+	-- SAML-specific fields
+	saml_idp_metadata_url TEXT,  -- IdP metadata URL for auto-configuration
+	saml_idp_sso_url TEXT,       -- IdP Single Sign-On URL
+	saml_idp_certificate TEXT,   -- IdP X.509 certificate (PEM)
+	saml_sp_entity_id TEXT,      -- SP Entity ID (defaults to base URL)
+	saml_sign_requests BOOLEAN DEFAULT 0, -- Whether to sign AuthnRequests
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

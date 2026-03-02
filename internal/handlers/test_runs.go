@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -533,7 +534,7 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 	// Update the parent test case status based on step results
 	err = h.updateTestCaseStatus(testResultID)
 	if err != nil {
-		fmt.Printf("Warning: Failed to update test case status: %v\n", err)
+		slog.Warn("failed to update test case status", slog.Any("error", err), slog.Int("test_result_id", testResultID))
 	}
 
 	w.WriteHeader(http.StatusOK)

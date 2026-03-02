@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -309,12 +310,14 @@ func (h *SCIMHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		VALUES (?, ?, ?, ?, ?, ?, true, true)
 	`, email, scimUser.UserName, firstName, lastName, scimUser.Active, scimUser.ExternalID)
 	if err != nil {
-		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to create user: "+err.Error(), "")
+		slog.Error("SCIM: failed to create user", slog.Any("error", err), slog.String("email", email))
+		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to create user", "")
 		return
 	}
 	userID, err := result.LastInsertId()
 	if err != nil {
-		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to get user ID: "+err.Error(), "")
+		slog.Error("SCIM: failed to get user ID", slog.Any("error", err))
+		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to create user", "")
 		return
 	}
 
@@ -631,12 +634,14 @@ func (h *SCIMHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		VALUES (?, '', ?, true, true)
 	`, scimGroup.DisplayName, scimGroup.ExternalID)
 	if err != nil {
-		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to create group: "+err.Error(), "")
+		slog.Error("SCIM: failed to create group", slog.Any("error", err), slog.String("name", scimGroup.DisplayName))
+		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to create group", "")
 		return
 	}
 	groupID, err := result.LastInsertId()
 	if err != nil {
-		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to get group ID: "+err.Error(), "")
+		slog.Error("SCIM: failed to get group ID", slog.Any("error", err))
+		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to create group", "")
 		return
 	}
 

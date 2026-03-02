@@ -3,7 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -207,7 +207,7 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[DEBUG] Update customer %d - received: name=%q, avatar_url=%q", id, c.Name, c.AvatarURL)
+	slog.Debug("updating customer", slog.Int("customer_id", id), slog.String("name", c.Name))
 
 	// Serialize custom field values to JSON
 	var customFieldValuesJSON []byte
@@ -228,12 +228,12 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 	`, c.Name, c.Email, c.Description, c.Active, c.AvatarURL, customFieldValuesJSON, time.Now(), id)
 
 	if err != nil {
-		log.Printf("[DEBUG] Update customer %d - ERROR: %v", id, err)
+		slog.Error("failed to update customer", slog.Int("customer_id", id), slog.Any("error", err))
 		respondInternalError(w, r, err)
 		return
 	}
 
-	log.Printf("[DEBUG] Update customer %d - SUCCESS, avatar_url saved: %q", id, c.AvatarURL)
+	slog.Debug("customer updated successfully", slog.Int("customer_id", id))
 
 	c.ID = id
 	c.UpdatedAt = time.Now()

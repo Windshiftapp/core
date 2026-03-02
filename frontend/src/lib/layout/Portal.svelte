@@ -78,9 +78,7 @@
 
   onMount(async () => {
     // Initialize auth (non-blocking for portal)
-    authStore.init().catch(err => {
-      console.log('Auth initialization failed (expected for public portal):', err);
-    });
+    authStore.init().catch(() => {});
 
     // Load portal data
     const slug = $currentRoute.params?.slug;
@@ -240,7 +238,6 @@
   }
 
   function handleRequestSubmitted() {
-    console.log('Request submitted successfully');
   }
 
   function handleLoginSuccess() {
