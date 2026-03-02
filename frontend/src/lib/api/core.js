@@ -1,5 +1,15 @@
+import {
+  updateOffset,
+  isClockDriftSignificant,
+  getClockOffset,
+  getSampleCount,
+} from '../utils/serverClock.js';
+
 // Use relative path for API calls - Vite proxy will handle dev, production uses same origin
 export const API_BASE = '/api';
+
+// Ensure the clock-drift warning toast fires at most once per session
+let driftWarningShown = false;
 
 /**
  * Create an enhanced error object from an API response
@@ -40,6 +50,32 @@ export async function fetchAPI(endpoint, options = {}) {
     credentials: 'same-origin', // Include cookies for session auth
     headers,
   });
+
+  // Track server-vs-client clock offset from the Date header
+  updateOffset(response.headers.get('Date'));
+
+  // After enough samples, warn admins once if drift is significant
+  if (!driftWarningShown && getSampleCount() >= 3 && isClockDriftSignificant()) {
+    driftWarningShown = true;
+    // Dynamic import avoids circular deps (stores → api → stores)
+    Promise.all([import('../stores'), import('../stores/toasts.svelte.js')]).then(
+      ([{ authStore }, { warningToast }]) => {
+        let user;
+        authStore.subscribe((s) => (user = s.currentUser))();
+        if (user?.is_system_admin) {
+          const offsetSec = Math.round(getClockOffset() / 1000);
+          const absMin = Math.floor(Math.abs(offsetSec) / 60);
+          const absSec = Math.abs(offsetSec) % 60;
+          const direction = offsetSec > 0 ? 'ahead' : 'behind';
+          const amount =
+            absMin > 0 ? `${absMin}m ${absSec}s ${direction}` : `${absSec}s ${direction}`;
+          warningToast(
+            `Server clock appears to be ${amount}. Timestamps may be inaccurate.`
+          );
+        }
+      }
+    );
+  }
 
   if (!response.ok) {
     // Handle authentication errors

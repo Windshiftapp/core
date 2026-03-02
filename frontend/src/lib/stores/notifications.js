@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
 import { api } from '../api.js';
+import { serverNow } from '../utils/serverClock.js';
 
 // Notification store
 export const notifications = writable([]);
@@ -119,7 +120,7 @@ export const notificationActions = {
 
   // Format timestamp for display
   formatTimestamp: (timestamp) => {
-    const now = new Date();
+    const now = serverNow();
     const diff = now - timestamp;
     const minutes = Math.floor(diff / (1000 * 60));
     const hours = Math.floor(diff / (1000 * 60 * 60));
