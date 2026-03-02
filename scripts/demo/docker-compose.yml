@@ -21,7 +21,7 @@ services:
       - caddy-config:/config      # Caddy configuration
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/csrf-token"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/setup/status"]
       interval: 30s
       timeout: 5s
       retries: 3

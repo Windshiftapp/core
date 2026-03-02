@@ -111,7 +111,7 @@ ENV WINDSHIFT_PORT=8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:${WINDSHIFT_PORT}/api/csrf-token || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:${WINDSHIFT_PORT}/api/setup/status || exit 1
 
 # Note: Container starts as root for Caddy to bind privileged ports (80/443).
 # Caddy handles privilege dropping internally, and windshift runs as the

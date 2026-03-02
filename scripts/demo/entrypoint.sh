@@ -30,7 +30,7 @@ WINDSHIFT_PID=$!
 # Wait for windshift to be ready
 echo "Waiting for Windshift to be ready..."
 sleep 2
-until wget -q --spider http://localhost:${WINDSHIFT_PORT:-8080}/api/csrf-token 2>/dev/null; do
+until wget -q --spider http://localhost:${WINDSHIFT_PORT:-8080}/api/setup/status 2>/dev/null; do
     echo "  Waiting..."
     sleep 1
 done
