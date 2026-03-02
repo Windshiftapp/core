@@ -8,7 +8,6 @@
 *.dylib
 windshift
 .dev-windshift
-.github
 cx
 
 # Test binary, built with `go test -c`
