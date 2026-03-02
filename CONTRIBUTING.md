@@ -23,6 +23,18 @@ cd frontend && npm install && cd ..
 
 The dev server runs on `localhost:7777`.
 
+For frontend-only development with hot reload:
+
+```bash
+cd frontend && npm run dev
+```
+
+To run the design system viewer:
+
+```bash
+cd frontend && npm run ds:dev
+```
+
 For a standalone Go build that includes test utilities:
 
 ```bash
