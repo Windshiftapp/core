@@ -58,7 +58,6 @@
   async function loadWorkflows() {
     try {
       const result = await api.get('/workflows');
-      console.log('[WorkflowBuilder] loadWorkflows response:', result);
       workflows = result;
       loading = false;
     } catch (error) {
@@ -94,7 +93,6 @@
 
     try {
       const created = await api.post('/workflows', newWorkflow);
-      console.log('[WorkflowBuilder] createWorkflow response:', created);
       workflows = [...workflows, created];
       creating = false;
       newWorkflow = { name: '', description: '', is_default: false };

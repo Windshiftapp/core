@@ -677,19 +677,15 @@
 
   // Drag and drop functions
   async function handleTestCaseMove(testCaseId, targetFolderId) {
-    console.log('handleTestCaseMove called:', { testCaseId, targetFolderId });
     try {
       // Use the dedicated move endpoint that only requires folder_id
       const result = await api.tests.testCases.move(workspaceId, testCaseId, {
         folder_id: targetFolderId,
         sort_order: 1000  // Default sort order for moved items
       });
-      console.log('Move API response:', result);
 
-      // Reload data to reflect changes
       await loadTestCases(selectedFolder);
       await loadFolders();
-      console.log('Reload complete');
     } catch (error) {
       console.error('Failed to move test case:', error);
     }
@@ -750,8 +746,6 @@
 
         const testCaseId = source.data.testCaseId;
         const currentFolderId = source.data.currentFolderId;
-
-        console.log('Drop detected:', { testCaseId, currentFolderId, targetFolderId: folderId, willMove: currentFolderId !== folderId });
 
         // Only move if dropping on a different folder
         if (currentFolderId !== folderId) {

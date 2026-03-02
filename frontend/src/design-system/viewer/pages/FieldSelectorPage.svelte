@@ -6,7 +6,6 @@
   let selectedField2 = $state(null)
 
   function handleSelect(event) {
-    console.log('Selected field:', event.detail)
   }
 </script>
 
