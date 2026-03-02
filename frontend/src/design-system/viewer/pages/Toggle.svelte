@@ -114,7 +114,7 @@
 <Toggle size="large" />
 
 <!-- With change handler -->
-<Toggle bind:checked={enabled} onchange={(v) => console.log(v)} />`}</code></pre>
+<Toggle bind:checked={enabled} onchange={() => {}} />`}</code></pre>
     </div>
   </section>
 </div>
