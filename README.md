@@ -91,19 +91,71 @@ docker run -p 8080:8080 windshift
 
 Set configuration via environment variables or command-line flags.
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | HTTP server port | 8080 |
-| `BASE_URL` | Public URL for the application | - |
-| `DB_TYPE` | Database type (`sqlite` or `postgres`) | sqlite |
-| `DB_PATH` | SQLite database file path | windshift.db |
-| `LOG_LEVEL` | Log level (debug, info, warn, error) | info |
-| `ATTACHMENT_PATH` | Directory for file attachments | - |
+**Server**
 
-For PostgreSQL:
-```bash
-POSTGRES_CONNECTION_STRING=postgresql://user:pass@host:5432/windshift
-```
+| Variable / Flag | Description | Default |
+|---|---|---|
+| `PORT` / `-port`, `-p` | HTTP server port | `8080` |
+| `BASE_URL` | Public URL (used for email links, SSO redirects) | - |
+| `LOG_LEVEL` / `-log-level` | `debug`, `info`, `warn`, `error` | `info` |
+| `LOG_FORMAT` / `-log-format` | `text`, `json`, `logfmt` | `text` |
+| `USE_PROXY` / `-use-proxy` | Trust `X-Forwarded-Proto` from private IPs | `false` |
+| `ADDITIONAL_PROXIES` / `-additional-proxies` | Extra trusted proxy IPs (requires proxy mode) | - |
+| `-allowed-hosts` | Comma-separated hostnames for CSRF | - |
+| `-allowed-port` | Port for CORS/WebAuthn origins (useful behind reverse proxy) | server port |
+| `-no-csrf` | Disable CSRF protection (development only) | `false` |
+| `-enable-fallback` | Admin password fallback for restrictive auth policies | `false` |
+
+**Database**
+
+| Variable / Flag | Description | Default |
+|---|---|---|
+| `DB_TYPE` | `sqlite` or `postgres` | `sqlite` |
+| `DB_PATH` / `-db` | SQLite database file path | `windshift.db` |
+| `POSTGRES_CONNECTION_STRING` / `-pg-conn` | Full PostgreSQL connection string | - |
+| `POSTGRES_HOST` | PostgreSQL hostname (when `DB_TYPE=postgres`) | `postgres` |
+| `POSTGRES_PORT` | PostgreSQL port | `5432` |
+| `POSTGRES_USER` | PostgreSQL username | `windshift` |
+| `POSTGRES_PASSWORD` | PostgreSQL password | - |
+| `POSTGRES_DB` | PostgreSQL database name | `windshift` |
+| `MAX_READ_CONNS` / `-max-read-conns` | Max read DB connections | `120` |
+| `MAX_WRITE_CONNS` / `-max-write-conns` | Max write DB connections | `1` |
+
+**Storage & TLS**
+
+| Variable / Flag | Description | Default |
+|---|---|---|
+| `ATTACHMENT_PATH` / `-attachment-path` | Directory for file attachments | - |
+| `-tls-cert` | Path to TLS certificate (enables HTTPS) | - |
+| `-tls-key` | Path to TLS key (enables HTTPS) | - |
+
+**Authentication**
+
+| Variable / Flag | Description | Default |
+|---|---|---|
+| `SSO_SECRET` | Secret for SSO and credential encryption | - |
+| `SESSION_SECRET` | Session encryption secret (falls back to `SSO_SECRET`) | - |
+| `WEBAUTHN_RP_ID` | WebAuthn Relying Party ID | auto-detected |
+| `WEBAUTHN_RP_NAME` | WebAuthn Relying Party display name | `Windshift` |
+
+**SSH Server**
+
+| Variable / Flag | Description | Default |
+|---|---|---|
+| `SSH_ENABLED` / `-ssh` | Enable SSH TUI server | `false` |
+| `SSH_PORT` / `-ssh-port` | SSH server port | `23234` |
+| `SSH_HOST` / `-ssh-host` | SSH server host | `localhost` |
+| `-ssh-key` | Path to SSH host key file | `.ssh/windshift_host_key` |
+
+**Services & Plugins**
+
+| Variable / Flag | Description | Default |
+|---|---|---|
+| `LLM_ENDPOINT` | LLM inference service URL | - |
+| `LOGBOOK_ENDPOINT` | Logbook sidecar service URL | - |
+| `LLM_PROVIDERS_FILE` / `-llm-providers` | Custom LLM providers JSON file | - |
+| `DISABLE_PLUGINS` / `-disable-plugins` | Disable the plugin system | `false` |
+| `PLUGIN_DIRS` | Additional plugin directories (comma-separated) | - |
 
 See `.env.example` for all available options.
 
