@@ -2,6 +2,7 @@
  * Date formatting utilities
  * Centralized date formatting functions to avoid duplication across components
  */
+import { serverNow } from './serverClock.js';
 
 /**
  * Format a date string to YYYY-MM-DD format
@@ -108,7 +109,7 @@ export function formatRelativeTime(dateString) {
   if (!dateString) return '';
   try {
     const date = new Date(dateString);
-    const now = new Date();
+    const now = serverNow();
     const diffMs = now - date;
     const diffSecs = Math.floor(diffMs / 1000);
     const diffMins = Math.floor(diffSecs / 60);
@@ -144,7 +145,7 @@ export function isToday(dateString) {
   if (!dateString) return false;
   try {
     const date = new Date(dateString);
-    const today = new Date();
+    const today = serverNow();
     return date.toDateString() === today.toDateString();
   } catch (_error) {
     return false;
@@ -160,7 +161,7 @@ export function isPast(dateString) {
   if (!dateString) return false;
   try {
     const date = new Date(dateString);
-    const now = new Date();
+    const now = serverNow();
     return date < now;
   } catch (_error) {
     return false;
@@ -273,7 +274,7 @@ export function formatRelativeCompact(date) {
   if (!date) return 'Unknown';
 
   const d = date instanceof Date ? date : new Date(date);
-  const now = new Date();
+  const now = serverNow();
   const diffMs = now.getTime() - d.getTime();
   const minutes = Math.floor(diffMs / 60000);
   const hours = Math.floor(diffMs / 3600000);
@@ -296,7 +297,7 @@ export function formatDueDate(dueDate) {
   if (!dueDate) return 'No due date';
 
   const d = dueDate instanceof Date ? dueDate : new Date(dueDate);
-  const now = new Date();
+  const now = serverNow();
   const diffMs = d.getTime() - now.getTime();
   const days = Math.round(diffMs / 86400000);
 
@@ -317,7 +318,7 @@ export function getDueBadgeClass(dueDate) {
   if (!dueDate) return 'bg-gray-100 text-gray-600';
 
   const d = dueDate instanceof Date ? dueDate : new Date(dueDate);
-  const now = new Date();
+  const now = serverNow();
   const diff = d.getTime() - now.getTime();
 
   if (diff < 0) return 'bg-rose-100 text-rose-700';
@@ -334,7 +335,7 @@ export function getDaysOverdue(dueDate) {
   if (!dueDate) return 0;
 
   const d = dueDate instanceof Date ? dueDate : new Date(dueDate);
-  const now = new Date();
+  const now = serverNow();
   const diffMs = now.getTime() - d.getTime();
   return Math.floor(diffMs / 86400000);
 }
