@@ -90,7 +90,6 @@
 
   async function saveCustomer() {
     try {
-      console.log(formData)
       if (editingCustomer) {
         await api.customerOrganisations.update(editingCustomer.id, formData);
       } else {

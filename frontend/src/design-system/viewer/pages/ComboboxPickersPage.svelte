@@ -574,19 +574,19 @@
 <WorkspacePicker
   bind:value={selectedWorkspaces}
   label="Workspaces"
-  on:change={(e) => console.log('Selected:', e.detail)}
+  on:change={() => {}}
 />
 
 <GroupPicker
   bind:value={selectedGroup}
   label="Group"
-  on:select={(e) => console.log('Selected:', e.detail)}
+  on:select={() => {}}
 />
 
 <RolePicker
   bind:value={selectedRole}
   label="Role"
-  on:select={(e) => console.log('Selected:', e.detail)}
+  on:select={() => {}}
 />`}</pre>
     </div>
   </section>

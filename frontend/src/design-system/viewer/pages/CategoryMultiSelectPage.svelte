@@ -26,7 +26,6 @@
   let emptyIds = $state([])
 
   function handleChange(event) {
-    console.log('Changed:', event)
   }
 </script>
 

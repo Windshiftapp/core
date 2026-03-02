@@ -176,9 +176,9 @@
       triggerIcon={Filter}
       triggerClass="px-4 py-2 border rounded hover:bg-gray-50"
       items={[
-        { id: 'active', type: 'checkbox', title: 'Active', checked: true, onChange: (v) => console.log('Active:', v), closeOnSelect: false },
-        { id: 'pending', type: 'checkbox', title: 'Pending', checked: false, onChange: (v) => console.log('Pending:', v), closeOnSelect: false },
-        { id: 'completed', type: 'checkbox', title: 'Completed', checked: true, onChange: (v) => console.log('Completed:', v), closeOnSelect: false }
+        { id: 'active', type: 'checkbox', title: 'Active', checked: true, onChange: () => {}, closeOnSelect: false },
+        { id: 'pending', type: 'checkbox', title: 'Pending', checked: false, onChange: () => {}, closeOnSelect: false },
+        { id: 'completed', type: 'checkbox', title: 'Completed', checked: true, onChange: () => {}, closeOnSelect: false }
       ]}
     />
   </section>
