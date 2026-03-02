@@ -409,21 +409,7 @@ async function startServer(options) {
   return serverProcess;
 }
 
-// Get CSRF token
-async function getCSRFToken(baseURL, cookie = null) {
-  const headers = {};
-  if (cookie) {
-    headers['Cookie'] = cookie;
-  }
-
-  const response = await makeRequest('GET', `${baseURL}/api/csrf-token`, null, headers);
-
-  if (response.status !== 200) {
-    throw new Error(`Failed to get CSRF token: ${response.status}`);
-  }
-
-  return response.data.csrf_token;
-}
+// Note: CSRF protection uses Sec-Fetch-Site header, no token endpoint needed
 
 // Make authenticated request with bearer token
 async function makeAuthRequest(baseURL, method, endpoint, data, token) {
@@ -451,11 +437,8 @@ async function completeSetup(baseURL) {
   };
 
   try {
-    // Get CSRF token for setup
-    const csrfToken = await getCSRFToken(baseURL);
-
     const response = await makeRequest('POST', `${baseURL}/api/setup/complete`, setupData, {
-      'X-CSRF-Token': csrfToken
+      'Sec-Fetch-Site': 'same-origin'
     });
 
     if (response.status === 200 || response.status === 201) {
@@ -482,11 +465,7 @@ async function getBearerToken(baseURL, options = {}) {
   const adminPassword = options.adminPassword || 'admin';
 
   try {
-    // Step 1: Get CSRF token for login
-    logInfo('Getting CSRF token for login...');
-    const csrfToken1 = await getCSRFToken(baseURL);
-
-    // Step 2: Login to get session cookie
+    // Step 1: Login to get session cookie (CSRF uses Sec-Fetch-Site header)
     logInfo(`Logging in as ${adminUser}...`);
     const loginData = {
       email_or_username: adminUser,
@@ -494,7 +473,7 @@ async function getBearerToken(baseURL, options = {}) {
     };
 
     const loginResponse = await makeRequest('POST', `${baseURL}/api/auth/login`, loginData, {
-      'X-CSRF-Token': csrfToken1
+      'Sec-Fetch-Site': 'same-origin'
     });
 
     if (loginResponse.status !== 200) {
@@ -502,7 +481,7 @@ async function getBearerToken(baseURL, options = {}) {
       return null;
     }
 
-    // Step 3: Extract session cookie
+    // Step 2: Extract session cookie
     const cookies = loginResponse.cookies;
     if (!cookies || cookies.length === 0) {
       logError('No session cookie received from login');
@@ -525,11 +504,7 @@ async function getBearerToken(baseURL, options = {}) {
 
     logInfo('Session cookie obtained');
 
-    // Step 4: Get CSRF token with session cookie
-    logInfo('Getting CSRF token with session...');
-    const csrfToken2 = await getCSRFToken(baseURL, sessionCookie);
-
-    // Step 5: Create bearer token with session cookie and CSRF token
+    // Step 3: Create bearer token with session cookie
     logInfo('Creating bearer token...');
     const tokenData = {
       name: 'Demo Generation Token',
@@ -537,7 +512,7 @@ async function getBearerToken(baseURL, options = {}) {
     };
 
     const tokenResponse = await makeRequest('POST', `${baseURL}/api/api-tokens`, tokenData, {
-      'X-CSRF-Token': csrfToken2,
+      'Sec-Fetch-Site': 'same-origin',
       'Cookie': sessionCookie
     });
 
@@ -564,6 +539,15 @@ async function createUsers(baseURL, token, usersData = demoUsers) {
 
   const createdUsers = {};
 
+  // Fetch existing users so we can resolve IDs for already-created ones
+  let existingUsers = [];
+  try {
+    const listResp = await makeAuthRequest(baseURL, 'GET', '/api/users', null, token);
+    if (listResp.status === 200 && Array.isArray(listResp.data)) {
+      existingUsers = listResp.data;
+    }
+  } catch (_) { /* ignore */ }
+
   for (const user of usersData) {
     try {
       const response = await makeAuthRequest(baseURL, 'POST', '/api/users', user, token);
@@ -574,6 +558,18 @@ async function createUsers(baseURL, token, usersData = demoUsers) {
           name: `${user.first_name} ${user.last_name}`.trim()
         };
         logSuccess(`Created user: ${user.first_name} ${user.last_name} (${user.role})`);
+      } else if (response.status === 409) {
+        // User already exists - find them in the existing list
+        const existing = existingUsers.find(u => u.username === user.username);
+        if (existing) {
+          createdUsers[user.username] = {
+            id: existing.id,
+            name: `${existing.first_name} ${existing.last_name}`.trim()
+          };
+          logInfo(`User already exists: ${user.username} (id: ${existing.id})`);
+        } else {
+          logError(`User ${user.username} exists but could not find in user list`);
+        }
       } else {
         logError(`Failed to create user ${user.username}: ${response.status}`);
       }
@@ -591,7 +587,24 @@ async function createWorkspaces(baseURL, token, workspacesData = workspaces) {
 
   const createdWorkspaces = {};
 
+  // Fetch existing workspaces so we can resolve IDs for already-created ones
+  let existingWorkspaces = [];
+  try {
+    const listResp = await makeAuthRequest(baseURL, 'GET', '/api/workspaces', null, token);
+    if (listResp.status === 200 && Array.isArray(listResp.data)) {
+      existingWorkspaces = listResp.data;
+    }
+  } catch (_) { /* ignore */ }
+
   for (const workspace of workspacesData) {
+    // Check if workspace already exists by key
+    const existing = existingWorkspaces.find(w => w.key === workspace.key);
+    if (existing) {
+      createdWorkspaces[workspace.key] = existing.id;
+      logInfo(`Workspace already exists: ${workspace.name} (${workspace.key}, id: ${existing.id})`);
+      continue;
+    }
+
     try {
       const response = await makeAuthRequest(baseURL, 'POST', '/api/workspaces', workspace, token);
 
@@ -655,7 +668,7 @@ async function createCustomFields(baseURL, token) {
 
   for (const field of customFields) {
     try {
-      const response = await makeAuthRequest(baseURL, 'POST', '/api/custom-fields', field, token);
+      const response = await makeAuthRequest(baseURL, 'POST', '/api/admin/custom-fields', field, token);
 
       if (response.status === 200 || response.status === 201) {
         createdFields[field.name] = response.data.id;
@@ -769,7 +782,24 @@ async function createMilestoneCategories(baseURL, token) {
 
   const categoryMap = {};
 
+  // Fetch existing categories
+  let existingCategories = [];
+  try {
+    const listResp = await makeAuthRequest(baseURL, 'GET', '/api/milestone-categories', null, token);
+    if (listResp.status === 200 && Array.isArray(listResp.data)) {
+      existingCategories = listResp.data;
+    }
+  } catch (_) { /* ignore */ }
+
   for (const category of milestoneCategories) {
+    // Check if already exists
+    const existing = existingCategories.find(c => c.name === category.name);
+    if (existing) {
+      categoryMap[category.name] = existing.id;
+      logInfo(`Milestone category already exists: ${category.name} (id: ${existing.id})`);
+      continue;
+    }
+
     try {
       const response = await makeAuthRequest(baseURL, 'POST', '/api/milestone-categories', {
         name: category.name,
@@ -1652,7 +1682,7 @@ async function createAssetSets(baseURL, token) {
 
   for (const set of assetSets) {
     try {
-      const response = await makeAuthRequest(baseURL, 'POST', '/api/asset-sets', set, token);
+      const response = await makeAuthRequest(baseURL, 'POST', '/api/admin/asset-sets', set, token);
 
       if (response.status === 200 || response.status === 201) {
         createdSets[set.name] = response.data.id;
