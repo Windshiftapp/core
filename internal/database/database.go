@@ -104,6 +104,9 @@ var labelsSchema string
 //go:embed schema/llm.sql
 var llmSchema string
 
+//go:embed schema/ldap.sql
+var ldapSchema string
+
 // DB wraps a sql.DB connection with a dedicated write connection
 type DB struct {
 	*sql.DB
@@ -295,11 +298,51 @@ func (db *DB) Initialize() error {
 			}
 		}
 
+		// Add SAML columns to sso_providers (for existing databases)
+		samlMigrations := []struct {
+			check string
+			alter string
+		}{
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('sso_providers') WHERE name='saml_idp_metadata_url'",
+				alter: "ALTER TABLE sso_providers ADD COLUMN saml_idp_metadata_url TEXT",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('sso_providers') WHERE name='saml_idp_sso_url'",
+				alter: "ALTER TABLE sso_providers ADD COLUMN saml_idp_sso_url TEXT",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('sso_providers') WHERE name='saml_idp_certificate'",
+				alter: "ALTER TABLE sso_providers ADD COLUMN saml_idp_certificate TEXT",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('sso_providers') WHERE name='saml_sp_entity_id'",
+				alter: "ALTER TABLE sso_providers ADD COLUMN saml_sp_entity_id TEXT",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('sso_providers') WHERE name='saml_sign_requests'",
+				alter: "ALTER TABLE sso_providers ADD COLUMN saml_sign_requests BOOLEAN DEFAULT 0",
+			},
+		}
+		for _, m := range samlMigrations {
+			var count int
+			if err := db.QueryRow(m.check).Scan(&count); err == nil && count == 0 {
+				if _, err := db.Exec(m.alter); err != nil {
+					slog.Warn("SAML migration failed", slog.String("component", "database"), slog.String("sql", m.alter), slog.Any("error", err))
+				}
+			}
+		}
+
+		// Create LDAP tables if they don't exist (for existing databases)
+		if _, err := db.Exec(ldapSchema); err != nil {
+			slog.Warn("LDAP migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
 		return nil
 	}
 
 	// Database needs full initialization
-	schema := coreSchema + itemsSchema + requestTypeSchema + usersSchema + testsSchema + workspaceSchema + configWorkflowsSchema + timeTrackingSchema + channelsSchema + portalSchema + portalAuthSchema + milestonesSchema + iterationsSchema + contentSchema + mentionsSchema + notificationsSchema + permissionsSchema + systemSchema + userPreferencesSchema + webauthnSchema + ssoSchema + scmSchema + assetsSchema + recurringTasksSchema + jiraImportSchema + actionsSchema + emailSchema + assetReportsSchema + labelsSchema + llmSchema
+	schema := coreSchema + itemsSchema + requestTypeSchema + usersSchema + testsSchema + workspaceSchema + configWorkflowsSchema + timeTrackingSchema + channelsSchema + portalSchema + portalAuthSchema + milestonesSchema + iterationsSchema + contentSchema + mentionsSchema + notificationsSchema + permissionsSchema + systemSchema + userPreferencesSchema + webauthnSchema + ssoSchema + scmSchema + assetsSchema + recurringTasksSchema + jiraImportSchema + actionsSchema + emailSchema + assetReportsSchema + labelsSchema + llmSchema + ldapSchema
 
 	if _, err := db.Exec(schema); err != nil {
 		return fmt.Errorf("failed to initialize database schema: %w", err)

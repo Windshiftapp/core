@@ -48,7 +48,6 @@
 			pluginName,
 			onReady: () => {
 				isReady = true;
-				console.log(`[IframePluginLoader] Plugin ${pluginName} is ready`);
 			},
 			onResize: (height) => {
 				// Add some padding to avoid scrollbars

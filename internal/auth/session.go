@@ -199,8 +199,12 @@ func (sm *SessionManager) ValidateSession(token, ipAddress string) (*Session, er
 		return nil, ErrSessionExpired
 	}
 
-	// Validate IP address for security (optional - can be configured)
-	if ipAddress != "" && session.IPAddress != ipAddress {
+	// Validate IP address for security
+	if ipAddress != "" && session.IPAddress != "" && session.IPAddress != ipAddress {
+		slog.Warn("session IP mismatch",
+			slog.Int("user_id", session.UserID),
+			slog.String("session_ip", session.IPAddress),
+			slog.String("request_ip", ipAddress))
 		return nil, ErrInvalidSession
 	}
 

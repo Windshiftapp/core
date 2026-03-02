@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -138,7 +139,7 @@ func (s *SessionStore) GetSession(sessionID string) (*webauthn.SessionData, erro
 	_, err = s.db.Exec("DELETE FROM webauthn_sessions WHERE id = ?", sessionID)
 	if err != nil {
 		// Log but don't fail - session was retrieved successfully
-		fmt.Printf("Warning: failed to delete session after retrieval: %v\n", err)
+		slog.Warn("failed to delete webauthn session after retrieval", slog.Any("error", err), slog.String("session_id", sessionID))
 	}
 
 	// Deserialize session data
@@ -175,7 +176,7 @@ func (s *SessionStore) cleanupExpiredSessions() {
 			WHERE expires_at < ?
 		`, time.Now())
 		if err != nil {
-			fmt.Printf("Warning: failed to cleanup expired sessions: %v\n", err)
+			slog.Warn("failed to cleanup expired webauthn sessions", slog.Any("error", err))
 		}
 	}()
 }

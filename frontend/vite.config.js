@@ -4,6 +4,23 @@ import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig } from 'vite';
 
+// When PLUGIN_DEV_PORTS is set (e.g. "ldap-config=5561,saml-config=5562,..."),
+// add proxy rules that route plugin asset requests to individual Vite dev servers
+// for HMR support. These rules are more specific than /api and take priority.
+const pluginProxies = {};
+if (process.env.PLUGIN_DEV_PORTS) {
+  for (const entry of process.env.PLUGIN_DEV_PORTS.split(',')) {
+    const [name, port] = entry.split('=');
+    if (name && port) {
+      pluginProxies[`/api/plugins/${name}/assets`] = {
+        target: `http://localhost:${port}`,
+        changeOrigin: true,
+        ws: true,
+      };
+    }
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -24,6 +41,7 @@ export default defineConfig({
   server: {
     port: 5555,
     proxy: {
+      ...pluginProxies,
       '/api': {
         target: 'http://localhost:7777',
         changeOrigin: true,
@@ -31,7 +49,7 @@ export default defineConfig({
     },
   },
   build: {
-    sourcemap: true, // Generate .map files for debugging
+    sourcemap: false,
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {

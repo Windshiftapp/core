@@ -261,10 +261,8 @@
   // Shared uploader logic for drag/drop/paste and the toolbar button
   async function uploadImages(files, schema, shouldInsertMarkdown = false) {
     if (!canUploadImages) {
-      console.log('[MilkdownEditor] Attachments disabled, skipping upload');
       return { nodes: [], attachments: [] };
     }
-    console.log('[MilkdownEditor] uploader called with', files.length, 'files');
 
     const images = [];
     for (let i = 0; i < files.length; i++) {
@@ -273,15 +271,12 @@
       images.push(file);
     }
 
-    console.log('[MilkdownEditor] Found', images.length, 'images');
-
     if (images.length === 0) {
       return { nodes: [], attachments: [] };
     }
 
     const results = await Promise.all(
       images.map(async (image) => {
-        console.log('[MilkdownEditor] Uploading image:', image.name);
         try {
           const formData = new FormData();
           formData.append('file', image);
@@ -294,8 +289,6 @@
           const result = customUploadFn
             ? await customUploadFn(formData)
             : await api.attachments.upload(formData);
-          console.log('[MilkdownEditor] Upload result:', result);
-
           if (result.success && result.attachment) {
             const src = `${downloadUrlBase}/${result.attachment.id}/download`;
             const node = schema?.nodes?.image?.createAndFill({
@@ -348,8 +341,6 @@
 
   onMount(async () => {
     try {
-      console.log('[MilkdownEditor] Mount - effectiveEntityId:', effectiveEntityId, 'effectiveEntityType:', effectiveEntityType, 'readonly:', readonly);
-
       editor = await Editor.make()
         .config((ctx) => {
           ctx.set(rootCtx, editorElement);
@@ -384,7 +375,6 @@
 
           // Configure upload plugin following official docs pattern (only if attachments enabled)
           if (!readonly && canUploadImages) {
-            console.log('[MilkdownEditor] Configuring uploadConfig with uploader');
             ctx.update(uploadConfig.key, (prev) => ({
               ...prev,
               uploader,
@@ -402,7 +392,6 @@
         .use(linkSanitizerPlugin)  // Sanitize dangerous URL schemes in links/images
         .create();
 
-      console.log('[MilkdownEditor] Editor created successfully');
     } catch (error) {
       console.error('Failed to initialize Milkdown editor:', error);
     }

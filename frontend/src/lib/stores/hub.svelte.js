@@ -157,7 +157,6 @@ async function handleLogoUpload(files) {
     if (uploadResult?.success && uploadResult.logo_url) {
       logoUrl = uploadResult.logo_url;
       saveCustomizations();
-      console.log('Hub logo uploaded successfully');
     }
   } catch (err) {
     console.error('Failed to upload hub logo:', err);
@@ -198,7 +197,6 @@ async function saveCustomizations() {
       };
 
       await api.hub.updateConfig(config);
-      console.log('Hub customizations saved');
     } catch (err) {
       console.error('Failed to save hub customizations:', err);
     }

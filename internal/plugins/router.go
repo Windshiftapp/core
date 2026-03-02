@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 )
@@ -135,7 +136,7 @@ func (r *Router) HandlePluginRequest(w http.ResponseWriter, req *http.Request) {
 	// Write response body
 	if _, err := w.Write([]byte(pluginResp.Body)); err != nil {
 		// Log error but response is already partially written
-		fmt.Printf("Error writing plugin response: %v\n", err)
+		slog.Error("failed to write plugin response", slog.Any("error", err))
 	}
 }
 

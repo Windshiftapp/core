@@ -69,11 +69,8 @@ export function createPluginBridge(iframe, options = {}) {
 
     if (!message || !message.type) return;
 
-    console.log(`[PluginBridge] Received from ${pluginName}:`, message);
-
     switch (message.type) {
       case MESSAGE_TYPES.READY:
-        console.log(`[PluginBridge] Plugin ${pluginName} ready`);
         onReady();
         // Send initial theme
         sendThemeUpdate();

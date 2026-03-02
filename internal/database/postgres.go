@@ -104,6 +104,9 @@ var labelsSchemaPostgres string
 //go:embed schema/llm_postgres.sql
 var llmSchemaPostgres string
 
+//go:embed schema/ldap_postgres.sql
+var ldapSchemaPostgres string
+
 // PostgresDB implements the Database interface for PostgreSQL
 type PostgresDB struct {
 	db  *sql.DB
@@ -337,6 +340,49 @@ func (p *PostgresDB) Initialize() error {
 			}
 		}
 
+		// Add SAML columns to sso_providers (for existing databases)
+		samlPgMigrations := []struct {
+			check string
+			alter string
+		}{
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='sso_providers' AND column_name='saml_idp_metadata_url'",
+				alter: "ALTER TABLE sso_providers ADD COLUMN saml_idp_metadata_url TEXT",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='sso_providers' AND column_name='saml_idp_sso_url'",
+				alter: "ALTER TABLE sso_providers ADD COLUMN saml_idp_sso_url TEXT",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='sso_providers' AND column_name='saml_idp_certificate'",
+				alter: "ALTER TABLE sso_providers ADD COLUMN saml_idp_certificate TEXT",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='sso_providers' AND column_name='saml_sp_entity_id'",
+				alter: "ALTER TABLE sso_providers ADD COLUMN saml_sp_entity_id TEXT",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='sso_providers' AND column_name='saml_sign_requests'",
+				alter: "ALTER TABLE sso_providers ADD COLUMN saml_sign_requests BOOLEAN DEFAULT FALSE",
+			},
+		}
+		for _, m := range samlPgMigrations {
+			var count int
+			if err = p.db.QueryRow(m.check).Scan(&count); err == nil && count == 0 {
+				if _, err = p.db.Exec(m.alter); err != nil {
+					slog.Warn("SAML postgres migration failed", slog.String("component", "database"), slog.String("sql", m.alter), slog.Any("error", err))
+				}
+			}
+		}
+
+		// Create LDAP tables if they don't exist (for existing databases)
+		ldapContent := strings.TrimSpace(ldapSchemaPostgres)
+		if ldapContent != "" {
+			if _, err = p.db.Exec(ldapContent); err != nil {
+				slog.Warn("LDAP postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
 		return nil
 	}
 
@@ -422,6 +468,7 @@ func (p *PostgresDB) getPostgresSchemaFiles() []schemaFile {
 		{"actions_postgres.sql", actionsSchemaPostgres},
 		{"labels_postgres.sql", labelsSchemaPostgres},
 		{"llm_postgres.sql", llmSchemaPostgres},
+		{"ldap_postgres.sql", ldapSchemaPostgres},
 	}
 }
 

@@ -111,14 +111,6 @@
         api.notificationSettings.getAll()
       ]);
 
-      // Debug logging
-      console.log('Configuration Sets Response:', configSetsResponse);
-      console.log('Response structure:', {
-        hasConfigurationSets: !!configSetsResponse.configuration_sets,
-        hasPagination: !!configSetsResponse.pagination,
-        configSetsLength: configSetsResponse.configuration_sets?.length || 0
-      });
-
       // Extract pagination data from response
       configurationSets = configSetsResponse.configuration_sets || [];
       if (configSetsResponse.pagination) {
@@ -129,12 +121,6 @@
         console.warn('No pagination metadata in response');
         totalConfigSets = configurationSets.length;
       }
-
-      console.log('After assignment:', {
-        configurationSetsLength: configurationSets.length,
-        totalConfigSets,
-        configSets: configurationSets
-      });
 
       workspaces = workspacesData || [];
       workflows = workflowsData || [];

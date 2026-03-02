@@ -21,6 +21,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/email"
 	"windshift/internal/handlers"
+	"windshift/internal/ldap"
 	"windshift/internal/llm"
 	"windshift/internal/logger"
 	"windshift/internal/middleware"
@@ -617,6 +618,16 @@ func (s *Server) initialize() error {
 
 	pluginHandler := handlers.NewPluginHandler(s.db, s.pluginManager, cfg.DisablePlugins)
 
+	// Audit log handler
+	auditLogHandler := handlers.NewAuditLogHandler(s.db)
+
+	// LDAP handler
+	ldapSyncService := ldap.NewSyncService(s.db, ssoHandler.GetEncryption())
+	ldapHandler := handlers.NewLDAPHandler(s.db, ldapSyncService, ssoHandler.GetEncryption())
+
+	// Features handler
+	featuresHandler := handlers.NewFeaturesHandler(s.pluginManager)
+
 	// System handler
 	shutdownChan := cfg.ShutdownChan
 	if shutdownChan == nil {
@@ -781,6 +792,9 @@ func (s *Server) initialize() error {
 			Plugin:           pluginHandler,
 			Setup:            setupHandler,
 			System:           systemHandler,
+			AuditLog:         auditLogHandler,
+			LDAP:             ldapHandler,
+			Features:         featuresHandler,
 		},
 		Planning: routes.PlanningHandlers{
 			MilestoneCategory: milestoneCategoryHandler,

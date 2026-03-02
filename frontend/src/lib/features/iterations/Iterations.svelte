@@ -95,10 +95,8 @@
   }
 
   function startCreate() {
-    console.log('startCreate called');
     editingIteration = null;
     showModal = true;
-    console.log('showModal is now:', showModal);
   }
 
   function startEdit(iteration) {
@@ -426,7 +424,6 @@
 
 <!-- Iteration Modal -->
 {#if showModal}
-  {console.log('Rendering IterationModal, props:', { iteration: editingIteration, workspaceId, iterationTypes, canManageGlobal })}
   <IterationModal
     iteration={editingIteration}
     {workspaceId}

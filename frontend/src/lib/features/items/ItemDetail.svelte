@@ -313,12 +313,9 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   }
 
   async function handleCopyKey() {
-    console.log('[handleCopyKey] Copy key button clicked');
     try {
       const key = `${item.workspace_key || workspace?.key || 'WORK'}-${item.workspace_item_number}`;
-      console.log('[handleCopyKey] Copying key:', key);
       await navigator.clipboard.writeText(key);
-      console.log('[handleCopyKey] Copy successful, calling showCopySuccess');
       showCopySuccess(key);
     } catch (error) {
       console.error('[handleCopyKey] Failed to copy key to clipboard:', error);
@@ -331,7 +328,6 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
-        console.log('[handleCopyKey] Fallback copy successful');
         showCopySuccess(key);
       } catch (fallbackError) {
         console.error('[handleCopyKey] Fallback copy also failed:', fallbackError);
@@ -341,7 +337,6 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   }
 
   function showCopySuccess(key) {
-    console.log('[showCopySuccess] Showing copy toast for key:', key);
     successToast(`${item?.workspace_key || workspace?.key || 'WORK'}-${item?.workspace_item_number}`, t('toast.copied'));
   }
 
@@ -490,7 +485,6 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   async function handleStartTimer() {
     // Guard: Check if we're already starting a timer
     if (isStartingTimer) {
-      console.log('Timer start already in progress, skipping duplicate request');
       return;
     }
 

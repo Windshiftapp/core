@@ -20,8 +20,6 @@ export async function loadExtensions() {
 
     const data = await response.json();
     extensions.set(data);
-
-    console.log('Loaded plugin extensions:', data);
   } catch (error) {
     console.error('Error loading extensions:', error);
   }

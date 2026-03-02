@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -180,7 +181,7 @@ func (h *PermissionSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 		`, permSetID, permID, userID, time.Now())
 		if err != nil {
 			// Log error but continue
-			fmt.Printf("Failed to add permission %d to set: %v\n", permID, err)
+			slog.Warn("failed to add permission to set", slog.Int("permission_id", permID), slog.Any("error", err))
 		}
 	}
 
@@ -293,7 +294,7 @@ func (h *PermissionSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 			VALUES (?, ?, ?, ?)
 		`, id, permID, userID, time.Now())
 		if err != nil {
-			fmt.Printf("Failed to add permission %d to set: %v\n", permID, err)
+			slog.Warn("failed to add permission to set", slog.Int("permission_id", permID), slog.Any("error", err))
 		}
 	}
 

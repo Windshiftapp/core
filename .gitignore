@@ -8,6 +8,7 @@
 *.dylib
 windshift
 .dev-windshift
+.github
 cx
 
 # Test binary, built with `go test -c`
@@ -26,6 +27,7 @@ go.work
 
 # Database files (SQLite and WAL mode files)
 *.db
+test*.db
 *.db-shm
 *.db-wal
 *.sqlite
@@ -41,6 +43,7 @@ server.log
 
 # Environment variables
 .env
+scripts/*/.env
 .env.local
 .env.development.local
 .env.test.local
