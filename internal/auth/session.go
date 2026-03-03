@@ -425,7 +425,7 @@ func (sm *SessionManager) ClearEnrollmentRequired(sessionID int) error {
 // IsEnrollmentRequired checks if a session requires passkey enrollment
 func (sm *SessionManager) IsEnrollmentRequired(sessionID int) (bool, error) {
 	var required bool
-	query := `SELECT COALESCE(enrollment_required, 0) FROM user_sessions WHERE id = ?`
+	query := `SELECT COALESCE(enrollment_required, false) FROM user_sessions WHERE id = ?`
 	err := sm.db.QueryRow(query, sessionID).Scan(&required)
 	if err != nil {
 		return false, fmt.Errorf("failed to check enrollment required: %w", err)
@@ -436,7 +436,7 @@ func (sm *SessionManager) IsEnrollmentRequired(sessionID int) (bool, error) {
 // ClearEnrollmentRequiredByUserID clears enrollment required for all sessions of a user
 // Called after successful passkey enrollment
 func (sm *SessionManager) ClearEnrollmentRequiredByUserID(userID int) error {
-	query := `UPDATE user_sessions SET enrollment_required = 0 WHERE user_id = ? AND is_active = 1`
+	query := `UPDATE user_sessions SET enrollment_required = false WHERE user_id = ? AND is_active = true`
 	_, err := sm.db.ExecWrite(query, userID)
 	if err != nil {
 		return fmt.Errorf("failed to clear enrollment required: %w", err)

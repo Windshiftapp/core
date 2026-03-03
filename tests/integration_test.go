@@ -8,7 +8,7 @@ import (
 
 // TestWorkspaceOperations tests the complete workspace CRUD lifecycle
 func TestWorkspaceOperations(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	var workspaceID int
@@ -104,7 +104,7 @@ func TestWorkspaceOperations(t *testing.T) {
 
 // TestCustomFieldOperations tests custom field CRUD operations
 func TestCustomFieldOperations(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	var textFieldID, selectFieldID int
@@ -201,7 +201,7 @@ func TestCustomFieldOperations(t *testing.T) {
 
 // TestWorkItemOperations tests work item creation and management
 func TestWorkItemOperations(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	// Create test workspace
@@ -307,7 +307,7 @@ func TestWorkItemOperations(t *testing.T) {
 
 // TestWorkItemHierarchy tests parent-child relationships
 func TestWorkItemHierarchy(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	// Create test workspace
@@ -460,7 +460,7 @@ func TestWorkItemHierarchy(t *testing.T) {
 
 // TestErrorHandling tests API error responses
 func TestErrorHandling(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	t.Run("InvalidWorkspaceCreation", func(t *testing.T) {
@@ -513,7 +513,7 @@ func TestErrorHandling(t *testing.T) {
 // TestBearerTokenAuth verifies that bearer tokens work for authentication,
 // including state-changing requests (which are CSRF-exempt for bearer token auth).
 func TestBearerTokenAuth(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	t.Run("BearerTokenStateChangingRequest", func(t *testing.T) {

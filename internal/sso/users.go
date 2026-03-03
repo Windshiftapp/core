@@ -232,23 +232,20 @@ func (s *UserStore) CreateUser(claims *OIDCClaims, emailVerified bool) (*models.
 			email_verified,
 			created_at, updated_at
 		) VALUES (?, ?, ?, ?, 1, ?, '', 0, 'UTC', 'en', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		RETURNING id
 	`
 
-	result, err := s.db.Exec(query,
+	var id int64
+	err := s.db.QueryRow(query,
 		claims.Email,
 		username,
 		firstName,
 		lastName,
 		nullStringFromString(avatarURL),
 		emailVerified,
-	)
+	).Scan(&id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return nil, err
 	}
 
 	return s.GetUserByID(int(id))

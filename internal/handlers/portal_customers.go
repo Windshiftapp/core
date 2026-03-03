@@ -386,24 +386,17 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 
 	// Insert the new portal customer
 	//nolint:misspell // database uses British spelling
-	query := `
+	var customerID int64
+	err := h.db.QueryRow(`
 		INSERT INTO portal_customers (name, email, phone, customer_organisation_id, is_primary, custom_field_values, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-	`
-
-	result, err := h.db.ExecWrite(query, requestData.Name, requestData.Email, requestData.Phone, requestData.CustomerOrganisationID, requestData.IsPrimary, customFieldValuesJSON)
+		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+	`, requestData.Name, requestData.Email, requestData.Phone, requestData.CustomerOrganisationID, requestData.IsPrimary, customFieldValuesJSON).Scan(&customerID)
 	if err != nil {
 		// Check for unique constraint violation on email
 		if strings.Contains(err.Error(), "UNIQUE constraint failed: portal_customers.email") || strings.Contains(err.Error(), "duplicate key") {
 			respondConflict(w, r, "A portal customer with this email address already exists")
 			return
 		}
-		respondInternalError(w, r, err)
-		return
-	}
-
-	customerID, err := result.LastInsertId()
-	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}

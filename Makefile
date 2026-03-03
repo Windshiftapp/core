@@ -27,7 +27,7 @@ TEST_TIMEOUT=-timeout=30s
 FRONTEND_DIR=frontend
 COVERAGE_DIR=coverage
 
-.PHONY: all build build-linux build-windows clean test test-coverage test-verbose deps frontend help
+.PHONY: all build build-linux build-windows clean test test-coverage test-verbose test-postgres deps frontend help
 
 # Default target
 all: clean frontend build
@@ -151,6 +151,23 @@ integration-test:
 	@echo "Running integration tests..."
 	@cd tests && ./run-all-tests.sh
 
+# Run integration tests against PostgreSQL (requires Docker)
+test-postgres:
+	@echo "Starting PostgreSQL via docker-compose..."
+	@docker compose -f tests/docker-compose.postgres.yml up -d
+	@echo "Waiting for PostgreSQL to be ready..."
+	@for i in 1 2 3 4 5 6 7 8 9 10; do \
+		docker compose -f tests/docker-compose.postgres.yml exec -T postgres pg_isready -U windshift_test > /dev/null 2>&1 && break; \
+		echo "  Waiting... ($$i/10)"; \
+		sleep 2; \
+	done
+	@docker compose -f tests/docker-compose.postgres.yml exec -T postgres pg_isready -U windshift_test > /dev/null 2>&1 || \
+		(echo "ERROR: PostgreSQL failed to start"; docker compose -f tests/docker-compose.postgres.yml down; exit 1)
+	@echo "PostgreSQL is ready. Running integration tests..."
+	TEST_DB_TYPE=postgres $(GOTEST) $(TEST_TAGS) -v -timeout=5m ./tests/...
+	@echo "Stopping PostgreSQL..."
+	@docker compose -f tests/docker-compose.postgres.yml down
+
 # Benchmark tests
 benchmark:
 	@echo "Running benchmark tests..."
@@ -179,6 +196,7 @@ help:
 	@echo "  make test-db        - Run database tests only"
 	@echo "  make test-models    - Run model tests only"
 	@echo "  make integration-test - Run integration test suite"
+	@echo "  make test-postgres    - Run integration tests against PostgreSQL (Docker)"
 	@echo "  make benchmark      - Run benchmark tests"
 	@echo ""
 	@echo "Utilities:"

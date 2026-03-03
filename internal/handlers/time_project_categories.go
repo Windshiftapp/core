@@ -134,17 +134,11 @@ func (h *TimeProjectCategoryHandler) CreateCategory(w http.ResponseWriter, r *ht
 	}
 
 	now := time.Now()
-	result, err := h.db.Exec(`
+	var id int64
+	err = h.db.QueryRow(`
 		INSERT INTO time_project_categories (name, description, color, display_order, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`, c.Name, c.Description, c.Color, displayOrder, now, now)
-
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	id, err := result.LastInsertId()
+		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
+	`, c.Name, c.Description, c.Color, displayOrder, now, now).Scan(&id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

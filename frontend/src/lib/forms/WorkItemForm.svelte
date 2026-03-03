@@ -4,6 +4,7 @@
   import { workItemFormStore } from '../stores/workItemFormStore.svelte.js';
   import { workspacesStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
+  import { formatDateWithOptions } from '../utils/dateFormatter.js';
   import MilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
   import FieldChip from '../components/FieldChip.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
@@ -59,7 +60,7 @@
     if (diffDays === 1) return t('common.tomorrow');
     if (diffDays === -1) return t('common.yesterday');
     if (diffDays > 0 && diffDays <= 7) return `${diffDays} days`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return formatDateWithOptions(date, { month: 'short', day: 'numeric' });
   }
 
   // Reactive effects for data loading based on form state

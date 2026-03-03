@@ -259,7 +259,7 @@ func (tdb *TestDB) SeedTestData(t *testing.T) TestDataSet {
 
 	_, err = tdb.Exec(`
 		INSERT INTO user_workspace_roles (user_id, workspace_id, role_id, granted_at)
-		VALUES (?, ?, ?, datetime('now'))
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
 	`, data.UserID, data.WorkspaceID, adminRoleID)
 	if err != nil {
 		t.Fatalf("Failed to assign workspace role: %v", err)

@@ -37,10 +37,10 @@ func (p *PermissionHelper) CanViewWorkspace(userID, workspaceID int) (bool, erro
 			WHERE gm.user_id = ?
 		) grp ON w.id = grp.workspace_id
 		WHERE w.id = ? AND (
-			w.active = 1
+			w.active = true
 			OR uwr.role_id IS NOT NULL
 			OR grp.workspace_id IS NOT NULL
-			OR (w.is_personal = 1 AND w.owner_id = ?)
+			OR (w.is_personal = true AND w.owner_id = ?)
 		)
 	`, userID, userID, workspaceID, userID).Scan(&exists)
 	return err == nil, nil
@@ -92,10 +92,10 @@ func (p *PermissionHelper) GetAccessibleWorkspaceIDs(userID int) ([]int, error) 
 			JOIN group_members gm ON gwr.group_id = gm.group_id
 			WHERE gm.user_id = ?
 		) grp ON w.id = grp.workspace_id
-		WHERE w.active = 1
-		   OR (w.active = 0 AND uwr.role_id IS NOT NULL)
-		   OR (w.active = 0 AND grp.workspace_id IS NOT NULL)
-		   OR (w.is_personal = 1 AND w.owner_id = ?)
+		WHERE w.active = true
+		   OR (w.active = false AND uwr.role_id IS NOT NULL)
+		   OR (w.active = false AND grp.workspace_id IS NOT NULL)
+		   OR (w.is_personal = true AND w.owner_id = ?)
 	`, userID, userID, userID)
 	if err != nil {
 		return nil, err

@@ -161,17 +161,15 @@ func (h *PermissionSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create permission set
-	result, err := writeDB.Exec(`
+	var permSetID int64
+	err := writeDB.QueryRow(`
 		INSERT INTO permission_sets (name, description, is_system, created_by, created_at, updated_at)
-		VALUES (?, ?, 0, ?, ?, ?)
-	`, req.Name, req.Description, userID, time.Now(), time.Now())
-
+		VALUES (?, ?, 0, ?, ?, ?) RETURNING id
+	`, req.Name, req.Description, userID, time.Now(), time.Now()).Scan(&permSetID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	permSetID, _ := result.LastInsertId()
 
 	// Add permissions to the set
 	for _, permID := range req.PermissionIDs {

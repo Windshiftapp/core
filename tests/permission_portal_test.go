@@ -10,7 +10,7 @@ import (
 // cannot be used to access internal API endpoints. Portal tokens are stored in
 // portal_customer_sessions (not api_tokens), so RequireAuth rejects them.
 func TestPortalCustomer_CannotAccessInternalEndpoints(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	// Create workspace and item for testing
@@ -57,7 +57,7 @@ func TestPortalCustomer_CannotAccessInternalEndpoints(t *testing.T) {
 // authentication are rejected from internal endpoints, while public portal endpoints
 // remain accessible.
 func TestUnauthenticated_CannotAccessInternalEndpoints(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	workspaceID, _ := CreateTestWorkspace(t, server, "Unauth Boundary Test", shortKey("UBT"))
@@ -104,7 +104,7 @@ func TestUnauthenticated_CannotAccessInternalEndpoints(t *testing.T) {
 // TestPortalCustomer_IDOR_Isolation verifies that portal customer A cannot access
 // portal customer B's requests. The portal returns 404 (not 403) to prevent enumeration.
 func TestPortalCustomer_IDOR_Isolation(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	workspaceID, _ := CreateTestWorkspace(t, server, "IDOR Test Workspace", shortKey("IDOR"))
@@ -185,7 +185,7 @@ func TestPortalCustomer_IDOR_Isolation(t *testing.T) {
 // bearer token is rejected by portal request-tracking endpoints when the user has
 // no linked portal customer.
 func TestInternalUser_CannotImpersonatePortalCustomer(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	workspaceID, _ := CreateTestWorkspace(t, server, "Impersonation Test", shortKey("IMP"))

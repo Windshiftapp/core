@@ -136,7 +136,7 @@ func (r *ActionRepository) ListEnabledByWorkspace(workspaceID int) ([]*models.Ac
 		SELECT a.id, a.workspace_id, a.name, a.description, a.is_enabled,
 		       a.trigger_type, a.trigger_config, a.created_by, a.created_at, a.updated_at
 		FROM actions a
-		WHERE a.workspace_id = ? AND a.is_enabled = 1
+		WHERE a.workspace_id = ? AND a.is_enabled = true
 		ORDER BY a.created_at DESC
 	`, workspaceID)
 	if err != nil {
@@ -191,23 +191,19 @@ func (r *ActionRepository) ListEnabledByWorkspace(workspaceID int) ([]*models.Ac
 
 // Create creates a new action
 func (r *ActionRepository) Create(action *models.Action) (int, error) {
-	result, err := r.db.Exec(`
+	var id int64
+	err := r.db.QueryRow(`
 		INSERT INTO actions (
 			workspace_id, name, description, is_enabled, trigger_type, trigger_config,
 			created_by, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,
 		action.WorkspaceID, action.Name, action.Description, action.IsEnabled,
 		action.TriggerType, action.TriggerConfig, action.CreatedBy,
 		time.Now(), time.Now(),
-	)
+	).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create action: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get last insert id: %w", err)
 	}
 
 	return int(id), nil
@@ -291,20 +287,16 @@ func (r *ActionRepository) GetNodesByActionID(actionID int) ([]models.ActionNode
 
 // CreateNode creates a new action node
 func (r *ActionRepository) CreateNode(node *models.ActionNode) (int, error) {
-	result, err := r.db.Exec(`
+	var id int64
+	err := r.db.QueryRow(`
 		INSERT INTO action_nodes (action_id, node_type, node_config, position_x, position_y, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,
 		node.ActionID, node.NodeType, node.NodeConfig, node.PositionX, node.PositionY,
 		time.Now(), time.Now(),
-	)
+	).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create action node: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get last insert id: %w", err)
 	}
 
 	return int(id), nil
@@ -383,20 +375,16 @@ func (r *ActionRepository) GetEdgesByActionID(actionID int) ([]models.ActionEdge
 
 // CreateEdge creates a new action edge
 func (r *ActionRepository) CreateEdge(edge *models.ActionEdge) (int, error) {
-	result, err := r.db.Exec(`
+	var id int64
+	err := r.db.QueryRow(`
 		INSERT INTO action_edges (action_id, source_node_id, target_node_id, edge_type, source_handle, target_handle, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,
 		edge.ActionID, edge.SourceNodeID, edge.TargetNodeID, edge.EdgeType,
 		edge.SourceHandle, edge.TargetHandle, time.Now(),
-	)
+	).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create action edge: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get last insert id: %w", err)
 	}
 
 	return int(id), nil
@@ -424,19 +412,15 @@ func (r *ActionRepository) DeleteEdgesByActionID(actionID int) error {
 
 // CreateExecutionLog creates a new execution log entry
 func (r *ActionRepository) CreateExecutionLog(log *models.ActionExecutionLog) (int, error) {
-	result, err := r.db.Exec(`
+	var id int64
+	err := r.db.QueryRow(`
 		INSERT INTO action_execution_logs (action_id, item_id, trigger_event, status, started_at)
-		VALUES (?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?) RETURNING id
 	`,
 		log.ActionID, log.ItemID, log.TriggerEvent, log.Status, time.Now(),
-	)
+	).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create execution log: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get last insert id: %w", err)
 	}
 
 	return int(id), nil
@@ -609,19 +593,16 @@ func (r *ActionRepository) SaveActionWithNodesAndEdges(action *models.Action, no
 	// Insert nodes and build ID mapping (old ID -> new ID)
 	nodeIDMap := make(map[int]int64)
 	for _, node := range nodes {
-		result, err := tx.Exec(`
+		var newID int64
+		err = tx.QueryRow(`
 			INSERT INTO action_nodes (action_id, node_type, node_config, position_x, position_y, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
+			VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
 		`,
 			action.ID, node.NodeType, node.NodeConfig, node.PositionX, node.PositionY,
 			time.Now(), time.Now(),
-		)
+		).Scan(&newID)
 		if err != nil {
 			return fmt.Errorf("failed to insert node: %w", err)
-		}
-		newID, err := result.LastInsertId()
-		if err != nil {
-			return fmt.Errorf("failed to get node insert id: %w", err)
 		}
 		nodeIDMap[node.ID] = newID
 	}

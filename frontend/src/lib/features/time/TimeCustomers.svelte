@@ -12,6 +12,7 @@
   import { Plus, Trash2, Edit, Users } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import PageHeader from '../../layout/PageHeader.svelte';
+  import { formatDateSimple } from '../../utils/dateFormatter.js';
   import { confirm } from '../../composables/useConfirm.js';
 
   let customers = $state([]);
@@ -127,7 +128,7 @@
     { key: 'name', label: t('common.name'), slot: 'name' },
     { key: 'email', label: t('common.email'), slot: 'email' },
     { key: 'status', label: t('common.status'), slot: 'status' },
-    { key: 'created_at', label: t('common.created'), render: (customer) => new Date(customer.created_at).toLocaleDateString(), textColor: 'var(--ds-text-subtle)' },
+    { key: 'created_at', label: t('common.created'), render: (customer) => formatDateSimple(customer.created_at), textColor: 'var(--ds-text-subtle)' },
     { key: 'actions', label: t('common.actions') }
   ]);
 

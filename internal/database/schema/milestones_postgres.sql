@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS milestone_releases (
 	is_draft BOOLEAN NOT NULL DEFAULT false,
 	is_prerelease BOOLEAN NOT NULL DEFAULT false,
 	target_commitish TEXT,
-	scm_connection_id INTEGER REFERENCES workspace_scm_connections(id) ON DELETE SET NULL,
+	scm_connection_id INTEGER, -- FK added in scm_postgres.sql (circular dep: items→milestones→scm→items)
 	scm_repository TEXT,
 	scm_release_id TEXT,
 	scm_release_url TEXT,

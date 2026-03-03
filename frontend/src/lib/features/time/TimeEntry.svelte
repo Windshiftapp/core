@@ -14,6 +14,7 @@
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
+  import { formatDateSimple } from '../../utils/dateFormatter.js';
   import PageHeader from '../../layout/PageHeader.svelte';
 
   // Bind to store values
@@ -30,7 +31,7 @@
   let filteredProjects = $derived(timeEntryStore.filteredProjects);
 
   const worklogColumns = $derived([
-    { key: 'date', label: t('common.date'), render: (w) => new Date(w.date * 1000).toLocaleDateString() },
+    { key: 'date', label: t('common.date'), render: (w) => formatDateSimple(new Date(w.date * 1000)) },
     { key: 'project_name', label: t('time.reports.project'), slot: 'project' },
     { key: 'item_title', label: t('items.workItem'), slot: 'item' },
     { key: 'description', label: t('common.description') },

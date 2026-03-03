@@ -3,22 +3,17 @@
   import { ExternalLink, Filter, ChevronLeft, ChevronRight, Inbox as InboxIcon } from 'lucide-svelte';
   import { hubStore, gradients } from '../stores/hub.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { formatDateShort, formatDateWithOptions } from '../utils/dateFormatter.js';
   import Spinner from '../components/Spinner.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
 
   // Format date for display
   function formatDate(dateStr) {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    return formatDateShort(dateStr);
   }
 
   function formatTime(dateStr) {
-    const date = new Date(dateStr);
-    return date.toLocaleTimeString(undefined, {
+    return formatDateWithOptions(dateStr, {
       hour: '2-digit',
       minute: '2-digit'
     });

@@ -4,6 +4,7 @@
   import { confirm } from '../composables/useConfirm.js';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
+  import { formatDateSimple } from '../utils/dateFormatter.js';
   import {
     Plus, Edit, Trash2, Save, X, Settings, Workflow,
     FileText, Target, Zap, BookOpen, CheckSquare, Bug, Minus, Star, Flag,
@@ -670,7 +671,7 @@
 
                   <!-- Footer with metadata -->
                   <div class="mt-5 pt-4 border-t" style="border-color: var(--ds-border);">
-                    <span class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.configSets.created')} {new Date(configSet.created_at).toLocaleDateString()}</span>
+                    <span class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.configSets.created')} {formatDateSimple(configSet.created_at)}</span>
                   </div>
 
                   {#if configSet.description}

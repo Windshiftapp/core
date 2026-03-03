@@ -353,15 +353,15 @@ func (s *PlanningService) CreateMilestone(params CreateMilestoneParams) (*Milest
 		status = "planning"
 	}
 
-	result, err := s.db.ExecWrite(`
+	var id int64
+	err := s.db.QueryRow(`
 		INSERT INTO milestones (name, description, target_date, status, category_id, is_global, workspace_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`, params.Name, params.Description, params.TargetDate, status, params.CategoryID, params.IsGlobal, params.WorkspaceID)
+		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
+	`, params.Name, params.Description, params.TargetDate, status, params.CategoryID, params.IsGlobal, params.WorkspaceID).Scan(&id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create milestone: %w", err)
 	}
 
-	id, _ := result.LastInsertId()
 	return s.GetMilestone(int(id))
 }
 
@@ -718,15 +718,15 @@ func (s *PlanningService) CreateIteration(params CreateIterationParams) (*Iterat
 		status = "planned"
 	}
 
-	result, err := s.db.ExecWrite(`
+	var id int64
+	err := s.db.QueryRow(`
 		INSERT INTO iterations (name, description, start_date, end_date, status, type_id, is_global, workspace_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, params.Name, params.Description, params.StartDate, params.EndDate, status, params.TypeID, params.IsGlobal, params.WorkspaceID)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+	`, params.Name, params.Description, params.StartDate, params.EndDate, status, params.TypeID, params.IsGlobal, params.WorkspaceID).Scan(&id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create iteration: %w", err)
 	}
 
-	id, _ := result.LastInsertId()
 	return s.GetIteration(int(id))
 }
 
@@ -888,15 +888,15 @@ type CreateProjectParams struct {
 
 // CreateProject creates a new project.
 func (s *PlanningService) CreateProject(params CreateProjectParams) (*ProjectResult, error) {
-	result, err := s.db.ExecWrite(`
+	var id int64
+	err := s.db.QueryRow(`
 		INSERT INTO projects (name, description, workspace_id, active)
-		VALUES (?, ?, ?, ?)
-	`, params.Name, params.Description, params.WorkspaceID, params.Active)
+		VALUES (?, ?, ?, ?) RETURNING id
+	`, params.Name, params.Description, params.WorkspaceID, params.Active).Scan(&id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create project: %w", err)
 	}
 
-	id, _ := result.LastInsertId()
 	return s.GetProject(int(id))
 }
 

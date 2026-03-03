@@ -1,6 +1,7 @@
 <script>
   import { CheckSquare } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
+  import { formatDateSimple } from '../../utils/dateFormatter.js';
   import ItemCard from './ItemCard.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import { getStatusCategory } from '../../utils/statusColors.js';
@@ -69,8 +70,7 @@
     if (!timestamp) return null;
     if (formatTimestamp) return formatTimestamp(timestamp);
     // Default formatting
-    const date = new Date(timestamp);
-    return date.toLocaleDateString();
+    return formatDateSimple(timestamp);
   });
 
   // Look up status - supports pre-resolved status_name, status string, or lookup by status_id

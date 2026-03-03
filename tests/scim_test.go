@@ -8,7 +8,7 @@ import (
 
 // TestSCIM_PublicEndpoints tests the unauthenticated SCIM discovery endpoints
 func TestSCIM_PublicEndpoints(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server) // Need to complete setup first
 
 	t.Run("ServiceProviderConfig", func(t *testing.T) {
@@ -95,7 +95,7 @@ func TestSCIM_PublicEndpoints(t *testing.T) {
 
 // TestSCIM_TokenManagement tests SCIM token CRUD via admin API
 func TestSCIM_TokenManagement(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	var tokenID int
@@ -193,7 +193,7 @@ func TestSCIM_TokenManagement(t *testing.T) {
 
 // TestSCIM_Authentication tests that SCIM endpoints require proper authentication
 func TestSCIM_Authentication(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	t.Run("NoAuthFails", func(t *testing.T) {
@@ -222,7 +222,7 @@ func TestSCIM_Authentication(t *testing.T) {
 
 // TestSCIM_UserLifecycle tests the complete SCIM user CRUD lifecycle
 func TestSCIM_UserLifecycle(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 	scimToken := CreateSCIMToken(t, server, "User Lifecycle Token")
 
@@ -415,7 +415,7 @@ func TestSCIM_UserLifecycle(t *testing.T) {
 
 // TestSCIM_GroupLifecycle tests the complete SCIM group CRUD lifecycle
 func TestSCIM_GroupLifecycle(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 	scimToken := CreateSCIMToken(t, server, "Group Lifecycle Token")
 
@@ -580,7 +580,7 @@ func TestSCIM_GroupLifecycle(t *testing.T) {
 
 // TestSCIM_ErrorResponses tests that SCIM returns proper error responses
 func TestSCIM_ErrorResponses(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 	scimToken := CreateSCIMToken(t, server, "Error Test Token")
 
@@ -639,7 +639,7 @@ func TestSCIM_ErrorResponses(t *testing.T) {
 
 // TestSCIM_Pagination tests SCIM pagination parameters
 func TestSCIM_Pagination(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 	scimToken := CreateSCIMToken(t, server, "Pagination Test Token")
 

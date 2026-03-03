@@ -3,6 +3,7 @@
   import { useDebounce } from 'runed';
   import { t } from '../stores/i18n.svelte.js';
   import { api } from '../api.js';
+  import { formatDateSimple } from '../utils/dateFormatter.js';
   import Modal from './Modal.svelte';
   import Spinner from '../components/Spinner.svelte';
   import Button from '../components/Button.svelte';
@@ -79,7 +80,7 @@
     if (minutes < 60) return `${minutes}m ago`;
     if (hours < 24) return `${hours}h ago`;
     if (days < 7) return `${days}d ago`;
-    return date.toLocaleDateString();
+    return formatDateSimple(date);
   }
 
   function getItemKey(msg) {

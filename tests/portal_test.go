@@ -15,7 +15,7 @@ import (
 // 4. Submit work items through the portal
 // 5. Verify items are created correctly
 func TestPortalWorkflow(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	timestamp := time.Now().Unix()

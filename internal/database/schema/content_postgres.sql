@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS attachments (
 	uploaded_by INTEGER,
 	has_thumbnail BOOLEAN DEFAULT false,
 	thumbnail_path TEXT,
+	category TEXT DEFAULT '',
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL
 );

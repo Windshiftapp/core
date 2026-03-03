@@ -83,7 +83,7 @@ func (h *AIHandler) PlanMyDay(w http.ResponseWriter, r *http.Request) {
 
 	// Find user's personal workspace IDs so we include all items from them
 	var personalWSIDs []int
-	pwsRows, err := h.db.Query("SELECT id FROM workspaces WHERE is_personal = 1 AND owner_id = ? AND active = 1", user.ID)
+	pwsRows, err := h.db.Query("SELECT id FROM workspaces WHERE is_personal = true AND owner_id = ? AND active = true", user.ID)
 	if err == nil {
 		defer func() { _ = pwsRows.Close() }()
 		for pwsRows.Next() {

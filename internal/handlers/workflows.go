@@ -116,16 +116,11 @@ func (h *WorkflowHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now()
-	result, err := h.db.ExecWrite(`
+	var id int64
+	err = h.db.QueryRow(`
 		INSERT INTO workflows (name, description, is_default, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?)
-	`, workflow.Name, workflow.Description, workflow.IsDefault, now, now)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	id, err := result.LastInsertId()
+		VALUES (?, ?, ?, ?, ?) RETURNING id
+	`, workflow.Name, workflow.Description, workflow.IsDefault, now, now).Scan(&id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

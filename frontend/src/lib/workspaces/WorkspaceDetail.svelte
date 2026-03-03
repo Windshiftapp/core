@@ -5,6 +5,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { currentWorkspace, workspacesStore } from '../stores';
+  import { formatDateSimple } from '../utils/dateFormatter.js';
   import { Plus, CheckSquare } from 'lucide-svelte';
   import WorkspaceNavigation from './WorkspaceNavigation.svelte';
   import TodoList from '../features/items/TodoList.svelte';
@@ -276,7 +277,7 @@
                     <Lozenge color={project.active ? 'green' : 'gray'} text={project.active ? 'Active' : 'Inactive'} />
                   </td>
                   <td class="px-6 py-4 text-sm" style="color: var(--ds-text-subtle);">
-                    {new Date(project.created_at).toLocaleDateString()}
+                    {formatDateSimple(project.created_at)}
                   </td>
                   <td class="px-6 py-4 text-right text-sm font-medium">
                     <button

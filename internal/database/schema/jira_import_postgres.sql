@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS jira_import_connections (
     email TEXT NOT NULL,
     encrypted_credentials TEXT NOT NULL,
     instance_name TEXT,
+    deployment_type TEXT DEFAULT 'cloud',
     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_used_at TIMESTAMP

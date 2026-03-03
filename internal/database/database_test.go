@@ -204,7 +204,7 @@ func TestDatabase_DefaultData_StatusSystem(t *testing.T) {
 
 	// Verify default workflow exists
 	var workflowCount int
-	err = tdb.QueryRow("SELECT COUNT(*) FROM workflows WHERE is_default = 1").Scan(&workflowCount)
+	err = tdb.QueryRow("SELECT COUNT(*) FROM workflows WHERE is_default = true").Scan(&workflowCount)
 	if err != nil {
 		t.Fatalf("Failed to count default workflows: %v", err)
 	}
@@ -250,7 +250,7 @@ func TestDatabase_DefaultData_ScreenSystem(t *testing.T) {
 
 	// Verify configuration set exists
 	var configSetCount int
-	err = tdb.QueryRow("SELECT COUNT(*) FROM configuration_sets WHERE is_default = 1").Scan(&configSetCount)
+	err = tdb.QueryRow("SELECT COUNT(*) FROM configuration_sets WHERE is_default = true").Scan(&configSetCount)
 	if err != nil {
 		t.Fatalf("Failed to count configuration sets: %v", err)
 	}
@@ -266,7 +266,7 @@ func TestDatabase_DefaultData_LinkTypes(t *testing.T) {
 
 	// Verify link types were created
 	var linkTypeCount int
-	err := tdb.QueryRow("SELECT COUNT(*) FROM link_types WHERE is_system = 1").Scan(&linkTypeCount)
+	err := tdb.QueryRow("SELECT COUNT(*) FROM link_types WHERE is_system = true").Scan(&linkTypeCount)
 	if err != nil {
 		t.Fatalf("Failed to count system link types: %v", err)
 	}

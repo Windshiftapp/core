@@ -3,6 +3,16 @@
  * Centralized date formatting functions to avoid duplication across components
  */
 import { serverNow } from './serverClock.js';
+import { i18n } from '../stores/i18n.svelte.js';
+
+/**
+ * Get the app's current locale for date formatting.
+ * Falls back to 'en' if i18n hasn't initialized yet.
+ * @returns {string} Locale code (e.g., 'en', 'de', 'es')
+ */
+function getAppLocale() {
+  return i18n.locale || 'en';
+}
 
 /**
  * Format a date string to YYYY-MM-DD format
@@ -52,7 +62,7 @@ export function formatDateLocale(dateString, options = {}) {
       day: 'numeric',
       ...options,
     };
-    return date.toLocaleDateString(undefined, defaultOptions);
+    return date.toLocaleDateString(getAppLocale(), defaultOptions);
   } catch (error) {
     console.error('Error formatting date with locale:', error);
     return '';
@@ -188,7 +198,7 @@ export function formatDateTimeWithTimezone(dateString, timezone = 'UTC', options
       timeZone: timezone,
       ...options,
     };
-    return date.toLocaleString(undefined, defaultOptions);
+    return date.toLocaleString(getAppLocale(), defaultOptions);
   } catch (error) {
     console.error('Error formatting date with timezone:', error);
     return '';
@@ -220,11 +230,11 @@ export function formatHistoryTimestamp(dateString, timezone = 'UTC') {
       timeZone: timezone,
     };
 
-    const datePart = date.toLocaleDateString(undefined, dateOptions);
-    const timePart = date.toLocaleTimeString(undefined, timeOptions);
+    const datePart = date.toLocaleDateString(getAppLocale(), dateOptions);
+    const timePart = date.toLocaleTimeString(getAppLocale(), timeOptions);
 
     // Get timezone abbreviation
-    const formatter = new Intl.DateTimeFormat(undefined, {
+    const formatter = new Intl.DateTimeFormat(getAppLocale(), {
       timeZone: timezone,
       timeZoneName: 'short',
     });
@@ -285,7 +295,7 @@ export function formatRelativeCompact(date) {
   if (hours < 24) return `${hours}h ago`;
   if (days === 1) return 'Yesterday';
   if (days < 7) return `${days}d ago`;
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(getAppLocale(), { month: 'short', day: 'numeric' });
 }
 
 /**
@@ -301,7 +311,7 @@ export function formatDueDate(dueDate) {
   const diffMs = d.getTime() - now.getTime();
   const days = Math.round(diffMs / 86400000);
 
-  if (days > 7) return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  if (days > 7) return d.toLocaleDateString(getAppLocale(), { month: 'short', day: 'numeric' });
   if (days > 1) return `Due in ${days} days`;
   if (days === 1) return 'Due tomorrow';
   if (days === 0) return 'Due today';
@@ -324,6 +334,58 @@ export function getDueBadgeClass(dueDate) {
   if (diff < 0) return 'bg-rose-100 text-rose-700';
   if (diff <= 2 * 86400000) return 'bg-amber-100 text-amber-700';
   return 'bg-blue-50 text-blue-700';
+}
+
+/**
+ * Format a date using the app locale with no special options.
+ * Drop-in replacement for bare `date.toLocaleDateString()` calls in components.
+ * @param {string|Date} dateString - Date string or Date object
+ * @returns {string} Locale-formatted date string, or empty string if invalid
+ */
+export function formatDateSimple(dateString) {
+  if (!dateString) return '';
+  try {
+    const date = dateString instanceof Date ? dateString : new Date(dateString);
+    return date.toLocaleDateString(getAppLocale());
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return '';
+  }
+}
+
+/**
+ * Format a date + time using the app locale.
+ * Drop-in replacement for `date.toLocaleDateString() + ' ' + date.toLocaleTimeString()`.
+ * @param {string|Date} dateString - Date string or Date object
+ * @returns {string} Locale-formatted date-time string, or empty string if invalid
+ */
+export function formatDateTimeSimple(dateString) {
+  if (!dateString) return '';
+  try {
+    const date = dateString instanceof Date ? dateString : new Date(dateString);
+    return date.toLocaleDateString(getAppLocale()) + ' ' + date.toLocaleTimeString(getAppLocale());
+  } catch (error) {
+    console.error('Error formatting datetime:', error);
+    return '';
+  }
+}
+
+/**
+ * Format a date using the app locale with custom Intl.DateTimeFormat options.
+ * Generic escape hatch for one-off format patterns in components.
+ * @param {string|Date} dateString - Date string or Date object
+ * @param {object} options - Intl.DateTimeFormat options
+ * @returns {string} Locale-formatted date string, or empty string if invalid
+ */
+export function formatDateWithOptions(dateString, options = {}) {
+  if (!dateString) return '';
+  try {
+    const date = dateString instanceof Date ? dateString : new Date(dateString);
+    return date.toLocaleDateString(getAppLocale(), options);
+  } catch (error) {
+    console.error('Error formatting date with options:', error);
+    return '';
+  }
 }
 
 /**

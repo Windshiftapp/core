@@ -23,7 +23,7 @@ func (s *UserReadService) List(pagination PaginationParams) ([]models.User, int,
 	rows, err := s.db.Query(`
 		SELECT id, email, username, first_name, last_name, is_active, avatar_url, timezone, language, created_at
 		FROM users
-		WHERE is_active = 1
+		WHERE is_active = true
 		ORDER BY first_name, last_name
 		LIMIT ? OFFSET ?
 	`, pagination.Limit, pagination.Offset)
@@ -60,7 +60,7 @@ func (s *UserReadService) List(pagination PaginationParams) ([]models.User, int,
 
 	// Get total count
 	var total int
-	err = s.db.QueryRow("SELECT COUNT(*) FROM users WHERE is_active = 1").Scan(&total)
+	err = s.db.QueryRow("SELECT COUNT(*) FROM users WHERE is_active = true").Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count users: %w", err)
 	}

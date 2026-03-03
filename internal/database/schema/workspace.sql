@@ -32,3 +32,17 @@
 
 	CREATE INDEX IF NOT EXISTS idx_workspaces_is_personal ON workspaces(is_personal);
 	CREATE INDEX IF NOT EXISTS idx_workspaces_owner_id ON workspaces(owner_id);
+
+	-- Junction table for workspace and time project categories relationship
+	CREATE TABLE IF NOT EXISTS workspace_time_project_categories (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		workspace_id INTEGER NOT NULL,
+		time_project_category_id INTEGER NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+		FOREIGN KEY (time_project_category_id) REFERENCES time_project_categories(id) ON DELETE CASCADE,
+		UNIQUE(workspace_id, time_project_category_id)
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_workspace_time_project_categories_workspace_id ON workspace_time_project_categories(workspace_id);
+	CREATE INDEX IF NOT EXISTS idx_workspace_time_project_categories_category_id ON workspace_time_project_categories(time_project_category_id);

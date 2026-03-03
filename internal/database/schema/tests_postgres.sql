@@ -2,16 +2,19 @@
 -- Test folders for organizing test cases
 CREATE TABLE IF NOT EXISTS test_folders (
 	id SERIAL PRIMARY KEY,
+	workspace_id INTEGER NOT NULL,
 	parent_id INTEGER REFERENCES test_folders(id) ON DELETE SET NULL,
 	name TEXT NOT NULL,
 	description TEXT,
 	sort_order INTEGER DEFAULT 0,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS test_cases (
 	id SERIAL PRIMARY KEY,
+	workspace_id INTEGER NOT NULL,
 	folder_id INTEGER REFERENCES test_folders(id) ON DELETE SET NULL,
 	title TEXT NOT NULL,
 	name TEXT NOT NULL DEFAULT '',
@@ -21,22 +24,29 @@ CREATE TABLE IF NOT EXISTS test_cases (
 	preconditions TEXT DEFAULT '',
 	sort_order INTEGER DEFAULT 0,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 );
 
+CREATE INDEX IF NOT EXISTS idx_test_folders_workspace_id ON test_folders(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_test_folders_sort_order ON test_folders(sort_order);
 CREATE INDEX IF NOT EXISTS idx_test_folders_parent_id ON test_folders(parent_id);
+CREATE INDEX IF NOT EXISTS idx_test_cases_workspace_id ON test_cases(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_test_cases_folder_id ON test_cases(folder_id);
 CREATE INDEX IF NOT EXISTS idx_test_cases_sort_order ON test_cases(sort_order);
 
 CREATE TABLE IF NOT EXISTS test_sets (
 	id SERIAL PRIMARY KEY,
+	workspace_id INTEGER NOT NULL,
 	name TEXT NOT NULL,
 	description TEXT,
 	milestone_id INTEGER REFERENCES milestones(id) ON DELETE SET NULL,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS idx_test_sets_workspace_id ON test_sets(workspace_id);
 
 CREATE TABLE IF NOT EXISTS set_test_cases (
 	id SERIAL PRIMARY KEY,
@@ -49,16 +59,21 @@ CREATE TABLE IF NOT EXISTS set_test_cases (
 
 CREATE TABLE IF NOT EXISTS test_run_templates (
 	id SERIAL PRIMARY KEY,
+	workspace_id INTEGER NOT NULL,
 	set_id INTEGER NOT NULL,
 	name TEXT NOT NULL,
 	description TEXT DEFAULT '',
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
 	FOREIGN KEY (set_id) REFERENCES test_sets(id) ON DELETE CASCADE
 );
 
+CREATE INDEX IF NOT EXISTS idx_test_run_templates_workspace_id ON test_run_templates(workspace_id);
+
 CREATE TABLE IF NOT EXISTS test_runs (
 	id SERIAL PRIMARY KEY,
+	workspace_id INTEGER NOT NULL,
 	template_id INTEGER,
 	set_id INTEGER NOT NULL,
 	name TEXT NOT NULL,
@@ -66,9 +81,12 @@ CREATE TABLE IF NOT EXISTS test_runs (
 	started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	ended_at TIMESTAMP,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
 	FOREIGN KEY (template_id) REFERENCES test_run_templates(id) ON DELETE SET NULL,
 	FOREIGN KEY (set_id) REFERENCES test_sets(id) ON DELETE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS idx_test_runs_workspace_id ON test_runs(workspace_id);
 
 CREATE TABLE IF NOT EXISTS test_results (
 	id SERIAL PRIMARY KEY,
@@ -85,15 +103,20 @@ CREATE TABLE IF NOT EXISTS test_results (
 	UNIQUE(run_id, test_case_id)
 );
 
--- Test labels for categorizing test cases
+-- Test labels for categorizing test cases (workspace-scoped)
 CREATE TABLE IF NOT EXISTS test_labels (
 	id SERIAL PRIMARY KEY,
-	name TEXT NOT NULL UNIQUE,
+	workspace_id INTEGER NOT NULL,
+	name TEXT NOT NULL,
 	color TEXT NOT NULL DEFAULT '#3B82F6',
 	description TEXT DEFAULT '',
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+	UNIQUE(workspace_id, name)
 );
+
+CREATE INDEX IF NOT EXISTS idx_test_labels_workspace_id ON test_labels(workspace_id);
 
 -- Junction table for test case labels
 CREATE TABLE IF NOT EXISTS test_case_labels (
@@ -119,19 +142,6 @@ CREATE TABLE IF NOT EXISTS test_steps (
 	FOREIGN KEY (test_case_id) REFERENCES test_cases(id) ON DELETE CASCADE
 );
 
--- Test defects for tracking issues found during testing (moved before test_step_results to satisfy FK constraint)
-CREATE TABLE IF NOT EXISTS test_defects (
-	id SERIAL PRIMARY KEY,
-	title TEXT NOT NULL,
-	description TEXT DEFAULT '',
-	status TEXT NOT NULL DEFAULT 'open',
-	priority TEXT NOT NULL DEFAULT 'medium',
-	item_id INTEGER,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL
-);
-
 -- Test step results for execution tracking
 CREATE TABLE IF NOT EXISTS test_step_results (
 	id SERIAL PRIMARY KEY,
@@ -140,16 +150,29 @@ CREATE TABLE IF NOT EXISTS test_step_results (
 	status TEXT NOT NULL DEFAULT 'not_run',
 	actual_result TEXT DEFAULT '',
 	notes TEXT DEFAULT '',
-	defect_id INTEGER,
+	item_id INTEGER,
 	executed_at TIMESTAMP,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (test_result_id) REFERENCES test_results(id) ON DELETE CASCADE,
 	FOREIGN KEY (test_step_id) REFERENCES test_steps(id) ON DELETE CASCADE,
-	FOREIGN KEY (defect_id) REFERENCES test_defects(id) ON DELETE SET NULL,
+	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,
 	UNIQUE(test_result_id, test_step_id)
 );
 
+-- Junction table for linking test results to work items
+CREATE TABLE IF NOT EXISTS test_result_items (
+	id SERIAL PRIMARY KEY,
+	test_result_id INTEGER NOT NULL,
+	item_id INTEGER NOT NULL,
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (test_result_id) REFERENCES test_results(id) ON DELETE CASCADE,
+	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+	UNIQUE(test_result_id, item_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_test_result_items_test_result_id ON test_result_items(test_result_id);
+CREATE INDEX IF NOT EXISTS idx_test_result_items_item_id ON test_result_items(item_id);
 
 CREATE INDEX IF NOT EXISTS idx_set_test_cases_set_id ON set_test_cases(set_id);
 CREATE INDEX IF NOT EXISTS idx_set_test_cases_test_case_id ON set_test_cases(test_case_id);

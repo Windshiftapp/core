@@ -9,7 +9,7 @@ import (
 
 // TestGlobalPermissions_SystemAdmin tests that system administrators have full access.
 func TestGlobalPermissions_SystemAdmin(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	adminToken := CreateBearerToken(t, server)
 
 	// Create a test workspace (key max 10 chars)
@@ -66,7 +66,7 @@ func TestGlobalPermissions_SystemAdmin(t *testing.T) {
 
 // TestGlobalPermissions_WorkspaceCreate tests the workspace.create global permission.
 func TestGlobalPermissions_WorkspaceCreate(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	adminToken := CreateBearerToken(t, server)
 	server.BearerToken = adminToken
 
@@ -109,7 +109,7 @@ func TestGlobalPermissions_WorkspaceCreate(t *testing.T) {
 // Note: Currently user management requires system.admin - the user.manage permission
 // exists in the schema but isn't enforced by middleware. This test documents current behavior.
 func TestGlobalPermissions_UserManage(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	adminToken := CreateBearerToken(t, server)
 	server.BearerToken = adminToken
 
@@ -193,7 +193,7 @@ func TestGlobalPermissions_UserManage(t *testing.T) {
 // Global iterations require iteration.manage permission.
 // Workspace iterations require item.edit permission on the workspace.
 func TestGlobalPermissions_IterationManage(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	adminToken := CreateBearerToken(t, server)
 	server.BearerToken = adminToken
 
@@ -284,7 +284,7 @@ func TestGlobalPermissions_IterationManage(t *testing.T) {
 // TestGlobalPermissions_NonAdminCannotAccessAdminEndpoints tests that non-admin users
 // cannot access admin-only endpoints.
 func TestGlobalPermissions_NonAdminCannotAccessAdminEndpoints(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	adminToken := CreateBearerToken(t, server)
 	server.BearerToken = adminToken
 

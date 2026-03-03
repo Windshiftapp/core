@@ -317,7 +317,7 @@ func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Reque
 
 	// If this is set as default, unset other defaults
 	if req.IsDefault {
-		_, err = h.db.Exec("UPDATE scm_providers SET is_default = 0 WHERE is_default = 1")
+		_, err = h.db.Exec("UPDATE scm_providers SET is_default = false WHERE is_default = true")
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -325,19 +325,20 @@ func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Insert the provider
-	result, err := h.db.Exec(`
+	var id int64
+	err = h.db.QueryRow(`
 		INSERT INTO scm_providers (
 			slug, name, provider_type, auth_method, enabled, is_default,
 			base_url, oauth_client_id, oauth_client_secret_encrypted,
 			personal_access_token_encrypted, github_app_id,
 			github_app_private_key_encrypted, github_app_installation_id, github_org_id,
 			scopes, workspace_restriction_mode
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`, req.Slug, req.Name, req.ProviderType, req.AuthMethod, req.Enabled, req.IsDefault,
 		nullString(req.BaseURL), nullString(req.OAuthClientID), nullString(oauthSecretEnc),
 		nullString(patEnc), nullString(req.GitHubAppID),
 		nullString(ghAppKeyEnc), nullString(req.GitHubAppInstallationID), nullInt64(req.GitHubOrgID),
-		req.Scopes, workspaceRestrictionMode)
+		req.Scopes, workspaceRestrictionMode).Scan(&id)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "duplicate key") {
 			respondConflict(w, r, "Provider with this slug already exists")
@@ -346,8 +347,6 @@ func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Reque
 		respondInternalError(w, r, err)
 		return
 	}
-
-	id, _ := result.LastInsertId()
 
 	provider, err := h.getProviderByID(int(id))
 	if err != nil {
@@ -453,7 +452,7 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 
 	// If this is set as default, unset other defaults
 	if req.IsDefault {
-		_, err = h.db.Exec("UPDATE scm_providers SET is_default = 0 WHERE is_default = 1 AND id != ?", id)
+		_, err = h.db.Exec("UPDATE scm_providers SET is_default = false WHERE is_default = true AND id != ?", id)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return

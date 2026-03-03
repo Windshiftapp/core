@@ -4,6 +4,7 @@
  * Centralizes dashboard data, activity, and UI state.
  */
 import { api } from '../api.js';
+import { formatDateSimple, formatDateWithOptions } from '../utils/dateFormatter.js';
 
 const ONBOARDING_STORAGE_KEY = 'windshift-dashboard-onboarding-dismissed';
 
@@ -139,7 +140,7 @@ class HomepageStore {
     }
 
     // Format current date
-    this.currentDate = now.toLocaleDateString('en-US', {
+    this.currentDate = formatDateWithOptions(now, {
       timeZone: userTimezone,
       weekday: 'long',
       year: 'numeric',
@@ -189,7 +190,7 @@ class HomepageStore {
     if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
     if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
 
-    return then.toLocaleDateString();
+    return formatDateSimple(then);
   }
 
   /**

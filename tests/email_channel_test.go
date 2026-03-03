@@ -12,7 +12,7 @@ func TestEmailChannelItemCreation(t *testing.T) {
 	}
 
 	// Start test server
-	server, cleanup := StartTestServer(t, "sqlite")
+	server, cleanup := StartTestServer(t, GetDBType())
 	defer cleanup()
 
 	// Complete setup and get token
@@ -118,7 +118,7 @@ func TestReplyCreatesComment(t *testing.T) {
 	}
 
 	// Start test server
-	server, cleanup := StartTestServer(t, "sqlite")
+	server, cleanup := StartTestServer(t, GetDBType())
 	defer cleanup()
 
 	// Complete setup and get token
@@ -222,7 +222,7 @@ func TestEmailChannelValidation(t *testing.T) {
 	}
 
 	// Start test server
-	server, cleanup := StartTestServer(t, "sqlite")
+	server, cleanup := StartTestServer(t, GetDBType())
 	defer cleanup()
 
 	// Complete setup and get token
@@ -303,7 +303,7 @@ func TestEmailDeduplication(t *testing.T) {
 	}
 
 	// Start test server
-	server, cleanup := StartTestServer(t, "sqlite")
+	server, cleanup := StartTestServer(t, GetDBType())
 	defer cleanup()
 
 	// Complete setup and get token

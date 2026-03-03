@@ -113,7 +113,7 @@ func (h *HomepageHandler) GetHomepage(w http.ResponseWriter, r *http.Request) {
 
 	// Get total workspace count (excluding personal workspaces for onboarding purposes)
 	var workspaceCount int
-	err = h.db.QueryRow(`SELECT COUNT(*) FROM workspaces WHERE is_personal = 0 OR is_personal IS NULL`).Scan(&workspaceCount)
+	err = h.db.QueryRow(`SELECT COUNT(*) FROM workspaces WHERE is_personal = false OR is_personal IS NULL`).Scan(&workspaceCount)
 	if err != nil {
 		slog.Warn("error getting workspace count", slog.String("component", "homepage"), slog.Any("error", err))
 		// Continue even if count fails - not critical
@@ -127,7 +127,7 @@ func (h *HomepageHandler) GetHomepage(w http.ResponseWriter, r *http.Request) {
 		SELECT COUNT(*)
 		FROM items i
 		JOIN workspaces w ON i.workspace_id = w.id
-		WHERE (w.is_personal = 0 OR w.is_personal IS NULL)
+		WHERE (w.is_personal = false OR w.is_personal IS NULL)
 	`).Scan(&itemCount)
 	if err != nil {
 		slog.Warn("error getting item count", slog.String("component", "homepage"), slog.Any("error", err))

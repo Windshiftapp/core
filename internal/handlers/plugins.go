@@ -239,8 +239,6 @@ func (h *PluginHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", mimeType)
-	// Enable CORS for plugin assets
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	_, _ = w.Write(data)
 }
 

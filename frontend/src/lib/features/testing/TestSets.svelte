@@ -18,6 +18,7 @@
   import { renderStatusBadge, renderMilestoneBadge } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { useEventListener } from 'runed';
+  import { formatDateSimple } from '../../utils/dateFormatter.js';
 
   let { workspaceId = null } = $props();
 
@@ -119,7 +120,7 @@
 
     try {
       // Create a test run for this plan
-      const runName = `${$selectedSet.name} - ${new Date().toLocaleDateString()}`;
+      const runName = `${$selectedSet.name} - ${formatDateSimple(new Date())}`;
       const newRun = await api.tests.testRuns.create(workspaceId, {
         set_id: $selectedSet.id,
         name: runName
@@ -255,7 +256,7 @@
       html: true,
       render: (set) => {
         if (!set.last_run_status) return `<span style="color: var(--ds-text-subtle);">${t('testing.neverRun')}</span>`;
-        const datePart = set.last_run_date ? `<span class="text-xs mt-1" style="color: var(--ds-text-subtle);">${new Date(set.last_run_date).toLocaleDateString()}</span>` : '';
+        const datePart = set.last_run_date ? `<span class="text-xs mt-1" style="color: var(--ds-text-subtle);">${formatDateSimple(set.last_run_date)}</span>` : '';
         return `<div class="flex flex-col">${renderStatusBadge(set.last_run_status)}${datePart}</div>`;
       }
     },

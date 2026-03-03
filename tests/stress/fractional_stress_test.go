@@ -22,7 +22,7 @@ func TestFractionalIndexingStressTest(t *testing.T) {
 		t.Skip("Skipping stress test in short mode")
 	}
 
-	server, _ := tests.StartTestServer(t, "sqlite")
+	server, _ := tests.StartTestServer(t, tests.GetDBType())
 	tests.CreateBearerToken(t, server)
 
 	// Open database connection

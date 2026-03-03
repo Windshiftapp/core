@@ -81,6 +81,18 @@ CREATE INDEX IF NOT EXISTS idx_api_tokens_user_id ON api_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_api_tokens_token_hash ON api_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_api_tokens_expires_at ON api_tokens(expires_at);
 
+-- Collection categories table (for organizing global collections)
+CREATE TABLE IF NOT EXISTS collection_categories (
+	id SERIAL PRIMARY KEY,
+	name TEXT NOT NULL UNIQUE,
+	color TEXT NOT NULL DEFAULT '#3b82f6',
+	description TEXT,
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_collection_categories_name ON collection_categories(name);
+
 -- Collections table
 CREATE TABLE IF NOT EXISTS collections (
 	id SERIAL PRIMARY KEY,
@@ -89,10 +101,12 @@ CREATE TABLE IF NOT EXISTS collections (
 	ql_query TEXT,
 	is_public BOOLEAN DEFAULT false,
 	workspace_id INTEGER,
+	category_id INTEGER,
 	created_by INTEGER,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+	FOREIGN KEY (category_id) REFERENCES collection_categories(id) ON DELETE SET NULL,
 	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
@@ -100,6 +114,7 @@ CREATE INDEX IF NOT EXISTS idx_collections_name ON collections(name);
 CREATE INDEX IF NOT EXISTS idx_collections_workspace_id ON collections(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_collections_created_by ON collections(created_by);
 CREATE INDEX IF NOT EXISTS idx_collections_is_public ON collections(is_public);
+CREATE INDEX IF NOT EXISTS idx_collections_category_id ON collections(category_id);
 
 -- Active timers table
 CREATE TABLE active_timers (
@@ -107,17 +122,20 @@ CREATE TABLE active_timers (
 	workspace_id INTEGER NOT NULL,
 	item_id INTEGER,
 	project_id INTEGER NOT NULL,
+	user_id INTEGER NOT NULL,
 	description TEXT NOT NULL,
 	start_time_utc INTEGER NOT NULL,
 	created_at INTEGER NOT NULL,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,
-	FOREIGN KEY (project_id) REFERENCES time_projects(id) ON DELETE CASCADE
+	FOREIGN KEY (project_id) REFERENCES time_projects(id) ON DELETE CASCADE,
+	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_active_timers_workspace_id ON active_timers(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_active_timers_item_id ON active_timers(item_id);
 CREATE INDEX IF NOT EXISTS idx_active_timers_project_id ON active_timers(project_id);
+CREATE INDEX IF NOT EXISTS idx_active_timers_user_id ON active_timers(user_id);
 
 -- Themes table
 CREATE TABLE IF NOT EXISTS themes (

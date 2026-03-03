@@ -37,13 +37,15 @@ func (rl *AdminFallbackRateLimiter) RecordAttempt(userID int, ipAddress string) 
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
+	oneHourAgo := time.Now().Add(-time.Hour).UTC()
+
 	// Try to update existing record
 	result, err := rl.db.Exec(`
 		UPDATE admin_fallback_rate_limits
 		SET attempts = attempts + 1
 		WHERE user_id = ? AND ip_address = ?
-		AND first_attempt_at > datetime('now', '-1 hour')
-	`, userID, ipAddress)
+		AND first_attempt_at > ?
+	`, userID, ipAddress, oneHourAgo)
 	if err != nil {
 		return err
 	}
@@ -54,22 +56,22 @@ func (rl *AdminFallbackRateLimiter) RecordAttempt(userID int, ipAddress string) 
 		_, _ = rl.db.Exec(`
 			DELETE FROM admin_fallback_rate_limits
 			WHERE user_id = ? AND ip_address = ?
-			AND first_attempt_at <= datetime('now', '-1 hour')
-		`, userID, ipAddress)
+			AND first_attempt_at <= ?
+		`, userID, ipAddress, oneHourAgo)
 
 		_, err = rl.db.Exec(`
 			INSERT INTO admin_fallback_rate_limits (user_id, ip_address, attempts, first_attempt_at)
 			VALUES (?, ?, 1, CURRENT_TIMESTAMP)
 			ON CONFLICT(user_id, ip_address) DO UPDATE SET
 				attempts = CASE
-					WHEN first_attempt_at <= datetime('now', '-1 hour') THEN 1
+					WHEN first_attempt_at <= ? THEN 1
 					ELSE attempts + 1
 				END,
 				first_attempt_at = CASE
-					WHEN first_attempt_at <= datetime('now', '-1 hour') THEN CURRENT_TIMESTAMP
+					WHEN first_attempt_at <= ? THEN CURRENT_TIMESTAMP
 					ELSE first_attempt_at
 				END
-		`, userID, ipAddress)
+		`, userID, ipAddress, oneHourAgo, oneHourAgo)
 		if err != nil {
 			return err
 		}
@@ -87,11 +89,12 @@ func (rl *AdminFallbackRateLimiter) RecordAttempt(userID int, ipAddress string) 
 
 	if attempts >= MaxAdminAttemptsPerUser {
 		// Set lockout
+		lockoutTime := time.Now().Add(time.Hour).UTC()
 		_, _ = rl.db.Exec(`
 			UPDATE admin_fallback_rate_limits
-			SET locked_until = datetime('now', '+1 hour')
+			SET locked_until = ?
 			WHERE user_id = ? AND ip_address = ?
-		`, userID, ipAddress)
+		`, lockoutTime, userID, ipAddress)
 	}
 
 	return nil
@@ -107,11 +110,12 @@ func (rl *AdminFallbackRateLimiter) IsAllowed(userID int, ipAddress string) (all
 	var lockedUntil sql.NullTime
 	var attempts int
 
+	oneHourAgo := time.Now().Add(-time.Hour).UTC()
 	err := rl.db.QueryRow(`
 		SELECT attempts, locked_until FROM admin_fallback_rate_limits
 		WHERE user_id = ? AND ip_address = ?
-		AND first_attempt_at > datetime('now', '-1 hour')
-	`, userID, ipAddress).Scan(&attempts, &lockedUntil)
+		AND first_attempt_at > ?
+	`, userID, ipAddress, oneHourAgo).Scan(&attempts, &lockedUntil)
 
 	if err == sql.ErrNoRows {
 		// No record - first attempt, fully allowed
@@ -152,11 +156,13 @@ func (rl *AdminFallbackRateLimiter) CleanupExpired() error {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
+	twoHoursAgo := time.Now().Add(-2 * time.Hour).UTC()
+	now := time.Now().UTC()
 	_, err := rl.db.Exec(`
 		DELETE FROM admin_fallback_rate_limits
-		WHERE first_attempt_at <= datetime('now', '-2 hour')
-		OR (locked_until IS NOT NULL AND locked_until < datetime('now'))
-	`)
+		WHERE first_attempt_at <= ?
+		OR (locked_until IS NOT NULL AND locked_until < ?)
+	`, twoHoursAgo, now)
 	return err
 }
 
@@ -166,12 +172,13 @@ func (rl *AdminFallbackRateLimiter) GetIPAttemptCount(ipAddress string) int {
 	rl.mu.RLock()
 	defer rl.mu.RUnlock()
 
+	oneHourAgo := time.Now().Add(-time.Hour).UTC()
 	var total int
 	err := rl.db.QueryRow(`
 		SELECT COALESCE(SUM(attempts), 0) FROM admin_fallback_rate_limits
 		WHERE ip_address = ?
-		AND first_attempt_at > datetime('now', '-1 hour')
-	`, ipAddress).Scan(&total)
+		AND first_attempt_at > ?
+	`, ipAddress, oneHourAgo).Scan(&total)
 	if err != nil {
 		return 0
 	}

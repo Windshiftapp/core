@@ -191,27 +191,26 @@ func (h *LDAPHandler) CreateConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.db.ExecWrite(`
+	var id int64
+	err = h.db.QueryRow(`
 		INSERT INTO ldap_configs (
 			name, enabled, host, port, use_tls, use_ssl, skip_tls_verify,
 			bind_dn, bind_password_encrypted, base_dn, user_filter,
 			group_base_dn, group_filter,
 			attr_username, attr_email, attr_first_name, attr_last_name, attr_display_name, attr_group_member,
 			sync_interval_minutes, auto_provision_users, auto_deactivate_users
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,
 		req.Name, req.Enabled, req.Host, req.Port, req.UseTLS, req.UseSSL, req.SkipTLSVerify,
 		req.BindDN, encryptedPassword, req.BaseDN, req.UserFilter,
 		nullStr(req.GroupBaseDN), nullStr(req.GroupFilter),
 		req.AttrUsername, req.AttrEmail, req.AttrFirstName, req.AttrLastName, req.AttrDisplayName, req.AttrGroupMember,
 		req.SyncIntervalMinutes, req.AutoProvisionUsers, req.AutoDeactivateUsers,
-	)
+	).Scan(&id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	id, _ := result.LastInsertId()
 	config, _ := h.syncService.GetConfig(int(id))
 	if config != nil {
 		resp := LDAPConfigResponse{LDAPConfig: *config, HasBindPassword: true}

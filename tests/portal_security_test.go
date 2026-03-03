@@ -8,7 +8,7 @@ import (
 )
 
 func TestPortalSecurity(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server) // Admin token for setup
 
 	// Setup shared resources

@@ -401,11 +401,13 @@ func (g *SQLGenerator) generateFunction(node *ASTNode) (sql string, args []inter
 		// Customer organization ID - resolved at handler level before CQL parsing
 		return "?", []interface{}{"current-organisation-id"}, nil //nolint:misspell // CQL function name uses British spelling
 	case "now":
-		return "datetime('now')", nil, nil
+		return "?", []interface{}{time.Now().UTC()}, nil
 	case "startofday":
-		return "date('now')", nil, nil
+		now := time.Now().UTC()
+		return "?", []interface{}{time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)}, nil
 	case "endofday":
-		return "datetime('now', '+1 day', '-1 second')", nil, nil
+		now := time.Now().UTC()
+		return "?", []interface{}{time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 0, time.UTC)}, nil
 
 	case "childrenof":
 		// childrenOf("ql query") - Find all descendants of items matching the inner query

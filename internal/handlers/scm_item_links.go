@@ -285,21 +285,20 @@ func (h *SCMItemLinksHandler) CreateItemSCMLink(w http.ResponseWriter, r *http.R
 	}
 
 	// Insert the link
-	result, err := h.db.Exec(`
+	var id int64
+	err = h.db.QueryRow(`
 		INSERT INTO item_scm_links (
 			item_id, workspace_repository_id, link_type, external_id,
 			external_url, title, state, author_name, detection_source
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manual')
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manual') RETURNING id
 	`, itemID, req.WorkspaceRepositoryID, linkType, req.ExternalID,
-		nullString(req.ExternalURL), nullString(req.Title), nullString(req.State), nullString(req.AuthorName))
+		nullString(req.ExternalURL), nullString(req.Title), nullString(req.State), nullString(req.AuthorName)).Scan(&id)
 	if err != nil {
 		slog.Error("failed to create link", slog.String("component", "scm_item_links"), slog.Any("error", err))
 		// Check for unique constraint violation
 		respondConflict(w, r, "Failed to create SCM link. It may already exist.")
 		return
 	}
-
-	id, _ := result.LastInsertId()
 
 	// Get the created link
 	link, err := h.getLinkByID(int(id))
@@ -522,7 +521,7 @@ func (h *SCMItemLinksHandler) GetWorkspaceRepositoriesForItem(w http.ResponseWri
 		FROM workspace_repositories wr
 		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
 		JOIN scm_providers sp ON sp.id = wsc.scm_provider_id
-		WHERE wsc.workspace_id = ? AND wr.is_active = 1 AND wsc.enabled = 1
+		WHERE wsc.workspace_id = ? AND wr.is_active = true AND wsc.enabled = true
 		ORDER BY wr.repository_name
 	`, workspaceID)
 	if err != nil {
@@ -957,7 +956,7 @@ func (h *SCMItemLinksHandler) GetSCMConnectionStatus(w http.ResponseWriter, r *h
 		FROM workspace_scm_connections wsc
 		JOIN scm_providers sp ON sp.id = wsc.scm_provider_id
 		LEFT JOIN user_scm_oauth_tokens ut ON ut.scm_provider_id = sp.id AND ut.user_id = ?
-		WHERE wsc.workspace_id = ? AND wsc.enabled = 1 AND sp.enabled = 1
+		WHERE wsc.workspace_id = ? AND wsc.enabled = true AND sp.enabled = true
 		ORDER BY sp.name
 	`, user.ID, workspaceID)
 	if err != nil {
@@ -1012,7 +1011,7 @@ func (h *SCMItemLinksHandler) GetSCMConnectionStatus(w http.ResponseWriter, r *h
 	_ = h.db.QueryRow(`
 		SELECT COUNT(*) FROM workspace_repositories wr
 		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
-		WHERE wsc.workspace_id = ? AND wr.is_active = 1 AND wsc.enabled = 1
+		WHERE wsc.workspace_id = ? AND wr.is_active = true AND wsc.enabled = true
 	`, workspaceID).Scan(&repoCount)
 
 	// Extract provider info for the OAuth connect prompt

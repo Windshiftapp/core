@@ -188,7 +188,7 @@ func (s *ProviderStore) GetBySlug(slug string) (*SSOProvider, error) {
 
 // GetDefault retrieves the default enabled provider
 func (s *ProviderStore) GetDefault() (*SSOProvider, error) {
-	query := `SELECT ` + providerColumnsWithSecret + ` FROM sso_providers WHERE enabled = 1 AND is_default = 1 LIMIT 1`
+	query := `SELECT ` + providerColumnsWithSecret + ` FROM sso_providers WHERE enabled = true AND is_default = true LIMIT 1`
 	provider, err := scanProvider(s.db.QueryRow(query))
 	if err == sql.ErrNoRows {
 		return nil, ErrNoDefaultProvider
@@ -228,7 +228,7 @@ func (s *ProviderStore) Create(provider *SSOProvider) error {
 
 	// If this is the first provider or marked as default, ensure it's the only default
 	if provider.IsDefault {
-		_, err = s.db.Exec("UPDATE sso_providers SET is_default = 0 WHERE is_default = 1")
+		_, err = s.db.Exec("UPDATE sso_providers SET is_default = false WHERE is_default = true")
 		if err != nil {
 			return err
 		}
@@ -243,9 +243,11 @@ func (s *ProviderStore) Create(provider *SSOProvider) error {
 			saml_idp_metadata_url, saml_idp_sso_url, saml_idp_certificate, saml_sp_entity_id, saml_sign_requests,
 			created_at, updated_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		RETURNING id
 	`
 
-	result, err := s.db.Exec(query,
+	var id int64
+	err = s.db.QueryRow(query,
 		provider.Slug,
 		provider.Name,
 		provider.ProviderType,
@@ -264,12 +266,7 @@ func (s *ProviderStore) Create(provider *SSOProvider) error {
 		nullString(provider.SAMLIdPCertificate),
 		nullString(provider.SAMLSPEntityID),
 		provider.SAMLSignRequests,
-	)
-	if err != nil {
-		return err
-	}
-
-	id, err := result.LastInsertId()
+	).Scan(&id)
 	if err != nil {
 		return err
 	}
@@ -282,7 +279,7 @@ func (s *ProviderStore) Create(provider *SSOProvider) error {
 func (s *ProviderStore) Update(provider *SSOProvider) error {
 	// If setting as default, clear other defaults
 	if provider.IsDefault {
-		_, err := s.db.Exec("UPDATE sso_providers SET is_default = 0 WHERE is_default = 1 AND id != ?", provider.ID)
+		_, err := s.db.Exec("UPDATE sso_providers SET is_default = false WHERE is_default = true AND id != ?", provider.ID)
 		if err != nil {
 			return err
 		}

@@ -18,6 +18,7 @@
     BarChart3 as DashboardIcon
   } from 'lucide-svelte';
   import PageHeader from '../layout/PageHeader.svelte';
+  import { formatDateSimple } from '../utils/dateFormatter.js';
   import StatCard from '../components/StatCard.svelte';
   import Card from '../components/Card.svelte';
   import { t } from '../stores/i18n.svelte.js';
@@ -313,7 +314,7 @@
                     </span>
                   </td>
                   <td class="px-4 py-3 text-sm" style="color: var(--ds-text-subtle);">
-                    {new Date(item.created_at).toLocaleDateString()}
+                    {formatDateSimple(item.created_at)}
                   </td>
                 </tr>
               {/each}

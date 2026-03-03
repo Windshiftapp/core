@@ -233,18 +233,15 @@ func (s *EnumService) Create(entity interface{}, r *http.Request) (EnumEntity, e
 	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)",
 		s.config.TableName, columns, placeholders)
 
-	result, err := s.db.Exec(query, args...)
+	query += " RETURNING id"
+	var id int64
+	err := s.db.QueryRow(query, args...).Scan(&id)
 	if err != nil {
 		// Check for unique constraint violation (database-level)
 		if isUniqueConstraintError(err) {
 			return nil, NewServiceError(http.StatusConflict,
 				fmt.Sprintf("%s already exists", s.config.EntityName))
 		}
-		return nil, err
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
 		return nil, err
 	}
 

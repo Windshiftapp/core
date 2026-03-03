@@ -55,7 +55,7 @@ func (h *UserSCMTokenHandler) GetUserConnections(w http.ResponseWriter, r *http.
 			ut.scm_username, ut.scm_avatar_url, ut.connected_at, ut.last_used_at
 		FROM user_scm_oauth_tokens ut
 		JOIN scm_providers sp ON sp.id = ut.scm_provider_id
-		WHERE ut.user_id = ? AND sp.enabled = 1
+		WHERE ut.user_id = ? AND sp.enabled = true
 		ORDER BY ut.connected_at DESC
 	`, user.ID)
 	if err != nil {
@@ -133,7 +133,7 @@ func (h *UserSCMTokenHandler) GetConnectionStatus(w http.ResponseWriter, r *http
 
 		err = h.db.QueryRow(`
 			SELECT name, provider_type, slug, auth_method
-			FROM scm_providers WHERE id = ? AND enabled = 1
+			FROM scm_providers WHERE id = ? AND enabled = true
 		`, providerID).Scan(&providerName, &providerType, &providerSlug, &authMethod)
 
 		if err == sql.ErrNoRows {
@@ -226,7 +226,7 @@ func (h *UserSCMTokenHandler) GetAvailableProviders(w http.ResponseWriter, r *ht
 			ut.scm_username, ut.scm_avatar_url, ut.connected_at
 		FROM scm_providers sp
 		LEFT JOIN user_scm_oauth_tokens ut ON ut.scm_provider_id = sp.id AND ut.user_id = ?
-		WHERE sp.enabled = 1 AND sp.auth_method = 'oauth'
+		WHERE sp.enabled = true AND sp.auth_method = 'oauth'
 		ORDER BY sp.name
 	`, user.ID)
 	if err != nil {

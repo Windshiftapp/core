@@ -18,6 +18,7 @@
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
+  import { formatDateSimple } from '../utils/dateFormatter.js';
 
   let customFields = $state([]);
   let screens = $state([]);
@@ -439,7 +440,7 @@
     {
       key: 'created_at',
       label: t('common.created'),
-      render: (field) => new Date(field.created_at).toLocaleDateString(),
+      render: (field) => formatDateSimple(field.created_at),
       textColor: 'var(--ds-text-subtle)'
     },
     {

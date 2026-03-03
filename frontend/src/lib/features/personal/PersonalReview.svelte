@@ -12,6 +12,7 @@
   import Button from '../../components/Button.svelte';
   import { getShortcut, matchesShortcut, toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { formatDateSimple, formatDateWithOptions } from '../../utils/dateFormatter.js';
 
   // Props (Svelte 5)
   let { currentUser = null } = $props();
@@ -46,7 +47,7 @@
     return {
       start: monday.toISOString().split('T')[0],
       end: sunday.toISOString().split('T')[0],
-      week: `Week of ${monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${sunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+      week: `Week of ${formatDateWithOptions(monday, { month: 'short', day: 'numeric' })} - ${formatDateWithOptions(sunday, { month: 'short', day: 'numeric', year: 'numeric' })}`
     };
   }
 
@@ -225,7 +226,7 @@ ${t('personal.placeholderImprovements')}`;
   function formatDisplayDate(dateStr, type) {
     const date = new Date(dateStr);
     if (type === 'daily') {
-      return date.toLocaleDateString('en-US', {
+      return formatDateWithOptions(date, {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
@@ -388,7 +389,7 @@ ${t('personal.placeholderImprovements')}`;
                       }}
                     >
                       <div class="font-medium" style="color: var(--ds-text);">
-                        {new Date(historyItem.review_date).toLocaleDateString()}
+                        {formatDateSimple(historyItem.review_date)}
                       </div>
                       <div class="text-xs capitalize mt-1" style="color: var(--ds-text-subtle);">
                         {historyItem.review_type === 'daily' ? t('personal.dailyReview') : t('personal.weeklyReview')}

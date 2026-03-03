@@ -8,7 +8,7 @@ import (
 
 // TestSimpleRankingTest performs a simple test to verify lexicographical ranking works
 func TestSimpleRankingTest(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	// Create a workspace

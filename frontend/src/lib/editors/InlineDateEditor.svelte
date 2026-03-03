@@ -2,6 +2,7 @@
   import { tick } from 'svelte';
   import { Check, X, Loader2, Calendar } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { formatDateShort } from '../utils/dateFormatter.js';
 
   let {
     value = '', placeholder = '', disabled = false, required = false,
@@ -24,16 +25,7 @@
 
   function formatDisplayDate(dateStr) {
     if (!dateStr) return '';
-    try {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-    } catch (e) {
-      return dateStr;
-    }
+    return formatDateShort(dateStr) || dateStr;
   }
 
   function formatInputDate(dateStr) {

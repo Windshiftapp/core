@@ -214,18 +214,14 @@ func (s *SyncService) createUser(configID int, ldapUser LDAPUser) error {
 	}
 
 	// Create user (no password - LDAP auth only)
-	result, err := s.db.ExecWrite(`
+	var userID int64
+	err = s.db.QueryRow(`
 		INSERT INTO users (email, username, first_name, last_name, is_active, password_hash,
 			requires_password_reset, timezone, language, email_verified, created_at, updated_at)
-		VALUES (?, ?, ?, ?, 1, '', 0, 'UTC', 'en', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-	`, strings.ToLower(ldapUser.Email), username, firstName, lastName)
+		VALUES (?, ?, ?, ?, true, '', 0, 'UTC', 'en', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+	`, strings.ToLower(ldapUser.Email), username, firstName, lastName).Scan(&userID)
 	if err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
-	}
-
-	userID, err := result.LastInsertId()
-	if err != nil {
-		return err
 	}
 
 	// Create LDAP mapping
@@ -257,7 +253,7 @@ func (s *SyncService) updateUser(userID int, ldapUser LDAPUser) error {
 
 // deactivateUser sets a user as inactive.
 func (s *SyncService) deactivateUser(userID int) error {
-	_, err := s.db.ExecWrite("UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?", userID)
+	_, err := s.db.ExecWrite("UPDATE users SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = ?", userID)
 	return err
 }
 
@@ -281,15 +277,15 @@ func (s *SyncService) ensureUniqueUsername(username string) string {
 
 // createSyncStatus creates a new sync status record.
 func (s *SyncService) createSyncStatus(configID int) (int, error) {
-	result, err := s.db.ExecWrite(`
+	var id int64
+	err := s.db.QueryRow(`
 		INSERT INTO ldap_sync_status (config_id, status, started_at)
-		VALUES (?, 'pending', CURRENT_TIMESTAMP)
-	`, configID)
+		VALUES (?, 'pending', CURRENT_TIMESTAMP) RETURNING id
+	`, configID).Scan(&id)
 	if err != nil {
 		return 0, err
 	}
-	id, err := result.LastInsertId()
-	return int(id), err
+	return int(id), nil
 }
 
 // updateSyncStatus updates the sync status record.

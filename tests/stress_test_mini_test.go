@@ -9,7 +9,7 @@ import (
 
 // TestMiniStressTest performs a focused stress test on a single hot spot
 func TestMiniStressTest(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	// Create a workspace

@@ -225,3 +225,18 @@ CREATE TABLE IF NOT EXISTS user_scm_oauth_tokens (
 
 CREATE INDEX IF NOT EXISTS idx_user_scm_tokens_user ON user_scm_oauth_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_scm_tokens_provider ON user_scm_oauth_tokens(scm_provider_id);
+
+-- Add deferred FK from milestone_releases to workspace_scm_connections
+-- (broken out of milestones_postgres.sql to avoid circular dep: items→milestones→scm→items)
+DO $$
+BEGIN
+	IF NOT EXISTS (
+		SELECT 1 FROM information_schema.table_constraints
+		WHERE constraint_name = 'fk_milestone_releases_scm_connection'
+		AND table_name = 'milestone_releases'
+	) THEN
+		ALTER TABLE milestone_releases
+			ADD CONSTRAINT fk_milestone_releases_scm_connection
+			FOREIGN KEY (scm_connection_id) REFERENCES workspace_scm_connections(id) ON DELETE SET NULL;
+	END IF;
+END $$;

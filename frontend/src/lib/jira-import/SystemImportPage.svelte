@@ -13,6 +13,7 @@
   import PageHeader from '../layout/PageHeader.svelte';
   import { addToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { formatDateTimeLocale } from '../utils/dateFormatter.js';
   import { confirm } from '../composables/useConfirm.js';
 
   // State
@@ -67,13 +68,7 @@
 
   function formatDate(dateString) {
     if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatDateTimeLocale(dateString);
   }
 
   function getStatusColor(status) {

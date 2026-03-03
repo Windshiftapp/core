@@ -236,7 +236,7 @@ func (h *CollectionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var id int64
 	err := h.db.QueryRow(`
 		INSERT INTO collections (name, description, ql_query, is_public, workspace_id, category_id, created_by, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now')) RETURNING id
+		VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
 	`, collection.Name, collection.Description, collection.QLQuery, collection.IsPublic, collection.WorkspaceID, collection.CategoryID, currentUser.ID).Scan(&id)
 
 	if err != nil {
@@ -361,7 +361,7 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Update the collection
 	_, err = h.db.ExecWrite(`
 		UPDATE collections
-		SET name = ?, description = ?, ql_query = ?, is_public = ?, workspace_id = ?, category_id = ?, updated_at = datetime('now')
+		SET name = ?, description = ?, ql_query = ?, is_public = ?, workspace_id = ?, category_id = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`, collection.Name, collection.Description, collection.QLQuery, collection.IsPublic, collection.WorkspaceID, collection.CategoryID, id)
 

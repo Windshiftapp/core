@@ -403,6 +403,7 @@ export default {
     noItemsInBacklog: 'No Items in Backlog',
     noItemsInBacklogDesc: 'All work items are either completed or no items exist yet.',
     showingItemsFromBacklog: 'Showing {count} items from backlog',
+    dragItemsHere: 'Drag items here to add to this sprint',
 
     // Map view
     loadingStoryMap: 'Loading story map...',
@@ -454,6 +455,7 @@ export default {
 
     // Board view
     boardSummary: 'Total: {itemCount} work items across {columnCount} columns',
+    allItems: 'All Items',
   },
 
   links: {

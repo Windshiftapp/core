@@ -10,7 +10,7 @@ import (
 
 // TestQLFiltering tests comprehensive QL filtering capabilities
 func TestQLFiltering(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	var workspaceID int

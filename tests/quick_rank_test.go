@@ -9,7 +9,7 @@ import (
 
 // TestQuickRankingTest performs a quick stress test to verify rebalancing is reduced
 func TestQuickRankingTest(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	// Create a workspace
