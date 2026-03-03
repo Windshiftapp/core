@@ -10,7 +10,7 @@
 
 services:
   windshift:
-    image: ghcr.io/windshiftapp/core:latest
+    image: ghcr.io/windshiftapp/windshift:latest
     container_name: windshift
     ports:
       - "${PORT:-8080}:8080"
