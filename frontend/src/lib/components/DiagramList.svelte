@@ -6,6 +6,7 @@
   import Spinner from './Spinner.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
+  import { formatDateTimeSimple } from '../utils/dateFormatter.js';
 
   export let itemId;
   export let onEdit = () => {};
@@ -49,8 +50,7 @@
   }
 
   function formatDate(dateStr) {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    return formatDateTimeSimple(dateStr);
   }
 
   onMount(() => {

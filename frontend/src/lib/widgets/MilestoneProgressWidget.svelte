@@ -1,6 +1,7 @@
 <script>
   import { Flag } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { formatDateShort } from '../utils/dateFormatter.js';
 
   export let milestones = [];
 
@@ -19,7 +20,7 @@
     if (!value) return null;
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return value;
-    return parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return formatDateShort(parsed);
   }
 
   function normalizeBreakdown(breakdown = []) {

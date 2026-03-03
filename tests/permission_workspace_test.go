@@ -8,7 +8,7 @@ import (
 
 // TestWorkspaceRoles_Viewer tests that users with the Viewer role have correct permissions.
 func TestWorkspaceRoles_Viewer(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	adminToken := CreateBearerToken(t, server)
 	server.BearerToken = adminToken
 
@@ -97,7 +97,7 @@ func TestWorkspaceRoles_Viewer(t *testing.T) {
 
 // TestWorkspaceRoles_Editor tests that users with the Editor role have correct permissions.
 func TestWorkspaceRoles_Editor(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	adminToken := CreateBearerToken(t, server)
 	server.BearerToken = adminToken
 
@@ -188,7 +188,7 @@ func TestWorkspaceRoles_Editor(t *testing.T) {
 
 // TestWorkspaceRoles_Administrator tests that users with the Administrator role have correct permissions.
 func TestWorkspaceRoles_Administrator(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	adminToken := CreateBearerToken(t, server)
 	server.BearerToken = adminToken
 
@@ -284,7 +284,7 @@ func TestWorkspaceRoles_Administrator(t *testing.T) {
 
 // TestWorkspaceRoles_EveryoneRole tests the Everyone role feature.
 func TestWorkspaceRoles_EveryoneRole(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	adminToken := CreateBearerToken(t, server)
 	server.BearerToken = adminToken
 
@@ -393,7 +393,7 @@ func TestWorkspaceRoles_EveryoneRole(t *testing.T) {
 
 // TestWorkspaceRoles_NoRole tests that users without any role cannot access locked workspaces.
 func TestWorkspaceRoles_NoRole(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	adminToken := CreateBearerToken(t, server)
 	server.BearerToken = adminToken
 

@@ -211,7 +211,8 @@ INSERT INTO permissions (permission_key, permission_name, description, scope, is
 	('comment.edit_others', 'Edit Other Comments', 'Can edit comments created by other users', 'workspace', false),
 	('test.view', 'View Tests', 'Can view test cases, test runs, and test results', 'workspace', false),
 	('test.execute', 'Execute Tests', 'Can execute test runs and record test results', 'workspace', false),
-	('test.manage', 'Manage Tests', 'Can create, edit, and delete test cases, sets, and folders', 'workspace', false)
+	('test.manage', 'Manage Tests', 'Can create, edit, and delete test cases, sets, and folders', 'workspace', false),
+	('action.manage', 'Manage Actions', 'Can create, edit, delete, and execute workspace actions', 'workspace', false)
 ON CONFLICT (permission_key) DO NOTHING;
 
 -- Default workspace roles
@@ -372,6 +373,14 @@ INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM workspace_roles r
 JOIN permissions p ON p.permission_key = 'test.manage'
+WHERE r.name = 'Administrator'
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- Administrator role action permissions
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM workspace_roles r
+JOIN permissions p ON p.permission_key = 'action.manage'
 WHERE r.name = 'Administrator'
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 

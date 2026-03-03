@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS time_worklogs (
 	id SERIAL PRIMARY KEY,
 	project_id INTEGER NOT NULL,
 	customer_id INTEGER NOT NULL,
+	user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
 	item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,
 	description TEXT NOT NULL,
 	date INTEGER NOT NULL,
@@ -19,3 +20,4 @@ CREATE INDEX IF NOT EXISTS idx_time_worklogs_project_id ON time_worklogs(project
 CREATE INDEX IF NOT EXISTS idx_time_worklogs_customer_id ON time_worklogs(customer_id);
 CREATE INDEX IF NOT EXISTS idx_time_worklogs_date ON time_worklogs(date);
 CREATE INDEX IF NOT EXISTS idx_time_worklogs_item_id ON time_worklogs(item_id);
+CREATE INDEX IF NOT EXISTS idx_time_worklogs_user_id ON time_worklogs(user_id);

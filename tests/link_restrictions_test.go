@@ -12,7 +12,7 @@ import (
 // only allows links between items and test_cases, not between same entity types
 func TestLinkTypeRestrictions(t *testing.T) {
 	// Start test server with isolated database
-	server, cleanup := StartTestServer(t, "sqlite")
+	server, cleanup := StartTestServer(t, GetDBType())
 	defer cleanup()
 
 	// Create bearer token for authentication
@@ -238,7 +238,7 @@ func TestLinkTypeRestrictions(t *testing.T) {
 // cannot be deleted because it has is_system=true
 func TestTestsLinkTypeIsSystemProtected(t *testing.T) {
 	// Start test server with isolated database
-	server, cleanup := StartTestServer(t, "sqlite")
+	server, cleanup := StartTestServer(t, GetDBType())
 	defer cleanup()
 
 	// Create bearer token for authentication

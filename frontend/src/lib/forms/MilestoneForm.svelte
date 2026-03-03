@@ -1,6 +1,7 @@
 <script>
   import { Calendar, Target } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { formatDateWithOptions } from '../utils/dateFormatter.js';
   import MilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
   import FieldChip from '../components/FieldChip.svelte';
   import { useForm, validators } from '../composables/useForm.svelte.js';
@@ -105,7 +106,7 @@
     <FieldChip
       label={t('createModal.targetDate')}
       value={form.values.target_date}
-      displayValue={form.values.target_date ? new Date(form.values.target_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+      displayValue={form.values.target_date ? formatDateWithOptions(form.values.target_date, { month: 'short', day: 'numeric' }) : ''}
       icon={Calendar}
       placeholder={t('createModal.targetDate')}
       required={true}

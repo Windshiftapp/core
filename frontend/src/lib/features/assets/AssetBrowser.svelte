@@ -16,6 +16,7 @@
   import { Plus, Package, Edit, Trash2, Box, ChevronRight, ChevronDown, Folder, FolderOpen, Search, ExternalLink, Code } from 'lucide-svelte';
   import CustomFieldRenderer from '../items/CustomFieldRenderer.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
+  import { formatDateSimple } from '../../utils/dateFormatter.js';
 
   // Props for detail view
   let { assetId = null } = $props();
@@ -364,7 +365,7 @@
     {
       key: 'created_at',
       label: 'CREATED',
-      render: (asset) => new Date(asset.created_at).toLocaleDateString()
+      render: (asset) => formatDateSimple(asset.created_at)
     },
     {
       key: 'actions',
@@ -664,11 +665,11 @@
           {/if}
           <div>
             <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.created')}</h4>
-            <span class="text-sm" style="color: var(--ds-text);">{new Date(selectedAsset.created_at).toLocaleDateString()}</span>
+            <span class="text-sm" style="color: var(--ds-text);">{formatDateSimple(selectedAsset.created_at)}</span>
           </div>
           <div>
             <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.updated')}</h4>
-            <span class="text-sm" style="color: var(--ds-text);">{new Date(selectedAsset.updated_at).toLocaleDateString()}</span>
+            <span class="text-sm" style="color: var(--ds-text);">{formatDateSimple(selectedAsset.updated_at)}</span>
           </div>
           {#if selectedAsset.linked_item_count > 0}
             <div>

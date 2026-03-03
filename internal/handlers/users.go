@@ -74,7 +74,7 @@ func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		query = `SELECT id, email, username, first_name, last_name, is_active, avatar_url, requires_password_reset, timezone, language, created_at, updated_at FROM users ORDER BY last_name, first_name`
 	} else {
 		// Limited query for non-admins: active users only, limited fields
-		query = `SELECT id, '', username, first_name, last_name, is_active, avatar_url, 0, '', '', created_at, updated_at FROM users WHERE is_active = 1 ORDER BY last_name, first_name`
+		query = `SELECT id, '', username, first_name, last_name, is_active, avatar_url, 0, '', '', created_at, updated_at FROM users WHERE is_active = true ORDER BY last_name, first_name`
 	}
 
 	rows, err := h.db.Query(query)

@@ -249,24 +249,20 @@ func (rs *RecurrenceScheduler) createInstance(rule *models.RecurrenceRule, templ
 	}
 
 	// Insert the new item
-	result, err := tx.Exec(`
+	var itemID int64
+	err = tx.QueryRow(`
 		INSERT INTO items (
 			workspace_id, workspace_item_number, item_type_id, title, description,
 			status_id, priority_id, due_date, is_task, parent_id,
 			assignee_id, custom_field_values, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,
 		template.WorkspaceID, nextNum, template.ItemTypeID, template.Title, description,
 		statusID, priorityID, scheduledDate, template.IsTask, template.ParentID,
 		assigneeID, customFieldValuesJSON, time.Now(), time.Now(),
-	)
+	).Scan(&itemID)
 	if err != nil {
 		return fmt.Errorf("failed to create item: %w", err)
-	}
-
-	itemID, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get item id: %w", err)
 	}
 
 	// Create the instance record

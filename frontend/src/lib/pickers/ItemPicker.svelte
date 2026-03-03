@@ -4,6 +4,7 @@
   import { createEventDispatcher } from 'svelte';
   import { getVisibleColor } from '../utils/colorUtils.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { formatDateShort } from '../utils/dateFormatter.js';
 
   const dispatch = createEventDispatcher();
 
@@ -201,9 +202,7 @@
 
   // Helper: Format date
   function formatDate(dateStr) {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return formatDateShort(dateStr);
   }
 </script>
 
@@ -353,14 +352,14 @@
             class="w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2"
             style="
               color: var(--ds-text);
-              background-color: {highlightedIndex === 0 ? 'var(--ds-background-neutral-hovered)' : 'transparent'};
+              background-color: {highlightedIndex === 0 ? 'var(--ds-surface-raised-hovered)' : 'transparent'};
             "
             role="option"
             id={getOptionId(0)}
             aria-selected={value === null}
             onmouseover={(e) => {
               highlightedIndex = 0;
-              e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)';
+              e.currentTarget.style.backgroundColor = 'var(--ds-surface-raised-hovered)';
             }}
             onmouseout={(e) => {
               if (highlightedIndex !== 0) {
@@ -369,7 +368,7 @@
             }}
             onfocus={(e) => {
               highlightedIndex = 0;
-              e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)';
+              e.currentTarget.style.backgroundColor = 'var(--ds-surface-raised-hovered)';
             }}
             onblur={(e) => {
               if (highlightedIndex !== 0) {
@@ -393,7 +392,7 @@
             onclick={() => handleSelect(item)}
             class="w-full px-3 py-2.5 text-left text-sm transition-colors"
             style="
-              background-color: {isSelected ? 'var(--ds-background-selected)' : isHighlighted ? 'var(--ds-background-neutral-hovered)' : 'transparent'};
+              background-color: {isSelected ? 'var(--ds-background-selected)' : isHighlighted ? 'var(--ds-surface-raised-hovered)' : 'transparent'};
               border-bottom: 1px solid var(--ds-border);
             "
             role="option"
@@ -402,7 +401,7 @@
             onmouseover={(e) => {
               highlightedIndex = itemIndex;
               if (!isSelected) {
-                e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)';
+                e.currentTarget.style.backgroundColor = 'var(--ds-surface-raised-hovered)';
               }
             }}
             onmouseout={(e) => {
@@ -413,7 +412,7 @@
             onfocus={(e) => {
               highlightedIndex = itemIndex;
               if (!isSelected) {
-                e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)';
+                e.currentTarget.style.backgroundColor = 'var(--ds-surface-raised-hovered)';
               }
             }}
             onblur={(e) => {

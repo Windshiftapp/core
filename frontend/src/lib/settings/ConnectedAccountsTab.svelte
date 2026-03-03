@@ -5,6 +5,7 @@
 	import Button from '../components/Button.svelte';
 	import AlertBox from '../components/AlertBox.svelte';
 	import { t } from '../stores/i18n.svelte.js';
+	import { formatDateSimple } from '../utils/dateFormatter.js';
 
 	let loading = $state(true);
 	let providers = $state([]);
@@ -145,7 +146,7 @@
 								</span>
 								{#if provider.connected_at}
 									<span class="text-xs" style="color: var(--ds-text-subtlest);">
-										{t('settings.connectedAccounts.connectedOn')} {new Date(provider.connected_at).toLocaleDateString()}
+										{t('settings.connectedAccounts.connectedOn')} {formatDateSimple(provider.connected_at)}
 									</span>
 								{/if}
 							</div>

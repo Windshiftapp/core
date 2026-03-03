@@ -46,7 +46,7 @@ func (s *SyncService) SyncAllRepositories(ctx context.Context) error {
 		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
 		JOIN workspaces w ON w.id = wsc.workspace_id
 		JOIN scm_providers sp ON sp.id = wsc.scm_provider_id
-		WHERE wr.is_active = 1 AND wsc.enabled = 1
+		WHERE wr.is_active = true AND wsc.enabled = true
 		  AND sp.auth_method != 'oauth'
 	`)
 	if err != nil {

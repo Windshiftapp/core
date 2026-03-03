@@ -568,16 +568,7 @@ func (h *JiraImportHandler) ensureWorkflowsAndConfigSet(
 			VALUES (?, '', false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
 		`, wfName).Scan(&workflowID)
 		if err != nil {
-			// Try ExecWrite fallback for databases that don't support RETURNING
-			res, err2 := h.db.ExecWrite(`
-				INSERT INTO workflows (name, description, is_default, created_at, updated_at)
-				VALUES (?, '', false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-			`, wfName)
-			if err2 != nil {
-				return fmt.Errorf("failed to create workflow: %w", err2)
-			}
-			id, _ := res.LastInsertId()
-			workflowID = int(id)
+			return fmt.Errorf("failed to create workflow: %w", err)
 		}
 
 		// Create transitions
@@ -951,16 +942,16 @@ func (h *JiraImportHandler) ensureUsers(ctx context.Context, jobID string, users
 		firstName, lastName := parseDisplayName(u.DisplayName)
 		username := generateUsername(u.Email, u.DisplayName)
 
-		res, err := h.db.ExecWrite(`
+		var newUserID int64
+		err = h.db.QueryRow(`
 			INSERT INTO users (email, username, first_name, last_name, is_active, avatar_url, requires_password_reset, created_at, updated_at)
-			VALUES (?, ?, ?, ?, false, ?, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-		`, u.Email, username, firstName, lastName, u.AvatarURL)
+			VALUES (?, ?, ?, ?, false, ?, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+		`, u.Email, username, firstName, lastName, u.AvatarURL).Scan(&newUserID)
 		if err != nil {
 			slog.Error("Failed to create user", slog.String("component", "jira"), slog.String("displayName", u.DisplayName), slog.String("email", u.Email), slog.Any("error", err))
 			continue
 		}
 
-		newUserID, _ := res.LastInsertId()
 		result[u.AccountID] = int(newUserID)
 		h.recordUserMapping(jobID, u, int(newUserID), true)
 

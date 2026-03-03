@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 import { api } from '../api.js';
 import { serverNow } from '../utils/serverClock.js';
+import { formatDateSimple } from '../utils/dateFormatter.js';
 
 // Notification store
 export const notifications = writable([]);
@@ -130,7 +131,7 @@ export const notificationActions = {
     if (minutes < 60) return `${minutes}m ago`;
     if (hours < 24) return `${hours}h ago`;
     if (days < 7) return `${days}d ago`;
-    return timestamp.toLocaleDateString();
+    return formatDateSimple(timestamp);
   },
 };
 

@@ -173,12 +173,12 @@ func (h *AuthPolicyHandler) UpdateAuthPolicy(w http.ResponseWriter, r *http.Requ
 				JOIN permissions gp ON ugp.permission_id = gp.id
 				JOIN users u ON ugp.user_id = u.id
 				WHERE gp.permission_key = 'system.admin'
-				AND u.is_active = 1
+				AND u.is_active = true
 				AND NOT EXISTS(
 					SELECT 1 FROM user_credentials uc
 					WHERE uc.user_id = ugp.user_id
 					AND uc.credential_type = 'fido'
-					AND uc.is_active = 1
+					AND uc.is_active = true
 				)
 				UNION
 				-- Group-based permissions
@@ -189,13 +189,13 @@ func (h *AuthPolicyHandler) UpdateAuthPolicy(w http.ResponseWriter, r *http.Requ
 				JOIN permissions gp ON ggp.permission_id = gp.id
 				JOIN users u ON gm.user_id = u.id
 				WHERE gp.permission_key = 'system.admin'
-				AND g.is_active = 1
-				AND u.is_active = 1
+				AND g.is_active = true
+				AND u.is_active = true
 				AND NOT EXISTS(
 					SELECT 1 FROM user_credentials uc
 					WHERE uc.user_id = gm.user_id
 					AND uc.credential_type = 'fido'
-					AND uc.is_active = 1
+					AND uc.is_active = true
 				)
 			)
 		`).Scan(&adminsWithoutPasskey)
@@ -240,12 +240,12 @@ func (h *AuthPolicyHandler) GetAuthPolicyStats(w http.ResponseWriter, r *http.Re
 	stats := AuthPolicyStats{}
 
 	// Total active users
-	_ = h.db.QueryRow("SELECT COUNT(*) FROM users WHERE is_active = 1").Scan(&stats.TotalUsers)
+	_ = h.db.QueryRow("SELECT COUNT(*) FROM users WHERE is_active = true").Scan(&stats.TotalUsers)
 
 	// Users with at least one active passkey (FIDO credential)
 	_ = h.db.QueryRow(`
 		SELECT COUNT(DISTINCT user_id) FROM user_credentials
-		WHERE credential_type = 'fido' AND is_active = 1
+		WHERE credential_type = 'fido' AND is_active = true
 	`).Scan(&stats.UsersWithPasskey)
 
 	stats.UsersWithoutPasskey = stats.TotalUsers - stats.UsersWithPasskey
@@ -270,7 +270,7 @@ func (h *AuthPolicyHandler) GetAuthPolicyStats(w http.ResponseWriter, r *http.Re
 			JOIN group_global_permissions ggp ON gm.group_id = ggp.group_id
 			JOIN permissions gp ON ggp.permission_id = gp.id
 			WHERE gp.permission_key = 'system.admin'
-			AND g.is_active = 1
+			AND g.is_active = true
 		)
 	`).Scan(&stats.SystemAdmins)
 
@@ -282,7 +282,7 @@ func (h *AuthPolicyHandler) GetAuthPolicyStats(w http.ResponseWriter, r *http.Re
 			JOIN permissions gp ON ugp.permission_id = gp.id
 			JOIN user_credentials uc ON ugp.user_id = uc.user_id
 			WHERE gp.permission_key = 'system.admin'
-			AND uc.credential_type = 'fido' AND uc.is_active = 1
+			AND uc.credential_type = 'fido' AND uc.is_active = true
 			UNION
 			SELECT gm.user_id as admin_user_id
 			FROM group_members gm
@@ -291,8 +291,8 @@ func (h *AuthPolicyHandler) GetAuthPolicyStats(w http.ResponseWriter, r *http.Re
 			JOIN permissions gp ON ggp.permission_id = gp.id
 			JOIN user_credentials uc ON gm.user_id = uc.user_id
 			WHERE gp.permission_key = 'system.admin'
-			AND g.is_active = 1
-			AND uc.credential_type = 'fido' AND uc.is_active = 1
+			AND g.is_active = true
+			AND uc.credential_type = 'fido' AND uc.is_active = true
 		)
 	`).Scan(&stats.AdminsWithPasskey)
 
@@ -324,29 +324,29 @@ func (h *AuthPolicyHandler) GetAffectedUsers(w http.ResponseWriter, r *http.Requ
 		// Users without passkeys (excluding system admins who have fallback)
 		query = `
 			SELECT u.id, u.email, u.username, u.first_name, u.last_name,
-				EXISTS(SELECT 1 FROM user_credentials uc WHERE uc.user_id = u.id AND uc.credential_type = 'fido' AND uc.is_active = 1) as has_passkey,
+				EXISTS(SELECT 1 FROM user_credentials uc WHERE uc.user_id = u.id AND uc.credential_type = 'fido' AND uc.is_active = true) as has_passkey,
 				EXISTS(SELECT 1 FROM user_external_accounts sea WHERE sea.user_id = u.id) as has_sso,
 				(
 					EXISTS(SELECT 1 FROM user_global_permissions ugp JOIN permissions gp ON ugp.permission_id = gp.id WHERE ugp.user_id = u.id AND gp.permission_key = 'system.admin')
-					OR EXISTS(SELECT 1 FROM group_members gm JOIN groups g ON gm.group_id = g.id JOIN group_global_permissions ggp ON gm.group_id = ggp.group_id JOIN permissions gp ON ggp.permission_id = gp.id WHERE gm.user_id = u.id AND gp.permission_key = 'system.admin' AND g.is_active = 1)
+					OR EXISTS(SELECT 1 FROM group_members gm JOIN groups g ON gm.group_id = g.id JOIN group_global_permissions ggp ON gm.group_id = ggp.group_id JOIN permissions gp ON ggp.permission_id = gp.id WHERE gm.user_id = u.id AND gp.permission_key = 'system.admin' AND g.is_active = true)
 				) as is_admin
 			FROM users u
-			WHERE u.is_active = 1
-			AND NOT EXISTS(SELECT 1 FROM user_credentials uc WHERE uc.user_id = u.id AND uc.credential_type = 'fido' AND uc.is_active = 1)
+			WHERE u.is_active = true
+			AND NOT EXISTS(SELECT 1 FROM user_credentials uc WHERE uc.user_id = u.id AND uc.credential_type = 'fido' AND uc.is_active = true)
 			ORDER BY u.email
 		`
 	case AuthPolicySSOPrimary:
 		// Users without SSO linked (excluding system admins who have fallback)
 		query = `
 			SELECT u.id, u.email, u.username, u.first_name, u.last_name,
-				EXISTS(SELECT 1 FROM user_credentials uc WHERE uc.user_id = u.id AND uc.credential_type = 'fido' AND uc.is_active = 1) as has_passkey,
+				EXISTS(SELECT 1 FROM user_credentials uc WHERE uc.user_id = u.id AND uc.credential_type = 'fido' AND uc.is_active = true) as has_passkey,
 				EXISTS(SELECT 1 FROM user_external_accounts sea WHERE sea.user_id = u.id) as has_sso,
 				(
 					EXISTS(SELECT 1 FROM user_global_permissions ugp JOIN permissions gp ON ugp.permission_id = gp.id WHERE ugp.user_id = u.id AND gp.permission_key = 'system.admin')
-					OR EXISTS(SELECT 1 FROM group_members gm JOIN groups g ON gm.group_id = g.id JOIN group_global_permissions ggp ON gm.group_id = ggp.group_id JOIN permissions gp ON ggp.permission_id = gp.id WHERE gm.user_id = u.id AND gp.permission_key = 'system.admin' AND g.is_active = 1)
+					OR EXISTS(SELECT 1 FROM group_members gm JOIN groups g ON gm.group_id = g.id JOIN group_global_permissions ggp ON gm.group_id = ggp.group_id JOIN permissions gp ON ggp.permission_id = gp.id WHERE gm.user_id = u.id AND gp.permission_key = 'system.admin' AND g.is_active = true)
 				) as is_admin
 			FROM users u
-			WHERE u.is_active = 1
+			WHERE u.is_active = true
 			AND NOT EXISTS(SELECT 1 FROM user_external_accounts sea WHERE sea.user_id = u.id)
 			ORDER BY u.email
 		`
@@ -381,7 +381,7 @@ func (h *AuthPolicyHandler) GetAffectedUsers(w http.ResponseWriter, r *http.Requ
 // isSSOConfigured checks if any SSO provider is configured and enabled
 func (h *AuthPolicyHandler) isSSOConfigured() bool {
 	var count int
-	err := h.db.QueryRow("SELECT COUNT(*) FROM sso_providers WHERE enabled = 1").Scan(&count)
+	err := h.db.QueryRow("SELECT COUNT(*) FROM sso_providers WHERE enabled = true").Scan(&count)
 	return err == nil && count > 0
 }
 

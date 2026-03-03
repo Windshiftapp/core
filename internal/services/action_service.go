@@ -209,7 +209,7 @@ func (as *ActionService) cacheRefresher() {
 func (as *ActionService) refreshActionCache() error {
 	// Get all workspaces with enabled actions
 	rows, err := as.db.Query(`
-		SELECT DISTINCT workspace_id FROM actions WHERE is_enabled = 1
+		SELECT DISTINCT workspace_id FROM actions WHERE is_enabled = true
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to query workspaces with actions: %w", err)
@@ -883,17 +883,11 @@ func (as *ActionService) executeAddComment(node *models.ActionNode, ctx *models.
 		)
 
 		now := time.Now()
-		result, err := as.db.Exec(`
+		if err := as.db.QueryRow(`
 			INSERT INTO comments (item_id, author_id, content, is_private, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?)
-		`, ctx.Event.ItemID, ctx.Event.ActorUserID, content, config.IsPrivate, now, now)
-		if err != nil {
+			VALUES (?, ?, ?, ?, ?, ?) RETURNING id
+		`, ctx.Event.ItemID, ctx.Event.ActorUserID, content, config.IsPrivate, now, now).Scan(&commentID); err != nil {
 			return err
-		}
-
-		// Get the inserted comment ID if available
-		if result != nil {
-			commentID, _ = result.LastInsertId()
 		}
 	}
 
@@ -1377,17 +1371,13 @@ func (as *ActionService) executeCreateAsset(node *models.ActionNode, ctx *models
 
 	// Insert the new asset
 	now := time.Now()
-	result, err := as.db.Exec(`
+	var assetID int64
+	err = as.db.QueryRow(`
 		INSERT INTO assets (set_id, asset_type_id, title, description, asset_tag, category_id, status_id, custom_field_values, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, config.AssetSetID, config.AssetTypeID, title, description, assetTag, config.CategoryID, statusID, string(customFieldsJSON), now, now)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+	`, config.AssetSetID, config.AssetTypeID, title, description, assetTag, config.CategoryID, statusID, string(customFieldsJSON), now, now).Scan(&assetID)
 	if err != nil {
 		return fmt.Errorf("failed to create asset: %w", err)
-	}
-
-	assetID, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get created asset ID: %w", err)
 	}
 
 	// Populate step result output

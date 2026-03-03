@@ -1031,7 +1031,7 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 
 	// Grant all permissions for personal workspaces owned by this user
 	personalRows, err := ps.db.Query(`
-		SELECT w.id FROM workspaces w WHERE w.is_personal = 1 AND w.owner_id = ? AND w.active = 1
+		SELECT w.id FROM workspaces w WHERE w.is_personal = true AND w.owner_id = ? AND w.active = true
 	`, userID)
 	if err == nil {
 		defer func() { _ = personalRows.Close() }()

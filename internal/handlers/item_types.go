@@ -551,7 +551,7 @@ func (h *ItemTypeHandler) createDefaultScreens(itemTypeID int) {
 	for _, context := range contexts {
 		_, _ = h.db.ExecWrite(`
 			INSERT INTO screens (item_type_id, name, description, screen_type, context, created_at, updated_at)
-			VALUES (?, ?, ?, 'issue', ?, datetime('now'), datetime('now'))
+			VALUES (?, ?, ?, 'issue', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		`, itemTypeID, context+" Screen", "Default "+context+" screen", context)
 	}
 }

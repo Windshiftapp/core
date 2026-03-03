@@ -246,9 +246,9 @@ CREATE TABLE IF NOT EXISTS themes (
 CREATE TABLE IF NOT EXISTS board_configurations (
 	id SERIAL PRIMARY KEY,
 	workspace_id INTEGER,
-	collection_id INTEGER NOT NULL,
-	name TEXT NOT NULL,
-	description TEXT,
+	collection_id INTEGER,
+	backlog_status_ids TEXT,
+	list_columns TEXT,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -298,9 +298,10 @@ CREATE TABLE IF NOT EXISTS notification_templates (
 CREATE INDEX IF NOT EXISTS idx_notification_templates_event_type ON notification_templates(event_type);
 CREATE INDEX IF NOT EXISTS idx_notification_templates_channel_type ON notification_templates(channel_type);
 
--- From tests_postgres.sql
+-- From tests_postgres.sql (simplified for base tables - full definition with FKs in tests_postgres.sql)
 CREATE TABLE IF NOT EXISTS test_folders (
 	id SERIAL PRIMARY KEY,
+	workspace_id INTEGER NOT NULL,
 	parent_id INTEGER REFERENCES test_folders(id) ON DELETE SET NULL,
 	name TEXT NOT NULL,
 	description TEXT,
@@ -313,11 +314,13 @@ CREATE INDEX IF NOT EXISTS idx_test_folders_parent_id ON test_folders(parent_id)
 
 CREATE TABLE IF NOT EXISTS test_labels (
 	id SERIAL PRIMARY KEY,
-	name TEXT NOT NULL UNIQUE,
-	color TEXT NOT NULL,
-	description TEXT,
+	workspace_id INTEGER NOT NULL,
+	name TEXT NOT NULL,
+	color TEXT NOT NULL DEFAULT '#3B82F6',
+	description TEXT DEFAULT '',
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	UNIQUE(workspace_id, name)
 );
 
 -- From iterations_postgres.sql

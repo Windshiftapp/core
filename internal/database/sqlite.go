@@ -3,9 +3,18 @@ package database
 import (
 	"context"
 	"database/sql"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
+
+// isWriteQuery returns true if the query is a write operation (INSERT, UPDATE, DELETE).
+func isWriteQuery(query string) bool {
+	trimmed := strings.ToUpper(strings.TrimSpace(query))
+	return strings.HasPrefix(trimmed, "INSERT") ||
+		strings.HasPrefix(trimmed, "UPDATE") ||
+		strings.HasPrefix(trimmed, "DELETE")
+}
 
 // SQLiteDB wraps the existing DB struct to implement the Database interface
 type SQLiteDB struct {
@@ -41,8 +50,13 @@ func (s *SQLiteDB) Query(query string, args ...interface{}) (*sql.Rows, error) {
 	return s.DB.Query(query, args...)
 }
 
-// QueryRow executes a query that returns at most one row
+// QueryRow executes a query that returns at most one row.
+// Write queries (INSERT/UPDATE/DELETE) are routed through the dedicated write
+// connection so that INSERT ... RETURNING does not race with other writers.
 func (s *SQLiteDB) QueryRow(query string, args ...interface{}) *sql.Row {
+	if isWriteQuery(query) {
+		return s.writeConn.QueryRow(query, args...)
+	}
 	return s.DB.QueryRow(query, args...)
 }
 
@@ -57,8 +71,13 @@ func (s *SQLiteDB) QueryContext(ctx context.Context, query string, args ...inter
 	return s.DB.QueryContext(ctx, query, args...)
 }
 
-// QueryRowContext executes a query with context that returns at most one row
+// QueryRowContext executes a query with context that returns at most one row.
+// Write queries (INSERT/UPDATE/DELETE) are routed through the dedicated write
+// connection so that INSERT ... RETURNING does not race with other writers.
 func (s *SQLiteDB) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
+	if isWriteQuery(query) {
+		return s.writeConn.QueryRowContext(ctx, query, args...)
+	}
 	return s.DB.QueryRowContext(ctx, query, args...)
 }
 

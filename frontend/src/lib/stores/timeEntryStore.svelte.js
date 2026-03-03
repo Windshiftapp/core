@@ -4,6 +4,7 @@
  * Centralizes worklogs, filters, and modal state.
  */
 import { api } from '../api.js';
+import { formatDateWithOptions } from '../utils/dateFormatter.js';
 
 class TimeEntryStore {
   // === Data ===
@@ -287,7 +288,7 @@ class TimeEntryStore {
    */
   formatTime(unixTimestamp) {
     const date = new Date(unixTimestamp * 1000);
-    return date.toLocaleTimeString('en-US', {
+    return formatDateWithOptions(date, {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,

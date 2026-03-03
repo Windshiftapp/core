@@ -234,20 +234,19 @@ func (h *SCMWorkspaceHandler) CreateWorkspaceSCMConnection(w http.ResponseWriter
 	}
 
 	// Insert the connection
-	result, err := h.db.Exec(`
+	var id int64
+	err = h.db.QueryRow(`
 		INSERT INTO workspace_scm_connections (
 			workspace_id, scm_provider_id, enabled,
 			default_branch_pattern, item_key_pattern, created_by
-		) VALUES (?, ?, 1, ?, ?, ?)
+		) VALUES (?, ?, true, ?, ?, ?) RETURNING id
 	`, workspaceID, req.SCMProviderID,
-		nullString(req.DefaultBranchPattern), nullString(req.ItemKeyPattern), createdBy)
+		nullString(req.DefaultBranchPattern), nullString(req.ItemKeyPattern), createdBy).Scan(&id)
 	if err != nil {
 		slog.Error("failed to create connection", slog.String("component", "scm"), slog.Any("error", err))
 		respondConflict(w, r, "Failed to create SCM connection. It may already exist.")
 		return
 	}
-
-	id, _ := result.LastInsertId()
 
 	// Get the created connection
 	conn, err := h.getConnectionByID(int(id))
@@ -706,19 +705,18 @@ func (h *SCMWorkspaceHandler) LinkRepository(w http.ResponseWriter, r *http.Requ
 		defaultBranch = "main"
 	}
 
-	result, err := h.db.Exec(`
+	var id int64
+	err = h.db.QueryRow(`
 		INSERT INTO workspace_repositories (
 			workspace_scm_connection_id, repository_external_id,
 			repository_name, repository_url, default_branch, is_active
-		) VALUES (?, ?, ?, ?, ?, 1)
-	`, connID, req.RepositoryExternalID, req.RepositoryName, req.RepositoryURL, defaultBranch)
+		) VALUES (?, ?, ?, ?, ?, true) RETURNING id
+	`, connID, req.RepositoryExternalID, req.RepositoryName, req.RepositoryURL, defaultBranch).Scan(&id)
 	if err != nil {
 		slog.Error("failed to link repository", slog.String("component", "scm"), slog.Any("error", err))
 		respondConflict(w, r, "Failed to link repository. It may already be linked.")
 		return
 	}
-
-	id, _ := result.LastInsertId()
 
 	// Get the created repo
 	var repo WorkspaceRepositoryResponse
@@ -805,7 +803,7 @@ func (h *SCMWorkspaceHandler) GetAvailableSCMProviders(w http.ResponseWriter, r 
 		FROM scm_providers sp
 		LEFT JOIN workspace_scm_connections wsc
 			ON wsc.scm_provider_id = sp.id AND wsc.workspace_id = ?
-		WHERE sp.enabled = 1
+		WHERE sp.enabled = true
 		  AND (
 			sp.workspace_restriction_mode = 'unrestricted'
 			OR sp.workspace_restriction_mode IS NULL

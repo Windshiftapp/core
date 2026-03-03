@@ -170,18 +170,19 @@ func (h *EmailProviderHandler) CreateEmailProvider(w http.ResponseWriter, r *htt
 	}
 
 	// Insert provider
-	result, err := h.db.Exec(`
+	var id int64
+	err := h.db.QueryRow(`
 		INSERT INTO email_providers (
 			name, slug, type, is_enabled,
 			oauth_client_id, oauth_client_secret_encrypted, oauth_scopes, oauth_tenant_id,
 			imap_host, imap_port, imap_encryption,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
 	`,
 		req.Name, req.Slug, req.Type, req.IsEnabled,
 		nullString(req.OAuthClientID), clientSecretEnc, nullString(req.OAuthScopes), nullString(req.OAuthTenantID),
 		nullString(req.IMAPHost), req.IMAPPort, nullString(req.IMAPEncryption),
-	)
+	).Scan(&id)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
 			respondConflict(w, r, "A provider with this slug already exists")
@@ -190,8 +191,6 @@ func (h *EmailProviderHandler) CreateEmailProvider(w http.ResponseWriter, r *htt
 		respondInternalError(w, r, err)
 		return
 	}
-
-	id, _ := result.LastInsertId()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -304,7 +303,7 @@ func (h *EmailProviderHandler) StartEmailOAuth(w http.ResponseWriter, r *http.Re
 	var clientSecretEnc *string
 	err = h.db.QueryRow(`
 		SELECT id, name, slug, type, oauth_client_id, oauth_client_secret_encrypted, oauth_scopes, oauth_tenant_id
-		FROM email_providers WHERE slug = ? AND is_enabled = 1
+		FROM email_providers WHERE slug = ? AND is_enabled = true
 	`, slug).Scan(
 		&provider.ID, &provider.Name, &provider.Slug, &provider.Type,
 		&provider.OAuthClientID, &clientSecretEnc, &provider.OAuthScopes, &provider.OAuthTenantID,

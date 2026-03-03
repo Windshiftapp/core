@@ -1095,7 +1095,7 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 
 	// Insert comment based on auth type
 	now := time.Now()
-	var result sql.Result
+	var commentID int64
 	var authorName, authorEmail string
 	var responseAuthorID *int
 	var responsePortalCustomerID *int
@@ -1104,9 +1104,9 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 		// Internal user: use author_id
 		insertQuery := `
 			INSERT INTO comments (item_id, author_id, content, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?)
+			VALUES (?, ?, ?, ?, ?) RETURNING id
 		`
-		result, err = h.db.ExecWriteContext(ctx, insertQuery, itemID, *internalUserID, sanitizedContent, now, now)
+		err = h.db.QueryRowContext(ctx, insertQuery, itemID, *internalUserID, sanitizedContent, now, now).Scan(&commentID)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -1123,9 +1123,9 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 		// Portal customer: use portal_customer_id
 		insertQuery := `
 			INSERT INTO comments (item_id, portal_customer_id, content, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?)
+			VALUES (?, ?, ?, ?, ?) RETURNING id
 		`
-		result, err = h.db.ExecWriteContext(ctx, insertQuery, itemID, *portalCustomerID, sanitizedContent, now, now)
+		err = h.db.QueryRowContext(ctx, insertQuery, itemID, *portalCustomerID, sanitizedContent, now, now).Scan(&commentID)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -1138,12 +1138,6 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 			authorEmail = ""
 		}
 		responsePortalCustomerID = portalCustomerID
-	}
-
-	commentID, err := result.LastInsertId()
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
 	}
 
 	// Return the created comment

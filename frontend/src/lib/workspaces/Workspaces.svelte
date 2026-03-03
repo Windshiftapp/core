@@ -12,6 +12,7 @@
   import Lozenge from '../components/Lozenge.svelte';
   import { toHotkeyString, getShortcutDisplay } from '../utils/keyboardShortcuts.js';
   import { workspacesStore } from '../stores';
+  import { formatDateSimple } from '../utils/dateFormatter.js';
 
   // Props
   export let showPageHeader = true; // Whether to show admin header and use admin layout
@@ -88,7 +89,7 @@
     {
       key: 'created_at',
       label: 'Created',
-      render: (workspace) => new Date(workspace.created_at).toLocaleDateString(),
+      render: (workspace) => formatDateSimple(workspace.created_at),
       textColor: 'var(--ds-text-subtle)'
     },
     {

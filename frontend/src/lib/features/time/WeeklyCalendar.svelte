@@ -10,6 +10,7 @@
   import { authStore, workspacesStore } from '../../stores';
   import { getStatusStyleFromStatuses } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { formatDateWithOptions } from '../../utils/dateFormatter.js';
   import Checkbox from '../../components/Checkbox.svelte';
 
   // Get current date and week
@@ -284,7 +285,7 @@
       date.setDate(weekStart.getDate() + i);
       days.push({
         date: new Date(date),
-        dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        dayName: formatDateWithOptions(date, { weekday: 'short' }),
         dayNumber: date.getDate(),
         isToday: isToday(date),
         isCurrentMonth: date.getMonth() === currentDate.getMonth(),
@@ -307,11 +308,11 @@
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
 
-    const startStr = weekStart.toLocaleDateString('en-US', {
+    const startStr = formatDateWithOptions(weekStart, {
       month: 'short',
       day: 'numeric'
     });
-    const endStr = weekEnd.toLocaleDateString('en-US', {
+    const endStr = formatDateWithOptions(weekEnd, {
       month: 'short',
       day: 'numeric',
       year: 'numeric'
@@ -1060,7 +1061,7 @@
                                 {@const dueDate = new Date(workItem.dueDate)}
                                 {@const isOverdue = dueDate < new Date() && dueDate.toDateString() !== new Date().toDateString()}
                                 <p class="text-[10px]" style="color: {isOverdue ? 'var(--ds-text-danger)' : 'var(--ds-text-subtle)'};">
-                                  Due: {dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                  Due: {formatDateWithOptions(dueDate, { month: 'short', day: 'numeric' })}
                                 </p>
                               {/if}
                               <button
@@ -1123,7 +1124,7 @@
                             {@const dueDate = new Date(workItem.dueDate)}
                             {@const isOverdue = dueDate < new Date() && dueDate.toDateString() !== new Date().toDateString()}
                             <p class="text-[10px]" style="color: {isOverdue ? 'var(--ds-text-danger)' : 'var(--ds-text-subtle)'};">
-                              Due: {dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              Due: {formatDateWithOptions(dueDate, { month: 'short', day: 'numeric' })}
                             </p>
                           {/if}
                           <button

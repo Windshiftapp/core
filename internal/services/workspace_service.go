@@ -62,10 +62,10 @@ func (s *WorkspaceService) List(params WorkspaceListParams) ([]WorkspaceListResu
 			JOIN group_members gm ON gwr.group_id = gm.group_id
 			WHERE gm.user_id = ?
 		) grp ON w.id = grp.workspace_id
-		WHERE w.active = 1
-		   OR (w.active = 0 AND uwr.role_id IS NOT NULL)
-		   OR (w.active = 0 AND grp.workspace_id IS NOT NULL)
-		   OR (w.is_personal = 1 AND w.owner_id = ?)
+		WHERE w.active = true
+		   OR (w.active = false AND uwr.role_id IS NOT NULL)
+		   OR (w.active = false AND grp.workspace_id IS NOT NULL)
+		   OR (w.is_personal = true AND w.owner_id = ?)
 		ORDER BY w.name
 		LIMIT ? OFFSET ?
 	`, params.UserID, params.UserID, params.UserID, params.Limit, params.Offset)
@@ -104,10 +104,10 @@ func (s *WorkspaceService) List(params WorkspaceListParams) ([]WorkspaceListResu
 			JOIN group_members gm ON gwr.group_id = gm.group_id
 			WHERE gm.user_id = ?
 		) grp ON w.id = grp.workspace_id
-		WHERE w.active = 1
-		   OR (w.active = 0 AND uwr.role_id IS NOT NULL)
-		   OR (w.active = 0 AND grp.workspace_id IS NOT NULL)
-		   OR (w.is_personal = 1 AND w.owner_id = ?)
+		WHERE w.active = true
+		   OR (w.active = false AND uwr.role_id IS NOT NULL)
+		   OR (w.active = false AND grp.workspace_id IS NOT NULL)
+		   OR (w.is_personal = true AND w.owner_id = ?)
 	`, params.UserID, params.UserID, params.UserID).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count workspaces: %w", err)
@@ -169,15 +169,14 @@ func (s *WorkspaceService) Create(params CreateWorkspaceParams) (*CreateWorkspac
 	}
 
 	// Create workspace
-	result, err := s.db.ExecWrite(`
+	var id int64
+	err = s.db.QueryRow(`
 		INSERT INTO workspaces (name, key, description, icon, color, active)
-		VALUES (?, ?, ?, ?, ?, 1)
-	`, params.Name, key, params.Description, params.Icon, params.Color)
+		VALUES (?, ?, ?, ?, ?, true) RETURNING id
+	`, params.Name, key, params.Description, params.Icon, params.Color).Scan(&id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create workspace: %w", err)
 	}
-
-	id, _ := result.LastInsertId()
 
 	// Grant admin permission to creator
 	_, err = s.db.ExecWrite(`

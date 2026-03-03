@@ -8,7 +8,7 @@ import (
 
 // TestStatusCategoryOperations tests status category CRUD
 func TestStatusCategoryOperations(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	var categoryID int
@@ -91,7 +91,7 @@ func TestStatusCategoryOperations(t *testing.T) {
 
 // TestStatusOperations tests status CRUD
 func TestStatusOperations(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	// Create test categories and statuses
@@ -161,7 +161,7 @@ func TestStatusOperations(t *testing.T) {
 
 // TestWorkflowOperations tests workflow CRUD and transitions
 func TestWorkflowOperations(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	// Setup: Create categories and statuses
@@ -266,7 +266,7 @@ func TestWorkflowOperations(t *testing.T) {
 
 // TestScreenOperations tests screen CRUD and field management
 func TestScreenOperations(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	var screenID int
@@ -428,7 +428,7 @@ func TestScreenOperations(t *testing.T) {
 
 // TestConfigurationSetOperations tests configuration set CRUD
 func TestConfigurationSetOperations(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	// Setup: Create workspace, workflow, and screen

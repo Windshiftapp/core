@@ -9,7 +9,7 @@ import (
 
 // TestCrossWorkspaceIsolation tests that users cannot access workspaces they don't have roles in.
 func TestCrossWorkspaceIsolation(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	adminToken := CreateBearerToken(t, server)
 	server.BearerToken = adminToken
 
@@ -88,7 +88,7 @@ func TestCrossWorkspaceIsolation(t *testing.T) {
 
 // TestCrossWorkspaceIsolation_DifferentRolesPerWorkspace tests correct permissions per workspace.
 func TestCrossWorkspaceIsolation_DifferentRolesPerWorkspace(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	adminToken := CreateBearerToken(t, server)
 	server.BearerToken = adminToken
 
@@ -167,7 +167,7 @@ func TestCrossWorkspaceIsolation_DifferentRolesPerWorkspace(t *testing.T) {
 
 // TestWorkspaceListFiltering tests that workspace list only returns accessible workspaces.
 func TestWorkspaceListFiltering(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	adminToken := CreateBearerToken(t, server)
 	server.BearerToken = adminToken
 
@@ -253,7 +253,7 @@ func TestWorkspaceListFiltering(t *testing.T) {
 
 // TestItemListFiltering tests that item list only returns items from accessible workspaces.
 func TestItemListFiltering(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	adminToken := CreateBearerToken(t, server)
 	server.BearerToken = adminToken
 
@@ -352,7 +352,7 @@ func TestItemListFiltering(t *testing.T) {
 
 // TestSystemAdminBypassesIsolation tests that system admins can access all workspaces.
 func TestSystemAdminBypassesIsolation(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	adminToken := CreateBearerToken(t, server)
 	server.BearerToken = adminToken
 

@@ -326,6 +326,18 @@ export default {
     idealProgress: 'Ideal',
     ideal: 'Ideal',
     noBurndownData: 'No burndown data available',
+
+    filterBySprint: 'Filter by sprint',
+
+    // Backlog sprint sections
+    addGlobalSprint: 'Add Sprint',
+    startSprint: 'Start Sprint',
+    start: 'Start',
+    completeSprint: 'Complete Sprint',
+    completeSprintConfirm: 'Are you sure you want to complete sprint "{name}"? Items that are not done will remain in the backlog.',
+    sprintStarted: 'Sprint "{name}" started',
+    sprintCompleted: 'Sprint "{name}" completed',
+    activeScopeWarning: 'Changing the scope of an active sprint is not recommended',
   },
 
   milestones: {

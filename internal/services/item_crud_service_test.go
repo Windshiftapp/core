@@ -48,7 +48,7 @@ func setupItemCRUDTestEnv(t *testing.T, db database.Database) itemCRUDTestEnv {
 
 	// Get default status (from database initialization)
 	var statusID int
-	err = db.QueryRow("SELECT id FROM statuses WHERE is_default = 1 LIMIT 1").Scan(&statusID)
+	err = db.QueryRow("SELECT id FROM statuses WHERE is_default = true LIMIT 1").Scan(&statusID)
 	if err != nil {
 		t.Fatalf("Failed to get default status: %v", err)
 	}

@@ -16,6 +16,7 @@
   import { workspacePermissions } from '../../stores';
   import { themeStore } from '../../stores/theme.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { formatDateShort } from '../../utils/dateFormatter.js';
   import StatusBadge from '../../components/StatusBadge.svelte';
 
   // Click outside action
@@ -502,7 +503,7 @@
           <div class="flex items-center gap-2">
             {#if item?.due_date}
               <Calendar size={14} class="flex-shrink-0" style="color: var(--ds-text-subtle);" />
-              <span style="color: var(--ds-text);">{new Date(item.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+              <span style="color: var(--ds-text);">{formatDateShort(item.due_date)}</span>
             {:else}
               <Text variant="subtle" size="sm">{t('common.none')}</Text>
             {/if}
@@ -743,7 +744,7 @@
                         {#if fieldDef.field_type === 'checkbox'}
                           {currentValue ? t('common.yes') : t('common.no')}
                         {:else if fieldDef.field_type === 'date'}
-                          {new Date(currentValue).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {formatDateShort(currentValue)}
                         {:else if fieldDef.field_type === 'user' && typeof currentValue === 'object'}
                           {currentValue.name || t('common.selected')}
                         {:else if Array.isArray(currentValue)}

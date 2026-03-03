@@ -4,6 +4,7 @@
   import Textarea from '../components/Textarea.svelte';
   import Button from '../components/Button.svelte';
   import { portalStore } from '../stores/portal.svelte.js';
+  import { formatDateSimple } from '../utils/dateFormatter.js';
 </script>
 
 <!-- My Requests View -->
@@ -41,7 +42,7 @@
         <div class="flex gap-4 text-sm" style="color: var(--ds-text-subtle);">
           <div class="flex items-center gap-1">
             <Calendar class="w-4 h-4" />
-            Created: {new Date(portalStore.selectedRequest.created_at).toLocaleDateString()}
+            Created: {formatDateSimple(portalStore.selectedRequest.created_at)}
           </div>
           {#if portalStore.selectedRequest.request_type_name}
             <div class="flex items-center gap-1">
@@ -146,7 +147,7 @@
             <div class="flex items-center gap-4 mt-3 text-sm" style="color: var(--ds-text-subtle);">
               <div class="flex items-center gap-1">
                 <Calendar class="w-4 h-4" />
-                {new Date(request.created_at).toLocaleDateString()}
+                {formatDateSimple(request.created_at)}
               </div>
               {#if request.comment_count > 0}
                 <div class="flex items-center gap-1">

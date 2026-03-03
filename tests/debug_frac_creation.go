@@ -11,7 +11,7 @@ import (
 )
 
 func TestDebugFracCreation(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 
 	db, err := sql.Open("sqlite", server.DBPath)
 	if err != nil {

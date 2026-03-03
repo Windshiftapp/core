@@ -94,7 +94,7 @@ func (r *RecurrenceRepository) GetRulesNeedingGeneration(limit int) ([]*models.R
 		       rr.copy_assignee, rr.copy_priority, rr.copy_custom_fields, rr.copy_description,
 		       rr.status_on_create, rr.is_active, rr.created_by, rr.created_at, rr.updated_at
 		FROM recurrence_rules rr
-		WHERE rr.is_active = 1
+		WHERE rr.is_active = true
 		  AND (rr.next_generation_check IS NULL OR rr.next_generation_check <= ?)
 		ORDER BY rr.next_generation_check ASC
 		LIMIT ?
@@ -147,25 +147,21 @@ func (r *RecurrenceRepository) GetRulesNeedingGeneration(limit int) ([]*models.R
 
 // Create creates a new recurrence rule
 func (r *RecurrenceRepository) Create(rule *models.RecurrenceRule) (int, error) {
-	result, err := r.db.Exec(`
+	var id int64
+	err := r.db.QueryRow(`
 		INSERT INTO recurrence_rules (
 			template_item_id, workspace_id, rrule, dtstart, dtend, timezone,
 			lead_time_days, copy_assignee, copy_priority, copy_custom_fields,
 			copy_description, status_on_create, is_active, created_by, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,
 		rule.TemplateItemID, rule.WorkspaceID, rule.RRule, rule.DtStart, rule.DtEnd, rule.Timezone,
 		rule.LeadTimeDays, rule.CopyAssignee, rule.CopyPriority, rule.CopyCustomFields,
 		rule.CopyDescription, rule.StatusOnCreate, rule.IsActive, rule.CreatedBy,
 		time.Now(), time.Now(),
-	)
+	).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create recurrence rule: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get last insert id: %w", err)
 	}
 
 	return int(id), nil

@@ -17,6 +17,7 @@
 	import Label from '../components/Label.svelte';
 	import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 	import { t } from '../stores/i18n.svelte.js';
+	import { formatDateSimple } from '../utils/dateFormatter.js';
 
 	let users = $state([]);
 	let loading = $state(false);
@@ -600,7 +601,7 @@
 						{user.full_name}
 					</div>
 					<div class="text-sm" style="color: var(--ds-text-subtle)">
-						{t('common.created')} {new Date(user.created_at).toLocaleDateString()}
+						{t('common.created')} {formatDateSimple(user.created_at)}
 					</div>
 				</div>
 			</div>

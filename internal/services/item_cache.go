@@ -252,14 +252,15 @@ func (ics *ItemCacheService) WarmCache() error {
 		FROM (
 			SELECT item_id, MAX(changed_at) as last_change
 			FROM item_history
-			WHERE changed_at > datetime('now', '-1 hour')
+			WHERE changed_at > ?
 			GROUP BY item_id
 			ORDER BY last_change DESC
 			LIMIT ?
 		)
 	`
 
-	rows, err := ics.db.Query(query, ics.config.WarmupBatchSize)
+	oneHourAgo := time.Now().Add(-time.Hour).UTC()
+	rows, err := ics.db.Query(query, oneHourAgo, ics.config.WarmupBatchSize)
 	if err != nil {
 		slog.Error("failed to identify hot items for cache warming", slog.String("component", "item_cache"), slog.Any("error", err))
 		return err

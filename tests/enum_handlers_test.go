@@ -13,7 +13,7 @@ import (
 // ============================================================================
 
 func TestStatusCategoryErrorCases(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	timestamp := time.Now().Unix()
@@ -88,7 +88,7 @@ func TestStatusCategoryErrorCases(t *testing.T) {
 // ============================================================================
 
 func TestStatusErrorCases(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	// Create a category first
@@ -175,7 +175,7 @@ func TestStatusErrorCases(t *testing.T) {
 // ============================================================================
 
 func TestIterationTypeOperations(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	timestamp := time.Now().Unix()
@@ -329,7 +329,7 @@ func TestIterationTypeOperations(t *testing.T) {
 // ============================================================================
 
 func TestMilestoneCategoryOperations(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	timestamp := time.Now().Unix()
@@ -495,7 +495,7 @@ func TestMilestoneCategoryOperations(t *testing.T) {
 // ============================================================================
 
 func TestPriorityOperations(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	timestamp := time.Now().Unix()
@@ -638,7 +638,7 @@ func TestPriorityOperations(t *testing.T) {
 // ============================================================================
 
 func TestHierarchyLevelOperations(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	timestamp := time.Now().Unix()
@@ -789,7 +789,7 @@ func TestHierarchyLevelOperations(t *testing.T) {
 // ============================================================================
 
 func TestContactRoleOperations(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	timestamp := time.Now().Unix()

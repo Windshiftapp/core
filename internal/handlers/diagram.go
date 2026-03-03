@@ -73,22 +73,14 @@ func (h *DiagramHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	query := `
-		INSERT INTO item_diagrams (item_id, name, diagram_data, created_by, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`
-
 	now := time.Now()
-	result, err := h.db.ExecWrite(query, itemID, req.Name, req.DiagramData, createdBy, now, now)
+	var id int64
+	err = h.db.QueryRow(`
+		INSERT INTO item_diagrams (item_id, name, diagram_data, created_by, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
+	`, itemID, req.Name, req.DiagramData, createdBy, now, now).Scan(&id)
 	if err != nil {
 		slog.Error("failed to create diagram", slog.String("component", "diagrams"), slog.Any("error", err))
-		respondInternalError(w, r, err)
-		return
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		slog.Error("failed to get last insert ID", slog.String("component", "diagrams"), slog.Any("error", err))
 		respondInternalError(w, r, err)
 		return
 	}

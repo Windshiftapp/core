@@ -152,17 +152,13 @@ func (p *Processor) findOrCreatePortalCustomer(
 	}
 
 	// Create new customer
-	result, err := p.db.Exec(`
+	var id int64
+	err = p.db.QueryRow(`
 		INSERT INTO portal_customers (name, email, created_at, updated_at)
-		VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-	`, name, email)
+		VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+	`, name, email).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create portal customer: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get customer ID: %w", err)
 	}
 
 	customerID = int(id)
@@ -336,23 +332,22 @@ func (p *Processor) addCommentFromReply(
 		"item_id", itemID)
 
 	now := time.Now()
-	var dbResult sql.Result
+	var commentIDInt64 int64
 	if linkedUserID != 0 {
-		dbResult, err = p.db.ExecContext(ctx, `
+		err = p.db.QueryRowContext(ctx, `
 			INSERT INTO comments (item_id, author_id, content, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?)
-		`, itemID, linkedUserID, content, now, now)
+			VALUES (?, ?, ?, ?, ?) RETURNING id
+		`, itemID, linkedUserID, content, now, now).Scan(&commentIDInt64)
 	} else {
-		dbResult, err = p.db.ExecContext(ctx, `
+		err = p.db.QueryRowContext(ctx, `
 			INSERT INTO comments (item_id, portal_customer_id, content, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?)
-		`, itemID, customerID, content, now, now)
+			VALUES (?, ?, ?, ?, ?) RETURNING id
+		`, itemID, customerID, content, now, now).Scan(&commentIDInt64)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create comment: %w", err)
 	}
 
-	commentIDInt64, _ := dbResult.LastInsertId()
 	commentID := int(commentIDInt64)
 
 	slog.Info("added comment from email reply",

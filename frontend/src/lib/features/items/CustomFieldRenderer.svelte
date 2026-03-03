@@ -10,6 +10,7 @@
   import ColorDot from '../../components/ColorDot.svelte';
   import { api } from '../../api.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { formatDateShort } from '../../utils/dateFormatter.js';
 
   // Helper to parse field options
   function parseOptions(optionsStr) {
@@ -81,16 +82,7 @@
   // Helper to format date for display
   function formatDateDisplay(dateValue) {
     if (!dateValue) return '';
-    try {
-      const date = new Date(dateValue);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-    } catch (e) {
-      return dateValue;
-    }
+    return formatDateShort(dateValue) || dateValue;
   }
 
   // Helper to format date for input[type="date"] (YYYY-MM-DD)

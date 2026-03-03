@@ -16,6 +16,7 @@
 	import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 	import { t } from '../stores/i18n.svelte.js';
 	import { confirm } from '../composables/useConfirm.js';
+	import { formatDateSimple } from '../utils/dateFormatter.js';
 
 	let groups = $state([]);
 	let users = $state([]);
@@ -373,7 +374,7 @@
 													{member.user_name || t('settings.groups.unknownUser')}
 												</div>
 												<div class="text-xs" style="color: var(--ds-text-subtle)">
-													{member.user_email} • {t('settings.groups.added')} {new Date(member.added_at).toLocaleDateString()}
+													{member.user_email} • {t('settings.groups.added')} {formatDateSimple(member.added_at)}
 													{#if member.ldap_sync_enabled}
 														<span class="ml-2 inline-flex px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded">
 															LDAP

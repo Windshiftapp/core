@@ -107,6 +107,9 @@ var llmSchemaPostgres string
 //go:embed schema/ldap_postgres.sql
 var ldapSchemaPostgres string
 
+//go:embed schema/email_postgres.sql
+var emailSchemaPostgres string
+
 // PostgresDB implements the Database interface for PostgreSQL
 type PostgresDB struct {
 	db  *sql.DB
@@ -455,6 +458,7 @@ func (p *PostgresDB) getPostgresSchemaFiles() []schemaFile {
 		{"items_postgres.sql", itemsSchemaPostgres},
 		{"time_worklogs_postgres.sql", timeWorklogsSchemaPostgres},
 		{"content_postgres.sql", contentSchemaPostgres},
+		{"email_postgres.sql", emailSchemaPostgres},
 		{"mentions_postgres.sql", mentionsSchemaPostgres},
 		{"notifications_postgres.sql", notificationsSchemaPostgres},
 		{"permissions_postgres.sql", permissionsSchemaPostgres},

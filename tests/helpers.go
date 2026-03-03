@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,6 +16,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	_ "github.com/lib/pq"
 
 	"windshift/internal/database"
 	"windshift/internal/server"
@@ -36,6 +39,15 @@ type TestServer struct {
 	server      *server.Server // in-process server reference
 }
 
+// GetDBType returns the database type to use for integration tests.
+// It reads from TEST_DB_TYPE env var, defaulting to "sqlite".
+func GetDBType() string {
+	if dt := os.Getenv("TEST_DB_TYPE"); dt != "" {
+		return dt
+	}
+	return "sqlite"
+}
+
 // StartTestServer starts a windshift server with an isolated database
 // and returns a TestServer instance with cleanup function.
 // This uses an in-process server for faster, more reliable tests.
@@ -47,6 +59,7 @@ func StartTestServer(t *testing.T, dbType string) (ts *TestServer, cleanup func(
 	pid := os.Getpid()
 
 	var dbPath string
+	var pgBaseDSN string // used for postgres cleanup
 
 	switch dbType {
 	case "sqlite":
@@ -57,8 +70,28 @@ func StartTestServer(t *testing.T, dbType string) (ts *TestServer, cleanup func(
 		}
 		dbPath = filepath.Join(tempDir, fmt.Sprintf("test_%d_%d.db", timestamp, pid))
 	case "postgres":
-		// PostgreSQL setup would go here
-		t.Skip("PostgreSQL testing not yet implemented")
+		pgBaseDSN = os.Getenv("TEST_POSTGRES_DSN")
+		if pgBaseDSN == "" {
+			pgBaseDSN = "postgresql://windshift_test:windshift_test_password@localhost:15432/postgres?sslmode=disable"
+		}
+
+		// Create a unique test database for isolation
+		dbName := fmt.Sprintf("windshift_test_%d_%d", timestamp, pid)
+
+		// Connect to default "postgres" DB to create the test database
+		adminDB, err := sql.Open("postgres", pgBaseDSN)
+		if err != nil {
+			t.Fatalf("Failed to connect to PostgreSQL: %v", err)
+		}
+		defer adminDB.Close()
+
+		_, err = adminDB.Exec("CREATE DATABASE " + dbName)
+		if err != nil {
+			t.Fatalf("Failed to create test database %s: %v", dbName, err)
+		}
+
+		// Build connection string pointing to the new test database
+		dbPath = strings.Replace(pgBaseDSN, "/postgres?", "/"+dbName+"?", 1)
 	default:
 		t.Fatalf("Unknown database type: %s", dbType)
 	}
@@ -69,11 +102,17 @@ func StartTestServer(t *testing.T, dbType string) (ts *TestServer, cleanup func(
 	// Create server configuration for testing
 	cfg := server.Config{
 		Port:          "0", // Use port 0 for OS-assigned free port
-		DBPath:        dbPath,
 		DisableCSRF:   true,                            // Disable CSRF for testing
 		SilentMode:    os.Getenv("TEST_VERBOSE") == "", // Suppress logs unless TEST_VERBOSE is set
 		MaxReadConns:  10,
 		MaxWriteConns: 1,
+	}
+
+	switch dbType {
+	case "sqlite":
+		cfg.DBPath = dbPath
+	case "postgres":
+		cfg.PostgresConn = dbPath
 	}
 
 	// Create the in-process server
@@ -103,17 +142,39 @@ func StartTestServer(t *testing.T, dbType string) (ts *TestServer, cleanup func(
 
 	// Cleanup function with graceful shutdown
 	cleanup = func() {
-		// Ensure we always clean up database files, even if server cleanup fails
+		// Ensure we always clean up database, even if server cleanup fails
 		defer func() {
-			if dbPath != "" && dbType == "sqlite" {
-				// Remove all SQLite database files
-				if err := os.Remove(dbPath); err != nil && !os.IsNotExist(err) {
-					t.Logf("Warning: Failed to remove database file %s: %v", dbPath, err)
+			switch dbType {
+			case "sqlite":
+				if dbPath != "" {
+					// Remove all SQLite database files
+					if err := os.Remove(dbPath); err != nil && !os.IsNotExist(err) {
+						t.Logf("Warning: Failed to remove database file %s: %v", dbPath, err)
+					}
+					// Also remove WAL files (ignore errors if they don't exist)
+					_ = os.Remove(dbPath + "-shm")
+					_ = os.Remove(dbPath + "-wal")
+					_ = os.Remove(dbPath + "-journal")
 				}
-				// Also remove WAL files (ignore errors if they don't exist)
-				_ = os.Remove(dbPath + "-shm")
-				_ = os.Remove(dbPath + "-wal")
-				_ = os.Remove(dbPath + "-journal")
+			case "postgres":
+				if pgBaseDSN != "" {
+					// Extract database name from the test connection string
+					dbName := dbPath[strings.LastIndex(dbPath, "/")+1:]
+					if idx := strings.Index(dbName, "?"); idx != -1 {
+						dbName = dbName[:idx]
+					}
+					adminDB, err := sql.Open("postgres", pgBaseDSN)
+					if err != nil {
+						t.Logf("Warning: Failed to connect for cleanup: %v", err)
+						return
+					}
+					defer adminDB.Close()
+					// Terminate existing connections before dropping
+					_, _ = adminDB.Exec(fmt.Sprintf("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '%s' AND pid <> pg_backend_pid()", dbName))
+					if _, err := adminDB.Exec("DROP DATABASE IF EXISTS " + dbName); err != nil {
+						t.Logf("Warning: Failed to drop test database %s: %v", dbName, err)
+					}
+				}
 			}
 		}()
 

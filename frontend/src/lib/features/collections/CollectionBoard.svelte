@@ -9,7 +9,8 @@
   import QuickAddForm from './QuickAddForm.svelte';
   import { getCollection, checkItemVisibility } from './collectionService.js';
   import { infoToast, successToast, warningToast } from '../../stores/toasts.svelte.js';
-  import { Plus, GripVertical } from 'lucide-svelte';
+  import { Plus, GripVertical, ChevronDown, Calendar } from 'lucide-svelte';
+  import ItemPicker from '../../pickers/ItemPicker.svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
@@ -21,6 +22,7 @@
   import Tooltip from '../../components/Tooltip.svelte';
   import { backlogStore, workspaceDataStore, statusTransitionStore } from '../../stores/index.js';
   import { useWorkItemPoller } from '../../composables/useWorkItemPoller.svelte.js';
+  import { getVisibleColor, hexToRgb } from '../../utils/colorUtils.js';
 
   // Props
   let { workspaceId, collectionId = null } = $props();
@@ -49,6 +51,10 @@
 
   // Backlog functionality
   let backlogItems = $state([]);
+
+  // Sprint filter state
+  let allIterations = $state([]);
+  let sprintFilterId = $state(null);
 
   // Edge-based drag state
   let dragState = $state(new Map()); // Track drag state for each item: { isDragging: boolean, closestEdge: 'top'|'bottom'|null }
@@ -194,6 +200,25 @@
       console.error('Failed to load workspaces:', error);
       workspaces = [];
     }
+    // Load iterations for sprint filter
+    if (workspaceId) {
+      try {
+        const iters = await api.iterations.getAll({ workspace_id: workspaceId, include_global: true });
+        allIterations = iters || [];
+      } catch (error) {
+        console.error('Failed to load iterations:', error);
+      }
+      // Restore persisted sprint filter
+      const saved = localStorage.getItem(`board-sprint-filter-${workspaceId}`);
+      if (saved) {
+        const id = parseInt(saved);
+        if (allIterations.some(i => i.id === id)) {
+          sprintFilterId = id;
+        } else {
+          localStorage.removeItem(`board-sprint-filter-${workspaceId}`);
+        }
+      }
+    }
     loading = false;
   });
 
@@ -228,15 +253,93 @@
   // Adaptive polling for board items
   const poller = useWorkItemPoller(() => reloadCollection());
 
+  // Sprint filter derived values
+  let activeLocalSprint = $derived(allIterations.find(i => !i.is_global && i.status === 'active'));
+
+  let sprintFilterOptions = $derived.by(() => {
+    const seen = new Set();
+    return allIterations.filter(i => {
+      if (i.status === 'completed' || i.status === 'cancelled') return false;
+      if (seen.has(i.id)) return false;
+      seen.add(i.id);
+      return true;
+    });
+  });
+
+  let filteredItems = $derived(
+    sprintFilterId ? items.filter(i => i.iteration_id === sprintFilterId) : items
+  );
+
   function getItemsByStatus(statusId) {
-    // Filter items by status_id
-    return items.filter(item => item.status_id === statusId);
+    return filteredItems.filter(item => item.status_id === statusId);
   }
 
   function getItemsByColumn(column) {
-    // Filter items by status IDs in this column
-    // column.status_ids is an array of status IDs this column should display
-    return items.filter(item => column.status_ids && column.status_ids.includes(item.status_id));
+    return filteredItems.filter(item => column.status_ids && column.status_ids.includes(item.status_id));
+  }
+
+  function getIterationStatusColor(status) {
+    switch (status) {
+      case 'active': return '#0052CC';
+      case 'completed': return '#00875A';
+      case 'cancelled': return '#6B778C';
+      case 'planned': return '#5243AA';
+      default: return '#6B778C';
+    }
+  }
+
+  function capitalize(str) {
+    return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+  }
+
+  const sprintPickerConfig = {
+    primary: { text: (item) => item.name },
+    badges: [
+      {
+        text: (item) => item.is_global ? 'Global' : 'Workspace',
+        bgColor: () => 'var(--ds-background-neutral)',
+        textColor: () => 'var(--ds-text-subtle)'
+      }
+    ],
+    metadata: [
+      {
+        type: 'date-range',
+        icon: Calendar,
+        startDate: (item) => item.start_date,
+        endDate: (item) => item.end_date
+      },
+      {
+        type: 'badge',
+        text: (item) => item.status ? capitalize(item.status) : '',
+        bgColor: (item) => {
+          if (!item.status) return 'transparent';
+          const color = getVisibleColor(getIterationStatusColor(item.status));
+          const { r, g, b } = hexToRgb(color);
+          return `rgba(${r}, ${g}, ${b}, 0.15)`;
+        },
+        textColor: (item) => item.status ? getVisibleColor(getIterationStatusColor(item.status)) : 'var(--ds-text)'
+      }
+    ],
+    searchFields: ['name'],
+    getValue: (item) => item.id,
+    getLabel: (item) => item.name
+  };
+
+  let otherSprintOptions = $derived(sprintFilterOptions.filter(i => i.id !== activeLocalSprint?.id));
+
+  let selectedOtherSprint = $derived(
+    sprintFilterId && sprintFilterId !== activeLocalSprint?.id
+      ? allIterations.find(i => i.id === sprintFilterId)
+      : null
+  );
+
+  function setSprintFilter(iterationId) {
+    sprintFilterId = iterationId;
+    if (iterationId) {
+      localStorage.setItem(`board-sprint-filter-${workspaceId}`, String(iterationId));
+    } else {
+      localStorage.removeItem(`board-sprint-filter-${workspaceId}`);
+    }
   }
 
 
@@ -672,18 +775,73 @@
           workspaceName={workspace.name}
           collection={currentCollectionName}
           viewName="Board"
-          itemCount={items.length}
+          itemCount={filteredItems.length}
           hasGradient={styles.hasCustomBackground}
           textStyle={styles.textStyle}
           subtleTextStyle={styles.subtleTextStyle}
         >
-          <CollectionViewSwitcher
-            slot="actions"
-            {workspaceId}
-            {collectionId}
-            activeView="board"
-            hasGradient={styles.hasCustomBackground}
-          />
+          <div slot="actions" class="flex items-center gap-3">
+            {#if allIterations.length > 0}
+              <div class="inline-flex items-center rounded-lg border overflow-hidden text-sm"
+                   style="border-color: var(--ds-border);">
+                <button
+                  class="px-3 py-1.5 transition-colors"
+                  style={!sprintFilterId
+                    ? 'background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue); font-weight: 500;'
+                    : 'color: var(--ds-text-subtle); background-color: transparent;'}
+                  onclick={() => setSprintFilter(null)}
+                >
+                  {t('collections.allItems')}
+                </button>
+                {#if activeLocalSprint}
+                  <button
+                    class="px-3 py-1.5 transition-colors border-l"
+                    style="border-color: var(--ds-border); {sprintFilterId === activeLocalSprint.id
+                      ? 'background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue); font-weight: 500;'
+                      : 'color: var(--ds-text-subtle); background-color: transparent;'}"
+                    onclick={() => setSprintFilter(activeLocalSprint.id)}
+                  >
+                    {activeLocalSprint.name}
+                  </button>
+                {/if}
+                {#if otherSprintOptions.length > 0}
+                  <ItemPicker
+                    items={otherSprintOptions}
+                    value={sprintFilterId && sprintFilterId !== activeLocalSprint?.id ? sprintFilterId : null}
+                    config={sprintPickerConfig}
+                    placeholder={t('iterations.filterBySprint')}
+                    showUnassigned={false}
+                    allowClear={false}
+                    showSelectedInTrigger={false}
+                    on:select={(e) => {
+                      const iter = e.detail;
+                      if (iter) {
+                        setSprintFilter(iter.id);
+                      }
+                    }}
+                  >
+                    {#snippet children()}
+                      <span
+                        class="px-3 py-1.5 text-sm border-l flex items-center gap-1 transition-colors"
+                        style="border-color: var(--ds-border); {selectedOtherSprint
+                          ? 'color: var(--ds-accent-blue); font-weight: 500; background-color: var(--ds-accent-blue-subtler);'
+                          : 'color: var(--ds-text-subtle);'}"
+                      >
+                        {selectedOtherSprint ? selectedOtherSprint.name : t('iterations.filterBySprint')}
+                        <ChevronDown size={12} />
+                      </span>
+                    {/snippet}
+                  </ItemPicker>
+                {/if}
+              </div>
+            {/if}
+            <CollectionViewSwitcher
+              {workspaceId}
+              {collectionId}
+              activeView="board"
+              hasGradient={styles.hasCustomBackground}
+            />
+          </div>
         </ViewHeader>
       </div>
 
@@ -887,4 +1045,5 @@
   :global(body.is-dragging) [data-item-card] {
     transition: opacity 0.2s ease;
   }
+
 </style>

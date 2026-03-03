@@ -7,6 +7,7 @@
   import BasePicker from '../../pickers/BasePicker.svelte';
   import { Filter, Download, FileText } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { formatDateSimple, formatDateWithOptions } from '../../utils/dateFormatter.js';
 
   // Escape HTML to prevent XSS in print templates
   function escapeHtml(text) {
@@ -167,10 +168,10 @@
 
   function formatTime(unixTimestamp) {
     const date = new Date(unixTimestamp * 1000);
-    return date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
+    return formatDateWithOptions(date, {
+      hour: '2-digit',
       minute: '2-digit',
-      hour12: false 
+      hour12: false
     });
   }
 
@@ -183,7 +184,7 @@
     
     worklogs.forEach(worklog => {
       csvData.push([
-        new Date(worklog.date * 1000).toLocaleDateString(),
+        formatDateSimple(new Date(worklog.date * 1000)),
         worklog.customer_name,
         worklog.project_name,
         worklog.description,
@@ -230,7 +231,7 @@
       const templateData = {
         date_from: filters.date_from || 'All time',
         date_to: filters.date_to || 'Present',
-        generated_date: new Date().toLocaleDateString(),
+        generated_date: formatDateSimple(new Date()),
         total_hours: summary.totalHours.toString(),
         total_entries: summary.totalEntries.toString(),
         average_hours_per_day: summary.averageHoursPerDay.toString(),
@@ -239,7 +240,7 @@
         top_customer_name: summary.topCustomer?.name || 'N/A',
         top_customer_hours: summary.topCustomer?.hours?.toString() || '0',
         entries: worklogs.map(worklog => ({
-          date: new Date(worklog.date * 1000).toLocaleDateString(),
+          date: formatDateSimple(new Date(worklog.date * 1000)),
           project_name: worklog.project_name,
           customer_name: worklog.customer_name,
           duration: formatDuration(worklog.duration_minutes),
@@ -511,7 +512,7 @@
             {#each filteredWorklogs as worklog (worklog.id)}
               <tr class="transition-colors duration-150 hover:bg-opacity-50" style="hover:background-color: var(--ds-background-neutral-hovered);">
                 <td class="px-6 py-4 text-sm" style="color: var(--ds-text);">
-                  {new Date(worklog.date * 1000).toLocaleDateString()}
+                  {formatDateSimple(new Date(worklog.date * 1000))}
                 </td>
                 <td class="px-6 py-4 text-sm" style="color: var(--ds-text);">
                   {worklog.customer_name}

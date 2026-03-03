@@ -111,7 +111,7 @@ func (r *WorkspaceRepository) FindAll(userID int, isPersonalOnly bool) ([]models
 			FROM workspaces w
 			LEFT JOIN projects p ON w.id = p.workspace_id
 			LEFT JOIN time_projects tp ON w.time_project_id = tp.id
-			WHERE w.is_personal = 0 OR w.is_personal IS NULL OR w.owner_id = ?
+			WHERE w.is_personal = false OR w.is_personal IS NULL OR w.owner_id = ?
 			GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name
 			ORDER BY w.is_personal ASC, w.name`
 		rows, err = r.db.Query(query, userID)

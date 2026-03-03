@@ -248,17 +248,11 @@ func (h *TimeProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now()
-	result, err := h.db.Exec(`
+	var id int64
+	err := h.db.QueryRow(`
 		INSERT INTO time_projects (customer_id, category_id, name, description, status, color, hourly_rate, settings, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, p.CustomerID, p.CategoryID, p.Name, p.Description, p.Status, p.Color, p.HourlyRate, settingsJSON, now, now)
-
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	id, err := result.LastInsertId()
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+	`, p.CustomerID, p.CategoryID, p.Name, p.Description, p.Status, p.Color, p.HourlyRate, settingsJSON, now, now).Scan(&id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

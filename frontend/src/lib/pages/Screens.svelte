@@ -7,6 +7,7 @@
   import { screenEditorStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
+  import { formatDateSimple } from '../utils/dateFormatter.js';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import Textarea from '../components/Textarea.svelte';
@@ -280,7 +281,7 @@
     {
       key: 'created_at',
       label: t('common.created'),
-      render: (screen) => new Date(screen.created_at).toLocaleDateString(),
+      render: (screen) => formatDateSimple(screen.created_at),
       textColor: 'var(--ds-text-subtle)'
     },
     {

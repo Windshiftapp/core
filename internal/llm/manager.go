@@ -52,7 +52,7 @@ func (m *ConnectionManager) ResolveForFeature(feature string, connectionID int) 
 			`SELECT c.id, c.provider_type, c.model, c.api_key_encrypted, c.base_url
 			 FROM llm_connections c
 			 JOIN llm_connection_features f ON f.connection_id = c.id
-			 WHERE c.id = ? AND c.is_enabled = 1 AND f.feature = ?`,
+			 WHERE c.id = ? AND c.is_enabled = true AND f.feature = ?`,
 			connectionID, feature,
 		)
 	} else {
@@ -60,7 +60,7 @@ func (m *ConnectionManager) ResolveForFeature(feature string, connectionID int) 
 			`SELECT c.id, c.provider_type, c.model, c.api_key_encrypted, c.base_url
 			 FROM llm_connections c
 			 JOIN llm_connection_features f ON f.connection_id = c.id
-			 WHERE c.is_enabled = 1 AND f.feature = ?
+			 WHERE c.is_enabled = true AND f.feature = ?
 			 ORDER BY c.is_default DESC, c.id ASC
 			 LIMIT 1`,
 			feature,
@@ -132,7 +132,7 @@ func (m *ConnectionManager) ListForFeature(feature string) ([]ConnectionInfo, er
 		`SELECT c.id, c.name, c.provider_type, c.model, c.api_key_encrypted, c.base_url, c.is_default, c.is_enabled, c.created_at, c.updated_at
 		 FROM llm_connections c
 		 JOIN llm_connection_features f ON f.connection_id = c.id
-		 WHERE c.is_enabled = 1 AND f.feature = ?
+		 WHERE c.is_enabled = true AND f.feature = ?
 		 ORDER BY c.is_default DESC, c.name ASC`,
 		feature,
 	)
@@ -213,21 +213,20 @@ func (m *ConnectionManager) CreateConnection(req CreateConnectionRequest) (*Conn
 
 	// If setting as default, clear existing defaults
 	if req.IsDefault {
-		if _, err := m.db.Exec("UPDATE llm_connections SET is_default = 0 WHERE is_default = 1"); err != nil {
+		if _, err := m.db.Exec("UPDATE llm_connections SET is_default = false WHERE is_default = true"); err != nil {
 			return nil, fmt.Errorf("failed to clear existing defaults: %w", err)
 		}
 	}
 
-	result, err := m.db.Exec(
+	var id int64
+	err := m.db.QueryRow(
 		`INSERT INTO llm_connections (name, provider_type, model, api_key_encrypted, base_url, is_default, is_enabled)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		 VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
 		req.Name, string(req.ProviderType), req.Model, encryptedKey, baseURL, req.IsDefault, req.IsEnabled,
-	)
+	).Scan(&id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
-
-	id, _ := result.LastInsertId()
 
 	// Insert features
 	for _, feature := range req.Features {
@@ -258,7 +257,7 @@ type UpdateConnectionRequest struct {
 func (m *ConnectionManager) UpdateConnection(id int, req UpdateConnectionRequest) (*ConnectionInfo, error) {
 	// If setting as default, clear existing defaults
 	if req.IsDefault {
-		if _, err := m.db.Exec("UPDATE llm_connections SET is_default = 0 WHERE is_default = 1 AND id != ?", id); err != nil {
+		if _, err := m.db.Exec("UPDATE llm_connections SET is_default = false WHERE is_default = true AND id != ?", id); err != nil {
 			return nil, fmt.Errorf("failed to clear existing defaults: %w", err)
 		}
 	}

@@ -157,6 +157,8 @@ export default {
     noResults: 'No results found',
     noData: 'No data',
     noItems: 'No items',
+    item: 'item',
+    items: 'items',
     empty: 'Empty',
 
     // Requirements

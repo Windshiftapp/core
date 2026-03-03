@@ -174,7 +174,7 @@ func GetAccessibleWorkspaceIDs(user *models.User, db database.Database,
 	if user == nil || permService == nil {
 		return []int{}, nil
 	}
-	rows, err := db.Query("SELECT id FROM workspaces WHERE active = 1")
+	rows, err := db.Query("SELECT id FROM workspaces WHERE active = true")
 	if err != nil {
 		return nil, fmt.Errorf("failed to query workspaces: %w", err)
 	}
@@ -203,7 +203,7 @@ func GetAccessibleWorkspaceKeys(user *models.User, db database.Database,
 	if user == nil || permService == nil {
 		return map[string]bool{}, nil
 	}
-	rows, err := db.Query("SELECT id, key FROM workspaces WHERE active = 1")
+	rows, err := db.Query("SELECT id, key FROM workspaces WHERE active = true")
 	if err != nil {
 		return nil, fmt.Errorf("failed to query workspaces: %w", err)
 	}

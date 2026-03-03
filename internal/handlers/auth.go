@@ -450,7 +450,7 @@ func (h *AuthHandler) userHasPasskey(userID int) bool {
 	var count int
 	err := h.db.QueryRow(`
 		SELECT COUNT(*) FROM user_credentials
-		WHERE user_id = ? AND credential_type = 'fido' AND is_active = 1
+		WHERE user_id = ? AND credential_type = 'fido' AND is_active = true
 	`, userID).Scan(&count)
 	return err == nil && count > 0
 }

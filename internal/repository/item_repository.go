@@ -273,28 +273,23 @@ func (r *ItemRepository) Create(tx database.Tx, item *models.Item) (int, error) 
 	}
 
 	now := time.Now()
-	result, err := tx.Exec(`
+	var id int64
+	err = tx.QueryRow(`
 		INSERT INTO items (
 			workspace_id, workspace_item_number, item_type_id, title, description, status_id,
 			priority_id, due_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
 			assignee_id, creator_id, custom_field_values, parent_id, related_work_item_id,
 			frac_index, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,
 		item.WorkspaceID, item.WorkspaceItemNumber, item.ItemTypeID, item.Title, item.Description,
 		item.StatusID, item.PriorityID, item.DueDate, item.IsTask, item.MilestoneID,
 		item.IterationID, item.ProjectID, item.InheritProject, item.AssigneeID, item.CreatorID,
 		customFieldValuesJSON, item.ParentID, item.RelatedWorkItemID,
 		item.FracIndex, now, now,
-	)
-
+	).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create item: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get item id: %w", err)
 	}
 
 	return int(id), nil

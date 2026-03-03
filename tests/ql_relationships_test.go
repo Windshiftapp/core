@@ -9,7 +9,7 @@ import (
 
 // TestQLChildrenOf tests the childrenOf() QL function
 func TestQLChildrenOf(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	var workspaceID, parentItemID, child1ID, child2ID, grandchildID, unrelatedID int
@@ -256,7 +256,7 @@ func TestQLChildrenOf(t *testing.T) {
 
 // TestQLLinkedOf tests the linkedOf() QL function
 func TestQLLinkedOf(t *testing.T) {
-	server, _ := StartTestServer(t, "sqlite")
+	server, _ := StartTestServer(t, GetDBType())
 	CreateBearerToken(t, server)
 
 	var workspaceID, linkTypeID, parentItemID, linkedItemID int
