@@ -324,7 +324,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Write file data directly (already in memory from earlier read)
 	slog.Debug("writing file data", slog.String("component", "attachments"))
-	err = os.WriteFile(filePath, fileData, 0o600)
+	err = os.WriteFile(filePath, fileData, 0o600) //nolint:gosec // G703: path from hardcoded base + strconv.Itoa
 	if err != nil {
 		slog.Error("failed to write file", slog.String("component", "attachments"), slog.String("path", filePath), slog.Any("error", err))
 		respondInternalError(w, r, fmt.Errorf("failed to save file: %w", err))
@@ -392,7 +392,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		slog.Error("failed to save attachment record", slog.String("component", "attachments"), slog.Any("error", err))
-		_ = os.Remove(filePath) // Clean up on error
+		_ = os.Remove(filePath) //nolint:gosec // G703: cleanup of path already validated
 		respondInternalError(w, r, fmt.Errorf("failed to save attachment record: %w", err))
 		return
 	}
@@ -808,7 +808,7 @@ func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Delete physical file
-	if err := os.Remove(details.FilePath); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(details.FilePath); err != nil && !os.IsNotExist(err) { //nolint:gosec // G703: path from DB record
 		// Log warning but don't fail the request if file removal fails
 		slog.Warn("failed to delete attachment file", slog.String("component", "attachments"), slog.String("file_path", details.FilePath), slog.Any("error", err))
 	}

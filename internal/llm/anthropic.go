@@ -169,7 +169,7 @@ func (c *anthropicClient) ChatCompletion(ctx context.Context, req ChatCompletion
 	httpReq.Header.Set("x-api-key", c.apiKey)
 	httpReq.Header.Set("anthropic-version", "2023-06-01")
 
-	resp, err := c.http.Do(httpReq)
+	resp, err := c.http.Do(httpReq) //nolint:gosec // G704: admin-configured LLM endpoint
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}

@@ -49,7 +49,7 @@ type SessionManager struct {
 type Session struct {
 	ID        int          `json:"id"`
 	UserID    int          `json:"user_id"`
-	Token     string       `json:"token"`
+	Token     string       `json:"-"`
 	ExpiresAt time.Time    `json:"expires_at"`
 	IPAddress string       `json:"ip_address"`
 	UserAgent string       `json:"user_agent"`
@@ -353,7 +353,7 @@ func (sm *SessionManager) SetSessionCookie(w http.ResponseWriter, r *http.Reques
 	}
 
 	http.SetCookie(w, cookie)
-	slog.Debug("session cookie set", slog.String("component", "sso"), slog.String("name", SessionCookieName), slog.Bool("secure", useSecure))
+	slog.Debug("session cookie set", slog.String("component", "sso"), slog.String("name", SessionCookieName), slog.Bool("secure", useSecure)) //nolint:gosec // G706: structured slog
 	return nil
 }
 

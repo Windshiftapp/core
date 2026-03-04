@@ -113,16 +113,16 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 	// Build markdown
 	var markdown strings.Builder
 
-	markdown.WriteString(fmt.Sprintf("# Test Run Summary: %s\n\n", runName))
-	markdown.WriteString(fmt.Sprintf("**Test Set:** %s\n\n", setName))
+	fmt.Fprintf(&markdown, "# Test Run Summary: %s\n\n", runName)
+	fmt.Fprintf(&markdown, "**Test Set:** %s\n\n", setName)
 	if startedAt.Valid {
-		markdown.WriteString(fmt.Sprintf("**Started:** %s\n\n", startedAt.Time.Format("2006-01-02 15:04:05")))
+		fmt.Fprintf(&markdown, "**Started:** %s\n\n", startedAt.Time.Format("2006-01-02 15:04:05"))
 	}
 	if endedAt.Valid {
-		markdown.WriteString(fmt.Sprintf("**Ended:** %s\n\n", endedAt.Time.Format("2006-01-02 15:04:05")))
+		fmt.Fprintf(&markdown, "**Ended:** %s\n\n", endedAt.Time.Format("2006-01-02 15:04:05"))
 		if startedAt.Valid {
 			duration := endedAt.Time.Sub(startedAt.Time)
-			markdown.WriteString(fmt.Sprintf("**Duration:** %s\n\n", duration.Round(time.Second)))
+			fmt.Fprintf(&markdown, "**Duration:** %s\n\n", duration.Round(time.Second))
 		}
 	}
 
@@ -131,15 +131,15 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 	markdown.WriteString("|--------|-------|------------|\n")
 
 	if stats["total"] > 0 {
-		markdown.WriteString(fmt.Sprintf("| ✅ Passed | %d | %.1f%% |\n", stats["passed"], float64(stats["passed"])/float64(stats["total"])*100))
-		markdown.WriteString(fmt.Sprintf("| ❌ Failed | %d | %.1f%% |\n", stats["failed"], float64(stats["failed"])/float64(stats["total"])*100))
-		markdown.WriteString(fmt.Sprintf("| ⚠️ Blocked | %d | %.1f%% |\n", stats["blocked"], float64(stats["blocked"])/float64(stats["total"])*100))
-		markdown.WriteString(fmt.Sprintf("| ⏭️ Skipped | %d | %.1f%% |\n", stats["skipped"], float64(stats["skipped"])/float64(stats["total"])*100))
-		markdown.WriteString(fmt.Sprintf("| ⏸️ Not Run | %d | %.1f%% |\n", stats["not_run"], float64(stats["not_run"])/float64(stats["total"])*100))
-		markdown.WriteString(fmt.Sprintf("| **Total** | **%d** | **100%%** |\n\n", stats["total"]))
+		fmt.Fprintf(&markdown, "| ✅ Passed | %d | %.1f%% |\n", stats["passed"], float64(stats["passed"])/float64(stats["total"])*100)
+		fmt.Fprintf(&markdown, "| ❌ Failed | %d | %.1f%% |\n", stats["failed"], float64(stats["failed"])/float64(stats["total"])*100)
+		fmt.Fprintf(&markdown, "| ⚠️ Blocked | %d | %.1f%% |\n", stats["blocked"], float64(stats["blocked"])/float64(stats["total"])*100)
+		fmt.Fprintf(&markdown, "| ⏭️ Skipped | %d | %.1f%% |\n", stats["skipped"], float64(stats["skipped"])/float64(stats["total"])*100)
+		fmt.Fprintf(&markdown, "| ⏸️ Not Run | %d | %.1f%% |\n", stats["not_run"], float64(stats["not_run"])/float64(stats["total"])*100)
+		fmt.Fprintf(&markdown, "| **Total** | **%d** | **100%%** |\n\n", stats["total"])
 
 		passRate := float64(stats["passed"]) / float64(stats["total"]) * 100
-		markdown.WriteString(fmt.Sprintf("**Overall Pass Rate:** %.1f%%\n\n", passRate))
+		fmt.Fprintf(&markdown, "**Overall Pass Rate:** %.1f%%\n\n", passRate)
 	}
 
 	// Failed tests details
@@ -147,12 +147,12 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		markdown.WriteString("## Failed Tests\n\n")
 		for _, result := range results {
 			if result.Status == "failed" {
-				markdown.WriteString(fmt.Sprintf("### ❌ %s\n\n", result.Title))
+				fmt.Fprintf(&markdown, "### ❌ %s\n\n", result.Title)
 				if result.ActualResult != "" {
-					markdown.WriteString(fmt.Sprintf("**Actual Result:**\n%s\n\n", result.ActualResult))
+					fmt.Fprintf(&markdown, "**Actual Result:**\n%s\n\n", result.ActualResult)
 				}
 				if result.Notes != "" {
-					markdown.WriteString(fmt.Sprintf("**Notes:**\n%s\n\n", result.Notes))
+					fmt.Fprintf(&markdown, "**Notes:**\n%s\n\n", result.Notes)
 				}
 				markdown.WriteString("---\n\n")
 			}

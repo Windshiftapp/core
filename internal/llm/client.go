@@ -98,7 +98,7 @@ func (c *httpClient) ChatCompletion(ctx context.Context, req ChatCompletionReque
 		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
 	}
 
-	resp, err := c.http.Do(httpReq)
+	resp, err := c.http.Do(httpReq) //nolint:gosec // G704: admin-configured LLM endpoint
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}
@@ -128,7 +128,7 @@ func (c *httpClient) Health(ctx context.Context) error {
 		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
 	}
 
-	resp, err := c.http.Do(httpReq)
+	resp, err := c.http.Do(httpReq) //nolint:gosec // G704: admin-configured LLM endpoint
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}

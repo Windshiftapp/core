@@ -163,7 +163,7 @@ func createSecurityHeaders(enableHTTPS, useProxy bool, additionalProxies []net.I
 			}
 
 			if isSecure {
-				w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+				w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
 			}
 
 			next.ServeHTTP(w, r)

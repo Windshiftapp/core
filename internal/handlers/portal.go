@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -35,6 +36,7 @@ type PortalHandler struct {
 	portalSessionManager *auth.PortalSessionManager
 	ipExtractor          *utils.IPExtractor
 	portalService        *services.PortalService
+	attachmentPath       string
 }
 
 // getClientIP extracts the client IP with proxy validation
@@ -185,13 +187,14 @@ func (h *PortalHandler) getRequestTypeWithVisibility(ctx context.Context, reques
 }
 
 // NewPortalHandler creates a new portal handler
-func NewPortalHandler(db database.Database, sessionManager *auth.SessionManager, portalSessionManager *auth.PortalSessionManager, ipExtractor *utils.IPExtractor) *PortalHandler {
+func NewPortalHandler(db database.Database, sessionManager *auth.SessionManager, portalSessionManager *auth.PortalSessionManager, ipExtractor *utils.IPExtractor, attachmentPath string) *PortalHandler {
 	return &PortalHandler{
 		db:                   db,
 		sessionManager:       sessionManager,
 		portalSessionManager: portalSessionManager,
 		ipExtractor:          ipExtractor,
 		portalService:        services.NewPortalService(db),
+		attachmentPath:       attachmentPath,
 	}
 }
 
@@ -1428,6 +1431,20 @@ func (h *PortalHandler) DownloadPortalAttachment(w http.ResponseWriter, r *http.
 		return
 	}
 
+	// Validate file path is within attachment directory (prevent path traversal)
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		slog.Error("failed to resolve file path", slog.String("component", "portal"), slog.Any("error", err))
+		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "File not found"))
+		return
+	}
+	absBasePath, _ := filepath.Abs(h.attachmentPath)
+	if !strings.HasPrefix(absPath, absBasePath+string(os.PathSeparator)) {
+		slog.Warn("path traversal attempt detected", slog.String("component", "portal"), slog.String("file_path", filePath))
+		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "File not found"))
+		return
+	}
+
 	// Open and serve the file
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -1441,6 +1458,8 @@ func (h *PortalHandler) DownloadPortalAttachment(w http.ResponseWriter, r *http.
 	w.Header().Set("Content-Type", mimeType)
 	w.Header().Set("Content-Length", strconv.FormatInt(fileSize, 10))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
 	w.Header().Set("Cache-Control", "public, max-age=86400") // Cache for 1 day
 	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", originalFilename))
 
