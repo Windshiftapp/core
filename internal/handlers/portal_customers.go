@@ -385,8 +385,8 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 	}
 
 	// Insert the new portal customer
-	//nolint:misspell // database uses British spelling
 	var customerID int64
+	//nolint:misspell // database column uses British spelling
 	err := h.db.QueryRow(`
 		INSERT INTO portal_customers (name, email, phone, customer_organisation_id, is_primary, custom_field_values, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id

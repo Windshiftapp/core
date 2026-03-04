@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
 	"windshift/internal/kreuzberg"
 	"windshift/internal/llm"
 	"windshift/internal/models"
@@ -67,7 +68,7 @@ func (s *IngestionService) IngestFile(ctx context.Context, docID string) error {
 	}
 
 	// Classify and clean content
-	contentType, cleanedContent := s.classifyAndClean(ctx, docID, doc.Title, result.Content, doc.FilePath, result.MimeType)
+	contentType, cleanedContent := s.classifyAndClean(ctx, docID, doc.Title, result.Content, result.MimeType)
 
 	// Generate KB article based on classification
 	s.generateArticle(ctx, docID, doc.Title, cleanedContent, contentType)
@@ -134,7 +135,7 @@ func (s *IngestionService) ReprocessDocument(ctx context.Context, docID string) 
 	}
 
 	content := doc.RawContent
-	var filePath, mimeType string
+	var mimeType string
 
 	// For uploaded files, re-extract
 	if doc.SourceType == models.LogbookSourceUpload && doc.FilePath != "" {
@@ -144,7 +145,6 @@ func (s *IngestionService) ReprocessDocument(ctx context.Context, docID string) 
 			return fmt.Errorf("re-extraction failed: %w", err)
 		}
 		content = result.Content
-		filePath = doc.FilePath
 		mimeType = result.MimeType
 		hash := fmt.Sprintf("%x", sha256.Sum256([]byte(content)))
 		if err := s.repo.UpdateDocumentContent(docID, content, result.MimeType, hash); err != nil {
@@ -161,7 +161,7 @@ func (s *IngestionService) ReprocessDocument(ctx context.Context, docID string) 
 	}
 
 	// Classify and clean content
-	contentType, cleanedContent := s.classifyAndClean(ctx, docID, doc.Title, content, filePath, mimeType)
+	contentType, cleanedContent := s.classifyAndClean(ctx, docID, doc.Title, content, mimeType)
 
 	// Re-generate KB article based on classification
 	s.generateArticle(ctx, docID, doc.Title, cleanedContent, contentType)
@@ -230,7 +230,7 @@ func contentPreview(s string, maxLen int) string {
 // classifyAndClean uses the LLM to classify a document and clean its content.
 // Internally runs two focused LLM calls: one for classification, one for cleaning.
 // Returns the content type and cleaned content. If no LLM is available, returns empty type and original content.
-func (s *IngestionService) classifyAndClean(ctx context.Context, docID, title, content, filePath, mimeType string) (contentType string, cleanedContent string) {
+func (s *IngestionService) classifyAndClean(ctx context.Context, docID, title, content, mimeType string) (contentType, cleanedContent string) {
 	if s.articleClient == nil || !s.articleClient.Available() {
 		return "", content
 	}

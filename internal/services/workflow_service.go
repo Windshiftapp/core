@@ -35,7 +35,10 @@ func (s *WorkflowService) GetInitialStatusIDCached(workspaceID int, itemTypeID *
 
 	// Check cache
 	if val, ok := s.initialStatusCache.Load(key); ok {
-		entry := val.(*initialStatusCacheEntry)
+		entry, ok := val.(*initialStatusCacheEntry)
+		if !ok {
+			return nil, fmt.Errorf("invalid cache entry type")
+		}
 		if time.Now().Before(entry.expiresAt) {
 			return entry.statusID, nil
 		}

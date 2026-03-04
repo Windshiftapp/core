@@ -252,20 +252,18 @@ func (h *AssetTypeHandler) CreateAssetType(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if currentUser != nil {
-		id := int(typeID)
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAssetTypeCreate,
-			ResourceType: logger.ResourceAssetType,
-			ResourceID:   &id,
-			ResourceName: req.Name,
-			Success:      true,
-		})
-	}
+	id := int(typeID)
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionAssetTypeCreate,
+		ResourceType: logger.ResourceAssetType,
+		ResourceID:   &id,
+		ResourceName: req.Name,
+		Success:      true,
+	})
 
 	assetType := models.AssetType{
 		ID:           int(typeID),
@@ -369,19 +367,17 @@ func (h *AssetTypeHandler) UpdateAssetType(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAssetTypeUpdate,
-			ResourceType: logger.ResourceAssetType,
-			ResourceID:   &typeID,
-			ResourceName: req.Name,
-			Success:      true,
-		})
-	}
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionAssetTypeUpdate,
+		ResourceType: logger.ResourceAssetType,
+		ResourceID:   &typeID,
+		ResourceName: req.Name,
+		Success:      true,
+	})
 
 	// Return updated type
 	var assetType models.AssetType
@@ -463,18 +459,16 @@ func (h *AssetTypeHandler) DeleteAssetType(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAssetTypeDelete,
-			ResourceType: logger.ResourceAssetType,
-			ResourceID:   &typeID,
-			Success:      true,
-		})
-	}
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionAssetTypeDelete,
+		ResourceType: logger.ResourceAssetType,
+		ResourceID:   &typeID,
+		Success:      true,
+	})
 
 	w.WriteHeader(http.StatusNoContent)
 }

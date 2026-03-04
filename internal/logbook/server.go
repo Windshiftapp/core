@@ -3,6 +3,7 @@ package logbook
 import (
 	"log/slog"
 	"net/http"
+
 	"windshift/internal/database"
 	"windshift/internal/llm"
 )

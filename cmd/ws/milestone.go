@@ -265,9 +265,10 @@ Examples:
 			return fmt.Errorf("failed to delete milestone: %w", err)
 		}
 
-		if outputFormat == "table" {
+		switch outputFormat {
+		case "table":
 			fmt.Printf("Deleted milestone %d\n", milestoneID)
-		} else if outputFormat == "json" {
+		case "json":
 			output := NewOutput()
 			output.Print(map[string]interface{}{
 				"deleted":      true,
@@ -305,7 +306,7 @@ func init() {
 	milestoneCmd.AddCommand(milestoneDeleteCmd)
 
 	// List filters
-	milestoneListCmd.Flags().StringVarP(&milestoneStatusFilter, "status", "s", "", "filter by status (planning, in-progress, completed, cancelled)")
+	milestoneListCmd.Flags().StringVarP(&milestoneStatusFilter, "status", "s", "", "filter by status (planning, in-progress, completed, canceled)")
 	milestoneListCmd.Flags().BoolVar(&milestoneGlobalOnly, "global", false, "show only global milestones")
 
 	// Get flags

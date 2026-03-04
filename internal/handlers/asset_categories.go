@@ -326,20 +326,18 @@ func (h *AssetCategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if currentUser != nil {
-		id := int(catID)
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAssetCategoryCreate,
-			ResourceType: logger.ResourceAssetCategory,
-			ResourceID:   &id,
-			ResourceName: req.Name,
-			Success:      true,
-		})
-	}
+	id := int(catID)
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionAssetCategoryCreate,
+		ResourceType: logger.ResourceAssetCategory,
+		ResourceID:   &id,
+		ResourceName: req.Name,
+		Success:      true,
+	})
 
 	cat := models.AssetCategory{
 		ID:          int(catID),
@@ -429,19 +427,17 @@ func (h *AssetCategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAssetCategoryUpdate,
-			ResourceType: logger.ResourceAssetCategory,
-			ResourceID:   &categoryID,
-			ResourceName: req.Name,
-			Success:      true,
-		})
-	}
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionAssetCategoryUpdate,
+		ResourceType: logger.ResourceAssetCategory,
+		ResourceID:   &categoryID,
+		ResourceName: req.Name,
+		Success:      true,
+	})
 
 	// Return updated category
 	var cat models.AssetCategory
@@ -547,18 +543,16 @@ func (h *AssetCategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAssetCategoryDelete,
-			ResourceType: logger.ResourceAssetCategory,
-			ResourceID:   &categoryID,
-			Success:      true,
-		})
-	}
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionAssetCategoryDelete,
+		ResourceType: logger.ResourceAssetCategory,
+		ResourceID:   &categoryID,
+		Success:      true,
+	})
 
 	w.WriteHeader(http.StatusNoContent)
 }

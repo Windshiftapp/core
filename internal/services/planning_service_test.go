@@ -8,6 +8,8 @@ import (
 	"windshift/internal/testutils"
 )
 
+func strPtr(s string) *string { return &s }
+
 // planningTestEnv contains test data for planning service tests
 type planningTestEnv struct {
 	MilestoneID int
@@ -139,7 +141,7 @@ func TestPlanningService_CreateMilestone(t *testing.T) {
 	params := CreateMilestoneParams{
 		Name:        "New Milestone",
 		Description: "A new milestone",
-		TargetDate:  "2025-06-30",
+		TargetDate:  strPtr("2025-06-30"),
 		Status:      "planning",
 	}
 
@@ -167,7 +169,7 @@ func TestPlanningService_UpdateMilestone(t *testing.T) {
 		ID:          env.MilestoneID,
 		Name:        "Updated Milestone",
 		Description: "Updated description",
-		TargetDate:  "2025-11-30",
+		TargetDate:  strPtr("2025-11-30"),
 		Status:      "active",
 	}
 
@@ -537,7 +539,7 @@ func TestPlanningService_UpdateMilestone_NonExistent(t *testing.T) {
 		ID:          99999,
 		Name:        "Non-existent",
 		Description: "Description",
-		TargetDate:  "2025-12-31",
+		TargetDate:  strPtr("2025-12-31"),
 		Status:      "planning",
 	}
 
@@ -636,7 +638,7 @@ func TestPlanningService_CreateMilestone_EmptyName(t *testing.T) {
 	params := CreateMilestoneParams{
 		Name:        "",
 		Description: "Description",
-		TargetDate:  "2025-12-31",
+		TargetDate:  strPtr("2025-12-31"),
 		Status:      "planning",
 	}
 
@@ -705,7 +707,7 @@ func TestPlanningService_CreateMilestone_DefaultStatus(t *testing.T) {
 	params := CreateMilestoneParams{
 		Name:        "Test Milestone Default Status",
 		Description: "Description",
-		TargetDate:  "2025-12-31",
+		TargetDate:  strPtr("2025-12-31"),
 		Status:      "", // Empty status should default to "planning"
 	}
 
@@ -754,7 +756,7 @@ func TestPlanningService_ListMilestones_Pagination(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		_, err := service.CreateMilestone(CreateMilestoneParams{
 			Name:       fmt.Sprintf("Milestone %d", i),
-			TargetDate: "2025-12-31",
+			TargetDate: strPtr("2025-12-31"),
 			Status:     "planning",
 		})
 		if err != nil {

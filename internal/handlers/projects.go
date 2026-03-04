@@ -237,19 +237,17 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	createdProject.MilestoneCategories = categories
 
-	if user != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       user.ID,
-			Username:     user.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionProjectCreate,
-			ResourceType: logger.ResourceProject,
-			ResourceID:   &createdProject.ID,
-			ResourceName: createdProject.Name,
-			Success:      true,
-		})
-	}
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionProjectCreate,
+		ResourceType: logger.ResourceProject,
+		ResourceID:   &createdProject.ID,
+		ResourceName: createdProject.Name,
+		Success:      true,
+	})
 	respondJSONCreated(w, createdProject)
 }
 
@@ -363,19 +361,17 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	updatedProject.MilestoneCategories = categories
 
-	if user != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       user.ID,
-			Username:     user.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionProjectUpdate,
-			ResourceType: logger.ResourceProject,
-			ResourceID:   &updatedProject.ID,
-			ResourceName: updatedProject.Name,
-			Success:      true,
-		})
-	}
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionProjectUpdate,
+		ResourceType: logger.ResourceProject,
+		ResourceID:   &updatedProject.ID,
+		ResourceName: updatedProject.Name,
+		Success:      true,
+	})
 	respondJSONOK(w, updatedProject)
 }
 
@@ -422,18 +418,16 @@ func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if user != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       user.ID,
-			Username:     user.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionProjectDelete,
-			ResourceType: logger.ResourceProject,
-			ResourceID:   &id,
-			Success:      true,
-		})
-	}
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionProjectDelete,
+		ResourceType: logger.ResourceProject,
+		ResourceID:   &id,
+		Success:      true,
+	})
 	w.WriteHeader(http.StatusNoContent)
 }
 

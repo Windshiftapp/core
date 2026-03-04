@@ -3,6 +3,7 @@ package logbook
 import (
 	_ "embed"
 	"fmt"
+
 	"windshift/internal/database"
 )
 

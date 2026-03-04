@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
 	"windshift/internal/models"
 	"windshift/internal/restapi"
 
@@ -386,12 +387,12 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 
 	// Save file to disk
 	storagePath := filepath.Join(h.storagePath, bucketID, docID)
-	if err := os.MkdirAll(storagePath, 0750); err != nil { //nolint:gosec // G703: path components are validated UUIDs
+	if err := os.MkdirAll(storagePath, 0o750); err != nil { //nolint:gosec // G703: path components are validated UUIDs
 		respondInternalError(w, r, err)
 		return
 	}
 	filePath := filepath.Join(storagePath, filepath.Base(header.Filename))
-	if err := os.WriteFile(filePath, content, 0600); err != nil {
+	if err := os.WriteFile(filePath, content, 0o600); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -906,12 +907,12 @@ func (h *Handlers) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 
 	// Store at {storagePath}/{bucketID}/{documentID}/{filename}
 	dir := filepath.Join(h.storagePath, doc.BucketID, docID)
-	if err := os.MkdirAll(dir, 0750); err != nil { //nolint:gosec // G703: filename is uuid-generated, not user input
+	if err := os.MkdirAll(dir, 0o750); err != nil { //nolint:gosec // G703: filename is uuid-generated, not user input
 		respondInternalError(w, r, err)
 		return
 	}
 	filePath := filepath.Join(dir, storedFilename)
-	if err := os.WriteFile(filePath, content, 0600); err != nil {
+	if err := os.WriteFile(filePath, content, 0o600); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}

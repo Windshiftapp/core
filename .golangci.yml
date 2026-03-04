@@ -32,7 +32,7 @@ linters:
         - (*database/sql.Rows).Close
         - (*database/sql.Result).LastInsertId
         - (*database/sql.Result).RowsAffected
-        - (*windshift/internal/database.Tx).Rollback
+        - (windshift/internal/database.Tx).Rollback
 
     govet:
       enable-all: true

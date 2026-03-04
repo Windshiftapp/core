@@ -79,7 +79,7 @@ func main() {
 	)
 
 	// Ensure storage directory exists
-	if err := os.MkdirAll(storagePath, 0750); err != nil { //nolint:gosec // G703: storagePath from env config, not user input
+	if err := os.MkdirAll(storagePath, 0o750); err != nil { //nolint:gosec // G703: storagePath from env config, not user input
 		slog.Error("failed to create storage directory", "error", err)
 		os.Exit(1)
 	}
@@ -124,7 +124,7 @@ func main() {
 	srv, err := logbook.NewServer(db, cfg, articleClient)
 	if err != nil {
 		slog.Error("failed to create logbook server", "error", err)
-		os.Exit(1)
+		os.Exit(1) //nolint:gocritic // exitAfterDefer: acceptable in main()
 	}
 
 	// Apply recovery middleware

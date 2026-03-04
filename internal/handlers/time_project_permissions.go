@@ -280,19 +280,17 @@ func (h *TimeProjectPermissionHandler) AddMember(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if user != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       user.ID,
-			Username:     user.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionTimeProjectAddMember,
-			ResourceType: logger.ResourceTimeProject,
-			ResourceID:   &projectID,
-			Details:      map[string]interface{}{"member_id": req.MemberID},
-			Success:      true,
-		})
-	}
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionTimeProjectAddMember,
+		ResourceType: logger.ResourceTimeProject,
+		ResourceID:   &projectID,
+		Details:      map[string]interface{}{"member_id": req.MemberID},
+		Success:      true,
+	})
 
 	respondJSONCreated(w, member)
 }
@@ -351,19 +349,17 @@ func (h *TimeProjectPermissionHandler) RemoveMember(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if user != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       user.ID,
-			Username:     user.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionTimeProjectRemoveMember,
-			ResourceType: logger.ResourceTimeProject,
-			ResourceID:   &projectID,
-			Details:      map[string]interface{}{"member_id": memberID},
-			Success:      true,
-		})
-	}
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionTimeProjectRemoveMember,
+		ResourceType: logger.ResourceTimeProject,
+		ResourceID:   &projectID,
+		Details:      map[string]interface{}{"member_id": memberID},
+		Success:      true,
+	})
 
 	w.WriteHeader(http.StatusNoContent)
 }
