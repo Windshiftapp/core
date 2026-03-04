@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -175,8 +176,12 @@ func (h *PermissionHandler) GrantGlobalPermission(w http.ResponseWriter, r *http
 	if currentUser != nil {
 		// Get permission and target user details for audit log
 		var permissionName, targetUsername string
-		_ = h.db.QueryRow("SELECT permission_name FROM permissions WHERE id = ?", req.PermissionID).Scan(&permissionName)
-		_ = h.db.QueryRow("SELECT username FROM users WHERE id = ?", req.UserID).Scan(&targetUsername)
+		if err := h.db.QueryRow("SELECT permission_name FROM permissions WHERE id = ?", req.PermissionID).Scan(&permissionName); err != nil {
+			slog.Warn("failed to look up permission name", slog.Any("error", err))
+		}
+		if err := h.db.QueryRow("SELECT username FROM users WHERE id = ?", req.UserID).Scan(&targetUsername); err != nil {
+			slog.Warn("failed to look up username", slog.Any("error", err))
+		}
 
 		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
@@ -271,8 +276,12 @@ func (h *PermissionHandler) RevokeGlobalPermission(w http.ResponseWriter, r *htt
 	if currentUser != nil {
 		// Get permission and target user details for audit log
 		var permissionName, targetUsername string
-		_ = h.db.QueryRow("SELECT permission_name FROM permissions WHERE id = ?", permissionID).Scan(&permissionName)
-		_ = h.db.QueryRow("SELECT username FROM users WHERE id = ?", userID).Scan(&targetUsername)
+		if err := h.db.QueryRow("SELECT permission_name FROM permissions WHERE id = ?", permissionID).Scan(&permissionName); err != nil {
+			slog.Warn("failed to look up permission name", slog.Any("error", err))
+		}
+		if err := h.db.QueryRow("SELECT username FROM users WHERE id = ?", userID).Scan(&targetUsername); err != nil {
+			slog.Warn("failed to look up username", slog.Any("error", err))
+		}
 
 		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
@@ -386,8 +395,12 @@ func (h *PermissionHandler) GrantGlobalPermissionToGroup(w http.ResponseWriter, 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		var permissionName, groupName string
-		_ = h.db.QueryRow("SELECT permission_name FROM permissions WHERE id = ?", req.PermissionID).Scan(&permissionName)
-		_ = h.db.QueryRow("SELECT name FROM groups WHERE id = ?", req.GroupID).Scan(&groupName)
+		if err := h.db.QueryRow("SELECT permission_name FROM permissions WHERE id = ?", req.PermissionID).Scan(&permissionName); err != nil {
+			slog.Warn("failed to look up permission name", slog.Any("error", err))
+		}
+		if err := h.db.QueryRow("SELECT name FROM groups WHERE id = ?", req.GroupID).Scan(&groupName); err != nil {
+			slog.Warn("failed to look up group name", slog.Any("error", err))
+		}
 
 		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
@@ -470,8 +483,12 @@ func (h *PermissionHandler) RevokeGlobalPermissionFromGroup(w http.ResponseWrite
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		var permissionName, groupName string
-		_ = h.db.QueryRow("SELECT permission_name FROM permissions WHERE id = ?", permissionID).Scan(&permissionName)
-		_ = h.db.QueryRow("SELECT name FROM groups WHERE id = ?", groupID).Scan(&groupName)
+		if err := h.db.QueryRow("SELECT permission_name FROM permissions WHERE id = ?", permissionID).Scan(&permissionName); err != nil {
+			slog.Warn("failed to look up permission name", slog.Any("error", err))
+		}
+		if err := h.db.QueryRow("SELECT name FROM groups WHERE id = ?", groupID).Scan(&groupName); err != nil {
+			slog.Warn("failed to look up group name", slog.Any("error", err))
+		}
 
 		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,

@@ -252,7 +252,7 @@ func (pm *CachedPermissionMiddleware) getWorkspaceIDFromPath(r *http.Request) (i
 
 	workspaceID, err := strconv.Atoi(workspaceIDStr)
 	if err != nil {
-		return 0, fmt.Errorf("invalid workspace ID: %v", err)
+		return 0, fmt.Errorf("invalid workspace ID: %w", err)
 	}
 
 	return workspaceID, nil
@@ -314,7 +314,7 @@ func (pm *CachedPermissionMiddleware) GetUserPermissionLevel(userID, workspaceID
 	// Check if user is system admin
 	isAdmin, err := pm.permissionService.IsSystemAdmin(userID)
 	if err != nil {
-		return "Error", fmt.Errorf("error checking system admin status: %v", err)
+		return "Error", fmt.Errorf("error checking system admin status: %w", err)
 	}
 	if isAdmin {
 		return "System Admin", nil
@@ -327,7 +327,7 @@ func (pm *CachedPermissionMiddleware) GetUserPermissionLevel(userID, workspaceID
 
 	hasPerms, err := pm.permissionService.HasWorkspacePermissions(userID, workspaceID, permissions)
 	if err != nil {
-		return "Error", fmt.Errorf("error checking workspace permissions: %v", err)
+		return "Error", fmt.Errorf("error checking workspace permissions: %w", err)
 	}
 
 	if hasPerms[models.PermissionWorkspaceAdmin] {
@@ -337,7 +337,7 @@ func (pm *CachedPermissionMiddleware) GetUserPermissionLevel(userID, workspaceID
 	// Check if user has any access
 	hasAccess, err := pm.hasAnyWorkspaceAccess(userID, workspaceID)
 	if err != nil {
-		return "Error", fmt.Errorf("error checking workspace access: %v", err)
+		return "Error", fmt.Errorf("error checking workspace access: %w", err)
 	}
 
 	if hasAccess {

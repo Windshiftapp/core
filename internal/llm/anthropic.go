@@ -163,7 +163,7 @@ func (c *anthropicClient) ChatCompletion(ctx context.Context, req ChatCompletion
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.endpoint+"/v1/messages", bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrConnectionFailed, err)
+		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("x-api-key", c.apiKey)
@@ -171,7 +171,7 @@ func (c *anthropicClient) ChatCompletion(ctx context.Context, req ChatCompletion
 
 	resp, err := c.http.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrConnectionFailed, err)
+		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -218,7 +218,7 @@ func (c *anthropicClient) Health(ctx context.Context) error {
 		MaxTokens: 1,
 	})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrConnectionFailed, err)
+		return fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}
 	return nil
 }

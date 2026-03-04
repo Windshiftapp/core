@@ -60,7 +60,7 @@ func (s *MagicLinkService) GenerateMagicLink(portalCustomerID int, channelID *in
 	// Generate a cryptographically secure random token
 	tokenBytes := make([]byte, MagicLinkTokenLength)
 	if _, err := rand.Read(tokenBytes); err != nil {
-		return "", fmt.Errorf("%w: %v", ErrMagicLinkGenerationFailed, err)
+		return "", fmt.Errorf("%w: %w", ErrMagicLinkGenerationFailed, err)
 	}
 	token := base64.URLEncoding.EncodeToString(tokenBytes)
 

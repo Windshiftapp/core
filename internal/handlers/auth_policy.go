@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -240,24 +241,30 @@ func (h *AuthPolicyHandler) GetAuthPolicyStats(w http.ResponseWriter, r *http.Re
 	stats := AuthPolicyStats{}
 
 	// Total active users
-	_ = h.db.QueryRow("SELECT COUNT(*) FROM users WHERE is_active = true").Scan(&stats.TotalUsers)
+	if err := h.db.QueryRow("SELECT COUNT(*) FROM users WHERE is_active = true").Scan(&stats.TotalUsers); err != nil {
+		slog.Warn("failed to get total users count", slog.Any("error", err))
+	}
 
 	// Users with at least one active passkey (FIDO credential)
-	_ = h.db.QueryRow(`
+	if err := h.db.QueryRow(`
 		SELECT COUNT(DISTINCT user_id) FROM user_credentials
 		WHERE credential_type = 'fido' AND is_active = true
-	`).Scan(&stats.UsersWithPasskey)
+	`).Scan(&stats.UsersWithPasskey); err != nil {
+		slog.Warn("failed to get passkey users count", slog.Any("error", err))
+	}
 
 	stats.UsersWithoutPasskey = stats.TotalUsers - stats.UsersWithPasskey
 
 	// Users with SSO external account linked
-	_ = h.db.QueryRow(`
+	if err := h.db.QueryRow(`
 		SELECT COUNT(DISTINCT user_id) FROM user_external_accounts
 		WHERE user_id IS NOT NULL
-	`).Scan(&stats.SSOUsers)
+	`).Scan(&stats.SSOUsers); err != nil {
+		slog.Warn("failed to get SSO users count", slog.Any("error", err))
+	}
 
 	// System admins (users with system.admin global permission - direct OR via group)
-	_ = h.db.QueryRow(`
+	if err := h.db.QueryRow(`
 		SELECT COUNT(DISTINCT admin_user_id) FROM (
 			SELECT ugp.user_id as admin_user_id
 			FROM user_global_permissions ugp
@@ -272,10 +279,12 @@ func (h *AuthPolicyHandler) GetAuthPolicyStats(w http.ResponseWriter, r *http.Re
 			WHERE gp.permission_key = 'system.admin'
 			AND g.is_active = true
 		)
-	`).Scan(&stats.SystemAdmins)
+	`).Scan(&stats.SystemAdmins); err != nil {
+		slog.Warn("failed to get system admins count", slog.Any("error", err))
+	}
 
 	// Admins with passkeys
-	_ = h.db.QueryRow(`
+	if err := h.db.QueryRow(`
 		SELECT COUNT(DISTINCT admin_user_id) FROM (
 			SELECT ugp.user_id as admin_user_id
 			FROM user_global_permissions ugp
@@ -294,7 +303,9 @@ func (h *AuthPolicyHandler) GetAuthPolicyStats(w http.ResponseWriter, r *http.Re
 			AND g.is_active = true
 			AND uc.credential_type = 'fido' AND uc.is_active = true
 		)
-	`).Scan(&stats.AdminsWithPasskey)
+	`).Scan(&stats.AdminsWithPasskey); err != nil {
+		slog.Warn("failed to get admins with passkey count", slog.Any("error", err))
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(stats)

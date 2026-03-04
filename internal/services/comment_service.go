@@ -168,12 +168,16 @@ func (s *CommentService) Create(params CreateCommentParams) (*CreateCommentResul
 		var actorName string
 		if params.PortalCustomerID != nil {
 			// Portal customer — look up customer name
-			_ = s.db.QueryRow("SELECT name FROM portal_customers WHERE id = ?", *params.PortalCustomerID).Scan(&actorName)
+			if err := s.db.QueryRow("SELECT name FROM portal_customers WHERE id = ?", *params.PortalCustomerID).Scan(&actorName); err != nil {
+				slog.Warn("failed to look up portal customer name", slog.Any("error", err), slog.Int("portal_customer_id", *params.PortalCustomerID))
+			}
 			if actorName == "" {
 				actorName = "Portal Customer"
 			}
 		} else {
-			_ = s.db.QueryRow("SELECT username FROM users WHERE id = ?", params.ActorUserID).Scan(&actorName)
+			if err := s.db.QueryRow("SELECT username FROM users WHERE id = ?", params.ActorUserID).Scan(&actorName); err != nil {
+				slog.Warn("failed to look up username", slog.Any("error", err), slog.Int("user_id", params.ActorUserID))
+			}
 			if actorName == "" {
 				actorName = fmt.Sprintf("User #%d", params.ActorUserID)
 			}

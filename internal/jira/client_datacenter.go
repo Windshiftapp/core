@@ -88,7 +88,7 @@ func (c *dataCenterClient) TestConnection(ctx context.Context) (*JiraInstanceInf
 	// Use /myself endpoint to verify credentials
 	resp, err := c.do(ctx, "GET", c.baseURL+"/myself", nil)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrConnectionFailed, err)
+		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 

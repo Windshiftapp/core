@@ -96,7 +96,7 @@ func (s *OIDCService) CreateRelyingParty(ctx context.Context, provider *SSOProvi
 		options...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrOIDCDiscoveryFailed, err)
+		return nil, fmt.Errorf("%w: %w", ErrOIDCDiscoveryFailed, err)
 	}
 
 	return relyingParty, nil

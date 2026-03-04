@@ -547,7 +547,9 @@ func (as *ActionService) executeAction(action *models.Action, event *models.Acti
 		log.ErrorMessage = fmt.Sprintf("failed to sort nodes: %v", err)
 		completedAt := time.Now()
 		log.CompletedAt = &completedAt
-		_ = as.repo.UpdateExecutionLog(log)
+		if logErr := as.repo.UpdateExecutionLog(log); logErr != nil {
+			slog.Error("failed to update execution log", slog.Any("error", logErr), slog.Int("action_id", action.ID))
+		}
 		return fmt.Errorf("failed to topologically sort nodes: %w", err)
 	}
 
@@ -614,7 +616,9 @@ func (as *ActionService) executeAction(action *models.Action, event *models.Acti
 		log.ExecutionTrace = string(trace)
 	}
 
-	_ = as.repo.UpdateExecutionLog(log)
+	if logErr := as.repo.UpdateExecutionLog(log); logErr != nil {
+		slog.Error("failed to update execution log", slog.Any("error", logErr), slog.Int("action_id", action.ID))
+	}
 
 	slog.Debug("action execution completed",
 		slog.String("component", "actions"),

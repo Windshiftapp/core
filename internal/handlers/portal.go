@@ -1367,7 +1367,9 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 
 	// Get total count
 	var total int
-	_ = h.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM assets WHERE asset_set_id = ?`, report.AssetSetID).Scan(&total)
+	if err := h.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM assets WHERE asset_set_id = ?`, report.AssetSetID).Scan(&total); err != nil {
+		slog.Warn("failed to get asset count", slog.Any("error", err))
+	}
 
 	// Build response
 	response := map[string]interface{}{

@@ -124,7 +124,7 @@ func (s *SAMLServiceProvider) ParseResponse(r *http.Request) (*SAMLAssertionInfo
 	possibleRequestIDs := []string{} // For SP-initiated flow, we'd track request IDs
 	assertion, err := s.SP.ParseResponse(r, possibleRequestIDs)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrSAMLAssertionInvalid, err)
+		return nil, fmt.Errorf("%w: %w", ErrSAMLAssertionInvalid, err)
 	}
 
 	info := &SAMLAssertionInfo{

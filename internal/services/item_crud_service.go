@@ -461,7 +461,9 @@ func (s *ItemCRUDService) GetWithEffectiveProject(id int) (*models.Item, error) 
 			item.EffectiveProjectID = effectiveProjectID
 			// Fetch project name
 			var name sql.NullString
-			_ = s.db.QueryRow("SELECT name FROM time_projects WHERE id = ?", *effectiveProjectID).Scan(&name)
+			if err := s.db.QueryRow("SELECT name FROM time_projects WHERE id = ?", *effectiveProjectID).Scan(&name); err != nil {
+				slog.Warn("failed to look up project name", slog.Any("error", err))
+			}
 			if name.Valid {
 				item.EffectiveProjectName = name.String
 			}

@@ -91,7 +91,7 @@ func (c *httpClient) ChatCompletion(ctx context.Context, req ChatCompletionReque
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.endpoint+"/v1/chat/completions", bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrConnectionFailed, err)
+		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	if c.apiKey != "" {
@@ -100,7 +100,7 @@ func (c *httpClient) ChatCompletion(ctx context.Context, req ChatCompletionReque
 
 	resp, err := c.http.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrConnectionFailed, err)
+		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -122,7 +122,7 @@ func (c *httpClient) ChatCompletion(ctx context.Context, req ChatCompletionReque
 func (c *httpClient) Health(ctx context.Context) error {
 	httpReq, err := http.NewRequestWithContext(ctx, "GET", c.endpoint+"/health", http.NoBody)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrConnectionFailed, err)
+		return fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}
 	if c.apiKey != "" {
 		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
@@ -130,7 +130,7 @@ func (c *httpClient) Health(ctx context.Context) error {
 
 	resp, err := c.http.Do(httpReq)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrConnectionFailed, err)
+		return fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 

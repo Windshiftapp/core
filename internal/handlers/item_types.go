@@ -227,7 +227,7 @@ func (h *ItemTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 				VALUES (?, ?, ?)
 			`, csID, id, now)
 			if err != nil {
-				respondInternalError(w, r, fmt.Errorf("failed to associate with configuration set %d: %v", csID, err))
+				respondInternalError(w, r, fmt.Errorf("failed to associate with configuration set %d: %w", csID, err))
 				return
 			}
 		}
@@ -374,7 +374,7 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		// Delete existing associations
 		_, err = h.db.ExecWrite("DELETE FROM configuration_set_item_types WHERE item_type_id = ?", id)
 		if err != nil {
-			respondInternalError(w, r, fmt.Errorf("failed to update configuration set associations: %v", err))
+			respondInternalError(w, r, fmt.Errorf("failed to update configuration set associations: %w", err))
 			return
 		}
 
@@ -385,7 +385,7 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 				VALUES (?, ?, ?)
 			`, csID, id, now)
 			if err != nil {
-				respondInternalError(w, r, fmt.Errorf("failed to associate with configuration set %d: %v", csID, err))
+				respondInternalError(w, r, fmt.Errorf("failed to associate with configuration set %d: %w", csID, err))
 				return
 			}
 		}

@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -404,7 +405,9 @@ func (h *ConfigurationSetHandler) AnalyzeComprehensiveMigration(w http.ResponseW
 
 	// Count total items in workspace
 	var totalItems int
-	_ = h.db.QueryRow(`SELECT COUNT(*) FROM items WHERE workspace_id = ?`, workspaceID).Scan(&totalItems)
+	if err := h.db.QueryRow(`SELECT COUNT(*) FROM items WHERE workspace_id = ?`, workspaceID).Scan(&totalItems); err != nil {
+		slog.Warn("failed to get total items count for migration analysis", slog.Any("error", err))
+	}
 
 	// Initialize analysis
 	analysis := models.ComprehensiveMigrationAnalysis{
@@ -588,7 +591,7 @@ func (h *ConfigurationSetHandler) analyzeCustomFieldMigration(workspaceID, sourc
 		FROM configuration_set_screens css
 		JOIN screen_fields sf ON css.screen_id = sf.screen_id
 		JOIN custom_field_definitions cfd ON sf.field_type = 'custom'
-			AND CAST(sf.field_identifier AS INTEGER) = cfd.id
+			AND (CASE WHEN sf.field_type = 'custom' THEN CAST(sf.field_identifier AS INTEGER) END) = cfd.id
 		WHERE css.configuration_set_id = ?
 	`, sourceConfigSetID)
 	if err == nil {
@@ -615,7 +618,7 @@ func (h *ConfigurationSetHandler) analyzeCustomFieldMigration(workspaceID, sourc
 		FROM configuration_set_screens css
 		JOIN screen_fields sf ON css.screen_id = sf.screen_id
 		JOIN custom_field_definitions cfd ON sf.field_type = 'custom'
-			AND CAST(sf.field_identifier AS INTEGER) = cfd.id
+			AND (CASE WHEN sf.field_type = 'custom' THEN CAST(sf.field_identifier AS INTEGER) END) = cfd.id
 		WHERE css.configuration_set_id = ?
 	`, targetConfigSetID)
 	if err == nil {

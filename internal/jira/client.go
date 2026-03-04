@@ -99,7 +99,7 @@ func NewClient(cfg Config) (Client, error) {
 	// Parse URL to validate it
 	u, err := url.Parse(baseURL)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidURL, err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidURL, err)
 	}
 	if u.Scheme != "https" && u.Scheme != "http" {
 		return nil, fmt.Errorf("%w: must use http or https", ErrInvalidURL)
@@ -215,7 +215,7 @@ func (c *cloudClient) TestConnection(ctx context.Context) (*JiraInstanceInfo, er
 	// Use /myself endpoint to verify credentials
 	resp, err := c.do(ctx, "GET", c.baseURL+"/myself", nil)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrConnectionFailed, err)
+		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
