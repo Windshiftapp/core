@@ -265,21 +265,6 @@ func (pm *PermissionMiddleware) hasGlobalPermission(userID int, permissionKey st
 	return count > 0, nil
 }
 
-func (pm *PermissionMiddleware) hasWorkspacePermission(userID, workspaceID int, permissionKey string) (bool, error) {
-	var count int
-	// Check if user has permission via role assignment
-	err := pm.db.QueryRow(`
-		SELECT COUNT(*) FROM user_workspace_roles uwr
-		JOIN role_permissions rp ON uwr.role_id = rp.role_id
-		JOIN permissions p ON rp.permission_id = p.id
-		WHERE uwr.user_id = ? AND uwr.workspace_id = ? AND p.permission_key = ?
-	`, userID, workspaceID, permissionKey).Scan(&count)
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
-}
-
 func (pm *PermissionMiddleware) hasAnyWorkspacePermission(userID, workspaceID int) (bool, error) {
 	var count int
 	// Check if user has any role in the workspace

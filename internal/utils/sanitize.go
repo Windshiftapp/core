@@ -24,12 +24,6 @@ var (
 
 // Pre-compiled regular expressions for non-HTML patterns
 var (
-	// Email validation regex
-	emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
-
-	// Dangerous filename characters regex
-	dangerousCharsRegex = regexp.MustCompile(`[<>:"|?*\x00-\x1f]`)
-
 	// Dangerous URL schemes in Markdown links: [text](javascript:...) or ![alt](data:...)
 	// Matches both link and image syntax, case-insensitive scheme names.
 	// Handles one level of nested parens in the URL (e.g. alert(1)) before the closing Markdown paren.

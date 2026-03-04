@@ -24,32 +24,34 @@ var (
 
 // SSOProvider represents an SSO identity provider configuration
 type SSOProvider struct {
-	ID                    int       `json:"id"`
-	Slug                  string    `json:"slug"`
-	Name                  string    `json:"name"`
-	ProviderType          string    `json:"provider_type"`
-	Enabled               bool      `json:"enabled"`
-	IsDefault             bool      `json:"is_default"`
-	IssuerURL             string    `json:"issuer_url,omitempty"`
-	ClientID              string    `json:"client_id,omitempty"`
-	ClientSecretEncrypted string    `json:"-"`                       // Never send to client
-	ClientSecret          string    `json:"client_secret,omitempty"` // Only used for input, never stored
-	Scopes                string    `json:"scopes"`
-	AutoProvisionUsers    bool      `json:"auto_provision_users"`
-	AllowPasswordLogin    bool      `json:"allow_password_login"`
-	RequireVerifiedEmail  bool      `json:"require_verified_email"` // Require email_verified=true from IdP (default: true)
-	AttributeMapping      string    `json:"attribute_mapping"`
+	ID                    int    `json:"id"`
+	Slug                  string `json:"slug"`
+	Name                  string `json:"name"`
+	ProviderType          string `json:"provider_type"`
+	Enabled               bool   `json:"enabled"`
+	IsDefault             bool   `json:"is_default"`
+	IssuerURL             string `json:"issuer_url,omitempty"`
+	ClientID              string `json:"client_id,omitempty"`
+	ClientSecretEncrypted string `json:"-"`                       // Never send to client
+	ClientSecret          string `json:"client_secret,omitempty"` // Only used for input, never stored
+	Scopes                string `json:"scopes"`
+	AutoProvisionUsers    bool   `json:"auto_provision_users"`
+	AllowPasswordLogin    bool   `json:"allow_password_login"`
+	RequireVerifiedEmail  bool   `json:"require_verified_email"` // Require email_verified=true from IdP (default: true)
+	AttributeMapping      string `json:"attribute_mapping"`
 	// SAML-specific fields
-	SAMLIdPMetadataURL string `json:"saml_idp_metadata_url,omitempty"` // IdP metadata URL for auto-configuration
-	SAMLIdPSSOURL      string `json:"saml_idp_sso_url,omitempty"`      // IdP Single Sign-On URL
-	SAMLIdPCertificate string `json:"saml_idp_certificate,omitempty"`  // IdP X.509 certificate (PEM)
-	SAMLSPEntityID     string `json:"saml_sp_entity_id,omitempty"`     // SP Entity ID (defaults to base URL)
-	SAMLSignRequests   bool   `json:"saml_sign_requests"`              // Whether to sign AuthnRequests
+	SAMLIdPMetadataURL string    `json:"saml_idp_metadata_url,omitempty"` // IdP metadata URL for auto-configuration
+	SAMLIdPSSOURL      string    `json:"saml_idp_sso_url,omitempty"`      // IdP Single Sign-On URL
+	SAMLIdPCertificate string    `json:"saml_idp_certificate,omitempty"`  // IdP X.509 certificate (PEM)
+	SAMLSPEntityID     string    `json:"saml_sp_entity_id,omitempty"`     // SP Entity ID (defaults to base URL)
+	SAMLSignRequests   bool      `json:"saml_sign_requests"`              // Whether to sign AuthnRequests
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 // providerColumns is the standard SELECT column list for providers (with secret)
+//
+//nolint:gosec // G101: SQL column name constants, not credentials
 const providerColumnsWithSecret = `id, slug, name, provider_type, enabled, is_default,
 	issuer_url, client_id, client_secret_encrypted, scopes,
 	auto_provision_users, allow_password_login, require_verified_email,
@@ -58,6 +60,8 @@ const providerColumnsWithSecret = `id, slug, name, provider_type, enabled, is_de
 	created_at, updated_at`
 
 // providerColumnsWithoutSecret is the SELECT column list for listing (no secret)
+//
+//nolint:gosec // G101: SQL column name constants, not credentials
 const providerColumnsWithoutSecret = `id, slug, name, provider_type, enabled, is_default,
 	issuer_url, client_id, scopes,
 	auto_provision_users, allow_password_login, require_verified_email,
@@ -66,10 +70,12 @@ const providerColumnsWithoutSecret = `id, slug, name, provider_type, enabled, is
 	created_at, updated_at`
 
 // scanProvider scans a row into an SSOProvider (with secret)
-func scanProvider(row interface{ Scan(dest ...interface{}) error }) (*SSOProvider, error) {
+func scanProvider(row interface {
+	Scan(dest ...interface{}) error
+}) (*SSOProvider, error) {
 	var provider SSOProvider
 	var issuerURL, clientID, clientSecretEncrypted, scopes, attributeMapping sql.NullString
-	var samlIdPMetadataURL, samlIdPSSOURL, samlIdPCertificate, samlSPEntityID sql.NullString
+	var samlIDPMetadataURL, samlIDPSSOURL, samlIDPCertificate, samlSPEntityID sql.NullString
 
 	err := row.Scan(
 		&provider.ID, &provider.Slug, &provider.Name, &provider.ProviderType,
@@ -77,7 +83,7 @@ func scanProvider(row interface{ Scan(dest ...interface{}) error }) (*SSOProvide
 		&issuerURL, &clientID, &clientSecretEncrypted, &scopes,
 		&provider.AutoProvisionUsers, &provider.AllowPasswordLogin, &provider.RequireVerifiedEmail,
 		&attributeMapping,
-		&samlIdPMetadataURL, &samlIdPSSOURL, &samlIdPCertificate, &samlSPEntityID, &provider.SAMLSignRequests,
+		&samlIDPMetadataURL, &samlIDPSSOURL, &samlIDPCertificate, &samlSPEntityID, &provider.SAMLSignRequests,
 		&provider.CreatedAt, &provider.UpdatedAt,
 	)
 	if err != nil {
@@ -89,19 +95,21 @@ func scanProvider(row interface{ Scan(dest ...interface{}) error }) (*SSOProvide
 	provider.ClientSecretEncrypted = clientSecretEncrypted.String
 	provider.Scopes = scopes.String
 	provider.AttributeMapping = attributeMapping.String
-	provider.SAMLIdPMetadataURL = samlIdPMetadataURL.String
-	provider.SAMLIdPSSOURL = samlIdPSSOURL.String
-	provider.SAMLIdPCertificate = samlIdPCertificate.String
+	provider.SAMLIdPMetadataURL = samlIDPMetadataURL.String
+	provider.SAMLIdPSSOURL = samlIDPSSOURL.String
+	provider.SAMLIdPCertificate = samlIDPCertificate.String
 	provider.SAMLSPEntityID = samlSPEntityID.String
 
 	return &provider, nil
 }
 
 // scanProviderNoSecret scans a row into an SSOProvider (without secret column)
-func scanProviderNoSecret(row interface{ Scan(dest ...interface{}) error }) (*SSOProvider, error) {
+func scanProviderNoSecret(row interface {
+	Scan(dest ...interface{}) error
+}) (*SSOProvider, error) {
 	var provider SSOProvider
 	var issuerURL, clientID, scopes, attributeMapping sql.NullString
-	var samlIdPMetadataURL, samlIdPSSOURL, samlIdPCertificate, samlSPEntityID sql.NullString
+	var samlIDPMetadataURL, samlIDPSSOURL, samlIDPCertificate, samlSPEntityID sql.NullString
 
 	err := row.Scan(
 		&provider.ID, &provider.Slug, &provider.Name, &provider.ProviderType,
@@ -109,7 +117,7 @@ func scanProviderNoSecret(row interface{ Scan(dest ...interface{}) error }) (*SS
 		&issuerURL, &clientID, &scopes,
 		&provider.AutoProvisionUsers, &provider.AllowPasswordLogin, &provider.RequireVerifiedEmail,
 		&attributeMapping,
-		&samlIdPMetadataURL, &samlIdPSSOURL, &samlIdPCertificate, &samlSPEntityID, &provider.SAMLSignRequests,
+		&samlIDPMetadataURL, &samlIDPSSOURL, &samlIDPCertificate, &samlSPEntityID, &provider.SAMLSignRequests,
 		&provider.CreatedAt, &provider.UpdatedAt,
 	)
 	if err != nil {
@@ -120,9 +128,9 @@ func scanProviderNoSecret(row interface{ Scan(dest ...interface{}) error }) (*SS
 	provider.ClientID = clientID.String
 	provider.Scopes = scopes.String
 	provider.AttributeMapping = attributeMapping.String
-	provider.SAMLIdPMetadataURL = samlIdPMetadataURL.String
-	provider.SAMLIdPSSOURL = samlIdPSSOURL.String
-	provider.SAMLIdPCertificate = samlIdPCertificate.String
+	provider.SAMLIdPMetadataURL = samlIDPMetadataURL.String
+	provider.SAMLIdPSSOURL = samlIDPSSOURL.String
+	provider.SAMLIdPCertificate = samlIDPCertificate.String
 	provider.SAMLSPEntityID = samlSPEntityID.String
 
 	return &provider, nil
