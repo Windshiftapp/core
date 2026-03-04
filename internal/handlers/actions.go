@@ -181,19 +181,17 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAutomationCreate,
-			ResourceType: logger.ResourceAutomation,
-			ResourceID:   &createdAction.ID,
-			ResourceName: createdAction.Name,
-			Success:      true,
-		})
-	}
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionAutomationCreate,
+		ResourceType: logger.ResourceAutomation,
+		ResourceID:   &createdAction.ID,
+		ResourceName: createdAction.Name,
+		Success:      true,
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

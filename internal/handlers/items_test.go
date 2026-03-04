@@ -414,7 +414,7 @@ func TestItemHandler_GetChildren_Success(t *testing.T) {
 	// Get children
 	req := testutils.CreateJSONRequest(t, "GET", "/api/items/"+testutils.IntToString(parent.ID)+"/children", nil)
 	req.SetPathValue("id", testutils.IntToString(parent.ID))
-	rr := testutils.ExecuteAuthenticatedRequest(t, handler.GetChildren, req, nil)
+	rr := testutils.ExecuteAuthenticatedRequest(t, handler.GetChildrenNew, req, nil)
 
 	rr.AssertStatusCode(http.StatusOK).
 		AssertContentType("application/json")

@@ -235,19 +235,17 @@ func (h *AssetHandler) AssignSetRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAssetSetRoleAssign,
-			ResourceType: logger.ResourceAssetSetRole,
-			ResourceID:   &setID,
-			Details:      map[string]interface{}{"role_id": req.RoleID},
-			Success:      true,
-		})
-	}
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionAssetSetRoleAssign,
+		ResourceType: logger.ResourceAssetSetRole,
+		ResourceID:   &setID,
+		Details:      map[string]interface{}{"role_id": req.RoleID},
+		Success:      true,
+	})
 
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
@@ -305,19 +303,17 @@ func (h *AssetHandler) RevokeSetRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAssetSetRoleRevoke,
-			ResourceType: logger.ResourceAssetSetRole,
-			ResourceID:   &setID,
-			Details:      map[string]interface{}{"role_assignment_id": roleAssignmentID},
-			Success:      true,
-		})
-	}
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionAssetSetRoleRevoke,
+		ResourceType: logger.ResourceAssetSetRole,
+		ResourceID:   &setID,
+		Details:      map[string]interface{}{"role_assignment_id": roleAssignmentID},
+		Success:      true,
+	})
 
 	w.WriteHeader(http.StatusNoContent)
 }

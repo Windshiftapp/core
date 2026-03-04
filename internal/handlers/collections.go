@@ -249,19 +249,17 @@ func (h *CollectionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	collection.ID = int(id)
 	collection.CreatedBy = &currentUser.ID
 
-	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionCollectionCreate,
-			ResourceType: logger.ResourceCollection,
-			ResourceID:   &collection.ID,
-			ResourceName: collection.Name,
-			Success:      true,
-		})
-	}
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionCollectionCreate,
+		ResourceType: logger.ResourceCollection,
+		ResourceID:   &collection.ID,
+		ResourceName: collection.Name,
+		Success:      true,
+	})
 
 	respondJSONCreated(w, collection)
 }
@@ -385,19 +383,17 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionCollectionUpdate,
-			ResourceType: logger.ResourceCollection,
-			ResourceID:   &id,
-			ResourceName: collection.Name,
-			Success:      true,
-		})
-	}
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionCollectionUpdate,
+		ResourceType: logger.ResourceCollection,
+		ResourceID:   &id,
+		ResourceName: collection.Name,
+		Success:      true,
+	})
 
 	// Return success
 	respondJSONOK(w, map[string]string{"message": "Collection updated successfully"})
@@ -443,18 +439,16 @@ func (h *CollectionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionCollectionDelete,
-			ResourceType: logger.ResourceCollection,
-			ResourceID:   &id,
-			Success:      true,
-		})
-	}
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionCollectionDelete,
+		ResourceType: logger.ResourceCollection,
+		ResourceID:   &id,
+		Success:      true,
+	})
 
 	respondJSONOK(w, map[string]string{"message": "Collection deleted successfully"})
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
 	"windshift/internal/database"
 	"windshift/internal/models"
 
@@ -733,26 +734,28 @@ func (r *Repository) DeleteAttachment(id string) error {
 // --- Helpers ---
 
 // buildStringPlaceholders creates PostgreSQL $N placeholders for string slices.
-func buildStringPlaceholders(ids []string) (string, []interface{}) {
-	placeholders := make([]string, len(ids))
-	args := make([]interface{}, len(ids))
+func buildStringPlaceholders(ids []string) (placeholders string, args []interface{}) {
+	ph := make([]string, len(ids))
+	args = make([]interface{}, len(ids))
 	for i, id := range ids {
-		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		ph[i] = fmt.Sprintf("$%d", i+1)
 		args[i] = id
 	}
-	return strings.Join(placeholders, ", "), args
+	placeholders = strings.Join(ph, ", ")
+	return placeholders, args
 }
 
 // buildIntPlaceholders creates PostgreSQL $N placeholders for int slices,
 // starting at the given parameter offset (1-based).
-func buildIntPlaceholders(ids []int, offset int) (string, []interface{}) {
-	placeholders := make([]string, len(ids))
-	args := make([]interface{}, len(ids))
+func buildIntPlaceholders(ids []int, offset int) (placeholders string, args []interface{}) {
+	ph := make([]string, len(ids))
+	args = make([]interface{}, len(ids))
 	for i, id := range ids {
-		placeholders[i] = fmt.Sprintf("$%d", offset+i+1)
+		ph[i] = fmt.Sprintf("$%d", offset+i+1)
 		args[i] = id
 	}
-	return strings.Join(placeholders, ", "), args
+	placeholders = strings.Join(ph, ", ")
+	return placeholders, args
 }
 
 // scanStringColumn scans a single string column from rows into a slice.

@@ -242,20 +242,18 @@ func (h *AssetHandler) CreateAssetSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if currentUser != nil {
-		id := int(setID)
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAssetSetCreate,
-			ResourceType: logger.ResourceAssetSet,
-			ResourceID:   &id,
-			ResourceName: req.Name,
-			Success:      true,
-		})
-	}
+	id := int(setID)
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionAssetSetCreate,
+		ResourceType: logger.ResourceAssetSet,
+		ResourceID:   &id,
+		ResourceName: req.Name,
+		Success:      true,
+	})
 
 	// Return the created set
 	set := models.AssetManagementSet{
@@ -345,19 +343,17 @@ func (h *AssetHandler) UpdateAssetSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAssetSetUpdate,
-			ResourceType: logger.ResourceAssetSet,
-			ResourceID:   &setID,
-			ResourceName: req.Name,
-			Success:      true,
-		})
-	}
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionAssetSetUpdate,
+		ResourceType: logger.ResourceAssetSet,
+		ResourceID:   &setID,
+		ResourceName: req.Name,
+		Success:      true,
+	})
 
 	// Return updated set
 	var set models.AssetManagementSet
@@ -409,18 +405,16 @@ func (h *AssetHandler) DeleteAssetSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAssetSetDelete,
-			ResourceType: logger.ResourceAssetSet,
-			ResourceID:   &setID,
-			Success:      true,
-		})
-	}
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionAssetSetDelete,
+		ResourceType: logger.ResourceAssetSet,
+		ResourceID:   &setID,
+		Success:      true,
+	})
 
 	w.WriteHeader(http.StatusNoContent)
 }
