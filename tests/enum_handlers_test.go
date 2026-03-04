@@ -919,3 +919,180 @@ func TestContactRoleOperations(t *testing.T) {
 		AssertStatusCode(t, resp, http.StatusNoContent)
 	})
 }
+
+// ============================================================================
+// Milestone Tests (Full CRUD + Error Cases)
+// ============================================================================
+
+func TestMilestoneOperations(t *testing.T) {
+	server, _ := StartTestServer(t, GetDBType())
+	CreateBearerToken(t, server)
+
+	timestamp := time.Now().Unix()
+	var milestoneID int
+	var globalMilestoneID int
+
+	// Create a workspace for workspace-scoped milestones
+	workspaceID, _ := CreateTestWorkspace(t, server, fmt.Sprintf("MilestoneTest %d", timestamp), "")
+
+	// Success Cases
+	t.Run("CreateLocal", func(t *testing.T) {
+		data := map[string]interface{}{
+			"name":         fmt.Sprintf("Sprint 1 %d", timestamp),
+			"description":  "First sprint milestone",
+			"status":       "planning",
+			"is_global":    false,
+			"workspace_id": workspaceID,
+		}
+		resp := MakeAuthRequest(t, server, http.MethodPost, "/milestones", data)
+		defer resp.Body.Close()
+
+		AssertStatusCode(t, resp, http.StatusCreated)
+
+		var result map[string]interface{}
+		DecodeJSON(t, resp, &result)
+
+		AssertJSONField(t, result, "name", fmt.Sprintf("Sprint 1 %d", timestamp))
+		AssertJSONField(t, result, "status", "planning")
+
+		milestoneID = ExtractIDFromResponse(t, result)
+
+		if _, ok := result["created_at"]; !ok {
+			t.Error("Expected created_at in response")
+		}
+	})
+
+	t.Run("CreateGlobal", func(t *testing.T) {
+		data := map[string]interface{}{
+			"name":        fmt.Sprintf("Global Release %d", timestamp),
+			"description": "A global milestone",
+			"status":      "planning",
+			"is_global":   true,
+		}
+		resp := MakeAuthRequest(t, server, http.MethodPost, "/milestones", data)
+		defer resp.Body.Close()
+
+		AssertStatusCode(t, resp, http.StatusCreated)
+
+		var result map[string]interface{}
+		DecodeJSON(t, resp, &result)
+
+		AssertJSONField(t, result, "name", fmt.Sprintf("Global Release %d", timestamp))
+
+		globalMilestoneID = ExtractIDFromResponse(t, result)
+	})
+
+	t.Run("GetAll", func(t *testing.T) {
+		resp := MakeAuthRequest(t, server, http.MethodGet, "/milestones", nil)
+		defer resp.Body.Close()
+
+		AssertStatusCode(t, resp, http.StatusOK)
+
+		var milestones []map[string]interface{}
+		DecodeJSON(t, resp, &milestones)
+
+		if len(milestones) == 0 {
+			t.Error("Expected at least one milestone")
+		}
+	})
+
+	t.Run("GetAllFilteredByWorkspace", func(t *testing.T) {
+		resp := MakeAuthRequest(t, server, http.MethodGet, fmt.Sprintf("/milestones?workspace_id=%d", workspaceID), nil)
+		defer resp.Body.Close()
+
+		AssertStatusCode(t, resp, http.StatusOK)
+
+		var milestones []map[string]interface{}
+		DecodeJSON(t, resp, &milestones)
+
+		if len(milestones) == 0 {
+			t.Error("Expected at least one milestone for workspace filter")
+		}
+	})
+
+	t.Run("GetByID", func(t *testing.T) {
+		resp := MakeAuthRequest(t, server, http.MethodGet, fmt.Sprintf("/milestones/%d", milestoneID), nil)
+		defer resp.Body.Close()
+
+		AssertStatusCode(t, resp, http.StatusOK)
+
+		var result map[string]interface{}
+		DecodeJSON(t, resp, &result)
+
+		AssertJSONField(t, result, "name", fmt.Sprintf("Sprint 1 %d", timestamp))
+	})
+
+	t.Run("Update", func(t *testing.T) {
+		data := map[string]interface{}{
+			"name":         fmt.Sprintf("Updated Sprint %d", timestamp),
+			"description":  "Updated milestone description",
+			"status":       "in-progress",
+			"is_global":    false,
+			"workspace_id": workspaceID,
+		}
+		resp := MakeAuthRequest(t, server, http.MethodPut, fmt.Sprintf("/milestones/%d", milestoneID), data)
+		defer resp.Body.Close()
+
+		AssertStatusCode(t, resp, http.StatusOK)
+
+		var result map[string]interface{}
+		DecodeJSON(t, resp, &result)
+
+		AssertJSONField(t, result, "name", fmt.Sprintf("Updated Sprint %d", timestamp))
+		AssertJSONField(t, result, "status", "in-progress")
+	})
+
+	// Error Cases
+	t.Run("CreateMissingName", func(t *testing.T) {
+		data := map[string]interface{}{
+			"is_global":    false,
+			"workspace_id": workspaceID,
+		}
+		resp := MakeAuthRequest(t, server, http.MethodPost, "/milestones", data)
+		defer resp.Body.Close()
+		AssertStatusCode(t, resp, http.StatusBadRequest)
+	})
+
+	t.Run("GetNonExistent", func(t *testing.T) {
+		resp := MakeAuthRequest(t, server, http.MethodGet, "/milestones/99999", nil)
+		defer resp.Body.Close()
+		AssertStatusCode(t, resp, http.StatusNotFound)
+	})
+
+	t.Run("UpdateNonExistent", func(t *testing.T) {
+		data := map[string]interface{}{
+			"name":      "Updated Name",
+			"status":    "planning",
+			"is_global": true,
+		}
+		resp := MakeAuthRequest(t, server, http.MethodPut, "/milestones/99999", data)
+		defer resp.Body.Close()
+		// Note: Current behavior returns 500 instead of 404 - this is a known issue to fix in refactoring
+		AssertStatusCode(t, resp, http.StatusInternalServerError)
+	})
+
+	t.Run("DeleteNonExistent", func(t *testing.T) {
+		resp := MakeAuthRequest(t, server, http.MethodDelete, "/milestones/99999", nil)
+		defer resp.Body.Close()
+		AssertStatusCode(t, resp, http.StatusNotFound)
+	})
+
+	t.Run("InvalidJSON", func(t *testing.T) {
+		resp := MakeAuthRequestRaw(t, server, http.MethodPost, "/milestones", "not valid json")
+		defer resp.Body.Close()
+		AssertStatusCode(t, resp, http.StatusBadRequest)
+	})
+
+	// Cleanup
+	t.Run("DeleteGlobal", func(t *testing.T) {
+		resp := MakeAuthRequest(t, server, http.MethodDelete, fmt.Sprintf("/milestones/%d", globalMilestoneID), nil)
+		defer resp.Body.Close()
+		AssertStatusCode(t, resp, http.StatusNoContent)
+	})
+
+	t.Run("Delete", func(t *testing.T) {
+		resp := MakeAuthRequest(t, server, http.MethodDelete, fmt.Sprintf("/milestones/%d", milestoneID), nil)
+		defer resp.Body.Close()
+		AssertStatusCode(t, resp, http.StatusNoContent)
+	})
+}
