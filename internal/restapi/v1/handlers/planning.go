@@ -159,10 +159,15 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var targetDate *string
+	if req.TargetDate != "" {
+		targetDate = &req.TargetDate
+	}
+
 	m, err := h.planningService.CreateMilestone(services.CreateMilestoneParams{
 		Name:        req.Name,
 		Description: req.Description,
-		TargetDate:  req.TargetDate,
+		TargetDate:  targetDate,
 		Status:      req.Status,
 		CategoryID:  req.CategoryID,
 	})
@@ -211,11 +216,16 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var updateTargetDate *string
+	if req.TargetDate != "" {
+		updateTargetDate = &req.TargetDate
+	}
+
 	m, err := h.planningService.UpdateMilestone(services.UpdateMilestoneParams{
 		ID:          id,
 		Name:        req.Name,
 		Description: req.Description,
-		TargetDate:  req.TargetDate,
+		TargetDate:  updateTargetDate,
 		Status:      req.Status,
 		CategoryID:  req.CategoryID,
 	})

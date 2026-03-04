@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS time_projects (
 	status TEXT DEFAULT 'Active',
 	color TEXT,
 	hourly_rate REAL DEFAULT 0,
+	settings TEXT,
 	active BOOLEAN DEFAULT true,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
