@@ -12,6 +12,7 @@ import (
 
 	"windshift/internal/auth"
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
@@ -225,6 +226,21 @@ func (h *WebAuthnHandler) CompleteFIDORegistrationNew(w http.ResponseWriter, r *
 		// Non-fatal, continue
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionWebAuthnRegister,
+			ResourceType: logger.ResourceWebAuthn,
+			ResourceID:   &userID,
+			ResourceName: req.CredentialName,
+			Success:      true,
+		})
+	}
+
 	response := map[string]interface{}{
 		"status":  "success",
 		"message": "FIDO credential registered successfully",
@@ -311,6 +327,21 @@ func (h *WebAuthnHandler) RemoveWebAuthnCredential(w http.ResponseWriter, r *htt
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionWebAuthnRemove,
+			ResourceType: logger.ResourceWebAuthn,
+			ResourceID:   &userID,
+			ResourceName: credentialID,
+			Success:      true,
+		})
 	}
 
 	response := map[string]string{

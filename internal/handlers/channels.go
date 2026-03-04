@@ -145,6 +145,22 @@ func (h *ChannelHandler) CreateChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		channelID := channel.ID
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionChannelCreate,
+			ResourceType: logger.ResourceChannel,
+			ResourceID:   &channelID,
+			ResourceName: channel.Name,
+			Success:      true,
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(channel)
@@ -235,6 +251,21 @@ func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionChannelUpdate,
+			ResourceType: logger.ResourceChannel,
+			ResourceID:   &id,
+			ResourceName: updates.Name,
+			Success:      true,
+		})
+	}
+
 	// Return the updated channel
 	h.GetChannel(w, r)
 }
@@ -286,6 +317,20 @@ func (h *ChannelHandler) DeleteChannel(w http.ResponseWriter, r *http.Request) {
 		}
 		respondInternalError(w, r, err)
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionChannelDelete,
+			ResourceType: logger.ResourceChannel,
+			ResourceID:   &id,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)

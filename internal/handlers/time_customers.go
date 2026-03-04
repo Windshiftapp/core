@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 type TimeCustomerHandler struct {
@@ -144,7 +146,8 @@ func (h *TimeCustomerHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *TimeCustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Check permission
-	if _, ok := h.checkCustomerPermission(w, r); !ok {
+	user, ok := h.checkCustomerPermission(w, r)
+	if !ok {
 		return
 	}
 
@@ -187,12 +190,28 @@ func (h *TimeCustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 	c.CreatedAt = now
 	c.UpdatedAt = now
 
+	if user != nil {
+		customerID := c.ID
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       user.ID,
+			Username:     user.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionTimeCustomerCreate,
+			ResourceType: logger.ResourceTimeCustomer,
+			ResourceID:   &customerID,
+			ResourceName: c.Name,
+			Success:      true,
+		})
+	}
+
 	respondJSONCreated(w, c)
 }
 
 func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Check permission
-	if _, ok := h.checkCustomerPermission(w, r); !ok {
+	user, ok := h.checkCustomerPermission(w, r)
+	if !ok {
 		return
 	}
 
@@ -238,12 +257,27 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 	c.ID = id
 	c.UpdatedAt = time.Now()
 
+	if user != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       user.ID,
+			Username:     user.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionTimeCustomerUpdate,
+			ResourceType: logger.ResourceTimeCustomer,
+			ResourceID:   &id,
+			ResourceName: c.Name,
+			Success:      true,
+		})
+	}
+
 	respondJSONOK(w, c)
 }
 
 func (h *TimeCustomerHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Check permission
-	if _, ok := h.checkCustomerPermission(w, r); !ok {
+	user, ok := h.checkCustomerPermission(w, r)
+	if !ok {
 		return
 	}
 
@@ -257,6 +291,19 @@ func (h *TimeCustomerHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	if user != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       user.ID,
+			Username:     user.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionTimeCustomerDelete,
+			ResourceType: logger.ResourceTimeCustomer,
+			ResourceID:   &id,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)

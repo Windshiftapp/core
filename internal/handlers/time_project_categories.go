@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/utils"
 )
 
 type TimeProjectCategoryHandler struct {
@@ -149,6 +151,22 @@ func (h *TimeProjectCategoryHandler) CreateCategory(w http.ResponseWriter, r *ht
 	c.CreatedAt = now
 	c.UpdatedAt = now
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		categoryID := c.ID
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionTimeCategoryCreate,
+			ResourceType: logger.ResourceTimeCategory,
+			ResourceID:   &categoryID,
+			ResourceName: c.Name,
+			Success:      true,
+		})
+	}
+
 	respondJSONCreated(w, c)
 }
 
@@ -197,6 +215,21 @@ func (h *TimeProjectCategoryHandler) UpdateCategory(w http.ResponseWriter, r *ht
 	c.ID = id
 	c.UpdatedAt = now
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionTimeCategoryUpdate,
+			ResourceType: logger.ResourceTimeCategory,
+			ResourceID:   &id,
+			ResourceName: c.Name,
+			Success:      true,
+		})
+	}
+
 	respondJSONOK(w, c)
 }
 
@@ -235,6 +268,20 @@ func (h *TimeProjectCategoryHandler) DeleteCategory(w http.ResponseWriter, r *ht
 	if rowsAffected == 0 {
 		respondNotFound(w, r, "category")
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionTimeCategoryDelete,
+			ResourceType: logger.ResourceTimeCategory,
+			ResourceID:   &id,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)

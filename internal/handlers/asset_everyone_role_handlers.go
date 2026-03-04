@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/utils"
 )
@@ -132,6 +133,23 @@ func (h *AssetHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	if currentUser != nil {
+		actionType := logger.ActionAssetSetRoleRevoke
+		if req.RoleID != nil {
+			actionType = logger.ActionAssetSetRoleAssign
+		}
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   actionType,
+			ResourceType: logger.ResourceAssetSetRole,
+			ResourceID:   &setID,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusOK)

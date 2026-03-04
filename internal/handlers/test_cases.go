@@ -6,9 +6,11 @@ import (
 	"strconv"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 type TestCaseHandler struct {
@@ -156,6 +158,18 @@ func (h *TestCaseHandler) CreateTestCase(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionTestCaseCreate,
+		ResourceType: logger.ResourceTestCase,
+		ResourceID:   &testCase.ID,
+		ResourceName: testCase.Title,
+		Success:      true,
+	})
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(testCase)
@@ -221,6 +235,18 @@ func (h *TestCaseHandler) UpdateTestCase(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionTestCaseUpdate,
+		ResourceType: logger.ResourceTestCase,
+		ResourceID:   &testCase.ID,
+		ResourceName: testCase.Title,
+		Success:      true,
+	})
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(testCase)
 }
@@ -256,6 +282,17 @@ func (h *TestCaseHandler) DeleteTestCase(w http.ResponseWriter, r *http.Request)
 		}
 		return
 	}
+
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionTestCaseDelete,
+		ResourceType: logger.ResourceTestCase,
+		ResourceID:   &id,
+		Success:      true,
+	})
 
 	w.WriteHeader(http.StatusNoContent)
 }

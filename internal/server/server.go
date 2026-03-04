@@ -350,12 +350,120 @@ func (s *Server) initialize() error {
 	priorityHandler := handlers.NewPriorityHandler(s.db)
 
 	// Generic enum handlers
+	hierarchyLevelConfig := services.NewHierarchyLevelConfig()
+	hierarchyLevelConfig.AfterCreate = func(db database.Database, id int, entity interface{}, r *http.Request) error {
+		h := entity.(*models.HierarchyLevel) //nolint:errcheck // type assertion is safe here
+		currentUser := utils.GetCurrentUser(r)
+		if currentUser != nil {
+			_ = logger.LogAudit(db, logger.AuditEvent{
+				UserID:       currentUser.ID,
+				Username:     currentUser.Username,
+				IPAddress:    utils.GetClientIP(r),
+				UserAgent:    r.UserAgent(),
+				ActionType:   logger.ActionHierarchyLevelCreate,
+				ResourceType: logger.ResourceHierarchyLevel,
+				ResourceID:   &id,
+				ResourceName: h.Name,
+				Success:      true,
+			})
+		}
+		return nil
+	}
+	hierarchyLevelConfig.AfterUpdate = func(db database.Database, id int, entity interface{}, r *http.Request) error {
+		h := entity.(*models.HierarchyLevel) //nolint:errcheck // type assertion is safe here
+		currentUser := utils.GetCurrentUser(r)
+		if currentUser != nil {
+			_ = logger.LogAudit(db, logger.AuditEvent{
+				UserID:       currentUser.ID,
+				Username:     currentUser.Username,
+				IPAddress:    utils.GetClientIP(r),
+				UserAgent:    r.UserAgent(),
+				ActionType:   logger.ActionHierarchyLevelUpdate,
+				ResourceType: logger.ResourceHierarchyLevel,
+				ResourceID:   &id,
+				ResourceName: h.Name,
+				Success:      true,
+			})
+		}
+		return nil
+	}
+	hierarchyLevelConfig.AfterDelete = func(db database.Database, id int, name string, r *http.Request) error {
+		currentUser := utils.GetCurrentUser(r)
+		if currentUser != nil {
+			_ = logger.LogAudit(db, logger.AuditEvent{
+				UserID:       currentUser.ID,
+				Username:     currentUser.Username,
+				IPAddress:    utils.GetClientIP(r),
+				UserAgent:    r.UserAgent(),
+				ActionType:   logger.ActionHierarchyLevelDelete,
+				ResourceType: logger.ResourceHierarchyLevel,
+				ResourceID:   &id,
+				ResourceName: name,
+				Success:      true,
+			})
+		}
+		return nil
+	}
 	hierarchyLevelHandler := handlers.NewEnumHandler(
-		services.NewEnumService(s.db, services.NewHierarchyLevelConfig()),
+		services.NewEnumService(s.db, hierarchyLevelConfig),
 		func() interface{} { return &models.HierarchyLevel{} })
 	requestTypeHandler := handlers.NewRequestTypeHandler(s.db)
+	statusCategoryConfig := services.NewStatusCategoryConfig()
+	statusCategoryConfig.AfterCreate = func(db database.Database, id int, entity interface{}, r *http.Request) error {
+		c := entity.(*models.StatusCategory) //nolint:errcheck // type assertion is safe here
+		currentUser := utils.GetCurrentUser(r)
+		if currentUser != nil {
+			_ = logger.LogAudit(db, logger.AuditEvent{
+				UserID:       currentUser.ID,
+				Username:     currentUser.Username,
+				IPAddress:    utils.GetClientIP(r),
+				UserAgent:    r.UserAgent(),
+				ActionType:   logger.ActionStatusCategoryCreate,
+				ResourceType: logger.ResourceStatusCategory,
+				ResourceID:   &id,
+				ResourceName: c.Name,
+				Success:      true,
+			})
+		}
+		return nil
+	}
+	statusCategoryConfig.AfterUpdate = func(db database.Database, id int, entity interface{}, r *http.Request) error {
+		c := entity.(*models.StatusCategory) //nolint:errcheck // type assertion is safe here
+		currentUser := utils.GetCurrentUser(r)
+		if currentUser != nil {
+			_ = logger.LogAudit(db, logger.AuditEvent{
+				UserID:       currentUser.ID,
+				Username:     currentUser.Username,
+				IPAddress:    utils.GetClientIP(r),
+				UserAgent:    r.UserAgent(),
+				ActionType:   logger.ActionStatusCategoryUpdate,
+				ResourceType: logger.ResourceStatusCategory,
+				ResourceID:   &id,
+				ResourceName: c.Name,
+				Success:      true,
+			})
+		}
+		return nil
+	}
+	statusCategoryConfig.AfterDelete = func(db database.Database, id int, name string, r *http.Request) error {
+		currentUser := utils.GetCurrentUser(r)
+		if currentUser != nil {
+			_ = logger.LogAudit(db, logger.AuditEvent{
+				UserID:       currentUser.ID,
+				Username:     currentUser.Username,
+				IPAddress:    utils.GetClientIP(r),
+				UserAgent:    r.UserAgent(),
+				ActionType:   logger.ActionStatusCategoryDelete,
+				ResourceType: logger.ResourceStatusCategory,
+				ResourceID:   &id,
+				ResourceName: name,
+				Success:      true,
+			})
+		}
+		return nil
+	}
 	statusCategoryHandler := handlers.NewEnumHandler(
-		services.NewEnumService(s.db, services.NewStatusCategoryConfig()),
+		services.NewEnumService(s.db, statusCategoryConfig),
 		func() interface{} { return &models.StatusCategory{} })
 	statusHandler := handlers.NewEnumHandler(
 		services.NewEnumService(s.db, services.NewStatusConfig()),
@@ -377,7 +485,7 @@ func (s *Server) initialize() error {
 	scimTokenManager := auth.NewSCIMTokenManager(s.db)
 	scimAuthMiddleware := middleware.NewSCIMAuthMiddleware(scimTokenManager)
 	scimHandler := handlers.NewSCIMHandler(s.db, baseURL)
-	scimTokenHandler := handlers.NewSCIMTokenHandler(scimTokenManager)
+	scimTokenHandler := handlers.NewSCIMTokenHandler(s.db, scimTokenManager)
 
 	permissionSetHandler := handlers.NewPermissionSetHandlerWithPool(s.db, permService)
 	workspaceRoleHandler := handlers.NewWorkspaceRoleHandlerWithPool(s.db, permService)
@@ -389,7 +497,7 @@ func (s *Server) initialize() error {
 	timeProjectCategoryHandler := handlers.NewTimeProjectCategoryHandler(s.db)
 	timeWorklogHandler := handlers.NewTimeWorklogHandler(s.db, permService, timePermissionService)
 	activeTimerHandler := handlers.NewActiveTimerHandler(s.db, timePermissionService)
-	timeProjectPermissionHandler := handlers.NewTimeProjectPermissionHandler(timePermissionService)
+	timeProjectPermissionHandler := handlers.NewTimeProjectPermissionHandler(s.db, timePermissionService)
 
 	// Test management handlers
 	testFolderHandler := handlers.NewTestFolderHandlerWithPool(s.db, permService)
@@ -443,7 +551,7 @@ func (s *Server) initialize() error {
 	// Initialize auth handler
 	authHandler := handlers.NewAuthHandler(s.db, sessionManager, s.loginRateLimiter, permService, emailVerificationService, ipExtractor, authPolicyHandler, adminRateLimiter)
 
-	themeHandler := handlers.NewThemeHandler(s.db)
+	themeHandler := handlers.NewThemeHandler(s.db, s.db)
 	userPreferencesHandler := handlers.NewUserPreferencesHandler(s.db)
 	homepageHandler := handlers.NewHomepageHandler(s.db, s.activityTracker)
 
@@ -565,7 +673,7 @@ func (s *Server) initialize() error {
 		if err := attachmentSettingsService.Initialize(cfg.AttachmentPath); err != nil {
 			slog.Warn("failed to initialize attachment settings", "error", err)
 		}
-		attachmentSettingsHandler = handlers.NewAttachmentSettingsHandler(attachmentSettingsService)
+		attachmentSettingsHandler = handlers.NewAttachmentSettingsHandler(s.db, attachmentSettingsService)
 	} else {
 		slog.Info("attachments disabled (no attachment path specified)")
 	}
@@ -655,7 +763,7 @@ func (s *Server) initialize() error {
 		slog.Info("LLM fallback service not configured")
 	}
 	llmManager := llm.NewConnectionManager(s.db, scmProviderHandler.GetEncryption(), fallbackLLMClient)
-	llmConnHandler := handlers.NewLLMConnectionHandler(llmManager)
+	llmConnHandler := handlers.NewLLMConnectionHandler(s.db, llmManager)
 	aiHandler := handlers.NewAIHandler(s.db, llmManager, permService)
 
 	// Logbook reverse proxy (optional sidecar)

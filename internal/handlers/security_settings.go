@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
+	"windshift/internal/utils"
 )
 
 // SecuritySettingsHandler handles admin security settings
@@ -102,6 +104,25 @@ func (h *SecuritySettingsHandler) UpdateSecuritySettings(w http.ResponseWriter, 
 			respondInternalError(w, r, err)
 			return
 		}
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionSecuritySettingsUpdate,
+			ResourceType: logger.ResourceSecuritySettings,
+			ResourceID:   nil,
+			ResourceName: "security_settings",
+			Details: map[string]interface{}{
+				"calendar_feed_enabled":  settings.CalendarFeedEnabled,
+				"plugin_cli_exec_enabled": settings.PluginCLIExecEnabled,
+			},
+			Success: true,
+		})
 	}
 
 	// Return updated settings

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/utils"
 )
@@ -241,6 +242,21 @@ func (h *AssetHandler) CreateAssetSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if currentUser != nil {
+		id := int(setID)
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAssetSetCreate,
+			ResourceType: logger.ResourceAssetSet,
+			ResourceID:   &id,
+			ResourceName: req.Name,
+			Success:      true,
+		})
+	}
+
 	// Return the created set
 	set := models.AssetManagementSet{
 		ID:             int(setID),
@@ -329,6 +345,20 @@ func (h *AssetHandler) UpdateAssetSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAssetSetUpdate,
+			ResourceType: logger.ResourceAssetSet,
+			ResourceID:   &setID,
+			ResourceName: req.Name,
+			Success:      true,
+		})
+	}
+
 	// Return updated set
 	var set models.AssetManagementSet
 	_ = h.db.QueryRow(`
@@ -377,6 +407,19 @@ func (h *AssetHandler) DeleteAssetSet(w http.ResponseWriter, r *http.Request) {
 	if rowsAffected == 0 {
 		respondNotFound(w, r, "set")
 		return
+	}
+
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAssetSetDelete,
+			ResourceType: logger.ResourceAssetSet,
+			ResourceID:   &setID,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)

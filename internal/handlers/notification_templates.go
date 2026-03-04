@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/utils"
 )
@@ -189,6 +190,22 @@ func (h *NotificationTemplateHandler) CreateTemplate(w http.ResponseWriter, r *h
 	template.CreatedAt = now
 	template.UpdatedAt = now
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		intID := int(id)
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionNotificationTemplateCreate,
+			ResourceType: logger.ResourceNotificationTemplate,
+			ResourceID:   &intID,
+			ResourceName: template.Name,
+			Success:      true,
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(template)
@@ -262,6 +279,21 @@ func (h *NotificationTemplateHandler) UpdateTemplate(w http.ResponseWriter, r *h
 	template.ID = id
 	template.UpdatedAt = now
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionNotificationTemplateUpdate,
+			ResourceType: logger.ResourceNotificationTemplate,
+			ResourceID:   &id,
+			ResourceName: template.Name,
+			Success:      true,
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(template)
 }
@@ -294,6 +326,20 @@ func (h *NotificationTemplateHandler) DeleteTemplate(w http.ResponseWriter, r *h
 	if rowsAffected == 0 {
 		respondNotFound(w, r, "template")
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionNotificationTemplateDelete,
+			ResourceType: logger.ResourceNotificationTemplate,
+			ResourceID:   &id,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)

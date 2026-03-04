@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/utils"
 )
 
 type ScreenHandler struct {
@@ -142,6 +144,22 @@ func (h *ScreenHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		intID := int(id)
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionScreenCreate,
+			ResourceType: logger.ResourceScreen,
+			ResourceID:   &intID,
+			ResourceName: screen.Name,
+			Success:      true,
+		})
+	}
+
 	respondJSONCreated(w, screen)
 }
 
@@ -180,6 +198,21 @@ func (h *ScreenHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionScreenUpdate,
+			ResourceType: logger.ResourceScreen,
+			ResourceID:   &id,
+			ResourceName: screen.Name,
+			Success:      true,
+		})
+	}
+
 	respondJSONOK(w, screen)
 }
 
@@ -199,6 +232,20 @@ func (h *ScreenHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionScreenDelete,
+			ResourceType: logger.ResourceScreen,
+			ResourceID:   &id,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -264,6 +311,21 @@ func (h *ScreenHandler) UpdateFields(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionScreenUpdate,
+			ResourceType: logger.ResourceScreen,
+			ResourceID:   &screenID,
+			Details:      map[string]interface{}{"update_type": "fields"},
+			Success:      true,
+		})
+	}
+
 	// Return updated fields
 	updatedFields, err := h.getScreenFields(screenID)
 	if err != nil {
@@ -318,6 +380,21 @@ func (h *ScreenHandler) UpdateSystemFields(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionScreenUpdate,
+			ResourceType: logger.ResourceScreen,
+			ResourceID:   &screenID,
+			Details:      map[string]interface{}{"update_type": "system_fields"},
+			Success:      true,
+		})
+	}
+
 	// Return updated system fields
 	updatedSystemFields, err := h.getSystemFields(screenID)
 	if err != nil {
@@ -345,7 +422,7 @@ func (h *ScreenHandler) getScreenFields(screenID int) ([]models.ScreenField, err
 		           ELSE NULL
 		       END as field_config
 		FROM screen_fields sf
-		LEFT JOIN custom_field_definitions cfd ON sf.field_type = 'custom' AND CAST(sf.field_identifier AS INTEGER) = cfd.id
+		LEFT JOIN custom_field_definitions cfd ON sf.field_type = 'custom' AND (CASE WHEN sf.field_type = 'custom' THEN CAST(sf.field_identifier AS INTEGER) END) = cfd.id
 		WHERE sf.screen_id = ?
 		ORDER BY sf.display_order, sf.id
 	`, screenID)

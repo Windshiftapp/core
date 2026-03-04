@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 // LabelHandler handles label CRUD and item-label management endpoints
@@ -178,6 +180,21 @@ func (h *LabelHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionLabelCreate,
+			ResourceType: logger.ResourceLabel,
+			ResourceID:   &label.ID,
+			ResourceName: label.Name,
+			Success:      true,
+		})
+	}
+
 	respondJSONCreated(w, label)
 }
 
@@ -253,6 +270,21 @@ func (h *LabelHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionLabelUpdate,
+			ResourceType: logger.ResourceLabel,
+			ResourceID:   &id,
+			ResourceName: label.Name,
+			Success:      true,
+		})
+	}
+
 	respondJSONOK(w, label)
 }
 
@@ -268,6 +300,20 @@ func (h *LabelHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionLabelDelete,
+			ResourceType: logger.ResourceLabel,
+			ResourceID:   &id,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)

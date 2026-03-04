@@ -9,8 +9,10 @@ import (
 	"strings"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/plugins"
 	"windshift/internal/restapi"
+	"windshift/internal/utils"
 )
 
 // PluginHandler handles plugin-related HTTP requests
@@ -195,6 +197,19 @@ func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
 	// Update database registry
 	h.syncPluginToDatabase()
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionPluginUpload,
+			ResourceType: logger.ResourcePlugin,
+			ResourceName: header.Filename,
+			Success:      true,
+		})
+	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Plugin uploaded successfully"})
 }
@@ -304,6 +319,19 @@ func (h *PluginHandler) DeletePlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionPluginDelete,
+			ResourceType: logger.ResourcePlugin,
+			ResourceName: pluginName,
+			Success:      true,
+		})
+	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Plugin deleted successfully"})
 }

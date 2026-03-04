@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
@@ -325,6 +326,21 @@ func (h *AssetCategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	if currentUser != nil {
+		id := int(catID)
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAssetCategoryCreate,
+			ResourceType: logger.ResourceAssetCategory,
+			ResourceID:   &id,
+			ResourceName: req.Name,
+			Success:      true,
+		})
+	}
+
 	cat := models.AssetCategory{
 		ID:          int(catID),
 		SetID:       setID,
@@ -411,6 +427,20 @@ func (h *AssetCategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Req
 	if rowsAffected == 0 {
 		respondNotFound(w, r, "category")
 		return
+	}
+
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAssetCategoryUpdate,
+			ResourceType: logger.ResourceAssetCategory,
+			ResourceID:   &categoryID,
+			ResourceName: req.Name,
+			Success:      true,
+		})
 	}
 
 	// Return updated category
@@ -515,6 +545,19 @@ func (h *AssetCategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Req
 	if err = tx.Commit(); err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAssetCategoryDelete,
+			ResourceType: logger.ResourceAssetCategory,
+			ResourceID:   &categoryID,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)

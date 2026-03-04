@@ -7,8 +7,10 @@ import (
 	"strings"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 type IterationHandler struct {
@@ -284,6 +286,17 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:     result.UpdatedAt,
 	}
 
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionIterationCreate,
+		ResourceType: logger.ResourceIteration,
+		ResourceID:   &createdIteration.ID,
+		ResourceName: createdIteration.Name,
+		Success:      true,
+	})
 	respondJSONCreated(w, createdIteration)
 }
 
@@ -416,6 +429,17 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:     result.UpdatedAt,
 	}
 
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionIterationUpdate,
+		ResourceType: logger.ResourceIteration,
+		ResourceID:   &updatedIteration.ID,
+		ResourceName: updatedIteration.Name,
+		Success:      true,
+	})
 	respondJSONOK(w, updatedIteration)
 }
 
@@ -460,6 +484,16 @@ func (h *IterationHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionIterationDelete,
+		ResourceType: logger.ResourceIteration,
+		ResourceID:   &id,
+		Success:      true,
+	})
 	w.WriteHeader(http.StatusNoContent)
 }
 

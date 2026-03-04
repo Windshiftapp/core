@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 type TimeProjectHandler struct {
@@ -262,6 +264,22 @@ func (h *TimeProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	p.CreatedAt = now
 	p.UpdatedAt = now
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		projectID := p.ID
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionTimeProjectCreate,
+			ResourceType: logger.ResourceTimeProject,
+			ResourceID:   &projectID,
+			ResourceName: p.Name,
+			Success:      true,
+		})
+	}
+
 	respondJSONCreated(w, p)
 }
 
@@ -352,6 +370,21 @@ func (h *TimeProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	p.ID = id
 	p.UpdatedAt = now
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionTimeProjectUpdate,
+			ResourceType: logger.ResourceTimeProject,
+			ResourceID:   &id,
+			ResourceName: p.Name,
+			Success:      true,
+		})
+	}
+
 	respondJSONOK(w, p)
 }
 
@@ -385,6 +418,20 @@ func (h *TimeProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionTimeProjectDelete,
+			ResourceType: logger.ResourceTimeProject,
+			ResourceID:   &id,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)

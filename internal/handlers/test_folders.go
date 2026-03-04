@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 type TestFolderHandler struct {
@@ -33,7 +35,7 @@ func NewTestFolderHandlerWithPool(db database.Database, permissionService *servi
 	}
 }
 
-func (h *TestFolderHandler) validateParentFolder(db *sql.DB, workspaceID int, parentID, currentFolderID *int) error {
+func (h *TestFolderHandler) validateParentFolder(db database.Database, workspaceID int, parentID, currentFolderID *int) error {
 	if parentID == nil {
 		return nil
 	}
@@ -287,6 +289,19 @@ func (h *TestFolderHandler) CreateFolder(w http.ResponseWriter, r *http.Request)
 	folder.ID = int(id)
 	folder.TestCaseCount = 0
 
+	folderID := folder.ID
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionTestFolderCreate,
+		ResourceType: logger.ResourceTestFolder,
+		ResourceID:   &folderID,
+		ResourceName: folder.Name,
+		Success:      true,
+	})
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(folder)
@@ -409,6 +424,19 @@ func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request)
 
 	folder.ID = id
 	folder.WorkspaceID = workspaceID
+
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionTestFolderUpdate,
+		ResourceType: logger.ResourceTestFolder,
+		ResourceID:   &id,
+		ResourceName: folder.Name,
+		Success:      true,
+	})
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(folder)
 }
@@ -481,6 +509,17 @@ func (h *TestFolderHandler) DeleteFolder(w http.ResponseWriter, r *http.Request)
 		respondInternalError(w, r, err)
 		return
 	}
+
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionTestFolderDelete,
+		ResourceType: logger.ResourceTestFolder,
+		ResourceID:   &id,
+		Success:      true,
+	})
 
 	w.WriteHeader(http.StatusNoContent)
 }

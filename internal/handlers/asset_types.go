@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
@@ -251,6 +252,21 @@ func (h *AssetTypeHandler) CreateAssetType(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	if currentUser != nil {
+		id := int(typeID)
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAssetTypeCreate,
+			ResourceType: logger.ResourceAssetType,
+			ResourceID:   &id,
+			ResourceName: req.Name,
+			Success:      true,
+		})
+	}
+
 	assetType := models.AssetType{
 		ID:           int(typeID),
 		SetID:        setID,
@@ -353,6 +369,20 @@ func (h *AssetTypeHandler) UpdateAssetType(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAssetTypeUpdate,
+			ResourceType: logger.ResourceAssetType,
+			ResourceID:   &typeID,
+			ResourceName: req.Name,
+			Success:      true,
+		})
+	}
+
 	// Return updated type
 	var assetType models.AssetType
 	_ = h.db.QueryRow(`
@@ -431,6 +461,19 @@ func (h *AssetTypeHandler) DeleteAssetType(w http.ResponseWriter, r *http.Reques
 	if rowsAffected == 0 {
 		respondNotFound(w, r, "asset_type")
 		return
+	}
+
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAssetTypeDelete,
+			ResourceType: logger.ResourceAssetType,
+			ResourceID:   &typeID,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)

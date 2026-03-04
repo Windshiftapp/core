@@ -11,7 +11,9 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/jira"
+	"windshift/internal/logger"
 	"windshift/internal/sso"
+	"windshift/internal/utils"
 
 	"github.com/google/uuid"
 )
@@ -101,6 +103,25 @@ func (h *JiraImportHandler) Connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionJiraConnect,
+			ResourceType: logger.ResourceJiraImport,
+			ResourceName: connectionID,
+			Details: map[string]interface{}{
+				"instance_url":    req.InstanceURL,
+				"instance_name":   instanceInfo.DisplayName,
+				"deployment_type": string(deploymentType),
+			},
+			Success: true,
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(JiraConnectResponse{
 		ConnectionID: connectionID,
@@ -166,6 +187,20 @@ func (h *JiraImportHandler) DeleteConnection(w http.ResponseWriter, r *http.Requ
 	if rowsAffected == 0 {
 		respondNotFound(w, r, "connection")
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionJiraDisconnect,
+			ResourceType: logger.ResourceJiraImport,
+			ResourceName: connectionID,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)

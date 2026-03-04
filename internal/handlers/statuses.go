@@ -10,7 +10,9 @@ import (
 
 	"windshift/internal/constants"
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/utils"
 )
 
 type StatusHandler struct {
@@ -158,6 +160,22 @@ func (h *StatusHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		intID := int(id)
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionStatusCreate,
+			ResourceType: logger.ResourceStatus,
+			ResourceID:   &intID,
+			ResourceName: status.Name,
+			Success:      true,
+		})
+	}
+
 	respondJSONCreated(w, createdStatus)
 }
 
@@ -236,6 +254,21 @@ func (h *StatusHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionStatusUpdate,
+			ResourceType: logger.ResourceStatus,
+			ResourceID:   &id,
+			ResourceName: updatedStatus.Name,
+			Success:      true,
+		})
+	}
+
 	respondJSONOK(w, updatedStatus)
 }
 
@@ -281,6 +314,20 @@ func (h *StatusHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionStatusDelete,
+			ResourceType: logger.ResourceStatus,
+			ResourceID:   &id,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)

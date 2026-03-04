@@ -4,19 +4,24 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 // TimeProjectPermissionHandler handles project manager/member CRUD
 type TimeProjectPermissionHandler struct {
+	db                    database.Database
 	timePermissionService *services.TimePermissionService
 }
 
 // NewTimeProjectPermissionHandler creates a new handler
-func NewTimeProjectPermissionHandler(timePermissionService *services.TimePermissionService) *TimeProjectPermissionHandler {
+func NewTimeProjectPermissionHandler(db database.Database, timePermissionService *services.TimePermissionService) *TimeProjectPermissionHandler {
 	return &TimeProjectPermissionHandler{
+		db:                    db,
 		timePermissionService: timePermissionService,
 	}
 }
@@ -110,6 +115,20 @@ func (h *TimeProjectPermissionHandler) AddManager(w http.ResponseWriter, r *http
 		return
 	}
 
+	if user != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       user.ID,
+			Username:     user.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionTimeProjectAddManager,
+			ResourceType: logger.ResourceTimeProject,
+			ResourceID:   &projectID,
+			Details:      map[string]interface{}{"manager_id": req.ManagerID},
+			Success:      true,
+		})
+	}
+
 	respondJSONCreated(w, manager)
 }
 
@@ -166,6 +185,20 @@ func (h *TimeProjectPermissionHandler) RemoveManager(w http.ResponseWriter, r *h
 	if err := h.timePermissionService.RemoveProjectManager(managerID); err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	if user != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       user.ID,
+			Username:     user.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionTimeProjectRemoveManager,
+			ResourceType: logger.ResourceTimeProject,
+			ResourceID:   &projectID,
+			Details:      map[string]interface{}{"manager_id": managerID},
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -251,6 +284,20 @@ func (h *TimeProjectPermissionHandler) AddMember(w http.ResponseWriter, r *http.
 		return
 	}
 
+	if user != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       user.ID,
+			Username:     user.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionTimeProjectAddMember,
+			ResourceType: logger.ResourceTimeProject,
+			ResourceID:   &projectID,
+			Details:      map[string]interface{}{"member_id": req.MemberID},
+			Success:      true,
+		})
+	}
+
 	respondJSONCreated(w, member)
 }
 
@@ -306,6 +353,20 @@ func (h *TimeProjectPermissionHandler) RemoveMember(w http.ResponseWriter, r *ht
 	if err := h.timePermissionService.RemoveProjectMember(memberID); err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	if user != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       user.ID,
+			Username:     user.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionTimeProjectRemoveMember,
+			ResourceType: logger.ResourceTimeProject,
+			ResourceID:   &projectID,
+			Details:      map[string]interface{}{"member_id": memberID},
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)
