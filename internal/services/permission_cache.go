@@ -235,7 +235,7 @@ func (ps *PermissionService) IsSystemAdmin(userID int) (bool, error) {
 	`, userID).Scan(&hasPermission)
 	if err != nil {
 		atomic.AddInt64(&ps.errors, 1)
-		return false, fmt.Errorf("error checking system admin permission: %v", err)
+		return false, fmt.Errorf("error checking system admin permission: %w", err)
 	}
 
 	return hasPermission, nil
@@ -264,7 +264,7 @@ func (ps *PermissionService) GetItemWorkspaceID(userID, itemID int) (int, error)
 			return 0, fmt.Errorf("item not found: %d", itemID)
 		}
 		atomic.AddInt64(&ps.errors, 1)
-		return 0, fmt.Errorf("error querying item workspace: %v", err)
+		return 0, fmt.Errorf("error querying item workspace: %w", err)
 	}
 
 	// Store in cache if we have a valid cached entry
@@ -447,7 +447,7 @@ func (ps *PermissionService) InvalidateGroupMemberCaches(groupID int) error {
 	// Get all group members
 	userIDs, err := ps.getGroupMembers(groupID)
 	if err != nil {
-		return fmt.Errorf("error getting group members for cache invalidation: %v", err)
+		return fmt.Errorf("error getting group members for cache invalidation: %w", err)
 	}
 
 	return ps.InvalidateMultipleUserCaches(userIDs)
@@ -464,7 +464,7 @@ func (ps *PermissionService) InvalidateWorkspaceMemberCaches(workspaceID int) er
 		WHERE gwr.workspace_id = ?
 	`, workspaceID, workspaceID)
 	if err != nil {
-		return fmt.Errorf("error getting workspace members for cache invalidation: %v", err)
+		return fmt.Errorf("error getting workspace members for cache invalidation: %w", err)
 	}
 	defer rows.Close()
 
@@ -820,7 +820,7 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 		if err == sql.ErrNoRows {
 			return cached, nil // User not found, return empty permissions
 		}
-		return nil, fmt.Errorf("error checking system admin permission: %v", err)
+		return nil, fmt.Errorf("error checking system admin permission: %w", err)
 	}
 	cached.IsSystemAdmin = hasSystemAdmin
 
@@ -835,7 +835,7 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 	// Load workspace active flags once
 	activeWorkspaces, err := ps.getWorkspaceActiveMap()
 	if err != nil {
-		return nil, fmt.Errorf("error loading workspace states: %v", err)
+		return nil, fmt.Errorf("error loading workspace states: %w", err)
 	}
 
 	// Load explicit Everyone role assignments (workspace access must be explicitly granted)
@@ -907,7 +907,7 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 		WHERE ugp.user_id = ?
 	`, userID)
 	if err != nil {
-		return nil, fmt.Errorf("error loading global permissions: %v", err)
+		return nil, fmt.Errorf("error loading global permissions: %w", err)
 	}
 	defer func() { _ = globalRows.Close() }()
 
@@ -1075,7 +1075,7 @@ func (ps *PermissionService) storeUserPermissionCache(userID int, cached *models
 
 	data, err := json.Marshal(cached)
 	if err != nil {
-		return fmt.Errorf("error marshaling cache data: %v", err)
+		return fmt.Errorf("error marshaling cache data: %w", err)
 	}
 
 	return ps.cache.Set(cacheKey, data)

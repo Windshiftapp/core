@@ -139,7 +139,7 @@ func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Reque
 			WHERE key = ?
 		`, strconv.FormatBool(setting.value), setting.key)
 		if err != nil {
-			respondInternalError(w, r, fmt.Errorf("failed to update module setting %s: %v", setting.key, err))
+			respondInternalError(w, r, fmt.Errorf("failed to update module setting %s: %w", setting.key, err))
 			return
 		}
 	}
@@ -266,7 +266,7 @@ func (h *SetupHandler) UpdateModuleSettings(w http.ResponseWriter, r *http.Reque
 			WHERE key = ?
 		`, strconv.FormatBool(setting.value), setting.key)
 		if err != nil {
-			respondInternalError(w, r, fmt.Errorf("failed to update module setting %s: %v", setting.key, err))
+			respondInternalError(w, r, fmt.Errorf("failed to update module setting %s: %w", setting.key, err))
 			return
 		}
 	}

@@ -323,7 +323,7 @@ func (s *UserStore) FindOrCreateUser(provider *SSOProvider, claims *OIDCClaims) 
 			}
 			// Link the external account to existing user
 			if err = s.LinkExternalAccount(existingUser.ID, provider.ID, claims.Subject, claims.Email, claims); err != nil {
-				return nil, fmt.Errorf("%w: %v", ErrAccountLinkingFailed, err)
+				return nil, fmt.Errorf("%w: %w", ErrAccountLinkingFailed, err)
 			}
 			result.User = existingUser
 			// For existing users, only need verification if they're not already verified
@@ -351,7 +351,7 @@ func (s *UserStore) FindOrCreateUser(provider *SSOProvider, claims *OIDCClaims) 
 
 	// Link the external account
 	if err := s.LinkExternalAccount(newUser.ID, provider.ID, claims.Subject, claims.Email, claims); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrAccountLinkingFailed, err)
+		return nil, fmt.Errorf("%w: %w", ErrAccountLinkingFailed, err)
 	}
 
 	result.User = newUser

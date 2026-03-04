@@ -159,9 +159,13 @@ func (s *EmailReplyService) HandleCommentCreated(params HandleCommentParams) err
 
 	// Get author name for email template
 	var authorName string
-	_ = s.db.QueryRow("SELECT first_name || ' ' || last_name FROM users WHERE id = ?", params.AuthorID).Scan(&authorName)
+	if err := s.db.QueryRow("SELECT first_name || ' ' || last_name FROM users WHERE id = ?", params.AuthorID).Scan(&authorName); err != nil {
+		slog.Warn("failed to look up author full name", slog.Any("error", err), slog.Int("author_id", params.AuthorID))
+	}
 	if authorName == "" {
-		_ = s.db.QueryRow("SELECT username FROM users WHERE id = ?", params.AuthorID).Scan(&authorName)
+		if err := s.db.QueryRow("SELECT username FROM users WHERE id = ?", params.AuthorID).Scan(&authorName); err != nil {
+			slog.Warn("failed to look up author username", slog.Any("error", err), slog.Int("author_id", params.AuthorID))
+		}
 	}
 	if authorName == "" {
 		authorName = "Team member"

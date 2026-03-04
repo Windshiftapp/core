@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -63,7 +64,10 @@ func NewStatusCategoryConfig() EnumConfig {
 
 		CheckDependencies: func(db database.Database, id int) string {
 			var count int
-			_ = db.QueryRow("SELECT COUNT(*) FROM statuses WHERE category_id = ?", id).Scan(&count)
+			if err := db.QueryRow("SELECT COUNT(*) FROM statuses WHERE category_id = ?", id).Scan(&count); err != nil {
+				slog.Error("dependency check failed", slog.Any("error", err), slog.String("table", "statuses"), slog.Int("id", id))
+				return "Unable to verify dependencies — please try again"
+			}
 			if count > 0 {
 				return "Cannot delete status category that is in use by statuses"
 			}
@@ -146,7 +150,10 @@ func NewMilestoneCategoryConfig() EnumConfig {
 
 		CheckDependencies: func(db database.Database, id int) string {
 			var count int
-			_ = db.QueryRow("SELECT COUNT(*) FROM milestones WHERE category_id = ?", id).Scan(&count)
+			if err := db.QueryRow("SELECT COUNT(*) FROM milestones WHERE category_id = ?", id).Scan(&count); err != nil {
+				slog.Error("dependency check failed", slog.Any("error", err), slog.String("table", "milestones"), slog.Int("id", id))
+				return "Unable to verify dependencies — please try again"
+			}
 			if count > 0 {
 				return "Cannot delete milestone category that is in use by milestones"
 			}
@@ -229,7 +236,10 @@ func NewCollectionCategoryConfig() EnumConfig {
 
 		CheckDependencies: func(db database.Database, id int) string {
 			var count int
-			_ = db.QueryRow("SELECT COUNT(*) FROM collections WHERE category_id = ?", id).Scan(&count)
+			if err := db.QueryRow("SELECT COUNT(*) FROM collections WHERE category_id = ?", id).Scan(&count); err != nil {
+				slog.Error("dependency check failed", slog.Any("error", err), slog.String("table", "collections"), slog.Int("id", id))
+				return "Unable to verify dependencies — please try again"
+			}
 			if count > 0 {
 				return "Cannot delete collection category that is in use by collections"
 			}
@@ -312,7 +322,10 @@ func NewChannelCategoryConfig() EnumConfig {
 
 		CheckDependencies: func(db database.Database, id int) string {
 			var count int
-			_ = db.QueryRow("SELECT COUNT(*) FROM channels WHERE category_id = ?", id).Scan(&count)
+			if err := db.QueryRow("SELECT COUNT(*) FROM channels WHERE category_id = ?", id).Scan(&count); err != nil {
+				slog.Error("dependency check failed", slog.Any("error", err), slog.String("table", "channels"), slog.Int("id", id))
+				return "Unable to verify dependencies — please try again"
+			}
 			if count > 0 {
 				return "Cannot delete channel category that is in use by channels"
 			}
@@ -389,7 +402,10 @@ func NewIterationTypeConfig() EnumConfig {
 
 		CheckDependencies: func(db database.Database, id int) string {
 			var count int
-			_ = db.QueryRow("SELECT COUNT(*) FROM iterations WHERE iteration_type_id = ?", id).Scan(&count)
+			if err := db.QueryRow("SELECT COUNT(*) FROM iterations WHERE iteration_type_id = ?", id).Scan(&count); err != nil {
+				slog.Error("dependency check failed", slog.Any("error", err), slog.String("table", "iterations"), slog.Int("id", id))
+				return "Unable to verify dependencies — please try again"
+			}
 			if count > 0 {
 				return "Cannot delete iteration type that is in use by iterations"
 			}
@@ -447,7 +463,10 @@ func NewHierarchyLevelConfig() EnumConfig {
 
 		CheckDependencies: func(db database.Database, id int) string {
 			var count int
-			_ = db.QueryRow("SELECT COUNT(*) FROM item_types WHERE hierarchy_level = (SELECT level FROM hierarchy_levels WHERE id = ?)", id).Scan(&count)
+			if err := db.QueryRow("SELECT COUNT(*) FROM item_types WHERE hierarchy_level = (SELECT level FROM hierarchy_levels WHERE id = ?)", id).Scan(&count); err != nil {
+				slog.Error("dependency check failed", slog.Any("error", err), slog.String("table", "item_types"), slog.Int("id", id))
+				return "Unable to verify dependencies — please try again"
+			}
 			if count > 0 {
 				return "Cannot delete hierarchy level that is in use by item types"
 			}
@@ -631,14 +650,20 @@ func NewStatusConfig() EnumConfig {
 		CheckDependencies: func(db database.Database, id int) string {
 			// Check workflow transitions
 			var transitionCount int
-			_ = db.QueryRow("SELECT COUNT(*) FROM workflow_transitions WHERE from_status_id = ? OR to_status_id = ?", id, id).Scan(&transitionCount)
+			if err := db.QueryRow("SELECT COUNT(*) FROM workflow_transitions WHERE from_status_id = ? OR to_status_id = ?", id, id).Scan(&transitionCount); err != nil {
+				slog.Error("dependency check failed", slog.Any("error", err), slog.String("table", "workflow_transitions"), slog.Int("id", id))
+				return "Unable to verify dependencies — please try again"
+			}
 			if transitionCount > 0 {
 				return "Cannot delete status that is in use by workflow transitions"
 			}
 
 			// Check items
 			var itemCount int
-			_ = db.QueryRow("SELECT COUNT(*) FROM items WHERE status_id = ?", id).Scan(&itemCount)
+			if err := db.QueryRow("SELECT COUNT(*) FROM items WHERE status_id = ?", id).Scan(&itemCount); err != nil {
+				slog.Error("dependency check failed", slog.Any("error", err), slog.String("table", "items"), slog.Int("id", id))
+				return "Unable to verify dependencies — please try again"
+			}
 			if itemCount > 0 {
 				return fmt.Sprintf("Cannot delete status that is in use by %d work item(s)", itemCount)
 			}
@@ -772,7 +797,10 @@ func NewTimeProjectCategoryConfig() EnumConfig {
 
 		CheckDependencies: func(db database.Database, id int) string {
 			var count int
-			_ = db.QueryRow("SELECT COUNT(*) FROM time_projects WHERE category_id = ?", id).Scan(&count)
+			if err := db.QueryRow("SELECT COUNT(*) FROM time_projects WHERE category_id = ?", id).Scan(&count); err != nil {
+				slog.Error("dependency check failed", slog.Any("error", err), slog.String("table", "time_projects"), slog.Int("id", id))
+				return "Unable to verify dependencies — please try again"
+			}
 			if count > 0 {
 				return "Cannot delete project category that is in use by time projects"
 			}
@@ -912,7 +940,10 @@ func NewTimeProjectConfig() EnumConfig {
 			if p.CustomerID != nil && *p.CustomerID > 0 {
 				var exists bool
 				//nolint:misspell // database uses British spelling (customer_organisations)
-				_ = db.QueryRow("SELECT EXISTS(SELECT 1 FROM customer_organisations WHERE id = ?)", *p.CustomerID).Scan(&exists)
+				if err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM customer_organisations WHERE id = ?)", *p.CustomerID).Scan(&exists); err != nil {
+					slog.Error("FK validation failed", slog.Any("error", err), slog.String("table", "customer_organisations"))
+					return "Unable to validate customer — please try again"
+				}
 				if !exists {
 					return "Customer not found"
 				}
@@ -920,7 +951,10 @@ func NewTimeProjectConfig() EnumConfig {
 			// Validate category if provided
 			if p.CategoryID != nil && *p.CategoryID > 0 {
 				var exists bool
-				_ = db.QueryRow("SELECT EXISTS(SELECT 1 FROM time_project_categories WHERE id = ?)", *p.CategoryID).Scan(&exists)
+				if err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM time_project_categories WHERE id = ?)", *p.CategoryID).Scan(&exists); err != nil {
+					slog.Error("FK validation failed", slog.Any("error", err), slog.String("table", "time_project_categories"))
+					return "Unable to validate category — please try again"
+				}
 				if !exists {
 					return "Project category not found"
 				}
@@ -930,7 +964,10 @@ func NewTimeProjectConfig() EnumConfig {
 
 		CheckDependencies: func(db database.Database, id int) string {
 			var count int
-			_ = db.QueryRow("SELECT COUNT(*) FROM time_worklogs WHERE project_id = ?", id).Scan(&count)
+			if err := db.QueryRow("SELECT COUNT(*) FROM time_worklogs WHERE project_id = ?", id).Scan(&count); err != nil {
+				slog.Error("dependency check failed", slog.Any("error", err), slog.String("table", "time_worklogs"), slog.Int("id", id))
+				return "Unable to verify dependencies — please try again"
+			}
 			if count > 0 {
 				return "Cannot delete time project that has worklogs"
 			}
@@ -1028,7 +1065,10 @@ func NewLinkTypeConfig() EnumConfig {
 
 		CheckDependencies: func(db database.Database, id int) string {
 			var count int
-			_ = db.QueryRow("SELECT COUNT(*) FROM item_links WHERE link_type_id = ?", id).Scan(&count)
+			if err := db.QueryRow("SELECT COUNT(*) FROM item_links WHERE link_type_id = ?", id).Scan(&count); err != nil {
+				slog.Error("dependency check failed", slog.Any("error", err), slog.String("table", "item_links"), slog.Int("id", id))
+				return "Unable to verify dependencies — please try again"
+			}
 			if count > 0 {
 				return "Cannot delete link type that is in use"
 			}
@@ -1118,7 +1158,10 @@ func NewItemTypeConfig() EnumConfig {
 
 		CheckDependencies: func(db database.Database, id int) string {
 			var count int
-			_ = db.QueryRow("SELECT COUNT(*) FROM items WHERE item_type_id = ?", id).Scan(&count)
+			if err := db.QueryRow("SELECT COUNT(*) FROM items WHERE item_type_id = ?", id).Scan(&count); err != nil {
+				slog.Error("dependency check failed", slog.Any("error", err), slog.String("table", "items"), slog.Int("id", id))
+				return "Unable to verify dependencies — please try again"
+			}
 			if count > 0 {
 				return fmt.Sprintf("Cannot delete item type that is in use by %d work item(s)", count)
 			}
@@ -1221,13 +1264,19 @@ func NewRequestTypeConfig() EnumConfig {
 			rt := entity.(*models.RequestType) //nolint:errcheck // type assertion is safe here
 			// Validate channel exists
 			var channelExists bool
-			_ = db.QueryRow("SELECT EXISTS(SELECT 1 FROM channels WHERE id = ?)", rt.ChannelID).Scan(&channelExists)
+			if err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM channels WHERE id = ?)", rt.ChannelID).Scan(&channelExists); err != nil {
+				slog.Error("FK validation failed", slog.Any("error", err), slog.String("table", "channels"))
+				return "Unable to validate channel — please try again"
+			}
 			if !channelExists {
 				return "Channel not found"
 			}
 			// Validate item type exists
 			var itemTypeExists bool
-			_ = db.QueryRow("SELECT EXISTS(SELECT 1 FROM item_types WHERE id = ?)", rt.ItemTypeID).Scan(&itemTypeExists)
+			if err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM item_types WHERE id = ?)", rt.ItemTypeID).Scan(&itemTypeExists); err != nil {
+				slog.Error("FK validation failed", slog.Any("error", err), slog.String("table", "item_types"))
+				return "Unable to validate item type — please try again"
+			}
 			if !itemTypeExists {
 				return "Item type not found"
 			}

@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"windshift/internal/database"
@@ -221,7 +222,9 @@ func (s *PlanningService) ListMilestones(params MilestoneListParams) ([]Mileston
 	}
 
 	var total int
-	_ = s.db.QueryRow(countQuery, countArgs...).Scan(&total)
+	if err := s.db.QueryRow(countQuery, countArgs...).Scan(&total); err != nil {
+		slog.Warn("failed to get milestone pagination count", slog.Any("error", err))
+	}
 
 	return milestones, total, nil
 }
@@ -339,7 +342,7 @@ func (s *PlanningService) GetSCMConnectionWorkspaceID(connectionID int) (int, er
 type CreateMilestoneParams struct {
 	Name        string
 	Description string
-	TargetDate  string
+	TargetDate  *string
 	Status      string
 	CategoryID  *int
 	IsGlobal    bool
@@ -370,7 +373,7 @@ type UpdateMilestoneParams struct {
 	ID          int
 	Name        string
 	Description string
-	TargetDate  string
+	TargetDate  *string
 	Status      string
 	CategoryID  *int
 	IsGlobal    bool
@@ -636,7 +639,9 @@ func (s *PlanningService) ListIterations(params IterationListParams) ([]Iteratio
 	}
 
 	var total int
-	_ = s.db.QueryRow(countQuery, countArgs...).Scan(&total)
+	if err := s.db.QueryRow(countQuery, countArgs...).Scan(&total); err != nil {
+		slog.Warn("failed to get iteration pagination count", slog.Any("error", err))
+	}
 
 	return iterations, total, nil
 }
@@ -843,7 +848,9 @@ func (s *PlanningService) ListProjects(params ProjectListParams) ([]ProjectResul
 	}
 
 	var total int
-	_ = s.db.QueryRow(countQuery, countArgs...).Scan(&total)
+	if err := s.db.QueryRow(countQuery, countArgs...).Scan(&total); err != nil {
+		slog.Warn("failed to get project pagination count", slog.Any("error", err))
+	}
 
 	return projects, total, nil
 }

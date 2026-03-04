@@ -50,7 +50,7 @@ func (s *EmailVerificationService) GenerateVerificationToken(userID int) (string
 	// Generate a cryptographically secure random token
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
-		return "", fmt.Errorf("%w: %v", ErrTokenGenerationFailed, err)
+		return "", fmt.Errorf("%w: %w", ErrTokenGenerationFailed, err)
 	}
 	token := base64.URLEncoding.EncodeToString(tokenBytes)
 

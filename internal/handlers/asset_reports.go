@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -199,7 +200,9 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if ar.DisplayOrder == 0 {
 		// Get next display order
 		var maxOrder int
-		_ = h.db.QueryRow("SELECT COALESCE(MAX(display_order), 0) FROM asset_reports WHERE channel_id = ?", ar.ChannelID).Scan(&maxOrder)
+		if err := h.db.QueryRow("SELECT COALESCE(MAX(display_order), 0) FROM asset_reports WHERE channel_id = ?", ar.ChannelID).Scan(&maxOrder); err != nil {
+			slog.Warn("failed to get max display order for asset reports", slog.Any("error", err))
+		}
 		ar.DisplayOrder = maxOrder + 1
 	}
 

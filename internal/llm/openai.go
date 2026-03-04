@@ -77,7 +77,7 @@ func (c *openaiClient) ChatCompletion(ctx context.Context, req ChatCompletionReq
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.endpoint+c.chatPath, bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrConnectionFailed, err)
+		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	if c.apiKey != "" {
@@ -86,7 +86,7 @@ func (c *openaiClient) ChatCompletion(ctx context.Context, req ChatCompletionReq
 
 	resp, err := c.http.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrConnectionFailed, err)
+		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -112,7 +112,7 @@ func (c *openaiClient) Health(ctx context.Context) error {
 		MaxTokens: 1,
 	})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrConnectionFailed, err)
+		return fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}
 	return nil
 }

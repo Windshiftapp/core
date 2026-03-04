@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -121,8 +122,16 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 
 	// Validate configuration sets exist
 	var oldConfigSetExists, newConfigSetExists bool
-	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", req.OldConfigurationSetID).Scan(&oldConfigSetExists)
-	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", req.NewConfigurationSetID).Scan(&newConfigSetExists)
+	if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", req.OldConfigurationSetID).Scan(&oldConfigSetExists); err != nil {
+		slog.Error("migration validation failed", slog.Any("error", err), slog.String("check", "old_configuration_set"))
+		respondInternalError(w, r, fmt.Errorf("failed to validate old configuration set: %w", err))
+		return
+	}
+	if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", req.NewConfigurationSetID).Scan(&newConfigSetExists); err != nil {
+		slog.Error("migration validation failed", slog.Any("error", err), slog.String("check", "new_configuration_set"))
+		respondInternalError(w, r, fmt.Errorf("failed to validate new configuration set: %w", err))
+		return
+	}
 
 	if !oldConfigSetExists {
 		respondBadRequest(w, r, "Old configuration set not found")
@@ -142,7 +151,11 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 	// Validate all target IDs exist
 	for _, mapping := range req.ItemTypeMappings {
 		var exists bool
-		_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM item_types WHERE id = ?)", mapping.ToItemTypeID).Scan(&exists)
+		if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM item_types WHERE id = ?)", mapping.ToItemTypeID).Scan(&exists); err != nil {
+			slog.Error("migration validation failed", slog.Any("error", err), slog.String("check", "item_type"))
+			respondInternalError(w, r, fmt.Errorf("failed to validate target item type: %w", err))
+			return
+		}
 		if !exists {
 			respondBadRequest(w, r, fmt.Sprintf("Target item type ID %d not found", mapping.ToItemTypeID))
 			return
@@ -151,7 +164,11 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 
 	for _, mapping := range req.StatusMappings {
 		var exists bool
-		_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE id = ?)", mapping.ToStatusID).Scan(&exists)
+		if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE id = ?)", mapping.ToStatusID).Scan(&exists); err != nil {
+			slog.Error("migration validation failed", slog.Any("error", err), slog.String("check", "status"))
+			respondInternalError(w, r, fmt.Errorf("failed to validate target status: %w", err))
+			return
+		}
 		if !exists {
 			respondBadRequest(w, r, fmt.Sprintf("Target status ID %d not found", mapping.ToStatusID))
 			return
@@ -160,7 +177,11 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 
 	for _, mapping := range req.PriorityMappings {
 		var exists bool
-		_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM priorities WHERE id = ?)", mapping.ToPriorityID).Scan(&exists)
+		if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM priorities WHERE id = ?)", mapping.ToPriorityID).Scan(&exists); err != nil {
+			slog.Error("migration validation failed", slog.Any("error", err), slog.String("check", "priority"))
+			respondInternalError(w, r, fmt.Errorf("failed to validate target priority: %w", err))
+			return
+		}
 		if !exists {
 			respondBadRequest(w, r, fmt.Sprintf("Target priority ID %d not found", mapping.ToPriorityID))
 			return

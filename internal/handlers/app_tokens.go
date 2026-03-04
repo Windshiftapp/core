@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -203,7 +204,9 @@ func (h *AppTokenHandler) CreateAppToken(w http.ResponseWriter, r *http.Request)
 	// Log audit event
 	// Get username for audit log
 	var username string
-	_ = h.db.QueryRow("SELECT username FROM users WHERE id = ?", userID).Scan(&username)
+	if err := h.db.QueryRow("SELECT username FROM users WHERE id = ?", userID).Scan(&username); err != nil {
+		slog.Warn("failed to look up username for audit log", slog.Any("error", err))
+	}
 
 	tokenIDInt := int(tokenID)
 	_ = logger.LogAudit(h.db, logger.AuditEvent{

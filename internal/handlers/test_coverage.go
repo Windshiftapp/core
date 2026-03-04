@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -571,7 +572,9 @@ func (h *TestCoverageHandler) GetRequirements(w http.ResponseWriter, r *http.Req
 			WHERE i.workspace_id = ? AND i.item_type_id IN (` + strings.Join(placeholders, ",") + `)
 		) sub
 	`
-	_ = h.db.QueryRow(summaryQuery, summaryArgs...).Scan(&summaryTotal, &summaryCovered)
+	if err := h.db.QueryRow(summaryQuery, summaryArgs...).Scan(&summaryTotal, &summaryCovered); err != nil {
+		slog.Warn("failed to get test coverage summary counts", slog.Any("error", err))
+	}
 
 	var coverageRate float64
 	if summaryTotal > 0 {
