@@ -278,7 +278,7 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -426,7 +426,7 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -622,7 +622,7 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -691,14 +691,4 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// getUserFromContext retrieves the authenticated user from the request context
-func (h *WorkspaceHandler) getUserFromContext(r *http.Request) *models.User {
-	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
-		if u, ok := user.(*models.User); ok {
-			return u
-		}
-	}
-	return nil
 }

@@ -2,7 +2,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -31,18 +30,18 @@ func NewBaseHandler(db database.Database) *BaseHandler {
 
 // getReadDB returns the database connection for read operations.
 // Returns an error if the database connection is not initialized.
-func (h *BaseHandler) getReadDB() (*sql.DB, error) {
+func (h *BaseHandler) getReadDB() (database.Database, error) {
 	if h.db != nil {
-		return h.db.GetDB(), nil
+		return h.db, nil
 	}
 	return nil, ErrDatabaseNil
 }
 
 // getWriteDB returns the database connection for write operations.
 // Returns an error if the database connection is not initialized.
-func (h *BaseHandler) getWriteDB() (*sql.DB, error) {
+func (h *BaseHandler) getWriteDB() (database.Database, error) {
 	if h.db != nil {
-		return h.db.GetDB(), nil
+		return h.db, nil
 	}
 	return nil, ErrDatabaseNil
 }
@@ -50,7 +49,7 @@ func (h *BaseHandler) getWriteDB() (*sql.DB, error) {
 // requireReadDB returns the database connection and writes an HTTP error if unavailable.
 // Returns nil and false if the database is unavailable (error already written to response).
 // Returns db and true if the database is available.
-func (h *BaseHandler) requireReadDB(w http.ResponseWriter, r *http.Request) (*sql.DB, bool) {
+func (h *BaseHandler) requireReadDB(w http.ResponseWriter, r *http.Request) (database.Database, bool) {
 	db, err := h.getReadDB()
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -62,7 +61,7 @@ func (h *BaseHandler) requireReadDB(w http.ResponseWriter, r *http.Request) (*sq
 // requireWriteDB returns the database connection and writes an HTTP error if unavailable.
 // Returns nil and false if the database is unavailable (error already written to response).
 // Returns db and true if the database is available.
-func (h *BaseHandler) requireWriteDB(w http.ResponseWriter, r *http.Request) (*sql.DB, bool) {
+func (h *BaseHandler) requireWriteDB(w http.ResponseWriter, r *http.Request) (database.Database, bool) {
 	db, err := h.getWriteDB()
 	if err != nil {
 		respondInternalError(w, r, err)

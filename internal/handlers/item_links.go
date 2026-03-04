@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"windshift/internal/database"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
@@ -57,7 +56,7 @@ func (h *ItemLinkHandler) GetLinksForItem(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -235,7 +234,7 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 
 	// Emit notification event (only for work item links)
 	if h.notificationService != nil && link.SourceType == "item" {
-		user := h.getUserFromContext(r)
+		user := utils.GetCurrentUser(r)
 		if user != nil {
 			// Fetch source item details for notification
 			var workspaceID int
@@ -349,7 +348,7 @@ func (h *ItemLinkHandler) DeleteLink(w http.ResponseWriter, r *http.Request) {
 
 	// Emit notification event (only for work item links)
 	if h.notificationService != nil && sourceType == "item" {
-		user := h.getUserFromContext(r)
+		user := utils.GetCurrentUser(r)
 		if user != nil {
 			// Fetch source item details for notification
 			var workspaceID int
@@ -510,7 +509,7 @@ func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request
 
 // SearchLinkableItems searches for items that can be linked
 func (h *ItemLinkHandler) SearchLinkableItems(w http.ResponseWriter, r *http.Request) {
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -805,14 +804,4 @@ func (h *ItemLinkHandler) searchAssets(query string, limit int) ([]models.Linkab
 
 func isValidLinkType(linkType string) bool {
 	return linkType == "item" || linkType == "test_case" || linkType == "asset"
-}
-
-// getUserFromContext retrieves the authenticated user from request context
-func (h *ItemLinkHandler) getUserFromContext(r *http.Request) *models.User {
-	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
-		if u, ok := user.(*models.User); ok {
-			return u
-		}
-	}
-	return nil
 }

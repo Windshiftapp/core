@@ -7,7 +7,6 @@ import (
 
 	"windshift/internal/auth"
 	"windshift/internal/database"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
 )
@@ -31,9 +30,8 @@ func NewAPITokenHandler(db database.Database, tokenManager *auth.TokenManager, p
 // CreateToken creates a new API token for a user
 func (ath *APITokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) {
 	// Get user from context (set by auth middleware)
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -93,9 +91,8 @@ func (ath *APITokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) 
 // GetUserTokens retrieves all tokens for the current user
 func (ath *APITokenHandler) GetUserTokens(w http.ResponseWriter, r *http.Request) {
 	// Get user from context (set by auth middleware)
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -120,9 +117,8 @@ func (ath *APITokenHandler) GetToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user from context (set by auth middleware)
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -153,9 +149,8 @@ func (ath *APITokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Get user from context (set by auth middleware)
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -178,9 +173,8 @@ func (ath *APITokenHandler) ValidateToken(w http.ResponseWriter, r *http.Request
 	// If they can call this successfully, their token is valid
 
 	// Get user and token info from context (set by auth middleware)
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"windshift/internal/models"
+	"windshift/internal/utils"
 )
 
 // GetPersonalTasks handles GET /api/items/{id}/personal-tasks - returns personal tasks related to a work item
@@ -16,7 +17,7 @@ func (h *ItemHandler) GetPersonalTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -174,7 +175,7 @@ func (h *ItemHandler) RemoveRelatedWorkItem(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return

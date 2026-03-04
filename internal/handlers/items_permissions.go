@@ -3,21 +3,9 @@ package handlers
 import (
 	"fmt"
 	"log/slog"
-	"net/http"
 
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 )
-
-// getUserFromContext extracts the user from the request context
-func (h *ItemHandler) getUserFromContext(r *http.Request) *models.User {
-	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
-		if u, ok := user.(*models.User); ok {
-			return u
-		}
-	}
-	return nil
-}
 
 // canViewItem checks if a user can view an item in a specific workspace
 func (h *ItemHandler) canViewItem(userID, workspaceID int) (bool, error) {

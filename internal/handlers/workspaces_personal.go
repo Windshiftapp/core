@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"windshift/internal/models"
+	"windshift/internal/utils"
 )
 
 var personalWorkspaceKeySanitizer = regexp.MustCompile(`[^A-Za-z0-9]+`)
@@ -18,7 +19,7 @@ var personalWorkspaceKeySanitizer = regexp.MustCompile(`[^A-Za-z0-9]+`)
 // GetOrCreatePersonalWorkspace gets or creates a personal workspace for a user
 func (h *WorkspaceHandler) GetOrCreatePersonalWorkspace(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return

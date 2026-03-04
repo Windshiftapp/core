@@ -10,9 +10,8 @@ import (
 	"time"
 
 	"windshift/internal/database"
-	"windshift/internal/middleware"
-	"windshift/internal/models"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 // HomepageHandler handles homepage-related HTTP requests
@@ -82,7 +81,7 @@ type MilestoneProgress struct {
 // GetHomepage handles GET /api/homepage - returns comprehensive homepage data
 func (h *HomepageHandler) GetHomepage(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -238,16 +237,6 @@ func (h *HomepageHandler) GetHomepage(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(homepageData)
-}
-
-// getUserFromContext extracts the user from the request context
-func (h *HomepageHandler) getUserFromContext(r *http.Request) *models.User {
-	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
-		if u, ok := user.(*models.User); ok {
-			return u
-		}
-	}
-	return nil
 }
 
 // getWorkspaceActivitiesBatch batch loads workspace details for multiple workspace visits

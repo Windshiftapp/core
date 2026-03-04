@@ -79,9 +79,10 @@ func (h *AuditLogHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) 
 		args = append(args, v)
 	}
 	if v := q.Get("success"); v != "" {
-		if v == "true" {
+		switch v {
+		case "true":
 			conditions = append(conditions, "success = 1")
-		} else if v == "false" {
+		case "false":
 			conditions = append(conditions, "success = 0")
 		}
 	}

@@ -34,9 +34,8 @@ func (h *TimeProjectPermissionHandler) GetManagers(w http.ResponseWriter, r *htt
 	}
 
 	// Get user from context
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -72,9 +71,8 @@ func (h *TimeProjectPermissionHandler) AddManager(w http.ResponseWriter, r *http
 	}
 
 	// Get user from context
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -145,9 +143,8 @@ func (h *TimeProjectPermissionHandler) RemoveManager(w http.ResponseWriter, r *h
 	}
 
 	// Get user from context
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -212,9 +209,8 @@ func (h *TimeProjectPermissionHandler) GetMembers(w http.ResponseWriter, r *http
 	}
 
 	// Get user from context
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 

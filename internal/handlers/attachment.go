@@ -24,6 +24,7 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 
 	"golang.org/x/image/draw"
 )
@@ -44,23 +45,13 @@ func NewAttachmentHandler(db database.Database, attachmentPath string, permissio
 	}
 }
 
-// getUserFromContext extracts the authenticated user from request context
-func (h *AttachmentHandler) getUserFromContext(r *http.Request) *models.User {
-	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
-		if u, ok := user.(*models.User); ok {
-			return u
-		}
-	}
-	return nil
-}
-
 // checkItemAttachmentPermission checks if the user can modify attachments on an item
 // Internal users need item.edit permission in the workspace
 // Portal customers can only modify attachments on items they created
 func (h *AttachmentHandler) checkItemAttachmentPermission(r *http.Request, itemID int) (bool, error) {
 	// Get user ID if internal user
 	var userID *int
-	if user := h.getUserFromContext(r); user != nil {
+	if user := utils.GetCurrentUser(r); user != nil {
 		userID = &user.ID
 	}
 
@@ -515,7 +506,7 @@ func (h *AttachmentHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user from context and check permissions
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -891,48 +882,7 @@ func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=31536000") // Cache for 1 year
 
 	// Serve thumbnail
-	io.Copy(w, file)
-}
-
-// verifyFileContent detects actual file content and validates it matches the extension
-func (h *AttachmentHandler) verifyFileContent(file io.ReadSeeker, filename string) (string, error) {
-	// Read first 512 bytes for content detection
-	buffer := make([]byte, 512)
-	n, err := file.Read(buffer)
-	if err != nil && err != io.EOF {
-		return "", fmt.Errorf("failed to read file for content detection: %w", err)
-	}
-
-	// Reset file pointer to beginning for subsequent reads
-	if _, err := file.Seek(0, 0); err != nil {
-		return "", fmt.Errorf("failed to reset file pointer: %w", err)
-	}
-
-	// Detect actual content type from file content
-	detectedType := http.DetectContentType(buffer[:n])
-
-	// Get expected type from file extension
-	ext := filepath.Ext(filename)
-	expectedType := mime.TypeByExtension(ext)
-
-	// Validate content matches extension (if we have an expected type)
-	if expectedType != "" {
-		// Extract base type (before semicolon and parameters)
-		detectedBase := strings.Split(detectedType, ";")[0]
-		expectedBase := strings.Split(expectedType, ";")[0]
-
-		// Allow octet-stream as it's a generic fallback.
-		// Allow text/plain when the expected type is a text/* subtype, since
-		// http.DetectContentType cannot distinguish between text subtypes
-		// (e.g. CSV, XML, YAML are all detected as text/plain).
-		if detectedBase != expectedBase && detectedBase != "application/octet-stream" &&
-			!(detectedBase == "text/plain" && strings.HasPrefix(expectedBase, "text/")) {
-			return "", fmt.Errorf("file content type (%s) doesn't match extension %s (expected %s)", detectedBase, ext, expectedBase)
-		}
-	}
-
-	slog.Debug("content verification passed", slog.String("component", "attachments"), slog.String("filename", filename), slog.String("detected_type", detectedType))
-	return detectedType, nil
+	_, _ = io.Copy(w, file)
 }
 
 // verifyFileContentFromBytes detects actual file content from bytes and validates it matches the extension
@@ -961,7 +911,7 @@ func (h *AttachmentHandler) verifyFileContentFromBytes(fileData []byte, filename
 		// http.DetectContentType cannot distinguish between text subtypes
 		// (e.g. CSV, XML, YAML are all detected as text/plain).
 		if detectedBase != expectedBase && detectedBase != "application/octet-stream" &&
-			!(detectedBase == "text/plain" && strings.HasPrefix(expectedBase, "text/")) {
+			(detectedBase != "text/plain" || !strings.HasPrefix(expectedBase, "text/")) {
 			return "", fmt.Errorf("file content type (%s) doesn't match extension %s (expected %s)", detectedBase, ext, expectedBase)
 		}
 	}
