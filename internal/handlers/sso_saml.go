@@ -50,7 +50,7 @@ func (h *SSOHandler) SAMLMetadata(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/samlmetadata+xml")
 	w.Header().Set("Content-Disposition", "attachment; filename=\"metadata.xml\"")
 	_, _ = w.Write([]byte(xml.Header))
-	_, _ = w.Write(xmlBytes)
+	_, _ = w.Write(xmlBytes) //nolint:gosec // G705: server-generated SAML metadata XML, not user content
 }
 
 // SAMLLogin initiates a SAML authentication flow by redirecting to the IdP.

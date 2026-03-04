@@ -303,7 +303,7 @@ func (sm *SessionManager) isSecureRequest(r *http.Request) bool {
 	proto := r.Header.Get("X-Forwarded-Proto")
 	if isTrusted {
 		result := proto == "https"
-		slog.Debug("secure request check: trusted proxy",
+		slog.Debug("secure request check: trusted proxy", //nolint:gosec // G706: structured slog with named fields prevents log injection
 			slog.String("component", "sso"),
 			slog.String("ip", clientIP.String()),
 			slog.String("x_forwarded_proto", proto),
@@ -311,7 +311,7 @@ func (sm *SessionManager) isSecureRequest(r *http.Request) bool {
 		return result
 	}
 
-	slog.Debug("secure request check: untrusted proxy",
+	slog.Debug("secure request check: untrusted proxy", //nolint:gosec // G706: structured slog with named fields prevents log injection
 		slog.String("component", "sso"),
 		slog.String("ip", clientIP.String()),
 		slog.String("x_forwarded_proto", proto),
@@ -335,7 +335,7 @@ func (sm *SessionManager) SetSessionCookie(w http.ResponseWriter, r *http.Reques
 	// Dynamically determine if cookie should be secure based on request
 	useSecure := sm.isSecureRequest(r)
 
-	slog.Debug("setting session cookie",
+	slog.Debug("setting session cookie", //nolint:gosec // G706: structured slog with named fields prevents log injection
 		slog.String("component", "sso"),
 		slog.String("remote_addr", r.RemoteAddr),
 		slog.Bool("tls", r.TLS != nil),

@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"encoding/json"
+	"strconv"
 	"time"
 
 	"windshift/internal/database"
@@ -799,7 +800,7 @@ func (r *WorkspaceRepository) BuildWorkspaceMap() (map[string]int, error) {
 		}
 
 		// Map by id (as string), lowercase name, and lowercase key
-		workspaceMap[string(rune(id)+'0')] = id // Note: This is simplified; in practice use strconv
+		workspaceMap[strconv.Itoa(id)] = id
 		workspaceMap[name] = id
 		workspaceMap[key] = id
 	}

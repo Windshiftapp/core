@@ -405,10 +405,10 @@ func (h *CalendarFeedHandler) buildICSContent(events []icsEvent, _ string) strin
 		endTime := startTime.Add(time.Duration(duration) * time.Minute)
 
 		sb.WriteString("BEGIN:VEVENT\r\n")
-		sb.WriteString(fmt.Sprintf("UID:%s\r\n", event.UID))
-		sb.WriteString(fmt.Sprintf("DTSTART:%s\r\n", formatICSDateTime(startTime)))
-		sb.WriteString(fmt.Sprintf("DTEND:%s\r\n", formatICSDateTime(endTime)))
-		sb.WriteString(fmt.Sprintf("SUMMARY:%s\r\n", escapeICS(event.Title)))
+		fmt.Fprintf(&sb, "UID:%s\r\n", event.UID)
+		fmt.Fprintf(&sb, "DTSTART:%s\r\n", formatICSDateTime(startTime))
+		fmt.Fprintf(&sb, "DTEND:%s\r\n", formatICSDateTime(endTime))
+		fmt.Fprintf(&sb, "SUMMARY:%s\r\n", escapeICS(event.Title))
 
 		// Build description with notes and link
 		desc := event.Description
@@ -419,7 +419,7 @@ func (h *CalendarFeedHandler) buildICSContent(events []icsEvent, _ string) strin
 			desc += "Notes: " + event.Notes
 		}
 		if desc != "" {
-			sb.WriteString(fmt.Sprintf("DESCRIPTION:%s\r\n", escapeICS(desc)))
+			fmt.Fprintf(&sb, "DESCRIPTION:%s\r\n", escapeICS(desc))
 		}
 
 		sb.WriteString("END:VEVENT\r\n")

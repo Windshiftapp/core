@@ -12,11 +12,11 @@ func openBrowser(url string) error {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = exec.Command("open", url)
+		cmd = exec.Command("open", url) //nolint:gosec // G204: URL is constructed by buildItemURL, not user input
 	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", url)
+		cmd = exec.Command("cmd", "/c", "start", url) //nolint:gosec // G204: URL is constructed by buildItemURL, not user input
 	default:
-		cmd = exec.Command("xdg-open", url)
+		cmd = exec.Command("xdg-open", url) //nolint:gosec // G204: URL is constructed by buildItemURL, not user input
 	}
 	return cmd.Start()
 }

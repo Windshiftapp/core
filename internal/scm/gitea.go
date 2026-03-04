@@ -116,7 +116,7 @@ func (g *GiteaProvider) TestConnection(ctx context.Context) error {
 	}
 	g.setAuthHeader(req)
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // G704: intentional HTTP client for admin-configured Gitea URLs
 	if err != nil {
 		return err
 	}
