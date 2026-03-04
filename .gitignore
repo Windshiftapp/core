@@ -9,6 +9,7 @@
 windshift
 .dev-windshift
 cx
+/ws
 
 # Test binary, built with `go test -c`
 *.test
