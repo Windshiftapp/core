@@ -214,6 +214,10 @@ func (s *WorkflowService) GetAvailableTransitions(workspaceID int, itemTypeID *i
 		transitions = append(transitions, t)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate transitions: %w", err)
+	}
+
 	return transitions, nil
 }
 

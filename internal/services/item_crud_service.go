@@ -269,7 +269,7 @@ func (s *ItemCRUDService) SearchWithFilters(params SearchParams) ([]models.Item,
 	// Detect workspace key pattern (e.g. "OK-40")
 	if params.TextQuery != "" {
 		parts := strings.Split(strings.ToUpper(params.TextQuery), "-")
-		isKeyPattern := len(parts) == 2 && len(parts[0]) > 0 && len(parts[1]) > 0
+		isKeyPattern := len(parts) == 2 && parts[0] != "" && parts[1] != ""
 		if isKeyPattern {
 			if _, err := strconv.Atoi(parts[1]); err == nil {
 				filters.ItemKeyQuery = params.TextQuery

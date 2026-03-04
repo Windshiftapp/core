@@ -1,6 +1,7 @@
 package sso
 
 import (
+	"context"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
@@ -171,7 +172,7 @@ func fetchIDPMetadata(metadataURL string) (*saml.EntityDescriptor, error) {
 	}
 
 	metadata, err := samlsp.FetchMetadata(
-		nil, // use http.DefaultClient context
+		context.TODO(),
 		http.DefaultClient,
 		*mdURL,
 	)
