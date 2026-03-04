@@ -32,11 +32,13 @@ linters:
         - (*database/sql.Rows).Close
         - (*database/sql.Result).LastInsertId
         - (*database/sql.Result).RowsAffected
+        - (*windshift/internal/database.Tx).Rollback
 
     govet:
       enable-all: true
       disable:
         - fieldalignment  # Too noisy for now
+        - shadow          # Idiomatic Go allows shadowing (22 instances)
 
     staticcheck:
       checks: ["all"]
@@ -45,6 +47,7 @@ linters:
       excludes:
         - G104  # Audit errors not checked (handled by errcheck)
         - G304  # File path provided as taint input (often intentional)
+        - G117  # Struct fields for passwords/tokens are data models, not hardcoded secrets
 
     gocritic:
       enabled-tags:
@@ -82,6 +85,17 @@ linters:
         linters:
           - revive
         text: "dot-imports"
+
+      # Allow deprecated LDAP API (no alternative)
+      - path: internal/ldap/
+        linters:
+          - staticcheck
+        text: "SA1019"
+
+      # Suppress package comment lint for internal packages
+      - linters:
+          - staticcheck
+        text: "ST1000"
 
 formatters:
   enable:

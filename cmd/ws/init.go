@@ -117,7 +117,7 @@ func generateWindshiftMD(ws *Workspace, statuses []Status, itemTypes []ItemType,
 	var sb strings.Builder
 
 	sb.WriteString("# Windshift CLI\n\n")
-	sb.WriteString(fmt.Sprintf("This project is connected to Windshift workspace **%s** (%s).\n\n", ws.Key, ws.Name))
+	fmt.Fprintf(&sb, "This project is connected to Windshift workspace **%s** (%s).\n\n", ws.Key, ws.Name)
 
 	// Quick Commands section
 	sb.WriteString("## Quick Commands\n\n")
@@ -144,7 +144,7 @@ func generateWindshiftMD(ws *Workspace, statuses []Status, itemTypes []ItemType,
 		sb.WriteString("| Alias | Maps To | Usage |\n")
 		sb.WriteString("|-------|---------|-------|\n")
 		for alias, status := range cfg.StatusAliases {
-			sb.WriteString(fmt.Sprintf("| `%s` | %s | `ws task move X %s` |\n", alias, status, alias))
+			fmt.Fprintf(&sb, "| `%s` | %s | `ws task move X %s` |\n", alias, status, alias)
 		}
 		sb.WriteString("\n")
 	}
@@ -156,7 +156,7 @@ func generateWindshiftMD(ws *Workspace, statuses []Status, itemTypes []ItemType,
 		if t.Icon != "" {
 			icon = t.Icon + " "
 		}
-		sb.WriteString(fmt.Sprintf("- %s%s\n", icon, t.Name))
+		fmt.Fprintf(&sb, "- %s%s\n", icon, t.Name)
 	}
 	sb.WriteString("\n")
 
