@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
@@ -227,6 +228,21 @@ func (h *AssetStatusHandler) CreateAssetStatus(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	if currentUser != nil {
+		id := int(statusID)
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAssetStatusCreate,
+			ResourceType: logger.ResourceAssetStatus,
+			ResourceID:   &id,
+			ResourceName: req.Name,
+			Success:      true,
+		})
+	}
+
 	status := models.AssetStatus{
 		ID:           int(statusID),
 		SetID:        setID,
@@ -336,6 +352,20 @@ func (h *AssetStatusHandler) UpdateAssetStatus(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAssetStatusUpdate,
+			ResourceType: logger.ResourceAssetStatus,
+			ResourceID:   &statusID,
+			ResourceName: req.Name,
+			Success:      true,
+		})
+	}
+
 	// Return updated status
 	var status models.AssetStatus
 	var description sql.NullString
@@ -411,6 +441,19 @@ func (h *AssetStatusHandler) DeleteAssetStatus(w http.ResponseWriter, r *http.Re
 	if rowsAffected == 0 {
 		respondNotFound(w, r, "asset_status")
 		return
+	}
+
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAssetStatusDelete,
+			ResourceType: logger.ResourceAssetStatus,
+			ResourceID:   &statusID,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)

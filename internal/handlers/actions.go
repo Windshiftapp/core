@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -180,6 +181,20 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAutomationCreate,
+			ResourceType: logger.ResourceAutomation,
+			ResourceID:   &createdAction.ID,
+			ResourceName: createdAction.Name,
+			Success:      true,
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(createdAction)
@@ -262,6 +277,21 @@ func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAutomationUpdate,
+			ResourceType: logger.ResourceAutomation,
+			ResourceID:   &actionID,
+			ResourceName: updatedAction.Name,
+			Success:      true,
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(updatedAction)
 }
@@ -304,6 +334,20 @@ func (h *ActionsHandler) DeleteAction(w http.ResponseWriter, r *http.Request) {
 	// Invalidate cache
 	if h.actionService != nil {
 		h.actionService.InvalidateWorkspaceCache(workspaceID)
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAutomationDelete,
+			ResourceType: logger.ResourceAutomation,
+			ResourceID:   &actionID,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -359,6 +403,21 @@ func (h *ActionsHandler) ToggleAction(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAutomationToggle,
+			ResourceType: logger.ResourceAutomation,
+			ResourceID:   &actionID,
+			ResourceName: updatedAction.Name,
+			Success:      true,
+		})
 	}
 
 	w.Header().Set("Content-Type", "application/json")

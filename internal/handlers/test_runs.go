@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -143,6 +144,18 @@ func (h *TestRunHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionTestRunCreate,
+		ResourceType: logger.ResourceTestRun,
+		ResourceID:   &run.ID,
+		ResourceName: run.Name,
+		Success:      true,
+	})
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(run)
@@ -226,6 +239,17 @@ func (h *TestRunHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionTestRunUpdate,
+		ResourceType: logger.ResourceTestRun,
+		ResourceID:   &id,
+		Success:      true,
+	})
 
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
@@ -738,6 +762,17 @@ func (h *TestRunHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionTestRunDelete,
+		ResourceType: logger.ResourceTestRun,
+		ResourceID:   &id,
+		Success:      true,
+	})
 
 	w.WriteHeader(http.StatusOK)
 }

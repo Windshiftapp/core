@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/utils"
 )
 
 type NotificationSettingsHandler struct {
@@ -195,6 +197,23 @@ func (h *NotificationSettingsHandler) CreateNotificationSetting(w http.ResponseW
 
 	// Return the created setting
 	req.ID = int(id)
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		intID := int(id)
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionNotificationSettingCreate,
+			ResourceType: logger.ResourceNotificationSetting,
+			ResourceID:   &intID,
+			ResourceName: req.Name,
+			Success:      true,
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(req)
@@ -271,6 +290,21 @@ func (h *NotificationSettingsHandler) UpdateNotificationSetting(w http.ResponseW
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionNotificationSettingUpdate,
+			ResourceType: logger.ResourceNotificationSetting,
+			ResourceID:   &id,
+			ResourceName: req.Name,
+			Success:      true,
+		})
+	}
+
 	// Return the updated setting
 	req.ID = id
 	w.Header().Set("Content-Type", "application/json")
@@ -318,6 +352,20 @@ func (h *NotificationSettingsHandler) DeleteNotificationSetting(w http.ResponseW
 	if rowsAffected == 0 {
 		respondNotFound(w, r, "notification_setting")
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionNotificationSettingDelete,
+			ResourceType: logger.ResourceNotificationSetting,
+			ResourceID:   &id,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)

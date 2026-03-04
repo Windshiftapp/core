@@ -17,9 +17,11 @@ import (
 	"strconv"
 
 	"windshift/internal/jira"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 
 	"github.com/google/uuid"
 )
@@ -173,6 +175,24 @@ func (h *JiraImportHandler) StartImport(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionJiraImport,
+			ResourceType: logger.ResourceJiraImport,
+			ResourceName: jobID,
+			Details: map[string]interface{}{
+				"connection_id": req.ConnectionID,
+				"project_keys":  req.ProjectKeys,
+			},
+			Success: true,
+		})
 	}
 
 	// Start the import in a background goroutine
@@ -733,9 +753,13 @@ func (h *JiraImportHandler) ensureMilestones(_ context.Context, jobID string, wo
 		}
 
 		// Create milestone
+		var jiraTargetDate *string
+		if m.ReleaseDate != "" {
+			jiraTargetDate = &m.ReleaseDate
+		}
 		milestone, err := planningSvc.CreateMilestone(services.CreateMilestoneParams{
 			Name:        m.JiraName,
-			TargetDate:  m.ReleaseDate,
+			TargetDate:  jiraTargetDate,
 			Status:      status,
 			IsGlobal:    false,
 			WorkspaceID: &workspaceID,

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"windshift/internal/cql"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/utils"
 )
@@ -505,6 +506,21 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if currentUser != nil {
+		id := int(assetID)
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAssetCreate,
+			ResourceType: logger.ResourceAsset,
+			ResourceID:   &id,
+			ResourceName: req.Title,
+			Success:      true,
+		})
+	}
+
 	// Return created asset
 	asset := models.Asset{
 		ID:                int(assetID),
@@ -683,6 +699,20 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAssetUpdate,
+			ResourceType: logger.ResourceAsset,
+			ResourceID:   &assetID,
+			ResourceName: req.Title,
+			Success:      true,
+		})
+	}
+
 	// Return updated asset
 	asset := models.Asset{
 		ID:                assetID,
@@ -755,6 +785,19 @@ func (h *AssetHandler) DeleteAsset(w http.ResponseWriter, r *http.Request) {
 	if rowsAffected == 0 {
 		respondNotFound(w, r, "asset")
 		return
+	}
+
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAssetDelete,
+			ResourceType: logger.ResourceAsset,
+			ResourceID:   &assetID,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)

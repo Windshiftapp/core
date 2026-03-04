@@ -436,6 +436,113 @@ const (
 	ActionTestSetCreate = "test_set.create"
 	ActionTestSetUpdate = "test_set.update"
 	ActionTestSetDelete = "test_set.delete"
+
+	// SSO Provider management
+	ActionSSOProviderCreate = "sso_provider.create"
+	ActionSSOProviderUpdate = "sso_provider.update"
+	ActionSSOProviderDelete = "sso_provider.delete"
+
+	// LDAP Config management
+	ActionLDAPConfigCreate = "ldap_config.create"
+	ActionLDAPConfigUpdate = "ldap_config.update"
+	ActionLDAPConfigDelete = "ldap_config.delete"
+
+	// Security Settings
+	ActionSecuritySettingsUpdate = "security_settings.update"
+
+	// LLM Connections
+	ActionLLMConnectionCreate = "llm_connection.create"
+	ActionLLMConnectionUpdate = "llm_connection.update"
+	ActionLLMConnectionDelete = "llm_connection.delete"
+
+	// Email Providers
+	ActionEmailProviderCreate = "email_provider.create"
+	ActionEmailProviderUpdate = "email_provider.update"
+	ActionEmailProviderDelete = "email_provider.delete"
+
+	// WebAuthn
+	ActionWebAuthnRegister = "webauthn.register"
+	ActionWebAuthnRemove   = "webauthn.remove"
+
+	// Plugins
+	ActionPluginUpload = "plugin.upload"
+	ActionPluginDelete = "plugin.delete"
+
+	// Jira Integration
+	ActionJiraConnect    = "jira.connect"
+	ActionJiraDisconnect = "jira.disconnect"
+	ActionJiraImport     = "jira.import"
+
+	// Iteration management
+	ActionIterationCreate = "iteration.create"
+	ActionIterationUpdate = "iteration.update"
+	ActionIterationDelete = "iteration.delete"
+
+	// Automation/Actions management
+	ActionAutomationCreate = "automation.create"
+	ActionAutomationUpdate = "automation.update"
+	ActionAutomationDelete = "automation.delete"
+	ActionAutomationToggle = "automation.toggle"
+
+	// Test Folder management
+	ActionTestFolderCreate = "test_folder.create"
+	ActionTestFolderUpdate = "test_folder.update"
+	ActionTestFolderDelete = "test_folder.delete"
+
+	// Time category management
+	ActionTimeCategoryCreate = "time_category.create"
+	ActionTimeCategoryUpdate = "time_category.update"
+	ActionTimeCategoryDelete = "time_category.delete"
+
+	// Time customer management
+	ActionTimeCustomerCreate = "time_customer.create"
+	ActionTimeCustomerUpdate = "time_customer.update"
+	ActionTimeCustomerDelete = "time_customer.delete"
+
+	// Time project permission management
+	ActionTimeProjectAddManager    = "time_project.add_manager"
+	ActionTimeProjectRemoveManager = "time_project.remove_manager"
+	ActionTimeProjectAddMember     = "time_project.add_member"
+	ActionTimeProjectRemoveMember  = "time_project.remove_member"
+
+	// Label management (workspace-level)
+	ActionLabelCreate = "label.create"
+	ActionLabelUpdate = "label.update"
+	ActionLabelDelete = "label.delete"
+
+	// Asset management
+	ActionAssetCreate = "asset.create"
+	ActionAssetUpdate = "asset.update"
+	ActionAssetDelete = "asset.delete"
+
+	// Asset type management
+	ActionAssetTypeCreate = "asset_type.create"
+	ActionAssetTypeUpdate = "asset_type.update"
+	ActionAssetTypeDelete = "asset_type.delete"
+
+	// Asset status management
+	ActionAssetStatusCreate = "asset_status.create"
+	ActionAssetStatusUpdate = "asset_status.update"
+	ActionAssetStatusDelete = "asset_status.delete"
+
+	// Asset category management
+	ActionAssetCategoryCreate = "asset_category.create"
+	ActionAssetCategoryUpdate = "asset_category.update"
+	ActionAssetCategoryDelete = "asset_category.delete"
+
+	// Asset set management
+	ActionAssetSetCreate = "asset_set.create"
+	ActionAssetSetUpdate = "asset_set.update"
+	ActionAssetSetDelete = "asset_set.delete"
+
+	// Asset set role management
+	ActionAssetSetRoleAssign = "asset_set_role.assign"
+	ActionAssetSetRoleRevoke = "asset_set_role.revoke"
+
+	// Notification setting management
+	ActionNotificationSettingCreate = "notification_setting.create"
+	ActionNotificationSettingUpdate = "notification_setting.update"
+	ActionNotificationSettingDelete = "notification_setting.delete"
 )
 
 // Resource type constants
@@ -472,4 +579,25 @@ const (
 	ResourceTestRun              = "test_run"
 	ResourceTestSet              = "test_set"
 	ResourceSCIMToken            = "scim_token"
+	ResourceSSOProvider          = "sso_provider"
+	ResourceLDAPConfig           = "ldap_config"
+	ResourceSecuritySettings     = "security_settings"
+	ResourceLLMConnection        = "llm_connection"
+	ResourceEmailProvider        = "email_provider"
+	ResourceWebAuthn             = "webauthn"
+	ResourcePlugin               = "plugin"
+	ResourceJiraImport           = "jira_import"
+	ResourceIteration            = "iteration"
+	ResourceAutomation           = "automation"
+	ResourceTestFolder           = "test_folder"
+	ResourceTimeCategory         = "time_category"
+	ResourceTimeCustomer         = "time_customer"
+	ResourceLabel                = "label"
+	ResourceAsset                = "asset"
+	ResourceAssetType            = "asset_type"
+	ResourceAssetStatus          = "asset_status"
+	ResourceAssetCategory        = "asset_category"
+	ResourceAssetSet             = "asset_set"
+	ResourceAssetSetRole         = "asset_set_role"
+	ResourceNotificationSetting  = "notification_setting"
 )

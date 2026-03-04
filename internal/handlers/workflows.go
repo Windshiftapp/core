@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/utils"
 )
 
 type WorkflowHandler struct {
@@ -150,6 +152,22 @@ func (h *WorkflowHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	createdWorkflow.Transitions = transitions
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		intID := int(id)
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionWorkflowCreate,
+			ResourceType: logger.ResourceWorkflow,
+			ResourceID:   &intID,
+			ResourceName: workflow.Name,
+			Success:      true,
+		})
+	}
+
 	respondJSONCreated(w, createdWorkflow)
 }
 
@@ -217,6 +235,21 @@ func (h *WorkflowHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	updatedWorkflow.Transitions = transitions
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionWorkflowUpdate,
+			ResourceType: logger.ResourceWorkflow,
+			ResourceID:   &id,
+			ResourceName: workflow.Name,
+			Success:      true,
+		})
+	}
+
 	respondJSONOK(w, updatedWorkflow)
 }
 
@@ -265,6 +298,20 @@ func (h *WorkflowHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if err = tx.Commit(); err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionWorkflowDelete,
+			ResourceType: logger.ResourceWorkflow,
+			ResourceID:   &id,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -361,6 +408,21 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 	if err = tx.Commit(); err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionWorkflowUpdate,
+			ResourceType: logger.ResourceWorkflow,
+			ResourceID:   &workflowID,
+			Details:      map[string]interface{}{"update_type": "transitions"},
+			Success:      true,
+		})
 	}
 
 	// Return updated transitions

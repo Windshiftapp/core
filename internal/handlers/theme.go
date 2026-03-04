@@ -8,7 +8,10 @@ import (
 	"strconv"
 	"time"
 
+	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/utils"
 )
 
 type ThemeHandler struct {
@@ -17,14 +20,15 @@ type ThemeHandler struct {
 		QueryRow(query string, args ...interface{}) *sql.Row
 		Exec(query string, args ...interface{}) (sql.Result, error)
 	}
+	auditDB database.Database
 }
 
 func NewThemeHandler(db interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 	QueryRow(query string, args ...interface{}) *sql.Row
 	Exec(query string, args ...interface{}) (sql.Result, error)
-}) *ThemeHandler {
-	return &ThemeHandler{DB: db}
+}, auditDB database.Database) *ThemeHandler {
+	return &ThemeHandler{DB: db, auditDB: auditDB}
 }
 
 // GetThemes returns all themes
@@ -173,6 +177,22 @@ func (h *ThemeHandler) CreateTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		themeIDInt := int(themeID)
+		_ = logger.LogAudit(h.auditDB, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionThemeCreate,
+			ResourceType: logger.ResourceTheme,
+			ResourceID:   &themeIDInt,
+			ResourceName: theme.Name,
+			Success:      true,
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(theme)
@@ -260,6 +280,21 @@ func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.auditDB, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionThemeUpdate,
+			ResourceType: logger.ResourceTheme,
+			ResourceID:   &themeID,
+			ResourceName: theme.Name,
+			Success:      true,
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(theme)
 }
@@ -293,6 +328,20 @@ func (h *ThemeHandler) DeleteTheme(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to delete theme: %w", err))
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.auditDB, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionThemeDelete,
+			ResourceType: logger.ResourceTheme,
+			ResourceID:   &themeID,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -330,6 +379,20 @@ func (h *ThemeHandler) ActivateTheme(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to activate theme: %w", err))
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.auditDB, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionThemeActivate,
+			ResourceType: logger.ResourceTheme,
+			ResourceID:   &themeID,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusOK)

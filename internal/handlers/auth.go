@@ -10,6 +10,7 @@ import (
 
 	"windshift/internal/auth"
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
@@ -139,6 +140,16 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			h.rateLimiter.RecordFailedLogin(ipAddress)
 			// Always perform bcrypt comparison to prevent timing attacks
 			_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(req.Password))
+			_ = logger.LogAudit(h.db, logger.AuditEvent{
+				UserID:       0,
+				IPAddress:    utils.GetClientIP(r),
+				UserAgent:    r.UserAgent(),
+				ActionType:   logger.ActionLoginFailure,
+				ResourceType: logger.ResourceUser,
+				ResourceName: req.EmailOrUsername,
+				Success:      false,
+				ErrorMessage: "invalid credentials",
+			})
 			respondUnauthorized(w, r)
 			return
 		}
@@ -156,6 +167,16 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		// Record failed attempt
 		h.rateLimiter.RecordFailedLogin(ipAddress)
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       0,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionLoginFailure,
+			ResourceType: logger.ResourceUser,
+			ResourceName: req.EmailOrUsername,
+			Success:      false,
+			ErrorMessage: "invalid credentials",
+		})
 		respondUnauthorized(w, r)
 		return
 	}
@@ -264,6 +285,18 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	user.FullName = fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 	user.PasswordHash = "" // Never send password hash
 
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionLoginSuccess,
+		ResourceType: logger.ResourceUser,
+		ResourceID:   &user.ID,
+		ResourceName: user.Username,
+		Success:      true,
+	})
+
 	response := LoginResponse{
 		Success:            true,
 		User:               user,
@@ -302,6 +335,18 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	// Clear session cookie
 	h.sessionManager.ClearSessionCookie(w, r)
+
+	session, _ := r.Context().Value(middleware.ContextKeySession).(*auth.Session)
+	if session != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       session.UserID,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionLogout,
+			ResourceType: logger.ResourceUser,
+			Success:      true,
+		})
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
@@ -503,6 +548,15 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
+
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       session.UserID,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionPasswordChange,
+		ResourceType: logger.ResourceUser,
+		Success:      true,
+	})
 
 	// Optionally logout all other sessions
 	if req.LogoutAll {

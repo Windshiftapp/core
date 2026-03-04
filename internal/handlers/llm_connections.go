@@ -4,18 +4,21 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"windshift/internal/database"
 	"windshift/internal/llm"
+	"windshift/internal/logger"
 	"windshift/internal/utils"
 )
 
 // LLMConnectionHandler handles admin CRUD for LLM connections and user queries.
 type LLMConnectionHandler struct {
+	db      database.Database
 	manager *llm.ConnectionManager
 }
 
 // NewLLMConnectionHandler creates a new LLM connection handler.
-func NewLLMConnectionHandler(manager *llm.ConnectionManager) *LLMConnectionHandler {
-	return &LLMConnectionHandler{manager: manager}
+func NewLLMConnectionHandler(db database.Database, manager *llm.ConnectionManager) *LLMConnectionHandler {
+	return &LLMConnectionHandler{db: db, manager: manager}
 }
 
 // ListConnections returns all LLM connections (admin).
@@ -69,6 +72,20 @@ func (h *LLMConnectionHandler) CreateConnection(w http.ResponseWriter, r *http.R
 		respondInternalError(w, r, err)
 		return
 	}
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionLLMConnectionCreate,
+			ResourceType: logger.ResourceLLMConnection,
+			ResourceID:   &conn.ID,
+			ResourceName: req.Name,
+			Success:      true,
+		})
+	}
 	respondJSONCreated(w, conn)
 }
 
@@ -104,6 +121,20 @@ func (h *LLMConnectionHandler) UpdateConnection(w http.ResponseWriter, r *http.R
 		respondNotFound(w, r, "LLM connection")
 		return
 	}
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionLLMConnectionUpdate,
+			ResourceType: logger.ResourceLLMConnection,
+			ResourceID:   &id,
+			ResourceName: req.Name,
+			Success:      true,
+		})
+	}
 	respondJSONOK(w, conn)
 }
 
@@ -116,6 +147,19 @@ func (h *LLMConnectionHandler) DeleteConnection(w http.ResponseWriter, r *http.R
 	if err := h.manager.DeleteConnection(id); err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionLLMConnectionDelete,
+			ResourceType: logger.ResourceLLMConnection,
+			ResourceID:   &id,
+			Success:      true,
+		})
 	}
 	respondJSON(w, http.StatusNoContent, nil)
 }

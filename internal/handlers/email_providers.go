@@ -16,7 +16,9 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/email"
+	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/utils"
 )
 
 // EmailProviderHandler handles email provider API endpoints
@@ -192,6 +194,22 @@ func (h *EmailProviderHandler) CreateEmailProvider(w http.ResponseWriter, r *htt
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		providerID := int(id)
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionEmailProviderCreate,
+			ResourceType: logger.ResourceEmailProvider,
+			ResourceID:   &providerID,
+			ResourceName: req.Name,
+			Success:      true,
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
@@ -253,6 +271,21 @@ func (h *EmailProviderHandler) UpdateEmailProvider(w http.ResponseWriter, r *htt
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionEmailProviderUpdate,
+			ResourceType: logger.ResourceEmailProvider,
+			ResourceID:   &id,
+			ResourceName: req.Name,
+			Success:      true,
+		})
+	}
+
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]string{"status": "updated"})
 }
@@ -270,6 +303,20 @@ func (h *EmailProviderHandler) DeleteEmailProvider(w http.ResponseWriter, r *htt
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionEmailProviderDelete,
+			ResourceType: logger.ResourceEmailProvider,
+			ResourceID:   &id,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)

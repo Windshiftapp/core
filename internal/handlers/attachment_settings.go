@@ -5,16 +5,21 @@ import (
 	"net/http"
 	"strconv"
 
+	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 type AttachmentSettingsHandler struct {
+	db              database.Database
 	settingsService *services.AttachmentSettingsService
 }
 
-func NewAttachmentSettingsHandler(settingsService *services.AttachmentSettingsService) *AttachmentSettingsHandler {
+func NewAttachmentSettingsHandler(db database.Database, settingsService *services.AttachmentSettingsService) *AttachmentSettingsHandler {
 	return &AttachmentSettingsHandler{
+		db:              db,
 		settingsService: settingsService,
 	}
 }
@@ -54,6 +59,21 @@ func (h *AttachmentSettingsHandler) Update(w http.ResponseWriter, r *http.Reques
 		}
 		respondInternalError(w, r, err)
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAttachmentSettingsUpdate,
+			ResourceType: logger.ResourceAttachmentSettings,
+			ResourceID:   &settingsID,
+			ResourceName: "attachment_settings",
+			Success:      true,
+		})
 	}
 
 	w.Header().Set("Content-Type", "application/json")

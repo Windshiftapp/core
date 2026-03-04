@@ -9,8 +9,10 @@ import (
 
 	"windshift/internal/database"
 	ldapPkg "windshift/internal/ldap"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/sso"
+	"windshift/internal/utils"
 )
 
 // LDAPHandler handles LDAP directory management endpoints.
@@ -211,6 +213,22 @@ func (h *LDAPHandler) CreateConfig(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		newID := int(id)
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionLDAPConfigCreate,
+			ResourceType: logger.ResourceLDAPConfig,
+			ResourceID:   &newID,
+			ResourceName: req.Name,
+			Success:      true,
+		})
+	}
+
 	config, _ := h.syncService.GetConfig(int(id))
 	if config != nil {
 		resp := LDAPConfigResponse{LDAPConfig: *config, HasBindPassword: true}
@@ -336,6 +354,21 @@ func (h *LDAPHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionLDAPConfigUpdate,
+			ResourceType: logger.ResourceLDAPConfig,
+			ResourceID:   &id,
+			ResourceName: existing.Name,
+			Success:      true,
+		})
+	}
+
 	config, _ := h.syncService.GetConfig(id)
 	if config != nil {
 		resp := LDAPConfigResponse{LDAPConfig: *config, HasBindPassword: true}
@@ -363,6 +396,21 @@ func (h *LDAPHandler) DeleteConfig(w http.ResponseWriter, r *http.Request) {
 	if rowsAffected == 0 {
 		respondNotFound(w, r, "LDAP config")
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionLDAPConfigDelete,
+			ResourceType: logger.ResourceLDAPConfig,
+			ResourceID:   &id,
+			ResourceName: "",
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)

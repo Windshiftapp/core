@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/scm"
 	"windshift/internal/services"
@@ -258,17 +259,11 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 	milestone.Name = utils.StripHTMLTags(milestone.Name)
 	milestone.Description = utils.SanitizeCommentContent(milestone.Description)
 
-	// Get target date as string
-	targetDate := ""
-	if milestone.TargetDate != nil {
-		targetDate = *milestone.TargetDate
-	}
-
 	// Use service to create milestone
 	result, err := h.planningService.CreateMilestone(services.CreateMilestoneParams{
 		Name:        milestone.Name,
 		Description: milestone.Description,
-		TargetDate:  targetDate,
+		TargetDate:  milestone.TargetDate,
 		Status:      milestone.Status,
 		CategoryID:  milestone.CategoryID,
 		IsGlobal:    milestone.IsGlobal,
@@ -280,6 +275,17 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	createdMilestone := h.milestoneResultToModel(result, user.ID)
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionMilestoneCreate,
+		ResourceType: logger.ResourceMilestone,
+		ResourceID:   &createdMilestone.ID,
+		ResourceName: createdMilestone.Name,
+		Success:      true,
+	})
 	respondJSONCreated(w, createdMilestone)
 }
 
@@ -377,18 +383,12 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 	milestone.Name = utils.StripHTMLTags(milestone.Name)
 	milestone.Description = utils.SanitizeCommentContent(milestone.Description)
 
-	// Get target date as string
-	targetDate := ""
-	if milestone.TargetDate != nil {
-		targetDate = *milestone.TargetDate
-	}
-
 	// Use service to update milestone
 	result, err := h.planningService.UpdateMilestone(services.UpdateMilestoneParams{
 		ID:          id,
 		Name:        milestone.Name,
 		Description: milestone.Description,
-		TargetDate:  targetDate,
+		TargetDate:  milestone.TargetDate,
 		Status:      milestone.Status,
 		CategoryID:  milestone.CategoryID,
 		IsGlobal:    milestone.IsGlobal,
@@ -400,6 +400,17 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	updatedMilestone := h.milestoneResultToModel(result, user.ID)
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionMilestoneUpdate,
+		ResourceType: logger.ResourceMilestone,
+		ResourceID:   &updatedMilestone.ID,
+		ResourceName: updatedMilestone.Name,
+		Success:      true,
+	})
 	respondJSONOK(w, updatedMilestone)
 }
 
@@ -444,6 +455,16 @@ func (h *MilestoneHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionMilestoneDelete,
+		ResourceType: logger.ResourceMilestone,
+		ResourceID:   &id,
+		Success:      true,
+	})
 	w.WriteHeader(http.StatusNoContent)
 }
 

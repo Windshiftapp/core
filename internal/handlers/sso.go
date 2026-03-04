@@ -21,6 +21,7 @@ import (
 
 	"windshift/internal/auth"
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/middleware"
 	"windshift/internal/services"
 	"windshift/internal/sso"
@@ -571,6 +572,21 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionSSOProviderCreate,
+			ResourceType: logger.ResourceSSOProvider,
+			ResourceID:   &provider.ID,
+			ResourceName: provider.Name,
+			Success:      true,
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(h.providerToResponse(provider))
@@ -661,6 +677,21 @@ func (h *SSOHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
 		existing.ClientSecretEncrypted = encryptedSecret
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionSSOProviderUpdate,
+			ResourceType: logger.ResourceSSOProvider,
+			ResourceID:   &id,
+			ResourceName: existing.Name,
+			Success:      true,
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(h.providerToResponse(existing))
 }
@@ -673,6 +704,9 @@ func (h *SSOHandler) DeleteProvider(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Fetch provider name before deletion for audit logging
+	provider, _ := h.providerStore.GetByID(id)
+
 	if err := h.providerStore.Delete(id); err != nil {
 		if err == sso.ErrProviderNotFound {
 			respondNotFound(w, r, "provider")
@@ -680,6 +714,25 @@ func (h *SSOHandler) DeleteProvider(w http.ResponseWriter, r *http.Request) {
 			respondInternalError(w, r, err)
 		}
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		providerName := ""
+		if provider != nil {
+			providerName = provider.Name
+		}
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionSSOProviderDelete,
+			ResourceType: logger.ResourceSSOProvider,
+			ResourceID:   &id,
+			ResourceName: providerName,
+			Success:      true,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)

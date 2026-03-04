@@ -6,18 +6,22 @@ import (
 	"net/http"
 
 	"windshift/internal/auth"
+	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/utils"
 )
 
 // SCIMTokenHandler handles SCIM token management endpoints
 type SCIMTokenHandler struct {
+	db           database.Database
 	tokenManager *auth.SCIMTokenManager
 }
 
 // NewSCIMTokenHandler creates a new SCIM token handler
-func NewSCIMTokenHandler(tokenManager *auth.SCIMTokenManager) *SCIMTokenHandler {
+func NewSCIMTokenHandler(db database.Database, tokenManager *auth.SCIMTokenManager) *SCIMTokenHandler {
 	return &SCIMTokenHandler{
+		db:           db,
 		tokenManager: tokenManager,
 	}
 }
@@ -72,6 +76,19 @@ func (h *SCIMTokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) {
 		slog.String("token_name", request.Name),
 		slog.String("token_prefix", response.SCIMToken.TokenPrefix))
 
+	tokenID := response.SCIMToken.ID
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionSCIMTokenCreate,
+		ResourceType: logger.ResourceSCIMToken,
+		ResourceID:   &tokenID,
+		ResourceName: request.Name,
+		Success:      true,
+	})
+
 	respondJSONCreated(w, response)
 }
 
@@ -123,6 +140,20 @@ func (h *SCIMTokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 		slog.String("component", "scim"),
 		slog.Int("token_id", id),
 		slog.Int("revoked_by", userID))
+
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionSCIMTokenRevoke,
+			ResourceType: logger.ResourceSCIMToken,
+			ResourceID:   &id,
+			ResourceName: "",
+			Success:      true,
+		})
+	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
