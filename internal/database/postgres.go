@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"strings"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 //go:embed schema/base_tables_postgres.sql
@@ -980,14 +980,14 @@ func (p *PostgresDB) EnsureDefaultNotificationSettings() error {
 // CreateWorkspaceItemSequence creates a PostgreSQL sequence for workspace item numbers
 func (p *PostgresDB) CreateWorkspaceItemSequence(workspaceID int64) error {
 	seqName := fmt.Sprintf("workspace_%d_item_seq", workspaceID)
-	_, err := p.db.Exec(fmt.Sprintf("CREATE SEQUENCE IF NOT EXISTS %s START 1", seqName))
+	_, err := p.db.Exec(fmt.Sprintf("CREATE SEQUENCE IF NOT EXISTS %s START 1", pq.QuoteIdentifier(seqName)))
 	return err
 }
 
 // DropWorkspaceItemSequence drops the PostgreSQL sequence when workspace is deleted
 func (p *PostgresDB) DropWorkspaceItemSequence(workspaceID int64) error {
 	seqName := fmt.Sprintf("workspace_%d_item_seq", workspaceID)
-	_, err := p.db.Exec(fmt.Sprintf("DROP SEQUENCE IF EXISTS %s", seqName))
+	_, err := p.db.Exec(fmt.Sprintf("DROP SEQUENCE IF EXISTS %s", pq.QuoteIdentifier(seqName)))
 	return err
 }
 
@@ -996,6 +996,6 @@ func (p *PostgresDB) DropWorkspaceItemSequence(workspaceID int64) error {
 func (p *PostgresDB) NextWorkspaceItemNumber(workspaceID int64) (int, error) {
 	seqName := fmt.Sprintf("workspace_%d_item_seq", workspaceID)
 	var nextVal int
-	err := p.db.QueryRow(fmt.Sprintf("SELECT nextval('%s')", seqName)).Scan(&nextVal)
+	err := p.db.QueryRow(fmt.Sprintf("SELECT nextval('%s')", pq.QuoteLiteral(seqName))).Scan(&nextVal)
 	return nextVal, err
 }

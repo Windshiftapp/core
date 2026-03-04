@@ -651,7 +651,7 @@ func (s *Server) initialize() error {
 
 	// Webhook handler
 	webhookHandler := handlers.NewWebhookHandler(s.db, webhookSender, permService)
-	portalHandler := handlers.NewPortalHandler(s.db, sessionManager, portalSessionManager, ipExtractor)
+	portalHandler := handlers.NewPortalHandler(s.db, sessionManager, portalSessionManager, ipExtractor, cfg.AttachmentPath)
 	portalAuthHandler := handlers.NewPortalAuthHandler(s.db, portalSessionManager, sessionManager, magicLinkService, ipExtractor)
 	portalCustomersHandler := handlers.NewPortalCustomersHandler(s.db)
 	contactRolesHandler := handlers.NewEnumHandler(

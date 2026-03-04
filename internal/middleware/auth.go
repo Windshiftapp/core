@@ -226,7 +226,7 @@ func (am *AuthMiddleware) shouldSkipAuth(r *http.Request) bool {
 
 	// Allow listed auth endpoints (login flows) even after setup
 	if publicAuthEndpoints[path] {
-		slog.Debug("skipping auth for public endpoint", slog.String("path", path))
+		slog.Debug("skipping auth for public endpoint", slog.String("path", path)) //nolint:gosec // G706: structured slog
 		return true
 	}
 
@@ -371,7 +371,7 @@ func (am *AuthMiddleware) RequireVerifiedEmail(next http.Handler) http.Handler {
 
 		// Check if user is loaded in session
 		if session.User == nil {
-			slog.Error("session user is nil", slog.Int("user_id", session.UserID))
+			slog.Error("session user is nil", slog.Int("user_id", session.UserID)) //nolint:gosec // G706: structured slog
 			am.handleVerificationError(w, r, "Failed to verify email status", "VERIFICATION_CHECK_FAILED", http.StatusInternalServerError)
 			return
 		}
