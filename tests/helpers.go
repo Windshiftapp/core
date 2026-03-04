@@ -72,7 +72,7 @@ func StartTestServer(t *testing.T, dbType string) (ts *TestServer, cleanup func(
 	case "postgres":
 		pgBaseDSN = os.Getenv("TEST_POSTGRES_DSN")
 		if pgBaseDSN == "" {
-			pgBaseDSN = "postgresql://windshift_test:windshift_test_password@localhost:15432/postgres?sslmode=disable"
+			pgBaseDSN = "postgresql://windshift_test:windshift_test_password@localhost:15432/postgres?sslmode=disable" //nolint:gosec // G101: test-only fallback DSN for local Postgres
 		}
 
 		// Create a unique test database for isolation

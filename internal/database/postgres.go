@@ -155,7 +155,7 @@ func ConvertPlaceholders(query string) string {
 	paramNum := 1
 	for _, ch := range query {
 		if ch == '?' {
-			result.WriteString(fmt.Sprintf("$%d", paramNum))
+			fmt.Fprintf(&result, "$%d", paramNum)
 			paramNum++
 		} else {
 			result.WriteRune(ch)

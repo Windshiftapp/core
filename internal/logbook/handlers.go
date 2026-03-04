@@ -392,7 +392,7 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	filePath := filepath.Join(storagePath, filepath.Base(header.Filename))
-	if err := os.WriteFile(filePath, content, 0o600); err != nil {
+	if err := os.WriteFile(filePath, content, 0o600); err != nil { //nolint:gosec // G703: filepath.Base() strips traversal
 		respondInternalError(w, r, err)
 		return
 	}
@@ -912,7 +912,7 @@ func (h *Handlers) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	filePath := filepath.Join(dir, storedFilename)
-	if err := os.WriteFile(filePath, content, 0o600); err != nil {
+	if err := os.WriteFile(filePath, content, 0o600); err != nil { //nolint:gosec // G703: path components are UUID-generated
 		respondInternalError(w, r, err)
 		return
 	}

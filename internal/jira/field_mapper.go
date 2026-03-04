@@ -500,7 +500,7 @@ func convertADFOrderedList(nodeMap map[string]interface{}) string {
 		if !ok {
 			continue
 		}
-		result.WriteString(fmt.Sprintf("%d. %s\n", i+1, strings.TrimSpace(convertADFContent(itemMap))))
+		fmt.Fprintf(&result, "%d. %s\n", i+1, strings.TrimSpace(convertADFContent(itemMap)))
 	}
 	return result.String() + "\n"
 }

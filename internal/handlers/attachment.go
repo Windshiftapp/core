@@ -312,7 +312,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		itemDir = filepath.Join(h.attachmentPath, "items", strconv.Itoa(entityID))
 	}
 	slog.Debug("creating directory", slog.String("component", "attachments"), slog.String("path", itemDir))
-	if err = os.MkdirAll(itemDir, 0o750); err != nil {
+	if err = os.MkdirAll(itemDir, 0o750); err != nil { //nolint:gosec // G703: path built from hardcoded strings + strconv.Itoa(entityID)
 		slog.Error("failed to create directory", slog.String("component", "attachments"), slog.String("path", itemDir), slog.Any("error", err))
 		respondInternalError(w, r, fmt.Errorf("failed to create attachment directory: %w", err))
 		return

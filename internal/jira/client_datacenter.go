@@ -49,7 +49,7 @@ func (c *dataCenterClient) do(ctx context.Context, method, reqURL string, body i
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	return c.httpClient.Do(req)
+	return c.httpClient.Do(req) //nolint:gosec // G704: intentional HTTP client for admin-configured Jira URLs
 }
 
 // setHeaders sets common headers for Jira API requests
@@ -653,7 +653,7 @@ func (c *dataCenterClient) DownloadAttachment(ctx context.Context, attachmentURL
 	}
 	c.setHeaders(req)
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req) //nolint:gosec // G704: intentional HTTP client for admin-configured Jira URLs
 	if err != nil {
 		return nil, "", err
 	}
