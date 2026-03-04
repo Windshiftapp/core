@@ -127,9 +127,12 @@ WINDSHIFT.md
 AGENTS.md
 docs
 
+# Local dev docker-compose
+docker-compose.yml
+
 # Old build artifacts
-ws
 ws.toml
 ethereal
 windshift.dsl
 endpoints.txt
+RELEASE_NOTES.md

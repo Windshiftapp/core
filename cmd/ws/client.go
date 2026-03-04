@@ -71,7 +71,7 @@ func (c *Client) doRequest(method, path string, body, result interface{}) error 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req) //nolint:gosec // G704: URL from server config, not user input
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
@@ -415,6 +415,116 @@ func (c *Client) UpdateComment(commentID int, content string) (*Comment, error) 
 // DeleteComment removes a comment
 func (c *Client) DeleteComment(commentID int) error {
 	return c.DELETE(fmt.Sprintf("/rest/api/v1/comments/%d", commentID))
+}
+
+// ============================================
+// Helper Methods
+// ============================================
+
+// ============================================
+// Milestone API Methods
+// ============================================
+
+// ListMilestones lists milestones with optional filters
+func (c *Client) ListMilestones(filters map[string]string) ([]Milestone, error) {
+	path := "/rest/api/v1/milestones"
+	if len(filters) > 0 {
+		params := url.Values{}
+		for k, v := range filters {
+			params.Set(k, v)
+		}
+		path += "?" + params.Encode()
+	}
+
+	var milestones []Milestone
+	if err := c.GET(path, &milestones); err != nil {
+		return nil, err
+	}
+	return milestones, nil
+}
+
+// GetMilestone gets a milestone by ID
+func (c *Client) GetMilestone(id int) (*Milestone, error) {
+	var milestone Milestone
+	if err := c.GET(fmt.Sprintf("/rest/api/v1/milestones/%d", id), &milestone); err != nil {
+		return nil, err
+	}
+	return &milestone, nil
+}
+
+// GetMilestoneProgress gets progress report for a milestone
+func (c *Client) GetMilestoneProgress(id int) (*MilestoneProgress, error) {
+	var progress MilestoneProgress
+	if err := c.GET(fmt.Sprintf("/rest/api/v1/milestones/%d/progress", id), &progress); err != nil {
+		return nil, err
+	}
+	return &progress, nil
+}
+
+// CreateMilestone creates a new milestone
+func (c *Client) CreateMilestone(req MilestoneCreateRequest) (*Milestone, error) {
+	var milestone Milestone
+	if err := c.POST("/rest/api/v1/milestones", req, &milestone); err != nil {
+		return nil, err
+	}
+	return &milestone, nil
+}
+
+// UpdateMilestone updates an existing milestone
+func (c *Client) UpdateMilestone(id int, req MilestoneUpdateRequest) (*Milestone, error) {
+	var milestone Milestone
+	if err := c.PUT(fmt.Sprintf("/rest/api/v1/milestones/%d", id), req, &milestone); err != nil {
+		return nil, err
+	}
+	return &milestone, nil
+}
+
+// DeleteMilestone deletes a milestone
+func (c *Client) DeleteMilestone(id int) error {
+	return c.DELETE(fmt.Sprintf("/rest/api/v1/milestones/%d", id))
+}
+
+// ResolveMilestoneID resolves a milestone name or ID to an ID
+func (c *Client) ResolveMilestoneID(nameOrID string, workspaceID *int) (int, error) {
+	// Try parsing as integer first
+	var id int
+	if _, err := fmt.Sscanf(nameOrID, "%d", &id); err == nil {
+		return id, nil
+	}
+
+	// Otherwise, look up by name (fuzzy match)
+	filters := make(map[string]string)
+	if workspaceID != nil {
+		filters["workspace_id"] = fmt.Sprintf("%d", *workspaceID)
+	}
+
+	milestones, err := c.ListMilestones(filters)
+	if err != nil {
+		return 0, err
+	}
+
+	nameLower := strings.ToLower(nameOrID)
+	var bestMatch *Milestone
+
+	for i := range milestones {
+		m := &milestones[i]
+		mNameLower := strings.ToLower(m.Name)
+
+		// Exact match (case-insensitive)
+		if mNameLower == nameLower {
+			return m.ID, nil
+		}
+		// Partial match - prefer first match
+		if bestMatch == nil && strings.Contains(mNameLower, nameLower) {
+			bestMatch = m
+		}
+	}
+
+	if bestMatch != nil {
+		return bestMatch.ID, nil
+	}
+
+	return 0, fmt.Errorf("milestone not found: %s", nameOrID)
 }
 
 // ============================================

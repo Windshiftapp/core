@@ -231,6 +231,43 @@ type MilestoneSummary struct {
 	Name string `json:"name,omitempty"`
 }
 
+type Milestone struct {
+	ID            int     `json:"id"`
+	Name          string  `json:"name"`
+	Description   string  `json:"description,omitempty"`
+	TargetDate    *string `json:"target_date,omitempty"`
+	Status        string  `json:"status"`
+	CategoryID    *int    `json:"category_id,omitempty"`
+	CategoryName  string  `json:"category_name,omitempty"`
+	CategoryColor string  `json:"category_color,omitempty"`
+	IsGlobal      bool    `json:"is_global"`
+	WorkspaceID   *int    `json:"workspace_id,omitempty"`
+	WorkspaceName string  `json:"workspace_name,omitempty"`
+	CreatedAt     string  `json:"created_at"`
+	UpdatedAt     string  `json:"updated_at"`
+}
+
+type MilestoneCreateRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	TargetDate  string `json:"target_date,omitempty"`
+	Status      string `json:"status,omitempty"`
+	WorkspaceID *int   `json:"workspace_id,omitempty"`
+}
+
+type MilestoneUpdateRequest struct {
+	Name        *string `json:"name,omitempty"`
+	Description *string `json:"description,omitempty"`
+	TargetDate  *string `json:"target_date,omitempty"`
+	Status      *string `json:"status,omitempty"`
+}
+
+type MilestoneProgress struct {
+	Milestone     Milestone      `json:"milestone"`
+	TotalItems    int            `json:"total_items"`
+	ItemsByStatus map[string]int `json:"items_by_status"`
+}
+
 type IterationSummary struct {
 	ID   int    `json:"id"`
 	Name string `json:"name,omitempty"`
