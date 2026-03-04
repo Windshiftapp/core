@@ -101,7 +101,7 @@ func StartTestServer(t *testing.T, dbType string) (ts *TestServer, cleanup func(
 
 	// Create server configuration for testing
 	cfg := server.Config{
-		Port:          "0", // Use port 0 for OS-assigned free port
+		Port:          "0",                             // Use port 0 for OS-assigned free port
 		DisableCSRF:   true,                            // Disable CSRF for testing
 		SilentMode:    os.Getenv("TEST_VERBOSE") == "", // Suppress logs unless TEST_VERBOSE is set
 		MaxReadConns:  10,
