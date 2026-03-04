@@ -82,5 +82,5 @@ func respondSCIMError(w http.ResponseWriter, status int, detail, scimType string
 
 // formatStatusCode converts an int status code to a string
 func formatStatusCode(status int) string {
-	return string(rune('0'+status/100)) + string(rune('0'+(status/10)%10)) + string(rune('0'+status%10))
+	return string(rune('0'+status/100)) + string(rune('0'+(status/10)%10)) + string(rune('0'+status%10)) //nolint:gosec // G115: safe int→rune conversion
 }

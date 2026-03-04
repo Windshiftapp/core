@@ -175,7 +175,7 @@ func (c *cloudClient) do(ctx context.Context, method, reqURL string, body interf
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	return c.httpClient.Do(req)
+	return c.httpClient.Do(req) //nolint:gosec // G704: URL constructed from configured Jira base URL
 }
 
 // setHeaders sets common headers for Jira API requests
@@ -832,7 +832,7 @@ func (c *cloudClient) DownloadAttachment(ctx context.Context, attachmentURL stri
 	}
 	c.setHeaders(req)
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req) //nolint:gosec // G704: attachment URL from trusted Jira API response
 	if err != nil {
 		return nil, "", err
 	}

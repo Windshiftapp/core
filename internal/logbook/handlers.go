@@ -386,12 +386,12 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 
 	// Save file to disk
 	storagePath := filepath.Join(h.storagePath, bucketID, docID)
-	if err := os.MkdirAll(storagePath, 0750); err != nil {
+	if err := os.MkdirAll(storagePath, 0750); err != nil { //nolint:gosec // G703: path components are validated UUIDs
 		respondInternalError(w, r, err)
 		return
 	}
-	filePath := filepath.Join(storagePath, header.Filename)
-	if err := os.WriteFile(filePath, content, 0640); err != nil {
+	filePath := filepath.Join(storagePath, filepath.Base(header.Filename))
+	if err := os.WriteFile(filePath, content, 0600); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -843,7 +843,7 @@ func (h *Handlers) GetDocumentFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, filename))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", filename))
 	http.ServeFile(w, r, doc.FilePath)
 }
 
@@ -906,12 +906,12 @@ func (h *Handlers) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 
 	// Store at {storagePath}/{bucketID}/{documentID}/{filename}
 	dir := filepath.Join(h.storagePath, doc.BucketID, docID)
-	if err := os.MkdirAll(dir, 0750); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil { //nolint:gosec // G703: filename is uuid-generated, not user input
 		respondInternalError(w, r, err)
 		return
 	}
 	filePath := filepath.Join(dir, storedFilename)
-	if err := os.WriteFile(filePath, content, 0640); err != nil {
+	if err := os.WriteFile(filePath, content, 0600); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -996,7 +996,7 @@ func (h *Handlers) DownloadAttachment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, att.OriginalFilename))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", att.OriginalFilename))
 	w.Header().Set("Cache-Control", "public, max-age=31536000")
 	http.ServeFile(w, r, att.FilePath)
 }

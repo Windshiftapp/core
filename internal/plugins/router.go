@@ -134,7 +134,7 @@ func (r *Router) HandlePluginRequest(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Write response body
-	if _, err := w.Write([]byte(pluginResp.Body)); err != nil {
+	if _, err := w.Write([]byte(pluginResp.Body)); err != nil { //nolint:gosec // G705: plugin responses from trusted/verified plugin code
 		// Log error but response is already partially written
 		slog.Error("failed to write plugin response", slog.Any("error", err))
 	}

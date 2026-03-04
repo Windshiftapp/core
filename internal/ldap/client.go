@@ -55,14 +55,14 @@ func NewClient(config *models.LDAPConfig, bindPassword string) (*Client, error) 
 			ServerName:         config.Host,
 		}
 		if err := conn.StartTLS(tlsConfig); err != nil {
-			conn.Close()
+			_ = conn.Close()
 			return nil, fmt.Errorf("STARTTLS failed: %w", err)
 		}
 	}
 
 	// Bind with service account
 	if err := conn.Bind(config.BindDN, bindPassword); err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, fmt.Errorf("LDAP bind failed: %w", err)
 	}
 
@@ -72,7 +72,7 @@ func NewClient(config *models.LDAPConfig, bindPassword string) (*Client, error) 
 // Close closes the LDAP connection.
 func (c *Client) Close() {
 	if c.conn != nil {
-		c.conn.Close()
+		_ = c.conn.Close()
 	}
 }
 
@@ -83,7 +83,7 @@ func (c *Client) TestConnection() error {
 		c.config.BaseDN,
 		goldap.ScopeBaseObject,
 		goldap.NeverDerefAliases,
-		1, // size limit
+		1,  // size limit
 		10, // time limit
 		false,
 		"(objectClass=*)",

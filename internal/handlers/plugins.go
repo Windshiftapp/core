@@ -254,7 +254,7 @@ func (h *PluginHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", mimeType)
-	_, _ = w.Write(data)
+	_, _ = w.Write(data) //nolint:gosec // G705: static plugin assets served with correct Content-Type
 }
 
 // TogglePlugin enables or disables a plugin

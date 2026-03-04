@@ -3,16 +3,16 @@ package logbook
 import (
 	"fmt"
 	"image"
-	"image/jpeg"
 	_ "image/gif"
+	"image/jpeg"
 	_ "image/png"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
-	_ "golang.org/x/image/webp"
 	"golang.org/x/image/draw"
+	_ "golang.org/x/image/webp"
 )
 
 const thumbnailMaxSize = 600
@@ -54,9 +54,9 @@ func generatePDFThumbnail(inputPath, outputPath string) error {
 	// pdftoppm writes to <prefix>-<page>.jpg; with -singlefile it writes <prefix>.jpg
 	tmpPrefix := outputPath + ".tmp"
 	tmpFile := tmpPrefix + ".jpg"
-	defer os.Remove(tmpFile)
+	defer func() { _ = os.Remove(tmpFile) }()
 
-	cmd := exec.Command("pdftoppm",
+	cmd := exec.Command("pdftoppm", //nolint:gosec // G204: pdftoppm path from system, not user input
 		"-jpeg", "-f", "1", "-l", "1", "-r", "300", "-singlefile",
 		inputPath, tmpPrefix,
 	)

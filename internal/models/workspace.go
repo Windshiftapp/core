@@ -138,9 +138,9 @@ type Milestone struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	// Joined fields for API responses
-	CategoryName  string            `json:"category_name,omitempty"`
-	CategoryColor string            `json:"category_color,omitempty"`
-	WorkspaceName string            `json:"workspace_name,omitempty"`
+	CategoryName  string             `json:"category_name,omitempty"`
+	CategoryColor string             `json:"category_color,omitempty"`
+	WorkspaceName string             `json:"workspace_name,omitempty"`
 	LatestRelease *MilestoneRelease  `json:"latest_release,omitempty"`
 	Releases      []MilestoneRelease `json:"releases,omitempty"`
 }

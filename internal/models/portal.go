@@ -566,15 +566,15 @@ type HubResponse struct {
 
 // HubPortalInfo represents portal information displayed in the hub
 type HubPortalInfo struct {
-	ID               int                    `json:"id"`
-	Name             string                 `json:"name"`
-	Description      string                 `json:"description"`
-	Status           string                 `json:"status"`
-	Slug             string                 `json:"slug"`
+	ID                 int                    `json:"id"`
+	Name               string                 `json:"name"`
+	Description        string                 `json:"description"`
+	Status             string                 `json:"status"`
+	Slug               string                 `json:"slug"`
 	Gradient           int                    `json:"gradient"`
 	BackgroundImageURL string                 `json:"background_image_url"`
 	RequestTypeCount   int                    `json:"request_type_count"`
-	RequestTypes     []HubPortalRequestType `json:"request_types,omitempty"`
+	RequestTypes       []HubPortalRequestType `json:"request_types,omitempty"`
 }
 
 // HubPortalRequestType represents a request type for hub search

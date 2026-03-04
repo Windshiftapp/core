@@ -270,7 +270,7 @@ func (sm *PortalSessionManager) SetPortalSessionCookie(w http.ResponseWriter, r 
 	// Dynamically determine if cookie should be secure based on request
 	useSecure := sm.isSecureRequest(r)
 
-	slog.Debug("setting portal session cookie",
+	slog.Debug("setting portal session cookie", //nolint:gosec // G706: logging r.RemoteAddr, standard request metadata
 		slog.String("component", "portal_auth"),
 		slog.String("remote_addr", r.RemoteAddr),
 		slog.Bool("tls", r.TLS != nil),
@@ -288,7 +288,7 @@ func (sm *PortalSessionManager) SetPortalSessionCookie(w http.ResponseWriter, r 
 	}
 
 	http.SetCookie(w, cookie)
-	slog.Debug("portal session cookie set", slog.String("component", "portal_auth"), slog.String("name", PortalSessionCookieName), slog.Bool("secure", useSecure))
+	slog.Debug("portal session cookie set", slog.String("component", "portal_auth"), slog.String("name", PortalSessionCookieName), slog.Bool("secure", useSecure)) //nolint:gosec // G706: logging constants and booleans
 	return nil
 }
 

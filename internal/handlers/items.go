@@ -21,14 +21,14 @@ import (
 )
 
 type ItemHandler struct {
-	db                database.Database
-	hierarchyService  *services.HierarchyService
-	permissionService *services.PermissionService
-	itemCache         *services.ItemCacheService
-	activityTracker   *services.ActivityTracker
-	idResolver        *services.IDResolverService
-	itemCRUD          *services.ItemCRUDService
-	mentionService    *services.MentionService // Mention service for processing @mentions (optional, can be nil)
+	db                  database.Database
+	hierarchyService    *services.HierarchyService
+	permissionService   *services.PermissionService
+	itemCache           *services.ItemCacheService
+	activityTracker     *services.ActivityTracker
+	idResolver          *services.IDResolverService
+	itemCRUD            *services.ItemCRUDService
+	mentionService      *services.MentionService // Mention service for processing @mentions (optional, can be nil)
 	notificationService interface {
 		EmitEvent(event *services.NotificationEvent)
 	} // Notification service for async notification processing (optional, can be nil)
@@ -86,7 +86,7 @@ func (h *ItemHandler) SetEventCoordinator(ec *services.EventCoordinator) {
 
 func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Get user from context
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -304,7 +304,7 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -388,7 +388,7 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("item decoded", slog.Int("workspace_id", item.WorkspaceID), slog.String("title", item.Title))
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -663,7 +663,7 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -909,7 +909,7 @@ func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -1000,7 +1000,7 @@ func (h *ItemHandler) GetDeleteInfo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -1062,7 +1062,7 @@ func (h *ItemHandler) ReparentChildren(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -1160,7 +1160,7 @@ func (h *ItemHandler) DeleteCascade(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -1236,7 +1236,7 @@ func (h *ItemHandler) Copy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return

@@ -77,26 +77,26 @@ type SSOStatusResponse struct {
 
 // SSOProviderResponse represents a provider for API responses (without secrets)
 type SSOProviderResponse struct {
-	ID                   int       `json:"id"`
-	Slug                 string    `json:"slug"`
-	Name                 string    `json:"name"`
-	ProviderType         string    `json:"provider_type"`
-	Enabled              bool      `json:"enabled"`
-	IsDefault            bool      `json:"is_default"`
-	IssuerURL            string    `json:"issuer_url,omitempty"`
-	ClientID             string    `json:"client_id,omitempty"`
-	HasClientSecret      bool      `json:"has_client_secret"`
-	Scopes               string    `json:"scopes"`
-	AutoProvisionUsers   bool      `json:"auto_provision_users"`
-	AllowPasswordLogin   bool      `json:"allow_password_login"`
-	RequireVerifiedEmail bool      `json:"require_verified_email"`
-	AttributeMapping     string    `json:"attribute_mapping"`
+	ID                   int    `json:"id"`
+	Slug                 string `json:"slug"`
+	Name                 string `json:"name"`
+	ProviderType         string `json:"provider_type"`
+	Enabled              bool   `json:"enabled"`
+	IsDefault            bool   `json:"is_default"`
+	IssuerURL            string `json:"issuer_url,omitempty"`
+	ClientID             string `json:"client_id,omitempty"`
+	HasClientSecret      bool   `json:"has_client_secret"`
+	Scopes               string `json:"scopes"`
+	AutoProvisionUsers   bool   `json:"auto_provision_users"`
+	AllowPasswordLogin   bool   `json:"allow_password_login"`
+	RequireVerifiedEmail bool   `json:"require_verified_email"`
+	AttributeMapping     string `json:"attribute_mapping"`
 	// SAML-specific fields
-	SAMLIdPMetadataURL string `json:"saml_idp_metadata_url,omitempty"`
-	SAMLIdPSSOURL      string `json:"saml_idp_sso_url,omitempty"`
-	HasSAMLIdPCert     bool   `json:"has_saml_idp_certificate"`
-	SAMLSPEntityID     string `json:"saml_sp_entity_id,omitempty"`
-	SAMLSignRequests   bool   `json:"saml_sign_requests"`
+	SAMLIdPMetadataURL string    `json:"saml_idp_metadata_url,omitempty"`
+	SAMLIdPSSOURL      string    `json:"saml_idp_sso_url,omitempty"`
+	HasSAMLIdPCert     bool      `json:"has_saml_idp_certificate"`
+	SAMLSPEntityID     string    `json:"saml_sp_entity_id,omitempty"`
+	SAMLSignRequests   bool      `json:"saml_sign_requests"`
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 }
@@ -486,7 +486,8 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 
 	// Validate type-specific fields
 	var encryptedSecret string
-	if req.ProviderType == sso.ProviderTypeOIDC {
+	switch req.ProviderType {
+	case sso.ProviderTypeOIDC:
 		if req.IssuerURL == "" {
 			respondValidationError(w, r, "Issuer URL is required for OIDC providers")
 			return
@@ -499,7 +500,7 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 			respondValidationError(w, r, "Client secret is required for OIDC providers")
 			return
 		}
-	} else if req.ProviderType == sso.ProviderTypeSAML {
+	case sso.ProviderTypeSAML:
 		if req.SAMLIdPMetadataURL == "" && req.SAMLIdPSSOURL == "" {
 			respondValidationError(w, r, "Either IdP metadata URL or IdP SSO URL is required for SAML providers")
 			return

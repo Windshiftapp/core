@@ -63,7 +63,7 @@ func (s *IngestionService) IngestFile(ctx context.Context, docID string) error {
 
 	// No text content (e.g. image files) — skip LLM processing, go straight to ready
 	if result.Content == "" {
-		return s.chunkContent(ctx, docID, "")
+		return s.chunkContent(docID, "")
 	}
 
 	// Classify and clean content
@@ -73,7 +73,7 @@ func (s *IngestionService) IngestFile(ctx context.Context, docID string) error {
 	s.generateArticle(ctx, docID, doc.Title, cleanedContent, contentType)
 
 	// Chunk cleaned content instead of raw
-	return s.chunkContent(ctx, docID, cleanedContent)
+	return s.chunkContent(docID, cleanedContent)
 }
 
 // IngestNote processes a markdown note: chunk and store.
@@ -109,7 +109,7 @@ func (s *IngestionService) IngestNote(ctx context.Context, docID string) error {
 		slog.Warn("failed to set note article", slog.String("doc_id", docID), slog.Any("error", err))
 	}
 
-	return s.chunkContent(ctx, docID, doc.RawContent)
+	return s.chunkContent(docID, doc.RawContent)
 }
 
 // ReprocessDocument re-processes an existing document (delete old chunks, re-chunk).
@@ -157,7 +157,7 @@ func (s *IngestionService) ReprocessDocument(ctx context.Context, docID string) 
 
 	// No text content (e.g. image files) — skip LLM processing, go straight to ready
 	if content == "" {
-		return s.chunkContent(ctx, docID, "")
+		return s.chunkContent(docID, "")
 	}
 
 	// Classify and clean content
@@ -166,11 +166,11 @@ func (s *IngestionService) ReprocessDocument(ctx context.Context, docID string) 
 	// Re-generate KB article based on classification
 	s.generateArticle(ctx, docID, doc.Title, cleanedContent, contentType)
 
-	return s.chunkContent(ctx, docID, cleanedContent)
+	return s.chunkContent(docID, cleanedContent)
 }
 
 // chunkContent splits text into chunks and stores them.
-func (s *IngestionService) chunkContent(ctx context.Context, docID, content string) error {
+func (s *IngestionService) chunkContent(docID, content string) error {
 	// Chunk the text
 	config := kreuzberg.DefaultChunkConfig()
 	textChunks, err := kreuzberg.ChunkText(content, config)
@@ -230,16 +230,16 @@ func contentPreview(s string, maxLen int) string {
 // classifyAndClean uses the LLM to classify a document and clean its content.
 // Internally runs two focused LLM calls: one for classification, one for cleaning.
 // Returns the content type and cleaned content. If no LLM is available, returns empty type and original content.
-func (s *IngestionService) classifyAndClean(ctx context.Context, docID, title, content, filePath, mimeType string) (string, string) {
+func (s *IngestionService) classifyAndClean(ctx context.Context, docID, title, content, filePath, mimeType string) (contentType string, cleanedContent string) {
 	if s.articleClient == nil || !s.articleClient.Available() {
 		return "", content
 	}
 
 	// Step 1: Classify with a focused, few-shot prompt
-	contentType := s.classify(ctx, docID, title, content, filePath, mimeType)
+	contentType = s.classify(ctx, docID, title, content, mimeType)
 
 	// Step 2: Clean content (skip for records — they don't get articles anyway)
-	cleanedContent := content
+	cleanedContent = content
 	if contentType != models.LogbookContentTypeRecord {
 		cleanedContent = s.cleanContent(ctx, docID, title, content)
 	}
@@ -259,7 +259,7 @@ func (s *IngestionService) classifyAndClean(ctx context.Context, docID, title, c
 
 // classify runs a focused classification-only LLM call with few-shot examples.
 // Returns a valid content type, defaulting to "record" on any failure.
-func (s *IngestionService) classify(ctx context.Context, docID, title, content, filePath, mimeType string) string {
+func (s *IngestionService) classify(ctx context.Context, docID, title, content, mimeType string) string {
 	// Truncate — classification only needs the beginning of the document
 	truncated := content
 	if len(truncated) > maxClassifyContentChars {

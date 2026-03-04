@@ -82,11 +82,11 @@ func (s *SyncService) SyncUsers(config *models.LDAPConfig) (*SyncResult, error) 
 	}
 
 	// Track which DNs we've seen (for deactivation)
-	seenDNs := make(map[string]bool)
+	seenDNS := make(map[string]bool)
 
 	// Process each LDAP user
 	for _, ldapUser := range ldapUsers {
-		seenDNs[ldapUser.DN] = true
+		seenDNS[ldapUser.DN] = true
 		result.UsersSynced++
 
 		if mapping, ok := existingMappings[ldapUser.DN]; ok {
@@ -111,7 +111,7 @@ func (s *SyncService) SyncUsers(config *models.LDAPConfig) (*SyncResult, error) 
 	// Deactivate users no longer in LDAP
 	if config.AutoDeactivateUsers {
 		for dn, mapping := range existingMappings {
-			if !seenDNs[dn] {
+			if !seenDNS[dn] {
 				if err := s.deactivateUser(mapping.UserID); err != nil {
 					result.Errors = append(result.Errors, fmt.Sprintf("failed to deactivate user %d: %v", mapping.UserID, err))
 					continue
@@ -132,12 +132,12 @@ func (s *SyncService) SyncUsers(config *models.LDAPConfig) (*SyncResult, error) 
 			ResourceType: "ldap_config",
 			ResourceName: config.Name,
 			Details: map[string]interface{}{
-				"config_id":    config.ID,
-				"synced":       result.UsersSynced,
-				"created":      result.UsersCreated,
-				"updated":      result.UsersUpdated,
-				"deactivated":  result.UsersDeactivated,
-				"errors":       len(result.Errors),
+				"config_id":   config.ID,
+				"synced":      result.UsersSynced,
+				"created":     result.UsersCreated,
+				"updated":     result.UsersUpdated,
+				"deactivated": result.UsersDeactivated,
+				"errors":      len(result.Errors),
 			},
 			Success: len(result.Errors) == 0,
 		})

@@ -132,7 +132,7 @@ func NewSCIMError(status int, detail, scimType string) *SCIMError {
 	return &SCIMError{
 		Schemas:  []string{SCIMSchemaError},
 		Detail:   detail,
-		Status:   string(rune('0'+status/100)) + string(rune('0'+(status/10)%10)) + string(rune('0'+status%10)),
+		Status:   string(rune('0'+status/100)) + string(rune('0'+(status/10)%10)) + string(rune('0'+status%10)), //nolint:gosec // G115: safe int→rune conversion
 		ScimType: scimType,
 	}
 }

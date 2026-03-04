@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"log/slog"
@@ -393,14 +392,4 @@ func (h *SSOHandler) getBaseURL(r *http.Request) string {
 		scheme = "http"
 	}
 	return scheme + "://" + r.Host
-}
-
-// exportOIDCClaims is exported from the sso package for use by SAML handler
-// (OIDCClaims is already exported, this just documents the conversion pattern)
-func samlAttributesToJSON(attrs map[string][]string) string {
-	data, err := json.Marshal(attrs)
-	if err != nil {
-		return "{}"
-	}
-	return string(data)
 }
