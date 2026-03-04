@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"windshift/internal/database"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/scm"
 	"windshift/internal/services"
 	"windshift/internal/sso"
+	"windshift/internal/utils"
 )
 
 // SCMItemLinksHandler handles item SCM link endpoints
@@ -191,7 +191,7 @@ func (h *SCMItemLinksHandler) GetItemSCMLinks(w http.ResponseWriter, r *http.Req
 
 	// Fire background refresh for OAuth PR links if the user is authenticated
 	if hasOAuthPRLinks {
-		if user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User); ok {
+		if user := utils.GetCurrentUser(r); user != nil {
 			go func() {
 				bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cancel()
@@ -391,9 +391,8 @@ func (h *SCMItemLinksHandler) RefreshItemSCMLink(w http.ResponseWriter, r *http.
 	`, linkID).Scan(&authMethod)
 
 	if authMethod == string(models.SCMAuthMethodOAuth) {
-		user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+		user, ok := RequireAuth(w, r)
 		if !ok {
-			respondUnauthorized(w, r)
 			return
 		}
 
@@ -457,9 +456,8 @@ func (h *SCMItemLinksHandler) SyncWorkspaceRepository(w http.ResponseWriter, r *
 	}
 
 	// Require workspace admin permission
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionWorkspaceAdmin)
@@ -626,9 +624,8 @@ func (h *SCMItemLinksHandler) CreateBranchForItem(w http.ResponseWriter, r *http
 	}
 
 	// Get authenticated user for per-user OAuth tokens
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 
@@ -775,9 +772,8 @@ func (h *SCMItemLinksHandler) CreatePRFromBranch(w http.ResponseWriter, r *http.
 	}
 
 	// Get authenticated user for per-user OAuth tokens
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 
@@ -925,9 +921,8 @@ func (h *SCMItemLinksHandler) GetSCMConnectionStatus(w http.ResponseWriter, r *h
 		return
 	}
 
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 

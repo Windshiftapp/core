@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"windshift/internal/database"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -68,7 +67,7 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -183,7 +182,7 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -302,7 +301,7 @@ func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -456,7 +455,7 @@ func (h *CommentHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -615,16 +614,6 @@ func (h *CommentHandler) getCommentByID(commentID int) (*models.Comment, error) 
 }
 
 // Permission helper methods
-
-// getUserFromContext extracts the user from the request context
-func (h *CommentHandler) getUserFromContext(r *http.Request) *models.User {
-	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
-		if u, ok := user.(*models.User); ok {
-			return u
-		}
-	}
-	return nil
-}
 
 // canViewItem checks if a user can view items in a specific workspace (needed to view comments)
 func (h *CommentHandler) canViewItem(userID, workspaceID int) (bool, error) {

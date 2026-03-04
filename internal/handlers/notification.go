@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"windshift/internal/database"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
+	"windshift/internal/utils"
 
 	"github.com/allegro/bigcache/v3"
 )
@@ -378,20 +378,10 @@ func (nm *NotificationManager) Stop() {
 
 // HTTP Handlers
 
-// getUserFromContext extracts the authenticated user from request context
-func (nh *NotificationHandler) getUserFromContext(r *http.Request) *models.User {
-	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
-		if u, ok := user.(*models.User); ok {
-			return u
-		}
-	}
-	return nil
-}
-
 // GetNotifications handles GET /api/notifications
 func (nh *NotificationHandler) GetNotifications(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
-	user := nh.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		slog.Debug("no authenticated user in context", slog.String("component", "notifications"))
 		respondUnauthorized(w, r)
@@ -457,7 +447,7 @@ func (nh *NotificationHandler) CreateNotification(w http.ResponseWriter, r *http
 // MarkNotificationAsRead handles PATCH /api/notifications/{id}/read
 func (nh *NotificationHandler) MarkNotificationAsRead(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
-	user := nh.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		slog.Debug("no authenticated user in context", slog.String("component", "notifications"))
 		respondUnauthorized(w, r)

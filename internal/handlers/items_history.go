@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"windshift/internal/models"
+	"windshift/internal/utils"
 )
 
 // GetItemHistory returns the history of changes for a specific item
@@ -16,7 +17,7 @@ func (h *ItemHandler) GetItemHistory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"windshift/internal/models"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 // Search filter limits to prevent abuse
@@ -24,7 +25,7 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	// Get user from context
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -128,11 +129,12 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 			respondValidationError(w, r, "Invalid limit format")
 			return
 		}
-		if parsedLimit < 1 {
+		switch {
+		case parsedLimit < 1:
 			limit = 1
-		} else if parsedLimit > 1000 {
+		case parsedLimit > 1000:
 			limit = 1000
-		} else {
+		default:
 			limit = parsedLimit
 		}
 	}
@@ -182,7 +184,7 @@ func (h *ItemHandler) UpdateFracIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -282,7 +284,7 @@ func (h *ItemHandler) UpdateFracIndex(w http.ResponseWriter, r *http.Request) {
 // GetBacklogItems returns items whose statuses are not marked as completed for a workspace
 func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 	// Get user from context
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return

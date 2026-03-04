@@ -10,7 +10,6 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
@@ -32,7 +31,7 @@ func NewProjectHandler(db database.Database, permissionService *services.Permiss
 
 func (h *ProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -108,7 +107,7 @@ func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -163,7 +162,7 @@ func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -261,7 +260,7 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -387,7 +386,7 @@ func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -439,16 +438,6 @@ func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 // Permission helper methods
-
-// getUserFromContext extracts the user from the request context
-func (h *ProjectHandler) getUserFromContext(r *http.Request) *models.User {
-	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
-		if u, ok := user.(*models.User); ok {
-			return u
-		}
-	}
-	return nil
-}
 
 // canViewProject checks if a user can view projects in a specific workspace
 func (h *ProjectHandler) canViewProject(userID, workspaceID int) (bool, error) {

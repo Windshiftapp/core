@@ -24,8 +24,8 @@ import (
 	"windshift/internal/restapi"
 	"windshift/internal/scheduler"
 	"windshift/internal/services"
-	"windshift/internal/utils"
 	windshiftsmtp "windshift/internal/smtp"
+	"windshift/internal/utils"
 	"windshift/internal/webhook"
 )
 
@@ -74,9 +74,8 @@ func (h *ChannelHandler) SetSMTPSender(sender *windshiftsmtp.NotificationSMTPSen
 // GetChannels returns all channels (admins) or only managed channels (non-admins)
 func (h *ChannelHandler) GetChannels(w http.ResponseWriter, r *http.Request) {
 	// Get current user
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 
@@ -595,9 +594,8 @@ func (h *ChannelHandler) updateChannelActivity(ctx context.Context, channelID in
 // UpdateChannelConfig updates only the configuration of a channel
 func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Request) {
 	// Get current user
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 
@@ -857,9 +855,8 @@ func (h *ChannelHandler) GetChannelManagers(w http.ResponseWriter, r *http.Reque
 // AddChannelManager adds managers to a channel
 func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Request) {
 	// Get current user
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 
@@ -969,9 +966,8 @@ func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Reques
 // RemoveChannelManager removes a manager from a channel
 func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Request) {
 	// Get current user
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 
@@ -1075,9 +1071,8 @@ func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Req
 // POST /api/channels/{id}/process-emails
 func (h *ChannelHandler) ProcessEmailsNow(w http.ResponseWriter, r *http.Request) {
 	// Get current user
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 

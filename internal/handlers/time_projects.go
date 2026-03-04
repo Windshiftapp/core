@@ -10,7 +10,6 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
@@ -30,9 +29,8 @@ func NewTimeProjectHandler(db database.Database, timePermissionService *services
 
 func (h *TimeProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Get user from context
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -123,9 +121,8 @@ func (h *TimeProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user from context
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -180,9 +177,8 @@ func (h *TimeProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *TimeProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Get user from context
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -290,9 +286,8 @@ func (h *TimeProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user from context
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -395,9 +390,8 @@ func (h *TimeProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user from context
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 

@@ -10,9 +10,9 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/llm"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 // AIHandler handles AI-powered endpoints.
@@ -29,15 +29,6 @@ func NewAIHandler(db database.Database, llmManager *llm.ConnectionManager, permS
 		llmManager:  llmManager,
 		permService: permService,
 	}
-}
-
-func (h *AIHandler) getUserFromContext(r *http.Request) *models.User {
-	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
-		if u, ok := user.(*models.User); ok {
-			return u
-		}
-	}
-	return nil
 }
 
 // PlanMyDayResponse is the response for the Plan My Day endpoint.
@@ -61,7 +52,7 @@ type PlannedActivity struct {
 
 // PlanMyDay generates a prioritized daily plan based on the user's assigned items.
 func (h *AIHandler) PlanMyDay(w http.ResponseWriter, r *http.Request) {
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -301,7 +292,7 @@ type SuggestedSubTask struct {
 
 // CatchMeUp generates a summary briefing for an item.
 func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -512,7 +503,7 @@ Be concise and factual. Focus on what someone needs to know to understand the cu
 
 // FindSimilarItems identifies similar items in the same workspace.
 func (h *AIHandler) FindSimilarItems(w http.ResponseWriter, r *http.Request) {
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -669,7 +660,7 @@ Find similar items.`, itemKey, item.Title, currentDesc, strings.Join(candidateLi
 
 // DecomposeItem suggests sub-tasks for an item.
 func (h *AIHandler) DecomposeItem(w http.ResponseWriter, r *http.Request) {
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -805,7 +796,7 @@ type GenerateReleaseNotesResponse struct {
 
 // GenerateReleaseNotes generates release notes for a milestone using the LLM.
 func (h *AIHandler) GenerateReleaseNotes(w http.ResponseWriter, r *http.Request) {
-	user := h.getUserFromContext(r)
+	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
 		return
@@ -924,7 +915,7 @@ func (h *AIHandler) GenerateReleaseNotes(w http.ResponseWriter, r *http.Request)
 
 	systemPrompt := `You are a software release manager. Given information about a project milestone, write professional release notes in markdown format.
 
-Include an introductory paragraph summarising the release, then use ## section headers (e.g. "## What's New", "## Bug Fixes", "## Improvements") with bullet points under each. Write in a professional tone with enough detail that users understand the impact of each change.
+Include an introductory paragraph summarizing the release, then use ## section headers (e.g. "## What's New", "## Bug Fixes", "## Improvements") with bullet points under each. Write in a professional tone with enough detail that users understand the impact of each change.
 
 Return ONLY the markdown text — no JSON, no code block fences, no preamble.`
 
