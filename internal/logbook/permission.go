@@ -20,7 +20,7 @@ func NewPermissionService(repo *Repository) *PermissionService {
 
 // HasBucketPermission checks if a user has a specific permission on a bucket.
 // System admins have full access to all buckets.
-func (s *PermissionService) HasBucketPermission(userID int, isAdmin bool, groupIDs []int, bucketID string, permission string) (bool, error) {
+func (s *PermissionService) HasBucketPermission(userID int, isAdmin bool, groupIDs []int, bucketID, permission string) (bool, error) {
 	if isAdmin {
 		return true, nil
 	}

@@ -193,7 +193,7 @@ func (r *Repository) SetBucketPermissions(bucketID string, perms []models.Logboo
 
 // HasBucketPermission checks if a user has a specific permission on a bucket.
 // Resolution: direct user permission → group membership (using provided groupIDs).
-func (r *Repository) HasBucketPermission(userID int, groupIDs []int, bucketID string, permission string) (bool, error) {
+func (r *Repository) HasBucketPermission(userID int, groupIDs []int, bucketID, permission string) (bool, error) {
 	// Check direct user permission
 	var count int
 	err := r.db.QueryRow(`
@@ -210,7 +210,8 @@ func (r *Repository) HasBucketPermission(userID int, groupIDs []int, bucketID st
 	// Check group permission using provided group IDs
 	if len(groupIDs) > 0 {
 		groupPlaceholders, groupArgs := buildIntPlaceholders(groupIDs, 2)
-		args := []interface{}{bucketID, permission}
+		args := make([]interface{}, 0, 2+len(groupArgs))
+		args = append(args, bucketID, permission)
 		args = append(args, groupArgs...)
 		query := fmt.Sprintf(`
 			SELECT COUNT(*) FROM logbook_bucket_permissions
@@ -245,7 +246,8 @@ func (r *Repository) GetAccessibleBucketIDs(userID int, groupIDs []int, permissi
 
 	// User + group query
 	groupPlaceholders, groupArgs := buildIntPlaceholders(groupIDs, 2)
-	args := []interface{}{userID, permission}
+	args := make([]interface{}, 0, 2+len(groupArgs))
+	args = append(args, userID, permission)
 	args = append(args, groupArgs...)
 	query := fmt.Sprintf(`
 		SELECT DISTINCT bucket_id FROM logbook_bucket_permissions
@@ -328,7 +330,7 @@ func (r *Repository) GetDocument(id string) (*models.LogbookDocument, error) {
 }
 
 // UpdateDocument updates a document's title and content.
-func (r *Repository) UpdateDocument(id string, title, content string) error {
+func (r *Repository) UpdateDocument(id, title, content string) error {
 	_, err := r.db.ExecWrite(`
 		UPDATE logbook_documents
 		SET title = $1, raw_content = $2, status = 'pending', updated_at = $3

@@ -1223,9 +1223,9 @@ func (h *SCMWorkspaceHandler) GetWorkspaceConnectionAuthStatus(w http.ResponseWr
 	}
 
 	response := map[string]interface{}{
-		"auth_method":   authMethod,
+		"auth_method":      authMethod,
 		"is_authenticated": false,
-		"provider_slug": providerSlug,
+		"provider_slug":    providerSlug,
 	}
 
 	switch authMethod {

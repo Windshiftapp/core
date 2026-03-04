@@ -294,7 +294,7 @@ func (sm *SessionManager) isSecureRequest(r *http.Request) bool {
 
 	clientIP := net.ParseIP(host)
 	if clientIP == nil {
-		slog.Debug("secure request check: failed to parse IP", slog.String("component", "sso"), slog.String("remote_addr", host), slog.Bool("result", false))
+		slog.Debug("secure request check: failed to parse IP", slog.String("component", "sso"), slog.String("remote_addr", host), slog.Bool("result", false)) //nolint:gosec // G706: logging parsed host from r.RemoteAddr
 		return false
 	}
 

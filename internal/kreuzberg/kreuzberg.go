@@ -1,3 +1,4 @@
+// Package kreuzberg provides text extraction and chunking utilities.
 package kreuzberg
 
 import (
@@ -41,7 +42,7 @@ func DefaultChunkConfig() ChunkConfig {
 // ExtractFile extracts text content from a file using the kreuzberg CLI.
 // Supports PDF, Office formats, plain text, images, and 75+ other formats.
 func ExtractFile(filePath string) (*ExtractionResult, error) {
-	out, err := exec.Command("kreuzberg", "extract", filePath, "--format", "json").Output()
+	out, err := exec.Command("kreuzberg", "extract", filePath, "--format", "json").Output() //nolint:gosec // G204: command path from application config, not user input
 	if err != nil {
 		return nil, fmt.Errorf("kreuzberg extraction failed: %w", err)
 	}
@@ -98,10 +99,10 @@ func ChunkText(content string, config ChunkConfig) ([]Chunk, error) {
 				overlap := chunkContent[len(chunkContent)-overlapChars:]
 				current.Reset()
 				current.WriteString(overlap)
-				currentStart = currentStart + len(chunkContent) - overlapChars
+				currentStart += len(chunkContent) - overlapChars
 			} else {
 				current.Reset()
-				currentStart = currentStart + len(chunkContent)
+				currentStart += len(chunkContent)
 			}
 		}
 
@@ -116,7 +117,7 @@ func ChunkText(content string, config ChunkConfig) ([]Chunk, error) {
 					ByteEnd:   currentStart + len(chunkContent),
 				})
 				current.Reset()
-				currentStart = currentStart + len(chunkContent)
+				currentStart += len(chunkContent)
 			}
 
 			// Split large paragraph by sentences/words

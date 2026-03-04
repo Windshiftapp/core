@@ -118,7 +118,7 @@ func (h *SecuritySettingsHandler) UpdateSecuritySettings(w http.ResponseWriter, 
 			ResourceID:   nil,
 			ResourceName: "security_settings",
 			Details: map[string]interface{}{
-				"calendar_feed_enabled":  settings.CalendarFeedEnabled,
+				"calendar_feed_enabled":   settings.CalendarFeedEnabled,
 				"plugin_cli_exec_enabled": settings.PluginCLIExecEnabled,
 			},
 			Success: true,

@@ -141,7 +141,7 @@ func (r *ItemRepository) Search(query string, workspaceIDs []int, pagination Pag
 	// Detect workspace key pattern (e.g. "OK-40")
 	filters := ItemFilters{}
 	parts := strings.Split(strings.ToUpper(query), "-")
-	isKeyPattern := len(parts) == 2 && len(parts[0]) > 0 && len(parts[1]) > 0
+	isKeyPattern := len(parts) == 2 && parts[0] != "" && parts[1] != ""
 	if isKeyPattern {
 		if _, err := strconv.Atoi(parts[1]); err == nil {
 			filters.ItemKeyQuery = query

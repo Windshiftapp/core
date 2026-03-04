@@ -43,15 +43,15 @@ func (h *MilestoneHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	includeGlobal := r.URL.Query().Get("include_global") != "false" // Default to true
 
 	// Check workspace permission if workspace_id is specified
+	// Check workspace permission if workspace_id is specified.
+	// No workspace_id: allow any authenticated user to list global milestones.
+	// Write operations (create/update/delete) still require PermissionMilestoneCreate.
 	if workspaceIDStr != "" {
 		if wsID, err := strconv.Atoi(workspaceIDStr); err == nil {
 			if !RequireWorkspacePermission(w, r, user.ID, wsID, models.PermissionItemView, h.permissionService) {
 				return
 			}
 		}
-	} else {
-		// No workspace_id: allow any authenticated user to list global milestones.
-		// Write operations (create/update/delete) still require PermissionMilestoneCreate.
 	}
 
 	// Build service params
@@ -622,7 +622,7 @@ func (h *MilestoneHandler) milestoneResultToModel(r *services.MilestoneResult, u
 // releaseRequest is the request body for the Release endpoint.
 type releaseRequest struct {
 	ConnectionID    int    `json:"connection_id"`
-	Repository      string `json:"repository"`       // "owner/repo"
+	Repository      string `json:"repository"` // "owner/repo"
 	TagName         string `json:"tag_name"`
 	Name            string `json:"name"`
 	Body            string `json:"body"`

@@ -16,7 +16,8 @@ func TestCollectionHandler_Create_Success(t *testing.T) {
 	defer tdb.Close()
 
 	tdb.SeedTestData(t)
-	handler := NewCollectionHandler(tdb.GetDatabase())
+	permService, _, _ := createTestServices(t, *tdb)
+	handler := NewCollectionHandler(tdb.GetDatabase(), permService)
 
 	collection := models.Collection{
 		Name:        "My Collection",
@@ -53,7 +54,8 @@ func TestCollectionHandler_Create_WithWorkspace(t *testing.T) {
 	defer tdb.Close()
 
 	data := tdb.SeedTestData(t)
-	handler := NewCollectionHandler(tdb.GetDatabase())
+	permService, _, _ := createTestServices(t, *tdb)
+	handler := NewCollectionHandler(tdb.GetDatabase(), permService)
 
 	workspaceID := data.WorkspaceID
 	collection := models.Collection{
@@ -80,7 +82,8 @@ func TestCollectionHandler_Create_ValidationErrors(t *testing.T) {
 	defer tdb.Close()
 
 	tdb.SeedTestData(t)
-	handler := NewCollectionHandler(tdb.GetDatabase())
+	permService, _, _ := createTestServices(t, *tdb)
+	handler := NewCollectionHandler(tdb.GetDatabase(), permService)
 
 	tests := []struct {
 		name        string
@@ -112,7 +115,8 @@ func TestCollectionHandler_Create_InvalidWorkspace(t *testing.T) {
 	defer tdb.Close()
 
 	tdb.SeedTestData(t)
-	handler := NewCollectionHandler(tdb.GetDatabase())
+	permService, _, _ := createTestServices(t, *tdb)
+	handler := NewCollectionHandler(tdb.GetDatabase(), permService)
 
 	invalidWorkspace := 99999
 	collection := models.Collection{
@@ -133,7 +137,8 @@ func TestCollectionHandler_Create_Unauthenticated(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewCollectionHandler(tdb.GetDatabase())
+	permService, _, _ := createTestServices(t, *tdb)
+	handler := NewCollectionHandler(tdb.GetDatabase(), permService)
 
 	collection := models.Collection{
 		Name: "Test Collection",
@@ -150,7 +155,8 @@ func TestCollectionHandler_GetAll_Success(t *testing.T) {
 	defer tdb.Close()
 
 	tdb.SeedTestData(t)
-	handler := NewCollectionHandler(tdb.GetDatabase())
+	permService, _, _ := createTestServices(t, *tdb)
+	handler := NewCollectionHandler(tdb.GetDatabase(), permService)
 
 	// Create test collections
 	collections := []models.Collection{
@@ -182,7 +188,8 @@ func TestCollectionHandler_GetAll_FilterByWorkspace(t *testing.T) {
 	defer tdb.Close()
 
 	data := tdb.SeedTestData(t)
-	handler := NewCollectionHandler(tdb.GetDatabase())
+	permService, _, _ := createTestServices(t, *tdb)
+	handler := NewCollectionHandler(tdb.GetDatabase(), permService)
 
 	workspaceID := data.WorkspaceID
 
@@ -224,7 +231,8 @@ func TestCollectionHandler_GetAll_Unauthenticated(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
-	handler := NewCollectionHandler(tdb.GetDatabase())
+	permService, _, _ := createTestServices(t, *tdb)
+	handler := NewCollectionHandler(tdb.GetDatabase(), permService)
 
 	req := testutils.CreateJSONRequest(t, "GET", "/api/collections", nil)
 	rr := testutils.ExecuteRequest(t, handler.GetAll, req)
@@ -237,7 +245,8 @@ func TestCollectionHandler_Get_Success(t *testing.T) {
 	defer tdb.Close()
 
 	tdb.SeedTestData(t)
-	handler := NewCollectionHandler(tdb.GetDatabase())
+	permService, _, _ := createTestServices(t, *tdb)
+	handler := NewCollectionHandler(tdb.GetDatabase(), permService)
 
 	// Create test collection
 	collection := models.Collection{
@@ -277,7 +286,8 @@ func TestCollectionHandler_Get_NotFound(t *testing.T) {
 	defer tdb.Close()
 
 	tdb.SeedTestData(t)
-	handler := NewCollectionHandler(tdb.GetDatabase())
+	permService, _, _ := createTestServices(t, *tdb)
+	handler := NewCollectionHandler(tdb.GetDatabase(), permService)
 
 	req := testutils.CreateJSONRequest(t, "GET", "/api/collections/99999", nil)
 	req.SetPathValue("id", "99999")
@@ -294,7 +304,8 @@ func TestCollectionHandler_Update_Success(t *testing.T) {
 	defer tdb.Close()
 
 	tdb.SeedTestData(t)
-	handler := NewCollectionHandler(tdb.GetDatabase())
+	permService, _, _ := createTestServices(t, *tdb)
+	handler := NewCollectionHandler(tdb.GetDatabase(), permService)
 
 	// Create test collection
 	collection := models.Collection{
@@ -342,7 +353,8 @@ func TestCollectionHandler_Update_ValidationError(t *testing.T) {
 	defer tdb.Close()
 
 	tdb.SeedTestData(t)
-	handler := NewCollectionHandler(tdb.GetDatabase())
+	permService, _, _ := createTestServices(t, *tdb)
+	handler := NewCollectionHandler(tdb.GetDatabase(), permService)
 
 	// Create test collection
 	collection := models.Collection{
@@ -372,7 +384,8 @@ func TestCollectionHandler_Update_NotFound(t *testing.T) {
 	defer tdb.Close()
 
 	tdb.SeedTestData(t)
-	handler := NewCollectionHandler(tdb.GetDatabase())
+	permService, _, _ := createTestServices(t, *tdb)
+	handler := NewCollectionHandler(tdb.GetDatabase(), permService)
 
 	updateData := models.Collection{
 		Name: "Updated Name",
@@ -390,7 +403,8 @@ func TestCollectionHandler_Update_PermissionDenied(t *testing.T) {
 	defer tdb.Close()
 
 	tdb.SeedTestData(t)
-	handler := NewCollectionHandler(tdb.GetDatabase())
+	permService, _, _ := createTestServices(t, *tdb)
+	handler := NewCollectionHandler(tdb.GetDatabase(), permService)
 
 	// Create collection as default user
 	collection := models.Collection{
@@ -425,7 +439,8 @@ func TestCollectionHandler_Delete_Success(t *testing.T) {
 	defer tdb.Close()
 
 	tdb.SeedTestData(t)
-	handler := NewCollectionHandler(tdb.GetDatabase())
+	permService, _, _ := createTestServices(t, *tdb)
+	handler := NewCollectionHandler(tdb.GetDatabase(), permService)
 
 	// Create test collection
 	collection := models.Collection{
@@ -458,7 +473,8 @@ func TestCollectionHandler_Delete_NotFound(t *testing.T) {
 	defer tdb.Close()
 
 	tdb.SeedTestData(t)
-	handler := NewCollectionHandler(tdb.GetDatabase())
+	permService, _, _ := createTestServices(t, *tdb)
+	handler := NewCollectionHandler(tdb.GetDatabase(), permService)
 
 	req := testutils.CreateJSONRequest(t, "DELETE", "/api/collections/99999", nil)
 	req.SetPathValue("id", "99999")
@@ -472,7 +488,8 @@ func TestCollectionHandler_Delete_PermissionDenied(t *testing.T) {
 	defer tdb.Close()
 
 	tdb.SeedTestData(t)
-	handler := NewCollectionHandler(tdb.GetDatabase())
+	permService, _, _ := createTestServices(t, *tdb)
+	handler := NewCollectionHandler(tdb.GetDatabase(), permService)
 
 	// Create collection as default user
 	collection := models.Collection{

@@ -86,7 +86,7 @@ type LogbookChunk struct {
 	LastPage       *int      `json:"last_page,omitempty"`
 	Summary        string    `json:"summary,omitempty"`
 	Tags           []string  `json:"tags,omitempty"`
-	RetrievalCount int `json:"retrieval_count"`
+	RetrievalCount int       `json:"retrieval_count"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
@@ -193,4 +193,3 @@ type LogbookAttachment struct {
 type LogbookSetPermissionsRequest struct {
 	Permissions []LogbookBucketPermission `json:"permissions"`
 }
-

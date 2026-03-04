@@ -564,9 +564,9 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 		from string // empty string means initial status
 		to   string
 	}{
-		{"", "Open"},                 // Initial transition
+		{"", "Open"}, // Initial transition
 		{"Open", "In Progress"},
-		{"Open", "Done"},             // Direct completion from Open
+		{"Open", "Done"}, // Direct completion from Open
 		{"In Progress", "Done"},
 	}
 

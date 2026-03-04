@@ -79,7 +79,7 @@ func main() {
 	)
 
 	// Ensure storage directory exists
-	if err := os.MkdirAll(storagePath, 0750); err != nil {
+	if err := os.MkdirAll(storagePath, 0750); err != nil { //nolint:gosec // G703: storagePath from env config, not user input
 		slog.Error("failed to create storage directory", "error", err)
 		os.Exit(1)
 	}
@@ -90,7 +90,7 @@ func main() {
 		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	slog.Info("connected to logbook database")
 
 	// Create article generation LLM client (optional).

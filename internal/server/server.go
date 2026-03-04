@@ -122,21 +122,21 @@ type Server struct {
 	pluginManager         *plugins.Manager
 
 	// Rate limiters that need cleanup
-	loginRateLimiter       *middleware.RateLimiter
-	fidoRateLimiter        *middleware.RateLimiter
-	authRateLimiter        *middleware.RateLimiter
-	scimRateLimiter        *middleware.RateLimiter
-	portalSubmitLimiter    *middleware.RateLimiter
-	portalSearchLimiter    *middleware.RateLimiter
-	emailVerifyLimiter     *middleware.RateLimiter
-	setupLimiter           *middleware.RateLimiter
-	ssoRateLimiter         *middleware.RateLimiter
-	portalAuthLimiter      *middleware.RateLimiter
-	aiRateLimiter          *middleware.RateLimiter
-	uploadLimiter          *middleware.RateLimiter
-	webhookLimiter         *middleware.RateLimiter
-	searchLimiter          *middleware.RateLimiter
-	calendarFeedLimiter    *middleware.RateLimiter
+	loginRateLimiter    *middleware.RateLimiter
+	fidoRateLimiter     *middleware.RateLimiter
+	authRateLimiter     *middleware.RateLimiter
+	scimRateLimiter     *middleware.RateLimiter
+	portalSubmitLimiter *middleware.RateLimiter
+	portalSearchLimiter *middleware.RateLimiter
+	emailVerifyLimiter  *middleware.RateLimiter
+	setupLimiter        *middleware.RateLimiter
+	ssoRateLimiter      *middleware.RateLimiter
+	portalAuthLimiter   *middleware.RateLimiter
+	aiRateLimiter       *middleware.RateLimiter
+	uploadLimiter       *middleware.RateLimiter
+	webhookLimiter      *middleware.RateLimiter
+	searchLimiter       *middleware.RateLimiter
+	calendarFeedLimiter *middleware.RateLimiter
 
 	// Server state
 	actualPort   int
@@ -828,14 +828,14 @@ func (s *Server) initialize() error {
 		SCIMRateLimiter:     s.scimRateLimiter,
 		PortalSubmitLimiter: s.portalSubmitLimiter,
 		PortalSearchLimiter: s.portalSearchLimiter,
-		PortalAuthLimiter:      s.portalAuthLimiter,
-		EmailVerifyLimiter:     s.emailVerifyLimiter,
-		SetupLimiter:           s.setupLimiter,
-		AIRateLimiter:          s.aiRateLimiter,
-		UploadLimiter:          s.uploadLimiter,
-		WebhookLimiter:         s.webhookLimiter,
-		SearchLimiter:          s.searchLimiter,
-		CalendarFeedLimiter:    s.calendarFeedLimiter,
+		PortalAuthLimiter:   s.portalAuthLimiter,
+		EmailVerifyLimiter:  s.emailVerifyLimiter,
+		SetupLimiter:        s.setupLimiter,
+		AIRateLimiter:       s.aiRateLimiter,
+		UploadLimiter:       s.uploadLimiter,
+		WebhookLimiter:      s.webhookLimiter,
+		SearchLimiter:       s.searchLimiter,
+		CalendarFeedLimiter: s.calendarFeedLimiter,
 
 		Auth: routes.AuthHandlers{
 			Auth:     authHandler,
