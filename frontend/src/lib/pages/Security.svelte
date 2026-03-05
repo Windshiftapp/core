@@ -40,6 +40,7 @@
 	let newTokenValue = $derived(securityStore.newTokenValue);
 	let showConfirmDialog = $derived(securityStore.showConfirmDialog);
 	let confirmDialogConfig = $derived(securityStore.confirmDialogConfig);
+	let sshAvailable = $derived(securityStore.sshAvailable);
 	let showEnrollmentBanner = $derived(securityStore.showEnrollmentBanner);
 	let enrollmentType = $derived(securityStore.enrollmentType);
 	let showChangePassword = $derived(securityStore.showChangePassword);
@@ -513,6 +514,7 @@
 						<Key class="h-4 w-4 mr-2" />
 						<span style="color: var(--ds-text);">Security Key (FIDO2)</span>
 					</label>
+					{#if sshAvailable}
 					<label class="flex items-center cursor-pointer">
 						<input
 							type="radio"
@@ -523,6 +525,7 @@
 						<Terminal class="h-4 w-4 mr-2" />
 						<span style="color: var(--ds-text);">SSH Key</span>
 					</label>
+				{/if}
 				</div>
 			</fieldset>
 		</div>

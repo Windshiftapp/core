@@ -80,6 +80,8 @@ type Config struct {
 	LLMProvidersFile string
 	// LogbookEndpoint is the URL of the logbook sidecar service (e.g., http://logbook:8090)
 	LogbookEndpoint string
+	// SSHEnabled indicates whether the SSH TUI server is enabled
+	SSHEnabled bool
 	// FrontendFiles is the embedded filesystem containing frontend assets
 	FrontendFiles embed.FS
 
@@ -472,7 +474,7 @@ func (s *Server) initialize() error {
 	workflowHandler := handlers.NewWorkflowHandler(s.db)
 	userHandler := handlers.NewUserHandler(s.db, permService)
 	groupHandler := handlers.NewGroupHandler(s.db, permService)
-	credentialHandler := handlers.NewCredentialHandler(s.db, permService)
+	credentialHandler := handlers.NewCredentialHandler(s.db, permService, cfg.SSHEnabled)
 	webAuthnHandler := handlers.NewWebAuthnHandler(s.db, permService, sessionManager, webAuthnConfig, ipExtractor)
 	appTokenHandler := handlers.NewAppTokenHandler(s.db, permService)
 	collectionHandler := handlers.NewCollectionHandler(s.db, permService)
@@ -734,7 +736,7 @@ func (s *Server) initialize() error {
 	ldapHandler := handlers.NewLDAPHandler(s.db, ldapSyncService, ssoHandler.GetEncryption())
 
 	// Features handler
-	featuresHandler := handlers.NewFeaturesHandler(s.pluginManager)
+	featuresHandler := handlers.NewFeaturesHandler(s.pluginManager, cfg.SSHEnabled)
 
 	// System handler
 	shutdownChan := cfg.ShutdownChan
