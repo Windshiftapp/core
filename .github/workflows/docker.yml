@@ -30,7 +30,7 @@ jobs:
             runner: ubuntu-24.04-arm
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set image name
         run: echo "IMAGE_NAME=windshiftapp/windshift" >> $GITHUB_ENV
