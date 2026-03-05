@@ -22,6 +22,12 @@ export { authStore } from './auth.svelte.js';
 // Access via: backlogStore.count, backlogStore.loading, backlogStore.workspaceId
 // Methods: backlogStore.load(wsId), backlogStore.setCount(wsId, count), increment(), decrement()
 export { backlogStore } from './backlogStore.svelte.js';
+// Collection context store
+// Access via: collectionStore.items, collectionStore.backlogItems, collectionStore.collectionName, collectionStore.loading
+// Methods: collectionStore.loadMoreItems(), collectionStore.loadMoreBacklog(), collectionStore.setItemsPage(page, limit)
+// Also: reloadCollection() to trigger a re-fetch, collectionData for backward compatibility
+// Class-based store with server-side pagination support
+export { collectionData, collectionStore, reloadCollection } from './collectionContext.js';
 // Homepage store
 // Access via: homepageStore.recentWorkspaces, homepageStore.notifications,
 // homepageStore.loadDashboardData(), homepageStore.isOnboarding, etc.
@@ -106,9 +112,3 @@ export { workspacePermissions } from './workspacePermissions.svelte.js';
 // workspacesStore.allWorkspaces, workspacesStore.regularWorkspaces,
 // workspacesStore.personalWorkspace, workspacesStore.loaded, workspacesStore.loading
 export { currentWorkspace, workspacesStore } from './workspaces.svelte.js';
-// Collection context store
-// Access via: collectionStore.items, collectionStore.backlogItems, collectionStore.collectionName, collectionStore.loading
-// Methods: collectionStore.loadMoreItems(), collectionStore.loadMoreBacklog(), collectionStore.setItemsPage(page, limit)
-// Also: reloadCollection() to trigger a re-fetch, collectionData for backward compatibility
-// Class-based store with server-side pagination support
-export { collectionData, collectionStore, reloadCollection } from './collectionContext.js';

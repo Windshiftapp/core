@@ -7,7 +7,11 @@ import { api } from '../../api.js';
  * @param {string|number|null} collectionId
  * @param {{ page?: number, limit?: number, sub_ql?: string, [key: string]: any }} [options]
  */
-export async function fetchCollectionItems(workspaceId, collectionId, { page, limit, sub_ql, ...extraFilters } = {}) {
+export async function fetchCollectionItems(
+  workspaceId,
+  collectionId,
+  { page, limit, sub_ql, ...extraFilters } = {}
+) {
   let collectionName = 'Default';
   const filters = { ...extraFilters };
   if (page) filters.page = page;
@@ -50,7 +54,10 @@ export async function fetchCollectionBacklog(workspaceId, collectionId, { page, 
     }
   }
 
-  const response = await api.items.getBacklog(workspaceId, null, collectionId || null, { page, limit });
+  const response = await api.items.getBacklog(workspaceId, null, collectionId || null, {
+    page,
+    limit,
+  });
   const items = response?.items ?? (Array.isArray(response) ? response : []);
   const pagination = response?.pagination ?? null;
   return { items, collectionName, pagination };

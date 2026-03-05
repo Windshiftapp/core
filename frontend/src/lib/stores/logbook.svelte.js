@@ -54,7 +54,7 @@ async function loadDocuments(bucketId, params = {}, { silent = false } = {}) {
     if (Array.isArray(result)) {
       documents = result;
       totalDocuments = result.length;
-    } else if (result && result.data) {
+    } else if (result?.data) {
       documents = result.data;
       totalDocuments = result.pagination?.total ?? result.data.length;
     } else {
@@ -78,7 +78,7 @@ async function loadAllDocuments(params = {}, { silent = false } = {}) {
     if (Array.isArray(result)) {
       documents = result;
       totalDocuments = result.length;
-    } else if (result && result.data) {
+    } else if (result?.data) {
       documents = result.data;
       totalDocuments = result.pagination?.total ?? result.data.length;
     } else {
@@ -111,22 +111,48 @@ function clearActiveDocument() {
 }
 
 export const logbookStore = {
-  get available() { return available; },
-  get loaded() { return loaded; },
-  get loading() { return loading; },
+  get available() {
+    return available;
+  },
+  get loaded() {
+    return loaded;
+  },
+  get loading() {
+    return loading;
+  },
 
-  get buckets() { return buckets; },
-  get bucketsLoaded() { return bucketsLoaded; },
-  get bucketsLoading() { return bucketsLoading; },
+  get buckets() {
+    return buckets;
+  },
+  get bucketsLoaded() {
+    return bucketsLoaded;
+  },
+  get bucketsLoading() {
+    return bucketsLoading;
+  },
 
-  get activeBucketId() { return activeBucketId; },
-  set activeBucketId(v) { activeBucketId = v; },
-  get documents() { return documents; },
-  get totalDocuments() { return totalDocuments; },
-  get documentsLoading() { return documentsLoading; },
+  get activeBucketId() {
+    return activeBucketId;
+  },
+  set activeBucketId(v) {
+    activeBucketId = v;
+  },
+  get documents() {
+    return documents;
+  },
+  get totalDocuments() {
+    return totalDocuments;
+  },
+  get documentsLoading() {
+    return documentsLoading;
+  },
 
-  get activeDocument() { return activeDocument; },
-  get activeDocumentLoading() { return activeDocumentLoading; },
+  get activeDocument() {
+    return activeDocument;
+  },
+  get activeDocumentLoading() {
+    return activeDocumentLoading;
+  },
 
   checkAvailability,
   loadBuckets,

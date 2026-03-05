@@ -51,15 +51,30 @@ export default {
       dashboard: { label: 'Painel', description: 'Ver análises e relatórios' },
       milestones: { label: 'Marcos', description: 'Acompanhar marcos do projeto' },
       channels: { label: 'Canais', description: 'Canais de comunicação e suporte' },
-      collections: { label: 'Coleções', description: 'Gerenciar coleções e visualizações de itens de trabalho' },
-      adminPanel: { label: 'Painel de Administração', description: 'Administração e configurações do sistema' },
+      collections: {
+        label: 'Coleções',
+        description: 'Gerenciar coleções e visualizações de itens de trabalho',
+      },
+      adminPanel: {
+        label: 'Painel de Administração',
+        description: 'Administração e configurações do sistema',
+      },
 
       // Test Management (labels aligned with workspace navigation)
       tests: { label: 'Testes', description: 'Gerenciar casos de teste, planos e execução' },
       testCases: { label: 'Casos de Teste', description: 'Visualizar e gerenciar casos de teste' },
-      testPlans: { label: 'Planos de Teste', description: 'Visualizar e gerenciar planos de teste' },
-      testTemplates: { label: 'Modelos', description: 'Execuções de modelos e passos compartilhados' },
-      testRuns: { label: 'Execuções de Teste', description: 'Visualizar e gerenciar execuções de teste' },
+      testPlans: {
+        label: 'Planos de Teste',
+        description: 'Visualizar e gerenciar planos de teste',
+      },
+      testTemplates: {
+        label: 'Modelos',
+        description: 'Execuções de modelos e passos compartilhados',
+      },
+      testRuns: {
+        label: 'Execuções de Teste',
+        description: 'Visualizar e gerenciar execuções de teste',
+      },
       testReports: { label: 'Relatórios', description: 'Ver relatórios de execução de testes' },
       createTestCase: {
         label: 'Criar Caso de Teste',
@@ -75,19 +90,37 @@ export default {
       },
 
       // Time Management
-      timeTracking: { label: 'Controle de Tempo', description: 'Registrar e gerenciar entradas de tempo' },
+      timeTracking: {
+        label: 'Controle de Tempo',
+        description: 'Registrar e gerenciar entradas de tempo',
+      },
       timeReports: {
         label: 'Relatórios de Tempo',
         description: 'Ver relatórios e análises de controle de tempo',
       },
-      timeProjects: { label: 'Projetos de Tempo', description: 'Gerenciar projetos de controle de tempo' },
-      logTime: { label: 'Registrar Tempo', description: 'Adicionar rapidamente uma nova entrada de tempo' },
-      startTimer: { label: 'Iniciar Cronômetro', description: 'Iniciar o controle de tempo para o trabalho atual' },
+      timeProjects: {
+        label: 'Projetos de Tempo',
+        description: 'Gerenciar projetos de controle de tempo',
+      },
+      logTime: {
+        label: 'Registrar Tempo',
+        description: 'Adicionar rapidamente uma nova entrada de tempo',
+      },
+      startTimer: {
+        label: 'Iniciar Cronômetro',
+        description: 'Iniciar o controle de tempo para o trabalho atual',
+      },
       stopTimer: { label: 'Parar Cronômetro', description: 'Parar o controle de tempo atual' },
 
       // Create Commands
-      createWorkItem: { label: 'Criar Item de Trabalho', description: 'Criar um novo item de trabalho ou tarefa' },
-      createWorkspace: { label: 'Criar Workspace', description: 'Criar um novo workspace de projeto' },
+      createWorkItem: {
+        label: 'Criar Item de Trabalho',
+        description: 'Criar um novo item de trabalho ou tarefa',
+      },
+      createWorkspace: {
+        label: 'Criar Workspace',
+        description: 'Criar um novo workspace de projeto',
+      },
       createMilestone: { label: 'Criar Marco', description: 'Criar um novo marco de projeto' },
       createCollection: {
         label: 'Criar Coleção',
@@ -95,7 +128,10 @@ export default {
       },
 
       // Admin Commands
-      adminCustomFields: { label: 'Campos Personalizados', description: 'Gerenciar definições de campos personalizados' },
+      adminCustomFields: {
+        label: 'Campos Personalizados',
+        description: 'Gerenciar definições de campos personalizados',
+      },
       adminScreens: {
         label: 'Gerenciamento de Telas',
         description: 'Configurar telas e layouts de formulários',
@@ -116,7 +152,10 @@ export default {
         label: 'Conjuntos de Configuração',
         description: 'Gerenciar conjuntos de configuração com workflows e telas',
       },
-      adminStatuses: { label: 'Status', description: 'Gerenciar status individuais de itens de trabalho' },
+      adminStatuses: {
+        label: 'Status',
+        description: 'Gerenciar status individuais de itens de trabalho',
+      },
       adminStatusCategories: {
         label: 'Categorias de Status',
         description: 'Gerenciar categorias de status e cores',
@@ -125,7 +164,10 @@ export default {
         label: 'Construtor de Workflow',
         description: 'Projetar e gerenciar transições de workflow',
       },
-      adminLinkTypes: { label: 'Tipos de Link', description: 'Gerenciar tipos de link entre itens de trabalho' },
+      adminLinkTypes: {
+        label: 'Tipos de Link',
+        description: 'Gerenciar tipos de link entre itens de trabalho',
+      },
       adminScmProviders: {
         label: 'Provedores SCM',
         description: 'Configurar integrações com GitHub, GitLab, Gitea e Bitbucket',
@@ -142,8 +184,14 @@ export default {
         label: 'Configurações de Tema',
         description: 'Gerenciar temas e aparência da aplicação',
       },
-      adminUsers: { label: 'Gerenciamento de Usuários', description: 'Gerenciar usuários, papéis e permissões' },
-      adminGroups: { label: 'Gerenciamento de Grupos', description: 'Gerenciar grupos de usuários e membros' },
+      adminUsers: {
+        label: 'Gerenciamento de Usuários',
+        description: 'Gerenciar usuários, papéis e permissões',
+      },
+      adminGroups: {
+        label: 'Gerenciamento de Grupos',
+        description: 'Gerenciar grupos de usuários e membros',
+      },
       adminPermissions: {
         label: 'Permissões',
         description: 'Gerenciar permissões de usuários e controle de acesso',
@@ -164,12 +212,18 @@ export default {
         label: 'Configurações de Segurança',
         description: 'Configurar feeds de calendário e execução de plugins',
       },
-      adminSystemImport: { label: 'Importação de Sistema', description: 'Importar dados de outros sistemas' },
+      adminSystemImport: {
+        label: 'Importação de Sistema',
+        description: 'Importar dados de outros sistemas',
+      },
       adminAssets: {
         label: 'Gerenciamento de Ativos',
         description: 'Configurar tipos e categorias de ativos',
       },
-      adminWorkspaces: { label: 'Administração de Workspaces', description: 'Gerenciar workspaces e configurações' },
+      adminWorkspaces: {
+        label: 'Administração de Workspaces',
+        description: 'Gerenciar workspaces e configurações',
+      },
       adminNotifications: {
         label: 'Configurações de Notificação',
         description: 'Gerenciar configurações de notificações',
@@ -282,7 +336,8 @@ export default {
 
   about: {
     title: 'Sobre o Windshift',
-    subtitle: 'Uma plataforma abrangente de gerenciamento de trabalho projetada para equipes modernas',
+    subtitle:
+      'Uma plataforma abrangente de gerenciamento de trabalho projetada para equipes modernas',
     whatIs: 'O que é o Windshift?',
     description:
       'O Windshift é uma poderosa aplicação de gerenciamento de trabalho que reúne acompanhamento de projetos, gerenciamento de testes, controle de tempo e colaboração em equipe em uma plataforma unificada. Desenvolvido com tecnologias modernas e projetado para flexibilidade, ele se adapta ao fluxo de trabalho exclusivo da sua equipe.',

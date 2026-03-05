@@ -28,7 +28,8 @@ export default {
     bucketCreated: 'Bucket criado com sucesso',
     bucketUpdated: 'Bucket atualizado',
     bucketDeleted: 'Bucket excluído',
-    confirmDeleteBucket: 'Tem certeza de que deseja excluir este bucket? Todos os documentos nele serão arquivados.',
+    confirmDeleteBucket:
+      'Tem certeza de que deseja excluir este bucket? Todos os documentos nele serão arquivados.',
     documentArchived: 'Documento arquivado',
     documentDeleted: 'Documento excluído',
     confirmDelete: 'Tem certeza de que deseja excluir este documento?',
@@ -50,7 +51,8 @@ export default {
 
     // Upload
     dropzoneTitle: 'Solte os arquivos aqui',
-    dropzoneDescription: 'ou clique para procurar. Suporta PDF, DOCX, PPTX, XLSX, TXT, MD, HTML e imagens.',
+    dropzoneDescription:
+      'ou clique para procurar. Suporta PDF, DOCX, PPTX, XLSX, TXT, MD, HTML e imagens.',
     uploading: 'Enviando...',
     documentTitle: 'Título do documento',
     documentTitlePlaceholder: 'Opcional - usa o nome do arquivo por padrão',
@@ -88,6 +90,5 @@ export default {
     health: 'Saúde',
     author: 'Autor',
     processingMessage: 'O documento está sendo processado...',
-
   },
 };

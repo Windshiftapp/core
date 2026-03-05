@@ -298,7 +298,8 @@ export const jiraImport = {
       }),
     }),
   // Get asset schemas
-  getAssetSchemas: (connectionId) => fetchAPI(`/admin/jira-import/assets?connection_id=${connectionId}`),
+  getAssetSchemas: (connectionId) =>
+    fetchAPI(`/admin/jira-import/assets?connection_id=${connectionId}`),
   // Get object types for a schema
   getAssetTypes: (connectionId, schemaId) =>
     fetchAPI(`/admin/jira-import/assets/${schemaId}/types?connection_id=${connectionId}`),

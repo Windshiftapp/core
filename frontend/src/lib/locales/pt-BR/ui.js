@@ -114,7 +114,10 @@ export default {
       assignee: { name: 'Responsável', description: 'Usuário atribuído' },
       reporter: { name: 'Relator', description: 'Quem relatou o item' },
       createdAt: { name: 'Criado em', description: 'Quando o item foi criado' },
-      updatedAt: { name: 'Atualizado em', description: 'Quando o item foi atualizado pela última vez' },
+      updatedAt: {
+        name: 'Atualizado em',
+        description: 'Quando o item foi atualizado pela última vez',
+      },
       dueDate: { name: 'Data de Vencimento', description: 'Quando o item deve ser concluído' },
       startDate: { name: 'Data de Início', description: 'Quando o trabalho começa' },
       estimate: { name: 'Estimativa', description: 'Esforço estimado' },
@@ -254,10 +257,12 @@ export default {
     alerts: {
       nameRequired: 'O nome é obrigatório',
       pleaseSelectImage: 'Por favor, selecione um arquivo de imagem',
-      timerAlreadyRunning: 'Um cronômetro já está em execução. Por favor, pare-o antes de iniciar um novo.',
+      timerAlreadyRunning:
+        'Um cronômetro já está em execução. Por favor, pare-o antes de iniciar um novo.',
       noTimerRunning: 'Nenhum cronômetro está em execução no momento.',
       timerSyncing: 'O cronômetro está sincronizando. Por favor, aguarde e tente novamente.',
-      startTimerFromItem: 'Por favor, inicie um cronômetro a partir de um item de trabalho para fornecer contexto.',
+      startTimerFromItem:
+        'Por favor, inicie um cronômetro a partir de um item de trabalho para fornecer contexto.',
       cannotDeleteDefaultScreen:
         'Não é possível excluir a tela padrão. Esta tela é necessária para espaços de trabalho sem um conjunto de configuração.',
       applicationShuttingDown: 'O aplicativo está sendo encerrado...',
@@ -274,7 +279,8 @@ export default {
       failedToApplyConfig: 'Falha ao aplicar a alteração de configuração: {error}',
       failedToAddManager: 'Falha ao adicionar gerente: {error}',
       failedToRemoveManager: 'Falha ao remover gerente: {error}',
-      failedToSaveWorkspace: 'Falha ao salvar o projeto. Por favor, verifique suas informações e tente novamente.',
+      failedToSaveWorkspace:
+        'Falha ao salvar o projeto. Por favor, verifique suas informações e tente novamente.',
       failedToResetConfig: 'Falha ao redefinir a configuração: {error}',
       failedToToggleStatus: 'Falha ao alternar o status do tipo de link: {error}',
       failedToAssignRole: 'Falha ao atribuir função: {error}',

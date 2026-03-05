@@ -28,7 +28,8 @@ export default {
     bucketCreated: 'تم إنشاء الحاوية بنجاح',
     bucketUpdated: 'تم تحديث الحاوية',
     bucketDeleted: 'تم حذف الحاوية',
-    confirmDeleteBucket: 'هل أنت متأكد من حذف هذه الحاوية؟ سيتم أرشفة جميع المستندات الموجودة فيها.',
+    confirmDeleteBucket:
+      'هل أنت متأكد من حذف هذه الحاوية؟ سيتم أرشفة جميع المستندات الموجودة فيها.',
     documentArchived: 'تم أرشفة المستند',
     documentDeleted: 'تم حذف المستند',
     confirmDelete: 'هل أنت متأكد من حذف هذا المستند؟',
@@ -88,6 +89,5 @@ export default {
     health: 'الحالة',
     author: 'المؤلف',
     processingMessage: 'جارٍ معالجة المستند...',
-
   },
 };

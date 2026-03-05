@@ -86,8 +86,7 @@ export default {
     activateUser: 'Ativar Usuário',
     deactivateUser: 'Desativar Usuário',
     confirmDelete: 'Tem certeza de que deseja excluir {name}? Esta ação não pode ser desfeita.',
-    confirmActivate:
-      'Tem certeza de que deseja ativar {name}? A pessoa poderá acessar o sistema.',
+    confirmActivate: 'Tem certeza de que deseja ativar {name}? A pessoa poderá acessar o sistema.',
     confirmDeactivate:
       'Tem certeza de que deseja desativar {name}? A pessoa não poderá mais acessar o sistema.',
     failedToLoad: 'Falha ao carregar usuários',
@@ -123,7 +122,8 @@ export default {
     connectedAccountsDesc:
       'Conecte suas contas de controle de versão para criar branches e pull requests',
     calendarIntegration: 'Integração de Calendário',
-    calendarIntegrationDesc: 'Inscreva-se nos seus itens agendados em aplicativos de calendário externos',
+    calendarIntegrationDesc:
+      'Inscreva-se nos seus itens agendados em aplicativos de calendário externos',
     loadCalendarFeedSettings: 'Carregar Configurações do Feed de Calendário',
     enableCalendarSubscription: 'Ativar Assinatura de Calendário',
     calendarSubscriptionDesc:
@@ -131,7 +131,8 @@ export default {
     generateCalendarFeedUrl: 'Gerar URL do Feed de Calendário',
     yourCalendarFeedUrl: 'Sua URL do Feed de Calendário',
     showFullUrl: 'Mostrar URL Completa',
-    calendarFeedWarning: 'Não compartilhe esta URL, pois ela fornece acesso aos seus itens agendados.',
+    calendarFeedWarning:
+      'Não compartilhe esta URL, pois ela fornece acesso aos seus itens agendados.',
     lastSynced: 'Última sincronização',
     howToSubscribe: 'Como se Inscrever',
     copyFeedUrlStep: 'Copie a URL do feed acima',
@@ -171,7 +172,8 @@ export default {
     authenticationCancelled: 'A autenticação foi cancelada ou falhou. Por favor, tente novamente.',
     failedToTestFidoLogin: 'Falha ao testar login FIDO',
     enterTokenName: 'Por favor, insira um nome para este token',
-    confirmRevokeToken: 'Tem certeza de que deseja revogar "{name}"? Esta ação não pode ser desfeita.',
+    confirmRevokeToken:
+      'Tem certeza de que deseja revogar "{name}"? Esta ação não pode ser desfeita.',
     securityKeyFido: 'Chave de Segurança (FIDO2)',
     authenticatorAppTotp: 'Aplicativo Autenticador (TOTP)',
   },

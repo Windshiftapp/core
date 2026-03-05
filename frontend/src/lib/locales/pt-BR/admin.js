@@ -38,7 +38,10 @@ export default {
 
     // Rótulos e descrições dos itens do painel administrativo (para Admin.svelte)
     adminItems: {
-      customFields: { title: 'Campos Personalizados', description: 'Gerenciar definições de campos personalizados' },
+      customFields: {
+        title: 'Campos Personalizados',
+        description: 'Gerenciar definições de campos personalizados',
+      },
       screens: { title: 'Telas', description: 'Configurar telas de formulário e layouts' },
       hierarchyLevels: {
         title: 'Níveis de Hierarquia',
@@ -52,18 +55,30 @@ export default {
         title: 'Prioridades',
         description: 'Configurar níveis de prioridade com ícones e cores',
       },
-      configurationSets: { title: 'Conjuntos de Configuração', description: 'Gerenciar conjuntos de configuração' },
+      configurationSets: {
+        title: 'Conjuntos de Configuração',
+        description: 'Gerenciar conjuntos de configuração',
+      },
       statuses: {
         title: 'Status',
         description: 'Gerenciar categorias de status e status individuais',
       },
-      workflows: { title: 'Fluxos de Trabalho', description: 'Projetar e gerenciar transições de fluxo de trabalho' },
+      workflows: {
+        title: 'Fluxos de Trabalho',
+        description: 'Projetar e gerenciar transições de fluxo de trabalho',
+      },
       scmProviders: {
         title: 'Provedores SCM',
         description: 'Configurar integrações com GitHub, GitLab, Gitea e Bitbucket',
       },
-      systemImport: { title: 'Importação do Sistema', description: 'Importar dados de sistemas externos' },
-      linkTypes: { title: 'Tipos de Vínculo', description: 'Gerenciar tipos de vínculo entre itens' },
+      systemImport: {
+        title: 'Importação do Sistema',
+        description: 'Importar dados de sistemas externos',
+      },
+      linkTypes: {
+        title: 'Tipos de Vínculo',
+        description: 'Gerenciar tipos de vínculo entre itens',
+      },
       attachments: { title: 'Anexos', description: 'Gerenciar configurações de anexos' },
       modules: { title: 'Módulos', description: 'Ativar ou desativar módulos do sistema' },
       themes: { title: 'Temas', description: 'Gerenciar temas e aparência do aplicativo' },
@@ -77,9 +92,18 @@ export default {
         title: 'Funções do Espaço de Trabalho',
         description: 'Visualizar funções do espaço de trabalho e suas permissões',
       },
-      sso: { title: 'Login Único', description: 'Configurar provedores de identidade OIDC para SSO' },
-      security: { title: 'Segurança', description: 'Gerenciar configurações de segurança e controles de funcionalidades' },
-      workspaces: { title: 'Espaços de Trabalho', description: 'Gerenciar espaços de trabalho e configurações' },
+      sso: {
+        title: 'Login Único',
+        description: 'Configurar provedores de identidade OIDC para SSO',
+      },
+      security: {
+        title: 'Segurança',
+        description: 'Gerenciar configurações de segurança e controles de funcionalidades',
+      },
+      workspaces: {
+        title: 'Espaços de Trabalho',
+        description: 'Gerenciar espaços de trabalho e configurações',
+      },
       notificationSettings: {
         title: 'Configurações de Notificação',
         description: 'Gerenciar configurações de notificações',
@@ -88,7 +112,10 @@ export default {
         title: 'Canais',
         description: 'Configurar canais de entrada e saída, portais e webhooks',
       },
-      assets: { title: 'Ativos', description: 'Gerenciar conjuntos de ativos, tipos, categorias e ativos' },
+      assets: {
+        title: 'Ativos',
+        description: 'Gerenciar conjuntos de ativos, tipos, categorias e ativos',
+      },
       llmConnections: {
         title: 'Conexões de IA',
         description: 'Configurar provedores de modelos de IA para funcionalidades inteligentes',
@@ -106,8 +133,7 @@ export default {
       notConfigured: 'Não configurado',
       pathWritable: 'Caminho Gravável',
       pathStatusUnknown: 'Status do Caminho Desconhecido',
-      enableNote:
-        'Para ativar anexos, reinicie o servidor windshift com a flag --attachment-path.',
+      enableNote: 'Para ativar anexos, reinicie o servidor windshift com a flag --attachment-path.',
       enableExample: 'Exemplo: ./windshift --attachment-path /caminho/para/anexos',
       generalSettings: 'Configurações Gerais',
       enableAttachments: 'Ativar Anexos',
@@ -164,7 +190,8 @@ export default {
       edit: 'Editar',
       manageMembers: 'Gerenciar Membros',
       delete: 'Excluir',
-      confirmDelete: 'Tem certeza de que deseja excluir este grupo? Todas as associações serão removidas.',
+      confirmDelete:
+        'Tem certeza de que deseja excluir este grupo? Todas as associações serão removidas.',
       failedToLoad: 'Falha ao carregar grupos',
       failedToSave: 'Falha ao salvar grupo',
       failedToDelete: 'Falha ao excluir grupo',
@@ -214,7 +241,8 @@ export default {
       watchers: 'Observadores',
       workspaceAdmins: 'Administradores do Espaço de Trabalho',
       customMessageTemplate: 'Modelo de Mensagem Personalizado (opcional)',
-      messageTemplatePlaceholder: 'Deixe vazio para a mensagem padrão, ou personalize usando variáveis',
+      messageTemplatePlaceholder:
+        'Deixe vazio para a mensagem padrão, ou personalize usando variáveis',
       availableVariables: 'Variáveis disponíveis',
       example: 'Exemplo',
       updateSetting: 'Atualizar Configuração',
@@ -310,7 +338,8 @@ export default {
       permissionGrantedToUser: 'Permissão concedida ao usuário com sucesso',
       permissionGrantedToGroup: 'Permissão concedida ao grupo com sucesso',
       failedToGrantPermission: 'Falha ao conceder permissão: ',
-      cannotRevokeLastAdmin: 'Não é possível revogar o administrador do sistema do último administrador',
+      cannotRevokeLastAdmin:
+        'Não é possível revogar o administrador do sistema do último administrador',
       permissionRevokedFromUser: 'Permissão revogada do usuário com sucesso',
       permissionRevokedFromGroup: 'Permissão revogada do grupo com sucesso',
       failedToRevokePermission: 'Falha ao revogar permissão: ',
@@ -320,7 +349,8 @@ export default {
     // Conjuntos de Permissões
     permissionSets: {
       title: 'Conjuntos de Permissões',
-      subtitle: 'Gerenciar pacotes de permissões que podem ser atribuídos a conjuntos de configuração',
+      subtitle:
+        'Gerenciar pacotes de permissões que podem ser atribuídos a conjuntos de configuração',
       createPermissionSet: 'Criar Conjunto de Permissões',
       name: 'Nome',
       namePlaceholder: 'ex.: Permissões da Equipe de Desenvolvimento',
@@ -421,7 +451,8 @@ export default {
       title: 'Segurança',
       subtitle: 'Gerenciar configurações relacionadas à segurança e controles de funcionalidades',
       calendarFeeds: 'Assinaturas de Feed de Calendário',
-      calendarFeedsDesc: 'Permitir que usuários gerem URLs de feed ICS para aplicativos de calendário externos',
+      calendarFeedsDesc:
+        'Permitir que usuários gerem URLs de feed ICS para aplicativos de calendário externos',
       calendarFeedsWarning:
         'Aviso: Quando desativado, os feeds de calendário existentes deixarão de funcionar imediatamente. Os usuários não poderão gerar novas URLs de feed.',
       pluginExecution: 'Execução de Comandos CLI de Plugins',
@@ -469,7 +500,8 @@ export default {
       leaveEmptyToKeepCurrent: '(deixe vazio para manter o atual)',
       notConfigured: 'Não configurado',
       callbackUrl: 'URL de Callback',
-      callbackUrlHelp: 'Configure esta URL como a URL de redirecionamento/callback no seu provedor de identidade',
+      callbackUrlHelp:
+        'Configure esta URL como a URL de redirecionamento/callback no seu provedor de identidade',
       scopes: 'Escopos',
       scopesHelp: 'Lista de escopos OIDC separados por espaço',
       enabled: 'Ativado',

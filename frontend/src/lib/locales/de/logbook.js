@@ -11,7 +11,8 @@ export default {
     uploadDocument: 'Dokument hochladen',
     newNote: 'Neue Notiz',
     noDocuments: 'Noch keine Dokumente',
-    noDocumentsDescription: 'Laden Sie eine Datei hoch oder erstellen Sie eine Notiz, um loszulegen',
+    noDocumentsDescription:
+      'Laden Sie eine Datei hoch oder erstellen Sie eine Notiz, um loszulegen',
     noDocumentsAllDescription: 'Keine Dokumente in Ihren zugänglichen Buckets gefunden',
     noBuckets: 'Noch keine Buckets',
     noBucketsDescription: 'Erstellen Sie einen Bucket, um Ihr Wissen zu organisieren',
@@ -28,7 +29,8 @@ export default {
     bucketCreated: 'Bucket erfolgreich erstellt',
     bucketUpdated: 'Bucket aktualisiert',
     bucketDeleted: 'Bucket gelöscht',
-    confirmDeleteBucket: 'Sind Sie sicher, dass Sie diesen Bucket löschen möchten? Alle darin enthaltenen Dokumente werden archiviert.',
+    confirmDeleteBucket:
+      'Sind Sie sicher, dass Sie diesen Bucket löschen möchten? Alle darin enthaltenen Dokumente werden archiviert.',
     documentArchived: 'Dokument archiviert',
     documentDeleted: 'Dokument gelöscht',
     confirmDelete: 'Sind Sie sicher, dass Sie dieses Dokument löschen möchten?',
@@ -50,7 +52,8 @@ export default {
 
     // Upload
     dropzoneTitle: 'Dateien hier ablegen',
-    dropzoneDescription: 'oder klicken Sie zum Durchsuchen. Unterstützt PDF, DOCX, PPTX, XLSX, TXT, MD, HTML und Bilder.',
+    dropzoneDescription:
+      'oder klicken Sie zum Durchsuchen. Unterstützt PDF, DOCX, PPTX, XLSX, TXT, MD, HTML und Bilder.',
     uploading: 'Wird hochgeladen...',
     documentTitle: 'Dokumenttitel',
     documentTitlePlaceholder: 'Optional – Standard ist der Dateiname',
@@ -88,6 +91,5 @@ export default {
     health: 'Zustand',
     author: 'Autor',
     processingMessage: 'Dokument wird verarbeitet...',
-
   },
 };

@@ -9,7 +9,9 @@ export const ai = {
   findSimilar: (itemId) => post(`/ai/items/${itemId}/find-similar`),
   decompose: (itemId) => post(`/ai/items/${itemId}/decompose`),
   generateReleaseNotes: (milestoneId, connectionId) =>
-    post(`/ai/milestones/${milestoneId}/generate-release-notes${connectionId ? `?connection_id=${connectionId}` : ''}`),
+    post(
+      `/ai/milestones/${milestoneId}/generate-release-notes${connectionId ? `?connection_id=${connectionId}` : ''}`
+    ),
 };
 
 export const llmConnections = {

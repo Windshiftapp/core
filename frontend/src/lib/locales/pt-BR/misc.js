@@ -393,7 +393,8 @@ export default {
     noAssetSets: 'Nenhum Conjunto de Ativos',
     noAssetSetsDesc: 'Crie seu primeiro conjunto de ativos para começar a gerenciar ativos.',
     selectAnAssetSet: 'Selecione um Conjunto de Ativos',
-    selectAnAssetSetDesc: 'Escolha um conjunto de ativos no menu acima para visualizar e gerenciar ativos.',
+    selectAnAssetSetDesc:
+      'Escolha um conjunto de ativos no menu acima para visualizar e gerenciar ativos.',
     default: 'Padrão',
 
     // Tabs
@@ -421,9 +422,11 @@ export default {
     // Permissions
     assignRole: 'Atribuir Papel',
     everyoneRole: 'Papel de Todos',
-    everyoneRoleDesc: 'Papel padrão para todos os usuários. Atribuições individuais substituem este.',
+    everyoneRoleDesc:
+      'Papel padrão para todos os usuários. Atribuições individuais substituem este.',
     noRoleAssignments: 'Nenhuma Atribuição de Papel',
-    noRoleAssignmentsDesc: 'Adicione atribuições de papel para controlar quem pode acessar este conjunto de ativos.',
+    noRoleAssignmentsDesc:
+      'Adicione atribuições de papel para controlar quem pode acessar este conjunto de ativos.',
     assignee: 'Responsável',
     role: 'Papel',
 
@@ -682,7 +685,8 @@ export default {
     password: 'Senha',
     confirmPassword: 'Confirmar Senha',
     configureModules: 'Configurar Módulos',
-    configureModulesDesc: 'Escolha quais módulos habilitar. Você pode alterar essas configurações depois.',
+    configureModulesDesc:
+      'Escolha quais módulos habilitar. Você pode alterar essas configurações depois.',
     testManagement: 'Gerenciamento de Testes',
     testManagementDesc: 'Gerencie casos de teste, execuções de teste e garantia de qualidade',
     setupComplete: 'Configuração Concluída!',
@@ -756,11 +760,13 @@ export default {
     selectRepository: 'Selecione um repositório...',
     branchName: 'Nome da Branch',
     baseBranch: 'Branch Base',
-    baseBranchHelp: 'A branch a partir da qual será criada. Usa a branch padrão do repositório por padrão.',
+    baseBranchHelp:
+      'A branch a partir da qual será criada. Usa a branch padrão do repositório por padrão.',
     creating: 'Criando...',
     branchCreatedSuccess: 'Branch criada com sucesso',
     noReposLinked: 'Nenhum repositório vinculado a este espaço de trabalho',
-    linkReposHelp: 'Vincule repositórios em Configurações do Espaço de Trabalho → Controle de Código Fonte',
+    linkReposHelp:
+      'Vincule repositórios em Configurações do Espaço de Trabalho → Controle de Código Fonte',
     fillAllRequired: 'Por favor, preencha todos os campos obrigatórios',
     failedToLoadRepos: 'Falha ao carregar repositórios',
     failedToCreateBranch: 'Falha ao criar branch',
@@ -799,7 +805,8 @@ export default {
     confirmRemoveLink: 'Tem certeza de que deseja remover este vínculo?',
     noRepositoriesLinked: 'Nenhum repositório vinculado a este espaço de trabalho',
     connectYourAccount: 'Conecte sua conta {provider}',
-    connectToCreate: 'Conecte para criar branches e pull requests diretamente dos itens de trabalho.',
+    connectToCreate:
+      'Conecte para criar branches e pull requests diretamente dos itens de trabalho.',
     connect: 'Conectar {provider}',
     noLinksYet: 'Nenhum vínculo de desenvolvimento ainda',
   },
@@ -817,7 +824,8 @@ export default {
     changeAvatar: 'Alterar Avatar',
     uploadAvatar: 'Enviar Avatar',
     attachmentsRequired: 'Os anexos devem estar habilitados para enviar avatares de organização',
-    uploadRecommendation: 'Recomendado: Imagens quadradas, com pelo menos 256x256 pixels para melhor qualidade',
+    uploadRecommendation:
+      'Recomendado: Imagens quadradas, com pelo menos 256x256 pixels para melhor qualidade',
     activeOrganization: 'Organização Ativa',
     customFields: 'Campos Personalizados',
     updateOrganization: 'Atualizar Organização',

@@ -19,7 +19,10 @@ class BacklogStore {
     this.loading = true;
     try {
       const response = await api.items.getBacklog(workspaceId);
-      this.count = response?.pagination?.total ?? response?.items?.length ?? (Array.isArray(response) ? response.length : 0);
+      this.count =
+        response?.pagination?.total ??
+        response?.items?.length ??
+        (Array.isArray(response) ? response.length : 0);
     } catch (error) {
       console.error('Failed to load backlog count:', error);
       this.count = 0;

@@ -1,8 +1,8 @@
 import {
-  updateOffset,
-  isClockDriftSignificant,
   getClockOffset,
   getSampleCount,
+  isClockDriftSignificant,
+  updateOffset,
 } from '../utils/serverClock.js';
 
 // Use relative path for API calls - Vite proxy will handle dev, production uses same origin
@@ -69,9 +69,7 @@ export async function fetchAPI(endpoint, options = {}) {
           const direction = offsetSec > 0 ? 'ahead' : 'behind';
           const amount =
             absMin > 0 ? `${absMin}m ${absSec}s ${direction}` : `${absSec}s ${direction}`;
-          warningToast(
-            `Server clock appears to be ${amount}. Timestamps may be inaccurate.`
-          );
+          warningToast(`Server clock appears to be ${amount}. Timestamps may be inaccurate.`);
         }
       }
     );
