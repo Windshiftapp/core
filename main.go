@@ -202,6 +202,10 @@ func main() {
 		postgresConn = fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=disable", pgUser, pgPassword, pgHost, pgPort, pgDB)
 	}
 
+	if envAllowedHosts := os.Getenv("ALLOWED_HOSTS"); envAllowedHosts != "" && allowedHosts == "" {
+		allowedHosts = envAllowedHosts
+	}
+
 	// Parse BASE_URL to derive allowed-hosts and allowed-port
 	baseURL := os.Getenv("BASE_URL")
 	if baseURL == "" {
