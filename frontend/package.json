@@ -59,7 +59,7 @@
     "dompurify": "^3.3.1",
     "lucide-svelte": "^0.563.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react-dom": "^19.2.4",
     "runed": "^0.37.0"
   }
 }
