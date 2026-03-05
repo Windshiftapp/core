@@ -3,7 +3,7 @@ module windshift
 go 1.25.7
 
 require (
-	github.com/BurntSushi/toml v1.3.2
+	github.com/BurntSushi/toml v1.6.0
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0
 	github.com/allegro/bigcache/v3 v3.1.0
 	github.com/charmbracelet/bubbles v0.21.0
