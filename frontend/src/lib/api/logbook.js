@@ -1,4 +1,4 @@
-import { fetchAPI, API_BASE } from './core.js';
+import { API_BASE, fetchAPI } from './core.js';
 
 export const logbook = {
   // Health check (determines availability)
@@ -31,7 +31,9 @@ export const logbook = {
       }
     });
     const queryString = query.toString();
-    return fetchAPI(`/logbook/buckets/${bucketId}/documents${queryString ? `?${queryString}` : ''}`);
+    return fetchAPI(
+      `/logbook/buckets/${bucketId}/documents${queryString ? `?${queryString}` : ''}`
+    );
   },
   listAllDocuments: (params = {}) => {
     const query = new URLSearchParams();

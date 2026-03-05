@@ -1,7 +1,7 @@
 import { writable } from 'svelte/store';
 import { api } from '../api.js';
-import { serverNow } from '../utils/serverClock.js';
 import { formatDateSimple } from '../utils/dateFormatter.js';
+import { serverNow } from '../utils/serverClock.js';
 
 // Notification store
 export const notifications = writable([]);

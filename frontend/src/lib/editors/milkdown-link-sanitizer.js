@@ -64,7 +64,7 @@ export const linkSanitizerPlugin = $prose(() => {
     key: linkSanitizerPluginKey,
 
     // Intercept every transaction to sanitize any new or changed links
-    appendTransaction(transactions, _oldState, newState) {
+    appendTransaction(_transactions, _oldState, newState) {
       const tr = newState.tr;
       const changed = sanitizeDoc(tr);
       return changed ? tr : null;
@@ -72,7 +72,7 @@ export const linkSanitizerPlugin = $prose(() => {
 
     props: {
       // Belt-and-suspenders: block click navigation to unsafe URLs
-      handleClick(view, _pos, event) {
+      handleClick(_view, _pos, event) {
         const link = event.target.closest?.('a[href]');
         if (link && !isSafeUrl(link.getAttribute('href'))) {
           event.preventDefault();

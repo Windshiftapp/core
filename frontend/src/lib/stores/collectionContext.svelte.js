@@ -1,9 +1,16 @@
+import {
+  fetchCollectionBacklog,
+  fetchCollectionItems,
+} from '../features/collections/collectionService.js';
 import { currentRoute } from '../router.js';
-import { fetchCollectionItems, fetchCollectionBacklog } from '../features/collections/collectionService.js';
 
 const COLLECTION_VIEWS = new Set([
-  'workspace-board', 'workspace-board-config', 'workspace-backlog',
-  'workspace-list', 'workspace-tree', 'workspace-map'
+  'workspace-board',
+  'workspace-board-config',
+  'workspace-backlog',
+  'workspace-list',
+  'workspace-tree',
+  'workspace-map',
 ]);
 
 const DEFAULT_PAGE_SIZE = 250;
@@ -67,7 +74,11 @@ class CollectionStore {
 
     try {
       const [itemsResult, backlogResult] = await Promise.all([
-        fetchCollectionItems(wsId, colId, { page: 1, limit: DEFAULT_PAGE_SIZE, sub_ql: this.subFilterQL || undefined }),
+        fetchCollectionItems(wsId, colId, {
+          page: 1,
+          limit: DEFAULT_PAGE_SIZE,
+          sub_ql: this.subFilterQL || undefined,
+        }),
         fetchCollectionBacklog(wsId, colId, { page: 1, limit: DEFAULT_PAGE_SIZE }),
       ]);
 
@@ -159,7 +170,11 @@ class CollectionStore {
     const loadId = ++this.#loadId;
 
     try {
-      const result = await fetchCollectionItems(this.#wsId, this.#colId, { page, limit, sub_ql: this.subFilterQL || undefined });
+      const result = await fetchCollectionItems(this.#wsId, this.#colId, {
+        page,
+        limit,
+        sub_ql: this.subFilterQL || undefined,
+      });
 
       if (loadId !== this.#loadId) return;
 
@@ -193,14 +208,18 @@ class CollectionStore {
 
     try {
       const [itemsResult, backlogResult] = await Promise.all([
-        fetchCollectionItems(this.#wsId, this.#colId, { page: 1, limit: itemsLimit, sub_ql: this.subFilterQL || undefined }),
+        fetchCollectionItems(this.#wsId, this.#colId, {
+          page: 1,
+          limit: itemsLimit,
+          sub_ql: this.subFilterQL || undefined,
+        }),
         fetchCollectionBacklog(this.#wsId, this.#colId, { page: 1, limit: backlogLimit }),
       ]);
       if (loadId !== this.#loadId) return;
 
       // Merge: preserve locally-present items that are beyond the server's pagination window
-      const serverItemIds = new Set(itemsResult.items.map(i => i.id));
-      const localOnlyItems = this.items.filter(i => !serverItemIds.has(i.id));
+      const serverItemIds = new Set(itemsResult.items.map((i) => i.id));
+      const localOnlyItems = this.items.filter((i) => !serverItemIds.has(i.id));
       this.items = [...itemsResult.items, ...localOnlyItems];
 
       this.collectionName = itemsResult.collectionName;
@@ -209,8 +228,8 @@ class CollectionStore {
         ? itemsResult.pagination.page < itemsResult.pagination.total_pages
         : false;
 
-      const serverBacklogIds = new Set(backlogResult.items.map(i => i.id));
-      const localOnlyBacklog = this.backlogItems.filter(i => !serverBacklogIds.has(i.id));
+      const serverBacklogIds = new Set(backlogResult.items.map((i) => i.id));
+      const localOnlyBacklog = this.backlogItems.filter((i) => !serverBacklogIds.has(i.id));
       this.backlogItems = [...backlogResult.items, ...localOnlyBacklog];
 
       this.backlogPagination = backlogResult.pagination;
@@ -293,5 +312,5 @@ export const collectionData = {
     return () => {
       if (cleanup) cleanup();
     };
-  }
+  },
 };

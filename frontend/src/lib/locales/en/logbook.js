@@ -28,7 +28,8 @@ export default {
     bucketCreated: 'Bucket created successfully',
     bucketUpdated: 'Bucket updated',
     bucketDeleted: 'Bucket deleted',
-    confirmDeleteBucket: 'Are you sure you want to delete this bucket? All documents in it will be archived.',
+    confirmDeleteBucket:
+      'Are you sure you want to delete this bucket? All documents in it will be archived.',
     documentArchived: 'Document archived',
     documentDeleted: 'Document deleted',
     confirmDelete: 'Are you sure you want to delete this document?',
@@ -50,7 +51,8 @@ export default {
 
     // Upload
     dropzoneTitle: 'Drop files here',
-    dropzoneDescription: 'or click to browse. Supports PDF, DOCX, PPTX, XLSX, TXT, MD, HTML, and images.',
+    dropzoneDescription:
+      'or click to browse. Supports PDF, DOCX, PPTX, XLSX, TXT, MD, HTML, and images.',
     uploading: 'Uploading...',
     documentTitle: 'Document title',
     documentTitlePlaceholder: 'Optional - defaults to filename',
@@ -88,6 +90,5 @@ export default {
     health: 'Health',
     author: 'Author',
     processingMessage: 'Document is being processed...',
-
   },
 };

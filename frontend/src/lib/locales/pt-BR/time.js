@@ -162,8 +162,7 @@ export default {
       startSetupWizard: 'iniciar o assistente de configuracao',
       applyFiltersTitle: 'Aplicar os filtros selecionados a lista de registros de tempo',
       clearFiltersTitle: 'Limpar todos os filtros e mostrar todos os registros de tempo',
-      noEntries:
-        'Nenhum registro de tempo encontrado. Registre seu primeiro tempo para comecar.',
+      noEntries: 'Nenhum registro de tempo encontrado. Registre seu primeiro tempo para comecar.',
       clickToView: 'Clique para visualizar {key}-{number}',
       budgetExceeded: '- orcamento excedido',
     },

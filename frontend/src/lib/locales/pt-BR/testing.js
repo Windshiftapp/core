@@ -20,7 +20,8 @@ export default {
     createTestRun: 'Criar Execução de Teste',
     deleteTestCase: 'Excluir Caso de Teste',
     deleteTestPlan: 'Excluir Plano de Teste',
-    deleteTestPlanConfirm: 'Tem certeza de que deseja excluir este plano de teste? Esta ação não pode ser desfeita.',
+    deleteTestPlanConfirm:
+      'Tem certeza de que deseja excluir este plano de teste? Esta ação não pode ser desfeita.',
     addTestPlan: 'Adicionar Plano de Teste',
     createFirstTestPlan: 'Crie seu primeiro plano de teste para organizar casos de teste',
     lastRun: 'Última Execução',
@@ -81,7 +82,8 @@ export default {
       'Tem certeza de que deseja excluir este caso de teste? Esta ação não pode ser desfeita.',
     noTestCasesFound: 'Nenhum caso de teste encontrado',
     noTestCasesWithLabel: 'Nenhum caso de teste encontrado com o filtro de rótulo selecionado.',
-    createFirstTestCase: "Clique em 'Adicionar Caso de Teste' para criar seu primeiro caso de teste nesta pasta.",
+    createFirstTestCase:
+      "Clique em 'Adicionar Caso de Teste' para criar seu primeiro caso de teste nesta pasta.",
     allLabels: 'Todos os rótulos',
     noLabels: 'Sem rótulos',
     draft: 'Rascunho',
@@ -150,7 +152,8 @@ export default {
     closeImagePreview: 'Fechar visualização da imagem',
     // Página de Execuções de Teste
     testRunsSubtitle: 'Execute planos de teste e acompanhe os resultados',
-    selectPlanAndEnterName: 'Por favor, selecione um plano de teste e insira um nome para a execução',
+    selectPlanAndEnterName:
+      'Por favor, selecione um plano de teste e insira um nome para a execução',
     createTestRunSubtitle: 'Inicie uma nova execução de teste a partir de um plano de teste',
     selectTestPlan: 'Selecionar Plano de Teste',
     selectTestPlanPlaceholder: 'Selecione um plano de teste...',
@@ -226,7 +229,8 @@ export default {
     adjustFiltersOrBroader: 'Tente ajustar seus filtros ou ampliar sua pesquisa.',
     workItemsCoveredByTests: 'Itens de trabalho cobertos por testes',
     itemsWithoutTestCoverage: 'Itens sem cobertura de teste',
-    selectWorkspacesAndTypes: 'Selecione os espaços de trabalho e tipos de item para incluir no relatório',
+    selectWorkspacesAndTypes:
+      'Selecione os espaços de trabalho e tipos de item para incluir no relatório',
     selectWorkspaces: 'Selecionar Espaços de Trabalho',
     allWorkspaces: 'Todos os Espaços de Trabalho',
     itemTypes: 'Tipos de Item',
@@ -259,8 +263,10 @@ export default {
     configureRequirements: 'Configurar Requisitos',
     configureRequirementTypes: 'Configurar Tipos de Requisito',
     noRequirementTypesConfigured: 'Nenhum tipo de requisito configurado',
-    selectItemTypesForCoverage: 'Selecione tipos de item para acompanhar nos relatórios de cobertura',
-    selectItemTypesForCoverageAnalysis: 'Selecione tipos de item para incluir na análise de cobertura',
+    selectItemTypesForCoverage:
+      'Selecione tipos de item para acompanhar nos relatórios de cobertura',
+    selectItemTypesForCoverageAnalysis:
+      'Selecione tipos de item para incluir na análise de cobertura',
     saveConfiguration: 'Salvar Configuração',
     overview: 'Visão Geral',
     failures: 'Falhas',

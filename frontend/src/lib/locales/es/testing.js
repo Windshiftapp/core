@@ -50,7 +50,8 @@ export default {
     noTrendDataForPeriod: 'Sin datos de tendencia para este periodo',
     noFailuresToShow: 'Sin fallos para mostrar',
     noRequirementsFound: 'No se encontraron requisitos',
-    noItemsMatchingRequirements: 'No hay elementos que coincidan con los tipos de requisito configurados',
+    noItemsMatchingRequirements:
+      'No hay elementos que coincidan con los tipos de requisito configurados',
   },
 
   testCase: {},

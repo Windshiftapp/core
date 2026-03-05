@@ -8,7 +8,8 @@ export default {
     create: 'Criar Ação',
     createFirst: 'Crie Sua Primeira Ação',
     noActions: 'Nenhuma ação ainda',
-    noActionsDescription: 'Crie ações para automatizar seus fluxos de trabalho com base em eventos de itens',
+    noActionsDescription:
+      'Crie ações para automatizar seus fluxos de trabalho com base em eventos de itens',
     enabled: 'Ativada',
     disabled: 'Desativada',
     enable: 'Ativar',

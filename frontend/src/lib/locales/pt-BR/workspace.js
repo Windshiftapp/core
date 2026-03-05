@@ -132,7 +132,8 @@ export default {
     type: 'Tipo',
     workItem: 'Item de Trabalho',
     noProjectConfigured: 'Nenhum projeto configurado para controle de tempo',
-    setDefaultProject: 'Defina um projeto padrão nas configurações do workspace ou do item para registrar tempo',
+    setDefaultProject:
+      'Defina um projeto padrão nas configurações do workspace ou do item para registrar tempo',
     timeEntries: 'Registros de Tempo',
     startTimer: 'Iniciar Cronômetro',
     logTime: 'Registrar Tempo',
@@ -161,7 +162,8 @@ export default {
     clickToViewCopied: 'Clique para visualizar o item copiado',
     failedToCopy: 'Falha ao copiar item',
     deleteWorkItem: 'Excluir Item de Trabalho',
-    confirmDeleteItem: 'Tem certeza de que deseja excluir "{title}"? Esta ação não pode ser desfeita.',
+    confirmDeleteItem:
+      'Tem certeza de que deseja excluir "{title}"? Esta ação não pode ser desfeita.',
     failedToDelete: 'Falha ao excluir item',
 
     // Cascade delete dialog
@@ -439,7 +441,8 @@ export default {
 
     // Results
     addFiltersToStart: 'Adicione filtros para começar',
-    addFiltersDesc: 'Use os filtros da barra lateral ou escreva uma consulta para buscar itens de trabalho.',
+    addFiltersDesc:
+      'Use os filtros da barra lateral ou escreva uma consulta para buscar itens de trabalho.',
     loadingWorkspaces: 'Carregando workspaces...',
     loadingWorkItems: 'Carregando itens de trabalho...',
     noWorkItemsFound: 'Nenhum item de trabalho encontrado',
@@ -449,8 +452,10 @@ export default {
     // Confirmations
     confirmDeleteCollection:
       'Tem certeza de que deseja excluir a coleção "{name}"? Esta ação não pode ser desfeita.',
-    confirmDeleteItem: 'Tem certeza de que deseja excluir "{title}"? Esta ação não pode ser desfeita.',
-    noQueryToSave: 'Nenhuma consulta para salvar. Por favor, configure alguns filtros ou insira uma consulta QL primeiro.',
+    confirmDeleteItem:
+      'Tem certeza de que deseja excluir "{title}"? Esta ação não pode ser desfeita.',
+    noQueryToSave:
+      'Nenhuma consulta para salvar. Por favor, configure alguns filtros ou insira uma consulta QL primeiro.',
 
     // Board view
     boardSummary: 'Total: {itemCount} itens de trabalho em {columnCount} colunas',
@@ -488,7 +493,8 @@ export default {
 
     // Access denied
     accessDenied: 'Acesso Negado',
-    accessDeniedDescription: 'Você precisa de permissões de administrador do workspace para acessar as configurações.',
+    accessDeniedDescription:
+      'Você precisa de permissões de administrador do workspace para acessar as configurações.',
     backToWorkspace: 'Voltar ao Workspace',
 
     // Mode tab
@@ -512,7 +518,8 @@ export default {
     workspaceNamePlaceholder: 'Digite o nome do workspace',
     workspaceKey: 'Chave do Workspace',
     workspaceKeyPlaceholder: 'ex.: DEV, TEST, PROD',
-    workspaceKeyHelp: 'Usada como prefixo de itens (ex.: DEV-123). Apenas letras maiúsculas e números.',
+    workspaceKeyHelp:
+      'Usada como prefixo de itens (ex.: DEV-123). Apenas letras maiúsculas e números.',
     description: 'Descrição',
     descriptionPlaceholder: 'Descrição opcional para este workspace',
     defaultTimeProject: 'Projeto Padrão de Controle de Tempo',
@@ -548,7 +555,8 @@ export default {
     changeAvatar: 'Alterar Avatar',
     uploadAvatar: 'Enviar Avatar',
     attachmentsRequired: 'Os anexos devem estar habilitados para enviar ícones do workspace',
-    uploadRecommendation: 'Recomendado: Imagens quadradas, pelo menos 256x256 pixels para melhor qualidade',
+    uploadRecommendation:
+      'Recomendado: Imagens quadradas, pelo menos 256x256 pixels para melhor qualidade',
     avatarOrIconNote:
       'Você pode usar uma imagem de avatar personalizada ou a combinação de ícone e cor acima.',
     uploading: 'Enviando...',
@@ -590,7 +598,8 @@ export default {
     failedToSave: 'Falha ao salvar configurações do workspace: {error}',
     deletedSuccessfully: 'Workspace "{name}" excluído com sucesso',
     failedToDelete: 'Falha ao excluir workspace: {error}',
-    pleaseConfirmDeletion: 'Por favor, digite o nome do workspace exatamente como mostrado para confirmar a exclusão',
+    pleaseConfirmDeletion:
+      'Por favor, digite o nome do workspace exatamente como mostrado para confirmar a exclusão',
     pleaseSelectImage: 'Por favor, selecione um arquivo de imagem',
     failedToUploadAvatar: 'Falha ao enviar avatar: {error}',
   },

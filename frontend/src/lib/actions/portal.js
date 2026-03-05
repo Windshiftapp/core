@@ -3,6 +3,6 @@ export function portal(node, target = document.body) {
   return {
     destroy() {
       node.remove();
-    }
+    },
   };
 }

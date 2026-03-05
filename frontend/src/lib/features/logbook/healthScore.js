@@ -8,7 +8,10 @@ export function computeDocumentHealth(doc) {
   if (!doc) return null;
 
   // Health only applies to knowledge and correspondence
-  if (!doc.content_type || (doc.content_type !== 'knowledge' && doc.content_type !== 'correspondence')) {
+  if (
+    !doc.content_type ||
+    (doc.content_type !== 'knowledge' && doc.content_type !== 'correspondence')
+  ) {
     return null;
   }
 

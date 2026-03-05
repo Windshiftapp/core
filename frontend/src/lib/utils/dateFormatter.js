@@ -2,8 +2,9 @@
  * Date formatting utilities
  * Centralized date formatting functions to avoid duplication across components
  */
-import { serverNow } from './serverClock.js';
+
 import { i18n } from '../stores/i18n.svelte.js';
+import { serverNow } from './serverClock.js';
 
 /**
  * Get the app's current locale for date formatting.
@@ -363,7 +364,7 @@ export function formatDateTimeSimple(dateString) {
   if (!dateString) return '';
   try {
     const date = dateString instanceof Date ? dateString : new Date(dateString);
-    return date.toLocaleDateString(getAppLocale()) + ' ' + date.toLocaleTimeString(getAppLocale());
+    return `${date.toLocaleDateString(getAppLocale())} ${date.toLocaleTimeString(getAppLocale())}`;
   } catch (error) {
     console.error('Error formatting datetime:', error);
     return '';

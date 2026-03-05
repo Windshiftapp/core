@@ -168,7 +168,8 @@ export default {
     clientSecretRequired: 'O Client Secret do OAuth é obrigatório',
     leaveBlankToKeep: 'Deixe em branco para manter o existente',
     tenantId: 'Tenant ID',
-    tenantIdHelp: 'Use "common" para permitir qualquer conta Microsoft, ou insira um Tenant ID específico',
+    tenantIdHelp:
+      'Use "common" para permitir qualquer conta Microsoft, ou insira um Tenant ID específico',
     connected: 'Conectado',
     reconnect: 'Reconectar',
     notConnected: 'Não Conectado',
@@ -407,7 +408,8 @@ export default {
         'Envie um logo para exibir no cabeçalho do portal. Se não definido, o logo do hub será usado como alternativa.',
       // Seção de relatórios de ativos
       assetReports: 'Relatórios de Ativos',
-      assetReportsDescription: 'Configure relatórios de ativos que os usuários do portal podem visualizar.',
+      assetReportsDescription:
+        'Configure relatórios de ativos que os usuários do portal podem visualizar.',
       noAssetReports: 'Nenhum relatório de ativos configurado ainda.',
       addAssetReport: 'Adicionar Relatório de Ativos',
     },
@@ -519,7 +521,8 @@ export default {
     backToHub: 'Voltar ao Hub',
     customizeHub: 'Personalizar Hub',
     sections: 'Seções',
-    sectionsHelp: 'Organize portais em seções. Arraste portais entre seções na visualização principal.',
+    sectionsHelp:
+      'Organize portais em seções. Arraste portais entre seções na visualização principal.',
     addSection: 'Adicionar Seção',
     noPortals: 'Nenhum portal disponível ainda',
     noDescription: 'Sem descrição',
