@@ -305,6 +305,7 @@ func main() {
 		LLMEndpoint:         llmEndpoint,
 		LLMProvidersFile:    llmProvidersFile,
 		LogbookEndpoint:     logbookEndpoint,
+		SSHEnabled:          enableSSH,
 		FrontendFiles:       frontendFiles,
 		ShutdownChan:        shutdownChan,
 	}

@@ -10,11 +10,12 @@ import (
 // FeaturesHandler handles the feature discovery endpoint.
 type FeaturesHandler struct {
 	pluginManager *plugins.Manager
+	sshEnabled    bool
 }
 
 // NewFeaturesHandler creates a new features handler.
-func NewFeaturesHandler(pluginManager *plugins.Manager) *FeaturesHandler {
-	return &FeaturesHandler{pluginManager: pluginManager}
+func NewFeaturesHandler(pluginManager *plugins.Manager, sshEnabled bool) *FeaturesHandler {
+	return &FeaturesHandler{pluginManager: pluginManager, sshEnabled: sshEnabled}
 }
 
 // FeaturesResponse represents the available features and installed plugins.
@@ -23,6 +24,7 @@ type FeaturesResponse struct {
 	SAMLAvailable bool     `json:"saml_available"`
 	LDAPAvailable bool     `json:"ldap_available"`
 	SCIMAvailable bool     `json:"scim_available"`
+	SSHAvailable  bool     `json:"ssh_available"`
 	Plugins       []string `json:"plugins"`
 }
 
@@ -33,6 +35,7 @@ func (h *FeaturesHandler) GetFeatures(w http.ResponseWriter, r *http.Request) {
 		SAMLAvailable: true,
 		LDAPAvailable: true,
 		SCIMAvailable: true,
+		SSHAvailable:  h.sshEnabled,
 		Plugins:       make([]string, 0),
 	}
 

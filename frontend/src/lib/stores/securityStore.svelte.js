@@ -20,6 +20,9 @@ class SecurityStore {
   apiTokens = $state([]);
   tokensLoading = $state(false);
 
+  // === Features ===
+  sshAvailable = $state(false);
+
   // === Enrollment Banner ===
   showEnrollmentBanner = $state(false);
   enrollmentType = $state('');
@@ -73,6 +76,7 @@ class SecurityStore {
     if (userId && !this.initialized) {
       this.currentUserId = userId;
       this.initialized = true;
+      this.loadFeatures();
       this.loadUserProfile();
       this.loadCredentials();
       this.loadApiTokens();
@@ -103,6 +107,18 @@ class SecurityStore {
   }
 
   // === Data Loading ===
+
+  async loadFeatures() {
+    try {
+      const resp = await fetch('/api/features');
+      if (resp.ok) {
+        const data = await resp.json();
+        this.sshAvailable = data.ssh_available || false;
+      }
+    } catch (err) {
+      console.warn('Failed to load features:', err);
+    }
+  }
 
   async loadUserProfile() {
     if (!this.currentUserId) return;
@@ -405,6 +421,7 @@ class SecurityStore {
     this.credentialsLoading = false;
     this.apiTokens = [];
     this.tokensLoading = false;
+    this.sshAvailable = false;
     this.showEnrollmentBanner = false;
     this.enrollmentType = '';
     this.showAddCredential = false;

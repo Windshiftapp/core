@@ -17,12 +17,14 @@ import (
 type CredentialHandler struct {
 	db                database.Database
 	permissionService *services.PermissionService
+	sshEnabled        bool
 }
 
-func NewCredentialHandler(db database.Database, permissionService *services.PermissionService) *CredentialHandler {
+func NewCredentialHandler(db database.Database, permissionService *services.PermissionService, sshEnabled bool) *CredentialHandler {
 	return &CredentialHandler{
 		db:                db,
 		permissionService: permissionService,
+		sshEnabled:        sshEnabled,
 	}
 }
 
@@ -142,6 +144,11 @@ func (h *CredentialHandler) GetUserCredentials(w http.ResponseWriter, r *http.Re
 
 // CreateSSHKey adds an SSH public key for a user
 func (h *CredentialHandler) CreateSSHKey(w http.ResponseWriter, r *http.Request) {
+	if !h.sshEnabled {
+		respondBadRequest(w, r, "SSH is not enabled on this server")
+		return
+	}
+
 	userID, err := strconv.Atoi(r.PathValue("userId"))
 	if err != nil {
 		respondInvalidID(w, r, "userId")
