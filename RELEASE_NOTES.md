@@ -10,6 +10,10 @@
 
 ---
 
+## New Features
+
+- **New `--base-url` CLI flag.** `BASE_URL` can now be set via the `--base-url` command-line flag in addition to the existing environment variable. The CLI flag takes precedence, matching the behavior of all other server settings like `--allowed-hosts` and `--use-proxy`.
+
 ## Bug Fixes
 
 - **`ALLOWED_HOSTS` environment variable now works correctly.** The `ALLOWED_HOSTS` env var was documented but silently ignored because the environment read happened after `BASE_URL` had already populated the value. It is now read at the correct point so that the intended priority order is respected:

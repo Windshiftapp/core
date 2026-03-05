@@ -100,6 +100,7 @@ func main() {
 	var allowedHosts string
 	var allowedPort string
 	var useProxy bool
+	var baseURL string
 	var additionalProxies string
 	var enableSSH bool
 	var sshPort string
@@ -124,6 +125,7 @@ func main() {
 	flag.StringVar(&allowedHosts, "allowed-hosts", "", "Comma-separated list of allowed hostnames for CSRF (e.g., 192.168.1.30,myserver.local)")
 	flag.StringVar(&allowedPort, "allowed-port", "", "Port for CORS/WebAuthn trusted origins (defaults to server port, useful for reverse proxy setups)")
 	flag.BoolVar(&useProxy, "use-proxy", false, "Enable proxy mode: trust X-Forwarded-Proto from private IPs. WARNING: Only enable when behind a reverse proxy that terminates TLS. Server must NOT be directly accessible from the internet.")
+	flag.StringVar(&baseURL, "base-url", "", "Public URL for the server (used for email links, SSO redirects, calendar feeds)")
 	flag.StringVar(&additionalProxies, "additional-proxies", "", "Additional proxy IPs to trust beyond private ranges (requires --use-proxy)")
 	flag.BoolVar(&enableSSH, "ssh", false, "Enable SSH TUI server")
 	flag.StringVar(&sshPort, "ssh-port", "23234", "Port to run the SSH server on")
@@ -207,7 +209,9 @@ func main() {
 	}
 
 	// Parse BASE_URL to derive allowed-hosts and allowed-port
-	baseURL := os.Getenv("BASE_URL")
+	if baseURL == "" {
+		baseURL = os.Getenv("BASE_URL")
+	}
 	if baseURL == "" {
 		baseURL = os.Getenv("PUBLIC_URL")
 	}
