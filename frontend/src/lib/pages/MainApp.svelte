@@ -768,8 +768,8 @@
 
     <!-- Main Content Area with Sidebar Layout -->
     <div
-      class="flex flex-1 transition-transform duration-200 ease-out {!$uiStore.reviewFullscreen ? 'ml-16' : ''}"
-      style={!$uiStore.reviewFullscreen ? `transform: translateX(${$uiStore.navExpanded ? '136px' : '0px'})` : ''}
+      class="flex flex-1 transition-[margin] duration-200 ease-out"
+      style={!$uiStore.reviewFullscreen ? `margin-left: ${$uiStore.navExpanded ? '200px' : '64px'}` : ''}
     >
       <!-- Left Sidebar for Workspace/Admin Navigation (hidden in board mode) -->
       {#if !$uiStore.reviewFullscreen && $currentRoute.view !== 'workspaces' && $currentWorkspace && $currentWorkspace.display_mode !== 'board' && (isWorkspaceRoute($currentRoute.view) || effectiveView === 'personal-task-detail' || testViews.has($currentRoute.view))}
