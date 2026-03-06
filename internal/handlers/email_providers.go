@@ -171,6 +171,14 @@ func (h *EmailProviderHandler) CreateEmailProvider(w http.ResponseWriter, r *htt
 		req.IMAPPort = 993
 	}
 
+	// Check uniqueness before insert
+	var slugExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM email_providers WHERE slug = ?)", req.Slug).Scan(&slugExists)
+	if slugExists {
+		respondConflict(w, r, "A provider with this slug already exists")
+		return
+	}
+
 	// Insert provider
 	var id int64
 	err := h.db.QueryRow(`
@@ -186,7 +194,7 @@ func (h *EmailProviderHandler) CreateEmailProvider(w http.ResponseWriter, r *htt
 		nullString(req.IMAPHost), req.IMAPPort, nullString(req.IMAPEncryption),
 	).Scan(&id)
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint") {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "A provider with this slug already exists")
 			return
 		}

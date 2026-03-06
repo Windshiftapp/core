@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS portal_customers (
 	phone TEXT,
 	user_id INTEGER,
 	customer_organisation_id INTEGER,
-	custom_field_values TEXT,
+	custom_field_values JSONB,
 	is_primary BOOLEAN DEFAULT false,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

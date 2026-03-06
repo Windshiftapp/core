@@ -56,8 +56,6 @@ func RegisterUserRoutes(deps *Deps) {
 	api.HandleH("DELETE /users/{userId}/workspaces/{workspaceId}/roles/{roleId}", admin(http.HandlerFunc(deps.Users.WorkspaceRole.RevokeRoleFromUser)))
 	api.HandleH("GET /users/{userId}/workspaces/{workspaceId}/roles", admin(http.HandlerFunc(deps.Users.WorkspaceRole.GetUserRolesInWorkspace)))
 	api.HandleH("GET /workspaces/{workspaceId}/role-assignments", admin(http.HandlerFunc(deps.Users.WorkspaceRole.GetWorkspaceRoleAssignments)))
-	api.HandleH("GET /workspaces/{workspaceId}/everyone-role", admin(http.HandlerFunc(deps.Users.WorkspaceRole.GetEveryoneRole)))
-	api.HandleH("PUT /workspaces/{workspaceId}/everyone-role", admin(http.HandlerFunc(deps.Users.WorkspaceRole.SetEveryoneRole)))
 
 	// User Credential endpoints
 	api.HandleH("GET /users/{userId}/credentials", auth(http.HandlerFunc(deps.Users.Credential.GetUserCredentials)))

@@ -272,7 +272,7 @@ func (h *ItemHandler) UpdateFracIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update the item's frac_index
-	err = services.UpdateItemFracIndex(h.db.GetDB(), id, newFracIndex)
+	err = services.UpdateItemFracIndex(h.db, id, newFracIndex)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

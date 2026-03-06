@@ -277,6 +277,23 @@ func (p *PostgresDB) Initialize() error {
 				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='active_timers' AND column_name='user_id'",
 				alter: "ALTER TABLE active_timers ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE",
 			},
+			// Migrate custom_field_values from TEXT to JSONB for proper JSON querying
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='items' AND column_name='custom_field_values' AND data_type='jsonb'",
+				alter: "ALTER TABLE items ALTER COLUMN custom_field_values TYPE JSONB USING custom_field_values::jsonb",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='assets' AND column_name='custom_field_values' AND data_type='jsonb'",
+				alter: "ALTER TABLE assets ALTER COLUMN custom_field_values TYPE JSONB USING custom_field_values::jsonb",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='portal_customers' AND column_name='custom_field_values' AND data_type='jsonb'",
+				alter: "ALTER TABLE portal_customers ALTER COLUMN custom_field_values TYPE JSONB USING custom_field_values::jsonb",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='customer_organisations' AND column_name='custom_field_values' AND data_type='jsonb'",
+				alter: "ALTER TABLE customer_organisations ALTER COLUMN custom_field_values TYPE JSONB USING custom_field_values::jsonb",
+			},
 		}
 
 		for _, m := range pgMigrations {
@@ -384,6 +401,11 @@ func (p *PostgresDB) Initialize() error {
 			if _, err = p.db.Exec(ldapContent); err != nil {
 				slog.Warn("LDAP postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 			}
+		}
+
+		// Drop workspace_everyone_roles table (permissions now derived from role assignments)
+		if _, err = p.db.Exec(`DROP TABLE IF EXISTS workspace_everyone_roles`); err != nil {
+			slog.Warn("workspace_everyone_roles drop failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
 		return nil

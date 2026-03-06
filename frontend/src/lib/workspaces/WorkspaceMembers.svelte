@@ -19,12 +19,9 @@
 
   let members = [];
   let roles = [];
-  let everyoneRole = null; // { role_id, role_name, source }
-  let everyoneRoleValue = '';
   let loading = true;
-  let updatingEveryone = false;
-let error = null;
-const defaultRoleOrder = ['Viewer', 'Editor', 'Administrator', 'Tester'];
+  let error = null;
+  const defaultRoleOrder = ['Viewer', 'Editor', 'Tester', 'Administrator'];
 
   // Add member modal state
   let showModal = false;
@@ -50,15 +47,12 @@ const defaultRoleOrder = ['Viewer', 'Editor', 'Administrator', 'Tester'];
     loading = true;
     error = null;
     try {
-      const [membersData, rolesData, everyoneData] = await Promise.all([
+      const [membersData, rolesData] = await Promise.all([
         api.workspaceRoles.getWorkspaceAssignments(workspaceIdNum),
-        api.workspaceRoles.getAll(),
-        api.workspaceRoles.getEveryoneRole(workspaceIdNum)
+        api.workspaceRoles.getAll()
       ]);
       members = membersData || [];
       roles = rolesData || [];
-      everyoneRole = everyoneData || null;
-      everyoneRoleValue = everyoneRole?.role_id ?? '';
     } catch (err) {
       console.error('Failed to load workspace members:', err);
       error = err.message || 'Failed to load workspace members';
@@ -119,35 +113,6 @@ const defaultRoleOrder = ['Viewer', 'Editor', 'Administrator', 'Tester'];
     }
   }
 
-  function getRoleName(roleId) {
-    const role = roles.find(r => r.id === roleId);
-    return role?.name || 'Unknown';
-  }
-
-  function getEveryoneLabel() {
-    if (!everyoneRole) return 'Viewer (default)';
-    if (everyoneRole.role_id === null || everyoneRole.role_id === undefined) return 'No access (locked)';
-    return everyoneRole.role_name || getRoleName(everyoneRole.role_id) || 'Viewer';
-  }
-
-  async function setEveryoneRole(roleId) {
-    try {
-      updatingEveryone = true;
-      const workspaceIdNum = Number(workspaceId);
-      await api.workspaceRoles.setEveryoneRole(workspaceIdNum, { role_id: roleId });
-      const updated = await api.workspaceRoles.getEveryoneRole(workspaceIdNum);
-      everyoneRole = updated;
-      everyoneRoleValue = updated?.role_id ?? '';
-      // Refresh members to update viewer cascade display
-      await loadData();
-    } catch (err) {
-      console.error('Failed to update Everyone role:', err);
-      alert(`Failed to update Everyone role: ${err.message || err}`);
-    } finally {
-      updatingEveryone = false;
-    }
-  }
-
   function getRoleBadgeStyle(roleId) {
     const role = roles.find(r => r.id === roleId);
     if (!role) return 'background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);';
@@ -169,6 +134,36 @@ const defaultRoleOrder = ['Viewer', 'Editor', 'Administrator', 'Tester'];
     showModal = false;
     selectedUserId = null;
     selectedRoleId = null;
+  }
+
+  // Derive effective access from member assignments using the hierarchy:
+  // Viewer -> Editor -> Tester. Admin always requires explicit assignment.
+  // A role with no explicit members means "Everyone" has that access,
+  // but only if the parent role in the hierarchy is also open.
+  function getEffectiveAccess(roleName, roleMembers) {
+    const viewerMembers = members.filter(m => m.roles.some(r => r.role_name === 'Viewer'));
+    const editorMembers = members.filter(m => m.roles.some(r => r.role_name === 'Editor'));
+    const testerMembers = members.filter(m => m.roles.some(r => r.role_name === 'Tester'));
+
+    const viewerOpen = viewerMembers.length === 0;
+    const editorOpen = editorMembers.length === 0;
+    const testerOpen = testerMembers.length === 0;
+
+    if (roleMembers.length > 0) {
+      return { type: 'members', count: roleMembers.length };
+    }
+
+    if (roleName === 'Viewer') {
+      return viewerOpen ? { type: 'everyone' } : { type: 'none' };
+    }
+    if (roleName === 'Editor') {
+      return viewerOpen && editorOpen ? { type: 'everyone' } : { type: 'none' };
+    }
+    if (roleName === 'Tester') {
+      return viewerOpen && editorOpen && testerOpen ? { type: 'everyone' } : { type: 'none' };
+    }
+    // Administrator: never implicit
+    return { type: 'none' };
   }
 
   // DataTable columns
@@ -245,7 +240,7 @@ const defaultRoleOrder = ['Viewer', 'Editor', 'Administrator', 'Tester'];
       <div>
         <h3 class="text-sm font-semibold" style="color: var(--ds-text);">Summary</h3>
         <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-          Shows effective role assignments for this workspace. Viewers have access to all content; higher roles inherit Viewer permissions.
+          Shows effective role assignments for this workspace. Roles without explicit members are open to everyone. Hierarchy: Viewer &rarr; Editor &rarr; Tester.
         </p>
       </div>
     </div>
@@ -264,40 +259,27 @@ const defaultRoleOrder = ['Viewer', 'Editor', 'Administrator', 'Tester'];
             {#if roles.find(r => r.name === roleName)}
               {@const role = roles.find(r => r.name === roleName)}
               {@const roleMembers = members.filter((m) => m.roles.some(r => r.role_name === roleName))}
-              {@const hasExplicitMembers = roleMembers.length > 0}
-              {@const isEveryoneRole = everyoneRoleValue && String(everyoneRoleValue) === String(role.id)}
-              {@const viewerRole = roles.find((r) => r.name === 'Viewer')}
-              {@const everyoneIsViewer = everyoneRoleValue && viewerRole && String(everyoneRoleValue) === String(viewerRole.id)}
-              {@const viewerMembers = members.filter((m) => m.roles.some(r => r.role_name === 'Viewer'))}
-              {@const hasViewers = viewerMembers.length > 0}
+              {@const access = getEffectiveAccess(roleName, roleMembers)}
               <tr class="border-t" style="border-color: var(--ds-border);">
                 <td class="px-6 py-4">
                   <div class="font-medium" style="color: var(--ds-text);">{roleName}</div>
                   <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">{role.description}</div>
                 </td>
                 <td class="px-6 py-4">
-                  {#if hasExplicitMembers}
+                  {#if access.type === 'members'}
                     <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs" style="background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue);">
-                      {roleMembers.length} {roleMembers.length === 1 ? 'member' : 'members'}
+                      {access.count} {access.count === 1 ? 'member' : 'members'}
                     </span>
-                  {:else if isEveryoneRole}
+                  {:else if access.type === 'everyone'}
                     <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs" style="background-color: var(--ds-background-accent-green-subtler); color: var(--ds-accent-green);">
-                      Everyone (default)
-                    </span>
-                  {:else if hasViewers && roleName !== 'Viewer'}
-                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs" style="background-color: var(--ds-background-accent-green-subtler); color: var(--ds-accent-green);">
-                      All Viewers
-                    </span>
-                  {:else if everyoneIsViewer && roleName !== 'Viewer'}
-                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs" style="background-color: var(--ds-background-accent-green-subtler); color: var(--ds-accent-green);">
-                      Everyone (default)
+                      Everyone
                     </span>
                   {:else}
-                    <span class="text-xs" style="color: var(--ds-text-subtle);">—</span>
+                    <span class="text-xs" style="color: var(--ds-text-subtle);">&mdash;</span>
                   {/if}
                 </td>
                 <td class="px-6 py-4">
-                  {#if hasExplicitMembers}
+                  {#if roleMembers.length > 0}
                     <div class="flex flex-wrap gap-2">
                       {#each roleMembers as member}
                         <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs" style="background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue);">

@@ -466,8 +466,16 @@ func (h *CalendarFeedHandler) getAccessibleWorkspaceIDs(userID int) ([]int, erro
 		      SELECT 1 FROM user_workspace_roles uwr
 		      WHERE uwr.workspace_id = w.id AND uwr.user_id = ?
 		    )
-		    -- Or workspace has "everyone" role
-		    OR w.everyone_role_id IS NOT NULL
+		    -- Or workspace has no explicit Viewer assignments (open to everyone)
+		    OR NOT EXISTS (
+		      SELECT 1 FROM user_workspace_roles uwr
+		      JOIN workspace_roles wr ON uwr.role_id = wr.id
+		      WHERE uwr.workspace_id = w.id AND wr.name = 'Viewer'
+		      UNION
+		      SELECT 1 FROM group_workspace_roles gwr
+		      JOIN workspace_roles wr ON gwr.role_id = wr.id
+		      WHERE gwr.workspace_id = w.id AND wr.name = 'Viewer'
+		    )
 		  )
 	`, userID, userID)
 	if err != nil {

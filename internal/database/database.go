@@ -338,6 +338,11 @@ func (db *DB) Initialize() error {
 			slog.Warn("LDAP migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Drop workspace_everyone_roles table (permissions now derived from role assignments)
+		if _, err := db.Exec(`DROP TABLE IF EXISTS workspace_everyone_roles`); err != nil {
+			slog.Warn("workspace_everyone_roles drop failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
 		return nil
 	}
 
@@ -785,12 +790,14 @@ func (db *DB) initializeDefaultData() error {
 	return nil
 }
 
-// IsUniqueConstraintError checks if the error is a unique constraint violation
+// IsUniqueConstraintError checks if the error is a unique constraint violation (SQLite + PostgreSQL)
 func IsUniqueConstraintError(err error) bool {
 	if err == nil {
 		return false
 	}
-	return strings.Contains(err.Error(), "UNIQUE constraint failed")
+	errStr := strings.ToLower(err.Error())
+	return strings.Contains(errStr, "unique constraint") ||
+		strings.Contains(errStr, "duplicate key")
 }
 
 // EnsureDefaultNotificationSettings creates default notification settings if they don't exist

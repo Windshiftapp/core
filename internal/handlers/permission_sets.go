@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"windshift/internal/database"
@@ -627,8 +626,7 @@ func (h *PermissionSetHandler) CreateAssignment(w http.ResponseWriter, r *http.R
 
 	if err != nil {
 		// Check for unique constraint violation
-		errMsg := err.Error()
-		if strings.Contains(errMsg, "UNIQUE constraint") || strings.Contains(errMsg, "duplicate key") {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "This assignment already exists")
 			return
 		}

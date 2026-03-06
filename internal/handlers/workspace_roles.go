@@ -162,6 +162,14 @@ func (h *WorkspaceRoleHandler) AssignRoleToUser(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// Count existing assignments for this role+workspace before the operation
+	var countBefore int
+	_ = readDB.QueryRow(`
+		SELECT COUNT(*) FROM user_workspace_roles WHERE workspace_id = ? AND role_id = ?
+		UNION ALL
+		SELECT COUNT(*) FROM group_workspace_roles WHERE workspace_id = ? AND role_id = ?
+	`, req.WorkspaceID, req.RoleID, req.WorkspaceID, req.RoleID).Scan(&countBefore)
+
 	// Insert or update role assignment
 	_, err = writeDB.Exec(`
 		INSERT INTO user_workspace_roles (user_id, workspace_id, role_id, granted_by, granted_at)
@@ -174,11 +182,16 @@ func (h *WorkspaceRoleHandler) AssignRoleToUser(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Invalidate cache for the user
+	// Invalidate cache: if this is the first assignment for this role+workspace,
+	// everyone's implicit access changed → full cache reset.
 	var warnings []models.APIWarning
 	if h.permissionService != nil {
-		if err := h.permissionService.OnUserPermissionChanged(req.UserID); err != nil {
-			warnings = append(warnings, createCacheWarning("permission", err, fmt.Sprintf("user_id:%d", req.UserID)))
+		if countBefore == 0 {
+			h.permissionService.OnEveryoneAccessChanged()
+		} else {
+			if err := h.permissionService.OnUserPermissionChanged(req.UserID); err != nil {
+				warnings = append(warnings, createCacheWarning("permission", err, fmt.Sprintf("user_id:%d", req.UserID)))
+			}
 		}
 	}
 
@@ -244,6 +257,13 @@ func (h *WorkspaceRoleHandler) RevokeRoleFromUser(w http.ResponseWriter, r *http
 		return
 	}
 
+	// Count existing assignments for this role+workspace before the operation
+	var countBefore int
+	_ = readDB.QueryRow(`
+		SELECT (SELECT COUNT(*) FROM user_workspace_roles WHERE workspace_id = ? AND role_id = ?)
+		     + (SELECT COUNT(*) FROM group_workspace_roles WHERE workspace_id = ? AND role_id = ?)
+	`, workspaceID, roleID, workspaceID, roleID).Scan(&countBefore)
+
 	result, err := writeDB.Exec(`
 		DELETE FROM user_workspace_roles
 		WHERE user_id = ? AND workspace_id = ? AND role_id = ?
@@ -260,11 +280,17 @@ func (h *WorkspaceRoleHandler) RevokeRoleFromUser(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Invalidate cache for the user
+	// Invalidate cache: if this was the last assignment for this role+workspace,
+	// everyone's implicit access changed → full cache reset.
 	var warnings []models.APIWarning
 	if h.permissionService != nil {
-		if err := h.permissionService.OnUserPermissionChanged(userID); err != nil {
-			warnings = append(warnings, createCacheWarning("permission", err, fmt.Sprintf("user_id:%d", userID)))
+		if countBefore == 1 {
+			// Was the only assignment, now removed → role becomes open to everyone
+			h.permissionService.OnEveryoneAccessChanged()
+		} else {
+			if err := h.permissionService.OnUserPermissionChanged(userID); err != nil {
+				warnings = append(warnings, createCacheWarning("permission", err, fmt.Sprintf("user_id:%d", userID)))
+			}
 		}
 	}
 
@@ -464,170 +490,6 @@ func (h *WorkspaceRoleHandler) GetWorkspaceRoleAssignments(w http.ResponseWriter
 	_ = json.NewEncoder(w).Encode(users)
 }
 
-type everyoneRoleResponse struct {
-	WorkspaceID int     `json:"workspace_id"`
-	RoleID      *int    `json:"role_id,omitempty"`
-	RoleName    *string `json:"role_name,omitempty"`
-	Source      string  `json:"source"` // explicit or default
-}
-
-// GetEveryoneRole returns the role assigned to the implicit Everyone principal for a workspace.
-func (h *WorkspaceRoleHandler) GetEveryoneRole(w http.ResponseWriter, r *http.Request) {
-	db, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	var storedRole sql.NullInt64
-	err = db.QueryRow(`
-		SELECT role_id FROM workspace_everyone_roles WHERE workspace_id = ?
-	`, workspaceID).Scan(&storedRole)
-
-	if err != nil && err != sql.ErrNoRows {
-		respondInternalError(w, r, fmt.Errorf("failed to load Everyone role: %w", err))
-		return
-	}
-
-	// Default: implicit Viewer
-	if err == sql.ErrNoRows {
-		var viewerRole *models.WorkspaceRole
-		viewerRole, err = h.getViewerRole()
-		if err != nil {
-			respondInternalError(w, r, fmt.Errorf("failed to load Viewer role: %w", err))
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(everyoneRoleResponse{
-			WorkspaceID: workspaceID,
-			RoleID:      &viewerRole.ID,
-			RoleName:    &viewerRole.Name,
-			Source:      "default",
-		})
-		return
-	}
-
-	// Explicit assignment (role present or explicitly removed)
-	if !storedRole.Valid {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(everyoneRoleResponse{
-			WorkspaceID: workspaceID,
-			Source:      "explicit",
-		})
-		return
-	}
-
-	role, err := h.getWorkspaceRoleByID(int(storedRole.Int64))
-	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to load role %d: %w", storedRole.Int64, err))
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(everyoneRoleResponse{
-		WorkspaceID: workspaceID,
-		RoleID:      &role.ID,
-		RoleName:    &role.Name,
-		Source:      "explicit",
-	})
-}
-
-type setEveryoneRoleRequest struct {
-	RoleID *int `json:"role_id"` // null -> remove Everyone access
-}
-
-// SetEveryoneRole assigns or removes the Everyone role for a workspace.
-func (h *WorkspaceRoleHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Request) {
-	writeDB, ok := h.requireWriteDB(w, r)
-	if !ok {
-		return
-	}
-
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	var req setEveryoneRoleRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
-		return
-	}
-
-	granterID := h.getSessionUserID(r)
-	if granterID == 0 {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	var roleValue sql.NullInt64
-	var roleName *string
-
-	if req.RoleID != nil {
-		var role *models.WorkspaceRole
-		role, err = h.getWorkspaceRoleByID(*req.RoleID)
-		if err != nil {
-			respondNotFound(w, r, "role")
-			return
-		}
-		roleValue = sql.NullInt64{Int64: int64(*req.RoleID), Valid: true}
-		roleName = &role.Name
-	} else {
-		// Removing Everyone role: ensure at least one viewer-equivalent assignment remains
-		// (unless the user is a system admin, who always has implicit access)
-		skipViewerCheck := false
-		if h.permissionService != nil {
-			var isAdmin bool
-			isAdmin, err = h.permissionService.IsSystemAdmin(granterID)
-			if err == nil && isAdmin {
-				skipViewerCheck = true
-			}
-		}
-
-		if !skipViewerCheck {
-			var hasViewer bool
-			hasViewer, err = h.hasWorkspaceViewerAssignment(workspaceID)
-			if err != nil {
-				respondInternalError(w, r, fmt.Errorf("failed to validate workspace access: %w", err))
-				return
-			}
-			if !hasViewer {
-				respondValidationError(w, r, "Cannot remove Everyone role without another viewer for the workspace")
-				return
-			}
-		}
-		roleValue = sql.NullInt64{Valid: false}
-	}
-
-	_, err = writeDB.Exec(`
-		INSERT INTO workspace_everyone_roles (workspace_id, role_id, granted_by, granted_at)
-		VALUES (?, ?, ?, ?)
-		ON CONFLICT(workspace_id) DO UPDATE SET role_id=excluded.role_id, granted_by=excluded.granted_by, granted_at=excluded.granted_at
-	`, workspaceID, roleValue, granterID, time.Now())
-	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to update Everyone role: %w", err))
-		return
-	}
-
-	if h.permissionService != nil {
-		h.permissionService.OnEveryoneRoleChanged()
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(everyoneRoleResponse{
-		WorkspaceID: workspaceID,
-		RoleID:      utils.NullInt64ToPtr(roleValue),
-		RoleName:    roleName,
-		Source:      "explicit",
-	})
-}
-
 func (h *WorkspaceRoleHandler) getWorkspaceRoleByID(roleID int) (*models.WorkspaceRole, error) {
 	db, err := h.getReadDB()
 	if err != nil {
@@ -643,47 +505,6 @@ func (h *WorkspaceRoleHandler) getWorkspaceRoleByID(roleID int) (*models.Workspa
 		return nil, err
 	}
 	return &role, nil
-}
-
-func (h *WorkspaceRoleHandler) getViewerRole() (*models.WorkspaceRole, error) {
-	db, err := h.getReadDB()
-	if err != nil {
-		return nil, err
-	}
-	var role models.WorkspaceRole
-	err = db.QueryRow(`
-		SELECT id, name, description, is_system, display_order, created_at, updated_at
-		FROM workspace_roles
-		WHERE name = ?
-		LIMIT 1
-	`, models.RoleViewer).Scan(&role.ID, &role.Name, &role.Description, &role.IsSystem, &role.DisplayOrder, &role.CreatedAt, &role.UpdatedAt)
-	if err != nil {
-		return nil, err
-	}
-	return &role, nil
-}
-
-// hasWorkspaceViewerAssignment returns true if any user/group has viewer-level access (item.view) in the workspace.
-func (h *WorkspaceRoleHandler) hasWorkspaceViewerAssignment(workspaceID int) (bool, error) {
-	db, err := h.getReadDB()
-	if err != nil {
-		return false, err
-	}
-	var exists bool
-	err = db.QueryRow(`
-		SELECT EXISTS(
-			SELECT 1 FROM user_workspace_roles uwr
-			JOIN role_permissions rp ON uwr.role_id = rp.role_id
-			JOIN permissions p ON rp.permission_id = p.id
-			WHERE uwr.workspace_id = ? AND p.permission_key = 'item.view'
-			UNION
-			SELECT 1 FROM group_workspace_roles gwr
-			JOIN role_permissions rp ON gwr.role_id = rp.role_id
-			JOIN permissions p ON rp.permission_id = p.id
-			WHERE gwr.workspace_id = ? AND p.permission_key = 'item.view'
-		)
-	`, workspaceID, workspaceID).Scan(&exists)
-	return exists, err
 }
 
 // getSessionUserID extracts user ID from session context

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/utils"
 )
@@ -220,6 +221,15 @@ func (h *AssetHandler) CreateAssetLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check uniqueness before insert
+	var linkExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM item_links WHERE link_type_id = ? AND source_type = 'asset' AND source_id = ? AND target_type = ? AND target_id = ?)",
+		req.LinkTypeID, assetID, req.TargetType, req.TargetID).Scan(&linkExists)
+	if linkExists {
+		respondConflict(w, r, "Link already exists")
+		return
+	}
+
 	now := time.Now()
 
 	var linkID int64
@@ -229,8 +239,7 @@ func (h *AssetHandler) CreateAssetLink(w http.ResponseWriter, r *http.Request) {
 	`, req.LinkTypeID, assetID, req.TargetType, req.TargetID, currentUser.ID, now).Scan(&linkID)
 
 	if err != nil {
-		// Check for unique constraint violation
-		if err.Error() == "UNIQUE constraint failed: item_links.link_type_id, item_links.source_type, item_links.source_id, item_links.target_type, item_links.target_id" {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "Link already exists")
 		} else {
 			respondInternalError(w, r, err)

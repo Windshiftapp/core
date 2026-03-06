@@ -162,15 +162,16 @@ func (h *TimeCustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Only set to true if it's actually missing from the request
 	// For now, we'll trust the frontend to send the correct value
 
-	// Serialize custom field values to JSON
-	var customFieldValuesJSON []byte
+	// Serialize custom field values to JSON (use *string so nil becomes SQL NULL for JSONB columns)
+	var customFieldValuesJSON *string
 	if len(c.CustomFieldValues) > 0 {
-		var err error
-		customFieldValuesJSON, err = json.Marshal(c.CustomFieldValues)
+		b, err := json.Marshal(c.CustomFieldValues)
 		if err != nil {
 			respondValidationError(w, r, "Invalid custom field values")
 			return
 		}
+		s := string(b)
+		customFieldValuesJSON = &s
 	}
 
 	now := time.Now()
@@ -228,15 +229,16 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	slog.Debug("updating customer", slog.Int("customer_id", id), slog.String("name", c.Name))
 
-	// Serialize custom field values to JSON
-	var customFieldValuesJSON []byte
+	// Serialize custom field values to JSON (use *string so nil becomes SQL NULL for JSONB columns)
+	var customFieldValuesJSON *string
 	if len(c.CustomFieldValues) > 0 {
-		var err error
-		customFieldValuesJSON, err = json.Marshal(c.CustomFieldValues)
+		b, err := json.Marshal(c.CustomFieldValues)
 		if err != nil {
 			respondValidationError(w, r, "Invalid custom field values")
 			return
 		}
+		s := string(b)
+		customFieldValuesJSON = &s
 	}
 
 	//nolint:misspell // "organisations" is intentional British spelling used throughout codebase

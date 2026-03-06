@@ -340,7 +340,7 @@ func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Reque
 		nullString(ghAppKeyEnc), nullString(req.GitHubAppInstallationID), nullInt64(req.GitHubOrgID),
 		req.Scopes, workspaceRestrictionMode).Scan(&id)
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "duplicate key") {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "Provider with this slug already exists")
 			return
 		}
@@ -491,7 +491,7 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 
 	_, err = h.db.Exec(query, args...)
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "duplicate key") {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "Provider with this slug already exists")
 			return
 		}
@@ -1379,7 +1379,7 @@ func (h *SCMProviderHandler) AddWorkspaceToProviderAllowlist(w http.ResponseWrit
 		VALUES (?, ?, ?)
 	`, providerID, req.WorkspaceID, createdBy)
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "duplicate key") {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "Workspace is already in the allowlist")
 			return
 		}

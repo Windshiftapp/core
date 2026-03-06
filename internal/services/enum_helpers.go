@@ -62,10 +62,15 @@ func ParseCustomFieldValues(s sql.NullString) map[string]interface{} {
 	return result
 }
 
-// MarshalCustomFieldValues converts a map to JSON bytes for storage
-func MarshalCustomFieldValues(values map[string]interface{}) ([]byte, error) {
+// MarshalCustomFieldValues converts a map to a JSON *string for storage (nil becomes SQL NULL for JSONB columns)
+func MarshalCustomFieldValues(values map[string]interface{}) (*string, error) {
 	if len(values) == 0 {
 		return nil, nil
 	}
-	return json.Marshal(values)
+	b, err := json.Marshal(values)
+	if err != nil {
+		return nil, err
+	}
+	s := string(b)
+	return &s, nil
 }

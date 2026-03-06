@@ -100,7 +100,7 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 	now := time.Now()
 
 	// Generate fractional index for manual ordering
-	fracIndex, err := GenerateFracIndexForNewItem(db.GetDB(), params.WorkspaceID, params.ParentID)
+	fracIndex, err := GenerateFracIndexForNewItem(db, params.WorkspaceID, params.ParentID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to generate frac_index: %w", err)
 	}

@@ -402,7 +402,7 @@ func NewIterationTypeConfig() EnumConfig {
 
 		CheckDependencies: func(db database.Database, id int) string {
 			var count int
-			if err := db.QueryRow("SELECT COUNT(*) FROM iterations WHERE iteration_type_id = ?", id).Scan(&count); err != nil {
+			if err := db.QueryRow("SELECT COUNT(*) FROM iterations WHERE type_id = ?", id).Scan(&count); err != nil {
 				slog.Error("dependency check failed", slog.Any("error", err), slog.String("table", "iterations"), slog.Int("id", id))
 				return "Unable to verify dependencies — please try again"
 			}
@@ -459,7 +459,7 @@ func NewHierarchyLevelConfig() EnumConfig {
 		},
 
 		// No CheckUnique - relies on DB UNIQUE constraint on `level` column
-		// isUniqueConstraintError will catch duplicates and return 409
+		// database.IsUniqueConstraintError will catch duplicates and return 409
 
 		CheckDependencies: func(db database.Database, id int) string {
 			var count int
@@ -525,7 +525,7 @@ func NewContactRoleConfig() EnumConfig {
 		},
 
 		// No CheckUnique - relies on DB UNIQUE constraint on `name` column
-		// isUniqueConstraintError will catch duplicates and return 409
+		// database.IsUniqueConstraintError will catch duplicates and return 409
 
 		BeforeUpdate: func(db database.Database, id int, entity interface{}) (bool, int, string) {
 			var isSystem bool

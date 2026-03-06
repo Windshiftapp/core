@@ -373,15 +373,16 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 		return
 	}
 
-	// Serialize custom field values to JSON
-	var customFieldValuesJSON []byte
+	// Serialize custom field values to JSON (use *string so nil becomes SQL NULL for JSONB columns)
+	var customFieldValuesJSON *string
 	if len(requestData.CustomFieldValues) > 0 {
-		var err error
-		customFieldValuesJSON, err = json.Marshal(requestData.CustomFieldValues)
+		b, err := json.Marshal(requestData.CustomFieldValues)
 		if err != nil {
 			respondBadRequest(w, r, "Invalid custom field values")
 			return
 		}
+		s := string(b)
+		customFieldValuesJSON = &s
 	}
 
 	// Insert the new portal customer
@@ -393,7 +394,7 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 	`, requestData.Name, requestData.Email, requestData.Phone, requestData.CustomerOrganisationID, requestData.IsPrimary, customFieldValuesJSON).Scan(&customerID)
 	if err != nil {
 		// Check for unique constraint violation on email
-		if strings.Contains(err.Error(), "UNIQUE constraint failed: portal_customers.email") || strings.Contains(err.Error(), "duplicate key") {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "A portal customer with this email address already exists")
 			return
 		}
@@ -566,14 +567,16 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 		return
 	}
 
-	// Serialize custom field values to JSON
-	var customFieldValuesJSON []byte
+	// Serialize custom field values to JSON (use *string so nil becomes SQL NULL for JSONB columns)
+	var customFieldValuesJSON *string
 	if len(requestData.CustomFieldValues) > 0 {
-		customFieldValuesJSON, err = json.Marshal(requestData.CustomFieldValues)
+		b, err := json.Marshal(requestData.CustomFieldValues)
 		if err != nil {
 			respondBadRequest(w, r, "Invalid custom field values")
 			return
 		}
+		s := string(b)
+		customFieldValuesJSON = &s
 	}
 
 	// Update the portal customer
@@ -586,7 +589,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 	_, err = h.db.ExecWrite(query, requestData.Name, requestData.Email, requestData.Phone, requestData.CustomerOrganisationID, requestData.IsPrimary, customFieldValuesJSON, customerID)
 	if err != nil {
 		// Check for unique constraint violation on email
-		if strings.Contains(err.Error(), "UNIQUE constraint failed: portal_customers.email") || strings.Contains(err.Error(), "duplicate key") {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "A portal customer with this email address already exists")
 			return
 		}

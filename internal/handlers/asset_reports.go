@@ -206,6 +206,14 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 		ar.DisplayOrder = maxOrder + 1
 	}
 
+	// Check uniqueness before insert
+	var nameExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM asset_reports WHERE name = ? AND channel_id = ?)", ar.Name, ar.ChannelID).Scan(&nameExists)
+	if nameExists {
+		respondConflict(w, r, "Asset report with this name already exists for this channel")
+		return
+	}
+
 	now := time.Now()
 	var id int64
 	err = h.db.QueryRow(`
@@ -215,7 +223,7 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 		serializeStringArray(ar.ColumnConfig), serializeIntArray(ar.VisibilityGroupIDs), serializeIntArray(ar.VisibilityOrgIDs), now, now).Scan(&id)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint") {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "Asset report with this name already exists for this channel")
 		} else {
 			respondInternalError(w, r, err)
@@ -323,6 +331,14 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check uniqueness before update
+	var nameExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM asset_reports WHERE name = ? AND channel_id = (SELECT channel_id FROM asset_reports WHERE id = ?) AND id != ?)", ar.Name, id, id).Scan(&nameExists)
+	if nameExists {
+		respondConflict(w, r, "Asset report with this name already exists for this channel")
+		return
+	}
+
 	now := time.Now()
 	_, err = h.db.ExecWrite(`
 		UPDATE asset_reports
@@ -333,7 +349,7 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 		serializeStringArray(ar.ColumnConfig), serializeIntArray(ar.VisibilityGroupIDs), serializeIntArray(ar.VisibilityOrgIDs), now, id)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint") {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "Asset report with this name already exists for this channel")
 		} else {
 			respondInternalError(w, r, err)

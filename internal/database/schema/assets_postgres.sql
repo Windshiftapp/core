@@ -226,7 +226,7 @@ CREATE TABLE IF NOT EXISTS assets (
 	title TEXT NOT NULL,
 	description TEXT,
 	asset_tag TEXT,
-	custom_field_values TEXT,
+	custom_field_values JSONB,
 	frac_index TEXT COLLATE "C",
 	created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -11,6 +11,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"windshift/internal/database"
 	"windshift/internal/services"
 	tests "windshift/tests"
 )
@@ -25,12 +26,13 @@ func TestFractionalIndexingStressTest(t *testing.T) {
 	server, _ := tests.StartTestServer(t, tests.GetDBType())
 	tests.CreateBearerToken(t, server)
 
-	// Open database connection
-	db, err := sql.Open("sqlite", server.DBPath)
+	// Open database connection via database wrapper for proper placeholder handling
+	dbWrapper, err := database.NewSQLiteDB(server.DBPath)
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
-	defer db.Close()
+	defer dbWrapper.Close()
+	db := dbWrapper.GetDB() // raw *sql.DB for direct queries
 
 	stats := &FracIndexStats{
 		ItemCreationTimes: []time.Duration{},
@@ -45,7 +47,7 @@ func TestFractionalIndexingStressTest(t *testing.T) {
 
 	// Phase 2: 10,000 random reranking operations
 	t.Run("Phase2_RerankingOperations", func(t *testing.T) {
-		testFrac_Phase2_RerankingOperations(t, server, db, stats)
+		testFrac_Phase2_RerankingOperations(t, server, db, dbWrapper, stats)
 	})
 
 	// Phase 3: Final Validation
@@ -184,7 +186,7 @@ func testFrac_Phase1_CreateItems(t *testing.T, server *tests.TestServer, db *sql
 }
 
 // testFrac_Phase2_RerankingOperations performs 10,000 random reranking operations
-func testFrac_Phase2_RerankingOperations(t *testing.T, server *tests.TestServer, db *sql.DB, stats *FracIndexStats) {
+func testFrac_Phase2_RerankingOperations(t *testing.T, server *tests.TestServer, db *sql.DB, dbWrapper database.Database, stats *FracIndexStats) {
 	t.Log("Phase 2: Performing 10,000 random reranking operations using fractional indexing")
 
 	const numReranks = 10000
@@ -271,7 +273,7 @@ func testFrac_Phase2_RerankingOperations(t *testing.T, server *tests.TestServer,
 		rerankTime := time.Since(startTime)
 
 		// Update the item
-		err = services.UpdateItemFracIndex(db, itemToMove.id, newFracIndex)
+		err = services.UpdateItemFracIndex(dbWrapper, itemToMove.id, newFracIndex)
 		if err != nil {
 			t.Errorf("Rerank operation %d failed to update frac_index: %v", i+1, err)
 			continue

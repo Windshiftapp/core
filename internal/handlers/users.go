@@ -223,6 +223,20 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		passwordHash = sql.NullString{String: string(hashedBytes), Valid: true}
 	}
 
+	// Check uniqueness before insert
+	var emailExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)", req.Email).Scan(&emailExists)
+	if emailExists {
+		respondConflict(w, r, "Email already exists")
+		return
+	}
+	var usernameExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE username = ?)", req.Username).Scan(&usernameExists)
+	if usernameExists {
+		respondConflict(w, r, "Username already exists")
+		return
+	}
+
 	now := time.Now()
 	var id int64
 	err := h.db.QueryRow(`
@@ -232,12 +246,8 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		nullableString(req.AvatarURL), passwordHash, req.Password == "", now, now).Scan(&id)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint failed: users.email") {
-			respondConflict(w, r, "Email already exists")
-			return
-		}
-		if strings.Contains(err.Error(), "UNIQUE constraint failed: users.username") {
-			respondConflict(w, r, "Username already exists")
+		if database.IsUniqueConstraintError(err) {
+			respondConflict(w, r, "Email or username already exists")
 			return
 		}
 		respondInternalError(w, r, err)
@@ -361,6 +371,20 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		language = "en"
 	}
 
+	// Check uniqueness before update
+	var emailExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE email = ? AND id != ?)", req.Email, id).Scan(&emailExists)
+	if emailExists {
+		respondConflict(w, r, "Email already exists")
+		return
+	}
+	var usernameExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE username = ? AND id != ?)", req.Username, id).Scan(&usernameExists)
+	if usernameExists {
+		respondConflict(w, r, "Username already exists")
+		return
+	}
+
 	now := time.Now()
 	_, err = h.db.ExecWrite(`
 		UPDATE users
@@ -370,12 +394,8 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		nullableString(req.AvatarURL), timezone, language, now, id)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint failed: users.email") {
-			respondConflict(w, r, "Email already exists")
-			return
-		}
-		if strings.Contains(err.Error(), "UNIQUE constraint failed: users.username") {
-			respondConflict(w, r, "Username already exists")
+		if database.IsUniqueConstraintError(err) {
+			respondConflict(w, r, "Email or username already exists")
 			return
 		}
 		respondInternalError(w, r, err)

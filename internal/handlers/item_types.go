@@ -203,6 +203,14 @@ func (h *ItemTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Check uniqueness before insert
+	var nameExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM item_types WHERE name = ?)", it.Name).Scan(&nameExists)
+	if nameExists {
+		respondConflict(w, r, "Item type with this name already exists")
+		return
+	}
+
 	now := time.Now()
 	var id int64
 	err := h.db.QueryRow(`
@@ -211,7 +219,7 @@ func (h *ItemTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	`, it.Name, it.Description, it.IsDefault, it.Icon, it.Color, it.HierarchyLevel, it.SortOrder, now, now).Scan(&id)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint") {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "Item type with this name already exists")
 		} else {
 			respondInternalError(w, r, err)
@@ -343,6 +351,14 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check uniqueness before update
+	var nameExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM item_types WHERE name = ? AND id != ?)", it.Name, id).Scan(&nameExists)
+	if nameExists {
+		respondConflict(w, r, "Item type with this name already exists")
+		return
+	}
+
 	now := time.Now()
 	_, err = h.db.ExecWrite(`
 		UPDATE item_types
@@ -351,7 +367,7 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	`, it.Name, it.Description, it.IsDefault, it.Icon, it.Color, it.HierarchyLevel, it.SortOrder, now, id)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint") {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "Item type with this name already exists")
 		} else {
 			respondInternalError(w, r, err)

@@ -188,6 +188,14 @@ func (h *ReviewHandler) CreateReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check uniqueness before insert
+	var reviewExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM reviews WHERE user_id = ? AND review_date = ? AND review_type = ?)", userID, req.ReviewDate, req.ReviewType).Scan(&reviewExists)
+	if reviewExists {
+		respondConflict(w, r, "Review already exists for this date and type")
+		return
+	}
+
 	// Insert review
 	var reviewID int64
 	err := h.db.QueryRow(`
@@ -196,7 +204,7 @@ func (h *ReviewHandler) CreateReview(w http.ResponseWriter, r *http.Request) {
 	`, userID, req.ReviewDate, req.ReviewType, req.ReviewData).Scan(&reviewID)
 
 	if err != nil {
-		if err.Error() == "UNIQUE constraint failed: reviews.user_id, reviews.review_date, reviews.review_type" {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "Review already exists for this date and type")
 		} else {
 			respondInternalError(w, r, err)

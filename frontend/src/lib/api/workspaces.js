@@ -49,12 +49,6 @@ export const workspaceRoles = {
   getAll: () => fetchAPI('/workspace-roles'),
   get: (id) => fetchAPI(`/workspace-roles/${id}`),
   getWorkspaceAssignments: (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/role-assignments`),
-  getEveryoneRole: (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/everyone-role`),
-  setEveryoneRole: (workspaceId, data) =>
-    fetchAPI(`/workspaces/${workspaceId}/everyone-role`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
   assignToUser: (data) =>
     fetchAPI('/workspace-roles/assign', {
       method: 'POST',

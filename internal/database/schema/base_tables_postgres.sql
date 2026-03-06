@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS customer_organisations (
 	description TEXT,
 	active BOOLEAN DEFAULT true,
 	avatar_url TEXT,
-	custom_field_values TEXT,
+	custom_field_values JSONB,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

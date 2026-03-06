@@ -11,9 +11,9 @@ type Evaluator struct {
 }
 
 // NewEvaluator creates a new QL evaluator
-func NewEvaluator(workspaceMap map[string]int) *Evaluator {
+func NewEvaluator(workspaceMap map[string]int, dbDriver string) *Evaluator {
 	return &Evaluator{
-		sqlGenerator: NewSQLGenerator(workspaceMap),
+		sqlGenerator: NewSQLGenerator(workspaceMap, dbDriver),
 	}
 }
 
@@ -53,9 +53,9 @@ type AssetEvaluator struct {
 }
 
 // NewAssetEvaluator creates a new QL evaluator for assets
-func NewAssetEvaluator(setMap, workspaceMap map[string]int) *AssetEvaluator {
+func NewAssetEvaluator(setMap, workspaceMap map[string]int, dbDriver string) *AssetEvaluator {
 	return &AssetEvaluator{
-		sqlGenerator: NewAssetSQLGenerator(setMap),
+		sqlGenerator: NewAssetSQLGenerator(setMap, dbDriver),
 		workspaceMap: workspaceMap,
 	}
 }

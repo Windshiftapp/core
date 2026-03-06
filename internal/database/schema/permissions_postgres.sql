@@ -122,17 +122,6 @@ CREATE TABLE IF NOT EXISTS group_workspace_roles (
 	UNIQUE(group_id, workspace_id, role_id)
 );
 
--- Everyone role assignment (applies to all authenticated users)
-CREATE TABLE IF NOT EXISTS workspace_everyone_roles (
-	workspace_id INTEGER PRIMARY KEY,
-	role_id INTEGER,
-	granted_by INTEGER,
-	granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-	FOREIGN KEY (role_id) REFERENCES workspace_roles(id) ON DELETE SET NULL,
-	FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL
-);
-
 CREATE INDEX IF NOT EXISTS idx_workspace_roles_name ON workspace_roles(name);
 CREATE INDEX IF NOT EXISTS idx_workspace_roles_display_order ON workspace_roles(display_order);
 CREATE INDEX IF NOT EXISTS idx_user_workspace_roles_user_id ON user_workspace_roles(user_id);

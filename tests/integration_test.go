@@ -180,7 +180,7 @@ func TestCustomFieldOperations(t *testing.T) {
 			"required":    true,
 		}
 
-		resp := MakeAuthRequest(t, server, http.MethodPut, fmt.Sprintf("/custom-fields/%d", textFieldID), updateData)
+		resp := MakeAuthRequest(t, server, http.MethodPut, fmt.Sprintf("/admin/custom-fields/%d", textFieldID), updateData)
 		defer resp.Body.Close()
 
 		AssertStatusCode(t, resp, http.StatusOK)
@@ -188,12 +188,12 @@ func TestCustomFieldOperations(t *testing.T) {
 
 	t.Run("DeleteCustomFields", func(t *testing.T) {
 		// Delete text field
-		resp1 := MakeAuthRequest(t, server, http.MethodDelete, fmt.Sprintf("/custom-fields/%d", textFieldID), nil)
+		resp1 := MakeAuthRequest(t, server, http.MethodDelete, fmt.Sprintf("/admin/custom-fields/%d", textFieldID), nil)
 		defer resp1.Body.Close()
 		AssertStatusCode(t, resp1, http.StatusNoContent)
 
 		// Delete select field
-		resp2 := MakeAuthRequest(t, server, http.MethodDelete, fmt.Sprintf("/custom-fields/%d", selectFieldID), nil)
+		resp2 := MakeAuthRequest(t, server, http.MethodDelete, fmt.Sprintf("/admin/custom-fields/%d", selectFieldID), nil)
 		defer resp2.Body.Close()
 		AssertStatusCode(t, resp2, http.StatusNoContent)
 	})

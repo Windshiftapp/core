@@ -203,6 +203,14 @@ func (h *GroupHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	createdBy := &currentUser.ID
 
+	// Check uniqueness before insert
+	var nameExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM groups WHERE name = ?)", req.Name).Scan(&nameExists)
+	if nameExists {
+		respondConflict(w, r, "Group name already exists")
+		return
+	}
+
 	now := time.Now()
 	var id int64
 	err := h.db.QueryRow(`
@@ -211,7 +219,7 @@ func (h *GroupHandler) Create(w http.ResponseWriter, r *http.Request) {
 	`, req.Name, req.Description, true, createdBy, now, now).Scan(&id)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "Group name already exists")
 			return
 		}
@@ -297,6 +305,14 @@ func (h *GroupHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check uniqueness before update
+	var nameExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM groups WHERE name = ? AND id != ?)", req.Name, id).Scan(&nameExists)
+	if nameExists {
+		respondConflict(w, r, "Group name already exists")
+		return
+	}
+
 	now := time.Now()
 	_, err = h.db.ExecWrite(`
 		UPDATE groups
@@ -305,7 +321,7 @@ func (h *GroupHandler) Update(w http.ResponseWriter, r *http.Request) {
 	`, req.Name, req.Description, req.IsActive, now, id)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "Group name already exists")
 			return
 		}

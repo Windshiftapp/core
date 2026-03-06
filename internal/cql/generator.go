@@ -15,43 +15,56 @@ type SQLGenerator struct {
 	aliasPrefix  string         // Prefix for table aliases ("" for outer, "inner_" for inner queries)
 	entityType   EntityType     // Type of entity being queried (item or asset)
 	setMap       map[string]int // Maps asset set names to IDs (for asset queries)
+	dbDriver     string         // Database driver name ("sqlite" or "postgres")
 }
 
 // NewSQLGenerator creates a new SQL generator for outer queries (work items)
-func NewSQLGenerator(workspaceMap map[string]int) *SQLGenerator {
+func NewSQLGenerator(workspaceMap map[string]int, dbDriver string) *SQLGenerator {
 	return &SQLGenerator{
 		workspaceMap: workspaceMap,
 		aliasPrefix:  "",
 		entityType:   EntityTypeItem,
+		dbDriver:     dbDriver,
 	}
 }
 
 // NewInnerSQLGenerator creates a new SQL generator for inner/nested queries (work items)
 // Uses "inner_" prefix for table aliases to avoid collision with outer query
-func NewInnerSQLGenerator(workspaceMap map[string]int) *SQLGenerator {
+func NewInnerSQLGenerator(workspaceMap map[string]int, dbDriver string) *SQLGenerator {
 	return &SQLGenerator{
 		workspaceMap: workspaceMap,
 		aliasPrefix:  "inner_",
 		entityType:   EntityTypeItem,
+		dbDriver:     dbDriver,
 	}
 }
 
 // NewAssetSQLGenerator creates a new SQL generator for asset queries
-func NewAssetSQLGenerator(setMap map[string]int) *SQLGenerator {
+func NewAssetSQLGenerator(setMap map[string]int, dbDriver string) *SQLGenerator {
 	return &SQLGenerator{
 		setMap:      setMap,
 		aliasPrefix: "",
 		entityType:  EntityTypeAsset,
+		dbDriver:    dbDriver,
 	}
 }
 
 // NewInnerAssetSQLGenerator creates a new SQL generator for inner asset queries
-func NewInnerAssetSQLGenerator(setMap map[string]int) *SQLGenerator {
+func NewInnerAssetSQLGenerator(setMap map[string]int, dbDriver string) *SQLGenerator {
 	return &SQLGenerator{
 		setMap:      setMap,
 		aliasPrefix: "inner_",
 		entityType:  EntityTypeAsset,
+		dbDriver:    dbDriver,
 	}
+}
+
+// jsonExtract returns the DB-appropriate expression for extracting a field from a JSON column.
+func (g *SQLGenerator) jsonExtract(column, field string) string {
+	if g.dbDriver == "postgres" {
+		return fmt.Sprintf("%s->>'%s'", column, field)
+	}
+	return fmt.Sprintf("json_extract(%s, '$.%s')", column, field)
 }
 
 // GenerateSQL converts a QL AST to SQL WHERE clause
@@ -237,6 +250,14 @@ func (g *SQLGenerator) generateComparison(node *ASTNode) (sql string, args []int
 		rightSQL = "?"
 		// Append to existing leftArgs, replacing rightArgs
 		leftArgs = append(leftArgs, node.Right.Value)
+	}
+
+	// For PostgreSQL JSONB ->> returns text, so numeric custom field comparisons need a CAST
+	if g.dbDriver == "postgres" && node.Left.Type == NodeIdentifier && node.Right.Type == NodeLiteral && node.Right.DataType == NUMBER {
+		fieldLower := strings.ToLower(node.Left.Value)
+		if strings.HasPrefix(fieldLower, "cf_") || strings.HasPrefix(fieldLower, "custom.") {
+			leftSQL = fmt.Sprintf("CAST(%s AS NUMERIC)", leftSQL)
+		}
 	}
 
 	switch node.Operator {
@@ -433,7 +454,7 @@ func (g *SQLGenerator) generateFunction(node *ASTNode) (sql string, args []inter
 			return "", nil, fmt.Errorf("childrenOf() inner query parse error: %w", err)
 		}
 
-		innerGenerator := NewInnerSQLGenerator(g.workspaceMap)
+		innerGenerator := NewInnerSQLGenerator(g.workspaceMap, g.dbDriver)
 		innerSQL, innerArgs, err := innerGenerator.GenerateSQL(innerAST)
 		if err != nil {
 			return "", nil, fmt.Errorf("childrenOf() inner query SQL generation error: %w", err)
@@ -513,7 +534,7 @@ func (g *SQLGenerator) generateItemLinkedOf(node *ASTNode) (sql string, args []i
 		return "", nil, fmt.Errorf("linkedOf() inner query parse error: %w", err)
 	}
 
-	innerGenerator := NewInnerSQLGenerator(g.workspaceMap)
+	innerGenerator := NewInnerSQLGenerator(g.workspaceMap, g.dbDriver)
 	innerSQL, innerArgs, err := innerGenerator.GenerateSQL(innerAST)
 	if err != nil {
 		return "", nil, fmt.Errorf("linkedOf() inner query SQL generation error: %w", err)
@@ -608,7 +629,7 @@ func (g *SQLGenerator) generateAssetLinkedOf(node *ASTNode) (sql string, args []
 	}
 
 	// Use item SQL generator for the inner query (querying items, not assets)
-	innerGenerator := NewInnerSQLGenerator(g.workspaceMap)
+	innerGenerator := NewInnerSQLGenerator(g.workspaceMap, g.dbDriver)
 	innerSQL, innerArgs, err := innerGenerator.GenerateSQL(innerAST)
 	if err != nil {
 		return "", nil, fmt.Errorf("linkedOf() inner query SQL generation error: %w", err)
@@ -695,7 +716,7 @@ func (g *SQLGenerator) mapAssetFieldName(fieldName string) (string, error) {
 		if !validCustomFieldNameRegex.MatchString(customFieldName) {
 			return "", fmt.Errorf("invalid custom field name: %s", customFieldName)
 		}
-		return fmt.Sprintf("json_extract(%sa.custom_field_values, '$.%s')", prefix, customFieldName), nil
+		return g.jsonExtract(prefix+"a.custom_field_values", customFieldName), nil
 	}
 
 	if strings.HasPrefix(lowerField, "custom.") {
@@ -703,7 +724,7 @@ func (g *SQLGenerator) mapAssetFieldName(fieldName string) (string, error) {
 		if !validCustomFieldNameRegex.MatchString(customFieldName) {
 			return "", fmt.Errorf("invalid custom field name: %s", customFieldName)
 		}
-		return fmt.Sprintf("json_extract(%sa.custom_field_values, '$.%s')", prefix, customFieldName), nil
+		return g.jsonExtract(prefix+"a.custom_field_values", customFieldName), nil
 	}
 
 	// Standard asset field mappings
@@ -776,7 +797,7 @@ func (g *SQLGenerator) mapItemFieldName(fieldName string) (string, error) {
 		if !validCustomFieldNameRegex.MatchString(customFieldName) {
 			return "", fmt.Errorf("invalid custom field name: %s", customFieldName)
 		}
-		return fmt.Sprintf("json_extract(%si.custom_field_values, '$.%s')", prefix, customFieldName), nil
+		return g.jsonExtract(prefix+"i.custom_field_values", customFieldName), nil
 	}
 
 	if strings.HasPrefix(lowerField, "custom.") {
@@ -785,7 +806,7 @@ func (g *SQLGenerator) mapItemFieldName(fieldName string) (string, error) {
 		if !validCustomFieldNameRegex.MatchString(customFieldName) {
 			return "", fmt.Errorf("invalid custom field name: %s", customFieldName)
 		}
-		return fmt.Sprintf("json_extract(%si.custom_field_values, '$.%s')", prefix, customFieldName), nil
+		return g.jsonExtract(prefix+"i.custom_field_values", customFieldName), nil
 	}
 
 	// Standard field mappings

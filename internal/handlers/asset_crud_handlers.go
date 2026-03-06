@@ -117,7 +117,7 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Create CQL evaluator and generate SQL
-		evaluator := cql.NewAssetEvaluator(setMap, workspaceMap)
+		evaluator := cql.NewAssetEvaluator(setMap, workspaceMap, h.db.GetDriverName())
 		var cqlSQL string
 		var cqlArgs []interface{}
 		cqlSQL, cqlArgs, err = evaluator.EvaluateToSQL(cqlQuery)
@@ -483,16 +483,16 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Serialize custom field values
-	var customFieldValuesJSON string
+	// Serialize custom field values (use *string so nil becomes SQL NULL for JSONB columns)
+	var customFieldValuesJSON *string
 	if req.CustomFieldValues != nil {
-		var customFieldValuesBytes []byte
-		customFieldValuesBytes, err = json.Marshal(req.CustomFieldValues)
-		if err != nil {
+		customFieldValuesBytes, jsonErr := json.Marshal(req.CustomFieldValues)
+		if jsonErr != nil {
 			respondValidationError(w, r, "Invalid custom field values")
 			return
 		}
-		customFieldValuesJSON = string(customFieldValuesBytes)
+		s := string(customFieldValuesBytes)
+		customFieldValuesJSON = &s
 	}
 
 	var assetID int64
@@ -667,16 +667,16 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Serialize custom field values
-	var customFieldValuesJSON string
+	// Serialize custom field values (use *string so nil becomes SQL NULL for JSONB columns)
+	var customFieldValuesJSON *string
 	if req.CustomFieldValues != nil {
-		var customFieldValuesBytes []byte
-		customFieldValuesBytes, err = json.Marshal(req.CustomFieldValues)
-		if err != nil {
+		customFieldValuesBytes, jsonErr := json.Marshal(req.CustomFieldValues)
+		if jsonErr != nil {
 			respondValidationError(w, r, "Invalid custom field values")
 			return
 		}
-		customFieldValuesJSON = string(customFieldValuesBytes)
+		s := string(customFieldValuesBytes)
+		customFieldValuesJSON = &s
 	}
 
 	result, err := h.db.ExecWrite(`

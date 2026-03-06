@@ -139,10 +139,21 @@ func (ps *PermissionService) HasWorkspacePermission(userID, workspaceID int, per
 
 		// Check workspace-specific permissions
 		if workspacePerms, exists := cached.WorkspacePermissions[workspaceID]; exists {
-			hasIt := workspacePerms[permission]
-			return hasIt, nil
+			if workspacePerms[permission] {
+				return true, nil
+			}
 		}
+
 		// No matching permission
+		_, everyoneExists := cached.WorkspaceEveryone[workspaceID]
+		_, wsPermsExists := cached.WorkspacePermissions[workspaceID]
+		slog.Debug("workspace permission denied",
+			slog.String("component", "permissions"),
+			slog.Int("user_id", userID),
+			slog.Int("workspace_id", workspaceID),
+			slog.String("permission", permission),
+			slog.Bool("everyone_exists", everyoneExists),
+			slog.Bool("workspace_perms_exists", wsPermsExists))
 		return false, nil
 	}
 
@@ -337,9 +348,21 @@ func (ps *PermissionService) loadUserPermissionAndCheck(userID, workspaceID int,
 
 	// Check workspace-specific permissions
 	if workspacePerms, exists := cached.WorkspacePermissions[workspaceID]; exists {
-		return workspacePerms[permission], nil
+		if workspacePerms[permission] {
+			return true, nil
+		}
 	}
 
+	// No matching permission
+	_, everyoneExists := cached.WorkspaceEveryone[workspaceID]
+	_, wsPermsExists := cached.WorkspacePermissions[workspaceID]
+	slog.Debug("workspace permission denied (cache miss path)",
+		slog.String("component", "permissions"),
+		slog.Int("user_id", userID),
+		slog.Int("workspace_id", workspaceID),
+		slog.String("permission", permission),
+		slog.Bool("everyone_exists", everyoneExists),
+		slog.Bool("workspace_perms_exists", wsPermsExists))
 	return false, nil
 }
 
@@ -617,12 +640,13 @@ func (ps *PermissionService) OnPermissionSetChanged(permissionSetID int) error {
 	return nil
 }
 
-// OnEveryoneRoleChanged clears permission caches when the Everyone assignment changes.
-// This is a broad reset because the assignment affects all users.
-func (ps *PermissionService) OnEveryoneRoleChanged() {
+// OnEveryoneAccessChanged resets the entire permission cache when the implicit
+// "everyone" access level changes (i.e., a role's first assignment is added or
+// its last assignment is removed for a workspace).
+func (ps *PermissionService) OnEveryoneAccessChanged() {
 	if ps.cache != nil {
 		if err := ps.cache.Reset(); err != nil {
-			slog.Error("Failed to reset permission cache after everyone-role change",
+			slog.Error("Failed to reset permission cache after everyone-access change",
 				slog.String("component", "permissions"),
 				slog.Any("error", err))
 		}
@@ -838,65 +862,92 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 		return nil, fmt.Errorf("error loading workspace states: %w", err)
 	}
 
-	// Load explicit Everyone role assignments (workspace access must be explicitly granted)
-	everyoneRows, err := ps.db.Query(`
-		SELECT workspace_id, role_id FROM workspace_everyone_roles
+	// Derive Everyone permissions from the absence of explicit role assignments.
+	// Hierarchy: Viewer → Editor → Tester (each requires the previous to be open).
+	// If a role has NO explicit assignments (user or group), everyone gets those permissions.
+	// Admin always requires explicit assignment.
+
+	// Load role IDs
+	var viewerRoleID, editorRoleID, testerRoleID int
+	_ = ps.db.QueryRow(`SELECT id FROM workspace_roles WHERE name = ? LIMIT 1`, models.RoleViewer).Scan(&viewerRoleID)
+	_ = ps.db.QueryRow(`SELECT id FROM workspace_roles WHERE name = ? LIMIT 1`, models.RoleEditor).Scan(&editorRoleID)
+	_ = ps.db.QueryRow(`SELECT id FROM workspace_roles WHERE name = ? LIMIT 1`, models.RoleTester).Scan(&testerRoleID)
+
+	// Query which roles have explicit assignments per workspace
+	explicitAssignments := make(map[int]map[int]bool) // workspace_id -> role_id -> true
+	explicitRows, err := ps.db.Query(`
+		SELECT DISTINCT workspace_id, role_id FROM user_workspace_roles
+		UNION
+		SELECT DISTINCT workspace_id, role_id FROM group_workspace_roles
 	`)
-	if err == nil {
-		defer func() { _ = everyoneRows.Close() }()
-		for everyoneRows.Next() {
-			var workspaceID int
-			var roleID sql.NullInt64
-			if err = everyoneRows.Scan(&workspaceID, &roleID); err != nil {
+	if err != nil {
+		slog.Error("failed to load explicit role assignments",
+			slog.String("component", "permissions"),
+			slog.Int("user_id", userID),
+			slog.Any("error", err))
+	} else {
+		defer func() { _ = explicitRows.Close() }()
+		for explicitRows.Next() {
+			var wsID, roleID int
+			if err = explicitRows.Scan(&wsID, &roleID); err != nil {
 				continue
 			}
-
-			// Skip inactive workspaces (remain restricted)
-			if active, ok := activeWorkspaces[workspaceID]; ok && !active {
-				continue
+			if explicitAssignments[wsID] == nil {
+				explicitAssignments[wsID] = make(map[int]bool)
 			}
-
-			// NULL role_id means "Everyone has no access" (lock down)
-			if !roleID.Valid {
-				cached.WorkspaceEveryone[workspaceID] = map[string]bool{}
-				continue
-			}
-
-			// Resolve permissions for the assigned role (cached per role_id)
-			perms, ok := rolePermissionCache[int(roleID.Int64)]
-			if !ok {
-				perms, err = ps.getRolePermissions(int(roleID.Int64))
-				if err != nil {
-					continue
-				}
-				rolePermissionCache[int(roleID.Int64)] = perms
-			}
-			cached.WorkspaceEveryone[workspaceID] = clonePermissionSet(perms)
+			explicitAssignments[wsID][roleID] = true
 		}
 	}
 
-	// Apply implicit "Everyone = Viewer" default for active workspaces without explicit Everyone assignments.
-	// Mirrors GetEveryoneRole API (workspace_roles.go:497-512) which returns implicit Viewer when no row exists.
-	var viewerRoleID int
-	if err := ps.db.QueryRow(`SELECT id FROM workspace_roles WHERE name = ? LIMIT 1`, models.RoleViewer).Scan(&viewerRoleID); err == nil {
-		viewerPerms, ok := rolePermissionCache[viewerRoleID]
+	// Load role permissions (lazy, cached per role_id)
+	loadRolePerms := func(roleID int) map[string]bool {
+		if roleID == 0 {
+			return nil
+		}
+		perms, ok := rolePermissionCache[roleID]
 		if !ok {
-			viewerPerms, err = ps.getRolePermissions(viewerRoleID)
+			perms, err = ps.getRolePermissions(roleID)
 			if err == nil {
-				rolePermissionCache[viewerRoleID] = viewerPerms
+				rolePermissionCache[roleID] = perms
 			}
 		}
-		if viewerPerms != nil {
-			for wsID, active := range activeWorkspaces {
-				if !active {
-					continue
-				}
-				if _, hasExplicit := cached.WorkspaceEveryone[wsID]; hasExplicit {
-					continue
-				}
-				cached.WorkspaceEveryone[wsID] = clonePermissionSet(viewerPerms)
-			}
+		return perms
+	}
+
+	viewerPerms := loadRolePerms(viewerRoleID)
+	editorPerms := loadRolePerms(editorRoleID)
+	testerPerms := loadRolePerms(testerRoleID)
+
+	// For each active workspace, derive everyone permissions
+	for wsID, active := range activeWorkspaces {
+		if !active {
+			continue
 		}
+		wsExplicit := explicitAssignments[wsID]
+
+		// If Viewer is restricted (has explicit assignments), no implicit everyone access
+		if wsExplicit[viewerRoleID] {
+			cached.WorkspaceEveryone[wsID] = map[string]bool{}
+			continue
+		}
+
+		// Viewer is open → everyone gets Viewer permissions
+		everyonePerms := clonePermissionSet(viewerPerms)
+
+		// Editor open if no explicit Editor assignments
+		editorOpen := !wsExplicit[editorRoleID]
+		if editorOpen {
+			mergePerms(everyonePerms, editorPerms)
+		}
+
+		// Tester requires Editor to be open (Testers need Editor to create defects)
+		testerOpen := editorOpen && !wsExplicit[testerRoleID]
+		if testerOpen {
+			mergePerms(everyonePerms, testerPerms)
+		}
+
+		// Admin: never implicit
+		cached.WorkspaceEveryone[wsID] = everyonePerms
 	}
 
 	// Load global permissions
@@ -1151,6 +1202,14 @@ func clonePermissionSet(src map[string]bool) map[string]bool {
 		dst[k] = v
 	}
 	return dst
+}
+
+func mergePerms(dst, src map[string]bool) {
+	for k, v := range src {
+		if v {
+			dst[k] = true
+		}
+	}
 }
 
 // WarmCache pre-loads permissions for recently active users

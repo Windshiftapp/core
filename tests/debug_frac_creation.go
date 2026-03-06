@@ -1,23 +1,22 @@
 package tests
 
 import (
-	"database/sql"
 	"fmt"
 	"testing"
 
-	_ "modernc.org/sqlite"
-
+	"windshift/internal/database"
 	"windshift/internal/services"
 )
 
 func TestDebugFracCreation(t *testing.T) {
 	server, _ := StartTestServer(t, GetDBType())
 
-	db, err := sql.Open("sqlite", server.DBPath)
+	dbWrapper, err := database.NewSQLiteDB(server.DBPath)
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
-	defer db.Close()
+	defer dbWrapper.Close()
+	db := dbWrapper.GetDB() // raw *sql.DB for direct queries
 
 	// Create workspace
 	result, _ := db.Exec("INSERT INTO workspaces (name, key) VALUES (?, ?)", "Test", "TEST")
@@ -27,7 +26,7 @@ func TestDebugFracCreation(t *testing.T) {
 	// Create 10 items and check for duplicates
 	for i := 0; i < 10; i++ {
 		// Generate frac_index
-		fracIndex, err := services.GenerateFracIndexForNewItem(db, workspaceID, nil)
+		fracIndex, err := services.GenerateFracIndexForNewItem(dbWrapper, workspaceID, nil)
 		if err != nil {
 			t.Fatalf("Failed to generate frac_index: %v", err)
 		}

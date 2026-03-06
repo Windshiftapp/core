@@ -131,7 +131,7 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 			respondInternalError(w, r, err)
 			return
 		}
-		evaluator := cql.NewEvaluator(workspaceMap)
+		evaluator := cql.NewEvaluator(workspaceMap, h.db.GetDriverName())
 		filterSQL, filterArgs, err = evaluator.EvaluateToSQL(vqlQuery)
 		if err != nil {
 			respondBadRequest(w, r, "VQL query error: "+err.Error())

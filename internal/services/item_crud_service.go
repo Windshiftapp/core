@@ -341,7 +341,7 @@ func (s *ItemCRUDService) GetBacklogItems(params BacklogParams) ([]models.Item, 
 			return nil, 0, fmt.Errorf("failed to build workspace map: %w", err)
 		}
 
-		evaluator := cql.NewEvaluator(workspaceMap)
+		evaluator := cql.NewEvaluator(workspaceMap, s.db.GetDriverName())
 		qlSQL, qlArgs, err := evaluator.EvaluateToSQL(qlQuery)
 		if err != nil {
 			return nil, 0, fmt.Errorf("QL query error: %w", err)
@@ -419,7 +419,7 @@ func (s *ItemCRUDService) ListWithQL(params ListWithQLParams) ([]models.Item, in
 			return nil, 0, fmt.Errorf("failed to build workspace map: %w", err)
 		}
 
-		evaluator := cql.NewEvaluator(workspaceMap)
+		evaluator := cql.NewEvaluator(workspaceMap, s.db.GetDriverName())
 		qlSQL, qlArgs, err := evaluator.EvaluateToSQL(qlQuery)
 		if err != nil {
 			return nil, 0, fmt.Errorf("QL query error: %w", err)

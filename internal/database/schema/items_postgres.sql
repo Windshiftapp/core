@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS items (
 	creator_id INTEGER,
 	reporter_id INTEGER,
 	creator_portal_customer_id INTEGER,
-	custom_field_values TEXT,
+	custom_field_values JSONB,
 	virtual_field_data TEXT,
 	calendar_data TEXT,
 	-- Hierarchy fields

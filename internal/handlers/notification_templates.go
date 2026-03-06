@@ -170,6 +170,14 @@ func (h *NotificationTemplateHandler) CreateTemplate(w http.ResponseWriter, r *h
 		return
 	}
 
+	// Check uniqueness before insert
+	var nameExists bool
+	_ = db.QueryRow("SELECT EXISTS(SELECT 1 FROM notification_templates WHERE name = ?)", template.Name).Scan(&nameExists)
+	if nameExists {
+		respondConflict(w, r, "Template name already exists")
+		return
+	}
+
 	now := time.Now()
 	var id int64
 	err := db.QueryRow(`
@@ -178,7 +186,7 @@ func (h *NotificationTemplateHandler) CreateTemplate(w http.ResponseWriter, r *h
 	`, template.Name, template.TemplateType, nullableString(template.Subject), template.Content, template.Description, template.IsActive, now, now).Scan(&id)
 
 	if err != nil {
-		if err.Error() == "UNIQUE constraint failed: notification_templates.name" {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "Template name already exists")
 			return
 		}
@@ -248,6 +256,14 @@ func (h *NotificationTemplateHandler) UpdateTemplate(w http.ResponseWriter, r *h
 		return
 	}
 
+	// Check uniqueness before update
+	var nameExists bool
+	_ = db.QueryRow("SELECT EXISTS(SELECT 1 FROM notification_templates WHERE name = ? AND id != ?)", template.Name, id).Scan(&nameExists)
+	if nameExists {
+		respondConflict(w, r, "Template name already exists")
+		return
+	}
+
 	now := time.Now()
 	result, err := db.Exec(`
 		UPDATE notification_templates
@@ -256,7 +272,7 @@ func (h *NotificationTemplateHandler) UpdateTemplate(w http.ResponseWriter, r *h
 	`, template.Name, template.TemplateType, nullableString(template.Subject), template.Content, template.Description, template.IsActive, now, id)
 
 	if err != nil {
-		if err.Error() == "UNIQUE constraint failed: notification_templates.name" {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "Template name already exists")
 			return
 		}

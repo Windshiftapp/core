@@ -201,6 +201,14 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 		rt.DisplayOrder = maxOrder + 1
 	}
 
+	// Check uniqueness before insert
+	var nameExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM request_types WHERE name = ? AND channel_id = ?)", rt.Name, rt.ChannelID).Scan(&nameExists)
+	if nameExists {
+		respondConflict(w, r, "Request type with this name already exists for this channel")
+		return
+	}
+
 	now := time.Now()
 	var id int64
 	err = h.db.QueryRow(`
@@ -210,7 +218,7 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 		serializeIntArray(rt.VisibilityGroupIDs), serializeIntArray(rt.VisibilityOrgIDs), now, now).Scan(&id)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint") {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "Request type with this name already exists for this channel")
 		} else {
 			respondInternalError(w, r, err)
@@ -317,6 +325,14 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check uniqueness before update
+	var nameExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM request_types WHERE name = ? AND channel_id = (SELECT channel_id FROM request_types WHERE id = ?) AND id != ?)", rt.Name, id, id).Scan(&nameExists)
+	if nameExists {
+		respondConflict(w, r, "Request type with this name already exists for this channel")
+		return
+	}
+
 	now := time.Now()
 	_, err = h.db.ExecWrite(`
 		UPDATE request_types
@@ -327,7 +343,7 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		serializeIntArray(rt.VisibilityGroupIDs), serializeIntArray(rt.VisibilityOrgIDs), now, id)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint") {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "Request type with this name already exists for this channel")
 		} else {
 			respondInternalError(w, r, err)

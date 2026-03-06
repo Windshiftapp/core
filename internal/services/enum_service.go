@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"windshift/internal/database"
@@ -238,7 +237,7 @@ func (s *EnumService) Create(entity interface{}, r *http.Request) (EnumEntity, e
 	err := s.db.QueryRow(query, args...).Scan(&id)
 	if err != nil {
 		// Check for unique constraint violation (database-level)
-		if isUniqueConstraintError(err) {
+		if database.IsUniqueConstraintError(err) {
 			return nil, NewServiceError(http.StatusConflict,
 				fmt.Sprintf("%s already exists", s.config.EntityName))
 		}
@@ -310,7 +309,7 @@ func (s *EnumService) Update(id int, entity interface{}, r *http.Request) (EnumE
 
 	_, err = s.db.Exec(query, args...)
 	if err != nil {
-		if isUniqueConstraintError(err) {
+		if database.IsUniqueConstraintError(err) {
 			return nil, NewServiceError(http.StatusConflict,
 				fmt.Sprintf("%s already exists", s.config.EntityName))
 		}
@@ -368,13 +367,3 @@ func (s *EnumService) Delete(id int, r *http.Request) error {
 	return nil
 }
 
-// isUniqueConstraintError checks if an error is a unique constraint violation
-func isUniqueConstraintError(err error) bool {
-	if err == nil {
-		return false
-	}
-	errStr := strings.ToLower(err.Error())
-	return strings.Contains(errStr, "unique constraint") ||
-		strings.Contains(errStr, "duplicate key") ||
-		strings.Contains(errStr, "unique_violation")
-}

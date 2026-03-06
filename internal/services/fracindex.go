@@ -1,7 +1,6 @@
 package services
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -9,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"windshift/internal/database"
 )
 
 // Fractional indexing implementation based on https://github.com/rocicorp/fracdex
@@ -432,11 +433,7 @@ func reverse(values []string) {
 // It uses an in-memory cache to avoid expensive global table scans on every insert.
 // The cache is populated on first call and updated after each successful generation.
 // Note: frac_index is globally unique across all workspaces to allow cross-instance ranking
-func GenerateFracIndexForNewItem(db *sql.DB, workspaceID int, parentID *int) (string, error) {
-	if db == nil {
-		return "", fmt.Errorf("database connection not available")
-	}
-
+func GenerateFracIndexForNewItem(db database.Database, workspaceID int, parentID *int) (string, error) {
 	// Try to use cached value first (fast path)
 	if cached := fracIndexCache.Load(); cached != nil {
 		lastIndex := cached.(*string) //nolint:errcheck // type assertion is safe, we only store *string
@@ -517,11 +514,7 @@ func InvalidateFracIndexCache() {
 }
 
 // UpdateItemFracIndex updates the frac_index of an item
-func UpdateItemFracIndex(db *sql.DB, itemID int, fracIndex string) error {
-	if db == nil {
-		return fmt.Errorf("database connection not available")
-	}
-
+func UpdateItemFracIndex(db database.Database, itemID int, fracIndex string) error {
 	query := "UPDATE items SET frac_index = ? WHERE id = ?"
 	_, err := db.Exec(query, fracIndex, itemID)
 	if err != nil {
@@ -532,11 +525,7 @@ func UpdateItemFracIndex(db *sql.DB, itemID int, fracIndex string) error {
 }
 
 // GetItemsInFracIndexOrder retrieves items sorted by frac_index
-func GetItemsInFracIndexOrder(db *sql.DB, workspaceID int, parentID *int, limit int) ([]map[string]interface{}, error) {
-	if db == nil {
-		return nil, fmt.Errorf("database connection not available")
-	}
-
+func GetItemsInFracIndexOrder(db database.Database, workspaceID int, parentID *int, limit int) ([]map[string]interface{}, error) {
 	var query string
 	var args []interface{}
 
@@ -588,11 +577,7 @@ func GetItemsInFracIndexOrder(db *sql.DB, workspaceID int, parentID *int, limit 
 }
 
 // CheckFracIndexExists checks if a frac_index already exists in the database
-func CheckFracIndexExists(db *sql.DB, workspaceID int, fracIndex string) (bool, error) {
-	if db == nil {
-		return false, fmt.Errorf("database connection not available")
-	}
-
+func CheckFracIndexExists(db database.Database, workspaceID int, fracIndex string) (bool, error) {
 	var count int
 	query := "SELECT COUNT(*) FROM items WHERE workspace_id = ? AND frac_index = ?"
 	err := db.QueryRow(query, workspaceID, fracIndex).Scan(&count)

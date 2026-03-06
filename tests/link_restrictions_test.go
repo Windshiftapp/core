@@ -245,7 +245,7 @@ func TestTestsLinkTypeIsSystemProtected(t *testing.T) {
 	token := CreateBearerToken(t, server)
 
 	// Try to delete link type ID=1 ("Tests")
-	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/link-types/1", server.APIBase), nil)
+	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/admin/link-types/1", server.APIBase), nil)
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
 	}

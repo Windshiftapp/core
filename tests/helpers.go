@@ -21,6 +21,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/server"
+	"windshift/internal/services"
 )
 
 // testHTTPClient is a shared HTTP client with timeout for all test requests
@@ -130,6 +131,9 @@ func StartTestServer(t *testing.T, dbType string) (ts *TestServer, cleanup func(
 	port := srv.Port()
 	baseURL := fmt.Sprintf("http://localhost:%d", port)
 	apiBase := baseURL + "/api"
+
+	// Invalidate the frac-index cache so each test gets a clean state
+	services.InvalidateFracIndexCache()
 
 	ts = &TestServer{
 		Port:    port,
@@ -888,31 +892,38 @@ func RevokeGlobalPermission(t *testing.T, testServer *TestServer, userID, permis
 	}
 }
 
-// SetEveryoneRole sets or removes the Everyone role for a workspace.
-// Pass nil to remove Everyone access (lock down the workspace).
-func SetEveryoneRole(t *testing.T, testServer *TestServer, workspaceID int, roleID *int) {
-	t.Helper()
-
-	endpoint := fmt.Sprintf("/workspaces/%d/everyone-role", workspaceID)
-	data := map[string]interface{}{
-		"role_id": roleID,
-	}
-
-	resp := MakeAuthRequest(t, testServer, http.MethodPut, endpoint, data)
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		t.Fatalf("Failed to set Everyone role for workspace %d: %d - %s",
-			workspaceID, resp.StatusCode, string(body))
-	}
-}
-
-// LockDownWorkspace removes the Everyone role access from a workspace,
-// requiring explicit role assignments for access.
+// LockDownWorkspace restricts a workspace so that only explicitly assigned
+// users have access. It does this by assigning the Viewer role to the admin
+// user (the bearer-token holder), which triggers the "has explicit Viewer
+// assignments" condition and blocks implicit everyone access.
 func LockDownWorkspace(t *testing.T, testServer *TestServer, workspaceID int) {
 	t.Helper()
-	SetEveryoneRole(t, testServer, workspaceID, nil)
+
+	// Get the admin user's ID via GET /users (bearer-token compatible)
+	resp := MakeAuthRequest(t, testServer, http.MethodGet, "/users", nil)
+	defer resp.Body.Close()
+	AssertStatusCode(t, resp, http.StatusOK)
+
+	var users []map[string]interface{}
+	DecodeJSON(t, resp, &users)
+	if len(users) == 0 {
+		t.Fatal("No users found")
+	}
+
+	// Find admin user (username "admin" from setup)
+	var adminID int
+	for _, u := range users {
+		if u["username"] == "admin" {
+			adminID = int(u["id"].(float64))
+			break
+		}
+	}
+	if adminID == 0 {
+		// Fallback to first user
+		adminID = int(users[0]["id"].(float64))
+	}
+
+	AssignWorkspaceRole(t, testServer, adminID, workspaceID, "Viewer")
 }
 
 // CreateTestItem creates a work item in a workspace and returns its ID.
@@ -1088,7 +1099,7 @@ func CreateEmailProvider(t *testing.T, testServer *TestServer, name, providerTyp
 		"is_enabled": true,
 	}
 
-	resp := MakeAuthRequest(t, testServer, http.MethodPost, "/email-providers", data)
+	resp := MakeAuthRequest(t, testServer, http.MethodPost, "/admin/email-providers", data)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {

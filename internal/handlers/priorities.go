@@ -195,6 +195,14 @@ func (h *PriorityHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Check uniqueness before insert
+	var nameExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM priorities WHERE name = ?)", p.Name).Scan(&nameExists)
+	if nameExists {
+		respondConflict(w, r, "Priority with this name already exists")
+		return
+	}
+
 	now := time.Now()
 	var id int64
 	err := h.db.QueryRow(`
@@ -203,7 +211,7 @@ func (h *PriorityHandler) Create(w http.ResponseWriter, r *http.Request) {
 	`, p.Name, p.Description, p.IsDefault, p.Icon, p.Color, p.SortOrder, now, now).Scan(&id)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint") {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "Priority with this name already exists")
 		} else {
 			respondInternalError(w, r, err)
@@ -319,6 +327,14 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Check uniqueness before update
+	var nameExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM priorities WHERE name = ? AND id != ?)", p.Name, id).Scan(&nameExists)
+	if nameExists {
+		respondConflict(w, r, "Priority with this name already exists")
+		return
+	}
+
 	// Update priority
 	now := time.Now()
 	_, err := h.db.ExecWrite(`
@@ -328,7 +344,7 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 	`, p.Name, p.Description, p.IsDefault, p.Icon, p.Color, p.SortOrder, now, id)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint") {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "Priority with this name already exists")
 		} else {
 			respondInternalError(w, r, err)

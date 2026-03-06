@@ -282,50 +282,168 @@ func TestWorkspaceRoles_Administrator(t *testing.T) {
 	})
 }
 
-// TestWorkspaceRoles_EveryoneRole tests the Everyone role feature.
-func TestWorkspaceRoles_EveryoneRole(t *testing.T) {
+// TestWorkspaceRoles_DerivedEveryone tests the derived "everyone" access model.
+// A workspace with no explicit role assignments gives everyone Viewer+Editor+Tester.
+// Adding the first assignment for a role restricts that role (and roles below it in the hierarchy).
+func TestWorkspaceRoles_DerivedEveryone(t *testing.T) {
 	server, _ := StartTestServer(t, GetDBType())
 	adminToken := CreateBearerToken(t, server)
 	server.BearerToken = adminToken
 
-	// Create a test workspace (workspaces are locked by default - no Everyone access)
-	workspaceID, _ := CreateTestWorkspace(t, server, "Everyone Role Test", shortKey("ERTW"))
+	// Get item type for creating items (shared across subtests)
+	configSetID := GetDefaultConfigurationSet(t, server)
+	itemTypes := GetItemTypes(t, server, configSetID)
+	var itemTypeID int
+	for _, id := range itemTypes {
+		itemTypeID = id
+		break
+	}
 
-	// Create a user with no explicit role assignment
-	_, noRoleUsername, noRolePassword := CreateTestUserWithCredentials(t, server, "no_role_user", "no_role@test.com")
-	noRoleToken := CreateBearerTokenForUser(t, server, noRoleUsername, noRolePassword)
+	t.Run("FullyOpenWorkspace_EveryoneGetsViewerEditorTester", func(t *testing.T) {
+		// A brand-new workspace with zero assignments → everyone can view+edit+test
+		workspaceID, _ := CreateTestWorkspace(t, server, "Fully Open WS", shortKey("FOWS"))
 
-	t.Run("WorkspaceLockedByDefault_DeniesAccessToNoRoleUser", func(t *testing.T) {
-		// By default, workspaces have no Everyone role - users without explicit roles cannot access
+		_, username, password := CreateTestUserWithCredentials(t, server, "open_ws_user", "open_ws@test.com")
+		userToken := CreateBearerTokenForUser(t, server, username, password)
+
+		// Can view workspace
 		endpoint := fmt.Sprintf("/workspaces/%d", workspaceID)
-		resp := MakeAuthRequestWithToken(t, server, noRoleToken, http.MethodGet, endpoint, nil)
+		resp := MakeAuthRequestWithToken(t, server, userToken, http.MethodGet, endpoint, nil)
+		defer resp.Body.Close()
+		AssertStatusCode(t, resp, http.StatusOK)
+
+		// Can create items (Editor perms)
+		itemData := map[string]interface{}{
+			"title":        "Created in open WS",
+			"workspace_id": workspaceID,
+			"item_type_id": itemTypeID,
+		}
+		resp2 := MakeAuthRequestWithToken(t, server, userToken, http.MethodPost, "/items", itemData)
+		defer resp2.Body.Close()
+		AssertStatusCode(t, resp2, http.StatusCreated)
+	})
+
+	t.Run("LockDown_DeniesAccess", func(t *testing.T) {
+		// Assign Viewer to admin → restricts everyone else
+		workspaceID, _ := CreateTestWorkspace(t, server, "Locked WS", shortKey("LKWS"))
+		LockDownWorkspace(t, server, workspaceID)
+
+		_, username, password := CreateTestUserWithCredentials(t, server, "locked_ws_user", "locked_ws@test.com")
+		userToken := CreateBearerTokenForUser(t, server, username, password)
+
+		endpoint := fmt.Sprintf("/workspaces/%d", workspaceID)
+		resp := MakeAuthRequestWithToken(t, server, userToken, http.MethodGet, endpoint, nil)
 		defer resp.Body.Close()
 		AssertStatusCode(t, resp, http.StatusForbidden)
 	})
 
-	t.Run("EveryoneRoleSetToViewer_GrantsViewerAccess", func(t *testing.T) {
-		// Set Everyone role to Viewer
-		roles := GetWorkspaceRoles(t, server)
-		viewerRoleID := roles["Viewer"]
-		SetEveryoneRole(t, server, workspaceID, &viewerRoleID)
+	t.Run("EditorRestricted_BlocksCreate_AllowsView", func(t *testing.T) {
+		// Assign Editor to a specific user → Editor restricted; Viewer still open
+		workspaceID, _ := CreateTestWorkspace(t, server, "Editor Restricted WS", shortKey("ERWS"))
+		editorID, _, _ := CreateTestUserWithCredentials(t, server, "editor_only", "editor_only@test.com")
+		AssignWorkspaceRole(t, server, editorID, workspaceID, "Editor")
 
-		// Now user with no explicit role should have Viewer access
+		_, noRoleUsername, noRolePassword := CreateTestUserWithCredentials(t, server, "norole_er", "norole_er@test.com")
+		noRoleToken := CreateBearerTokenForUser(t, server, noRoleUsername, noRolePassword)
+
+		// Can view (Viewer still open)
 		endpoint := fmt.Sprintf("/workspaces/%d", workspaceID)
 		resp := MakeAuthRequestWithToken(t, server, noRoleToken, http.MethodGet, endpoint, nil)
 		defer resp.Body.Close()
 		AssertStatusCode(t, resp, http.StatusOK)
+
+		// Cannot create items (Editor restricted)
+		itemData := map[string]interface{}{
+			"title":        "Should Fail",
+			"workspace_id": workspaceID,
+			"item_type_id": itemTypeID,
+		}
+		resp2 := MakeAuthRequestWithToken(t, server, noRoleToken, http.MethodPost, "/items", itemData)
+		defer resp2.Body.Close()
+		AssertStatusCode(t, resp2, http.StatusForbidden)
 	})
 
-	t.Run("EveryoneRoleViewer_CanViewItems", func(t *testing.T) {
-		// Everyone role was set to Viewer in previous test
-		endpoint := fmt.Sprintf("/items?workspace_id=%d", workspaceID)
-		resp := MakeAuthRequestWithToken(t, server, noRoleToken, http.MethodGet, endpoint, nil)
+	t.Run("ViewerRestricted_BlocksAll", func(t *testing.T) {
+		// Assigning Viewer to a user restricts everyone else from all access
+		workspaceID, _ := CreateTestWorkspace(t, server, "Viewer Restricted WS", shortKey("VRWS"))
+		viewerID, _, _ := CreateTestUserWithCredentials(t, server, "viewer_only", "viewer_only@test.com")
+		AssignWorkspaceRole(t, server, viewerID, workspaceID, "Viewer")
+
+		_, outsiderUsername, outsiderPassword := CreateTestUserWithCredentials(t, server, "outsider", "outsider@test.com")
+		outsiderToken := CreateBearerTokenForUser(t, server, outsiderUsername, outsiderPassword)
+
+		// Cannot view
+		endpoint := fmt.Sprintf("/workspaces/%d", workspaceID)
+		resp := MakeAuthRequestWithToken(t, server, outsiderToken, http.MethodGet, endpoint, nil)
+		defer resp.Body.Close()
+		AssertStatusCode(t, resp, http.StatusForbidden)
+
+		// Cannot create
+		itemData := map[string]interface{}{
+			"title":        "Should Fail",
+			"workspace_id": workspaceID,
+			"item_type_id": itemTypeID,
+		}
+		resp2 := MakeAuthRequestWithToken(t, server, outsiderToken, http.MethodPost, "/items", itemData)
+		defer resp2.Body.Close()
+		AssertStatusCode(t, resp2, http.StatusForbidden)
+	})
+
+	t.Run("EditorRestricted_AdminNeverImplicit", func(t *testing.T) {
+		// Even with fully open workspace, admin requires explicit assignment
+		workspaceID, workspaceKey := CreateTestWorkspace(t, server, "Admin Never Implicit WS", shortKey("ANWS"))
+
+		_, username, password := CreateTestUserWithCredentials(t, server, "not_admin", "not_admin@test.com")
+		userToken := CreateBearerTokenForUser(t, server, username, password)
+
+		// Cannot administer workspace
+		endpoint := fmt.Sprintf("/workspaces/%d", workspaceID)
+		updateData := map[string]interface{}{
+			"name":        "Updated by Non-Admin",
+			"key":         workspaceKey,
+			"description": "Should fail",
+		}
+		resp := MakeAuthRequestWithToken(t, server, userToken, http.MethodPut, endpoint, updateData)
+		defer resp.Body.Close()
+		AssertStatusCode(t, resp, http.StatusForbidden)
+	})
+}
+
+// TestWorkspaceRoles_OpenWorkspace_CanEditItems tests that a user with no explicit role
+// can view and edit items in a fully open workspace (no role assignments).
+func TestWorkspaceRoles_OpenWorkspace_CanEditItems(t *testing.T) {
+	server, _ := StartTestServer(t, GetDBType())
+	adminToken := CreateBearerToken(t, server)
+	server.BearerToken = adminToken
+
+	// Create workspace with no role assignments → everyone can view+edit
+	workspaceID, _ := CreateTestWorkspace(t, server, "Open Workspace Edit Test", shortKey("OWET"))
+
+	// Create a user with no explicit role
+	_, username, password := CreateTestUserWithCredentials(t, server, "open_ws_editor", "open_ws_editor@test.com")
+	userToken := CreateBearerTokenForUser(t, server, username, password)
+
+	// Create an item as admin
+	testItemID := CreateTestItem(t, server, workspaceID, "Item for Open WS Editor")
+
+	t.Run("CanViewItem", func(t *testing.T) {
+		endpoint := fmt.Sprintf("/items/%d", testItemID)
+		resp := MakeAuthRequestWithToken(t, server, userToken, http.MethodGet, endpoint, nil)
 		defer resp.Body.Close()
 		AssertStatusCode(t, resp, http.StatusOK)
 	})
 
-	t.Run("DefaultEveryoneRole_CannotCreateItems", func(t *testing.T) {
-		// Default Everyone role is Viewer, so should not be able to create items
+	t.Run("CanEditItem", func(t *testing.T) {
+		endpoint := fmt.Sprintf("/items/%d", testItemID)
+		updateData := map[string]interface{}{
+			"title": "Updated in open workspace",
+		}
+		resp := MakeAuthRequestWithToken(t, server, userToken, http.MethodPut, endpoint, updateData)
+		defer resp.Body.Close()
+		AssertStatusCode(t, resp, http.StatusOK)
+	})
+
+	t.Run("CanCreateItem", func(t *testing.T) {
 		configSetID := GetDefaultConfigurationSet(t, server)
 		itemTypes := GetItemTypes(t, server, configSetID)
 		var itemTypeID int
@@ -335,7 +453,71 @@ func TestWorkspaceRoles_EveryoneRole(t *testing.T) {
 		}
 
 		itemData := map[string]interface{}{
-			"title":        "Everyone Created Item",
+			"title":        "Created in open workspace",
+			"workspace_id": workspaceID,
+			"item_type_id": itemTypeID,
+		}
+		resp := MakeAuthRequestWithToken(t, server, userToken, http.MethodPost, "/items", itemData)
+		defer resp.Body.Close()
+		AssertStatusCode(t, resp, http.StatusCreated)
+	})
+
+	t.Run("CannotDeleteItem", func(t *testing.T) {
+		endpoint := fmt.Sprintf("/items/%d", testItemID)
+		resp := MakeAuthRequestWithToken(t, server, userToken, http.MethodDelete, endpoint, nil)
+		defer resp.Body.Close()
+		AssertStatusCode(t, resp, http.StatusForbidden)
+	})
+}
+
+// TestWorkspaceRoles_EditorRoleRemoval_RegainsImplicitAccess tests that removing the
+// last Editor assignment makes Editor open to everyone again.
+func TestWorkspaceRoles_EditorRoleRemoval_RegainsImplicitAccess(t *testing.T) {
+	server, _ := StartTestServer(t, GetDBType())
+	adminToken := CreateBearerToken(t, server)
+	server.BearerToken = adminToken
+
+	// Create workspace (fully open by default)
+	workspaceID, _ := CreateTestWorkspace(t, server, "Role Removal Test", shortKey("RRWS"))
+	roles := GetWorkspaceRoles(t, server)
+	editorRoleID := roles["Editor"]
+
+	// Create a user
+	userID, username, password := CreateTestUserWithCredentials(t, server, "role_removal_user", "role_removal@test.com")
+	userToken := CreateBearerTokenForUser(t, server, username, password)
+
+	// Create a second user who won't have explicit assignments
+	_, noRoleUsername, noRolePassword := CreateTestUserWithCredentials(t, server, "norole_rr", "norole_rr@test.com")
+	noRoleToken := CreateBearerTokenForUser(t, server, noRoleUsername, noRolePassword)
+
+	// Create an item
+	testItemID := CreateTestItem(t, server, workspaceID, "Item for Role Removal")
+
+	configSetID := GetDefaultConfigurationSet(t, server)
+	itemTypes := GetItemTypes(t, server, configSetID)
+	var itemTypeID int
+	for _, id := range itemTypes {
+		itemTypeID = id
+		break
+	}
+
+	t.Run("InitiallyEveryoneCanEdit", func(t *testing.T) {
+		itemData := map[string]interface{}{
+			"title":        "Created by norole initially",
+			"workspace_id": workspaceID,
+			"item_type_id": itemTypeID,
+		}
+		resp := MakeAuthRequestWithToken(t, server, noRoleToken, http.MethodPost, "/items", itemData)
+		defer resp.Body.Close()
+		AssertStatusCode(t, resp, http.StatusCreated)
+	})
+
+	// Assign Editor to user → Editor becomes restricted
+	AssignWorkspaceRole(t, server, userID, workspaceID, "Editor")
+
+	t.Run("AfterEditorAssignment_NoRoleCannotCreate", func(t *testing.T) {
+		itemData := map[string]interface{}{
+			"title":        "Should fail after restriction",
 			"workspace_id": workspaceID,
 			"item_type_id": itemTypeID,
 		}
@@ -344,50 +526,35 @@ func TestWorkspaceRoles_EveryoneRole(t *testing.T) {
 		AssertStatusCode(t, resp, http.StatusForbidden)
 	})
 
-	t.Run("EveryoneRoleRemoved_DeniesAccessToNoRoleUser", func(t *testing.T) {
-		// Lock down the workspace (remove Everyone role)
-		LockDownWorkspace(t, server, workspaceID)
-
-		// User with no explicit role should now be denied
-		endpoint := fmt.Sprintf("/workspaces/%d", workspaceID)
-		resp := MakeAuthRequestWithToken(t, server, noRoleToken, http.MethodGet, endpoint, nil)
-		defer resp.Body.Close()
-		AssertStatusCode(t, resp, http.StatusForbidden)
-	})
-
-	t.Run("EveryoneRoleChanged_ToEditor_GrantsEditorToAll", func(t *testing.T) {
-		// Create a new workspace for this test
-		workspaceID2, _ := CreateTestWorkspace(t, server, "Editor Everyone Test", shortKey("EETW"))
-
-		// Get Editor role ID
-		roles := GetWorkspaceRoles(t, server)
-		editorRoleID := roles["Editor"]
-
-		// Set Everyone role to Editor
-		SetEveryoneRole(t, server, workspaceID2, &editorRoleID)
-
-		// Create another user with no explicit role
-		_, anotherUsername, anotherPassword := CreateTestUserWithCredentials(t, server, "another_user", "another@test.com")
-		anotherToken := CreateBearerTokenForUser(t, server, anotherUsername, anotherPassword)
-
-		// Get item type for creating items
-		configSetID := GetDefaultConfigurationSet(t, server)
-		itemTypes := GetItemTypes(t, server, configSetID)
-		var itemTypeID int
-		for _, id := range itemTypes {
-			itemTypeID = id
-			break
-		}
-
-		// This user should now be able to create items (Editor permission)
+	t.Run("AfterEditorAssignment_ExplicitEditorCanCreate", func(t *testing.T) {
 		itemData := map[string]interface{}{
-			"title":        "Created via Everyone Editor Role",
-			"workspace_id": workspaceID2,
+			"title":        "Created by explicit editor",
+			"workspace_id": workspaceID,
 			"item_type_id": itemTypeID,
 		}
-		resp := MakeAuthRequestWithToken(t, server, anotherToken, http.MethodPost, "/items", itemData)
+		resp := MakeAuthRequestWithToken(t, server, userToken, http.MethodPost, "/items", itemData)
 		defer resp.Body.Close()
 		AssertStatusCode(t, resp, http.StatusCreated)
+	})
+
+	t.Run("AfterEditorAssignment_NoRoleCanStillView", func(t *testing.T) {
+		endpoint := fmt.Sprintf("/items/%d", testItemID)
+		resp := MakeAuthRequestWithToken(t, server, noRoleToken, http.MethodGet, endpoint, nil)
+		defer resp.Body.Close()
+		AssertStatusCode(t, resp, http.StatusOK)
+	})
+
+	// Revoke the Editor role → Editor becomes open again
+	RevokeWorkspaceRole(t, server, userID, workspaceID, editorRoleID)
+
+	t.Run("AfterEditorRevoked_EveryoneCanEditAgain", func(t *testing.T) {
+		endpoint := fmt.Sprintf("/items/%d", testItemID)
+		updateData := map[string]interface{}{
+			"title": "Updated after editor revoked",
+		}
+		resp := MakeAuthRequestWithToken(t, server, noRoleToken, http.MethodPut, endpoint, updateData)
+		defer resp.Body.Close()
+		AssertStatusCode(t, resp, http.StatusOK)
 	})
 }
 

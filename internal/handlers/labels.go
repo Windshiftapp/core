@@ -445,7 +445,7 @@ func (h *LabelHandler) AddItemLabel(w http.ResponseWriter, r *http.Request) {
 	_, err = h.db.ExecWrite("INSERT INTO item_labels (item_id, label_id, created_at) VALUES (?, ?, ?)",
 		itemID, input.LabelID, now)
 	if err != nil {
-		if database.IsUniqueConstraintError(err) || strings.Contains(err.Error(), "duplicate key") {
+		if database.IsUniqueConstraintError(err) {
 			respondConflict(w, r, "Label is already assigned to this item")
 			return
 		}
