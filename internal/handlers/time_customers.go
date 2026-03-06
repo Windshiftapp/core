@@ -51,8 +51,8 @@ func (h *TimeCustomerHandler) checkCustomerPermission(w http.ResponseWriter, r *
 }
 
 func (h *TimeCustomerHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	// Check permission
-	if _, ok := h.checkCustomerPermission(w, r); !ok {
+	if user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User); !ok || user == nil {
+		respondUnauthorized(w, r)
 		return
 	}
 
@@ -99,8 +99,8 @@ func (h *TimeCustomerHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TimeCustomerHandler) Get(w http.ResponseWriter, r *http.Request) {
-	// Check permission
-	if _, ok := h.checkCustomerPermission(w, r); !ok {
+	if user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User); !ok || user == nil {
+		respondUnauthorized(w, r)
 		return
 	}
 

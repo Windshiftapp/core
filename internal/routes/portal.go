@@ -62,16 +62,16 @@ func RegisterPortalRoutes(deps *Deps) {
 
 	//nolint:misspell // British spelling used in database
 	// Customer Organisations Management
-	api.HandleH("GET /customer-organisations", customersPerm(http.HandlerFunc(deps.TimeTracking.Customer.GetAll)))
+	auth := deps.AuthMiddleware.RequireAuth
+	api.HandleH("GET /customer-organisations", auth(http.HandlerFunc(deps.TimeTracking.Customer.GetAll)))
 	api.HandleH("POST /customer-organisations", customersPerm(http.HandlerFunc(deps.TimeTracking.Customer.Create)))
-	api.HandleH("GET /customer-organisations/{id}", customersPerm(http.HandlerFunc(deps.TimeTracking.Customer.Get)))
+	api.HandleH("GET /customer-organisations/{id}", auth(http.HandlerFunc(deps.TimeTracking.Customer.Get)))
 	api.HandleH("PUT /customer-organisations/{id}", customersPerm(http.HandlerFunc(deps.TimeTracking.Customer.Update)))
 	api.HandleH("DELETE /customer-organisations/{id}", customersPerm(http.HandlerFunc(deps.TimeTracking.Customer.Delete)))
-	api.HandleH("GET /customer-organisations/{id}/contacts", customersPerm(http.HandlerFunc(deps.Portal.PortalCustomer.GetOrganisationContacts)))
-	api.HandleH("GET /customer-organisations/{id}/projects", customersPerm(http.HandlerFunc(deps.TimeTracking.Project.GetByCustomer)))
+	api.HandleH("GET /customer-organisations/{id}/contacts", auth(http.HandlerFunc(deps.Portal.PortalCustomer.GetOrganisationContacts)))
+	api.HandleH("GET /customer-organisations/{id}/projects", auth(http.HandlerFunc(deps.TimeTracking.Project.GetByCustomer)))
 
 	// Portal Hub endpoints (for internal users)
-	auth := deps.AuthMiddleware.RequireAuth
 	admin := deps.PermissionMiddleware.RequireSystemAdmin()
 
 	if deps.Portal.Hub != nil {
