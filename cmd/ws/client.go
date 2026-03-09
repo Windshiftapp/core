@@ -193,11 +193,11 @@ func (c *Client) GetItemTransitions(id int) ([]Transition, error) {
 
 // ListWorkspaces lists all accessible workspaces
 func (c *Client) ListWorkspaces() (*PaginatedResponse[Workspace], error) {
-	var resp PaginatedResponse[Workspace]
-	if err := c.GET("/rest/api/v1/workspaces", &resp); err != nil {
+	var workspaces []Workspace
+	if err := c.GET("/rest/api/v1/workspaces", &workspaces); err != nil {
 		return nil, err
 	}
-	return &resp, nil
+	return &PaginatedResponse[Workspace]{Data: workspaces}, nil
 }
 
 // GetWorkspace gets a workspace by ID
@@ -539,19 +539,12 @@ func (c *Client) ResolveWorkspaceID(keyOrID string) (int, error) {
 		return id, nil
 	}
 
-	// Otherwise, look up by key
-	resp, err := c.ListWorkspaces()
-	if err != nil {
-		return 0, err
+	// Look up by key
+	var ws Workspace
+	if err := c.GET("/rest/api/v1/workspaces/"+url.PathEscape(keyOrID), &ws); err != nil {
+		return 0, fmt.Errorf("workspace not found: %s", keyOrID)
 	}
-
-	for _, ws := range resp.Data {
-		if strings.EqualFold(ws.Key, keyOrID) {
-			return ws.ID, nil
-		}
-	}
-
-	return 0, fmt.Errorf("workspace not found: %s", keyOrID)
+	return ws.ID, nil
 }
 
 // ResolveItemID resolves an item key (e.g., PROJ-123) or ID to an item ID

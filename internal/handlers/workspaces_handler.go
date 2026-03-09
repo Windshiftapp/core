@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"windshift/internal/database"
@@ -187,9 +188,21 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, ok := requireIDParam(w, r, "id")
-	if !ok {
+	idParam := r.PathValue("id")
+	if idParam == "" {
+		respondBadRequest(w, r, "Workspace ID or key is required")
 		return
+	}
+
+	// Determine whether to query by numeric ID or workspace key
+	var whereClause string
+	var queryArg interface{}
+	if numericID, err := strconv.Atoi(idParam); err == nil {
+		whereClause = "w.id = ?"
+		queryArg = numericID
+	} else {
+		whereClause = "LOWER(w.key) = LOWER(?)"
+		queryArg = idParam
 	}
 
 	var workspace models.Workspace
@@ -204,9 +217,9 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN projects p ON w.id = p.workspace_id
 		LEFT JOIN time_projects tp ON w.time_project_id = tp.id
 		LEFT JOIN workspace_configuration_sets wcs ON w.id = wcs.workspace_id
-		WHERE w.id = ?
+		WHERE `+whereClause+`
 		GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name, wcs.configuration_set_id
-	`, id).Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
+	`, queryArg).Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
 		&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID, &icon, &color, &workspace.AvatarURL, &defaultView, &displayMode, &workspace.CreatedAt, &workspace.UpdatedAt,
 		&workspace.ProjectCount, &timeProjectName, &configSetID)
 
@@ -264,9 +277,9 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Load time project categories for this workspace
-	timeProjectCats, err := h.loadTimeProjectCategories(id)
+	timeProjectCats, err := h.loadTimeProjectCategories(workspace.ID)
 	if err != nil {
-		slog.Error("failed to load time project categories", slog.String("component", "workspaces"), slog.Int("workspace_id", id), slog.Any("error", err))
+		slog.Error("failed to load time project categories", slog.String("component", "workspaces"), slog.Int("workspace_id", workspace.ID), slog.Any("error", err))
 		// Don't fail the request, just log the error
 		workspace.TimeProjectCategories = []int{} // Always include the field
 	} else {
