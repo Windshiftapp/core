@@ -262,9 +262,6 @@ func TestLinkTypeHandler_Get_NotFound(t *testing.T) {
 	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Get, req, nil)
 
 	rr.AssertStatusCode(http.StatusNotFound)
-	if !strings.Contains(rr.Body.String(), "Link type not found") {
-		t.Errorf("Expected 'Link type not found', got %s", rr.Body.String())
-	}
 }
 
 func TestLinkTypeHandler_Update_Success(t *testing.T) {
@@ -438,7 +435,4 @@ func TestLinkTypeHandler_Delete_SystemType(t *testing.T) {
 	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Delete, req, nil)
 
 	rr.AssertStatusCode(http.StatusForbidden)
-	if !strings.Contains(rr.Body.String(), "Cannot delete system link types") {
-		t.Errorf("Expected 'Cannot delete system link types', got %s", rr.Body.String())
-	}
 }

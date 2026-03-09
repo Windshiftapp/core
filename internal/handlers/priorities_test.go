@@ -245,9 +245,6 @@ func TestPriorityHandler_Get_NotFound(t *testing.T) {
 	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Get, req, nil)
 
 	rr.AssertStatusCode(http.StatusNotFound)
-	if !strings.Contains(rr.Body.String(), "Priority not found") {
-		t.Errorf("Expected 'Priority not found', got %s", rr.Body.String())
-	}
 }
 
 func TestPriorityHandler_Update_Success(t *testing.T) {

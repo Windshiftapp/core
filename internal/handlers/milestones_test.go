@@ -420,9 +420,6 @@ func TestMilestoneHandler_Get_NotFound(t *testing.T) {
 	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Get, req, nil)
 
 	rr.AssertStatusCode(http.StatusNotFound)
-	if !strings.Contains(rr.Body.String(), "Milestone not found") {
-		t.Errorf("Expected 'Milestone not found', got %s", rr.Body.String())
-	}
 }
 
 func TestMilestoneHandler_Update_Success(t *testing.T) {

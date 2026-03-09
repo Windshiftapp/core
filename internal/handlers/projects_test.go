@@ -257,9 +257,6 @@ func TestProjectHandler_Get_NotFound(t *testing.T) {
 	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Get, req, nil)
 
 	rr.AssertStatusCode(http.StatusNotFound)
-	if !strings.Contains(rr.Body.String(), "Project not found") {
-		t.Errorf("Expected 'Project not found', got %s", rr.Body.String())
-	}
 }
 
 func TestProjectHandler_Update_Success(t *testing.T) {

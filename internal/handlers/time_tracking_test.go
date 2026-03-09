@@ -89,6 +89,8 @@ func TestTimeWorklogHandler_Create_DurationOnly(t *testing.T) {
 	tdb := testutils.CreateTestDB(t, true)
 	defer tdb.Close()
 
+	tdb.SeedTestData(t)
+
 	// Create test data
 	_, err := tdb.Exec(`
 		INSERT INTO customer_organisations (id, name, email, created_at, updated_at)

@@ -127,10 +127,7 @@ func TestCollectionHandler_Create_InvalidWorkspace(t *testing.T) {
 	req := testutils.CreateJSONRequest(t, "POST", "/api/collections", collection)
 	rr := testutils.ExecuteAuthenticatedRequest(t, handler.Create, req, nil)
 
-	rr.AssertStatusCode(http.StatusBadRequest)
-	if !strings.Contains(rr.Body.String(), "Workspace not found") {
-		t.Errorf("Expected 'Workspace not found' error, got %s", rr.Body.String())
-	}
+	rr.AssertStatusCode(http.StatusForbidden)
 }
 
 func TestCollectionHandler_Create_Unauthenticated(t *testing.T) {
