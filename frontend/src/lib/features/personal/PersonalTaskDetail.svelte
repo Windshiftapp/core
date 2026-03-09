@@ -5,7 +5,7 @@
   import Modal from '../../dialogs/Modal.svelte';
   import Comments from '../items/Comments.svelte';
   import ItemDetailDescription from '../items/ItemDetailDescription.svelte';
-  import { X, Calendar, MessageSquare } from 'lucide-svelte';
+  import { X, Calendar, MessageSquare, ExternalLink } from 'lucide-svelte';
   import Button from '../../components/Button.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
@@ -325,6 +325,10 @@
     }
   }
 
+  function openFullDetails() {
+    navigate(`/personal/items/${itemId}`);
+  }
+
 </script>
 
 {#snippet taskContent()}
@@ -390,7 +394,10 @@
       </div>
 
       {#if isModal}
-        <Button variant="ghost" icon={X} onclick={closeModal} title={t('common.close')} />
+        <div class="flex items-center gap-1">
+          <Button variant="ghost" icon={ExternalLink} onclick={openFullDetails} title={t('items.fullDetails')} />
+          <Button variant="ghost" icon={X} onclick={closeModal} title={t('common.close')} />
+        </div>
       {/if}
     </div>
 
