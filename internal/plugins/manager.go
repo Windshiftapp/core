@@ -667,7 +667,10 @@ func (m *Manager) UploadPluginLegacy(name string, wasmData, manifestData []byte)
 	if wasmFileName == "" {
 		wasmFileName = "plugin.wasm"
 	}
-	wasmPath := filepath.Join(pluginPath, wasmFileName)
+	wasmPath, err := securejoin.SecureJoin(pluginPath, wasmFileName)
+	if err != nil {
+		return fmt.Errorf("invalid entry point path in manifest: %w", err)
+	}
 	if err := os.WriteFile(wasmPath, wasmData, 0o640); err != nil { //nolint:gosec // G306: plugin files need owner rw, group r
 		return fmt.Errorf("failed to write WASM file: %w", err)
 	}

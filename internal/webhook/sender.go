@@ -498,7 +498,7 @@ func (w *WebhookSender) SendTestWebhook(ctx context.Context, config *models.Chan
 
 	// Send request with timeout
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec // URL validated by validateWebhookURL above (SSRF protection)
 	if err != nil {
 		return false, fmt.Sprintf("Failed to send webhook: %v", err)
 	}

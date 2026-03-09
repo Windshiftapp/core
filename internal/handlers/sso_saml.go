@@ -371,8 +371,8 @@ func isValidRedirectURI(uri string) bool {
 	if uri == "" {
 		return false
 	}
-	// Must start with "/" and must not start with "//" (protocol-relative URL)
-	if !strings.HasPrefix(uri, "/") || strings.HasPrefix(uri, "//") {
+	// Must start with "/" and must not start with "//" or "/\" (protocol-relative or backslash-relative URL)
+	if !strings.HasPrefix(uri, "/") || strings.HasPrefix(uri, "//") || strings.HasPrefix(uri, `/\`) {
 		return false
 	}
 	// Reject backslash-based bypasses (e.g., "/\evil.com")
