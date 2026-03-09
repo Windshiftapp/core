@@ -193,7 +193,7 @@ build_frontend() {
         return 0
     fi
 
-    log_step "1/6" "Building frontend..."
+    log_step "1/8" "Building frontend..."
 
     if [ "$DRY_RUN" = true ]; then
         log_info "[DRY-RUN] Would run: cd frontend && npm install && npm run build"
@@ -235,7 +235,7 @@ build_binary() {
 }
 
 build_binaries() {
-    log_step "2/6" "Building binaries..."
+    log_step "2/8" "Building server binaries..."
 
     dry_run_or_exec mkdir -p dist/binaries
 
@@ -244,11 +244,49 @@ build_binaries() {
         build_binary "$goos" "$goarch" || true
     done
 
-    log_success "Binary builds complete"
+    log_success "Server binary builds complete"
+}
+
+build_ws_binary() {
+    local goos="$1"
+    local goarch="$2"
+
+    local output_path="dist/binaries/ws-${goos}-${goarch}"
+    [ "$goos" = "windows" ] && output_path="${output_path}.exe"
+
+    log_info "  Building ws for ${goos}/${goarch}..."
+
+    if [ "$DRY_RUN" = true ]; then
+        log_info "  [DRY-RUN] Would build: $output_path"
+        return 0
+    fi
+
+    export CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch"
+
+    if go build -ldflags "-s -w" -o "$output_path" ./cmd/ws; then
+        local size=$(ls -lh "$output_path" | awk '{print $5}')
+        log_success "  Built: $output_path ($size)"
+    else
+        log_error "  Failed to build ws for ${goos}/${goarch}"
+        return 1
+    fi
+}
+
+build_ws_binaries() {
+    log_step "3/8" "Building ws CLI binaries..."
+
+    dry_run_or_exec mkdir -p dist/binaries
+
+    for platform in "${PLATFORMS[@]}"; do
+        IFS="/" read -r goos goarch <<< "$platform"
+        build_ws_binary "$goos" "$goarch" || true
+    done
+
+    log_success "ws CLI binary builds complete"
 }
 
 create_release_packages() {
-    log_step "3/6" "Creating release packages..."
+    log_step "4/8" "Creating server release packages..."
 
     dry_run_or_exec mkdir -p dist/releases
 
@@ -269,7 +307,7 @@ create_release_packages() {
 
         mkdir -p "$package_dir"
 
-        # Copy binary
+        # Copy server binary
         if [[ "$platform" == *windows* ]]; then
             cp "$binary" "$package_dir/windshift.exe"
         else
@@ -303,8 +341,51 @@ CONFIGEOF
 
         rm -rf "$package_dir"
     done
+}
 
-    # Generate checksums
+create_ws_release_packages() {
+    log_step "5/8" "Creating ws CLI release packages..."
+
+    dry_run_or_exec mkdir -p dist/releases
+
+    if [ "$DRY_RUN" = true ]; then
+        log_info "[DRY-RUN] Would create ws release packages for all built ws binaries"
+        log_info "[DRY-RUN] Would generate SHA256SUMS.txt for all release archives"
+        return 0
+    fi
+
+    for binary in dist/binaries/ws-*; do
+        [ -f "$binary" ] || continue
+
+        local basename=$(basename "$binary")
+        local platform="${basename#ws-}"
+        platform="${platform%.exe}"
+
+        local package_name="ws-${VERSION}-${platform}"
+        local package_dir="dist/releases/${package_name}"
+
+        mkdir -p "$package_dir"
+
+        # Copy ws binary
+        if [[ "$platform" == *windows* ]]; then
+            cp "$binary" "$package_dir/ws.exe"
+        else
+            cp "$binary" "$package_dir/ws"
+        fi
+
+        # Create archive
+        if [[ "$platform" == *windows* ]]; then
+            (cd dist/releases && zip -q -r "${package_name}.zip" "${package_name}")
+            log_success "Created ${package_name}.zip"
+        else
+            (cd dist/releases && tar -czf "${package_name}.tar.gz" "${package_name}")
+            log_success "Created ${package_name}.tar.gz"
+        fi
+
+        rm -rf "$package_dir"
+    done
+
+    # Generate checksums for all release archives (windshift + ws)
     if ls dist/releases/*.tar.gz dist/releases/*.zip 2>/dev/null | head -1 >/dev/null; then
         (cd dist/releases && sha256sum *.tar.gz *.zip 2>/dev/null > SHA256SUMS.txt || true)
         log_success "Generated SHA256SUMS.txt"
@@ -321,7 +402,7 @@ ensure_buildx() {
 }
 
 build_docker() {
-    log_step "4/6" "Building Docker images..."
+    log_step "6/8" "Building Docker images..."
 
     check_docker
     ensure_buildx
@@ -351,7 +432,7 @@ build_docker() {
 }
 
 create_github_release() {
-    log_step "5/6" "Creating GitHub release..."
+    log_step "7/8" "Creating GitHub release..."
 
     check_gh_cli
 
@@ -399,7 +480,9 @@ cmd_build() {
 
     build_frontend
     build_binaries
+    build_ws_binaries
     create_release_packages
+    create_ws_release_packages
 
     echo ""
     log_success "Build complete! Artifacts in dist/"
@@ -462,7 +545,8 @@ cmd_release() {
         echo "=========================="
         echo "This will:"
         echo "  - Build frontend"
-        echo "  - Build binaries for multiple platforms"
+        echo "  - Build server binaries for multiple platforms"
+        echo "  - Build ws CLI binaries for multiple platforms"
         echo "  - Create release packages with checksums"
         echo "  - Build and push Docker images"
         echo "  - Create git tag and push"
@@ -479,7 +563,9 @@ cmd_release() {
 
     build_frontend
     build_binaries
+    build_ws_binaries
     create_release_packages
+    create_ws_release_packages
     build_docker
     create_github_release
 
