@@ -169,7 +169,14 @@ class PluginBridge {
 	 * Handle messages from host
 	 */
 	_handleMessage(event) {
-		// In production, verify event.origin
+		// Only accept messages from the parent window's origin
+		const expectedOrigin = window.location.ancestorOrigins?.length
+			? window.location.ancestorOrigins[0]
+			: window.location.origin;
+		if (event.origin !== expectedOrigin) {
+			return;
+		}
+
 		const message = event.data;
 
 		if (!message || !message.type) return;

@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 
+	securejoin "github.com/cyphar/filepath-securejoin"
 	extism "github.com/extism/go-sdk"
 )
 
@@ -518,6 +520,23 @@ func (m *Manager) CallPluginFunction(pluginName, funcName string, payload any) (
 	return m.callFunction(ctx, instance, funcName, payload)
 }
 
+// validPluginName matches only safe plugin names: alphanumeric, hyphens, underscores.
+var validPluginName = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+// validatePluginName rejects names that could cause path traversal or injection.
+func validatePluginName(name string) error {
+	if name == "" {
+		return fmt.Errorf("plugin name must not be empty")
+	}
+	if strings.Contains(name, "..") || strings.Contains(name, "/") || strings.Contains(name, "\\") {
+		return fmt.Errorf("invalid plugin name: must not contain path separators or '..'")
+	}
+	if !validPluginName.MatchString(name) {
+		return fmt.Errorf("invalid plugin name: must contain only alphanumeric characters, hyphens, and underscores")
+	}
+	return nil
+}
+
 // UploadPlugin handles plugin upload from a zip file.
 func (m *Manager) UploadPlugin(name string, zipData []byte) error {
 	zipReader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
@@ -555,6 +574,10 @@ func (m *Manager) UploadPlugin(name string, zipData []byte) error {
 		name = manifest.Name
 	}
 
+	if err := validatePluginName(name); err != nil {
+		return err
+	}
+
 	// Install plugins to the primary plugin directory
 	pluginPath := filepath.Join(m.pluginDirs[0], name)
 	if err := os.MkdirAll(pluginPath, 0o750); err != nil {
@@ -571,6 +594,16 @@ func (m *Manager) UploadPlugin(name string, zipData []byte) error {
 			continue
 		}
 
+		// Skip symlinks to prevent symlink-based path traversal
+		if file.FileInfo().Mode()&os.ModeSymlink != 0 {
+			continue
+		}
+
+		// Reject absolute paths in zip entries
+		if filepath.IsAbs(file.Name) {
+			return fmt.Errorf("invalid path in zip file: %s", file.Name)
+		}
+
 		rc, err := file.Open()
 		if err != nil {
 			return fmt.Errorf("failed to open file %s in zip: %w", file.Name, err)
@@ -584,19 +617,16 @@ func (m *Manager) UploadPlugin(name string, zipData []byte) error {
 
 		fileName := filepath.Base(file.Name)
 
+		// Use securejoin to safely resolve the destination path within the plugin directory
 		var destPath string
 		if strings.HasSuffix(fileName, ".js") || strings.HasSuffix(fileName, ".css") ||
 			strings.HasPrefix(filepath.Dir(file.Name), "assets") {
-			destPath = filepath.Join(assetsPath, fileName)
+			destPath, err = securejoin.SecureJoin(assetsPath, fileName)
 		} else {
-			destPath = filepath.Join(pluginPath, fileName)
+			destPath, err = securejoin.SecureJoin(pluginPath, fileName)
 		}
-
-		// Validate path stays within plugin directory (prevent path traversal)
-		cleanDest := filepath.Clean(destPath)
-		cleanBase := filepath.Clean(pluginPath) + string(os.PathSeparator)
-		if !strings.HasPrefix(cleanDest, cleanBase) && cleanDest != filepath.Clean(pluginPath) {
-			return fmt.Errorf("invalid path in zip file: %s", file.Name)
+		if err != nil {
+			return fmt.Errorf("invalid path in zip file: %s: %w", file.Name, err)
 		}
 
 		if err := os.WriteFile(destPath, fileData, 0o640); err != nil { //nolint:gosec // G306: plugin files need owner rw, group r
@@ -616,6 +646,10 @@ func (m *Manager) UploadPluginLegacy(name string, wasmData, manifestData []byte)
 
 	if name == "" {
 		name = manifest.Name
+	}
+
+	if err := validatePluginName(name); err != nil {
+		return err
 	}
 
 	// Install plugins to the primary plugin directory
@@ -683,15 +717,10 @@ func (m *Manager) GetAsset(pluginName, assetPath string) (data []byte, contentTy
 		return nil, "", fmt.Errorf("plugin is disabled: %s", pluginName)
 	}
 
-	cleanPath := filepath.Clean(assetPath)
-	if strings.Contains(cleanPath, "..") {
-		return nil, "", fmt.Errorf("invalid asset path")
-	}
-
-	fullPath := filepath.Join(p.Path, "assets", cleanPath)
 	assetsDir := filepath.Join(p.Path, "assets")
-	if !strings.HasPrefix(fullPath, assetsDir) {
-		return nil, "", fmt.Errorf("asset path outside assets directory")
+	fullPath, err := securejoin.SecureJoin(assetsDir, assetPath)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid asset path: %w", err)
 	}
 
 	data, err = os.ReadFile(fullPath)
@@ -819,9 +848,9 @@ func mergeMetadata(base, meta PluginMetadata) PluginMetadata {
 
 // ReadPluginFile reads a file from a plugin directory.
 func ReadPluginFile(pluginDir, pluginName, filename string) (io.ReadCloser, error) {
-	filePath := filepath.Join(pluginDir, pluginName, filename)
-
-	if !strings.HasPrefix(filePath, filepath.Join(pluginDir, pluginName)) {
+	baseDir := filepath.Join(pluginDir, pluginName)
+	filePath, err := securejoin.SecureJoin(baseDir, filename)
+	if err != nil {
 		return nil, errors.New("invalid file path")
 	}
 

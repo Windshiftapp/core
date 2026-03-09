@@ -2238,7 +2238,7 @@ ${colors.reset}`);
     const modeText = options.scale ? ' (with scale data)' : (options.challenge ? ' (with challenge data)' : '');
     log(`\n${colors.bright}${colors.green}✓ Demo content generated successfully${modeText}!${colors.reset}\n`);
     logInfo(`Access the application at: ${options.baseURL}`);
-    logInfo(`Login with: ${options.adminUser} / ${options.adminPassword}`);
+    logInfo(`Login with: ${options.adminUser} / ${'*'.repeat(options.adminPassword.length)}`);
 
     if (serverProcess && options.keepServer) {
       log(`\n${colors.yellow}Server is still running. Press Ctrl+C to stop.${colors.reset}\n`);

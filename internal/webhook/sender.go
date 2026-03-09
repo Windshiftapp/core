@@ -9,7 +9,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"time"
 
 	"windshift/internal/database"
@@ -240,6 +242,52 @@ func (w *WebhookSender) itemInCollections(ctx context.Context, itemID int, colle
 	return false
 }
 
+// validateWebhookURL checks that a webhook URL is safe to call (not targeting internal networks).
+func validateWebhookURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid webhook URL: %w", err)
+	}
+
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("webhook URL must use http or https scheme, got %q", u.Scheme)
+	}
+
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("webhook URL must have a host")
+	}
+
+	// Reject localhost and common loopback names
+	lower := net.ParseIP(host)
+	if lower == nil {
+		// It's a hostname, resolve it
+		if host == "localhost" || host == "ip6-localhost" || host == "ip6-loopback" {
+			return fmt.Errorf("webhook URL must not target localhost")
+		}
+		ips, err := net.LookupHost(host)
+		if err != nil {
+			return fmt.Errorf("cannot resolve webhook host %q: %w", host, err)
+		}
+		for _, ipStr := range ips {
+			if ip := net.ParseIP(ipStr); ip != nil && isPrivateIP(ip) {
+				return fmt.Errorf("webhook URL %q resolves to private IP %s", host, ipStr)
+			}
+		}
+	} else {
+		if isPrivateIP(lower) {
+			return fmt.Errorf("webhook URL must not target private IP %s", host)
+		}
+	}
+
+	return nil
+}
+
+// isPrivateIP returns true for loopback, private, and link-local addresses.
+func isPrivateIP(ip net.IP) bool {
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified()
+}
+
 // sendWebhook sends the webhook payload to the configured URL or plugin
 func (w *WebhookSender) sendWebhook(webhook WebhookConfig, event string, item *models.Item) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -302,6 +350,12 @@ func (w *WebhookSender) sendWebhook(webhook WebhookConfig, event string, item *m
 	}
 
 	// Standard HTTP webhook
+	// Validate URL to prevent SSRF
+	if err := validateWebhookURL(webhook.URL); err != nil {
+		logger.Get().Error("Webhook URL validation failed", "error", err, "url", webhook.URL, "webhook_id", webhook.ChannelID)
+		return
+	}
+
 	// Create request
 	req, err := http.NewRequestWithContext(ctx, "POST", webhook.URL, bytes.NewBuffer(payloadBytes))
 	if err != nil {
@@ -392,6 +446,11 @@ func (w *WebhookSender) TriggerManually(ctx context.Context, webhookID, itemID i
 func (w *WebhookSender) SendTestWebhook(ctx context.Context, config *models.ChannelConfig) (success bool, message string) {
 	if config.WebhookURL == "" {
 		return false, "Webhook URL is required"
+	}
+
+	// Validate URL to prevent SSRF
+	if err := validateWebhookURL(config.WebhookURL); err != nil {
+		return false, fmt.Sprintf("Invalid webhook URL: %v", err)
 	}
 
 	// Create test payload

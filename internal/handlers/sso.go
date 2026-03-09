@@ -241,6 +241,17 @@ func (h *SSOHandler) StartLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Extract and validate redirect_uri (where to return after login)
+	redirectAfterLogin := r.URL.Query().Get("redirect_uri")
+	if redirectAfterLogin == "" {
+		redirectAfterLogin = "/"
+	}
+	if !isValidRedirectURI(redirectAfterLogin) {
+		redirectAfterLogin = "/"
+	}
+
+	rememberMe := r.URL.Query().Get("remember") == "true"
+
 	// Decrypt client secret
 	clientSecret, err := h.encryption.Decrypt(provider.ClientSecretEncrypted)
 	if err != nil {
@@ -263,6 +274,17 @@ func (h *SSOHandler) StartLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Generate state with random data
 	state := generateRandomState()
+
+	// Store state token with redirect_uri and remember_me
+	_, storeErr := h.db.Exec(`
+		INSERT INTO sso_state_tokens (provider_id, state, redirect_uri, remember_me, expires_at)
+		VALUES (?, ?, ?, ?, ?)
+	`, provider.ID, state, redirectAfterLogin, rememberMe, time.Now().Add(5*time.Minute))
+	if storeErr != nil {
+		slog.Error("failed to store OIDC state token", "error", storeErr)
+		respondInternalError(w, r, storeErr)
+		return
+	}
 
 	// Get the auth URL handler and redirect
 	authHandler := h.oidcService.GetAuthURLHandler(relyingParty, func() string {
@@ -330,6 +352,22 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	// Create callback handler
 	callbackHandler := h.oidcService.GetCodeExchangeHandler(relyingParty, func(w http.ResponseWriter, r *http.Request, tokens *oidc.Tokens[*oidc.IDTokenClaims], state string, rp rp.RelyingParty) {
+		// Retrieve stored state data (redirect_uri, remember_me)
+		var stateTokenID int
+		var storedRedirectURI string
+		var rememberMe bool
+		stateErr := h.db.QueryRow(`
+			SELECT id, redirect_uri, remember_me FROM sso_state_tokens
+			WHERE state = ? AND provider_id = ? AND expires_at > ?
+		`, state, provider.ID, time.Now()).Scan(&stateTokenID, &storedRedirectURI, &rememberMe)
+		if stateErr == nil {
+			_, _ = h.db.Exec("DELETE FROM sso_state_tokens WHERE id = ?", stateTokenID)
+		}
+		// Default to "/" if state token not found (e.g., expired)
+		if storedRedirectURI == "" || !isValidRedirectURI(storedRedirectURI) {
+			storedRedirectURI = "/"
+		}
+
 		// Extract claims
 		claims, err := h.oidcService.ExtractClaims(tokens, attributeMap)
 		if err != nil {
@@ -390,7 +428,7 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 		// Create session
 		slog.Debug("creating session", slog.String("component", "sso"), slog.Int("user_id", user.ID), slog.String("ip_address", ipAddress))
-		session, err := h.sessionManager.CreateSession(user.ID, ipAddress, r.UserAgent(), false)
+		session, err := h.sessionManager.CreateSession(user.ID, ipAddress, r.UserAgent(), rememberMe)
 		if err != nil {
 			slog.Error("failed to create session", slog.String("component", "sso"), slog.Any("error", err))
 			h.redirectWithError(w, r, "Failed to create session")
@@ -400,7 +438,7 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 		// Set session cookie
 		slog.Debug("setting session cookie", slog.String("component", "sso"))
-		if err := h.sessionManager.SetSessionCookie(w, r, session.Token, false); err != nil {
+		if err := h.sessionManager.SetSessionCookie(w, r, session.Token, rememberMe); err != nil {
 			slog.Error("failed to set session cookie", slog.String("component", "sso"), slog.Any("error", err))
 			h.redirectWithError(w, r, "Failed to set session")
 			return
@@ -409,11 +447,9 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 		// Redirect based on email verification status
 		if result.NeedsEmailVerification && !user.EmailVerified {
-			// Redirect to verification pending page
 			http.Redirect(w, r, "/?verify_email=pending", http.StatusFound)
 		} else {
-			// Redirect to app
-			http.Redirect(w, r, "/", http.StatusFound)
+			http.Redirect(w, r, storedRedirectURI, http.StatusFound)
 		}
 	})
 

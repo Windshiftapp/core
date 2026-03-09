@@ -379,6 +379,14 @@ func isValidRedirectURI(uri string) bool {
 	if strings.Contains(uri, "\\") {
 		return false
 	}
+	// Reject tab/newline characters (header injection / URL confusion)
+	if strings.ContainsAny(uri, "\t\n\r") {
+		return false
+	}
+	// Reject userinfo-based redirect confusion (e.g., "/@evil.com")
+	if strings.Contains(uri, "@") {
+		return false
+	}
 	return true
 }
 
