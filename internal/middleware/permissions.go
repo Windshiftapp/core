@@ -7,6 +7,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/restapi"
 	"windshift/internal/services"
 )
 
@@ -27,7 +28,7 @@ func (pm *PermissionMiddleware) RequireGlobalPermission(permissionKey string) fu
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			user := pm.getUserFromContext(r)
 			if user == nil {
-				http.Error(w, "Authentication required", http.StatusUnauthorized)
+				restapi.RespondError(w, r, restapi.ErrUnauthorized)
 				return
 			}
 
@@ -41,12 +42,12 @@ func (pm *PermissionMiddleware) RequireGlobalPermission(permissionKey string) fu
 			hasPermission, err := pm.hasGlobalPermission(user.ID, permissionKey)
 			if err != nil {
 				slog.Error("error checking global permission", slog.Any("error", err))
-				http.Error(w, "Permission check failed", http.StatusInternalServerError)
+				restapi.RespondError(w, r, restapi.ErrInternalError)
 				return
 			}
 
 			if !hasPermission {
-				http.Error(w, "Insufficient permissions", http.StatusForbidden)
+				restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
 				return
 			}
 
@@ -62,7 +63,7 @@ func (pm *PermissionMiddleware) RequireWorkspacePermission(permissionKey string)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			user := pm.getUserFromContext(r)
 			if user == nil {
-				http.Error(w, "Authentication required", http.StatusUnauthorized)
+				restapi.RespondError(w, r, restapi.ErrUnauthorized)
 				return
 			}
 
@@ -78,13 +79,13 @@ func (pm *PermissionMiddleware) RequireWorkspacePermission(permissionKey string)
 				workspaceIDStr = r.PathValue("id")
 			}
 			if workspaceIDStr == "" {
-				http.Error(w, "Workspace ID not found in URL", http.StatusBadRequest)
+				restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Workspace ID not found in URL"))
 				return
 			}
 
 			workspaceID, err := strconv.Atoi(workspaceIDStr)
 			if err != nil {
-				http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+				restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid workspaceId"))
 				return
 			}
 
@@ -92,12 +93,12 @@ func (pm *PermissionMiddleware) RequireWorkspacePermission(permissionKey string)
 			hasPermission, err := pm.permissionService.HasWorkspacePermission(user.ID, workspaceID, permissionKey)
 			if err != nil {
 				slog.Error("error checking workspace permission", slog.Any("error", err))
-				http.Error(w, "Permission check failed", http.StatusInternalServerError)
+				restapi.RespondError(w, r, restapi.ErrInternalError)
 				return
 			}
 
 			if !hasPermission {
-				http.Error(w, "Insufficient permissions for this workspace", http.StatusForbidden)
+				restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
 				return
 			}
 
@@ -118,7 +119,7 @@ func (pm *PermissionMiddleware) RequireAnyWorkspacePermission() func(http.Handle
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			user := pm.getUserFromContext(r)
 			if user == nil {
-				http.Error(w, "Authentication required", http.StatusUnauthorized)
+				restapi.RespondError(w, r, restapi.ErrUnauthorized)
 				return
 			}
 
@@ -134,13 +135,13 @@ func (pm *PermissionMiddleware) RequireAnyWorkspacePermission() func(http.Handle
 				workspaceIDStr = r.PathValue("id")
 			}
 			if workspaceIDStr == "" {
-				http.Error(w, "Workspace ID not found in URL", http.StatusBadRequest)
+				restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Workspace ID not found in URL"))
 				return
 			}
 
 			workspaceID, err := strconv.Atoi(workspaceIDStr)
 			if err != nil {
-				http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+				restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid workspaceId"))
 				return
 			}
 
@@ -148,12 +149,12 @@ func (pm *PermissionMiddleware) RequireAnyWorkspacePermission() func(http.Handle
 			hasAnyPermission, err := pm.hasAnyWorkspacePermission(user.ID, workspaceID)
 			if err != nil {
 				slog.Error("error checking workspace permissions", slog.Any("error", err))
-				http.Error(w, "Permission check failed", http.StatusInternalServerError)
+				restapi.RespondError(w, r, restapi.ErrInternalError)
 				return
 			}
 
 			if !hasAnyPermission {
-				http.Error(w, "No permissions for this workspace", http.StatusForbidden)
+				restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
 				return
 			}
 
@@ -169,7 +170,7 @@ func (pm *PermissionMiddleware) RequireChannelManagement() func(http.Handler) ht
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			user := pm.getUserFromContext(r)
 			if user == nil {
-				http.Error(w, "Authentication required", http.StatusUnauthorized)
+				restapi.RespondError(w, r, restapi.ErrUnauthorized)
 				return
 			}
 
@@ -182,13 +183,13 @@ func (pm *PermissionMiddleware) RequireChannelManagement() func(http.Handler) ht
 			// Extract channel ID from URL (PathValue returns "" if not found)
 			channelIDStr := r.PathValue("id")
 			if channelIDStr == "" {
-				http.Error(w, "Channel ID not found in URL", http.StatusBadRequest)
+				restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Channel ID not found in URL"))
 				return
 			}
 
 			channelID, err := strconv.Atoi(channelIDStr)
 			if err != nil {
-				http.Error(w, "Invalid channel ID", http.StatusBadRequest)
+				restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid channel ID"))
 				return
 			}
 
@@ -196,13 +197,13 @@ func (pm *PermissionMiddleware) RequireChannelManagement() func(http.Handler) ht
 			var isDefault bool
 			err = pm.db.QueryRow(`SELECT is_default FROM channels WHERE id = ?`, channelID).Scan(&isDefault)
 			if err != nil {
-				http.Error(w, "Channel not found", http.StatusNotFound)
+				restapi.RespondError(w, r, restapi.ErrChannelNotFound)
 				return
 			}
 
 			// Default channels can only be managed by system admins
 			if isDefault {
-				http.Error(w, "Default channels can only be managed by system administrators", http.StatusForbidden)
+				restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, restapi.ErrCodeForbidden, "Default channels can only be managed by system administrators"))
 				return
 			}
 
@@ -210,12 +211,12 @@ func (pm *PermissionMiddleware) RequireChannelManagement() func(http.Handler) ht
 			hasPermission, err := pm.isChannelManager(user.ID, channelID)
 			if err != nil {
 				slog.Error("error checking channel management permission", slog.Any("error", err))
-				http.Error(w, "Permission check failed", http.StatusInternalServerError)
+				restapi.RespondError(w, r, restapi.ErrInternalError)
 				return
 			}
 
 			if !hasPermission {
-				http.Error(w, "You must be a channel manager or administrator to modify this channel", http.StatusForbidden)
+				restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, restapi.ErrCodeInsufficientPermission, "You must be a channel manager or administrator to modify this channel"))
 				return
 			}
 
@@ -350,13 +351,13 @@ func (pm *PermissionMiddleware) RequireSetupNotComplete() func(http.Handler) htt
 			err := pm.db.QueryRow(`SELECT value FROM system_settings WHERE key = 'setup_completed'`).Scan(&setupCompleted)
 			if err != nil {
 				slog.Error("error checking setup status", slog.Any("error", err))
-				http.Error(w, "Failed to check setup status", http.StatusInternalServerError)
+				restapi.RespondError(w, r, restapi.ErrInternalError)
 				return
 			}
 
 			// Block access if setup is already completed
 			if setupCompleted == "true" {
-				http.Error(w, "Setup has already been completed", http.StatusForbidden)
+				restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, restapi.ErrCodeForbidden, "Setup has already been completed"))
 				return
 			}
 
