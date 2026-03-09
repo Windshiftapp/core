@@ -97,25 +97,11 @@ func NewSCMWorkspaceHandler(db database.Database, encryption *sso.SecretEncrypti
 	}
 }
 
-// requireWorkspacePermission checks authentication and workspace permission.
-// Returns true if authorized, false otherwise (error already written to response).
-func (h *SCMWorkspaceHandler) requireWorkspacePermission(w http.ResponseWriter, r *http.Request, workspaceID int, permission string) bool {
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return false
-	}
-	return RequireWorkspacePermission(w, r, user.ID, workspaceID, permission, h.permissionService)
-}
-
 // GetWorkspaceSCMConnections returns all SCM connections for a workspace
 func (h *SCMWorkspaceHandler) GetWorkspaceSCMConnections(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	if !h.requireWorkspacePermission(w, r, workspaceID, models.PermissionItemView) {
 		return
 	}
 
@@ -178,10 +164,6 @@ func (h *SCMWorkspaceHandler) CreateWorkspaceSCMConnection(w http.ResponseWriter
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	if !h.requireWorkspacePermission(w, r, workspaceID, models.PermissionWorkspaceAdmin) {
 		return
 	}
 
@@ -273,10 +255,6 @@ func (h *SCMWorkspaceHandler) GetWorkspaceSCMConnection(w http.ResponseWriter, r
 		return
 	}
 
-	if !h.requireWorkspacePermission(w, r, workspaceID, models.PermissionItemView) {
-		return
-	}
-
 	conn, err := h.getConnectionByID(connID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -307,10 +285,6 @@ func (h *SCMWorkspaceHandler) UpdateWorkspaceSCMConnection(w http.ResponseWriter
 	connID, err := strconv.Atoi(r.PathValue("connId"))
 	if err != nil {
 		respondInvalidID(w, r, "connectionId")
-		return
-	}
-
-	if !h.requireWorkspacePermission(w, r, workspaceID, models.PermissionWorkspaceAdmin) {
 		return
 	}
 
@@ -379,10 +353,6 @@ func (h *SCMWorkspaceHandler) DeleteWorkspaceSCMConnection(w http.ResponseWriter
 		return
 	}
 
-	if !h.requireWorkspacePermission(w, r, workspaceID, models.PermissionWorkspaceAdmin) {
-		return
-	}
-
 	// Verify connection belongs to this workspace
 	var connWorkspaceID int
 	err = h.db.QueryRow("SELECT workspace_id FROM workspace_scm_connections WHERE id = ?", connID).Scan(&connWorkspaceID)
@@ -420,10 +390,6 @@ func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r
 	connID, err := strconv.Atoi(r.PathValue("connId"))
 	if err != nil {
 		respondInvalidID(w, r, "connectionId")
-		return
-	}
-
-	if !h.requireWorkspacePermission(w, r, workspaceID, models.PermissionItemView) {
 		return
 	}
 
@@ -580,10 +546,6 @@ func (h *SCMWorkspaceHandler) GetLinkedRepositories(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if !h.requireWorkspacePermission(w, r, workspaceID, models.PermissionItemView) {
-		return
-	}
-
 	// Verify connection belongs to workspace
 	var connWorkspaceID int
 	err = h.db.QueryRow("SELECT workspace_id FROM workspace_scm_connections WHERE id = ?", connID).Scan(&connWorkspaceID)
@@ -651,10 +613,6 @@ func (h *SCMWorkspaceHandler) LinkRepository(w http.ResponseWriter, r *http.Requ
 	connID, err := strconv.Atoi(r.PathValue("connId"))
 	if err != nil {
 		respondInvalidID(w, r, "connectionId")
-		return
-	}
-
-	if !h.requireWorkspacePermission(w, r, workspaceID, models.PermissionWorkspaceAdmin) {
 		return
 	}
 
@@ -769,7 +727,11 @@ func (h *SCMWorkspaceHandler) UnlinkRepository(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	if !h.requireWorkspacePermission(w, r, workspaceID, models.PermissionWorkspaceAdmin) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionWorkspaceAdmin, h.permissionService) {
 		return
 	}
 
@@ -787,10 +749,6 @@ func (h *SCMWorkspaceHandler) GetAvailableSCMProviders(w http.ResponseWriter, r 
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	if !h.requireWorkspacePermission(w, r, workspaceID, models.PermissionItemView) {
 		return
 	}
 
@@ -900,10 +858,6 @@ func (h *SCMWorkspaceHandler) StartWorkspaceOAuth(w http.ResponseWriter, r *http
 	connID, err := strconv.Atoi(r.PathValue("connId"))
 	if err != nil {
 		respondInvalidID(w, r, "connectionId")
-		return
-	}
-
-	if !h.requireWorkspacePermission(w, r, workspaceID, models.PermissionWorkspaceAdmin) {
 		return
 	}
 
@@ -1034,10 +988,6 @@ func (h *SCMWorkspaceHandler) SetWorkspacePAT(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if !h.requireWorkspacePermission(w, r, workspaceID, models.PermissionWorkspaceAdmin) {
-		return
-	}
-
 	var req struct {
 		PersonalAccessToken string `json:"personal_access_token"`
 	}
@@ -1122,10 +1072,6 @@ func (h *SCMWorkspaceHandler) ClearWorkspaceCredentials(w http.ResponseWriter, r
 		return
 	}
 
-	if !h.requireWorkspacePermission(w, r, workspaceID, models.PermissionWorkspaceAdmin) {
-		return
-	}
-
 	// Verify connection exists and belongs to this workspace
 	var connWorkspaceID int
 	err = h.db.QueryRow("SELECT workspace_id FROM workspace_scm_connections WHERE id = ?", connID).Scan(&connWorkspaceID)
@@ -1172,10 +1118,6 @@ func (h *SCMWorkspaceHandler) GetWorkspaceConnectionAuthStatus(w http.ResponseWr
 	connID, err := strconv.Atoi(r.PathValue("connId"))
 	if err != nil {
 		respondInvalidID(w, r, "connectionId")
-		return
-	}
-
-	if !h.requireWorkspacePermission(w, r, workspaceID, models.PermissionItemView) {
 		return
 	}
 
