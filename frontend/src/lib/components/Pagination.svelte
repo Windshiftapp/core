@@ -15,6 +15,8 @@
   export let pageSizeOptions = [10, 25, 50, 100];
   export let compact = false; // For smaller spaces
   export let hasGradient = false; // Gradient background awareness
+  export let onpageChange = null; // Callback prop (Svelte 5 callers)
+  export let onpageSizeChange = null; // Callback prop (Svelte 5 callers)
 
   // Gradient-aware text styles (using inline styles instead of Tailwind classes)
   $: textStyle = hasGradient ? 'color: var(--ds-text);' : 'color: var(--ds-text);';
@@ -56,13 +58,15 @@
   function goToPage(page) {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
       dispatch('pageChange', { page, itemsPerPage });
+      onpageChange?.({ detail: { page, itemsPerPage } });
     }
   }
-  
+
   function handlePageSizeChange(event) {
     const newPageSize = parseInt(event.target.value);
     const newPage = Math.min(currentPage, Math.ceil(Math.min(totalItems, maxItems) / newPageSize));
     dispatch('pageSizeChange', { page: newPage, itemsPerPage: newPageSize });
+    onpageSizeChange?.({ detail: { page: newPage, itemsPerPage: newPageSize } });
   }
 </script>
 
@@ -80,7 +84,7 @@
 
       {#if showPageSizes && !compact}
         <div class="flex items-center gap-2 text-sm" style={textStyle}>
-          <label>{t('components.pagination.itemsPerPage')}</label>
+          <span>{t('components.pagination.itemsPerPage')}</span>
           <div style="min-width: 100px;">
             <BasePicker
               value={itemsPerPage}

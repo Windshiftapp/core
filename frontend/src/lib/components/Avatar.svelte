@@ -74,16 +74,29 @@
 </script>
 
 {#if src}
-  <img
-    {src}
-    alt={computedAlt}
-    class="{baseClasses} object-cover"
-    onclick={onclick}
-  />
+  {#if onclick}
+    <button type="button" class="p-0 border-0 bg-transparent cursor-pointer" onclick={onclick}>
+      <img
+        {src}
+        alt={computedAlt}
+        class="{baseClasses} object-cover"
+      />
+    </button>
+  {:else}
+    <img
+      {src}
+      alt={computedAlt}
+      class="{baseClasses} object-cover"
+    />
+  {/if}
 {:else}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class={baseClasses} style={variantStyles[variant]} onclick={onclick}>
-    {initials}
-  </div>
+  {#if onclick}
+    <button type="button" class="appearance-none bg-transparent border-none p-0 m-0 font-[inherit] text-[inherit] cursor-pointer {baseClasses}" style={variantStyles[variant]} onclick={onclick}>
+      {initials}
+    </button>
+  {:else}
+    <div class={baseClasses} style={variantStyles[variant]}>
+      {initials}
+    </div>
+  {/if}
 {/if}

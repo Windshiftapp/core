@@ -397,7 +397,7 @@
 
 			{#if !selectedLog.success && selectedLog.error_message}
 				<div>
-					<label class="block text-sm font-medium mb-1 text-red-700">{t('auditLog.errorMessage')}</label>
+					<span class="block text-sm font-medium mb-1 text-red-700">{t('auditLog.errorMessage')}</span>
 					<div class="text-sm bg-red-50 p-3 rounded border border-red-200 text-red-700">
 						{selectedLog.error_message}
 					</div>

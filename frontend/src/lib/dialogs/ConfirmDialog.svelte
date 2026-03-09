@@ -94,8 +94,9 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <ModalBackdrop bind:show onclose={cancel} ariaLabelledBy="dialog-title" zIndex={70}>
-    <!-- Modal content -->
+    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
     <div
+      role="presentation"
       class="bg-white rounded shadow-xl max-w-md w-full transform transition-all"
       style="background-color: var(--ds-surface-raised);"
       onclick={(e) => e.stopPropagation()}

@@ -1,5 +1,5 @@
 <script>
-  let { tabs = [], activeTab = $bindable(''), onTabChange = null, children } = $props();
+  let { tabs = [], activeTab = $bindable(''), onTabChange = null, type = 'default', children } = $props();
 
   // Initialize activeTab to first tab if not set
   $effect(() => {

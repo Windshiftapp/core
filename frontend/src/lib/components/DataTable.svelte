@@ -8,6 +8,7 @@
   export let columns = []; // Array of column definitions: { key, label, width?, align?, sortable? }
   export let data = []; // Array of data objects
   export let keyField = 'id'; // Field to use as unique key
+  export let loading = false; // Loading state
   export let emptyMessage = '';
   export let emptyDescription = ''; // Optional description for empty state
   export let emptyIcon = null; // Lucide icon component

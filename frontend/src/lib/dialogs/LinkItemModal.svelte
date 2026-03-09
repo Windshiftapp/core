@@ -183,10 +183,11 @@
     <div class="space-y-4">
       <!-- Link Type Picker -->
       <div class="space-y-1">
-        <label class="block text-sm font-medium" style="color: var(--ds-text-subtle);">
+        <label for="link-type-picker" class="block text-sm font-medium" style="color: var(--ds-text-subtle);">
           {t('items.linkType')}
         </label>
         <BasePicker
+          id="link-type-picker"
           bind:value={formData.link_type_id}
           items={linkTypes}
           placeholder={t('items.chooseRelationshipType')}
@@ -202,7 +203,7 @@
 
       <!-- Target Item Search -->
       <div>
-        <label class="block text-sm font-medium mb-1" style="color: var(--ds-text-subtle);">
+        <label for="link-target-search" class="block text-sm font-medium mb-1" style="color: var(--ds-text-subtle);">
           {t('items.targetItem')}
         </label>
 
@@ -227,6 +228,7 @@
           <!-- Search Input -->
           <div class="relative">
             <input
+              id="link-target-search"
               bind:this={inputRef}
               type="text"
               bind:value={searchQuery}

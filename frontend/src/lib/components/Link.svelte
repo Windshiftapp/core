@@ -12,7 +12,7 @@
    * - Optional onClick for modal/custom behavior while preserving link benefits
    */
 
-  export let href;
+  export let href = '';
   export let active = false;
   export let disabled = false;
   export let onClick = null; // Optional click handler for modals or custom behavior
@@ -25,7 +25,7 @@
   export { className as class };
 
   // Expose the anchor element reference for parent components
-  let anchorElement;
+  let anchorElement = undefined;
   export { anchorElement as element };
 
 

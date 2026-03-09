@@ -2,12 +2,15 @@
   import { AlertCircle, CircleCheck, Info, AlertTriangle } from 'lucide-svelte';
 
   let {
-    variant = 'error', // 'error', 'warning', 'info', 'success', 'neutral'
+    variant: variantProp = 'error', // 'error', 'warning', 'info', 'success', 'neutral'
+    type = undefined,               // Alias for variant
     message = '',
     showIcon = true,
     class: className = '',
-    children
+    children = undefined
   } = $props();
+
+  const variant = $derived(type || variantProp);
 
   const styles = $derived({
     error: {

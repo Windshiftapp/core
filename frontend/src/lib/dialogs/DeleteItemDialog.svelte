@@ -159,7 +159,9 @@
 </script>
 
 <ModalBackdrop bind:show closeOnClick={!loading} closeOnEscape={!loading} onclose={handleCancel} ariaLabelledBy="dialog-title">
+    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
     <div
+      role="presentation"
       class="bg-white rounded-xl shadow-xl max-w-md w-full transform transition-all"
       style="background-color: var(--ds-surface-raised);"
       onclick={(e) => e.stopPropagation()}
@@ -262,9 +264,9 @@
           <!-- New parent picker for reparent mode -->
           {#if selectedMode === 'reparent'}
             <div class="mt-4">
-              <label class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
+              <span class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
                 {t('items.selectNewParent')}
-              </label>
+              </span>
               {#if loadingCandidates}
                 <div class="flex items-center gap-2 p-3 rounded-lg border" style="border-color: var(--ds-border); background-color: var(--ds-background-input);">
                   <Spinner size="small" />
@@ -293,10 +295,11 @@
           <!-- Confirmation text input for delete all -->
           {#if selectedMode === 'deleteAll'}
             <div class="mt-4">
-              <label class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
+              <label for="delete-confirm-input" class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
                 {t('items.typeToConfirm', { title: item?.title })}
               </label>
               <input
+                id="delete-confirm-input"
                 type="text"
                 bind:value={confirmText}
                 placeholder={t('items.confirmationPlaceholder')}

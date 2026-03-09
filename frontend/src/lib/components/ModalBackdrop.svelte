@@ -15,7 +15,7 @@
     transition = true,
     ariaLabelledBy = undefined,
     onclose = undefined,
-    children,
+    children = undefined,
   } = $props();
 
   let backdropRef = $state(null);

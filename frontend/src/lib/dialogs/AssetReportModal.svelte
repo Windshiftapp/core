@@ -15,6 +15,7 @@
 
   export let isOpen = false;
   export let mode = 'create'; // 'create' or 'edit'
+  /** @type {{ name: string, description: string, icon: string, color: string, asset_set_id: string|null, cql_query: string, column_config: any[], is_active: boolean } | null} */
   export let assetReport = null;
   export let channelId = null;
   export let availableAssetSets = [];

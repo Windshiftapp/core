@@ -154,9 +154,11 @@
 
 {#if isOpen}
 <!-- Portal-styled login overlay -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
   class="fixed inset-0 flex items-center justify-center z-50 p-4"
   style="background-color: rgba(0, 0, 0, 0.4); backdrop-filter: blur(8px);"
+  role="presentation"
   onclick={handleClose}
 >
   <!-- Login Card with portal gradient accent -->

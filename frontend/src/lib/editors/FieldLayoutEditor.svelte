@@ -297,6 +297,7 @@
 
             {#each fields as field}
               {@const identifier = field.identifier || field.id?.toString()}
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div
                 data-available-field-editor={JSON.stringify({ ...field, identifier })}
                 class="group flex items-center gap-3 px-3 py-2 rounded border transition-all duration-200 cursor-grab hover:border-blue-300 active:cursor-grabbing"

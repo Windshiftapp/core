@@ -14,6 +14,7 @@
     disabled = false,
 
     // Display props
+    id = undefined,
     placeholder = '',
     label = '',
     class: className = '',
@@ -285,6 +286,7 @@
         style="background-color: var(--ds-background-input);
                border-color: var(--ds-border);"
         onclick={focusInput}
+        onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && focusInput()}
         role="button"
         tabindex="-1"
       >
@@ -341,6 +343,7 @@
       <!-- Single-select: Input/Trigger -->
       <input
         use:melt={$input}
+        {id}
         type="text"
         placeholder={resolvedPlaceholder}
         {disabled}

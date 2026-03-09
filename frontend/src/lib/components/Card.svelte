@@ -11,8 +11,8 @@
     class: className = '',
     style: userStyle = '',
     children,
-    header,                // Snippet for header content
-    footer                 // Snippet for footer content
+    header = undefined,    // Snippet for header content
+    footer = undefined     // Snippet for footer content
   } = $props();
 
   // Variant styles using design tokens

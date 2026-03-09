@@ -111,6 +111,7 @@
 
 {#if chartData && chartData.length > 0}
   <div class="responsive-chart">
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="chart-wrapper" bind:this={container} onmouseleave={hideTooltip}>
       <svg
         class="chart-svg"
@@ -156,6 +157,7 @@
         {/if}
 
         {#each points as point, index}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <circle
             cx={point.x}
             cy={point.y}
@@ -165,7 +167,7 @@
             stroke-width="2"
             class="chart-point"
             class:chart-point--active={hoveredPointIndex === index}
-            tabindex="0"
+            tabindex="-1"
             aria-label={`${labels[index]}: ${chartData[index]?.count ?? 0} items`}
             onmouseenter={() => showTooltip(point, index)}
             onfocus={() => showTooltip(point, index)}

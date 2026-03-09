@@ -168,6 +168,8 @@
     bind:this={nameInputRef}
     bind:value={store.formData.name}
     type="text"
+    id="work-item-title"
+    aria-label={t('createModal.issueTitle')}
     class="w-full text-lg font-medium border-0 outline-none bg-transparent"
     style="color: var(--ds-text);"
     placeholder={t('createModal.issueTitle')}
@@ -237,6 +239,7 @@
           unassignedLabel={t('createModal.noPriority')}
         >
           {#snippet children()}
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
               class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
               style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {store.formData.priority_id ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
@@ -269,6 +272,7 @@
         unassignedLabel={t('createModal.unassigned')}
       >
         {#snippet children()}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
             style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {store.formData.assignee_id ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
@@ -306,6 +310,7 @@
           <input
             type="date"
             bind:value={store.formData.due_date}
+            aria-label={t('createModal.dueDate')}
             class="w-full px-3 py-2 rounded border text-sm"
             style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
             onchange={() => $dueDateOpen = false}
@@ -323,6 +328,7 @@
         unassignedLabel={t('createModal.noMilestone')}
       >
         {#snippet children()}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
             style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {store.formData.milestone_id ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
@@ -407,11 +413,12 @@
           </div>
         {:else if field.field_identifier === 'due_date'}
           <div class="space-y-1">
-            <Label color="default">
+            <Label color="default" for="work-item-due-date-required">
               {t('createModal.dueDate')} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
             </Label>
             <input
               type="date"
+              id="work-item-due-date-required"
               bind:value={store.formData.due_date}
               class="w-full px-3 py-2 rounded border text-sm"
               style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"

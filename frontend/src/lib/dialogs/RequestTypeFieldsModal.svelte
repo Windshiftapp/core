@@ -813,10 +813,11 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
+            <label for="virtual-field-name" class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
               {t('requestTypeFields.fieldName')}
             </label>
             <input
+              id="virtual-field-name"
               type="text"
               bind:value={virtualFieldName}
               placeholder={t('requestTypeFields.fieldNamePlaceholder')}
@@ -826,10 +827,10 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
+            <span id="virtual-field-type-label" class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
               {t('requestTypeFields.fieldType')}
-            </label>
-            <div class="grid grid-cols-4 gap-2">
+            </span>
+            <div class="grid grid-cols-4 gap-2" role="group" aria-labelledby="virtual-field-type-label">
               {#each [
                 { value: 'text', label: t('requestTypeFields.text'), icon: Type },
                 { value: 'textarea', label: t('requestTypeFields.multiLine'), icon: AlignLeft },
@@ -850,10 +851,10 @@
 
           {#if virtualFieldType === 'select'}
             <div>
-              <label class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
+              <span id="virtual-field-options-label" class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
                 {t('requestTypeFields.options')}
-              </label>
-              <div class="space-y-2">
+              </span>
+              <div class="space-y-2" role="group" aria-labelledby="virtual-field-options-label">
                 {#each virtualFieldOptions as option, i}
                   <div class="flex gap-2">
                     <input
@@ -968,10 +969,11 @@
   >
     <div class="space-y-4">
       <div>
-        <label class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
+        <label for="edit-field-display-name" class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
           {t('requestTypeFields.displayName')}
         </label>
         <input
+          id="edit-field-display-name"
           type="text"
           bind:value={editDisplayName}
           placeholder={editingField.field_name || editingField.field_identifier}
@@ -984,10 +986,11 @@
       </div>
 
       <div>
-        <label class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
+        <label for="edit-field-description" class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
           {t('requestTypeFields.descriptionHelpText')}
         </label>
         <textarea
+          id="edit-field-description"
           bind:value={editDescription}
           placeholder={t('requestTypeFields.helpTextPlaceholder')}
           rows="3"

@@ -515,6 +515,7 @@
   $effect(() => { if (editor && readonly) { editor.action(replaceAll(content || '')); } });
 </script>
 
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="milkdown-wrapper" class:has-toolbar={toolbarVisible}
   onfocusin={() => isFocused = true}
   onfocusout={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) isFocused = false; }}
@@ -547,6 +548,7 @@
       {/if}
     </div>
   {/if}
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
   <div bind:this={editorElement} class="milkdown-editor" class:readonly class:compact class:has-toolbar={toolbarVisible} onclick={handleClick}></div>
 </div>
 <input
@@ -570,11 +572,13 @@
 />
 <!-- User Hover Card for mentions -->
 {#if hoverCardVisible}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="user-hover-card"
     style="left: {hoverCardPosition.x}px; top: {hoverCardPosition.y}px;"
     onmouseenter={hoverCardMouseEnter}
     onmouseleave={hoverCardMouseLeave}
+    role="tooltip"
   >
     {#if hoverCardLoading}
       <div class="hc-loading">{t('common.loading')}</div>

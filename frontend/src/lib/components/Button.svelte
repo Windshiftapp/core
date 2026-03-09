@@ -19,7 +19,7 @@
     onclick = null, // Svelte 5 style click handler
     hotkeyConfig = null, // { key: 'a', guard?: () => boolean }
     class: className = '',
-    children
+    children = undefined
   } = $props();
   export { className as class };
 
