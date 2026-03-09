@@ -245,6 +245,8 @@ export default {
         'Deixe vazio para a mensagem padrão, ou personalize usando variáveis',
       availableVariables: 'Variáveis disponíveis',
       example: 'Exemplo',
+      selectRecipients: 'Selecione os destinatários...',
+      customizeMessage: 'Personalizar mensagem',
       updateSetting: 'Atualizar Configuração',
       failedToLoad: 'Falha ao carregar configurações de notificação',
       failedToSave: 'Falha ao salvar configuração de notificação',

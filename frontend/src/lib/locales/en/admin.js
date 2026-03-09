@@ -217,6 +217,8 @@ export default {
       messageTemplatePlaceholder: 'Leave empty for default message, or customize using variables',
       availableVariables: 'Available variables',
       example: 'Example',
+      selectRecipients: 'Select recipients...',
+      customizeMessage: 'Customize message',
       updateSetting: 'Update Setting',
       failedToLoad: 'Failed to load notification settings',
       failedToSave: 'Failed to save notification setting',

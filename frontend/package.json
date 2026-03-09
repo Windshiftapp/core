@@ -20,7 +20,8 @@
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "typecheck": "svelte-check --threshold error"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.5",

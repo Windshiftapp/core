@@ -240,6 +240,8 @@ export default {
       messageTemplatePlaceholder: 'Leer lassen für Standardnachricht, oder mit Variablen anpassen',
       availableVariables: 'Verfügbare Variablen',
       example: 'Beispiel',
+      selectRecipients: 'Empfänger auswählen...',
+      customizeMessage: 'Nachricht anpassen',
       updateSetting: 'Einstellung aktualisieren',
       failedToLoad: 'Benachrichtigungseinstellungen konnten nicht geladen werden',
       failedToSave: 'Benachrichtigungseinstellung konnte nicht gespeichert werden',

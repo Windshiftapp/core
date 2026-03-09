@@ -1,11 +1,11 @@
 import { writable } from 'svelte/store';
 
-// Current route store
-export const currentRoute = writable({
+export const currentRoute = writable(/** @type {{path: string, view: string|null, params: Record<string, string>, query: Record<string, string>}} */ ({
   path: '/',
+  view: null,
   params: {},
   query: {},
-});
+}));
 
 // Available routes
 const routes = {

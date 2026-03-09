@@ -2,6 +2,7 @@ import { derived, writable } from 'svelte/store';
 import { api } from '../api.js';
 
 function createAuthStore() {
+  /** @type {import('svelte/store').Writable<{id: string, email: string, name: string, language: string, avatar_url: string, role: string, is_system_admin?: boolean, [key: string]: any} | null>} */
   const user = writable(null);
   const session = writable(null);
   const isAuthenticated = writable(false);
@@ -27,7 +28,8 @@ function createAuthStore() {
 
     // Convenience getters for backwards compatibility with direct property access
     get currentUser() {
-      let value;
+      /** @type {{id: string, email: string, name: string, language: string, avatar_url: string, role: string, is_system_admin?: boolean, [key: string]: any} | null} */
+      let value = null;
       user.subscribe((v) => (value = v))();
       return value;
     },
