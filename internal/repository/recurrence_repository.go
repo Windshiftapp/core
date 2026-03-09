@@ -30,7 +30,7 @@ func (r *RecurrenceRepository) GetByID(id int) (*models.RecurrenceRule, error) {
 		       rr.timezone, rr.lead_time_days, rr.last_generated_until, rr.next_generation_check,
 		       rr.copy_assignee, rr.copy_priority, rr.copy_custom_fields, rr.copy_description,
 		       rr.status_on_create, rr.is_active, rr.created_by, rr.created_at, rr.updated_at,
-		       i.title, w.name, w.key, u.name
+		       i.title, w.name, w.key, u.username
 		FROM recurrence_rules rr
 		LEFT JOIN items i ON rr.template_item_id = i.id
 		LEFT JOIN workspaces w ON rr.workspace_id = w.id
