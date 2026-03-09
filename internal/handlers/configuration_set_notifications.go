@@ -225,14 +225,23 @@ func (h *ConfigurationSetNotificationHandler) GetAvailableNotificationSettings(w
 	for rows.Next() {
 		var s models.NotificationSetting
 		var createdAtStr, updatedAtStr string
+		var createdBy *int
+		var createdByName *string
 
 		err := rows.Scan(
-			&s.ID, &s.Name, &s.Description, &s.IsActive, &s.CreatedBy, &createdAtStr, &updatedAtStr,
-			&s.CreatedByName,
+			&s.ID, &s.Name, &s.Description, &s.IsActive, &createdBy, &createdAtStr, &updatedAtStr,
+			&createdByName,
 		)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
+		}
+
+		if createdBy != nil {
+			s.CreatedBy = *createdBy
+		}
+		if createdByName != nil {
+			s.CreatedByName = *createdByName
 		}
 
 		// Parse timestamps

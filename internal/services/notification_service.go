@@ -434,9 +434,10 @@ func (ns *NotificationService) determineRecipients(event *NotificationEvent, rul
 // getWorkspaceAdmins retrieves admin user IDs for a workspace
 func (ns *NotificationService) getWorkspaceAdmins(workspaceID int) []int {
 	rows, err := ns.db.Query(`
-		SELECT DISTINCT user_id
-		FROM workspace_members
-		WHERE workspace_id = ? AND role IN ('admin', 'owner')
+		SELECT DISTINCT uwr.user_id
+		FROM user_workspace_roles uwr
+		JOIN workspace_roles wr ON uwr.role_id = wr.id
+		WHERE uwr.workspace_id = ? AND wr.name = 'Administrator'
 	`, workspaceID)
 	if err != nil {
 		slog.Error("failed to fetch workspace admins", slog.String("component", "notifications"), slog.Int("workspace_id", workspaceID), slog.Any("error", err))
@@ -585,6 +586,8 @@ func (ns *NotificationService) getNotificationType(eventType string) string {
 		return "status_change"
 	case models.EventMention:
 		return "mention"
+	case models.EventItemDeleted:
+		return "warning"
 	default:
 		return "info"
 	}

@@ -121,6 +121,7 @@ func (s *NotificationSMTPSender) generateEmailBody(userName string, notification
 		.notification.error { border-left-color: #ef4444; }
 		.notification.assignment { border-left-color: #8b5cf6; }
 		.notification.comment { border-left-color: #06b6d4; }
+		.notification.mention { border-left-color: #a855f7; }
 		.notification.status_change { border-left-color: #f97316; }
 		.notification.reminder { border-left-color: #84cc16; }
 		.notification.milestone { border-left-color: #ec4899; }
