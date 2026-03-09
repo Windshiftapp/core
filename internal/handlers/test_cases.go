@@ -7,7 +7,6 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
-	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/utils"
@@ -15,15 +14,13 @@ import (
 
 type TestCaseHandler struct {
 	*BaseHandler
-	permissionService *services.PermissionService
-	service           *services.TestCaseService
+	service *services.TestCaseService
 }
 
-func NewTestCaseHandlerWithPool(db database.Database, permissionService *services.PermissionService) *TestCaseHandler {
+func NewTestCaseHandlerWithPool(db database.Database) *TestCaseHandler {
 	return &TestCaseHandler{
-		BaseHandler:       NewBaseHandler(db),
-		permissionService: permissionService,
-		service:           services.NewTestCaseService(db),
+		BaseHandler: NewBaseHandler(db),
+		service:     services.NewTestCaseService(db),
 	}
 }
 
@@ -32,15 +29,6 @@ func (h *TestCaseHandler) GetAllTestCases(w http.ResponseWriter, r *http.Request
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
 		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
 		return
 	}
 
@@ -87,15 +75,6 @@ func (h *TestCaseHandler) GetTestCase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
-		return
-	}
-
 	testCase, err := h.service.GetByID(id, workspaceID)
 	if err != nil {
 		if err == repository.ErrNotFound {
@@ -118,14 +97,7 @@ func (h *TestCaseHandler) CreateTestCase(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
-		return
-	}
+	user := utils.GetCurrentUser(r)
 
 	var input struct {
 		Title             string `json:"title"`
@@ -189,14 +161,7 @@ func (h *TestCaseHandler) UpdateTestCase(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
-		return
-	}
+	user := utils.GetCurrentUser(r)
 
 	var input struct {
 		Title             string `json:"title"`
@@ -265,14 +230,7 @@ func (h *TestCaseHandler) DeleteTestCase(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
-		return
-	}
+	user := utils.GetCurrentUser(r)
 
 	if err := h.service.Delete(id, workspaceID); err != nil {
 		if err == repository.ErrNotFound {
@@ -311,15 +269,6 @@ func (h *TestCaseHandler) MoveTestCase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
-		return
-	}
-
 	var moveData struct {
 		FolderID  *int `json:"folder_id"`
 		SortOrder int  `json:"sort_order"`
@@ -348,15 +297,6 @@ func (h *TestCaseHandler) ReorderTestCases(w http.ResponseWriter, r *http.Reques
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
 		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
 		return
 	}
 
@@ -395,15 +335,6 @@ func (h *TestCaseHandler) GetTestSteps(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
-		return
-	}
-
 	// Verify test case belongs to workspace
 	exists, err := h.service.Exists(testCaseID, workspaceID)
 	if err != nil {
@@ -436,15 +367,6 @@ func (h *TestCaseHandler) CreateTestStep(w http.ResponseWriter, r *http.Request)
 	testCaseID, err := strconv.Atoi(r.PathValue("testCaseId"))
 	if err != nil {
 		respondInvalidID(w, r, "testCaseId")
-		return
-	}
-
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
 		return
 	}
 
@@ -506,15 +428,6 @@ func (h *TestCaseHandler) UpdateTestStep(w http.ResponseWriter, r *http.Request)
 	stepID, err := strconv.Atoi(r.PathValue("stepId"))
 	if err != nil {
 		respondInvalidID(w, r, "stepId")
-		return
-	}
-
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
 		return
 	}
 
@@ -584,15 +497,6 @@ func (h *TestCaseHandler) DeleteTestStep(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
-		return
-	}
-
 	// Verify test case belongs to workspace
 	exists, err := h.service.Exists(testCaseID, workspaceID)
 	if err != nil {
@@ -627,15 +531,6 @@ func (h *TestCaseHandler) ReorderTestSteps(w http.ResponseWriter, r *http.Reques
 	testCaseID, err := strconv.Atoi(r.PathValue("testCaseId"))
 	if err != nil {
 		respondInvalidID(w, r, "testCaseId")
-		return
-	}
-
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
 		return
 	}
 
@@ -676,15 +571,6 @@ func (h *TestCaseHandler) GetAllTestLabels(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
-		return
-	}
-
 	labels, err := h.service.GetAllLabels(workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -700,15 +586,6 @@ func (h *TestCaseHandler) CreateTestLabel(w http.ResponseWriter, r *http.Request
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
 		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
 		return
 	}
 
@@ -753,15 +630,6 @@ func (h *TestCaseHandler) UpdateTestLabel(w http.ResponseWriter, r *http.Request
 	labelID, err := strconv.Atoi(r.PathValue("labelId"))
 	if err != nil {
 		respondInvalidID(w, r, "labelId")
-		return
-	}
-
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
 		return
 	}
 
@@ -812,15 +680,6 @@ func (h *TestCaseHandler) DeleteTestLabel(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
-		return
-	}
-
 	if err := h.service.DeleteLabel(labelID, workspaceID); err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -840,15 +699,6 @@ func (h *TestCaseHandler) GetTestCaseLabels(w http.ResponseWriter, r *http.Reque
 	testCaseID, err := strconv.Atoi(r.PathValue("testCaseId"))
 	if err != nil {
 		respondInvalidID(w, r, "testCaseId")
-		return
-	}
-
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
 		return
 	}
 
@@ -884,15 +734,6 @@ func (h *TestCaseHandler) AddTestCaseLabel(w http.ResponseWriter, r *http.Reques
 	testCaseID, err := strconv.Atoi(r.PathValue("testCaseId"))
 	if err != nil {
 		respondInvalidID(w, r, "testCaseId")
-		return
-	}
-
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
 		return
 	}
 
@@ -948,15 +789,6 @@ func (h *TestCaseHandler) RemoveTestCaseLabel(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
-		return
-	}
-
 	// Verify test case belongs to workspace
 	exists, err := h.service.Exists(testCaseID, workspaceID)
 	if err != nil {
@@ -987,15 +819,6 @@ func (h *TestCaseHandler) GetTestCaseConnections(w http.ResponseWriter, r *http.
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
-		return
-	}
-
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
 		return
 	}
 

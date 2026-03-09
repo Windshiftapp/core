@@ -10,9 +10,6 @@ import (
 	"time"
 
 	"windshift/internal/database"
-	"windshift/internal/models"
-	"windshift/internal/services"
-	"windshift/internal/utils"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -20,13 +17,11 @@ import (
 
 type TestSummaryHandler struct {
 	*BaseHandler
-	permissionService *services.PermissionService
 }
 
-func NewTestSummaryHandlerWithPool(db database.Database, permissionService *services.PermissionService) *TestSummaryHandler {
+func NewTestSummaryHandlerWithPool(db database.Database) *TestSummaryHandler {
 	return &TestSummaryHandler{
-		BaseHandler:       NewBaseHandler(db),
-		permissionService: permissionService,
+		BaseHandler: NewBaseHandler(db),
 	}
 }
 
@@ -221,18 +216,6 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
 		respondInvalidID(w, r, "workspace ID")
-		return
-	}
-
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
-	if err != nil || !hasPermission {
-		respondForbidden(w, r)
 		return
 	}
 

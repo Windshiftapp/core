@@ -9,19 +9,15 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
-	"windshift/internal/services"
-	"windshift/internal/utils"
 )
 
 type TestRunTemplateHandler struct {
 	*BaseHandler
-	permissionService *services.PermissionService
 }
 
-func NewTestRunTemplateHandlerWithPool(db database.Database, permissionService *services.PermissionService) *TestRunTemplateHandler {
+func NewTestRunTemplateHandlerWithPool(db database.Database) *TestRunTemplateHandler {
 	return &TestRunTemplateHandler{
-		BaseHandler:       NewBaseHandler(db),
-		permissionService: permissionService,
+		BaseHandler: NewBaseHandler(db),
 	}
 }
 
@@ -30,18 +26,6 @@ func (h *TestRunTemplateHandler) GetAll(w http.ResponseWriter, r *http.Request) 
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
 		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
-	if err != nil || !hasPermission {
-		respondForbidden(w, r)
 		return
 	}
 
@@ -105,18 +89,6 @@ func (h *TestRunTemplateHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
-	if err != nil || !hasPermission {
-		respondForbidden(w, r)
-		return
-	}
-
 	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
@@ -159,18 +131,6 @@ func (h *TestRunTemplateHandler) Create(w http.ResponseWriter, r *http.Request) 
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
 		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestManage)
-	if err != nil || !hasPermission {
-		respondForbidden(w, r)
 		return
 	}
 
@@ -236,18 +196,6 @@ func (h *TestRunTemplateHandler) Update(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestManage)
-	if err != nil || !hasPermission {
-		respondForbidden(w, r)
-		return
-	}
-
 	var template models.TestRunTemplate
 	if err = json.NewDecoder(r.Body).Decode(&template); err != nil {
 		respondBadRequest(w, r, err.Error())
@@ -308,18 +256,6 @@ func (h *TestRunTemplateHandler) Delete(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestManage)
-	if err != nil || !hasPermission {
-		respondForbidden(w, r)
-		return
-	}
-
 	writeDB, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
@@ -345,18 +281,6 @@ func (h *TestRunTemplateHandler) GetExecutions(w http.ResponseWriter, r *http.Re
 	templateID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
-		return
-	}
-
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestView)
-	if err != nil || !hasPermission {
-		respondForbidden(w, r)
 		return
 	}
 
@@ -417,18 +341,6 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 	templateID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
-		return
-	}
-
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionTestExecute)
-	if err != nil || !hasPermission {
-		respondForbidden(w, r)
 		return
 	}
 

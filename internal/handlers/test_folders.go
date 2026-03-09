@@ -12,13 +12,11 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
-	"windshift/internal/services"
 	"windshift/internal/utils"
 )
 
 type TestFolderHandler struct {
 	*BaseHandler
-	permissionService *services.PermissionService
 }
 
 var (
@@ -28,10 +26,9 @@ var (
 	errParentHasChildren    = errors.New("folders with subfolders cannot be nested under another folder")
 )
 
-func NewTestFolderHandlerWithPool(db database.Database, permissionService *services.PermissionService) *TestFolderHandler {
+func NewTestFolderHandlerWithPool(db database.Database) *TestFolderHandler {
 	return &TestFolderHandler{
-		BaseHandler:       NewBaseHandler(db),
-		permissionService: permissionService,
+		BaseHandler: NewBaseHandler(db),
 	}
 }
 
@@ -104,15 +101,6 @@ func (h *TestFolderHandler) GetAllFolders(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
-		return
-	}
-
 	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
@@ -167,15 +155,6 @@ func (h *TestFolderHandler) GetFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
-		return
-	}
-
 	db, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
@@ -216,14 +195,7 @@ func (h *TestFolderHandler) CreateFolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
-		return
-	}
+	user := utils.GetCurrentUser(r)
 
 	var folder models.TestFolder
 	if err = json.NewDecoder(r.Body).Decode(&folder); err != nil {
@@ -321,14 +293,7 @@ func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
-		return
-	}
+	user := utils.GetCurrentUser(r)
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -455,14 +420,7 @@ func (h *TestFolderHandler) DeleteFolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
-		return
-	}
+	user := utils.GetCurrentUser(r)
 
 	db, ok := h.requireWriteDB(w, r)
 	if !ok {
@@ -529,15 +487,6 @@ func (h *TestFolderHandler) ReorderFolders(w http.ResponseWriter, r *http.Reques
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
 		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
 		return
 	}
 

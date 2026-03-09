@@ -19,15 +19,13 @@ import (
 
 type TestRunHandler struct {
 	*BaseHandler
-	permissionService *services.PermissionService
-	service           *services.TestRunService
+	service *services.TestRunService
 }
 
-func NewTestRunHandlerWithPool(db database.Database, permissionService *services.PermissionService) *TestRunHandler {
+func NewTestRunHandlerWithPool(db database.Database) *TestRunHandler {
 	return &TestRunHandler{
-		BaseHandler:       NewBaseHandler(db),
-		permissionService: permissionService,
-		service:           services.NewTestRunService(db),
+		BaseHandler: NewBaseHandler(db),
+		service:     services.NewTestRunService(db),
 	}
 }
 
@@ -35,15 +33,6 @@ func (h *TestRunHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
 	if err != nil {
 		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
 		return
 	}
 
@@ -83,15 +72,6 @@ func (h *TestRunHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
-		return
-	}
-
 	run, err := h.service.GetByID(id, workspaceID)
 	if err != nil {
 		if err == repository.ErrNotFound {
@@ -113,14 +93,7 @@ func (h *TestRunHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
-		return
-	}
+	user := utils.GetCurrentUser(r)
 
 	var input struct {
 		Name       string `json:"name"`
@@ -174,15 +147,6 @@ func (h *TestRunHandler) End(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
-		return
-	}
-
 	if err := h.service.Complete(id, workspaceID); err != nil {
 		if err == repository.ErrNotFound {
 			respondNotFound(w, r, "test_run")
@@ -209,14 +173,7 @@ func (h *TestRunHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
-		return
-	}
+	user := utils.GetCurrentUser(r)
 
 	var input struct {
 		Name       string `json:"name"`
@@ -265,15 +222,6 @@ func (h *TestRunHandler) GetResults(w http.ResponseWriter, r *http.Request) {
 	runID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
-		return
-	}
-
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
 		return
 	}
 
@@ -363,15 +311,6 @@ func (h *TestRunHandler) UpdateResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
-		return
-	}
-
 	// Verify test run belongs to workspace
 	exists, err := h.service.Exists(runID, workspaceID)
 	if err != nil {
@@ -422,15 +361,6 @@ func (h *TestRunHandler) GetBySet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
-		return
-	}
-
 	// Use service to filter by set
 	runs, err := h.service.List(workspaceID, services.TestRunListFilters{
 		SetID:        &setID,
@@ -462,15 +392,6 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 	stepID, err := strconv.Atoi(r.PathValue("stepId"))
 	if err != nil {
 		respondInvalidID(w, r, "stepId")
-		return
-	}
-
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
 		return
 	}
 
@@ -576,15 +497,6 @@ func (h *TestRunHandler) GetStepResults(w http.ResponseWriter, r *http.Request) 
 	runID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
-		return
-	}
-
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
 		return
 	}
 
@@ -745,14 +657,7 @@ func (h *TestRunHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestManage, h.permissionService) {
-		return
-	}
+	user := utils.GetCurrentUser(r)
 
 	if err := h.service.Delete(id, workspaceID); err != nil {
 		if err == repository.ErrNotFound {
@@ -788,15 +693,6 @@ func (h *TestRunHandler) LinkItemToTestResult(w http.ResponseWriter, r *http.Req
 	resultID, err := strconv.Atoi(r.PathValue("resultId"))
 	if err != nil {
 		respondInvalidID(w, r, "resultId")
-		return
-	}
-
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
 		return
 	}
 
@@ -871,15 +767,6 @@ func (h *TestRunHandler) UnlinkItemFromTestResult(w http.ResponseWriter, r *http
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestExecute, h.permissionService) {
-		return
-	}
-
 	readDB, ok := h.requireReadDB(w, r)
 	if !ok {
 		return
@@ -926,15 +813,6 @@ func (h *TestRunHandler) GetTestResultItems(w http.ResponseWriter, r *http.Reque
 	resultID, err := strconv.Atoi(r.PathValue("resultId"))
 	if err != nil {
 		respondInvalidID(w, r, "resultId")
-		return
-	}
-
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionTestView, h.permissionService) {
 		return
 	}
 

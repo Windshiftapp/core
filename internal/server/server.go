@@ -502,12 +502,12 @@ func (s *Server) initialize() error {
 	timeProjectPermissionHandler := handlers.NewTimeProjectPermissionHandler(s.db, timePermissionService)
 
 	// Test management handlers
-	testFolderHandler := handlers.NewTestFolderHandlerWithPool(s.db, permService)
-	testCaseHandler := handlers.NewTestCaseHandlerWithPool(s.db, permService)
-	testSetHandler := handlers.NewTestSetHandlerWithPool(s.db, permService)
-	testRunTemplateHandler := handlers.NewTestRunTemplateHandlerWithPool(s.db, permService)
-	testRunHandler := handlers.NewTestRunHandlerWithPool(s.db, permService)
-	testSummaryHandler := handlers.NewTestSummaryHandlerWithPool(s.db, permService)
+	testFolderHandler := handlers.NewTestFolderHandlerWithPool(s.db)
+	testCaseHandler := handlers.NewTestCaseHandlerWithPool(s.db)
+	testSetHandler := handlers.NewTestSetHandlerWithPool(s.db)
+	testRunTemplateHandler := handlers.NewTestRunTemplateHandlerWithPool(s.db)
+	testRunHandler := handlers.NewTestRunHandlerWithPool(s.db)
+	testSummaryHandler := handlers.NewTestSummaryHandlerWithPool(s.db)
 
 	// Link management handlers
 	linkTypeHandler := handlers.NewLinkTypeHandler(s.db)
