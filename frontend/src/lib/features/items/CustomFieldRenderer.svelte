@@ -536,6 +536,7 @@
       />
     {:else if field.field_type === 'date'}
       <div use:clickOutside onclickOutside={() => onCancel?.()}>
+        <!-- svelte-ignore a11y_autofocus -->
         <input
           type="date"
           value={formatDateForInput(value)}
@@ -545,12 +546,12 @@
           onkeydown={handleKeydown}
           {disabled}
           required={isRequired}
-          <!-- svelte-ignore a11y_autofocus -->
           autofocus
         />
       </div>
     {:else if field.field_type === 'textarea'}
       <div use:clickOutside onclickOutside={() => onCancel?.()}>
+        <!-- svelte-ignore a11y_autofocus -->
         <textarea
           {value}
           oninput={(e) => onChange(e.target.value)}
@@ -560,12 +561,12 @@
           rows="3"
           {disabled}
           required={isRequired}
-          <!-- svelte-ignore a11y_autofocus -->
           autofocus
         ></textarea>
       </div>
     {:else if field.field_type === 'number'}
       <div use:clickOutside onclickOutside={() => onCancel?.()}>
+        <!-- svelte-ignore a11y_autofocus -->
         <input
           type="number"
           {value}
@@ -576,13 +577,13 @@
           onkeydown={handleKeydown}
           {disabled}
           required={isRequired}
-          <!-- svelte-ignore a11y_autofocus -->
           autofocus
         />
       </div>
     {:else}
       <!-- Default: text input -->
       <div use:clickOutside onclickOutside={() => onCancel?.()}>
+        <!-- svelte-ignore a11y_autofocus -->
         <input
           type="text"
           {value}
@@ -593,7 +594,6 @@
           onkeydown={handleKeydown}
           {disabled}
           required={isRequired}
-          <!-- svelte-ignore a11y_autofocus -->
           autofocus
         />
       </div>

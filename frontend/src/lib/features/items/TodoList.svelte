@@ -548,8 +548,8 @@
       itemId={selectedItemId}
       workspaceId={getWorkspaceIdForItem(selectedItemId)}
       {statuses}
-      on:close={closeItemModal}
-      on:update={handleItemUpdate}
+      onclose={closeItemModal}
+      onupdate={handleItemUpdate}
     />
   {:else}
     <ItemDetail

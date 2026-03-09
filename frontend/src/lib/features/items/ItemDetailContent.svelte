@@ -156,9 +156,8 @@
   useEventListener(() => isResizing ? document : undefined, 'mousemove', handleResizeMove);
   useEventListener(() => isResizing ? document : undefined, 'mouseup', handleResizeUp);
 
-  // Forward events from Svelte 4 children (still using on:event with event.detail)
-  function handleNavigate(event) {
-    onnavigate?.(event.detail);
+  function handleNavigate(path) {
+    onnavigate?.({ path });
   }
 
   function handleGoBack() {
@@ -355,9 +354,9 @@
             {item}
             {iconMap}
             {workspaceId}
-            on:navigate={handleNavigate}
-            on:parent-changed={handleParentChanged}
-            on:copy-key={handleCopyKey}
+            onnavigate={handleNavigate}
+            onparentChanged={handleParentChanged}
+            oncopyKey={handleCopyKey}
           />
           
           <ItemDetailHeader 

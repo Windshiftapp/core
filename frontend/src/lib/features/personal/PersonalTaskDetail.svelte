@@ -344,9 +344,9 @@
           {item}
           {iconMap}
           {workspaceId}
-          onnavigate={(e) => navigate(e.detail.path)}
-          onparent-changed={loadParentHierarchy}
-          oncopy-key={() => {
+          onnavigate={(path) => navigate(path)}
+          onparentChanged={loadParentHierarchy}
+          oncopyKey={() => {
             navigator.clipboard.writeText(`${workspace?.key || 'WORK'}-${item.workspace_item_number}`);
           }}
         />

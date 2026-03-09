@@ -2,20 +2,20 @@
   import { FileText, Edit3, X, Check, Search } from 'lucide-svelte';
   import Tooltip from '../../components/Tooltip.svelte';
   import ItemKey from '../items/ItemKey.svelte';
-  import { createEventDispatcher } from 'svelte';
   import { api } from '../../api.js';
   import { t } from '../../stores/i18n.svelte.js';
 
-  const dispatch = createEventDispatcher();
-  
-  let { 
+  let {
   workspace,
   parentHierarchy = [],
   currentItemType,
   currentHierarchyLevel,
   item,
   iconMap,
-  workspaceId
+  workspaceId,
+  onnavigate = null,
+  onparentChanged = null,
+  oncopyKey = null
 } = $props();
   
   // We need access to item types to filter by hierarchy level
@@ -31,7 +31,7 @@
   let searchTimeout;
   
   function navigate(path) {
-    dispatch('navigate', { path });
+    onnavigate?.(path);
   }
 
   function getItemTypeInfo(itemTypeId) {
@@ -119,7 +119,7 @@
       });
       
       // Dispatch event to parent component to reload data
-      dispatch('parent-changed');
+      onparentChanged?.();
       closeParentSelector();
     } catch (error) {
       console.error('Failed to update parent:', error);
@@ -128,18 +128,17 @@
       saving = false;
     }
   }
-  
+
   async function removeParent() {
     if (saving) return;
-    
+
     try {
       saving = true;
       await api.items.update(item.id, {
         parent_id: null
       });
-      
-      // Dispatch event to parent component to reload data
-      dispatch('parent-changed');
+
+      onparentChanged?.();
       closeParentSelector();
     } catch (error) {
       console.error('Failed to remove parent:', error);
@@ -378,7 +377,7 @@
     <Tooltip content={t('items.clickToCopyKey')}>
       {#snippet children()}
         <button
-          onclick={() => dispatch('copy-key')}
+          onclick={() => oncopyKey?.()}
           class="text-xs px-2 py-1 rounded transition-colors cursor-pointer flex-shrink-0 whitespace-nowrap"
           style="background-color: var(--ds-surface); color: var(--ds-text);"
         >

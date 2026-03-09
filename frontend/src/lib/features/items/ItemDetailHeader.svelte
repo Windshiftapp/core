@@ -56,6 +56,7 @@
           <!-- Issue Key (in edit mode) -->
 
           <div class="min-w-[80%]">
+            <!-- svelte-ignore a11y_autofocus -->
             <input
               type="text"
               bind:value={editTitle}
@@ -63,7 +64,6 @@
               class="w-full text-2xl font-semibold bg-transparent border-0 py-1 focus:outline-none break-words"
               style="color: var(--ds-text); word-wrap: break-word; overflow-wrap: break-word;"
               placeholder={t('items.enterTitle')}
-              <!-- svelte-ignore a11y_autofocus -->
               autofocus
             />
           </div>
