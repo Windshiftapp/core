@@ -256,6 +256,7 @@
 						</div>
 						{#if editingCommentId === comment.id}
 							<!-- Edit Mode -->
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div onkeydown={handleEditKeydown}>
 								<MilkdownEditor
 									bind:this={editEditorRef}
@@ -319,7 +320,8 @@
 					variant="blue"
 				/>
 			</div>
-			<div class="flex-1" onkeydown={handleCommentKeydown}>
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="flex-1" onkeydown={handleCommentKeydown}>
 				<MilkdownEditor
 					bind:this={editorRef}
 					bind:content={newCommentContent}

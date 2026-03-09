@@ -144,8 +144,8 @@
   maxWidth="max-w-2xl"
   onclose={handleCancel}
 >
-  <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
-  <div tabindex="0" onkeydown={handleKeyDown} class="max-h-[90vh] overflow-y-auto outline-none">
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <div tabindex="-1" role="form" onkeydown={handleKeyDown} class="max-h-[90vh] overflow-y-auto outline-none">
     <div class="px-8 py-6">
       <!-- Header -->
       <div class="text-center mb-8 relative">

@@ -351,9 +351,9 @@
         </div>
 
         <div>
-          <label class="block text-sm font-medium mb-1" style="color: var(--ds-text);">
+          <span class="block text-sm font-medium mb-1" style="color: var(--ds-text);">
             {t('logbook.noteContent')}
-          </label>
+          </span>
           <div style="min-height: 300px;">
             <LazyMilkdownEditor
               bind:content={noteFormData.content}

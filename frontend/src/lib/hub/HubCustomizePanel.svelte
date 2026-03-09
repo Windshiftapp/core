@@ -23,6 +23,7 @@
 
 <!-- Customization Slide-in Panel -->
 {#if hubStore.showCustomizePanel}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="fixed right-0 top-0 bottom-0 w-80 shadow-2xl z-50 flex flex-col overflow-hidden"
     style="background-color: var(--ds-surface);"
@@ -67,10 +68,10 @@
         <div class="space-y-6">
           <!-- Title & Description -->
           <div>
-            <label class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
+            <span class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
               <TextCursorInput class="w-4 h-4 inline mr-1" />
               {t('hub.heroContent', 'Hero Content')}
-            </label>
+            </span>
             <input
               type="text"
               value={hubStore.editableTitle}
@@ -91,10 +92,10 @@
 
           <!-- Gradient Selection -->
           <div>
-            <label class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
+            <span class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
               <Palette class="w-4 h-4 inline mr-1" />
               {t('portal.gradient', 'Gradient')}
-            </label>
+            </span>
             <div class="grid grid-cols-3 gap-2">
               {#each gradients as gradient, index}
                 <button
@@ -120,10 +121,11 @@
 
           <!-- Search Box Customization -->
           <div>
-            <label class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
+            <label for="hub-search-box" class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
               {t('portal.searchBox', 'Search Box')}
             </label>
             <input
+              id="hub-search-box"
               type="text"
               value={hubStore.editableSearchPlaceholder}
               oninput={(e) => { hubStore.editableSearchPlaceholder = e.target.value; hubStore.saveCustomizations(); }}

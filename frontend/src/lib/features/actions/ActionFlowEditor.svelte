@@ -470,8 +470,9 @@
       <div class="space-y-4">
         {#if selectedNode.type === 'trigger'}
           <div>
-            <label class="block text-xs font-medium mb-1">{t('actions.config.triggerType')}</label>
+            <label for="config-trigger-type" class="block text-xs font-medium mb-1">{t('actions.config.triggerType')}</label>
             <select
+              id="config-trigger-type"
               class="w-full px-3 py-2 border rounded-md text-sm config-input"
               value={selectedNode.data?.triggerType || action?.trigger_type || 'status_transition'}
               onchange={handleTriggerTypeChange}
@@ -483,8 +484,9 @@
           </div>
           {#if (selectedNode.data?.triggerType || action?.trigger_type) === 'status_transition'}
             <div>
-              <label class="block text-xs font-medium mb-1">{t('actions.config.fromStatus')}</label>
+              <label for="config-from-status" class="block text-xs font-medium mb-1">{t('actions.config.fromStatus')}</label>
               <select
+                id="config-from-status"
                 class="w-full px-3 py-2 border rounded-md text-sm config-input"
                 value={selectedNode.data?.config?.from_status_id || ''}
                 onchange={handleFromStatusChange}
@@ -496,8 +498,9 @@
               </select>
             </div>
             <div>
-              <label class="block text-xs font-medium mb-1">{t('actions.config.toStatus')}</label>
+              <label for="config-to-status" class="block text-xs font-medium mb-1">{t('actions.config.toStatus')}</label>
               <select
+                id="config-to-status"
                 class="w-full px-3 py-2 border rounded-md text-sm config-input"
                 value={selectedNode.data?.config?.to_status_id || ''}
                 onchange={handleToStatusChange}
@@ -520,8 +523,9 @@
           </div>
         {:else if selectedNode.type === 'set_status'}
           <div>
-            <label class="block text-xs font-medium mb-1">{t('actions.config.targetStatus')}</label>
+            <label for="config-target-status" class="block text-xs font-medium mb-1">{t('actions.config.targetStatus')}</label>
             <select
+              id="config-target-status"
               class="w-full px-3 py-2 border rounded-md text-sm config-input"
               value={selectedNode.data?.config?.status_id || ''}
               onchange={handleTargetStatusChange}
@@ -534,7 +538,7 @@
           </div>
         {:else if selectedNode.type === 'set_field'}
           <div>
-            <label class="block text-xs font-medium mb-1">{t('actions.config.fieldName')}</label>
+            <label for="config-set-field-name" class="block text-xs font-medium mb-1">{t('actions.config.fieldName')}</label>
             <FieldSelector
               selectedField={selectedNode.data?.config?.field_name ? { id: selectedNode.data.config.field_name, name: selectedNode.data.config.field_name } : null}
               onselect={handleSetFieldSelect}
@@ -543,7 +547,7 @@
           </div>
           <div>
             <div class="flex items-center gap-1 mb-1">
-              <label class="block text-xs font-medium">{t('actions.config.value')}</label>
+              <label for="config-set-field-value" class="block text-xs font-medium">{t('actions.config.value')}</label>
               <button
                 onclick={() => showPlaceholderModal = true}
                 class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
@@ -553,6 +557,7 @@
               </button>
             </div>
             <input
+              id="config-set-field-value"
               type="text"
               class="w-full px-3 py-2 border rounded-md text-sm config-input"
               value={selectedNode.data?.config?.value || ''}
@@ -563,7 +568,7 @@
         {:else if selectedNode.type === 'add_comment'}
           <div>
             <div class="flex items-center gap-1 mb-1">
-              <label class="block text-xs font-medium">{t('actions.config.commentContent')}</label>
+              <label for="config-comment-content" class="block text-xs font-medium">{t('actions.config.commentContent')}</label>
               <button
                 onclick={() => showPlaceholderModal = true}
                 class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
@@ -573,6 +578,7 @@
               </button>
             </div>
             <textarea
+              id="config-comment-content"
               class="w-full px-3 py-2 border rounded-md text-sm config-input"
               rows="4"
               value={selectedNode.data?.config?.content || ''}
@@ -588,7 +594,7 @@
           />
         {:else if selectedNode.type === 'condition'}
           <div>
-            <label class="block text-xs font-medium mb-1">{t('actions.config.fieldToCheck')}</label>
+            <label for="config-condition-field" class="block text-xs font-medium mb-1">{t('actions.config.fieldToCheck')}</label>
             <FieldSelector
               selectedField={selectedNode.data?.config?.field_name ? { id: selectedNode.data.config.field_name, name: selectedNode.data.config.field_name } : null}
               onselect={handleConditionFieldSelect}
@@ -596,8 +602,9 @@
             />
           </div>
           <div>
-            <label class="block text-xs font-medium mb-1">{t('actions.config.operator')}</label>
+            <label for="config-condition-operator" class="block text-xs font-medium mb-1">{t('actions.config.operator')}</label>
             <select
+              id="config-condition-operator"
               class="w-full px-3 py-2 border rounded-md text-sm config-input"
               value={selectedNode.data?.config?.operator || 'eq'}
               onchange={handleOperatorChange}
@@ -612,8 +619,9 @@
             </select>
           </div>
           <div>
-            <label class="block text-xs font-medium mb-1">{t('actions.config.compareValue')}</label>
+            <label for="config-condition-value" class="block text-xs font-medium mb-1">{t('actions.config.compareValue')}</label>
             <input
+              id="config-condition-value"
               type="text"
               class="w-full px-3 py-2 border rounded-md text-sm config-input"
               value={selectedNode.data?.config?.value || ''}
@@ -622,8 +630,9 @@
           </div>
         {:else if selectedNode.type === 'notify_user'}
           <div>
-            <label class="block text-xs font-medium mb-1">{t('actions.config.recipientType')}</label>
+            <label for="config-recipient-type" class="block text-xs font-medium mb-1">{t('actions.config.recipientType')}</label>
             <select
+              id="config-recipient-type"
               class="w-full px-3 py-2 border rounded-md text-sm config-input"
               value={selectedNode.data?.config?.recipient_type || 'assignee'}
               onchange={handleRecipientTypeChange}
@@ -635,7 +644,7 @@
           </div>
           <div>
             <div class="flex items-center gap-1 mb-1">
-              <label class="block text-xs font-medium">{t('actions.config.notifyMessage')}</label>
+              <label for="config-notify-message" class="block text-xs font-medium">{t('actions.config.notifyMessage')}</label>
               <button
                 onclick={() => showPlaceholderModal = true}
                 class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
@@ -645,6 +654,7 @@
               </button>
             </div>
             <textarea
+              id="config-notify-message"
               class="w-full px-3 py-2 border rounded-md text-sm config-input"
               rows="4"
               value={selectedNode.data?.config?.message || ''}

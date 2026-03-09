@@ -165,8 +165,9 @@
 <div class="space-y-4">
   <!-- Step 1: Select asset set -->
   <div>
-    <label class="block text-xs font-medium mb-1">{t('actions.config.assetSet')}</label>
+    <label for="asset-set" class="block text-xs font-medium mb-1">{t('actions.config.assetSet')}</label>
     <select
+      id="asset-set"
       class="w-full px-3 py-2 border rounded-md text-sm config-input"
       value={selectedNode.data?.config?.asset_set_id || ''}
       onchange={handleAssetSetChange}
@@ -182,8 +183,9 @@
   <!-- Step 2: Select asset type -->
   {#if selectedNode.data?.config?.asset_set_id}
     <div>
-      <label class="block text-xs font-medium mb-1">{t('actions.config.targetAssetType')}</label>
+      <label for="asset-type" class="block text-xs font-medium mb-1">{t('actions.config.targetAssetType')}</label>
       <select
+        id="asset-type"
         class="w-full px-3 py-2 border rounded-md text-sm config-input"
         value={selectedNode.data?.config?.asset_type_id || ''}
         onchange={handleAssetTypeChange}
@@ -202,7 +204,7 @@
       <!-- Title -->
       <div class="mb-3">
         <div class="flex items-center gap-1 mb-1">
-          <label class="block text-xs font-medium">{t('actions.config.assetTitle')}</label>
+          <label for="asset-title" class="block text-xs font-medium">{t('actions.config.assetTitle')}</label>
           <span class="text-red-500 text-xs">*</span>
           <button
             onclick={() => showPlaceholderModal = true}
@@ -213,6 +215,7 @@
           </button>
         </div>
         <input
+          id="asset-title"
           type="text"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={selectedNode.data?.config?.title || ''}
@@ -225,7 +228,7 @@
       <!-- Description -->
       <div class="mb-3">
         <div class="flex items-center gap-1 mb-1">
-          <label class="block text-xs font-medium">{t('actions.config.assetDescription')}</label>
+          <label for="asset-description" class="block text-xs font-medium">{t('actions.config.assetDescription')}</label>
           <button
             onclick={() => showPlaceholderModal = true}
             class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
@@ -235,6 +238,7 @@
           </button>
         </div>
         <textarea
+          id="asset-description"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           rows="2"
           value={selectedNode.data?.config?.description || ''}
@@ -246,7 +250,7 @@
       <!-- Asset Tag -->
       <div class="mb-3">
         <div class="flex items-center gap-1 mb-1">
-          <label class="block text-xs font-medium">{t('actions.config.assetTagLabel')}</label>
+          <label for="asset-tag" class="block text-xs font-medium">{t('actions.config.assetTagLabel')}</label>
           <button
             onclick={() => showPlaceholderModal = true}
             class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
@@ -256,6 +260,7 @@
           </button>
         </div>
         <input
+          id="asset-tag"
           type="text"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={selectedNode.data?.config?.asset_tag || ''}
@@ -266,8 +271,9 @@
 
       <!-- Category -->
       <div class="mb-3">
-        <label class="block text-xs font-medium mb-1">{t('actions.config.assetCategory')}</label>
+        <label for="asset-category" class="block text-xs font-medium mb-1">{t('actions.config.assetCategory')}</label>
         <select
+          id="asset-category"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={selectedNode.data?.config?.category_id || ''}
           onchange={handleCategoryChange}
@@ -281,8 +287,9 @@
 
       <!-- Status -->
       <div class="mb-3">
-        <label class="block text-xs font-medium mb-1">{t('actions.config.assetStatus')}</label>
+        <label for="asset-status" class="block text-xs font-medium mb-1">{t('actions.config.assetStatus')}</label>
         <select
+          id="asset-status"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={selectedNode.data?.config?.status_id || ''}
           onchange={handleStatusChange}
@@ -298,7 +305,7 @@
     <!-- Step 4: Field mappings -->
     <div class="pt-2 border-t" style="border-color: var(--ds-border);">
       <div class="flex items-center justify-between mb-2">
-        <label class="block text-xs font-medium">{t('actions.config.fieldMappingsLabel')}</label>
+        <span class="block text-xs font-medium">{t('actions.config.fieldMappingsLabel')}</span>
         <button
           onclick={() => showPlaceholderModal = true}
           class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"

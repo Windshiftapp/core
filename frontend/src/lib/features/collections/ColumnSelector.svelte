@@ -262,6 +262,7 @@
 
       {#each editableColumns as column, index (column.field_identifier)}
         {@const required = isRequired(column.field_identifier)}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
           class="flex items-center gap-2 px-2 py-2 rounded transition-colors {dragOverIndex === index ? 'bg-blue-50 dark:bg-blue-900/20' : ''}"
           draggable={!required}

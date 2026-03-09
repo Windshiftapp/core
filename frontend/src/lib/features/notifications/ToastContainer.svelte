@@ -103,6 +103,7 @@
       {@const stackStyles = getStackStyles(index)}
 
       {#if index < 3}
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
         <div
           class="absolute w-[360px] rounded shadow-xl flex items-start gap-3 transition-all duration-300 ease-out {toast.clickable ? 'cursor-pointer hover:shadow-2xl' : ''}"
           style="

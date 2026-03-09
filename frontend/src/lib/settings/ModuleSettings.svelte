@@ -312,6 +312,7 @@
           <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">{t('settings.modules.uploadPlugin')}</h3>
 
           <!-- Drag and Drop Area -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="border-2 border-dashed rounded p-8 text-center transition-colors drop-zone"
             class:drop-zone-active={dragActive}

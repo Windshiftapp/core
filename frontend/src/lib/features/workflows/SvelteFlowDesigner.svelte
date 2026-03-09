@@ -403,8 +403,9 @@
     </div>
     <div class="space-y-3">
       {#each availableStatuses as status}
-        <div
-          class="p-3 rounded border status-card cursor-pointer transition-colors"
+        <button
+          type="button"
+          class="appearance-none bg-transparent border-none font-[inherit] text-[inherit] text-left w-full p-3 rounded border status-card cursor-pointer transition-colors"
           onclick={() => addStatusToWorkflow(status)}
         >
           <div class="flex items-center gap-3">
@@ -417,7 +418,7 @@
               <div class="text-xs status-subtitle">{status.category_name}</div>
             </div>
           </div>
-        </div>
+        </button>
       {/each}
       
       {#if availableStatuses.length === 0}

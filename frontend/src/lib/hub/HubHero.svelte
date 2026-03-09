@@ -220,8 +220,9 @@
         {#if hubStore.isEditing}
           <div class="mt-3 space-y-2">
             <div>
-              <label class="text-xs text-white/60 block mb-1">Search Box Placeholder:</label>
+              <label for="hub-search-placeholder" class="text-xs text-white/60 block mb-1">Search Box Placeholder:</label>
               <input
+                id="hub-search-placeholder"
                 type="text"
                 value={hubStore.editableSearchPlaceholder}
                 oninput={(e) => hubStore.editableSearchPlaceholder = e.target.value}
@@ -230,8 +231,9 @@
               />
             </div>
             <div>
-              <label class="text-xs text-white/60 block mb-1">Search Hint Text:</label>
+              <label for="hub-search-hint" class="text-xs text-white/60 block mb-1">Search Hint Text:</label>
               <input
+                id="hub-search-hint"
                 type="text"
                 value={hubStore.editableSearchHint}
                 oninput={(e) => hubStore.editableSearchHint = e.target.value}

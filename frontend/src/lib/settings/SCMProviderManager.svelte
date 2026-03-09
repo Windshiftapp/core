@@ -612,7 +612,7 @@
       <!-- Provider Type & Auth Method -->
       <div class="grid grid-cols-2 gap-4">
         <div>
-          <Label color="default" class="mb-1">{t('settings.scmProviders.providerType')}</Label>
+          <span class="text-xs font-medium block mb-1" style="color: var(--ds-text);">{t('settings.scmProviders.providerType')}</span>
           <BasePicker
             bind:value={formData.provider_type}
             items={providerTypes}
@@ -622,7 +622,7 @@
           />
         </div>
         <div>
-          <Label color="default" class="mb-1">{t('settings.scmProviders.authMethod')}</Label>
+          <span class="text-xs font-medium block mb-1" style="color: var(--ds-text);">{t('settings.scmProviders.authMethod')}</span>
           <BasePicker
             bind:value={formData.auth_method}
             items={availableAuthMethods}
@@ -648,7 +648,7 @@
         <!-- Callback URL -->
         <div class="p-3 rounded-lg border" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
           <div class="flex items-center justify-between mb-1">
-            <label class="text-sm font-medium" style="color: var(--ds-text);">{t('settings.scmProviders.callbackUrl')}</label>
+            <span class="text-sm font-medium" style="color: var(--ds-text);">{t('settings.scmProviders.callbackUrl')}</span>
             {#if oauthCallbackUrl}
               <button
                 type="button"
@@ -700,7 +700,7 @@
         <!-- Callback URL -->
         <div class="p-3 rounded-lg border" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
           <div class="flex items-center justify-between mb-1">
-            <label class="text-sm font-medium" style="color: var(--ds-text);">{t('settings.scmProviders.callbackUrl')}</label>
+            <span class="text-sm font-medium" style="color: var(--ds-text);">{t('settings.scmProviders.callbackUrl')}</span>
             {#if oauthCallbackUrl}
               <button
                 type="button"
@@ -822,7 +822,7 @@
       <!-- Workspace Restrictions -->
       <div class="space-y-3">
         <div>
-          <Label color="default" class="mb-1">{t('settings.scmProviders.workspaceAccess')}</Label>
+          <span class="text-xs font-medium block mb-1" style="color: var(--ds-text);">{t('settings.scmProviders.workspaceAccess')}</span>
           <BasePicker
             bind:value={formData.workspace_restriction_mode}
             items={workspaceAccessOptions}

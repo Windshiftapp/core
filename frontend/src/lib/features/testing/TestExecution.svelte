@@ -467,14 +467,13 @@
           {#if sidebarCollapsed}
             <!-- Collapsed: show only progress indicator -->
             {@const isCollapsedActive = currentCaseIndex === index}
-            <div
-              class="mb-2 p-1 rounded-lg cursor-pointer transition-all"
+            <button
+              type="button"
+              class="appearance-none bg-transparent border-none font-[inherit] text-[inherit] text-left w-full m-0 cursor-pointer mb-2 p-1 rounded-lg transition-all"
               style={isCollapsedActive ? 'background: var(--ds-surface); box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);' : ''}
               onmouseenter={(e) => { if (!isCollapsedActive) e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'; }}
               onmouseleave={(e) => { if (!isCollapsedActive) e.currentTarget.style.background = ''; }}
               onclick={() => goToCase(index)}
-              role="button"
-              tabindex="0"
               title="{testCase.title} ({progress.percent}%)"
             >
               <div class="w-full rounded-full h-6 relative" style="background-color: var(--ds-progress-track);">
@@ -486,18 +485,17 @@
                   {index + 1}
                 </span>
               </div>
-            </div>
+            </button>
           {:else}
             <!-- Expanded: show full card -->
             {@const isExpandedActive = currentCaseIndex === index}
-            <div
-              class="p-3 mb-2 rounded-lg border cursor-pointer transition-all"
+            <button
+              type="button"
+              class="appearance-none bg-transparent font-[inherit] text-[inherit] text-left w-full m-0 cursor-pointer p-3 mb-2 rounded-lg border transition-all"
               style={isExpandedActive ? 'border-color: var(--ds-interactive); background: var(--ds-surface); box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);' : 'border-color: var(--ds-border);'}
               onmouseenter={(e) => { if (!isExpandedActive) e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'; }}
               onmouseleave={(e) => { if (!isExpandedActive) e.currentTarget.style.background = ''; }}
               onclick={() => goToCase(index)}
-              role="button"
-              tabindex="0"
             >
               <div class="font-medium text-sm mb-1 truncate" style="color: var(--ds-text);">
                 {testCase.title}
@@ -511,7 +509,7 @@
                   style="width: {progress.percent}%; background-color: var(--ds-progress-fill);"
                 ></div>
               </div>
-            </div>
+            </button>
           {/if}
         {/each}
       </div>
@@ -585,6 +583,7 @@
                   style="background-color: {currentStepIndex === index ? 'var(--ds-progress-fill)' : 'var(--ds-progress-track)'};"
                   onmouseenter={(e) => { if (currentStepIndex !== index) e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'; }}
                   onmouseleave={(e) => { if (currentStepIndex !== index) e.currentTarget.style.backgroundColor = 'var(--ds-progress-track)'; }}
+                  aria-label="Step {index + 1}"
                 ></button>
               {/each}
             {:else}
@@ -739,7 +738,7 @@
 
                       <!-- Link existing item -->
                       <div>
-                        <label class="block text-sm font-medium mb-1" style="color: var(--ds-status-danger-text);">{t('testing.linkExistingItem')}</label>
+                        <span class="block text-sm font-medium mb-1" style="color: var(--ds-status-danger-text);">{t('testing.linkExistingItem')}</span>
                         <ItemPicker
                           items={workspaceItems}
                           placeholder={t('testing.searchItemsToLink')}
@@ -893,8 +892,9 @@
 
 <!-- Image Preview Modal -->
 {#if previewImage}
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
   <div class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+       role="presentation"
        onclick={() => previewImage = null}>
     <div class="relative max-w-4xl max-h-full">
       <img src={previewImage.src} alt={previewImage.alt} class="max-w-full max-h-[90vh] object-contain rounded" />

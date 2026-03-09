@@ -643,10 +643,11 @@
 
         <div class="space-y-4">
           <div>
-            <label class="block text-xs font-medium mb-2" style="color: var(--ds-text);">
+            <label for="docmost-share-link" class="block text-xs font-medium mb-2" style="color: var(--ds-text);">
               {t('portal.customize.docmostShareLink')}
             </label>
             <input
+              id="docmost-share-link"
               type="text"
               value={portalStore.knowledgeBaseShareLink}
               oninput={(e) => portalStore.knowledgeBaseShareLink = e.target.value}

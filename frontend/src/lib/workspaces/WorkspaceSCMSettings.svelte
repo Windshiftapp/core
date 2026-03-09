@@ -297,7 +297,7 @@
               class="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-opacity-50"
               style="background-color: var(--ds-surface);"
               onclick={() => toggleExpanded(conn.id)}
-              onkeypress={(e) => e.key === 'Enter' && toggleExpanded(conn.id)}
+              onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleExpanded(conn.id)}
               role="button"
               tabindex="0"
             >
@@ -316,6 +316,8 @@
                   {conn.repository_count} {conn.repository_count === 1 ? 'repository' : 'repositories'}
                 </span>
               </div>
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div class="flex items-center gap-2" onclick={e => e.stopPropagation()}>
                 {#if authStatuses[conn.id]?.auth_method === 'oauth' && !authStatuses[conn.id]?.has_workspace_token}
                   <Button size="sm" variant="ghost" onclick={() => reconnectOAuth(conn)}>

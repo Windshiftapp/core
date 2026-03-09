@@ -151,6 +151,7 @@
       </div>
     </div>
 
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="chart-wrapper" bind:this={container} onmouseleave={hideTooltip}>
       <svg
         class="chart-svg"
@@ -228,6 +229,7 @@
 
         <!-- Ideal line points -->
         {#each idealPoints as point, index}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <circle
             cx={point.x}
             cy={point.y}
@@ -236,7 +238,7 @@
             stroke="white"
             stroke-width="1.5"
             class="chart-point"
-            tabindex="0"
+            tabindex="-1"
             aria-label={`${point.date}: ${point.value} ideal`}
             onmouseenter={() => showTooltip(point, index, 'ideal')}
             onfocus={() => showTooltip(point, index, 'ideal')}
@@ -247,6 +249,7 @@
 
         <!-- Actual line points -->
         {#each actualPoints as point, index}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <circle
             cx={point.x}
             cy={point.y}
@@ -255,7 +258,7 @@
             stroke="white"
             stroke-width="2"
             class="chart-point"
-            tabindex="0"
+            tabindex="-1"
             aria-label={`${point.date}: ${point.value} remaining`}
             onmouseenter={() => showTooltip(point, index, 'actual')}
             onfocus={() => showTooltip(point, index, 'actual')}

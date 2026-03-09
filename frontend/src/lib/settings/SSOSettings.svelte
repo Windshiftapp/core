@@ -28,8 +28,11 @@
   let showCreateModal = $state(false);
   let showEditModal = $state(false);
   let showDeleteModal = $state(false);
+  /** @type {{ id: string, name: string, slug: string, type: string, enabled: boolean, [key: string]: any } | null} */
   let editingProvider = $state(null);
+  /** @type {{ id: string, name: string, slug: string, type: string, enabled: boolean, [key: string]: any } | null} */
   let deletingProvider = $state(null);
+  /** @type {{ success: boolean, error?: string } | null} */
   let testResult = $state(null);
   let testLoading = $state(false);
   let saving = $state(false);

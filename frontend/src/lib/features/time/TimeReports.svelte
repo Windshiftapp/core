@@ -400,8 +400,9 @@
     <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">{t('time.reports.filters')}</h3>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
       <div>
-        <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.customer')}</label>
+        <label for="report-customer-picker" class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.customer')}</label>
         <BasePicker
+          id="report-customer-picker"
           bind:value={filters.customer_id}
           items={customers}
           placeholder={t('time.reports.allCustomers')}
@@ -412,8 +413,9 @@
         />
       </div>
       <div>
-        <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.project')}</label>
+        <label for="report-project-picker" class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.project')}</label>
         <BasePicker
+          id="report-project-picker"
           bind:value={filters.project_id}
           items={filteredProjects}
           placeholder={t('time.reports.allProjects')}
@@ -424,18 +426,18 @@
         />
       </div>
       <div>
-        <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.descriptionFilter')}</label>
-        <Input bind:value={filters.description_filter} placeholder={t('time.reports.searchDescriptions')} size="small" />
+        <label for="report-description-filter" class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.descriptionFilter')}</label>
+        <Input id="report-description-filter" bind:value={filters.description_filter} placeholder={t('time.reports.searchDescriptions')} size="small" />
       </div>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
       <div>
-        <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.fromDate')}</label>
-        <Input type="date" bind:value={filters.date_from} size="small" />
+        <label for="report-date-from" class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.fromDate')}</label>
+        <Input id="report-date-from" type="date" bind:value={filters.date_from} size="small" />
       </div>
       <div>
-        <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.toDate')}</label>
-        <Input type="date" bind:value={filters.date_to} size="small" />
+        <label for="report-date-to" class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.toDate')}</label>
+        <Input id="report-date-to" type="date" bind:value={filters.date_to} size="small" />
       </div>
     </div>
     <div class="flex gap-3">

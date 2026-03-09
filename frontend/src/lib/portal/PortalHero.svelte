@@ -61,8 +61,9 @@
       {#if portalStore.isEditing}
         <div class="mt-4 space-y-3">
           <div>
-            <label class="text-xs text-white/60 block mb-1">Search Box Placeholder:</label>
+            <label for="search-box-placeholder" class="text-xs text-white/60 block mb-1">Search Box Placeholder:</label>
             <input
+              id="search-box-placeholder"
               type="text"
               value={portalStore.editableSearchPlaceholder}
               oninput={(e) => portalStore.editableSearchPlaceholder = e.target.value}
@@ -71,8 +72,9 @@
             />
           </div>
           <div>
-            <label class="text-xs text-white/60 block mb-1">Search Hint Text:</label>
+            <label for="search-hint-text" class="text-xs text-white/60 block mb-1">Search Hint Text:</label>
             <input
+              id="search-hint-text"
               type="text"
               value={portalStore.editableSearchHint}
               oninput={(e) => portalStore.editableSearchHint = e.target.value}

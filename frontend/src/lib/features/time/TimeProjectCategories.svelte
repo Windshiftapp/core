@@ -180,6 +180,7 @@
     </div>
   {:else}
     {#each categories as category (category.id)}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
         class="flex items-center gap-3 p-3 rounded transition-colors"
         style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"

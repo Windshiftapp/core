@@ -175,6 +175,7 @@
           </button>
           <div class="flex-1">
             {#if editMode}
+              <!-- svelte-ignore a11y_autofocus -->
               <input
                 type="text"
                 bind:value={editName}
@@ -295,6 +296,7 @@
               <div class="space-y-3">
                 {#each executions as execution}
                   {@const status = getRunStatus(execution)}
+                  <!-- svelte-ignore a11y_no_static_element_interactions -->
                   <div class="border rounded p-4 transition" style="border-color: var(--ds-border);" onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'} onmouseleave={(e) => e.currentTarget.style.background = ''}>
                     <div class="flex items-center justify-between">
                       <div class="flex-1">

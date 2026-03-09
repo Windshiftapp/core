@@ -264,6 +264,7 @@
         <h4 class="text-lg font-medium mb-4" style="color: var(--ds-text);">
           {editingStep ? t('testing.editTestStep') : t('testing.addTestStep')}
         </h4>
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <form onsubmit={(e) => { e.preventDefault(); handleStepSubmit(); }} onkeydown={handleFormKeydown}>
           <div class="grid grid-cols-3 gap-4">
             <!-- Action Column -->
@@ -349,12 +350,16 @@
       </div>
 
       <div slot="step_action" let:item={step}>
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="text-sm prose-sm max-w-none test-step-rendered" onclick={handleRenderedContentClick}>
           <MilkdownEditor content={step.action || ''} readonly={true} showToolbar={false} />
         </div>
       </div>
 
       <div slot="step_data" let:item={step}>
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="text-sm prose-sm max-w-none test-step-rendered" onclick={handleRenderedContentClick}>
           {#if step.data}
             <MilkdownEditor content={step.data} readonly={true} showToolbar={false} />
@@ -365,6 +370,8 @@
       </div>
 
       <div slot="step_expected" let:item={step}>
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="text-sm prose-sm max-w-none test-step-rendered" onclick={handleRenderedContentClick}>
           <MilkdownEditor content={step.expected || ''} readonly={true} showToolbar={false} />
         </div>
@@ -396,7 +403,9 @@
 />
 
 {#if showImagePreview && previewImage.src}
-  <div class="image-lightbox-backdrop" onclick={closePreview}>
+  <div class="image-lightbox-backdrop" role="button" tabindex="0" onclick={closePreview} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') closePreview(); }}>
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="image-lightbox" onclick={(e) => e.stopPropagation()}>
       <Button class="lightbox-close" variant="ghost" icon={X} onclick={closePreview} title={t('testing.closeImagePreview')} />
       <img src={previewImage.src} alt={previewImage.alt} />

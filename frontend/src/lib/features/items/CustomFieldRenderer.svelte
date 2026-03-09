@@ -545,6 +545,7 @@
           onkeydown={handleKeydown}
           {disabled}
           required={isRequired}
+          <!-- svelte-ignore a11y_autofocus -->
           autofocus
         />
       </div>
@@ -559,6 +560,7 @@
           rows="3"
           {disabled}
           required={isRequired}
+          <!-- svelte-ignore a11y_autofocus -->
           autofocus
         ></textarea>
       </div>
@@ -574,6 +576,7 @@
           onkeydown={handleKeydown}
           {disabled}
           required={isRequired}
+          <!-- svelte-ignore a11y_autofocus -->
           autofocus
         />
       </div>
@@ -590,6 +593,7 @@
           onkeydown={handleKeydown}
           {disabled}
           required={isRequired}
+          <!-- svelte-ignore a11y_autofocus -->
           autofocus
         />
       </div>

@@ -80,9 +80,9 @@
     </p>
 
     <div class="mb-4">
-      <label class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
+      <span class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
         {t('actions.test.selectItem')}
-      </label>
+      </span>
       <ItemPicker
         bind:value={selectedItemId}
         {items}

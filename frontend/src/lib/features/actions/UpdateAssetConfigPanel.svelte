@@ -132,8 +132,9 @@
 <div class="space-y-4">
   <!-- Step 1: Select source asset field -->
   <div>
-    <label class="block text-xs font-medium mb-1">{t('actions.config.sourceAssetField')}</label>
+    <label for="source-asset-field" class="block text-xs font-medium mb-1">{t('actions.config.sourceAssetField')}</label>
     <select
+      id="source-asset-field"
       class="w-full px-3 py-2 border rounded-md text-sm config-input"
       value={selectedNode.data?.config?.source_field_id || ''}
       onchange={handleSourceFieldChange}
@@ -150,8 +151,9 @@
   <!-- Step 2: Select target asset type -->
   {#if selectedNode.data?.config?.source_field_id}
     <div>
-      <label class="block text-xs font-medium mb-1">{t('actions.config.targetAssetType')}</label>
+      <label for="target-asset-type" class="block text-xs font-medium mb-1">{t('actions.config.targetAssetType')}</label>
       <select
+        id="target-asset-type"
         class="w-full px-3 py-2 border rounded-md text-sm config-input"
         value={selectedNode.data?.config?.asset_type_id || ''}
         onchange={handleAssetTypeChange}
@@ -168,7 +170,7 @@
   {#if selectedNode.data?.config?.asset_type_id}
     <div class="pt-2 border-t" style="border-color: var(--ds-border);">
       <div class="flex items-center justify-between mb-2">
-        <label class="block text-xs font-medium">{t('actions.config.fieldMappingsLabel')}</label>
+        <span class="block text-xs font-medium">{t('actions.config.fieldMappingsLabel')}</span>
         <button
           onclick={() => showPlaceholderModal = true}
           class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"

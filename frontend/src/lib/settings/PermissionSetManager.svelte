@@ -170,6 +170,7 @@
 
   <!-- Create Modal -->
   {#if showCreateModal}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="fixed inset-0 flex items-center justify-center p-4 z-50"
       style="background-color: rgba(0, 0, 0, 0.3); backdrop-filter: blur(2px);"
@@ -180,9 +181,11 @@
 
         <div class="space-y-4">
           <div>
-            <Label color="default" required class="mb-1">{t('common.name')}</Label>
+            <Label for="permset-name" color="default" required class="mb-1">{t('common.name')}</Label>
+            <!-- svelte-ignore a11y_autofocus -->
             <input
               type="text"
+              id="permset-name"
               bind:value={formData.name}
               class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text)"
@@ -192,8 +195,9 @@
           </div>
 
           <div>
-            <Label color="default" class="mb-1">{t('common.description')}</Label>
+            <Label for="permset-description" color="default" class="mb-1">{t('common.description')}</Label>
             <Textarea
+              id="permset-description"
               bind:value={formData.description}
               rows={2}
               placeholder={t('settings.permissionSets.descriptionPlaceholder')}

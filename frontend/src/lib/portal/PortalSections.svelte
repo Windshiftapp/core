@@ -172,6 +172,7 @@
           <!-- Section Title -->
           {#if portalStore.isEditing}
             {#if editingSectionId === section.id && editingSectionField === 'title'}
+              <!-- svelte-ignore a11y_autofocus -->
               <input
                 type="text"
                 bind:value={editingSectionValue}
@@ -203,6 +204,7 @@
           <!-- Section Subtitle -->
           {#if portalStore.isEditing}
             {#if editingSectionId === section.id && editingSectionField === 'subtitle'}
+              <!-- svelte-ignore a11y_autofocus -->
               <input
                 type="text"
                 bind:value={editingSectionValue}
@@ -243,20 +245,24 @@
             {#if sectionRequestTypes.length > 0}
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {#each sectionRequestTypes as requestType}
-                  <div
-                    class="rounded p-6 border hover:shadow-md transition-shadow cursor-pointer relative group"
+                  <button
+                    type="button"
+                    class="appearance-none font-[inherit] text-[inherit] text-left w-full m-0 rounded p-6 border hover:shadow-md transition-shadow cursor-pointer relative group"
                     style="background-color: var(--ds-surface-card); border-color: var(--ds-border);"
                     onclick={() => onOpenRequestForm(requestType)}
                   >
                     {#if portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'request-types')}
-                      <button
+                      <span
+                        role="button"
+                        tabindex="-1"
                         onclick={(e) => { e.stopPropagation(); portalStore.removeRequestTypeFromSection(section.id, requestType.id); }}
-                        class="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); portalStore.removeRequestTypeFromSection(section.id, requestType.id); } }}
+                        class="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                         style="background-color: {portalStore.isDarkMode ? 'rgba(220, 38, 38, 0.1)' : '#fee2e2'}; color: #dc2626;"
                         title={t('portal.removeFromSection')}
                       >
                         <X class="w-3 h-3" />
-                      </button>
+                      </span>
                     {/if}
                     <div class="w-12 h-12 rounded mb-4 flex items-center justify-center" style="background-color: {requestType.color || '#6b7280'};">
                       <svelte:component this={iconMap[requestType.icon] || Package} size={24} color="white" />
@@ -277,7 +283,7 @@
                         {requestType.description}
                       </p>
                     {/if}
-                  </div>
+                  </button>
                 {/each}
               </div>
 

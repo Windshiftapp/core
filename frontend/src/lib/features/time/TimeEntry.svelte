@@ -176,8 +176,9 @@
   <h3 class="text-sm font-semibold mb-4" style="color: var(--ds-text);">{t('time.reports.filters')}</h3>
   <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
     <div>
-      <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.customer')}</label>
+      <label for="entry-customer-picker" class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.customer')}</label>
       <BasePicker
+        id="entry-customer-picker"
         value={filters.customer_id}
         items={customers}
         placeholder={t('time.reports.allCustomers')}
@@ -189,8 +190,9 @@
       />
     </div>
     <div>
-      <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.project')}</label>
+      <label for="entry-project-picker" class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.project')}</label>
       <BasePicker
+        id="entry-project-picker"
         value={filters.project_id}
         items={filteredProjects}
         placeholder={t('time.reports.allProjects')}
@@ -202,12 +204,12 @@
       />
     </div>
     <div>
-      <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.fromDate')}</label>
-      <Input type="date" value={filters.date_from} oninput={(e) => setFilter('date_from', e.target.value)} size="small" />
+      <label for="entry-date-from" class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.fromDate')}</label>
+      <Input id="entry-date-from" type="date" value={filters.date_from} oninput={(e) => setFilter('date_from', e.target.value)} size="small" />
     </div>
     <div>
-      <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.toDate')}</label>
-      <Input type="date" value={filters.date_to} oninput={(e) => setFilter('date_to', e.target.value)} size="small" />
+      <label for="entry-date-to" class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.toDate')}</label>
+      <Input id="entry-date-to" type="date" value={filters.date_to} oninput={(e) => setFilter('date_to', e.target.value)} size="small" />
     </div>
   </div>
   <div class="mt-5 flex gap-3">

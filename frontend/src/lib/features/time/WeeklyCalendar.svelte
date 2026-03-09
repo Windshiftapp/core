@@ -929,8 +929,10 @@
               </div>
 
               <!-- Time Grid -->
-              <div
-                class="relative rounded border"
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <button
+                type="button"
+                class="appearance-none bg-transparent border-none font-[inherit] text-[inherit] text-left p-0 m-0 cursor-pointer relative rounded border w-full"
                 style="height: {GRID_HEIGHT}px; background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
                 onclick={(e) => handleGridClick(e, day.dateKey)}
                 ondragover={(e) => {
@@ -1019,6 +1021,7 @@
 
                     {#if hasTime}
                       <!-- Time-positioned item -->
+                      <!-- svelte-ignore a11y_no_static_element_interactions -->
                       <div
                         class="absolute left-1 right-1 rounded group/item cursor-grab calendar-time-item"
                         style="top: {top}px; height: {height}px;"
@@ -1035,6 +1038,7 @@
                         ondragend={() => { isDragging = false; lastDragOrResizeEnd = Date.now(); }}
                       >
                         <!-- Top resize handle -->
+                        <!-- svelte-ignore a11y_no_static_element_interactions -->
                         <div
                           class="resize-handle resize-handle-top"
                           onmousedown={(e) => { e.stopPropagation(); e.preventDefault(); startResize(e, workItem, day.dateKey, 'top'); }}
@@ -1081,6 +1085,7 @@
                         </div>
 
                         <!-- Bottom resize handle -->
+                        <!-- svelte-ignore a11y_no_static_element_interactions -->
                         <div
                           class="resize-handle resize-handle-bottom"
                           onmousedown={(e) => { e.stopPropagation(); e.preventDefault(); startResize(e, workItem, day.dateKey, 'bottom'); }}
@@ -1091,6 +1096,7 @@
                       </div>
                     {:else}
                       <!-- Unscheduled item (no time) - show at top -->
+                      <!-- svelte-ignore a11y_no_static_element_interactions -->
                       <div
                         class="mx-1 mt-1 rounded p-2 group/item cursor-grab"
                         class:calendar-item-personal={workItem.is_personal}
@@ -1165,7 +1171,7 @@
                     </div>
                   </div>
                 {/if}
-              </div>
+              </button>
             </div>
           {/each}
         </div>

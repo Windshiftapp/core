@@ -7,7 +7,7 @@
   import { confirm } from '../composables/useConfirm.js';
   import {
     Bell, Plus, Edit, Trash2, Save, X, Check,
-    AlertCircle, Settings, Power, PowerOff
+    AlertCircle, Settings
   } from 'lucide-svelte';
   import DataTable from '../components/DataTable.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
@@ -36,7 +36,8 @@
     name: '',
     description: '',
     is_active: true,
-    event_rules: []
+    event_rules: [],
+    created_by: undefined
   });
 
   // Load notification settings and available events
@@ -67,13 +68,42 @@
     }
   }
 
+  // Recipient picker helpers
+  const recipientItems = $derived([
+    { id: 'assignee', name: t('settings.notifications.assignee') },
+    { id: 'creator', name: t('settings.notifications.creator') },
+    { id: 'watchers', name: t('settings.notifications.watchers') },
+    { id: 'workspace_admins', name: t('settings.notifications.workspaceAdmins') }
+  ]);
+
+  function getRecipientValue(rule) {
+    const result = [];
+    if (rule.notify_assignee) result.push('assignee');
+    if (rule.notify_creator) result.push('creator');
+    if (rule.notify_watchers) result.push('watchers');
+    if (rule.notify_workspace_admins) result.push('workspace_admins');
+    return result;
+  }
+
+  function handleRecipientsChange(index, selectedIds) {
+    formData.event_rules[index] = {
+      ...formData.event_rules[index],
+      notify_assignee: selectedIds.includes('assignee'),
+      notify_creator: selectedIds.includes('creator'),
+      notify_watchers: selectedIds.includes('watchers'),
+      notify_workspace_admins: selectedIds.includes('workspace_admins')
+    };
+  }
+
   function openCreateModal() {
     formData = {
       name: '',
       description: '',
       is_active: true,
-      event_rules: []
+      event_rules: [],
+      created_by: undefined
     };
+    showCustomMessage = [];
     showCreateModal = true;
   }
 
@@ -82,9 +112,11 @@
     formData = {
       name: setting.name,
       description: setting.description || '',
-      is_active: setting.is_active,
-      event_rules: [...(setting.event_rules || [])]
+      is_active: true,
+      event_rules: [...(setting.event_rules || [])],
+      created_by: setting.created_by
     };
+    showCustomMessage = (setting.event_rules || []).map(rule => !!(rule.message_template));
     showEditModal = true;
   }
 
@@ -96,8 +128,10 @@
       name: '',
       description: '',
       is_active: true,
-      event_rules: []
+      event_rules: [],
+      created_by: undefined
     };
+    showCustomMessage = [];
   }
 
   async function handleSubmit() {
@@ -111,7 +145,7 @@
         await api.notificationSettings.update(editingSetting.id, formData);
       } else {
         // Add created_by from current user
-        formData.created_by = authStore.currentUser?.id;
+        formData.created_by = /** @type {any} */ (authStore.currentUser)?.id;
         await api.notificationSettings.create(formData);
       }
 
@@ -142,19 +176,8 @@
     }
   }
 
-  async function toggleActive(setting) {
-    try {
-      const updatedSetting = {
-        ...setting,
-        is_active: !setting.is_active
-      };
-      await api.notificationSettings.update(setting.id, updatedSetting);
-      await loadNotificationSettings();
-    } catch (err) {
-      console.error('Failed to toggle notification setting:', err);
-      alert(t('settings.notifications.failedToUpdate') + ': ' + err.message);
-    }
-  }
+  // Custom message toggle state
+  let showCustomMessage = $state([]);
 
   function addEventRule() {
     formData.event_rules = [
@@ -169,10 +192,12 @@
         message_template: ''
       }
     ];
+    showCustomMessage = [...showCustomMessage, false];
   }
 
   function removeEventRule(index) {
     formData.event_rules = formData.event_rules.filter((_, i) => i !== index);
+    showCustomMessage = showCustomMessage.filter((_, i) => i !== index);
   }
 
   function groupEventsByCategory(events) {
@@ -218,11 +243,6 @@
       key: 'setting_info',
       label: t('settings.notifications.setting'),
       render: (setting) => setting.name + (setting.description ? ` - ${setting.description}` : '')
-    },
-    {
-      key: 'status_info',
-      label: t('common.status'),
-      slot: 'status'
     },
     {
       key: 'event_rules_info',
@@ -282,27 +302,8 @@
       emptyMessage={t('settings.notifications.noSettingsFound')}
       emptyIcon={Bell}
       actionItems={buildNotificationDropdownItems}
-    >
+    />
 
-      <div slot="status" let:item={setting}>
-        <button
-          onclick={() => toggleActive(setting)}
-          class="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium transition-colors
-                 {setting.is_active
-                   ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                   : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}"
-        >
-          {#if setting.is_active}
-            <Power class="w-3 h-3" />
-            {t('common.active')}
-          {:else}
-            <PowerOff class="w-3 h-3" />
-            {t('common.inactive')}
-          {/if}
-        </button>
-      </div>
-
-    </DataTable>
   {/if}
 </div>
 
@@ -344,11 +345,6 @@
             />
           </div>
 
-          <Checkbox
-            bind:checked={formData.is_active}
-            label={t('settings.notifications.activeCanBeAssigned')}
-            size="small"
-          />
         </div>
 
         <!-- Event Rules -->
@@ -375,20 +371,9 @@
             <div class="space-y-4">
               {#each formData.event_rules as rule, index (index)}
                 <div class="border rounded p-4" style="border-color: var(--ds-border)">
-                  <div class="flex items-center justify-between mb-4">
-                    <h5 class="font-medium" style="color: var(--ds-text)">{t('settings.notifications.rule')} {index + 1}</h5>
-                    <button
-                      type="button"
-                      onclick={() => removeEventRule(index)}
-                      class="text-red-600 hover:text-red-800 transition-colors"
-                    >
-                      <Trash2 class="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <div class="grid grid-cols-2 gap-4">
-                    <!-- Event Type -->
-                    <div>
+                  <!-- Event Type + Enable + Delete inline -->
+                  <div class="flex items-end gap-3">
+                    <div class="flex-1">
                       <Label color="default" required class="mb-1">{t('settings.notifications.eventType')}</Label>
                       <BasePicker
                         bind:value={rule.event_type}
@@ -400,60 +385,61 @@
                         getLabel={(event) => `${event.category ? event.category.charAt(0).toUpperCase() + event.category.slice(1) + ': ' : ''}${event.name}`}
                       />
                     </div>
-
-                    <!-- Enabled -->
-                    <div class="flex items-center pt-7">
+                    <div class="flex items-center pb-1.5">
                       <Checkbox
                         bind:checked={rule.is_enabled}
                         label={t('common.enable')}
                         size="small"
                       />
                     </div>
+                    <button
+                      type="button"
+                      onclick={() => removeEventRule(index)}
+                      class="text-red-600 hover:text-red-800 transition-colors pb-1.5"
+                    >
+                      <Trash2 class="w-4 h-4" />
+                    </button>
                   </div>
 
-                  <!-- Notification Recipients -->
-                  <div class="mt-4">
-                    <Label color="default" class="mb-2">{t('settings.notifications.notifyRecipients')}</Label>
-                    <div class="grid grid-cols-2 gap-4">
-                      <Checkbox
-                        bind:checked={rule.notify_assignee}
-                        label={t('settings.notifications.assignee')}
-                        size="small"
-                      />
-
-                      <Checkbox
-                        bind:checked={rule.notify_creator}
-                        label={t('settings.notifications.creator')}
-                        size="small"
-                      />
-
-                      <Checkbox
-                        bind:checked={rule.notify_watchers}
-                        label={t('settings.notifications.watchers')}
-                        size="small"
-                      />
-
-                      <Checkbox
-                        bind:checked={rule.notify_workspace_admins}
-                        label={t('settings.notifications.workspaceAdmins')}
-                        size="small"
-                      />
-                    </div>
-                  </div>
-
-                  <!-- Message Template -->
-                  <div class="mt-4">
-                    <Label color="default" class="mb-1">{t('settings.notifications.customMessageTemplate')}</Label>
-                    <Textarea
-                      bind:value={rule.message_template}
-                      placeholder={t('settings.notifications.messageTemplatePlaceholder')}
-                      rows={3}
-                      class="text-sm"
+                  <!-- Notification Recipients (multiselect) -->
+                  <div class="mt-3">
+                    <Label color="default" class="mb-1">{t('settings.notifications.notifyRecipients')}</Label>
+                    <BasePicker
+                      value={getRecipientValue(rule)}
+                      items={recipientItems}
+                      multiple={true}
+                      placeholder={t('settings.notifications.selectRecipients')}
+                      onChange={(selectedIds) => handleRecipientsChange(index, selectedIds)}
                     />
-                    <div class="mt-1 text-xs" style="color: var(--ds-text-subtle)">
-                      <strong>{t('settings.notifications.availableVariables')}:</strong> &#123;item.title&#125;, &#123;item.key&#125;, &#123;user.name&#125;, &#123;workspace.name&#125;, &#123;event.type&#125;<br>
-                      <strong>{t('settings.notifications.example')}:</strong> "Work item &#123;item.key&#125; '&#123;item.title&#125;' was updated in &#123;workspace.name&#125; by &#123;user.name&#125;"
-                    </div>
+                  </div>
+
+                  <!-- Custom Message Toggle -->
+                  <div class="mt-3">
+                    <Checkbox
+                      checked={showCustomMessage[index] || false}
+                      label={t('settings.notifications.customizeMessage')}
+                      size="small"
+                      onchange={(val) => {
+                        showCustomMessage[index] = val;
+                        if (!val) {
+                          formData.event_rules[index] = { ...formData.event_rules[index], message_template: '' };
+                        }
+                      }}
+                    />
+                    {#if showCustomMessage[index]}
+                      <div class="mt-2">
+                        <Textarea
+                          bind:value={rule.message_template}
+                          placeholder={t('settings.notifications.messageTemplatePlaceholder')}
+                          rows={3}
+                          class="text-sm"
+                        />
+                        <div class="mt-1 text-xs" style="color: var(--ds-text-subtle)">
+                          <strong>{t('settings.notifications.availableVariables')}:</strong> &#123;item.title&#125;, &#123;item.key&#125;, &#123;user.name&#125;, &#123;workspace.name&#125;, &#123;event.type&#125;<br>
+                          <strong>{t('settings.notifications.example')}:</strong> "Work item &#123;item.key&#125; '&#123;item.title&#125;' was updated in &#123;workspace.name&#125; by &#123;user.name&#125;"
+                        </div>
+                      </div>
+                    {/if}
                   </div>
                 </div>
               {/each}

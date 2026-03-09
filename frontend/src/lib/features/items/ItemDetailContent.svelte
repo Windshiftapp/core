@@ -442,6 +442,7 @@
         <!-- Resizable Right Panel -->
         <div class="flex-shrink-0 relative" style="width: var(--panel-width, 320px); min-width: 280px; max-width: 600px;">
           <!-- Resize Handle -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize transition-colors opacity-0 hover:opacity-100"
             style="background-color: var(--ds-border);"

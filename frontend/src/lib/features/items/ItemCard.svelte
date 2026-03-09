@@ -21,6 +21,7 @@
     </div>
   </a>
 {:else}
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
   <div
     class="item-card block p-3 rounded-lg border group"
     style="{bgStyle} {borderStyle}"

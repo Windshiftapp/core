@@ -55,6 +55,8 @@
         class:rounded-lg={hubStore.isEditing}
         class:p-4={hubStore.isEditing}
         style="border-color: {hubStore.isEditing ? 'var(--ds-border)' : 'transparent'};"
+        role="region"
+        aria-label={section.title || t('hub.section', 'Section')}
         ondrop={(e) => handleDrop(e, section.id)}
         ondragover={handleDragOver}
       >

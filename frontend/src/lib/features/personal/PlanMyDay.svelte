@@ -124,8 +124,9 @@
           </p>
           {#if connections.length > 0}
             <div class="flex items-center gap-2">
-              <label class="text-xs" style="color: var(--ds-text-subtle);">AI Model:</label>
+              <label for="ai-model-select" class="text-xs" style="color: var(--ds-text-subtle);">AI Model:</label>
               <select
+                id="ai-model-select"
                 bind:value={selectedConnectionId}
                 class="text-sm rounded px-2 py-1 border"
                 style="border-color: var(--ds-border); background: var(--ds-surface); color: var(--ds-text);"

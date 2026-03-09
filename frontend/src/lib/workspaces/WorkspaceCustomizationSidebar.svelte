@@ -98,6 +98,7 @@
         <div class="space-y-3">
           {#each currentWidgets as widget}
             {@const IconComponent = getIconComponent(widget.icon)}
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
               class="widget-card p-3 rounded border transition-colors cursor-grab active:cursor-grabbing"
               style="border-color: var(--ds-border); background-color: var(--ds-surface);"

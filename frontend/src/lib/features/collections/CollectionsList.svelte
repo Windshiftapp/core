@@ -231,7 +231,7 @@
       <!-- Workspace filter (only shown in workspace view) -->
       {#if isWorkspaceView}
         <div class="flex flex-wrap items-center gap-3 mb-6">
-          <label class="text-sm font-medium" style="color: var(--ds-text-subtle);">{t('collections.workspaceFilter')}</label>
+          <span class="text-sm font-medium" style="color: var(--ds-text-subtle);">{t('collections.workspaceFilter')}</span>
           <div class="min-w-[260px]">
             <WorkspaceSelector
               value={selectedWorkspaceFilter}

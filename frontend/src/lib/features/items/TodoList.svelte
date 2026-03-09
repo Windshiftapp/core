@@ -419,19 +419,21 @@
                     />
 
                     <!-- Todo Content with Key -->
-                    <div class="flex-1 min-w-0 cursor-pointer flex items-center gap-2" onclick={() => openItem(todo.id)}>
-                      <button
-                        onclick={() => openItem(todo.id)}
+                    <button
+                      type="button"
+                      class="appearance-none bg-transparent border-none font-[inherit] text-[inherit] text-left w-full p-0 m-0 cursor-pointer flex-1 min-w-0 flex items-center gap-2"
+                      onclick={() => openItem(todo.id)}
+                    >
+                      <span
                         class="text-xs font-mono px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0 transition-colors item-key"
                         style="color: var(--ds-text-subtle); background-color: var(--ds-surface);"
-                        title={t('items.clickToViewDetails')}
                       >
                         {todo.workspace_key || 'WORK'}-{todo.id}
-                      </button>
-                      <div class="flex-1 min-w-0 font-medium" style="color: {isPersonalTaskCompleted(todo) ? 'var(--ds-text-subtle)' : 'var(--ds-text)'}; {isPersonalTaskCompleted(todo) ? 'text-decoration: line-through;' : ''}">
+                      </span>
+                      <span class="flex-1 min-w-0 font-medium" style="color: {isPersonalTaskCompleted(todo) ? 'var(--ds-text-subtle)' : 'var(--ds-text)'}; {isPersonalTaskCompleted(todo) ? 'text-decoration: line-through;' : ''}">
                         {todo.title}
-                      </div>
-                    </div>
+                      </span>
+                    </button>
 
                     <!-- Actions -->
                     <div class="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">

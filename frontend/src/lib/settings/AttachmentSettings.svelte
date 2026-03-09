@@ -278,9 +278,9 @@
             <!-- Enable/Disable Toggle -->
             <div class="flex items-center justify-between">
               <div>
-                <label class="text-sm font-medium" style="color: var(--ds-text);">
+                <span class="text-sm font-medium" style="color: var(--ds-text);">
                   {t('settings.attachments.enableAttachments')}
-                </label>
+                </span>
                 <p class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.attachments.enableAttachmentsDesc')}</p>
               </div>
 <Toggle bind:checked={enabled} disabled={!status || !status.attachment_path} />
@@ -288,9 +288,10 @@
 
             <!-- Max File Size -->
             <div>
-              <Label color="default" class="mb-1">{t('settings.attachments.maxFileSize')}</Label>
+              <Label for="max-file-size" color="default" class="mb-1">{t('settings.attachments.maxFileSize')}</Label>
               <input
                 type="number"
+                id="max-file-size"
                 bind:value={maxFileSizeMB}
                 min="1"
                 max="1024"
@@ -313,7 +314,7 @@
 
           <!-- Quick Add Presets -->
           <div class="mb-4">
-            <Label color="default" class="mb-2">{t('settings.attachments.quickAddCommonTypes')}</Label>
+            <span class="block font-medium text-sm mb-2" style="color: var(--ds-text);">{t('settings.attachments.quickAddCommonTypes')}</span>
             <div class="flex flex-wrap gap-2">
               {#each mimeTypePresets as preset}
                 <Button
@@ -341,10 +342,11 @@
 
           <!-- Add Custom MIME Type -->
           <div class="mb-4">
-            <Label color="default" class="mb-1">{t('settings.attachments.addMimeType')}</Label>
+            <Label for="add-mime-type" color="default" class="mb-1">{t('settings.attachments.addMimeType')}</Label>
             <div class="flex gap-2">
               <input
                 type="text"
+                id="add-mime-type"
                 bind:value={newMimeType}
                 onkeydown={handleKeydown}
                 placeholder={t('settings.attachments.mimeTypePlaceholder')}
@@ -365,7 +367,7 @@
           <!-- Current MIME Types -->
           {#if allowedMimeTypes.length > 0}
             <div>
-              <Label color="default" class="mb-2">{t('settings.attachments.allowedMimeTypes')} ({allowedMimeTypes.length}):</Label>
+              <span class="block font-medium text-sm mb-2" style="color: var(--ds-text);">{t('settings.attachments.allowedMimeTypes')} ({allowedMimeTypes.length}):</span>
               <div class="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1">
                 {#each allowedMimeTypes as mimeType, index}
                   <Lozenge

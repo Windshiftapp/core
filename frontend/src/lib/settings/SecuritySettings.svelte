@@ -233,10 +233,11 @@
           {:else}
             <!-- Policy Selector -->
             <div class="mt-4">
-              <label class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
+              <label for="auth-policy-select" class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
                 Authentication Method
               </label>
               <select
+                id="auth-policy-select"
                 value={authPolicyConfig.policy}
                 onchange={handlePolicyChange}
                 disabled={savingPolicy}

@@ -200,8 +200,9 @@
 
     <div class="space-y-4">
       <div>
-        <label class="block text-sm font-medium mb-1 modal-label">{t('common.name')}</label>
+        <label for="action-name" class="block text-sm font-medium mb-1 modal-label">{t('common.name')}</label>
         <input
+          id="action-name"
           type="text"
           class="w-full px-3 py-2 border rounded-md text-sm modal-input"
           bind:value={newActionName}
@@ -210,8 +211,9 @@
       </div>
 
       <div>
-        <label class="block text-sm font-medium mb-1 modal-label">{t('common.description')}</label>
+        <label for="action-description" class="block text-sm font-medium mb-1 modal-label">{t('common.description')}</label>
         <textarea
+          id="action-description"
           class="w-full px-3 py-2 border rounded-md text-sm modal-input"
           rows="2"
           bind:value={newActionDescription}

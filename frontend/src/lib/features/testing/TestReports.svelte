@@ -390,9 +390,10 @@
           <div class="flex items-center gap-3">
             <!-- Collection selector -->
             <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium" style="color: var(--ds-text-subtle);">{t('collections.collection')}</label>
+              <label for="coverage-collection-select" class="text-xs font-medium" style="color: var(--ds-text-subtle);">{t('collections.collection')}</label>
               <div class="relative">
                 <select
+                  id="coverage-collection-select"
                   class="appearance-none px-3 py-2 pr-8 text-sm border rounded-md cursor-pointer min-w-[140px]"
                   style="border-color: var(--ds-border); background-color: var(--ds-background-input); color: var(--ds-text);"
                   value={coverageSelectedCollectionId ?? ''}
@@ -409,9 +410,10 @@
 
             <!-- Filter -->
             <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium" style="color: var(--ds-text-subtle);">{t('common.filter')}</label>
+              <label for="coverage-filter-select" class="text-xs font-medium" style="color: var(--ds-text-subtle);">{t('common.filter')}</label>
               <div class="relative">
                 <select
+                  id="coverage-filter-select"
                   class="appearance-none px-3 py-2 pr-8 text-sm border rounded-md cursor-pointer min-w-[140px]"
                   style="border-color: var(--ds-border); background-color: var(--ds-background-input); color: var(--ds-text);"
                   value={coverageFilterCovered}

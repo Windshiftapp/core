@@ -295,6 +295,8 @@ ${t('personal.placeholderImprovements')}`;
   });
 </script>
 
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="p-6" style="background-color: var(--ds-surface); min-height: 100vh;" onclick={handleClickOutside}>
   <PageHeader
     icon={FileEdit}
@@ -469,6 +471,7 @@ ${t('personal.placeholderImprovements')}`;
           {/if}
         </div>
 
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div onkeydown={handleKeydown} class="review-editor-container">
           <MilkdownEditor
             bind:content={reviewContent}

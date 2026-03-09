@@ -597,6 +597,7 @@
   {#if selectedAsset}
     <div class="flex-shrink-0 flex flex-col relative" style="width: {assetPanelWidth}px; min-width: 280px; max-width: 600px; border-left: 1px solid var(--ds-border);">
       <!-- Resize handle -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
         class="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize transition-colors z-10"
         style="background-color: transparent;"

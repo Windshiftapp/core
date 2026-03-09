@@ -94,6 +94,7 @@
     class="fixed z-50 {positionClass}"
     style="animation: {positionAnimation} 0.4s cubic-bezier(0.21, 1.02, 0.73, 1);"
   >
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div
       class="rounded shadow-xl flex items-start gap-3 transition-shadow duration-200 {clickable ? 'cursor-pointer hover:shadow-2xl' : ''}"
       style="background: var(--ds-surface-raised); border: 1px solid var(--ds-border); border-left: 4px solid {variantBorder};{width !== 'auto' ? ` width: ${width};` : ''}"

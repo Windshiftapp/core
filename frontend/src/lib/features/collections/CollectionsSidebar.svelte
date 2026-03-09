@@ -179,9 +179,9 @@
       <div class="space-y-4">
         <!-- Workspace Picker -->
         <div>
-          <label class="block text-xs font-medium mb-1.5" style="color: var(--ds-text-subtle);">
+          <span class="block text-xs font-medium mb-1.5" style="color: var(--ds-text-subtle);">
             {t('collections.workspaces')}
-          </label>
+          </span>
           <BasePicker
             items={workspaces}
             value={selectedWorkspaces}
@@ -195,9 +195,9 @@
 
         <!-- Status Picker -->
         <div>
-          <label class="block text-xs font-medium mb-1.5" style="color: var(--ds-text-subtle);">
+          <span class="block text-xs font-medium mb-1.5" style="color: var(--ds-text-subtle);">
             {t('collections.status')}
-          </label>
+          </span>
           <BasePicker
             items={allStatuses}
             value={selectedStatuses}
@@ -211,9 +211,9 @@
 
         <!-- Priority Picker -->
         <div>
-          <label class="block text-xs font-medium mb-1.5" style="color: var(--ds-text-subtle);">
+          <span class="block text-xs font-medium mb-1.5" style="color: var(--ds-text-subtle);">
             {t('collections.priority')}
-          </label>
+          </span>
           <BasePicker
             items={allPriorities}
             value={selectedPriorities}

@@ -253,12 +253,12 @@
         </h4>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label color="default" class="mb-2">{t('common.color')}</Label>
+            <span class="text-xs font-medium" style="color: var(--ds-text);">{t('common.color')}</span>
             <ColorPicker bind:value={newTheme.nav_background_color_light} compact={true} />
           </div>
 
           <div>
-            <Label color="default" class="mb-2">{t('common.color')}</Label>
+            <span class="text-xs font-medium" style="color: var(--ds-text);">{t('common.color')}</span>
             <ColorPicker bind:value={newTheme.nav_text_color_light} compact={true} />
           </div>
         </div>
@@ -272,12 +272,12 @@
         </h4>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label color="default" class="mb-2">{t('common.color')}</Label>
+            <span class="text-xs font-medium" style="color: var(--ds-text);">{t('common.color')}</span>
             <ColorPicker bind:value={newTheme.nav_background_color_dark} compact={true} />
           </div>
 
           <div>
-            <Label color="default" class="mb-2">{t('common.color')}</Label>
+            <span class="text-xs font-medium" style="color: var(--ds-text);">{t('common.color')}</span>
             <ColorPicker bind:value={newTheme.nav_text_color_dark} compact={true} />
           </div>
         </div>
@@ -330,9 +330,10 @@
               <!-- Edit Form -->
               <form onsubmit={handleEditSubmit} class="space-y-4">
                 <div>
-                  <Label color="default" class="mb-1">Name</Label>
+                  <Label for="edit-theme-name" color="default" class="mb-1">Name</Label>
                   <input
                     type="text"
+                    id="edit-theme-name"
                     bind:value={editingTheme.name}
                     required
                     class="w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2" style="border: 1px solid var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
@@ -340,9 +341,10 @@
                 </div>
 
                 <div>
-                  <Label color="default" class="mb-1">Description</Label>
+                  <Label for="edit-theme-description" color="default" class="mb-1">Description</Label>
                   <input
                     type="text"
+                    id="edit-theme-description"
                     bind:value={editingTheme.description}
                     class="w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2" style="border: 1px solid var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
                   />
@@ -356,11 +358,11 @@
                   </h5>
                   <div class="grid grid-cols-2 gap-3">
                     <div>
-                      <label class="block text-xs mb-1" style="color: var(--ds-text-subtle);">Background</label>
+                      <span class="block text-xs mb-1" style="color: var(--ds-text-subtle);">Background</span>
                       <ColorPicker bind:value={editingTheme.nav_background_color_light} compact={true} />
                     </div>
                     <div>
-                      <label class="block text-xs mb-1" style="color: var(--ds-text-subtle);">Text</label>
+                      <span class="block text-xs mb-1" style="color: var(--ds-text-subtle);">Text</span>
                       <ColorPicker bind:value={editingTheme.nav_text_color_light} compact={true} />
                     </div>
                   </div>
@@ -374,11 +376,11 @@
                   </h5>
                   <div class="grid grid-cols-2 gap-3">
                     <div>
-                      <label class="block text-xs mb-1" style="color: var(--ds-text-subtle);">Background</label>
+                      <span class="block text-xs mb-1" style="color: var(--ds-text-subtle);">Background</span>
                       <ColorPicker bind:value={editingTheme.nav_background_color_dark} compact={true} />
                     </div>
                     <div>
-                      <label class="block text-xs mb-1" style="color: var(--ds-text-subtle);">Text</label>
+                      <span class="block text-xs mb-1" style="color: var(--ds-text-subtle);">Text</span>
                       <ColorPicker bind:value={editingTheme.nav_text_color_dark} compact={true} />
                     </div>
                   </div>

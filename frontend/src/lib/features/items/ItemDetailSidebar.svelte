@@ -406,9 +406,9 @@
         }}
       >
         {#snippet children()}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
-            role="group"
             onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
           >
@@ -449,9 +449,9 @@
         }}
       >
         {#snippet children()}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
-            role="group"
             onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
           >
@@ -495,8 +495,7 @@
         <button
           onclick={startEditingDueDate}
           class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
-          role="group"
-            onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
+          onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
           onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
         >
           <Text variant="subtle" size="sm">{t('common.dueDate')}</Text>
@@ -547,10 +546,10 @@
           }}
         >
           {#snippet children()}
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
               class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
-              role="group"
-            onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
+              onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
               onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
             >
               <Text variant="subtle" size="sm">{t('items.project')}</Text>
@@ -585,9 +584,9 @@
         }}
       >
         {#snippet children()}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
-            role="group"
             onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
           >
@@ -631,9 +630,9 @@
         }}
       >
         {#snippet children()}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
-            role="group"
             onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
           >
@@ -668,9 +667,9 @@
         }}
       >
         {#snippet children()}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
-            role="group"
             onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
           >
@@ -733,8 +732,7 @@
                   <button
                     onclick={() => startEditingCustomField(screenField.field_identifier)}
                     class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
-                    role="group"
-            onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
+                    onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
                     onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
                     disabled={!canEdit}
                   >

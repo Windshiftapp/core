@@ -5,6 +5,7 @@
 
   const dispatch = createEventDispatcher();
   
+  /** @type {{ id: string, original_filename: string, file_size: number, mime_type: string, uploader_name: string, [key: string]: any } | null} */
   export let attachment = null;
   export let show = false;
   
@@ -194,13 +195,19 @@
 
 {#if show && attachment}
   <!-- Modal backdrop -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center"
+    role="presentation"
     onclick={close}
   >
     <!-- Modal content -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="relative w-full h-full flex flex-col"
+      role="presentation"
       onclick={(e) => e.stopPropagation()}
     >
       <!-- Header -->
@@ -277,6 +284,7 @@
         class:cursor-grabbing={isDragging}
         onwheel={handleWheel}
       >
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <img
           bind:this={imageElement}
           src={getImageUrl(attachment)}

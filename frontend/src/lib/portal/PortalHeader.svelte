@@ -48,8 +48,10 @@
     <!-- Dropdown Menu -->
     {#if portalStore.showMainMenu}
       <!-- Click-outside overlay -->
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div
         class="fixed inset-0 z-[-1]"
+        role="presentation"
         onclick={() => portalStore.showMainMenu = false}
       ></div>
 

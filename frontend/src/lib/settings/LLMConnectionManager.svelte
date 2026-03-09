@@ -354,8 +354,9 @@
 {#snippet connectionForm()}
   <!-- Name -->
   <div>
-    <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Name</label>
+    <label for="llm-connection-name" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Name</label>
     <input
+      id="llm-connection-name"
       type="text"
       bind:value={form.name}
       placeholder="e.g. Claude Sonnet"
@@ -366,8 +367,9 @@
 
   <!-- Provider Type -->
   <div>
-    <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Provider</label>
+    <label for="llm-connection-provider" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Provider</label>
     <select
+      id="llm-connection-provider"
       bind:value={form.provider_type}
       class="w-full px-3 py-2 text-sm rounded-md border"
       style="border-color: var(--ds-border); background: var(--ds-surface); color: var(--ds-text);"
@@ -382,9 +384,10 @@
 
   <!-- Model -->
   <div>
-    <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Model</label>
+    <label for="llm-connection-model" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Model</label>
     {#if isLocalProvider}
       <input
+        id="llm-connection-model"
         type="text"
         bind:value={form.model}
         placeholder="e.g. llama-3.1-8b"
@@ -393,6 +396,7 @@
       />
     {:else}
       <select
+        id="llm-connection-model"
         bind:value={form.model}
         class="w-full px-3 py-2 text-sm rounded-md border"
         style="border-color: var(--ds-border); background: var(--ds-surface); color: var(--ds-text);"
@@ -407,8 +411,9 @@
 
   <!-- API Key -->
   <div>
-    <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">API Key</label>
+    <label for="llm-connection-api-key" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">API Key</label>
     <input
+      id="llm-connection-api-key"
       type="password"
       bind:value={form.api_key}
       placeholder={editingConnection?.has_api_key ? 'Key configured (leave blank to keep)' : 'Enter API key'}
@@ -420,8 +425,9 @@
   <!-- Base URL (only for local) -->
   {#if isLocalProvider}
     <div>
-      <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Base URL</label>
+      <label for="llm-connection-base-url" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Base URL</label>
       <input
+        id="llm-connection-base-url"
         type="text"
         bind:value={form.base_url}
         placeholder="e.g. https://llm.example.com"
@@ -447,8 +453,8 @@
 
   <!-- Features -->
   <div>
-    <label class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">Features</label>
-    <div class="flex flex-col gap-2">
+    <span class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">Features</span>
+    <div class="flex flex-col gap-2" role="group" aria-label="Features">
       {#each knownFeatures as feature}
         <label class="flex items-center gap-2 text-sm cursor-pointer" style="color: var(--ds-text);">
           <input

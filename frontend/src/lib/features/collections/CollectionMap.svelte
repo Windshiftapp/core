@@ -787,6 +787,7 @@ async function loadStatuses() {
                 <div class="space-y-2">
                   {#each childItemsByParent[backboneItem.id] || [] as childItem}
                     {@const childItemType = getItemTypeInfo(childItem.item_type_id)}
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <div
                       class="item-card rounded border p-3 cursor-move"
                       style="box-shadow: var(--ds-shadow-raised); {styles.cardStyle(4)}"

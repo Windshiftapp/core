@@ -24,8 +24,9 @@
   }
 </script>
 
-<div
-  class="portal-card group relative rounded-lg overflow-hidden cursor-pointer"
+<button
+  type="button"
+  class="portal-card group relative rounded-lg overflow-hidden cursor-pointer appearance-none bg-transparent border-none p-0 m-0 font-[inherit] text-[inherit] text-left w-full"
   class:border-2={hubStore.isEditing}
   class:border-dashed={hubStore.isEditing}
   onclick={handleClick}
@@ -53,13 +54,16 @@
 
     <!-- Remove button (edit mode only) -->
     {#if hubStore.isEditing && onRemove}
-      <button
+      <span
+        role="button"
+        tabindex="-1"
         onclick={(e) => { e.stopPropagation(); onRemove(portal.id); }}
-        class="absolute top-2 right-2 p-1 rounded bg-red-500/80 text-white hover:bg-red-600 transition-colors"
+        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onRemove(portal.id); } }}
+        class="absolute top-2 right-2 p-1 rounded bg-red-500/80 text-white hover:bg-red-600 transition-colors cursor-pointer"
         title={t('common.remove', 'Remove')}
       >
         <X class="w-4 h-4" />
-      </button>
+      </span>
     {/if}
   </div>
 
@@ -93,7 +97,7 @@
       {/if}
     </div>
   </div>
-</div>
+</button>
 
 <style>
   .portal-card {

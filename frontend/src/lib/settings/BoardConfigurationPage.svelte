@@ -344,6 +344,7 @@
         {#if activeTab === 'columns'}
         <div class="flex gap-4 mt-6 mb-6 overflow-x-auto pb-4">
           {#each columns as column, index (index)}
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
               class="rounded border shadow-sm flex-shrink-0 transition-opacity"
               class:opacity-50={draggedColumnIndex === index}
@@ -356,6 +357,7 @@
               <!-- Column header -->
               <div class="p-3 border-b flex items-center justify-between" style="border-color: var(--ds-border);">
                 <div class="flex items-center gap-2 flex-1 min-w-0">
+                  <!-- svelte-ignore a11y_no_static_element_interactions -->
                   <div
                     class="cursor-grab active:cursor-grabbing"
                     style="color: var(--ds-text-subtlest);"
@@ -390,11 +392,12 @@
               <div class="p-3 space-y-3">
                 <!-- WIP Limit -->
                 <div>
-                  <label class="text-xs font-medium block mb-1" style="color: var(--ds-text);">
+                  <label for="wip-limit-{index}" class="text-xs font-medium block mb-1" style="color: var(--ds-text);">
                     {t('settings.boardConfig.wipLimit')}
                   </label>
                   <input
                     type="number"
+                    id="wip-limit-{index}"
                     value={column.wip_limit || ''}
                     oninput={(e) => updateWIPLimit(index, e.target.value)}
                     class="w-full px-2 py-1 border rounded text-sm"
@@ -406,9 +409,9 @@
 
                 <!-- Status mapping -->
                 <div>
-                  <label class="text-xs font-medium block mb-2" style="color: var(--ds-text);">
+                  <span class="text-xs font-medium block mb-2" style="color: var(--ds-text);">
                     {t('settings.boardConfig.mappedStatuses')}
-                  </label>
+                  </span>
                   <div class="space-y-1">
                     {#each statuses as status}
                       {@const isSelected = column.status_ids.includes(status.id)}
