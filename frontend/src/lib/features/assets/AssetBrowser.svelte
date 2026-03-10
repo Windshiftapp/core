@@ -1,9 +1,9 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { api } from '../../api.js';
-  import { navigate } from '../../router.js';
+  import { navigate, currentRoute } from '../../router.js';
   import Button from '../../components/Button.svelte';
   import Label from '../../components/Label.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
@@ -13,7 +13,9 @@
   import ColorDot from '../../components/ColorDot.svelte';
   import Select from '../../components/Select.svelte';
   import DataTable from '../../components/DataTable.svelte';
-  import { Plus, Package, Edit, Trash2, Box, ChevronRight, ChevronDown, Folder, FolderOpen, Search, ExternalLink, Code } from 'lucide-svelte';
+  import { Plus, Package, Edit, Trash2, Box, ChevronRight, ChevronDown, Folder, FolderOpen, Search, ExternalLink, Code, Upload } from 'lucide-svelte';
+  import AssetImportWizard from './import/AssetImportWizard.svelte';
+  import AssetSubFilterBar from './AssetSubFilterBar.svelte';
   import CustomFieldRenderer from '../items/CustomFieldRenderer.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { formatDateSimple } from '../../utils/dateFormatter.js';
@@ -35,6 +37,8 @@
   let assets = $state([]);
   let selectedAsset = $state(null);
   let showAssetForm = $state(false);
+  let showImportWizard = $state(false);
+  let isAdmin = $derived(selectedSet?.user_permission === 'Administrator');
   let editingAsset = $state(null);
   let assetFormData = $state({
     title: '',
@@ -79,9 +83,11 @@
   let searchMode = $state('simple'); // 'simple' or 'ql'
   let searchInput = $state(''); // Search input (either simple text or QL query)
   let activeQuery = $state(''); // The committed query that triggers API calls
+  let filterBarQL = $state(''); // QL from the visual filter bar
+  let allCustomFields = $state([]); // Aggregated custom fields from all asset types
 
   // Pagination state
-  let currentPage = $state(1);
+  let currentPage = $derived(parseInt($currentRoute.query?.page) || 1);
   let totalAssets = $state(0);
   const pageSize = 25;
 
@@ -106,13 +112,12 @@
     }
   }
 
-  // Load data when set changes
+  // Load metadata when set changes
   $effect(() => {
     if (selectedSetId) {
       loadAssetTypes();
       loadAssetCategories();
       loadStatuses();
-      loadAssets();
     }
   });
 
@@ -121,8 +126,33 @@
     try {
       const types = await api.assetTypes.getAll(selectedSetId);
       assetTypes = (types || []).filter(t => t.is_active);
+      loadAllCustomFields();
     } catch (error) {
       console.error('Failed to load asset types:', error);
+    }
+  }
+
+  async function loadAllCustomFields() {
+    if (assetTypes.length === 0) {
+      allCustomFields = [];
+      return;
+    }
+    try {
+      const seenFieldIds = new Set();
+      const fields = [];
+      for (const type of assetTypes) {
+        const typeFields = await api.assetTypes.getFields(type.id);
+        for (const f of (typeFields || [])) {
+          if (!seenFieldIds.has(f.custom_field_id)) {
+            seenFieldIds.add(f.custom_field_id);
+            fields.push(f);
+          }
+        }
+      }
+      allCustomFields = fields;
+    } catch (error) {
+      console.error('Failed to load custom fields for filter:', error);
+      allCustomFields = [];
     }
   }
 
@@ -157,16 +187,21 @@
         filters.category_id = selectedCategoryId;
         filters.include_subcategories = true;
       }
-      // Use activeQuery for API calls
+      // Build combined QL from search input and visual filter bar
+      const qlParts = [];
       if (activeQuery) {
         if (searchMode === 'ql') {
-          // QL mode: pass query directly
-          filters.ql = activeQuery;
+          qlParts.push(activeQuery);
         } else {
-          // Simple mode: translate to title/description search
           const escapedInput = activeQuery.replace(/"/g, '\\"');
-          filters.ql = `title ~ "${escapedInput}" OR description ~ "${escapedInput}"`;
+          qlParts.push(`(title ~ "${escapedInput}" OR description ~ "${escapedInput}")`);
         }
+      }
+      if (filterBarQL) {
+        qlParts.push(filterBarQL);
+      }
+      if (qlParts.length > 0) {
+        filters.ql = qlParts.join(' AND ');
       }
       const result = await api.assets.getAll(selectedSetId, filters);
       assets = result?.assets || [];
@@ -176,13 +211,40 @@
     }
   }
 
-  // Reload assets when filters change (reset to page 1)
+  // Navigate to a new page via URL
+  function updatePage(page) {
+    const params = new URLSearchParams(window.location.search);
+    if (page > 1) {
+      params.set('page', page);
+    } else {
+      params.delete('page');
+    }
+    const qs = params.toString();
+    navigate(`/assets${qs ? '?' + qs : ''}`);
+  }
+
+  // Reset to page 1 when filters change (not on initial load)
+  let filtersInitialized = false;
   $effect(() => {
     if (selectedSetId) {
-      // Dependencies: selectedCategoryId, activeQuery
-      const _ = [selectedCategoryId, activeQuery];
-      currentPage = 1;
-      loadAssets();
+      const _ = [selectedCategoryId, activeQuery, filterBarQL];
+      if (!filtersInitialized) {
+        filtersInitialized = true;
+        return;
+      }
+      untrack(() => {
+        if (currentPage !== 1) {
+          updatePage(1);
+        }
+      });
+    }
+  });
+
+  // Reload assets when any dependency changes (set, page, filters)
+  $effect(() => {
+    if (selectedSetId) {
+      const _ = [currentPage, selectedCategoryId, activeQuery, filterBarQL];
+      untrack(() => loadAssets());
     }
   });
 
@@ -195,8 +257,7 @@
 
   // Handle page change from DataTable
   function handlePageChange(page) {
-    currentPage = page;
-    loadAssets();
+    updatePage(page);
   }
 
   // Load custom fields when asset type changes in form
@@ -400,7 +461,7 @@
   <!-- Left sidebar: Category tree -->
   <div class="w-64 flex flex-col" style="border-right: 1px solid var(--ds-border); background: var(--ds-surface-raised);">
     <!-- Set selector -->
-    <div class="p-4" style="border-bottom: 1px solid var(--ds-border);">
+    <div class="px-4 h-[80px] flex items-center" style="border-bottom: 1px solid var(--ds-border);">
       <Select bind:value={selectedSetId} class="w-full">
         {#if assetSets.length === 0}
           <option value={null} disabled>No asset sets available</option>
@@ -481,7 +542,7 @@
   <!-- Main content -->
   <div class="flex-1 flex flex-col overflow-hidden">
     <!-- Header with search -->
-    <div class="p-4 flex items-center gap-4" style="border-bottom: 1px solid var(--ds-border);">
+    <div class="px-4 h-[80px] flex items-center gap-4" style="border-bottom: 1px solid var(--ds-border);">
       <div class="flex-1 relative max-w-lg flex items-center gap-2">
         <div class="flex-1 relative">
           <Search class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style="color: var(--ds-icon);" />
@@ -497,7 +558,7 @@
         </div>
         <button
           onclick={() => {
-            searchMode = searchMode === 'simple' ? 'cql' : 'simple';
+            searchMode = searchMode === 'simple' ? 'ql' : 'simple';
             searchInput = '';
             activeQuery = '';
           }}
@@ -507,9 +568,24 @@
         >
           <Code class="w-4 h-4" />
         </button>
+        {#if selectedSetId}
+          <AssetSubFilterBar
+            {statuses}
+            {assetTypes}
+            categories={assetCategories}
+            customFields={allCustomFields}
+            onApply={(ql) => { filterBarQL = ql; }}
+          />
+        {/if}
       </div>
       <div class="flex-1"></div>
       {#if selectedSetId}
+        {#if isAdmin}
+          <Button onclick={() => { showImportWizard = true; }} variant="default" class="whitespace-nowrap">
+            <Upload class="w-4 h-4 mr-1" />
+            Import
+          </Button>
+        {/if}
         <Button onclick={showAddAssetForm} class="whitespace-nowrap" keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('assets', 'upload'), guard: () => !!(selectedSetId && !showAssetForm) }}>
           <Plus class="w-4 h-4 mr-1" />
           {t('common.create')}
@@ -554,7 +630,7 @@
           onRowClick={(asset) => selectedAsset = asset}
           pagination={true}
           {pageSize}
-          bind:currentPage
+          {currentPage}
           totalItems={totalAssets}
           onPageChange={handlePageChange}
         >
@@ -686,6 +762,7 @@
               {@const fieldDef = displayTypeFields.find(f => String(f.custom_field_id) === String(fieldId))}
               {#if fieldDef && value !== null && value !== ''}
                 <div class="mb-3">
+                  <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{fieldDef.field_name}</h4>
                   <CustomFieldRenderer
                     field={{
                       id: fieldDef.custom_field_id,
@@ -695,6 +772,7 @@
                     }}
                     value={value}
                     readonly={true}
+                    noPadding={true}
                   />
                 </div>
               {/if}
@@ -761,6 +839,12 @@
           <h4 class="text-sm font-medium mb-3" style="color: var(--ds-text-subtle);">Custom Fields</h4>
           {#each selectedTypeFields as field}
             <div class="mb-4">
+              <Label color="default" class="mb-1">
+                {field.field_name}
+                {#if field.is_required}
+                  <span style="color: var(--ds-text-danger, #ef4444);">*</span>
+                {/if}
+              </Label>
               <CustomFieldRenderer
                 field={{
                   id: field.custom_field_id,
@@ -784,4 +868,13 @@
     </div>
   </form>
 </Modal>
+
+<!-- Import Wizard -->
+{#if isAdmin}
+  <AssetImportWizard
+    bind:isOpen={showImportWizard}
+    setId={selectedSetId}
+    onComplete={() => { loadAssets(); }}
+  />
+{/if}
 

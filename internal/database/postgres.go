@@ -408,6 +408,14 @@ func (p *PostgresDB) Initialize() error {
 			slog.Warn("workspace_everyone_roles drop failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Create asset import tables if they don't exist (for existing databases)
+		assetsContent := strings.TrimSpace(assetsSchemaPostgres)
+		if assetsContent != "" {
+			if _, err = p.db.Exec(assetsContent); err != nil {
+				slog.Warn("assets postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
 		return nil
 	}
 

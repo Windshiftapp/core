@@ -11,11 +11,12 @@ import (
 
 // SQLGenerator converts QL AST to SQL WHERE clause
 type SQLGenerator struct {
-	workspaceMap map[string]int // Maps workspace names/keys to IDs
-	aliasPrefix  string         // Prefix for table aliases ("" for outer, "inner_" for inner queries)
-	entityType   EntityType     // Type of entity being queried (item or asset)
-	setMap       map[string]int // Maps asset set names to IDs (for asset queries)
-	dbDriver     string         // Database driver name ("sqlite" or "postgres")
+	workspaceMap   map[string]int // Maps workspace names/keys to IDs
+	aliasPrefix    string         // Prefix for table aliases ("" for outer, "inner_" for inner queries)
+	entityType     EntityType     // Type of entity being queried (item or asset)
+	setMap         map[string]int // Maps asset set names to IDs (for asset queries)
+	dbDriver       string         // Database driver name ("sqlite" or "postgres")
+	customFieldMap map[string]int // Maps lowercase custom field name to field ID (for asset queries)
 }
 
 // NewSQLGenerator creates a new SQL generator for outer queries (work items)
@@ -40,31 +41,38 @@ func NewInnerSQLGenerator(workspaceMap map[string]int, dbDriver string) *SQLGene
 }
 
 // NewAssetSQLGenerator creates a new SQL generator for asset queries
-func NewAssetSQLGenerator(setMap map[string]int, dbDriver string) *SQLGenerator {
+func NewAssetSQLGenerator(setMap map[string]int, customFieldMap map[string]int, dbDriver string) *SQLGenerator {
 	return &SQLGenerator{
-		setMap:      setMap,
-		aliasPrefix: "",
-		entityType:  EntityTypeAsset,
-		dbDriver:    dbDriver,
+		setMap:         setMap,
+		aliasPrefix:    "",
+		entityType:     EntityTypeAsset,
+		dbDriver:       dbDriver,
+		customFieldMap: customFieldMap,
 	}
 }
 
 // NewInnerAssetSQLGenerator creates a new SQL generator for inner asset queries
-func NewInnerAssetSQLGenerator(setMap map[string]int, dbDriver string) *SQLGenerator {
+func NewInnerAssetSQLGenerator(setMap map[string]int, customFieldMap map[string]int, dbDriver string) *SQLGenerator {
 	return &SQLGenerator{
-		setMap:      setMap,
-		aliasPrefix: "inner_",
-		entityType:  EntityTypeAsset,
-		dbDriver:    dbDriver,
+		setMap:         setMap,
+		aliasPrefix:    "inner_",
+		entityType:     EntityTypeAsset,
+		dbDriver:       dbDriver,
+		customFieldMap: customFieldMap,
 	}
 }
 
 // jsonExtract returns the DB-appropriate expression for extracting a field from a JSON column.
-func (g *SQLGenerator) jsonExtract(column, field string) string {
+// Returns a parameterized SQL expression and its arguments to prevent injection.
+func (g *SQLGenerator) jsonExtract(column, field string) (string, []interface{}) {
 	if g.dbDriver == "postgres" {
-		return fmt.Sprintf("%s->>'%s'", column, field)
+		return fmt.Sprintf("%s->>?", column), []interface{}{field}
 	}
-	return fmt.Sprintf("json_extract(%s, '$.%s')", column, field)
+	// SQLite 3.38+: ->> always returns TEXT (like PostgreSQL), avoiding type mismatch
+	// issues where json_extract returns INTEGER for numbers but TEXT for strings.
+	// NULLIF guards against empty-string data which causes "malformed JSON" errors.
+	path := fmt.Sprintf("$.\"%s\"", field)
+	return fmt.Sprintf("NULLIF(%s, '') ->> '%s'", column, path), nil
 }
 
 // GenerateSQL converts a QL AST to SQL WHERE clause
@@ -86,11 +94,11 @@ func (g *SQLGenerator) generateNode(node *ASTNode) (sql string, args []interface
 	case NodeInExpression:
 		return g.generateInExpression(node)
 	case NodeIdentifier:
-		sql, err := g.mapFieldName(node.Value)
+		sql, args, err := g.mapFieldName(node.Value)
 		if err != nil {
 			return "", nil, err
 		}
-		return sql, nil, nil
+		return sql, args, nil
 	case NodeLiteral:
 		return "?", []interface{}{g.convertLiteral(node)}, nil
 	case NodeFunction:
@@ -216,9 +224,30 @@ func (g *SQLGenerator) generateComparison(node *ASTNode) (sql string, args []int
 		return "", nil, err
 	}
 
-	rightSQL, rightArgs, err := g.generateNode(node.Right)
-	if err != nil {
-		return "", nil, err
+	// Check if we're comparing status, priority, or type fields - make them case-insensitive
+	isCaseInsensitiveField := false
+	if node.Left.Type == NodeIdentifier {
+		fieldName := strings.ToLower(node.Left.Value)
+		// status and priority apply to items, status and type apply to assets
+		if fieldName == "status" || fieldName == "priority" || fieldName == "type" || fieldName == "assettype" || fieldName == "asset_type" || fieldName == "category" {
+			isCaseInsensitiveField = true
+		}
+	}
+
+	// If comparing case-insensitive field with an unquoted identifier (e.g., "status = Inactive"),
+	// treat the right side as a string value directly, not a column name.
+	// This must happen before generateNode(node.Right) because generateNode would try to
+	// map the identifier as a field name and fail.
+	var rightSQL string
+	var rightArgs []interface{}
+	if isCaseInsensitiveField && node.Right.Type == NodeIdentifier {
+		rightSQL = "?"
+		rightArgs = []interface{}{node.Right.Value}
+	} else {
+		rightSQL, rightArgs, err = g.generateNode(node.Right)
+		if err != nil {
+			return "", nil, err
+		}
 	}
 
 	leftArgs = append(leftArgs, rightArgs...)
@@ -234,29 +263,23 @@ func (g *SQLGenerator) generateComparison(node *ASTNode) (sql string, args []int
 		}
 	}
 
-	// Check if we're comparing status, priority, or type fields - make them case-insensitive
-	isCaseInsensitiveField := false
-	if node.Left.Type == NodeIdentifier {
-		fieldName := strings.ToLower(node.Left.Value)
-		// status and priority apply to items, status and type apply to assets
-		if fieldName == "status" || fieldName == "priority" || fieldName == "type" || fieldName == "assettype" || fieldName == "asset_type" || fieldName == "category" {
-			isCaseInsensitiveField = true
-		}
-	}
-
-	// If comparing case-insensitive field with an unquoted identifier (e.g., "priority = high"),
-	// treat the right side as a string value, not a column name
-	if isCaseInsensitiveField && node.Right.Type == NodeIdentifier {
-		rightSQL = "?"
-		// Append to existing leftArgs, replacing rightArgs
-		leftArgs = append(leftArgs, node.Right.Value)
-	}
-
-	// For PostgreSQL JSONB ->> returns text, so numeric custom field comparisons need a CAST
-	if g.dbDriver == "postgres" && node.Left.Type == NodeIdentifier && node.Right.Type == NodeLiteral && node.Right.DataType == NUMBER {
+	// Custom field type casting for cross-type comparisons.
+	// PostgreSQL ->> always returns text; SQLite ->> preserves JSON types
+	// (string→TEXT, number→INTEGER). SQLite treats different storage classes as unequal,
+	// so we CAST to normalize types for reliable comparisons.
+	if node.Left.Type == NodeIdentifier && node.Right.Type == NodeLiteral {
 		fieldLower := strings.ToLower(node.Left.Value)
 		if strings.HasPrefix(fieldLower, "cf_") || strings.HasPrefix(fieldLower, "custom.") {
-			leftSQL = fmt.Sprintf("CAST(%s AS NUMERIC)", leftSQL)
+			switch node.Right.DataType {
+			case NUMBER:
+				// CAST to NUMERIC for number comparisons on both databases
+				leftSQL = fmt.Sprintf("CAST(%s AS NUMERIC)", leftSQL)
+			case STRING:
+				if g.dbDriver != "postgres" {
+					// SQLite: CAST to TEXT so JSON number 20 matches string "20"
+					leftSQL = fmt.Sprintf("CAST(%s AS TEXT)", leftSQL)
+				}
+			}
 		}
 	}
 
@@ -355,6 +378,17 @@ func (g *SQLGenerator) generateInExpression(node *ASTNode) (sql string, args []i
 		fieldName := strings.ToLower(node.Field.Value)
 		if fieldName == "status" || fieldName == "priority" || fieldName == "type" || fieldName == "assettype" || fieldName == "asset_type" || fieldName == "category" {
 			isCaseInsensitiveField = true
+		}
+	}
+
+	// Custom field NUMERIC cast for IN expressions with number values.
+	// Both PostgreSQL ->> and SQLite ->> return TEXT, so CAST for numeric comparisons.
+	if node.Field.Type == NodeIdentifier {
+		fieldLower := strings.ToLower(node.Field.Value)
+		if strings.HasPrefix(fieldLower, "cf_") || strings.HasPrefix(fieldLower, "custom.") {
+			if len(node.Values.Arguments) > 0 && node.Values.Arguments[0].DataType == NUMBER {
+				fieldSQL = fmt.Sprintf("CAST(%s AS NUMERIC)", fieldSQL)
+			}
 		}
 	}
 
@@ -693,11 +727,11 @@ func (g *SQLGenerator) generateAssetLinkedOf(node *ASTNode) (sql string, args []
 
 // validCustomFieldName validates that a custom field name contains only safe characters
 // for use in JSON paths. Returns true if the name is safe.
-var validCustomFieldNameRegex = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_-]*$`)
+var validCustomFieldNameRegex = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_ -]*$`)
 
 // mapFieldName maps QL field names to SQL column names
 // Dispatches to entity-specific mapping based on entityType
-func (g *SQLGenerator) mapFieldName(fieldName string) (string, error) {
+func (g *SQLGenerator) mapFieldName(fieldName string) (string, []interface{}, error) {
 	if g.entityType == EntityTypeAsset {
 		return g.mapAssetFieldName(fieldName)
 	}
@@ -706,7 +740,7 @@ func (g *SQLGenerator) mapFieldName(fieldName string) (string, error) {
 
 // mapAssetFieldName maps QL field names to asset SQL column names
 // Supports custom fields using syntax: cf_fieldname or custom.fieldname
-func (g *SQLGenerator) mapAssetFieldName(fieldName string) (string, error) {
+func (g *SQLGenerator) mapAssetFieldName(fieldName string) (string, []interface{}, error) {
 	lowerField := strings.ToLower(fieldName)
 	prefix := g.aliasPrefix
 
@@ -714,79 +748,95 @@ func (g *SQLGenerator) mapAssetFieldName(fieldName string) (string, error) {
 	if strings.HasPrefix(lowerField, "cf_") {
 		customFieldName := fieldName[3:]
 		if !validCustomFieldNameRegex.MatchString(customFieldName) {
-			return "", fmt.Errorf("invalid custom field name: %s", customFieldName)
+			return "", nil, fmt.Errorf("invalid custom field name: %s", customFieldName)
 		}
-		return g.jsonExtract(prefix+"a.custom_field_values", customFieldName), nil
+		// Resolve human-readable name to numeric field ID for JSON key lookup
+		jsonKey := customFieldName
+		if g.customFieldMap != nil {
+			if id, ok := g.customFieldMap[strings.ToLower(customFieldName)]; ok {
+				jsonKey = strconv.Itoa(id)
+			}
+		}
+		sql, args := g.jsonExtract(prefix+"a.custom_field_values", jsonKey)
+		return sql, args, nil
 	}
 
 	if strings.HasPrefix(lowerField, "custom.") {
 		customFieldName := fieldName[7:]
 		if !validCustomFieldNameRegex.MatchString(customFieldName) {
-			return "", fmt.Errorf("invalid custom field name: %s", customFieldName)
+			return "", nil, fmt.Errorf("invalid custom field name: %s", customFieldName)
 		}
-		return g.jsonExtract(prefix+"a.custom_field_values", customFieldName), nil
+		// Resolve human-readable name to numeric field ID for JSON key lookup
+		jsonKey := customFieldName
+		if g.customFieldMap != nil {
+			if id, ok := g.customFieldMap[strings.ToLower(customFieldName)]; ok {
+				jsonKey = strconv.Itoa(id)
+			}
+		}
+		sql, args := g.jsonExtract(prefix+"a.custom_field_values", jsonKey)
+		return sql, args, nil
 	}
 
 	// Standard asset field mappings
 	switch lowerField {
 	// Set fields (equivalent to workspace for items)
 	case "set", "setname", "set_name":
-		return prefix + "ams.name", nil
+		return prefix + "ams.name", nil, nil
 	case "setid", "set_id":
-		return prefix + "a.set_id", nil
+		return prefix + "a.set_id", nil, nil
 
 	// Status fields
 	case "status":
-		return prefix + "ast.name", nil
+		return prefix + "ast.name", nil, nil
 	case "statusid", "status_id":
-		return prefix + "a.status_id", nil
+		return prefix + "a.status_id", nil, nil
 
 	// Type fields
 	case "type", "assettype", "asset_type":
-		return prefix + "at.name", nil
+		return prefix + "at.name", nil, nil
 	case "typeid", "type_id", "assettypeid", "asset_type_id":
-		return prefix + "a.asset_type_id", nil
+		return prefix + "a.asset_type_id", nil, nil
 
 	// Category fields
 	case "category":
-		return prefix + "ac.name", nil
+		return prefix + "ac.name", nil, nil
 	case "categoryid", "category_id":
-		return prefix + "a.category_id", nil
+		return prefix + "a.category_id", nil, nil
 	case "categorypath", "category_path":
-		return prefix + "ac.path", nil
+		return prefix + "ac.path", nil, nil
 
 	// Basic text fields
 	case "title":
-		return prefix + "a.title", nil
+		return prefix + "a.title", nil, nil
 	case "description":
-		return prefix + "a.description", nil
+		return prefix + "a.description", nil, nil
 	case "tag", "assettag", "asset_tag":
-		return prefix + "a.asset_tag", nil
+		return prefix + "a.asset_tag", nil, nil
 
 	// Date fields
 	case "created", "created_at", "createdat":
-		return prefix + "a.created_at", nil
+		return prefix + "a.created_at", nil, nil
 	case "updated", "updated_at", "updatedat":
-		return prefix + "a.updated_at", nil
+		return prefix + "a.updated_at", nil, nil
 
 	// Creator fields
 	case "creator", "creatorid", "creator_id", "createdby", "created_by":
-		return prefix + "a.created_by", nil
+		return prefix + "a.created_by", nil, nil
 	case "creatorname", "creator_name":
-		return prefix + "u.first_name || ' ' || " + prefix + "u.last_name", nil
+		return prefix + "u.first_name || ' ' || " + prefix + "u.last_name", nil, nil
 
 	// ID
 	case "id":
-		return prefix + "a.id", nil
+		return prefix + "a.id", nil, nil
 
 	default:
-		return "", fmt.Errorf("unknown field: %s", fieldName)
+		return "", nil, fmt.Errorf("unknown field: %s", fieldName)
 	}
 }
 
 // mapItemFieldName maps QL field names to work item SQL column names
 // Supports custom fields using syntax: cf_fieldname or custom.fieldname
-func (g *SQLGenerator) mapItemFieldName(fieldName string) (string, error) {
+func (g *SQLGenerator) mapItemFieldName(fieldName string) (string, []interface{}, error) {
 	lowerField := strings.ToLower(fieldName)
 	prefix := g.aliasPrefix
 
@@ -795,110 +845,112 @@ func (g *SQLGenerator) mapItemFieldName(fieldName string) (string, error) {
 		// Extract field name after "cf_" prefix
 		customFieldName := fieldName[3:]
 		if !validCustomFieldNameRegex.MatchString(customFieldName) {
-			return "", fmt.Errorf("invalid custom field name: %s", customFieldName)
+			return "", nil, fmt.Errorf("invalid custom field name: %s", customFieldName)
 		}
-		return g.jsonExtract(prefix+"i.custom_field_values", customFieldName), nil
+		sql, args := g.jsonExtract(prefix+"i.custom_field_values", customFieldName)
+		return sql, args, nil
 	}
 
 	if strings.HasPrefix(lowerField, "custom.") {
 		// Extract field name after "custom." prefix
 		customFieldName := fieldName[7:]
 		if !validCustomFieldNameRegex.MatchString(customFieldName) {
-			return "", fmt.Errorf("invalid custom field name: %s", customFieldName)
+			return "", nil, fmt.Errorf("invalid custom field name: %s", customFieldName)
 		}
-		return g.jsonExtract(prefix+"i.custom_field_values", customFieldName), nil
+		sql, args := g.jsonExtract(prefix+"i.custom_field_values", customFieldName)
+		return sql, args, nil
 	}
 
 	// Standard field mappings
 	switch lowerField {
 	// Workspace fields
 	case "workspace":
-		return prefix + "w.name", nil
+		return prefix + "w.name", nil, nil
 	case "workspaceid", "workspace_id":
-		return prefix + "i.workspace_id", nil
+		return prefix + "i.workspace_id", nil, nil
 	case "workspacekey":
-		return prefix + "w.key", nil
+		return prefix + "w.key", nil, nil
 
 	// Status and priority
 	case "status":
-		return prefix + "st.name", nil
+		return prefix + "st.name", nil, nil
 	case "statusid", "status_id":
-		return prefix + "i.status_id", nil
+		return prefix + "i.status_id", nil, nil
 	case "priorityid", "priority_id":
-		return prefix + "i.priority_id", nil
+		return prefix + "i.priority_id", nil, nil
 	case "priority":
-		return prefix + "pri.name", nil
+		return prefix + "pri.name", nil, nil
 
 	// Basic text fields
 	case "title":
-		return prefix + "i.title", nil
+		return prefix + "i.title", nil, nil
 	case "description":
-		return prefix + "i.description", nil
+		return prefix + "i.description", nil, nil
 
 	// Date fields
 	case "created", "created_at", "createdat":
-		return prefix + "i.created_at", nil
+		return prefix + "i.created_at", nil, nil
 	case "updated", "updated_at", "updatedat":
-		return prefix + "i.updated_at", nil
+		return prefix + "i.updated_at", nil, nil
 	case "due_date", "due-date", "duedate":
-		return prefix + "i.due_date", nil
+		return prefix + "i.due_date", nil, nil
 
 	// User assignments
 	case "assignee", "assignee_id", "assigneeid":
-		return prefix + "i.assignee_id", nil
+		return prefix + "i.assignee_id", nil, nil
 	case "creator", "creator_id", "creatorid":
-		return prefix + "i.creator_id", nil
+		return prefix + "i.creator_id", nil, nil
 
 	// Milestone fields
 	case "milestone", "milestone_id", "milestoneid":
-		return prefix + "i.milestone_id", nil
+		return prefix + "i.milestone_id", nil, nil
 	case "milestonename":
-		return prefix + "m.name", nil
+		return prefix + "m.name", nil, nil
 
 	// Iteration fields
 	case "iteration", "iteration_id", "iterationid":
-		return prefix + "i.iteration_id", nil
+		return prefix + "i.iteration_id", nil, nil
 	case "iterationname":
-		return prefix + "iter.name", nil
+		return prefix + "iter.name", nil, nil
 
 	// Project fields
 	case "project", "project_id", "projectid":
-		return prefix + "i.project_id", nil
+		return prefix + "i.project_id", nil, nil
 	case "projectname":
-		return prefix + "proj.name", nil
+		return prefix + "proj.name", nil, nil
 	case "timeproject", "time_project_id", "timeprojectid":
-		return prefix + "i.time_project_id", nil
+		return prefix + "i.time_project_id", nil, nil
 	case "inheritproject", "inherit_project":
-		return prefix + "i.inherit_project", nil
+		return prefix + "i.inherit_project", nil, nil
 
 	// Item type fields
 	case "itemtype", "item_type_id", "itemtypeid":
-		return prefix + "i.item_type_id", nil
+		return prefix + "i.item_type_id", nil, nil
 	case "itemtypename":
-		return prefix + "it.name", nil
+		return prefix + "it.name", nil, nil
 
 	// Hierarchy fields
 	case "parent", "parent_id", "parentid":
-		return prefix + "i.parent_id", nil
+		return prefix + "i.parent_id", nil, nil
 
 	// Task flag
 	case "istask", "is_task":
-		return prefix + "i.is_task", nil
+		return prefix + "i.is_task", nil, nil
 
 	// Ranking
 	case "rank":
-		return prefix + "i.rank", nil
+		return prefix + "i.rank", nil, nil
 
 	// ID
 	case "id":
-		return prefix + "i.id", nil
+		return prefix + "i.id", nil, nil
 
 	// Item Key (workspace_key + "-" + workspace_item_number)
 	case "key":
-		return prefix + "w.key || '-' || " + prefix + "i.workspace_item_number", nil
+		return prefix + "w.key || '-' || " + prefix + "i.workspace_item_number", nil, nil
 
 	default:
-		return "", fmt.Errorf("unknown field: %s", fieldName)
+		return "", nil, fmt.Errorf("unknown field: %s", fieldName)
 	}
 }
 

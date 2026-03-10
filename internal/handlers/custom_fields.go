@@ -18,6 +18,16 @@ type CustomFieldHandler struct {
 	db database.Database
 }
 
+type assetTypeUsage struct {
+	AssetTypeName string `json:"asset_type_name"`
+	SetName       string `json:"set_name"`
+}
+
+type customFieldWithUsage struct {
+	models.CustomFieldDefinition
+	AssetTypeUsages []assetTypeUsage `json:"asset_type_usages"`
+}
+
 // logAndRespondDatabaseError logs database errors and responds with a generic message
 func (h *CustomFieldHandler) logAndRespondDatabaseError(w http.ResponseWriter, r *http.Request, err error) {
 	slog.Error("database error in custom field handler", slog.String("component", "custom_fields"), slog.Any("error", err))
@@ -47,8 +57,9 @@ func (h *CustomFieldHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var cf models.CustomFieldDefinition
 		var optionsJSON sql.NullString
+		var description sql.NullString
 
-		err := rows.Scan(&cf.ID, &cf.Name, &cf.FieldType, &cf.Description,
+		err := rows.Scan(&cf.ID, &cf.Name, &cf.FieldType, &description,
 			&cf.Required, &optionsJSON, &cf.DisplayOrder, &cf.SystemDefault,
 			&cf.AppliesToPortalCustomers, &cf.AppliesToCustomerOrganisations,
 			&cf.CreatedAt, &cf.UpdatedAt)
@@ -57,6 +68,7 @@ func (h *CustomFieldHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		cf.Description = description.String
 		// Set options string
 		if optionsJSON.Valid {
 			cf.Options = optionsJSON.String
@@ -70,7 +82,47 @@ func (h *CustomFieldHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		customFields = []models.CustomFieldDefinition{}
 	}
 
-	respondJSONOK(w, customFields)
+	// Load asset type usages for all custom fields
+	assetTypeUsages := make(map[int][]assetTypeUsage)
+	usageRows, err := h.db.Query(`
+		SELECT atf.custom_field_id, at.name, s.name
+		FROM asset_type_fields atf
+		JOIN asset_types at ON atf.asset_type_id = at.id
+		JOIN asset_management_sets s ON at.set_id = s.id
+		ORDER BY atf.custom_field_id, s.name, at.name`)
+	if err != nil {
+		h.logAndRespondDatabaseError(w, r, err)
+		return
+	}
+	defer func() { _ = usageRows.Close() }()
+
+	for usageRows.Next() {
+		var fieldID int
+		var typeName, setName string
+		if err := usageRows.Scan(&fieldID, &typeName, &setName); err != nil {
+			h.logAndRespondDatabaseError(w, r, err)
+			return
+		}
+		assetTypeUsages[fieldID] = append(assetTypeUsages[fieldID], assetTypeUsage{
+			AssetTypeName: typeName,
+			SetName:       setName,
+		})
+	}
+
+	// Wrap each field with its asset type usages
+	result := make([]customFieldWithUsage, len(customFields))
+	for i, cf := range customFields {
+		usages := assetTypeUsages[cf.ID]
+		if usages == nil {
+			usages = []assetTypeUsage{}
+		}
+		result[i] = customFieldWithUsage{
+			CustomFieldDefinition: cf,
+			AssetTypeUsages:       usages,
+		}
+	}
+
+	respondJSONOK(w, result)
 }
 
 func (h *CustomFieldHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -81,6 +133,7 @@ func (h *CustomFieldHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	var cf models.CustomFieldDefinition
 	var optionsJSON sql.NullString
+	var description sql.NullString
 
 	//nolint:misspell // database uses British spelling
 	err := h.db.QueryRow(`
@@ -88,7 +141,7 @@ func (h *CustomFieldHandler) Get(w http.ResponseWriter, r *http.Request) {
 		       applies_to_portal_customers, applies_to_customer_organisations, created_at, updated_at
 		FROM custom_field_definitions
 		WHERE id = ?
-	`, id).Scan(&cf.ID, &cf.Name, &cf.FieldType, &cf.Description,
+	`, id).Scan(&cf.ID, &cf.Name, &cf.FieldType, &description,
 		&cf.Required, &optionsJSON, &cf.DisplayOrder, &cf.SystemDefault,
 		&cf.AppliesToPortalCustomers, &cf.AppliesToCustomerOrganisations,
 		&cf.CreatedAt, &cf.UpdatedAt)
@@ -102,6 +155,7 @@ func (h *CustomFieldHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cf.Description = description.String
 	// Set options string
 	if optionsJSON.Valid {
 		cf.Options = optionsJSON.String
@@ -190,6 +244,7 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Return the created custom field
 	var createdCF models.CustomFieldDefinition
 	var returnOptionsJSON sql.NullString
+	var returnDescription sql.NullString
 
 	//nolint:misspell // database uses British spelling (applies_to_customer_organisations)
 	err = h.db.QueryRow(`
@@ -197,7 +252,7 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 		       applies_to_portal_customers, applies_to_customer_organisations, created_at, updated_at
 		FROM custom_field_definitions
 		WHERE id = ?
-	`, id).Scan(&createdCF.ID, &createdCF.Name, &createdCF.FieldType, &createdCF.Description,
+	`, id).Scan(&createdCF.ID, &createdCF.Name, &createdCF.FieldType, &returnDescription,
 		&createdCF.Required, &returnOptionsJSON, &createdCF.DisplayOrder, &createdCF.SystemDefault,
 		&createdCF.AppliesToPortalCustomers, &createdCF.AppliesToCustomerOrganisations,
 		&createdCF.CreatedAt, &createdCF.UpdatedAt)
@@ -207,6 +262,7 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	createdCF.Description = returnDescription.String
 	// Set options string
 	if returnOptionsJSON.Valid {
 		createdCF.Options = returnOptionsJSON.String
@@ -245,13 +301,14 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Get the old custom field for audit logging
 	var oldCF models.CustomFieldDefinition
 	var oldOptionsJSON sql.NullString
+	var oldDescription sql.NullString
 	//nolint:misspell // database uses British spelling (applies_to_customer_organisations)
 	err := h.db.QueryRow(`
 		SELECT id, name, field_type, description, required, options, display_order, system_default,
 		       applies_to_portal_customers, applies_to_customer_organisations, created_at, updated_at
 		FROM custom_field_definitions
 		WHERE id = ?
-	`, id).Scan(&oldCF.ID, &oldCF.Name, &oldCF.FieldType, &oldCF.Description,
+	`, id).Scan(&oldCF.ID, &oldCF.Name, &oldCF.FieldType, &oldDescription,
 		&oldCF.Required, &oldOptionsJSON, &oldCF.DisplayOrder, &oldCF.SystemDefault,
 		&oldCF.AppliesToPortalCustomers, &oldCF.AppliesToCustomerOrganisations,
 		&oldCF.CreatedAt, &oldCF.UpdatedAt)
@@ -265,6 +322,7 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	oldCF.Description = oldDescription.String
 	if oldOptionsJSON.Valid {
 		oldCF.Options = oldOptionsJSON.String
 	}
@@ -334,6 +392,7 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Return the updated custom field
 	var updatedCF models.CustomFieldDefinition
 	var returnOptionsJSON sql.NullString
+	var updatedDescription sql.NullString
 
 	//nolint:misspell // customer_organisations is a database table name
 	err = h.db.QueryRow(`
@@ -341,7 +400,7 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 		       applies_to_portal_customers, applies_to_customer_organisations, created_at, updated_at
 		FROM custom_field_definitions
 		WHERE id = ?
-	`, id).Scan(&updatedCF.ID, &updatedCF.Name, &updatedCF.FieldType, &updatedCF.Description,
+	`, id).Scan(&updatedCF.ID, &updatedCF.Name, &updatedCF.FieldType, &updatedDescription,
 		&updatedCF.Required, &returnOptionsJSON, &updatedCF.DisplayOrder, &updatedCF.SystemDefault,
 		&updatedCF.AppliesToPortalCustomers, &updatedCF.AppliesToCustomerOrganisations,
 		&updatedCF.CreatedAt, &updatedCF.UpdatedAt)
@@ -351,6 +410,7 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	updatedCF.Description = updatedDescription.String
 	// Set options string
 	if returnOptionsJSON.Valid {
 		updatedCF.Options = returnOptionsJSON.String

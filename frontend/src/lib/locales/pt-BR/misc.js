@@ -179,6 +179,9 @@ export default {
       'Campos de Cliente do Portal referenciam clientes do portal. Use com currentCustomer() em relatórios de ativos para filtrar pelo cliente do portal logado.',
     customerOrganisationHint:
       'Campos de Organização do Cliente referenciam organizações de clientes. Use com currentOrganisation() em relatórios de ativos para filtrar pela organização do cliente.',
+    usedIn: 'Usado em',
+    portalCustomers: 'Clientes do Portal',
+    customerOrganisations: 'Organizações de Clientes',
   },
 
   categories: {

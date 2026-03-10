@@ -16,14 +16,16 @@ type AssetHandler struct {
 	db                database.Database
 	repo              *repository.AssetRepository
 	permissionService *services.PermissionService
+	attachmentPath    string
 }
 
 // NewAssetHandler creates a new asset handler
-func NewAssetHandler(db database.Database, permissionService *services.PermissionService) *AssetHandler {
+func NewAssetHandler(db database.Database, permissionService *services.PermissionService, attachmentPath string) *AssetHandler {
 	return &AssetHandler{
 		db:                db,
 		repo:              repository.NewAssetRepository(db),
 		permissionService: permissionService,
+		attachmentPath:    attachmentPath,
 	}
 }
 
@@ -227,6 +229,31 @@ func (h *AssetHandler) buildSetMap() (map[string]int, error) {
 		setMap[strings.ToLower(name)] = id
 	}
 	return setMap, nil
+}
+
+// buildCustomFieldMap creates a mapping of lowercase custom field names to field IDs for CQL evaluation.
+// This allows CQL queries to use human-readable names (cf_Time Estimate) while the DB stores numeric IDs as JSON keys.
+func (h *AssetHandler) buildCustomFieldMap(setID int) (map[string]int, error) {
+	rows, err := h.db.Query(`SELECT DISTINCT cfd.id, LOWER(cfd.name)
+		FROM custom_field_definitions cfd
+		JOIN asset_type_fields atf ON atf.custom_field_id = cfd.id
+		JOIN asset_types at2 ON atf.asset_type_id = at2.id
+		WHERE at2.set_id = ?`, setID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	cfMap := make(map[string]int)
+	for rows.Next() {
+		var id int
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, err
+		}
+		cfMap[name] = id
+	}
+	return cfMap, nil
 }
 
 // buildWorkspaceMap creates a mapping of workspace names/keys to IDs for CQL evaluation

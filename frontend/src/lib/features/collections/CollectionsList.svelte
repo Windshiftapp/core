@@ -253,7 +253,8 @@
         data={filteredCollections}
         keyField="id"
         loading={loading}
-        emptyMessage={t('collections.noCollectionsFound')}
+        emptyMessage={t('collections.noCollectionsTitle')}
+        emptyDescription={t('collections.noCollectionsFound')}
         emptyIcon={FolderOpen}
         actionItems={buildCollectionActions}
         onRowClick={(collection) => viewCollection(collection)}

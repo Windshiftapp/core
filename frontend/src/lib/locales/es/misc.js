@@ -52,6 +52,9 @@ export default {
     checkbox: 'Casilla de verificacion',
     user: 'Usuario',
     url: 'URL',
+    usedIn: 'Usado en',
+    portalCustomers: 'Clientes del Portal',
+    customerOrganisations: 'Organizaciones de Clientes',
   },
 
   categories: {

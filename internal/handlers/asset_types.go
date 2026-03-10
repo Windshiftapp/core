@@ -26,7 +26,7 @@ func NewAssetTypeHandler(db database.Database, permissionService *services.Permi
 	return &AssetTypeHandler{
 		db:                db,
 		permissionService: permissionService,
-		assetHandler:      NewAssetHandler(db, permissionService),
+		assetHandler:      NewAssetHandler(db, permissionService, ""),
 	}
 }
 

@@ -663,6 +663,9 @@ export default {
       'Portal-Kunden-Felder verweisen auf Portal-Kunden. Verwenden Sie currentCustomer() in Asset-Berichten, um nach dem angemeldeten Portal-Kunden zu filtern.',
     customerOrganisationHint:
       'Kundenorganisations-Felder verweisen auf Kundenorganisationen. Verwenden Sie currentOrganisation() in Asset-Berichten, um nach der Organisation des Kunden zu filtern.',
+    usedIn: 'Verwendet in',
+    portalCustomers: 'Portal-Kunden',
+    customerOrganisations: 'Kundenorganisationen',
   },
 
   itemTypes: {

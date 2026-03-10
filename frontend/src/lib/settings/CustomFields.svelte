@@ -12,6 +12,7 @@
   import SearchInput from '../components/SearchInput.svelte';
   import Pagination from '../components/Pagination.svelte';
   import Lozenge from '../components/Lozenge.svelte';
+  import Tooltip from '../components/Tooltip.svelte';
   import Toggle from '../components/Toggle.svelte';
   import Label from '../components/Label.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
@@ -274,33 +275,20 @@
 
   function getScreenCount(fieldId) {
     if (!screens || screens.length === 0) {
-      console.warn('No screens loaded');
       return 0;
     }
-    
-    const count = screens.filter(screen => {
-      if (!screen.fields || screen.fields.length === 0) {
-        return false;
-      }
-      
-      return screen.fields.some(field => {
-        // Convert both to strings for comparison to handle type mismatches
-        const fieldIdStr = fieldId.toString();
-        const identifierStr = field.field_identifier.toString();
-        const isMatch = field.field_type === 'custom' && identifierStr === fieldIdStr;
-        
-        if (isMatch) {
-        }
-        
-        // Debug: log comparison details
-        if (field.field_type === 'custom') {
-        }
-        
-        return isMatch;
-      });
-    }).length;
-    
-    return count;
+    return getFieldScreens(fieldId).length;
+  }
+
+  function getFieldScreens(fieldId) {
+    if (!screens || screens.length === 0) {
+      return [];
+    }
+    return screens.filter(screen => {
+      if (!screen.fields || screen.fields.length === 0) return false;
+      const fieldIdStr = fieldId.toString();
+      return screen.fields.some(f => f.field_type === 'custom' && f.field_identifier.toString() === fieldIdStr);
+    });
   }
 
   const needsOptions = $derived(formData.field_type === 'select' || formData.field_type === 'multiselect');
@@ -434,7 +422,7 @@
     },
     {
       key: 'screen_usage',
-      label: t('screens.title'),
+      label: t('fields.usedIn'),
       slot: 'usage'
     },
     {
@@ -639,10 +627,33 @@
 
       <div slot="usage" let:item={field} class="text-sm">
         {#if screensLoaded}
-          {(() => {
-            const count = fieldScreenCounts[field.id] || 0;
-            return count === 0 ? t('common.noData') : t('screens.screens', { count });
-          })()}
+          {@const matchingScreens = getFieldScreens(field.id)}
+          {@const assetTypes = field.asset_type_usages || []}
+          {@const hasPortal = field.applies_to_portal_customers}
+          {@const hasOrgs = field.applies_to_customer_organisations}
+          {@const hasUsage = matchingScreens.length > 0 || assetTypes.length > 0 || hasPortal || hasOrgs}
+          {#if hasUsage}
+            <div class="flex flex-wrap gap-1">
+              {#if matchingScreens.length > 0}
+                <Tooltip content={matchingScreens.map(s => s.name).join(', ')}>
+                  <Lozenge color="blue" text={t('screens.screens', { count: matchingScreens.length })} size="sm" />
+                </Tooltip>
+              {/if}
+              {#each assetTypes as at}
+                <Tooltip content={at.set_name}>
+                  <Lozenge color="teal" text={at.asset_type_name} size="sm" />
+                </Tooltip>
+              {/each}
+              {#if hasPortal}
+                <Lozenge color="purple" text={t('fields.portalCustomers')} size="sm" />
+              {/if}
+              {#if hasOrgs}
+                <Lozenge color="green" text={t('fields.customerOrganisations')} size="sm" />
+              {/if}
+            </div>
+          {:else}
+            {t('common.noData')}
+          {/if}
         {:else}
           <span class="text-gray-400">{t('common.loading')}</span>
         {/if}

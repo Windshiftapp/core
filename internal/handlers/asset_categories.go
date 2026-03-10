@@ -26,7 +26,7 @@ func NewAssetCategoryHandler(db database.Database, permissionService *services.P
 	return &AssetCategoryHandler{
 		db:                db,
 		permissionService: permissionService,
-		assetHandler:      NewAssetHandler(db, permissionService),
+		assetHandler:      NewAssetHandler(db, permissionService, ""),
 	}
 }
 

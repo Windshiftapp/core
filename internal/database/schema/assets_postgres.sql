@@ -259,3 +259,23 @@ CREATE TABLE IF NOT EXISTS user_asset_set_preferences (
 
 CREATE INDEX IF NOT EXISTS idx_user_asset_set_preferences_user_id ON user_asset_set_preferences(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_asset_set_preferences_primary_set_id ON user_asset_set_preferences(primary_set_id);
+
+-- Asset Import Jobs (CSV import tracking)
+CREATE TABLE IF NOT EXISTS asset_import_jobs (
+	id TEXT PRIMARY KEY,
+	set_id INTEGER NOT NULL REFERENCES asset_management_sets(id) ON DELETE CASCADE,
+	status TEXT NOT NULL DEFAULT 'queued',
+	phase TEXT DEFAULT 'initializing',
+	file_path TEXT NOT NULL,
+	config_json TEXT,
+	progress_json TEXT,
+	error_message TEXT,
+	created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	started_at TIMESTAMP,
+	completed_at TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_asset_import_jobs_set_id ON asset_import_jobs(set_id);
+CREATE INDEX IF NOT EXISTS idx_asset_import_jobs_status ON asset_import_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_asset_import_jobs_created_by ON asset_import_jobs(created_by);

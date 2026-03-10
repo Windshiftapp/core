@@ -53,6 +53,9 @@ export default {
     checkbox: 'مربع اختيار',
     user: 'مستخدم',
     url: 'رابط',
+    usedIn: 'مستخدم في',
+    portalCustomers: 'عملاء البوابة',
+    customerOrganisations: 'منظمات العملاء',
   },
 
   categories: {

@@ -343,6 +343,11 @@ func (db *DB) Initialize() error {
 			slog.Warn("workspace_everyone_roles drop failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Create asset import tables if they don't exist (for existing databases)
+		if _, err := db.Exec(assetsSchema); err != nil {
+			slog.Warn("assets migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
 		return nil
 	}
 

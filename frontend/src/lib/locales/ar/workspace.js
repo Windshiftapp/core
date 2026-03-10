@@ -95,6 +95,15 @@ export default {
     createdByYou: 'تم إنشاؤه بواسطتك',
     recentlyViewed: 'شوهد مؤخراً',
     recentlyUpdated: 'تم التحديث مؤخراً',
+
+    // Custom field placeholders
+    setField: 'تعيين {field}',
+    selectField: 'اختيار {field}',
+    enterField: 'إدخال {field}',
+    notSet: 'غير محدد',
+    selectIteration: 'اختيار التكرار',
+    noIteration: 'بدون تكرار',
+    selectOrCreateLabels: 'اختيار أو إنشاء تسميات',
   },
 
   comments: {

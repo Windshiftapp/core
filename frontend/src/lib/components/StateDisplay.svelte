@@ -122,7 +122,7 @@
     {/if}
 
     {#if displayMessage}
-      <p class="text-sm mb-4" style="color: {messageColor};">{displayMessage}</p>
+      <p class="text-base mb-4" style="color: {messageColor};">{displayMessage}</p>
     {/if}
 
     {#if action}
