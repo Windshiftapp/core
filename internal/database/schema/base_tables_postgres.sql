@@ -117,6 +117,16 @@ CREATE TABLE IF NOT EXISTS custom_field_definitions (
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS custom_field_indexes (
+	id SERIAL PRIMARY KEY,
+	custom_field_id INTEGER NOT NULL,
+	target_table TEXT NOT NULL,
+	index_name TEXT NOT NULL,
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (custom_field_id) REFERENCES custom_field_definitions(id) ON DELETE CASCADE,
+	UNIQUE(custom_field_id, target_table)
+);
+
 -- From config_workflows_postgres.sql
 CREATE TABLE IF NOT EXISTS workflows (
 	id SERIAL PRIMARY KEY,

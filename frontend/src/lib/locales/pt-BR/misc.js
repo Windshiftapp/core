@@ -158,6 +158,7 @@ export default {
     fieldDeleted: 'Campo excluído com sucesso',
     configureFields: 'Configurar Campos',
     searchFields: 'Pesquisar campos...',
+    indexSettings: 'Configurações de Índice',
     // Field types
     text: 'Texto',
     number: 'Número',

@@ -54,6 +54,12 @@ func CreateTestDB(t *testing.T, inMemory bool) *TestDB {
 	// Wrap in SQLiteDB to get Database interface
 	sqliteDB := &database.SQLiteDB{DB: db}
 
+	// Seed default test user so audit logging FK constraints pass
+	_, _ = sqliteDB.ExecWrite(`
+		INSERT INTO users (id, email, username, first_name, last_name, password_hash, is_active)
+		VALUES (1, 'test@example.com', 'testuser', 'Test', 'User', '$2a$10$hash', 1)
+	`)
+
 	return &TestDB{
 		DB:          db,
 		TempFile:    tempFile,
@@ -212,9 +218,9 @@ func (tdb *TestDB) SeedTestData(t *testing.T) TestDataSet {
 	}
 	data.WorkspaceID = 1
 
-	// Create test user
+	// Create test user (OR IGNORE since CreateTestDB already seeds this user)
 	_, err = tdb.Exec(`
-		INSERT INTO users (id, email, username, first_name, last_name, password_hash, is_active)
+		INSERT OR IGNORE INTO users (id, email, username, first_name, last_name, password_hash, is_active)
 		VALUES (1, 'test@example.com', 'testuser', 'Test', 'User', '$2a$10$hash', 1)
 	`)
 	if err != nil {

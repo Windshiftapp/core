@@ -480,14 +480,14 @@ func TestSetupHandler_TransactionRollback(t *testing.T) {
 		t.Errorf("Expected setup_completed to remain 'false' after rollback, got '%s'", setupCompleted)
 	}
 
-	// Verify only the original user exists (not the failed admin user)
+	// Verify no extra user was created (only the seeded test user + the pre-existing one)
 	var userCount int
 	err = tdb.QueryRow("SELECT COUNT(*) FROM users").Scan(&userCount)
 	if err != nil {
 		t.Fatalf("Failed to count users: %v", err)
 	}
-	if userCount != 1 {
-		t.Errorf("Expected 1 user (original), got %d", userCount)
+	if userCount != 2 {
+		t.Errorf("Expected 2 users (seeded test user + original), got %d", userCount)
 	}
 }
 

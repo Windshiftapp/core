@@ -32,6 +32,7 @@ func RegisterMiscRoutes(deps *Deps) {
 	api.HandleH("POST /admin/custom-fields", admin(http.HandlerFunc(deps.Misc.CustomField.Create)))
 	api.HandleH("PUT /admin/custom-fields/{id}", admin(http.HandlerFunc(deps.Misc.CustomField.Update)))
 	api.HandleH("DELETE /admin/custom-fields/{id}", admin(http.HandlerFunc(deps.Misc.CustomField.Delete)))
+	api.HandleH("PUT /admin/custom-fields/settings", admin(http.HandlerFunc(deps.Misc.CustomField.UpdateSettings)))
 
 	// Link type endpoints
 	api.HandleH("GET /link-types", auth(http.HandlerFunc(deps.Items.LinkType.GetAll)))

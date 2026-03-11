@@ -396,73 +396,7 @@
     </PageHeader>
 
     <!-- Drag and Drop Field Editor -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-      <!-- Available Fields -->
-      <div class="rounded-xl p-6 border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-        <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">{t('screensPage.availableFields')}</h3>
-        <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">{t('screensPage.dragFieldsHint')}</p>
-
-        <Input
-          placeholder={t('screensPage.searchFields')}
-          value={fieldSearchQuery}
-          oninput={(e) => setFieldSearchQuery(e.target.value)}
-          class="mb-4"
-        />
-
-        <div class="space-y-1 min-h-96 max-h-[70vh] overflow-y-auto">
-          {#each searchFilteredFields as field, index}
-            {#if index === 0 || field.category !== searchFilteredFields[index - 1].category}
-              <div class="text-xs font-semibold uppercase tracking-wider mt-4 mb-2 first:mt-0" style="color: var(--ds-text-subtle);">
-                {field.category === 'System Fields' ? t('screensPage.systemFields') : field.category === 'Custom Fields' ? t('screensPage.customFields') : field.category}
-              </div>
-            {/if}
-
-            <div
-              data-available-field={JSON.stringify(field)}
-              class="group flex items-center gap-3 px-4 py-3 rounded border transition-all duration-200 cursor-grab hover:bg-blue-50 hover:border-blue-300 active:cursor-grabbing"
-              style="border-color: var(--ds-border); background-color: var(--ds-background-input); user-select: none; -webkit-user-select: none;"
-            >
-              <!-- Drag Handle -->
-              <div class="flex-shrink-0">
-                <svg class="w-4 h-4 group-hover:text-blue-500" style="color: var(--ds-text-subtle);" fill="currentColor" viewBox="0 0 24 24">
-                  <circle cx="9" cy="6" r="1.5"/>
-                  <circle cx="15" cy="6" r="1.5"/>
-                  <circle cx="9" cy="12" r="1.5"/>
-                  <circle cx="15" cy="12" r="1.5"/>
-                  <circle cx="9" cy="18" r="1.5"/>
-                  <circle cx="15" cy="18" r="1.5"/>
-                </svg>
-              </div>
-
-              <div class="flex-1">
-                <div class="font-medium" style="color: var(--ds-text);">{field.name}</div>
-                <div class="text-sm" style="color: var(--ds-text-subtle);">
-                  {#if field.type === 'system'}
-                    {SYSTEM_FIELDS.find(sf => sf.identifier === field.identifier)?.type || field.identifier}
-                    • {t('screensPage.system')}
-                  {:else}
-                    {field.fieldType}
-                    • {t('screensPage.custom')}
-                  {/if}
-                </div>
-              </div>
-            </div>
-          {/each}
-
-          {#if searchFilteredFields.length === 0}
-            <div class="text-center py-8">
-              <p class="text-sm" style="color: var(--ds-text-subtle);">
-                {#if fieldSearchQuery.trim()}
-                  {t('screensPage.noFieldsMatch')}
-                {:else}
-                  {t('screensPage.allFieldsAdded')}
-                {/if}
-              </p>
-            </div>
-          {/if}
-        </div>
-      </div>
-
+    <div class="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 mb-8">
       <!-- Screen Fields Configuration -->
       <div class="rounded-xl p-6 border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
         <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">{t('screensPage.screenFields')} ({screenFields.length})</h3>
@@ -470,9 +404,8 @@
 
         <div
           data-drop-zone
-          class="min-h-96 max-h-[70vh] overflow-y-auto border-2 border-dashed rounded p-4 space-y-2" style="border-color: var(--ds-border);"
-          class:border-blue-400={draggedField}
-          class:bg-blue-50={draggedField}
+          class="min-h-96 max-h-[70vh] overflow-y-auto border-2 border-dashed rounded p-4 space-y-2"
+          style="border-color: {draggedField ? 'var(--ds-border-focused)' : 'var(--ds-border)'}; background-color: {draggedField ? 'var(--ds-interactive-subtle)' : 'transparent'};"
         >
           {#if screenFields.length === 0}
             <div class="text-center py-12">
@@ -499,7 +432,7 @@
                   class="cursor-grab active:cursor-grabbing flex-shrink-0 p-1 rounded hover-bg transition-colors"
                   style="touch-action: none;"
                 >
-                  <svg class="w-4 h-4 group-hover:text-blue-500" style="color: var(--ds-text-subtle);" fill="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-4 h-4 drag-handle-icon" style="color: var(--ds-text-subtle);" fill="currentColor" viewBox="0 0 24 24">
                     <circle cx="9" cy="6" r="1.5"/>
                     <circle cx="15" cy="6" r="1.5"/>
                     <circle cx="9" cy="12" r="1.5"/>
@@ -549,6 +482,84 @@
           {/if}
         </div>
       </div>
+
+      <!-- Available Fields -->
+      <div class="rounded-xl p-6 border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+        <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">{t('screensPage.availableFields')}</h3>
+        <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">{t('screensPage.dragFieldsHint')}</p>
+
+        <Input
+          placeholder={t('screensPage.searchFields')}
+          value={fieldSearchQuery}
+          oninput={(e) => setFieldSearchQuery(e.target.value)}
+          class="mb-4"
+        />
+
+        <div class="space-y-1 min-h-96 max-h-[70vh] overflow-y-auto">
+          {#each searchFilteredFields as field, index}
+            {#if index === 0 || field.category !== searchFilteredFields[index - 1].category}
+              <div class="text-xs font-semibold uppercase tracking-wider mt-4 mb-2 first:mt-0" style="color: var(--ds-text-subtle);">
+                {field.category === 'System Fields' ? t('screensPage.systemFields') : field.category === 'Custom Fields' ? t('screensPage.customFields') : field.category}
+              </div>
+            {/if}
+
+            <div
+              data-available-field={JSON.stringify(field)}
+              class="available-field group flex items-center gap-3 px-4 py-3 rounded border transition-all duration-200 cursor-grab active:cursor-grabbing"
+              style="border-color: var(--ds-border); background-color: var(--ds-background-input); user-select: none; -webkit-user-select: none;"
+            >
+              <!-- Drag Handle -->
+              <div class="flex-shrink-0">
+                <svg class="w-4 h-4 drag-handle-icon" style="color: var(--ds-text-subtle);" fill="currentColor" viewBox="0 0 24 24">
+                  <circle cx="9" cy="6" r="1.5"/>
+                  <circle cx="15" cy="6" r="1.5"/>
+                  <circle cx="9" cy="12" r="1.5"/>
+                  <circle cx="15" cy="12" r="1.5"/>
+                  <circle cx="9" cy="18" r="1.5"/>
+                  <circle cx="15" cy="18" r="1.5"/>
+                </svg>
+              </div>
+
+              <div class="flex-1">
+                <div class="font-medium" style="color: var(--ds-text);">{field.name}</div>
+                <div class="text-sm" style="color: var(--ds-text-subtle);">
+                  {#if field.type === 'system'}
+                    {SYSTEM_FIELDS.find(sf => sf.identifier === field.identifier)?.type || field.identifier}
+                    • {t('screensPage.system')}
+                  {:else}
+                    {field.fieldType}
+                    • {t('screensPage.custom')}
+                  {/if}
+                </div>
+              </div>
+            </div>
+          {/each}
+
+          {#if searchFilteredFields.length === 0}
+            <div class="text-center py-8">
+              <p class="text-sm" style="color: var(--ds-text-subtle);">
+                {#if fieldSearchQuery.trim()}
+                  {t('screensPage.noFieldsMatch')}
+                {:else}
+                  {t('screensPage.allFieldsAdded')}
+                {/if}
+              </p>
+            </div>
+          {/if}
+        </div>
+      </div>
     </div>
 
   {/if}
+
+<style>
+  .available-field:hover {
+    background-color: var(--ds-background-input-hovered) !important;
+    border-color: var(--ds-border-focused) !important;
+  }
+
+  :global(.group):hover .drag-handle-icon,
+  .available-field:hover .drag-handle-icon {
+    color: var(--ds-icon-accent) !important;
+  }
+</style>

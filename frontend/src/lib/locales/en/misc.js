@@ -158,6 +158,7 @@ export default {
     fieldDeleted: 'Field deleted successfully',
     configureFields: 'Configure Fields',
     searchFields: 'Search fields...',
+    indexSettings: 'Index Settings',
     // Field types
     text: 'Text',
     number: 'Number',

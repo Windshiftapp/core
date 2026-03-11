@@ -44,6 +44,7 @@ export default {
     fieldDeleted: 'تم حذف الحقل بنجاح',
     configureFields: 'تكوين الحقول',
     searchFields: 'البحث في الحقول...',
+    indexSettings: 'إعدادات الفهرس',
     text: 'نص',
     number: 'رقم',
     date: 'تاريخ',

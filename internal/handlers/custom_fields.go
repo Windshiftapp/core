@@ -3,8 +3,10 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,7 +27,31 @@ type assetTypeUsage struct {
 
 type customFieldWithUsage struct {
 	models.CustomFieldDefinition
-	AssetTypeUsages []assetTypeUsage `json:"asset_type_usages"`
+	AssetTypeUsages []assetTypeUsage        `json:"asset_type_usages"`
+	Indexed         *models.CustomFieldIndexInfo `json:"indexed,omitempty"`
+}
+
+type indexCountInfo struct {
+	Current int `json:"current"`
+	Max     int `json:"max"`
+}
+
+type customFieldsResponse struct {
+	Data        []customFieldWithUsage    `json:"data"`
+	IndexCounts map[string]indexCountInfo  `json:"index_counts"`
+}
+
+// indexable field types that benefit from B-tree indexes
+var indexableFieldTypes = map[string]bool{
+	"number": true,
+	"date":   true,
+	"text":   true,
+}
+
+// allowed target tables for indexing
+var indexableTargetTables = map[string]bool{
+	"items":  true,
+	"assets": true,
 }
 
 // logAndRespondDatabaseError logs database errors and responds with a generic message
@@ -109,20 +135,71 @@ func (h *CustomFieldHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// Wrap each field with its asset type usages
+	// Load index info for all custom fields
+	fieldIndexes := make(map[int]*models.CustomFieldIndexInfo)
+	indexRows, err := h.db.Query(`SELECT custom_field_id, target_table FROM custom_field_indexes`)
+	if err != nil {
+		h.logAndRespondDatabaseError(w, r, err)
+		return
+	}
+	defer func() { _ = indexRows.Close() }()
+
+	indexCounts := map[string]int{"items": 0, "assets": 0}
+	for indexRows.Next() {
+		var fieldID int
+		var targetTable string
+		if err := indexRows.Scan(&fieldID, &targetTable); err != nil {
+			h.logAndRespondDatabaseError(w, r, err)
+			return
+		}
+		if fieldIndexes[fieldID] == nil {
+			fieldIndexes[fieldID] = &models.CustomFieldIndexInfo{}
+		}
+		switch targetTable {
+		case "items":
+			fieldIndexes[fieldID].Items = true
+			indexCounts["items"]++
+		case "assets":
+			fieldIndexes[fieldID].Assets = true
+			indexCounts["assets"]++
+		}
+	}
+
+	// Get max index limit
+	maxIndexes := 20
+	var maxStr sql.NullString
+	if err := h.db.QueryRow(`SELECT value FROM system_settings WHERE key = 'max_custom_field_indexes_per_table'`).Scan(&maxStr); err == nil && maxStr.Valid {
+		if v, err := strconv.Atoi(maxStr.String); err == nil {
+			maxIndexes = v
+		}
+	}
+
+	// Wrap each field with its asset type usages and index info
 	result := make([]customFieldWithUsage, len(customFields))
 	for i, cf := range customFields {
 		usages := assetTypeUsages[cf.ID]
 		if usages == nil {
 			usages = []assetTypeUsage{}
 		}
-		result[i] = customFieldWithUsage{
+		entry := customFieldWithUsage{
 			CustomFieldDefinition: cf,
 			AssetTypeUsages:       usages,
 		}
+		if idx, ok := fieldIndexes[cf.ID]; ok {
+			entry.Indexed = idx
+		} else if indexableFieldTypes[cf.FieldType] {
+			entry.Indexed = &models.CustomFieldIndexInfo{}
+		}
+		result[i] = entry
 	}
 
-	respondJSONOK(w, result)
+	respondJSONOK(w, customFieldsResponse{
+		Data: result,
+		IndexCounts: map[string]indexCountInfo{
+			"items":  {Current: indexCounts["items"], Max: maxIndexes},
+			"assets": {Current: indexCounts["assets"], Max: maxIndexes},
+		},
+	})
 }
 
 func (h *CustomFieldHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -292,6 +369,12 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 	respondJSONCreated(w, createdCF)
 }
 
+// updateRequest extends the custom field definition with optional indexing control
+type updateRequest struct {
+	models.CustomFieldDefinition
+	Indexed *models.CustomFieldIndexInfo `json:"indexed,omitempty"`
+}
+
 func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
@@ -327,11 +410,13 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 		oldCF.Options = oldOptionsJSON.String
 	}
 
-	var cf models.CustomFieldDefinition
-	if err = json.NewDecoder(r.Body).Decode(&cf); err != nil {
+	var req updateRequest
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
+
+	cf := req.CustomFieldDefinition
 
 	// Validate required fields
 	if strings.TrimSpace(cf.Name) == "" {
@@ -387,6 +472,33 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	// Handle indexing changes if provided
+	if req.Indexed != nil {
+		// Validate that field type is indexable
+		if !indexableFieldTypes[oldCF.FieldType] {
+			respondValidationError(w, r, fmt.Sprintf("Field type '%s' cannot be indexed. Only number, date, and text fields support indexing.", oldCF.FieldType))
+			return
+		}
+
+		// Process each target table
+		for _, table := range []struct {
+			name   string
+			wanted bool
+		}{
+			{"items", req.Indexed.Items},
+			{"assets", req.Indexed.Assets},
+		} {
+			if err := h.manageFieldIndex(id, oldCF.FieldType, table.name, table.wanted); err != nil {
+				if strings.Contains(err.Error(), "index limit") {
+					respondBadRequest(w, r, err.Error())
+					return
+				}
+				respondInternalError(w, r, err)
+				return
+			}
+		}
 	}
 
 	// Return the updated custom field
@@ -452,6 +564,9 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 				"new": updatedCF.Options,
 			}
 		}
+		if req.Indexed != nil {
+			details["indexed"] = req.Indexed
+		}
 
 		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
@@ -500,6 +615,31 @@ func (h *CustomFieldHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Drop any database indexes before deleting the field
+	indexRows, err := h.db.Query(`SELECT index_name FROM custom_field_indexes WHERE custom_field_id = ?`, id)
+	if err != nil {
+		h.logAndRespondDatabaseError(w, r, err)
+		return
+	}
+	defer func() { _ = indexRows.Close() }()
+
+	var indexNames []string
+	for indexRows.Next() {
+		var indexName string
+		if err := indexRows.Scan(&indexName); err != nil {
+			h.logAndRespondDatabaseError(w, r, err)
+			return
+		}
+		indexNames = append(indexNames, indexName)
+	}
+
+	for _, indexName := range indexNames {
+		dropSQL := fmt.Sprintf("DROP INDEX IF EXISTS %s", indexName)
+		if _, err := h.db.ExecWrite(dropSQL); err != nil {
+			slog.Warn("failed to drop index during field deletion", slog.String("component", "custom_fields"), slog.String("index", indexName), slog.Any("error", err))
+		}
+	}
+
 	_, err = h.db.ExecWrite("DELETE FROM custom_field_definitions WHERE id = ?", id)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -526,4 +666,184 @@ func (h *CustomFieldHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// manageFieldIndex creates or drops a database index for a custom field on a target table.
+func (h *CustomFieldHandler) manageFieldIndex(fieldID int, fieldType, targetTable string, enable bool) error {
+	if !indexableTargetTables[targetTable] {
+		return fmt.Errorf("invalid target table: %s", targetTable)
+	}
+
+	indexName := fmt.Sprintf("idx_cf_%s_%d", targetTable, fieldID)
+
+	// Check current state
+	var exists int
+	err := h.db.QueryRow(`SELECT COUNT(*) FROM custom_field_indexes WHERE custom_field_id = ? AND target_table = ?`, fieldID, targetTable).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("failed to check index state: %w", err)
+	}
+
+	currentlyEnabled := exists > 0
+
+	if enable == currentlyEnabled {
+		return nil // no change needed
+	}
+
+	if enable {
+		// Check limit
+		var currentCount int
+		err := h.db.QueryRow(`SELECT COUNT(*) FROM custom_field_indexes WHERE target_table = ?`, targetTable).Scan(&currentCount)
+		if err != nil {
+			return fmt.Errorf("failed to count indexes: %w", err)
+		}
+
+		maxIndexes := 20
+		var maxStr sql.NullString
+		if err := h.db.QueryRow(`SELECT value FROM system_settings WHERE key = 'max_custom_field_indexes_per_table'`).Scan(&maxStr); err == nil && maxStr.Valid {
+			if v, err := strconv.Atoi(maxStr.String); err == nil {
+				maxIndexes = v
+			}
+		}
+
+		if currentCount >= maxIndexes {
+			return fmt.Errorf("index limit reached: %d of %d indexes used on %s", currentCount, maxIndexes, targetTable)
+		}
+
+		// Create the database index
+		createSQL := h.buildCreateIndexSQL(fieldID, fieldType, targetTable, indexName)
+		if _, err := h.db.ExecWrite(createSQL); err != nil {
+			return fmt.Errorf("failed to create index: %w", err)
+		}
+
+		// Record in junction table
+		if _, err := h.db.ExecWrite(`INSERT INTO custom_field_indexes (custom_field_id, target_table, index_name) VALUES (?, ?, ?)`,
+			fieldID, targetTable, indexName); err != nil {
+			// Attempt to drop the index we just created
+			_, _ = h.db.ExecWrite(fmt.Sprintf("DROP INDEX IF EXISTS %s", indexName))
+			return fmt.Errorf("failed to record index: %w", err)
+		}
+	} else {
+		// Drop the database index
+		dropSQL := fmt.Sprintf("DROP INDEX IF EXISTS %s", indexName)
+		if _, err := h.db.ExecWrite(dropSQL); err != nil {
+			return fmt.Errorf("failed to drop index: %w", err)
+		}
+
+		// Remove from junction table
+		if _, err := h.db.ExecWrite(`DELETE FROM custom_field_indexes WHERE custom_field_id = ? AND target_table = ?`,
+			fieldID, targetTable); err != nil {
+			return fmt.Errorf("failed to remove index record: %w", err)
+		}
+	}
+
+	return nil
+}
+
+type customFieldSettings struct {
+	MaxIndexesPerTable int `json:"max_indexes_per_table"`
+}
+
+func (h *CustomFieldHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
+	var settings customFieldSettings
+	if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
+		respondBadRequest(w, r, "Invalid request body")
+		return
+	}
+
+	if settings.MaxIndexesPerTable < 1 || settings.MaxIndexesPerTable > 100 {
+		respondValidationError(w, r, "Maximum indexes per table must be between 1 and 100")
+		return
+	}
+
+	// Check that new limit is not below current usage for any table
+	rows, err := h.db.Query(`SELECT target_table, COUNT(*) FROM custom_field_indexes GROUP BY target_table`)
+	if err != nil {
+		h.logAndRespondDatabaseError(w, r, err)
+		return
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var table string
+		var count int
+		if err := rows.Scan(&table, &count); err != nil {
+			h.logAndRespondDatabaseError(w, r, err)
+			return
+		}
+		if count > settings.MaxIndexesPerTable {
+			respondBadRequest(w, r, fmt.Sprintf("Cannot set limit to %d: %s table already has %d indexes", settings.MaxIndexesPerTable, table, count))
+			return
+		}
+	}
+
+	// Upsert system_settings (UPDATE then INSERT)
+	value := strconv.Itoa(settings.MaxIndexesPerTable)
+	result, err := h.db.ExecWrite(`
+		UPDATE system_settings SET value = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE key = 'max_custom_field_indexes_per_table'
+	`, value)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		_, err = h.db.ExecWrite(`
+			INSERT INTO system_settings (key, value, value_type, description, category, created_at, updated_at)
+			VALUES ('max_custom_field_indexes_per_table', ?, 'integer', 'Maximum number of custom field indexes per table', 'performance', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		`, value)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+	}
+
+	// Audit log
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionCustomFieldUpdate,
+			ResourceType: logger.ResourceCustomField,
+			ResourceName: "custom_field_settings",
+			Details: map[string]interface{}{
+				"max_indexes_per_table": settings.MaxIndexesPerTable,
+			},
+			Success: true,
+		})
+	}
+
+	respondJSONOK(w, settings)
+}
+
+// buildCreateIndexSQL generates the CREATE INDEX SQL based on driver and field type.
+func (h *CustomFieldHandler) buildCreateIndexSQL(fieldID int, fieldType, targetTable, indexName string) string {
+	fieldIDStr := strconv.Itoa(fieldID)
+	driver := h.db.GetDriverName()
+
+	if driver == "postgres" {
+		switch fieldType {
+		case "number":
+			return fmt.Sprintf(`CREATE INDEX %s ON %s(CAST(%s->>'%s' AS NUMERIC))`,
+				indexName, targetTable, "custom_field_values", fieldIDStr)
+		case "text":
+			return fmt.Sprintf(`CREATE INDEX %s ON %s((%s->>'%s'))`,
+				indexName, targetTable, "custom_field_values", fieldIDStr)
+		case "date":
+			return fmt.Sprintf(`CREATE INDEX %s ON %s(CAST(%s->>'%s' AS TEXT))`,
+				indexName, targetTable, "custom_field_values", fieldIDStr)
+		}
+	}
+
+	// SQLite
+	castType := "TEXT"
+	if fieldType == "number" {
+		castType = "NUMERIC"
+	}
+	return fmt.Sprintf(`CREATE INDEX %s ON %s(CAST(NULLIF(custom_field_values,'') ->> '$.\"%s\"' AS %s))`,
+		indexName, targetTable, fieldIDStr, castType)
 }

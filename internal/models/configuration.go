@@ -217,6 +217,12 @@ type WorkflowTransition struct {
 	WorkflowName   string `json:"workflow_name,omitempty"`
 }
 
+// CustomFieldIndexInfo represents which tables have indexes for a custom field
+type CustomFieldIndexInfo struct {
+	Items  bool `json:"items"`
+	Assets bool `json:"assets"`
+}
+
 // CustomFieldDefinition represents a custom field definition
 type CustomFieldDefinition struct {
 	ID                             int       `json:"id"`

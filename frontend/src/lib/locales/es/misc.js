@@ -43,6 +43,7 @@ export default {
     fieldDeleted: 'Campo eliminado correctamente',
     configureFields: 'Configurar campos',
     searchFields: 'Buscar campos...',
+    indexSettings: 'Configuración de índices',
     text: 'Texto',
     number: 'Numero',
     date: 'Fecha',

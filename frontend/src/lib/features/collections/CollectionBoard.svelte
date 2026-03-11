@@ -783,12 +783,18 @@
           <div slot="actions" class="flex items-center gap-3">
             {#if allIterations.length > 0}
               <div class="inline-flex items-center rounded-lg border overflow-hidden text-sm"
-                   style="border-color: var(--ds-border);">
+                   style="{styles.hasCustomBackground
+                     ? 'background-color: var(--ds-glass-bg); backdrop-filter: blur(12px); border-color: var(--ds-glass-border);'
+                     : 'border-color: var(--ds-border);'}">
                 <button
                   class="px-3 py-1.5 transition-colors"
                   style={!sprintFilterId
-                    ? 'background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue); font-weight: 500;'
-                    : 'color: var(--ds-text-subtle); background-color: transparent;'}
+                    ? (styles.hasCustomBackground
+                      ? 'color: var(--ds-text); background-color: var(--ds-glass-bg); font-weight: 500;'
+                      : 'background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue); font-weight: 500;')
+                    : (styles.hasCustomBackground
+                      ? 'color: var(--ds-text); background-color: transparent;'
+                      : 'color: var(--ds-text-subtle); background-color: transparent;')}
                   onclick={() => setSprintFilter(null)}
                 >
                   {t('collections.allItems')}
@@ -796,9 +802,13 @@
                 {#if activeLocalSprint}
                   <button
                     class="px-3 py-1.5 transition-colors border-l"
-                    style="border-color: var(--ds-border); {sprintFilterId === activeLocalSprint.id
-                      ? 'background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue); font-weight: 500;'
-                      : 'color: var(--ds-text-subtle); background-color: transparent;'}"
+                    style="{styles.hasCustomBackground ? 'border-color: var(--ds-glass-border);' : 'border-color: var(--ds-border);'} {sprintFilterId === activeLocalSprint.id
+                      ? (styles.hasCustomBackground
+                        ? 'color: var(--ds-text); background-color: var(--ds-glass-bg); font-weight: 500;'
+                        : 'background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue); font-weight: 500;')
+                      : (styles.hasCustomBackground
+                        ? 'color: var(--ds-text); background-color: transparent;'
+                        : 'color: var(--ds-text-subtle); background-color: transparent;')}"
                     onclick={() => setSprintFilter(activeLocalSprint.id)}
                   >
                     {activeLocalSprint.name}
@@ -823,9 +833,13 @@
                     {#snippet children()}
                       <span
                         class="px-3 py-1.5 text-sm border-l flex items-center gap-1 transition-colors"
-                        style="border-color: var(--ds-border); {selectedOtherSprint
-                          ? 'color: var(--ds-accent-blue); font-weight: 500; background-color: var(--ds-accent-blue-subtler);'
-                          : 'color: var(--ds-text-subtle);'}"
+                        style="{styles.hasCustomBackground ? 'border-color: var(--ds-glass-border);' : 'border-color: var(--ds-border);'} {selectedOtherSprint
+                          ? (styles.hasCustomBackground
+                            ? 'color: var(--ds-text); font-weight: 500; background-color: var(--ds-glass-bg);'
+                            : 'color: var(--ds-accent-blue); font-weight: 500; background-color: var(--ds-accent-blue-subtler);')
+                          : (styles.hasCustomBackground
+                            ? 'color: var(--ds-text);'
+                            : 'color: var(--ds-text-subtle);')}"
                       >
                         {selectedOtherSprint ? selectedOtherSprint.name : t('iterations.filterBySprint')}
                         <ChevronDown size={12} />

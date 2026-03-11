@@ -643,6 +643,7 @@ export default {
     fieldDeleted: 'Feld erfolgreich gelöscht',
     configureFields: 'Felder konfigurieren',
     searchFields: 'Felder suchen...',
+    indexSettings: 'Index-Einstellungen',
     text: 'Text',
     number: 'Zahl',
     date: 'Datum',
