@@ -14,7 +14,7 @@ require (
 	github.com/charmbracelet/wish v1.4.7
 	github.com/crewjam/saml v0.5.1
 	github.com/cyphar/filepath-securejoin v0.6.1
-	github.com/emersion/go-imap/v2 v2.0.0-beta.7
+	github.com/emersion/go-imap/v2 v2.0.0-beta.8
 	github.com/emersion/go-message v0.18.2
 	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6
 	github.com/extism/go-sdk v1.7.1
@@ -94,7 +94,6 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/russellhaering/goxmldsig v1.4.0 // indirect
-	github.com/sahilm/fuzzy v0.1.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/tetratelabs/wabin v0.0.0-20230304001439-f6f874872834 // indirect
