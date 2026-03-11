@@ -13,7 +13,6 @@ cx
 
 # Test binary, built with `go test -c`
 *.test
-windshift-test
 data
 
 # Output of the go coverage tool, specifically when used with LiteIDE
@@ -115,9 +114,6 @@ deployment/build/
 node_modules
 .gocache
 
-# Test Reports
-tests/reports/
-tests/cmd/testreport/testreport
 .ssh
 
 # Runtime plugins directory (plugins are loaded at runtime, not committed)
