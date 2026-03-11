@@ -110,6 +110,11 @@ export const customFields = {
     fetchAPI(`/admin/custom-fields/${id}`, {
       method: 'DELETE',
     }),
+  updateSettings: (data) =>
+    fetchAPI('/admin/custom-fields/settings', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
 };
 
 export const projectFieldRequirements = {

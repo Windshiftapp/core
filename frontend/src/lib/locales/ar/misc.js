@@ -44,6 +44,7 @@ export default {
     fieldDeleted: 'تم حذف الحقل بنجاح',
     configureFields: 'تكوين الحقول',
     searchFields: 'البحث في الحقول...',
+    indexSettings: 'إعدادات الفهرس',
     text: 'نص',
     number: 'رقم',
     date: 'تاريخ',
@@ -53,6 +54,9 @@ export default {
     checkbox: 'مربع اختيار',
     user: 'مستخدم',
     url: 'رابط',
+    usedIn: 'مستخدم في',
+    portalCustomers: 'عملاء البوابة',
+    customerOrganisations: 'منظمات العملاء',
   },
 
   categories: {

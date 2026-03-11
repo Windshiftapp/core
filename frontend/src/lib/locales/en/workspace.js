@@ -258,6 +258,15 @@ export default {
     itemLinkCopied: 'Item link copied to clipboard',
     failedToCopyToClipboard: 'Failed to copy to clipboard',
     copyError: 'Copy Error',
+
+    // Custom field placeholders
+    setField: 'Set {field}',
+    selectField: 'Select {field}',
+    enterField: 'Enter {field}',
+    notSet: 'Not set',
+    selectIteration: 'Select iteration',
+    noIteration: 'No iteration',
+    selectOrCreateLabels: 'Select or create labels',
   },
 
   comments: {
@@ -433,8 +442,9 @@ export default {
     public: 'Public',
     workspaceFilter: 'Workspace Filter',
     allWorkspaces: 'All workspaces',
+    noCollectionsTitle: 'No collections found.',
     noCollectionsFound:
-      'No collections found. Create your first collection to save and reuse work item queries.',
+      'Create your first collection to save and reuse work item queries.',
     collectionCount: '{count} collection',
     collectionCountPlural: '{count} collections',
 

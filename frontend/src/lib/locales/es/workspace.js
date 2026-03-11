@@ -95,6 +95,15 @@ export default {
     createdByYou: 'Creado por usted',
     recentlyViewed: 'Visto recientemente',
     recentlyUpdated: 'Actualizado recientemente',
+
+    // Custom field placeholders
+    setField: 'Establecer {field}',
+    selectField: 'Seleccionar {field}',
+    enterField: 'Introducir {field}',
+    notSet: 'No establecido',
+    selectIteration: 'Seleccionar iteración',
+    noIteration: 'Sin iteración',
+    selectOrCreateLabels: 'Seleccionar o crear etiquetas',
   },
 
   comments: {},

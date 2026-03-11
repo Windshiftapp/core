@@ -260,6 +260,15 @@ export default {
     itemLinkCopied: 'Link do item copiado para a área de transferência',
     failedToCopyToClipboard: 'Falha ao copiar para a área de transferência',
     copyError: 'Erro ao Copiar',
+
+    // Custom field placeholders
+    setField: 'Definir {field}',
+    selectField: 'Selecionar {field}',
+    enterField: 'Inserir {field}',
+    notSet: 'Não definido',
+    selectIteration: 'Selecionar iteração',
+    noIteration: 'Sem iteração',
+    selectOrCreateLabels: 'Selecionar ou criar rótulos',
   },
 
   comments: {
@@ -434,8 +443,9 @@ export default {
     public: 'Público',
     workspaceFilter: 'Filtro de Workspace',
     allWorkspaces: 'Todos os workspaces',
+    noCollectionsTitle: 'Nenhuma coleção encontrada.',
     noCollectionsFound:
-      'Nenhuma coleção encontrada. Crie sua primeira coleção para salvar e reutilizar consultas de itens de trabalho.',
+      'Crie sua primeira coleção para salvar e reutilizar consultas de itens de trabalho.',
     collectionCount: '{count} coleção',
     collectionCountPlural: '{count} coleções',
 

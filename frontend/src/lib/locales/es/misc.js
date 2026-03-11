@@ -43,6 +43,7 @@ export default {
     fieldDeleted: 'Campo eliminado correctamente',
     configureFields: 'Configurar campos',
     searchFields: 'Buscar campos...',
+    indexSettings: 'Configuración de índices',
     text: 'Texto',
     number: 'Numero',
     date: 'Fecha',
@@ -52,6 +53,9 @@ export default {
     checkbox: 'Casilla de verificacion',
     user: 'Usuario',
     url: 'URL',
+    usedIn: 'Usado en',
+    portalCustomers: 'Clientes del Portal',
+    customerOrganisations: 'Organizaciones de Clientes',
   },
 
   categories: {

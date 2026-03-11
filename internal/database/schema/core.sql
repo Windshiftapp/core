@@ -27,3 +27,13 @@ CREATE TABLE IF NOT EXISTS custom_field_definitions (
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS custom_field_indexes (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	custom_field_id INTEGER NOT NULL,
+	target_table TEXT NOT NULL,
+	index_name TEXT NOT NULL,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (custom_field_id) REFERENCES custom_field_definitions(id) ON DELETE CASCADE,
+	UNIQUE(custom_field_id, target_table)
+);

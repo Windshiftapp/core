@@ -158,6 +158,7 @@ export default {
     fieldDeleted: 'Field deleted successfully',
     configureFields: 'Configure Fields',
     searchFields: 'Search fields...',
+    indexSettings: 'Index Settings',
     // Field types
     text: 'Text',
     number: 'Number',
@@ -179,6 +180,9 @@ export default {
       'Portal Customer fields reference portal customers. Use with currentCustomer() in asset reports to filter by the logged-in portal customer.',
     customerOrganisationHint:
       "Customer Organisation fields reference customer organisations. Use with currentOrganisation() in asset reports to filter by the customer's organisation.",
+    usedIn: 'Used In',
+    portalCustomers: 'Portal Customers',
+    customerOrganisations: 'Customer Organisations',
   },
 
   categories: {

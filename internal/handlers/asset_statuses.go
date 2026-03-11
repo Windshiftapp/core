@@ -26,7 +26,7 @@ func NewAssetStatusHandler(db database.Database, permissionService *services.Per
 	return &AssetStatusHandler{
 		db:                db,
 		permissionService: permissionService,
-		assetHandler:      NewAssetHandler(db, permissionService),
+		assetHandler:      NewAssetHandler(db, permissionService, ""),
 	}
 }
 

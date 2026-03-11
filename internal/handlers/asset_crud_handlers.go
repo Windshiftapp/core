@@ -99,7 +99,7 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check for CQL query parameter
-	if cqlQuery := r.URL.Query().Get("cql"); cqlQuery != "" {
+	if cqlQuery := r.URL.Query().Get("ql"); cqlQuery != "" {
 		// Build set mapping for CQL evaluation
 		var setMap map[string]int
 		setMap, err = h.buildSetMap()
@@ -116,8 +116,16 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Build custom field name→ID mapping for CQL resolution
+		var customFieldMap map[string]int
+		customFieldMap, err = h.buildCustomFieldMap(setID)
+		if err != nil {
+			respondInternalError(w, r, fmt.Errorf("failed to load custom field mapping: %w", err))
+			return
+		}
+
 		// Create CQL evaluator and generate SQL
-		evaluator := cql.NewAssetEvaluator(setMap, workspaceMap, h.db.GetDriverName())
+		evaluator := cql.NewAssetEvaluator(setMap, workspaceMap, customFieldMap, h.db.GetDriverName())
 		var cqlSQL string
 		var cqlArgs []interface{}
 		cqlSQL, cqlArgs, err = evaluator.EvaluateToSQL(cqlQuery)
@@ -130,6 +138,11 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 			whereClause += " AND (" + cqlSQL + ")"
 			args = append(args, cqlArgs...)
 		}
+
+		slog.Debug("asset query CQL",
+			slog.String("cql", cqlQuery),
+			slog.String("sql", cqlSQL),
+			slog.Any("args", cqlArgs))
 	}
 
 	// Get total count first (include JOINs for CQL field references)
@@ -142,6 +155,10 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 		` + whereClause
 	var total int
 	if err = h.db.QueryRow(countQuery, args...).Scan(&total); err != nil {
+		slog.Error("asset count query failed",
+			slog.String("query", countQuery),
+			slog.Any("args", args),
+			slog.Any("error", err))
 		respondInternalError(w, r, err)
 		return
 	}
@@ -173,6 +190,10 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query, args...)
 	if err != nil {
+		slog.Error("asset list query failed",
+			slog.String("query", query),
+			slog.Any("args", args),
+			slog.Any("error", err))
 		respondInternalError(w, r, err)
 		return
 	}

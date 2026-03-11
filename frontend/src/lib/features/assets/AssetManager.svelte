@@ -20,6 +20,7 @@
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
+  import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
 
   // State for asset sets
   let assetSets = $state([]);
@@ -517,8 +518,7 @@
             <option value={set.id}>{set.name}{set.is_default ? ` (${t('assets.default')})` : ''}</option>
           {/each}
         </Select>
-        <Button variant="outline" size="sm" onclick={showAddSetForm} class="whitespace-nowrap">
-          <Plus class="w-4 h-4 mr-1" />
+        <Button variant="primary" size="sm" icon={Plus} onclick={showAddSetForm} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('assetSets', 'add'), guard: () => !showSetForm }}>
           {t('assets.newSet')}
         </Button>
       </div>

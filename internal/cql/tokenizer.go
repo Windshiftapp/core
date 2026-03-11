@@ -141,6 +141,16 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 			continue
 		}
 
+		// Backtick-quoted identifiers (for field names with spaces)
+		if t.current == '`' {
+			value, err := t.readString()
+			if err != nil {
+				return nil, err
+			}
+			tokens = append(tokens, Token{Type: IDENTIFIER, Value: value, Pos: start})
+			continue
+		}
+
 		// Numbers and dates
 		if unicode.IsDigit(t.current) {
 			if t.isDatePattern() {

@@ -1,4 +1,4 @@
-import { fetchAPI } from './core.js';
+import { fetchAPI, API_BASE } from './core.js';
 
 export const assetSets = {
   getAll: () => fetchAPI('/asset-sets'),
@@ -147,4 +147,36 @@ export const assets = {
 
 export const itemLinkedAssets = {
   get: (itemId) => fetchAPI(`/items/${itemId}/linked-assets`),
+};
+
+export const assetImport = {
+  upload: async (setId, formData) => {
+    const response = await fetch(`${API_BASE}/asset-sets/${setId}/import/upload`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'same-origin',
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || 'Upload failed');
+    }
+    return response.json();
+  },
+  start: (setId, data) =>
+    fetchAPI(`/asset-sets/${setId}/import/start`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getJob: (setId, jobId) => fetchAPI(`/asset-sets/${setId}/import/jobs/${jobId}`),
+  getJobs: (setId) => fetchAPI(`/asset-sets/${setId}/import/jobs`),
+  suggestFields: (setId, data) =>
+    fetchAPI(`/asset-sets/${setId}/import/suggest-fields`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  createType: (setId, data) =>
+    fetchAPI(`/asset-sets/${setId}/import/create-type`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };

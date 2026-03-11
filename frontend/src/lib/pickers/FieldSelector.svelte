@@ -10,6 +10,9 @@
   export let placeholder = '';
   export let selectedField = null;
   export let disabled = false;
+  // Optional overrides: when provided, skip default field/API loading
+  export let fieldGroups = null; // array of { category, fields } to override standardFields
+  export let customFieldItems = null; // array of custom field objects to override API loading
 
   $: resolvedPlaceholder = placeholder || t('pickers.selectField');
 
@@ -29,7 +32,8 @@
   }
 
   // Standard fields grouped by category - using reactive to support i18n
-  $: standardFields = [
+  // When fieldGroups prop is provided, use it instead of the default item-centric fields
+  $: standardFields = fieldGroups || [
     {
       category: t('pickers.fieldCategories.basic'),
       fields: [
@@ -71,6 +75,12 @@
   });
 
   async function loadCustomFields() {
+    // When customFieldItems prop is provided, use it instead of API
+    if (customFieldItems) {
+      customFields = customFieldItems;
+      updateFilteredFields();
+      return;
+    }
     try {
       const fields = await api.customFields.getAll();
       customFields = (fields || []).map(field => ({
@@ -95,15 +105,15 @@
     const filteredStandard = standardFields.map(group => ({
       category: group.category,
       fields: group.fields.filter(field =>
-        field.name.toLowerCase().includes(query) ||
-        field.description.toLowerCase().includes(query)
+        (field.name || '').toLowerCase().includes(query) ||
+        (field.description || '').toLowerCase().includes(query)
       )
     })).filter(group => group.fields.length > 0);
 
     // Filter custom fields
     const filteredCustom = customFields.filter(field =>
-      field.name.toLowerCase().includes(query) ||
-      field.description.toLowerCase().includes(query)
+      (field.name || '').toLowerCase().includes(query) ||
+      (field.description || '').toLowerCase().includes(query)
     );
 
     filteredFields = filteredStandard;

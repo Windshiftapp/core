@@ -164,6 +164,15 @@ export class QLTokenizer {
         continue;
       }
 
+      // Backtick-quoted identifiers (for field names with spaces)
+      if (this.current === '`') {
+        tokens.push({
+          type: TokenType.IDENTIFIER,
+          value: this.readString(),
+        });
+        continue;
+      }
+
       // Numbers and dates (YYYY-MM-DD)
       if (/\d/.test(this.current)) {
         // Check if it's a date pattern (YYYY-MM-DD)
@@ -799,8 +808,8 @@ export class QLBuilder {
 
     if (!field || !field.id) return null;
 
-    // Get the field identifier for QL
-    const fieldId = field.id;
+    // Wrap field ID in backticks to handle names with spaces (e.g. cf_Time Estimate)
+    const fieldId = `\`${field.id}\``;
 
     // Handle IN/NOT IN operators with multiple values
     if ((operator === 'IN' || operator === 'NOT IN') && values && values.length > 0) {

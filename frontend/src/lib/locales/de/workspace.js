@@ -237,6 +237,15 @@ export default {
     iteration: 'Iteration',
     project: 'Projekt',
     clickToViewDetails: 'Klicken, um Eintragsdetails anzuzeigen',
+
+    // Custom field placeholders
+    setField: '{field} festlegen',
+    selectField: '{field} auswählen',
+    enterField: '{field} eingeben',
+    notSet: 'Nicht festgelegt',
+    selectIteration: 'Iteration auswählen',
+    noIteration: 'Keine Iteration',
+    selectOrCreateLabels: 'Labels auswählen oder erstellen',
   },
 
   comments: {
@@ -387,8 +396,9 @@ export default {
     public: 'Öffentlich',
     workspaceFilter: 'Arbeitsbereich-Filter',
     allWorkspaces: 'Alle Arbeitsbereiche',
+    noCollectionsTitle: 'Keine Sammlungen gefunden.',
     noCollectionsFound:
-      'Keine Sammlungen gefunden. Erstellen Sie Ihre erste Sammlung, um Vorgangsabfragen zu speichern und wiederzuverwenden.',
+      'Erstellen Sie Ihre erste Sammlung, um Vorgangsabfragen zu speichern und wiederzuverwenden.',
     collectionCount: '{count} Sammlung',
     collectionCountPlural: '{count} Sammlungen',
     addFiltersToStart: 'Fügen Sie Filter hinzu, um zu beginnen',

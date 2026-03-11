@@ -58,7 +58,8 @@
   let {
     field, value = '', onChange = () => {}, milestones = [], iterations = [],
     isDarkMode = false, required = false, readonly = true, disabled = false,
-    onStartEdit = null, onCancel = null, showSelectedInTrigger = true, autoOpenPickers = true
+    onStartEdit = null, onCancel = null, showSelectedInTrigger = true, autoOpenPickers = true,
+    noPadding = false
   } = $props();
 
   const isRequired = $derived(required || field.required || field.is_required);
@@ -244,7 +245,7 @@
     {#if onStartEdit && !disabled}
       <button
         type="button"
-        class="w-full flex items-center gap-2 justify-start px-3 py-2 text-sm hover:bg-gray-50 transition-colors text-left rounded"
+        class="w-full flex items-center gap-2 justify-start {noPadding ? '' : 'px-3'} py-2 text-sm hover:bg-gray-50 transition-colors text-left rounded"
         onclick={handleClick}
       >
         {#if value !== null && value !== undefined && value !== ''}
@@ -324,7 +325,7 @@
       </button>
     {:else}
       <!-- Static display (no click handler or disabled) -->
-      <div class="px-3 py-2 text-sm {disabled ? 'opacity-50' : ''}">
+      <div class="{noPadding ? '' : 'px-3'} py-2 text-sm {disabled ? 'opacity-50' : ''}">
         {#if value !== null && value !== undefined && value !== ''}
           {#if field.field_type === 'user'}
             {#if userData}
@@ -569,6 +570,7 @@
         <!-- svelte-ignore a11y_autofocus -->
         <input
           type="number"
+          step="any"
           {value}
           oninput={(e) => onChange(e.target.value)}
           class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded tabular-nums"

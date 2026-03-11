@@ -1,7 +1,8 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { api } from '../api.js';
-  import { Plus, Edit, Trash2, MoreHorizontal, Circle, Database } from 'lucide-svelte';
+  import { currentRoute, navigate } from '../router.js';
+  import { Plus, Edit, Trash2, MoreHorizontal, Circle, Database, Settings, Type, AlignLeft, ChevronDownCircle, ListChecks, Hash, Calendar, User, Repeat, Flag, Box, Globe, Building2 } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import Select from '../components/Select.svelte';
@@ -12,15 +13,18 @@
   import SearchInput from '../components/SearchInput.svelte';
   import Pagination from '../components/Pagination.svelte';
   import Lozenge from '../components/Lozenge.svelte';
+  import Tooltip from '../components/Tooltip.svelte';
   import Toggle from '../components/Toggle.svelte';
   import Label from '../components/Label.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
+  import DropdownMenu from '../layout/DropdownMenu.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { formatDateSimple } from '../utils/dateFormatter.js';
 
   let customFields = $state([]);
+  let indexCounts = $state({ items: { current: 0, max: 20 }, assets: { current: 0, max: 20 } });
   let screens = $state([]);
   let showCreateForm = $state(false);
   let editingField = $state(null);
@@ -32,27 +36,39 @@
     applies_to_customer_organisations: false
   });
 
+  // Settings modal state
+  let showSettingsModal = $state(false);
+  let settingsMaxIndexes = $state(20);
+
+  // Indexing state for edit modal
+  let indexedItems = $state(false);
+  let indexedAssets = $state(false);
+
   let optionsText = $state(''); // For managing select/multiselect options
 
-  // Search and pagination state
+  // Search state
   let searchQuery = $state('');
-  let currentPage = $state(1);
-  let itemsPerPage = $state(25);
+
+  // Pagination state derived from URL
+  let currentPage = $derived(parseInt($currentRoute.query?.page) || 1);
+  let itemsPerPage = $derived(parseInt($currentRoute.query?.pageSize) || 25);
 
   const fieldTypes = [
-    { value: 'text', label: 'Single Line Text' },
-    { value: 'textarea', label: 'Multi Line Text' },
-    { value: 'select', label: 'Single Select' },
-    { value: 'multiselect', label: 'Multi Select' },
-    { value: 'number', label: 'Number' },
-    { value: 'date', label: 'Date' },
-    { value: 'user', label: 'User' },
-    { value: 'iteration', label: 'Iteration' },
-    { value: 'milestone', label: 'Milestone' },
-    { value: 'asset', label: 'Asset' },
-    { value: 'portalcustomer', label: 'Portal Customer' },
-    { value: 'customerorganisation', label: 'Customer Organisation' }
+    { value: 'text', label: 'Single Line Text', icon: Type, iconColor: '#4A90D9' },
+    { value: 'textarea', label: 'Multi Line Text', icon: AlignLeft, iconColor: '#5B6ABF' },
+    { value: 'select', label: 'Single Select', icon: ChevronDownCircle, iconColor: '#E8853D' },
+    { value: 'multiselect', label: 'Multi Select', icon: ListChecks, iconColor: '#D46B2F' },
+    { value: 'number', label: 'Number', icon: Hash, iconColor: '#4CAF7D' },
+    { value: 'date', label: 'Date', icon: Calendar, iconColor: '#9B6DB7' },
+    { value: 'user', label: 'User', icon: User, iconColor: '#5BA4C9' },
+    { value: 'iteration', label: 'Iteration', icon: Repeat, iconColor: '#D95B5B' },
+    { value: 'milestone', label: 'Milestone', icon: Flag, iconColor: '#C9A84C' },
+    { value: 'asset', label: 'Asset', icon: Box, iconColor: '#7B8A9E' },
+    { value: 'portalcustomer', label: 'Portal Customer', icon: Globe, iconColor: '#E07BAF' },
+    { value: 'customerorganisation', label: 'Customer Organisation', icon: Building2, iconColor: '#8B7EC8' }
   ];
+
+  const selectedFieldType = $derived(fieldTypes.find(ft => ft.value === formData.field_type));
 
   // Asset field configuration
   let assetSetId = $state(null);
@@ -77,7 +93,13 @@
         api.customFields.getAll(),
         api.screens.getAll()
       ]);
-      customFields = fieldsResult || [];
+      // Handle new response format with data array and index_counts
+      if (fieldsResult && fieldsResult.data) {
+        customFields = fieldsResult.data || [];
+        indexCounts = fieldsResult.index_counts || { items: { current: 0, max: 20 }, assets: { current: 0, max: 20 } };
+      } else {
+        customFields = fieldsResult || [];
+      }
       
       // Load screen fields for each screen
       const screensWithFields = await Promise.all(
@@ -100,6 +122,22 @@
     }
   }
 
+
+  function openSettings() {
+    settingsMaxIndexes = indexCounts.items?.max || 20;
+    showSettingsModal = true;
+  }
+
+  async function saveSettings() {
+    try {
+      await api.customFields.updateSettings({ max_indexes_per_table: settingsMaxIndexes });
+      showSettingsModal = false;
+      await loadCustomFields();
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
+    }
+  }
 
   function startCreate() {
     showCreateForm = true;
@@ -148,6 +186,10 @@
       assetQlQuery = '';
     }
 
+    // Load indexing state
+    indexedItems = field.indexed?.items || false;
+    indexedAssets = field.indexed?.assets || false;
+
     showCreateForm = true;
   }
 
@@ -162,6 +204,8 @@
     optionsText = '';
     assetSetId = null;
     assetQlQuery = '';
+    indexedItems = false;
+    indexedAssets = false;
   }
 
   function cancelForm() {
@@ -234,6 +278,10 @@
       }
 
       if (editingField) {
+        // Include indexing state if field type supports it
+        if (isIndexableType(formData.field_type)) {
+          data.indexed = { items: indexedItems, assets: indexedAssets };
+        }
         await api.customFields.update(editingField.id, data);
       } else {
         await api.customFields.create(data);
@@ -274,34 +322,27 @@
 
   function getScreenCount(fieldId) {
     if (!screens || screens.length === 0) {
-      console.warn('No screens loaded');
       return 0;
     }
-    
-    const count = screens.filter(screen => {
-      if (!screen.fields || screen.fields.length === 0) {
-        return false;
-      }
-      
-      return screen.fields.some(field => {
-        // Convert both to strings for comparison to handle type mismatches
-        const fieldIdStr = fieldId.toString();
-        const identifierStr = field.field_identifier.toString();
-        const isMatch = field.field_type === 'custom' && identifierStr === fieldIdStr;
-        
-        if (isMatch) {
-        }
-        
-        // Debug: log comparison details
-        if (field.field_type === 'custom') {
-        }
-        
-        return isMatch;
-      });
-    }).length;
-    
-    return count;
+    return getFieldScreens(fieldId).length;
   }
+
+  function getFieldScreens(fieldId) {
+    if (!screens || screens.length === 0) {
+      return [];
+    }
+    return screens.filter(screen => {
+      if (!screen.fields || screen.fields.length === 0) return false;
+      const fieldIdStr = fieldId.toString();
+      return screen.fields.some(f => f.field_type === 'custom' && f.field_identifier.toString() === fieldIdStr);
+    });
+  }
+
+  const indexableTypes = ['number', 'date', 'text'];
+  function isIndexableType(type) {
+    return indexableTypes.includes(type);
+  }
+  const showIndexingSection = $derived(editingField && isIndexableType(formData.field_type));
 
   const needsOptions = $derived(formData.field_type === 'select' || formData.field_type === 'multiselect');
   const needsMaxLength = $derived(formData.field_type === 'text' || formData.field_type === 'textarea');
@@ -339,10 +380,18 @@
   }));
 
   // Reset to page 1 when search query changes
+  let searchInitialized = false;
   $effect(() => {
-    if (searchQuery) {
-      currentPage = 1;
+    const _ = searchQuery;
+    if (!searchInitialized) {
+      searchInitialized = true;
+      return;
     }
+    untrack(() => {
+      if (currentPage !== 1) {
+        updatePagination(1, itemsPerPage);
+      }
+    });
   });
 
   // Pagination logic - slice filtered results based on current page
@@ -352,15 +401,31 @@
     currentPage * itemsPerPage
   ));
 
-  // Handle page change
-  function handlePageChange(event) {
-    currentPage = event.detail;
+  // Update pagination via URL
+  function updatePagination(page, pageSize) {
+    const params = new URLSearchParams(window.location.search);
+    if (page > 1) {
+      params.set('page', page);
+    } else {
+      params.delete('page');
+    }
+    if (pageSize && pageSize !== 25) {
+      params.set('pageSize', pageSize);
+    } else {
+      params.delete('pageSize');
+    }
+    const qs = params.toString();
+    navigate(`/admin/custom-fields${qs ? '?' + qs : ''}`);
   }
 
-  // Handle page size change
+  // Handle page change from Pagination component
+  function handlePageChange(event) {
+    updatePagination(event.detail.page, itemsPerPage);
+  }
+
+  // Handle page size change from Pagination component
   function handlePageSizeChange(event) {
-    itemsPerPage = event.detail;
-    currentPage = 1; // Reset to first page when changing page size
+    updatePagination(event.detail.page, event.detail.itemsPerPage);
   }
 
   function buildFieldDropdownItems(field) {
@@ -434,7 +499,7 @@
     },
     {
       key: 'screen_usage',
-      label: t('screens.title'),
+      label: t('fields.usedIn'),
       slot: 'usage'
     },
     {
@@ -471,6 +536,21 @@
       >
         {t('fields.createField')}
       </Button>
+      <DropdownMenu
+        triggerIcon={MoreHorizontal}
+        items={[
+          {
+            id: 'index-settings',
+            type: 'regular',
+            icon: Settings,
+            title: t('fields.indexSettings'),
+            onClick: openSettings
+          }
+        ]}
+        maxWidth="max-w-48"
+        showChevron={false}
+        iconOnly={true}
+      />
     </div>
   {/snippet}
 </PageHeader>
@@ -501,15 +581,24 @@
 
         <div>
           <Label for="field-type" required class="mb-2">{t('fields.fieldType')}</Label>
-          <Select
-            id="field-type"
-            bind:value={formData.field_type}
-            required
-          >
-            {#each fieldTypes as type}
-              <option value={type.value}>{type.label}</option>
-            {/each}
-          </Select>
+          <DropdownMenu
+            triggerIcon={selectedFieldType?.icon}
+            triggerIconBgColor={selectedFieldType?.iconColor}
+            triggerText={selectedFieldType?.label || 'Select type...'}
+            triggerClass="w-full h-[38px] rounded-lg border px-3 text-sm"
+            triggerStyle="border-color: var(--ds-border); background: var(--ds-surface); color: var(--ds-text);"
+            triggerAlignment="between"
+            showChevron={true}
+            maxWidth="max-w-72"
+            items={fieldTypes.map(type => ({
+              id: type.value,
+              type: 'regular',
+              icon: type.icon,
+              iconColor: type.iconColor,
+              title: type.label,
+              onClick: () => { formData.field_type = type.value; }
+            }))}
+          />
           {#if isMilestoneField}
             <p class="text-sm mt-2 p-2 rounded" style="color: var(--ds-text); background: var(--ds-surface); border: 1px solid var(--ds-border);">
               {t('fields.milestoneHint')}
@@ -611,6 +700,37 @@
           </p>
         </div>
       {/if}
+
+      {#if showIndexingSection}
+        <div class="mt-6 p-4 rounded-lg" style="background: var(--ds-surface); border: 1px solid var(--ds-border);">
+          <Label class="mb-3">Database Indexing</Label>
+          <div class="flex flex-col gap-3">
+            <div class="flex items-center justify-between">
+              <Toggle
+                bind:checked={indexedItems}
+                label="Index on Items"
+                size="small"
+              />
+              <span class="text-xs" style="color: var(--ds-text-subtle);">
+                {indexCounts.items?.current || 0} of {indexCounts.items?.max || 20} used
+              </span>
+            </div>
+            <div class="flex items-center justify-between">
+              <Toggle
+                bind:checked={indexedAssets}
+                label="Index on Assets"
+                size="small"
+              />
+              <span class="text-xs" style="color: var(--ds-text-subtle);">
+                {indexCounts.assets?.current || 0} of {indexCounts.assets?.max || 20} used
+              </span>
+            </div>
+          </div>
+          <p class="text-xs mt-3" style="color: var(--ds-text-subtle);">
+            Indexing improves sort and filter performance but adds overhead to every write operation on this table.
+          </p>
+        </div>
+      {/if}
     </form>
   </div>
 
@@ -619,6 +739,31 @@
     onConfirm={saveField}
     confirmLabel={editingField ? t('common.update') : t('common.create')}
     disabled={!formData.field_name.trim() || (needsOptions && !optionsText.trim()) || (isAssetField && !assetSetId)}
+  />
+</Modal>
+
+<Modal isOpen={showSettingsModal} onclose={() => showSettingsModal = false} maxWidth="max-w-md">
+  <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
+    <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{t('fields.indexSettings')}</h3>
+  </div>
+  <div class="px-6 py-4">
+    <Label for="max-indexes" class="mb-2">Maximum indexes per table</Label>
+    <Input
+      id="max-indexes"
+      type="number"
+      bind:value={settingsMaxIndexes}
+      min={1}
+      max={100}
+    />
+    <p class="text-xs mt-2" style="color: var(--ds-text-subtle);">
+      Controls how many custom field indexes can be created per table (items, assets). Higher values allow more indexed fields but may impact write performance. Currently using {indexCounts.items?.current || 0} on items and {indexCounts.assets?.current || 0} on assets.
+    </p>
+  </div>
+  <DialogFooter
+    onCancel={() => showSettingsModal = false}
+    onConfirm={saveSettings}
+    confirmLabel={t('common.save')}
+    disabled={!settingsMaxIndexes || settingsMaxIndexes < 1 || settingsMaxIndexes > 100}
   />
 </Modal>
 
@@ -639,10 +784,33 @@
 
       <div slot="usage" let:item={field} class="text-sm">
         {#if screensLoaded}
-          {(() => {
-            const count = fieldScreenCounts[field.id] || 0;
-            return count === 0 ? t('common.noData') : t('screens.screens', { count });
-          })()}
+          {@const matchingScreens = getFieldScreens(field.id)}
+          {@const assetTypes = field.asset_type_usages || []}
+          {@const hasPortal = field.applies_to_portal_customers}
+          {@const hasOrgs = field.applies_to_customer_organisations}
+          {@const hasUsage = matchingScreens.length > 0 || assetTypes.length > 0 || hasPortal || hasOrgs}
+          {#if hasUsage}
+            <div class="flex flex-wrap gap-1">
+              {#if matchingScreens.length > 0}
+                <Tooltip content={matchingScreens.map(s => s.name).join(', ')}>
+                  <Lozenge color="blue" text={t('screens.screens', { count: matchingScreens.length })} size="sm" />
+                </Tooltip>
+              {/if}
+              {#each assetTypes as at}
+                <Tooltip content={at.set_name}>
+                  <Lozenge color="teal" text={at.asset_type_name} size="sm" />
+                </Tooltip>
+              {/each}
+              {#if hasPortal}
+                <Lozenge color="purple" text={t('fields.portalCustomers')} size="sm" />
+              {/if}
+              {#if hasOrgs}
+                <Lozenge color="green" text={t('fields.customerOrganisations')} size="sm" />
+              {/if}
+            </div>
+          {:else}
+            {t('common.noData')}
+          {/if}
         {:else}
           <span class="text-gray-400">{t('common.loading')}</span>
         {/if}
@@ -651,12 +819,14 @@
   </div>
 
   {#if filteredCustomFields.length > 0}
-    <Pagination
-      currentPage={currentPage}
-      totalItems={filteredCustomFields.length}
-      itemsPerPage={itemsPerPage}
-      showPageSizes={true}
-      onpageChange={handlePageChange}
-      onpageSizeChange={handlePageSizeChange}
-    />
+    <div class="pb-6">
+      <Pagination
+        currentPage={currentPage}
+        totalItems={filteredCustomFields.length}
+        itemsPerPage={itemsPerPage}
+        showPageSizes={true}
+        onpageChange={handlePageChange}
+        onpageSizeChange={handlePageSizeChange}
+      />
+    </div>
   {/if}

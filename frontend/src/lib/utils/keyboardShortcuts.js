@@ -134,6 +134,9 @@ const shortcuts = {
   assets: {
     upload: { key: 'a' },
   },
+  assetSets: {
+    add: { key: 'a' },
+  },
   customers: {
     add: { key: 'a' },
   },

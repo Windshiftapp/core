@@ -577,7 +577,7 @@ func (s *Server) initialize() error {
 	milestoneHandler := handlers.NewMilestoneHandler(s.db, permService, scm.NewCredentialResolver(s.db, scmProviderHandler.GetEncryption()))
 
 	// Asset management handlers
-	assetHandler := handlers.NewAssetHandler(s.db, permService)
+	assetHandler := handlers.NewAssetHandler(s.db, permService, cfg.AttachmentPath)
 	assetTypeHandler := handlers.NewAssetTypeHandler(s.db, permService)
 	assetCategoryHandler := handlers.NewAssetCategoryHandler(s.db, permService)
 	assetStatusHandler := handlers.NewAssetStatusHandler(s.db, permService)
@@ -986,7 +986,7 @@ func (s *Server) initialize() error {
 			fileServer := http.FileServer(http.FS(distFS))
 
 			mux.Handle("GET /remoteEntry.js", fileServer)
-			mux.Handle("GET /assets/", fileServer)
+			mux.Handle("GET /_app/", fileServer)
 			mux.Handle("GET /windshift-3.svg", fileServer)
 
 			mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {

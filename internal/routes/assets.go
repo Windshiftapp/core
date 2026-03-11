@@ -63,4 +63,12 @@ func RegisterAssetRoutes(deps *Deps) {
 	api.HandleH("GET /asset-statuses/{id}", auth(http.HandlerFunc(deps.Assets.Status.GetAssetStatus)))
 	api.HandleH("PUT /asset-statuses/{id}", auth(http.HandlerFunc(deps.Assets.Status.UpdateAssetStatus)))
 	api.HandleH("DELETE /asset-statuses/{id}", auth(http.HandlerFunc(deps.Assets.Status.DeleteAssetStatus)))
+
+	// Asset Import (CSV)
+	api.HandleH("POST /asset-sets/{setId}/import/upload", auth(http.HandlerFunc(deps.Assets.Asset.UploadCSV)))
+	api.HandleH("POST /asset-sets/{setId}/import/start", auth(http.HandlerFunc(deps.Assets.Asset.StartImport)))
+	api.HandleH("GET /asset-sets/{setId}/import/jobs/{jobId}", auth(http.HandlerFunc(deps.Assets.Asset.GetImportJob)))
+	api.HandleH("GET /asset-sets/{setId}/import/jobs", auth(http.HandlerFunc(deps.Assets.Asset.GetImportJobs)))
+	api.HandleH("POST /asset-sets/{setId}/import/suggest-fields", auth(http.HandlerFunc(deps.Assets.Asset.SuggestFieldsFromCSV)))
+	api.HandleH("POST /asset-sets/{setId}/import/create-type", auth(http.HandlerFunc(deps.Assets.Asset.CreateTypeFromImport)))
 }

@@ -343,6 +343,34 @@ func (db *DB) Initialize() error {
 			slog.Warn("workspace_everyone_roles drop failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Create asset import tables if they don't exist (for existing databases)
+		if _, err := db.Exec(assetsSchema); err != nil {
+			slog.Warn("assets migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Create custom_field_indexes table if it doesn't exist (for existing databases)
+		if _, err := db.Exec(`
+			CREATE TABLE IF NOT EXISTS custom_field_indexes (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				custom_field_id INTEGER NOT NULL,
+				target_table TEXT NOT NULL,
+				index_name TEXT NOT NULL,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (custom_field_id) REFERENCES custom_field_definitions(id) ON DELETE CASCADE,
+				UNIQUE(custom_field_id, target_table)
+			)
+		`); err != nil {
+			slog.Warn("custom_field_indexes migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Add max_custom_field_indexes_per_table system setting if it doesn't exist
+		var settingCount int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM system_settings WHERE key = 'max_custom_field_indexes_per_table'`).Scan(&settingCount); err == nil && settingCount == 0 {
+			if _, err := db.Exec(`INSERT INTO system_settings (key, value, value_type, description, category) VALUES ('max_custom_field_indexes_per_table', '20', 'integer', 'Maximum number of custom field indexes per table', 'performance')`); err != nil {
+				slog.Warn("max_custom_field_indexes_per_table setting migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
 		return nil
 	}
 
@@ -574,6 +602,7 @@ func (db *DB) initializeDefaultData() error {
 		{"admin_user_created", "false", "boolean", "Whether admin user has been created", "setup"},
 		{"calendar_feed_enabled", "true", "boolean", "Allow users to generate ICS calendar feed URLs", "security"},
 		{"plugin_cli_exec_enabled", "false", "boolean", "Allow plugins to execute CLI commands", "security"},
+		{"max_custom_field_indexes_per_table", "20", "integer", "Maximum number of custom field indexes per table", "performance"},
 	}
 
 	for _, setting := range systemSettings {
