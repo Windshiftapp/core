@@ -180,42 +180,14 @@ func (h *LLMConnectionHandler) TestConnection(w http.ResponseWriter, r *http.Req
 	respondJSONOK(w, map[string]string{"status": "ok"})
 }
 
-// SetFeatures sets the feature assignments for a connection (admin).
-func (h *LLMConnectionHandler) SetFeatures(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	var req struct {
-		Features []string `json:"features"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "invalid request body")
-		return
-	}
-
-	if err := h.manager.SetFeatures(id, req.Features); err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	respondJSONOK(w, map[string]string{"status": "ok"})
-}
-
 // GetProviders returns the hardcoded list of known LLM providers (user).
 func (h *LLMConnectionHandler) GetProviders(w http.ResponseWriter, _ *http.Request) {
 	respondJSONOK(w, llm.KnownProviders())
 }
 
-// GetConnectionsForFeature returns enabled connections for a specific feature (user).
-func (h *LLMConnectionHandler) GetConnectionsForFeature(w http.ResponseWriter, r *http.Request) {
-	feature := r.URL.Query().Get("feature")
-	if feature == "" {
-		respondBadRequest(w, r, "feature query parameter is required")
-		return
-	}
-
-	connections, err := h.manager.ListForFeature(feature)
+// GetEnabledConnections returns all enabled connections (user).
+func (h *LLMConnectionHandler) GetEnabledConnections(w http.ResponseWriter, r *http.Request) {
+	connections, err := h.manager.ListEnabled()
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

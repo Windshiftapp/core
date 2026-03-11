@@ -1371,11 +1371,11 @@ func (s *PlanningService) GetIterationBurndown(iterationID int) (*IterationBurnd
 	}
 
 	// Parse dates
-	startDate, err := time.Parse("2006-01-02", iter.StartDate)
+	startDate, err := parseDate(iter.StartDate)
 	if err != nil {
 		return nil, fmt.Errorf("invalid start date: %w", err)
 	}
-	endDate, err := time.Parse("2006-01-02", iter.EndDate)
+	endDate, err := parseDate(iter.EndDate)
 	if err != nil {
 		return nil, fmt.Errorf("invalid end date: %w", err)
 	}
@@ -1555,7 +1555,7 @@ func (s *PlanningService) GetIterationBurndown(iterationID int) (*IterationBurnd
 	for i := len(dailyData) - 1; i >= 0; i-- {
 		dd := dailyData[i]
 		dayIndex := 0
-		d, _ := time.Parse("2006-01-02", dd.date)
+		d, _ := parseDate(dd.date)
 		dayIndex = int(d.Sub(startDate).Hours() / 24)
 
 		// Calculate ideal remaining for this day
@@ -1669,4 +1669,12 @@ func (s *PlanningService) SaveProjectMilestoneCategories(projectID int, categori
 	}
 
 	return tx.Commit()
+}
+
+// parseDate tries date-only format first, then falls back to RFC3339.
+func parseDate(s string) (time.Time, error) {
+	if t, err := time.Parse("2006-01-02", s); err == nil {
+		return t, nil
+	}
+	return time.Parse(time.RFC3339, s)
 }

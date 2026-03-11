@@ -347,7 +347,7 @@ func (s *Server) initialize() error {
 	workspaceFieldReqHandler := handlers.NewWorkspaceFieldRequirementHandler(s.db)
 	workspaceHandler := handlers.NewWorkspaceHandler(s.db, permService, s.activityTracker)
 	screenHandler := handlers.NewScreenHandler(s.db)
-	configSetHandler := handlers.NewConfigurationSetHandler(s.db, s.notificationService)
+	configSetHandler := handlers.NewConfigurationSetHandler(s.db, s.notificationService, permService)
 	itemTypeHandler := handlers.NewItemTypeHandler(s.db)
 	priorityHandler := handlers.NewPriorityHandler(s.db)
 
@@ -784,9 +784,9 @@ func (s *Server) initialize() error {
 
 		// Internal LLM proxy for logbook article generation
 		if ssoSecret := os.Getenv("SSO_SECRET"); ssoSecret != "" {
-			llmProxy := NewInternalLLMProxy(llmManager, "logbook_article", ssoSecret)
+			llmProxy := NewInternalLLMProxy(llmManager, ssoSecret)
 			mux.Handle("POST /api/internal/llm/v1/chat/completions", llmProxy)
-			mux.Handle("GET /api/internal/llm/health", NewInternalLLMHealthCheck(llmManager, "logbook_article", ssoSecret))
+			mux.Handle("GET /api/internal/llm/health", NewInternalLLMHealthCheck(llmManager, ssoSecret))
 			slog.Info("internal LLM proxy enabled for logbook article generation")
 		}
 	}

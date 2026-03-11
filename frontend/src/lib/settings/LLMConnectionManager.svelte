@@ -24,13 +24,6 @@
   let testLoading = $state(false);
   let saving = $state(false);
 
-  // Known features
-  const knownFeatures = [
-    { id: 'plan_my_day', label: 'Plan My Day' },
-    { id: 'item_analysis', label: 'Item Analysis' },
-    { id: 'release_notes_generation', label: 'Release Notes Generation' },
-  ];
-
   // Form state
   let form = $state({
     name: '',
@@ -40,7 +33,6 @@
     base_url: '',
     is_default: false,
     is_enabled: true,
-    features: [],
   });
 
   function resetForm() {
@@ -52,7 +44,6 @@
       base_url: '',
       is_default: false,
       is_enabled: true,
-      features: [],
     };
     testResult = null;
   }
@@ -103,7 +94,6 @@
       base_url: conn.base_url || '',
       is_default: conn.is_default,
       is_enabled: conn.is_enabled,
-      features: [...conn.features],
     };
     testResult = null;
     showEditModal = true;
@@ -170,13 +160,6 @@
     }
   }
 
-  function toggleFeature(featureId) {
-    if (form.features.includes(featureId)) {
-      form.features = form.features.filter(f => f !== featureId);
-    } else {
-      form.features = [...form.features, featureId];
-    }
-  }
 </script>
 
 <div class="space-y-4">
@@ -207,7 +190,6 @@
             <th class="text-left px-4 py-2 font-medium" style="color: var(--ds-text-subtle);">Name</th>
             <th class="text-left px-4 py-2 font-medium" style="color: var(--ds-text-subtle);">Provider</th>
             <th class="text-left px-4 py-2 font-medium" style="color: var(--ds-text-subtle);">Model</th>
-            <th class="text-left px-4 py-2 font-medium" style="color: var(--ds-text-subtle);">Features</th>
             <th class="text-left px-4 py-2 font-medium" style="color: var(--ds-text-subtle);">Status</th>
             <th class="text-right px-4 py-2 font-medium" style="color: var(--ds-text-subtle);">Actions</th>
           </tr>
@@ -226,13 +208,6 @@
               <td class="px-4 py-3" style="color: var(--ds-text-subtle);">{conn.provider_type}</td>
               <td class="px-4 py-3">
                 <span class="font-mono text-xs px-1.5 py-0.5 rounded" style="background-color: var(--ds-surface-sunken); color: var(--ds-text-subtle);">{conn.model}</span>
-              </td>
-              <td class="px-4 py-3">
-                <div class="flex gap-1 flex-wrap">
-                  {#each conn.features as feature}
-                    <Lozenge appearance="default" size="sm">{feature}</Lozenge>
-                  {/each}
-                </div>
               </td>
               <td class="px-4 py-3">
                 {#if conn.is_enabled}
@@ -451,21 +426,4 @@
     </label>
   </div>
 
-  <!-- Features -->
-  <div>
-    <span class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">Features</span>
-    <div class="flex flex-col gap-2" role="group" aria-label="Features">
-      {#each knownFeatures as feature}
-        <label class="flex items-center gap-2 text-sm cursor-pointer" style="color: var(--ds-text);">
-          <input
-            type="checkbox"
-            checked={form.features.includes(feature.id)}
-            onchange={() => toggleFeature(feature.id)}
-            class="rounded"
-          />
-          {feature.label}
-        </label>
-      {/each}
-    </div>
-  </div>
 {/snippet}

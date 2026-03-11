@@ -527,6 +527,9 @@ func (h *GroupHandler) AddMembers(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Invalidate permission cache for the user added to this group
+		_ = h.permissionService.OnUserGroupMembershipChanged(userID, groupID)
+
 		// Get user details for the response
 		var userEmail, userName, userUsername string
 		err = h.db.QueryRow("SELECT email, first_name || ' ' || last_name, username FROM users WHERE id = ?", userID).Scan(&userEmail, &userName, &userUsername)
@@ -625,6 +628,9 @@ func (h *GroupHandler) RemoveMembers(w http.ResponseWriter, r *http.Request) {
 		}
 
 		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected > 0 {
+			_ = h.permissionService.OnUserGroupMembershipChanged(userID, groupID)
+		}
 		removedCount += int(rowsAffected)
 	}
 

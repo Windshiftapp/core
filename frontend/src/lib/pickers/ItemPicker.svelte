@@ -1,6 +1,6 @@
 <script>
   import { createPopover, melt } from '@melt-ui/svelte';
-  import { ChevronDown, X } from 'lucide-svelte';
+  import { ChevronDown, X, CheckSquare, Square } from 'lucide-svelte';
   import { createEventDispatcher } from 'svelte';
   import { getVisibleColor } from '../utils/colorUtils.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -25,6 +25,9 @@
     loading = false,
     autoOpen = false,
     showSelectedInTrigger = true,
+    multiSelect = false,
+    values = $bindable([]),
+    maxSelections = null,
     class: className = '',
     children = null,  // Optional custom trigger snippet
     onSearchChange = null,  // Callback for async search: (searchTerm) => void
@@ -137,8 +140,39 @@
     }
   });
 
+  // Derived: selected items for multi-select trigger display
+  let selectedItems = $derived(
+    multiSelect
+      ? values.map(v => items.find(item => {
+          const itemValue = finalConfig.getValue(item);
+          if (itemValue == null || v == null) return itemValue === v;
+          return Number(itemValue) === Number(v);
+        })).filter(Boolean)
+      : []
+  );
+
   // Handle selection
   function handleSelect(item) {
+    if (multiSelect) {
+      if (!item) {
+        values = [];
+        dispatch('select', values);
+        return;
+      }
+      const itemValue = finalConfig.getValue(item);
+      const idx = values.findIndex(v => {
+        if (v == null || itemValue == null) return v === itemValue;
+        return Number(v) === Number(itemValue);
+      });
+      if (idx >= 0) {
+        values = values.filter((_, i) => i !== idx);
+      } else {
+        if (maxSelections && values.length >= maxSelections) return;
+        values = [...values, itemValue];
+      }
+      dispatch('select', values);
+      return;
+    }
     wasSelectionMade = true;
     value = item ? finalConfig.getValue(item) : null;
     $open = false;
@@ -183,6 +217,29 @@
     e.stopPropagation();
     handleSelect(null);
   }
+
+  // Remove a single item in multi-select mode
+  function handleRemoveValue(e, val) {
+    e.stopPropagation();
+    values = values.filter(v => {
+      if (v == null || val == null) return v !== val;
+      return Number(v) !== Number(val);
+    });
+    dispatch('select', values);
+  }
+
+  // Check if an item value is selected (multi-select)
+  function isValueSelected(itemValue) {
+    return values.some(v => {
+      if (v == null || itemValue == null) return v === itemValue;
+      return Number(v) === Number(itemValue);
+    });
+  }
+
+  // Check if max selections reached (multi-select)
+  let atMaxSelections = $derived(
+    multiSelect && maxSelections != null && values.length >= maxSelections
+  );
 
   // Helper: Render icon
   function renderIcon(item, size = 16) {
@@ -258,8 +315,23 @@
       e.currentTarget.style.backgroundColor = 'var(--ds-background-input)';
     }}
   >
-    <div class="flex items-center gap-2 flex-1 min-w-0">
-      {#if selectedItem && showSelectedInTrigger}
+    <div class="flex items-center gap-2 flex-1 min-w-0 {multiSelect && selectedItems.length > 0 ? 'flex-wrap' : ''}">
+      {#if multiSelect}
+        {#if selectedItems.length > 0}
+          {#each selectedItems as selItem}
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs" style="background-color: var(--ds-background-selected); color: var(--ds-text);">
+              <span class="truncate max-w-[120px]">{finalConfig.getLabel(selItem)}</span>
+              {#if !disabled}
+                <button type="button" onclick={(e) => handleRemoveValue(e, finalConfig.getValue(selItem))} class="p-0 leading-none hover:opacity-70">
+                  <X size={12} />
+                </button>
+              {/if}
+            </span>
+          {/each}
+        {:else}
+          <span style="color: var(--ds-text-subtle);">{resolvedPlaceholder}</span>
+        {/if}
+      {:else if selectedItem && showSelectedInTrigger}
         <!-- Show selected item -->
         {@const iconData = renderIcon(selectedItem, 16)}
         {#if iconData}
@@ -277,7 +349,17 @@
     </div>
 
     <div class="flex items-center gap-1 flex-shrink-0">
-      {#if allowClear && selectedItem && !disabled && showSelectedInTrigger}
+      {#if multiSelect && allowClear && selectedItems.length > 0 && !disabled}
+        <button
+          type="button"
+          onclick={handleClear}
+          class="p-0.5 rounded hover:bg-opacity-10"
+          style="color: var(--ds-text-subtle);"
+          aria-label={t('pickers.clearSelection')}
+        >
+          <X size={14} />
+        </button>
+      {:else if !multiSelect && allowClear && selectedItem && !disabled && showSelectedInTrigger}
         <button
           type="button"
           onclick={handleClear}
@@ -384,8 +466,9 @@
         {#each filteredItems as item, index}
           {@const itemIndex = showUnassigned ? index + 1 : index}
           {@const isHighlighted = highlightedIndex === itemIndex}
-          {@const isSelected = value === finalConfig.getValue(item)}
+          {@const isSelected = multiSelect ? isValueSelected(finalConfig.getValue(item)) : value === finalConfig.getValue(item)}
           {@const iconData = renderIcon(item, 16)}
+          {@const isDisabledByMax = multiSelect && atMaxSelections && !isSelected}
 
           <button
             type="button"
@@ -394,6 +477,8 @@
             style="
               background-color: {isSelected ? 'var(--ds-background-selected)' : isHighlighted ? 'var(--ds-surface-raised-hovered)' : 'transparent'};
               border-bottom: 1px solid var(--ds-border);
+              opacity: {isDisabledByMax ? 0.4 : 1};
+              pointer-events: {isDisabledByMax ? 'none' : 'auto'};
             "
             role="option"
             id={getOptionId(itemIndex)}
@@ -423,6 +508,15 @@
           >
             <!-- Item Header -->
             <div class="flex items-center gap-2 mb-1">
+              {#if multiSelect}
+                <div class="flex-shrink-0">
+                  {#if isSelected}
+                    <CheckSquare size={16} style="color: var(--ds-interactive);" />
+                  {:else}
+                    <Square size={16} style="color: var(--ds-text-subtle);" />
+                  {/if}
+                </div>
+              {/if}
               <!-- Icon -->
               {#if iconData}
                 {#if iconData.type === 'color-dot'}

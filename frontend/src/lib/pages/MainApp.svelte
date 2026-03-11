@@ -74,6 +74,7 @@
     'milestone-detail': () => import('../features/milestones/MilestoneDetail.svelte'),
     'iterations': () => import('../features/iterations/Iterations.svelte'),
     'iteration-detail': () => import('../features/iterations/IterationDetail.svelte'),
+    'iteration-dependencies': () => import('../features/iterations/IterationDependencies.svelte'),
     'assets': () => import('../features/assets/AssetBrowser.svelte'),
     'asset-detail': () => import('../features/assets/AssetBrowser.svelte'),
     'workspace-board': () => import('../features/collections/CollectionBoard.svelte'),
@@ -208,6 +209,14 @@
       getProps: (route) => ({
         iterationId: route.params.id,
         workspaceId: route.query?.workspaceId || null
+      })
+    },
+    'iteration-dependencies': {
+      loadingMsg: 'Loading Dependency Analysis...',
+      errorMsg: 'Failed to load Dependency Analysis',
+      wrapper: 'surface-full',
+      getProps: (route) => ({
+        iterationId: route.params.id,
       })
     },
     'assets': {

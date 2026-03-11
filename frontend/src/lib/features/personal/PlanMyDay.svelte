@@ -19,7 +19,7 @@
 
   onMount(async () => {
     try {
-      connections = await api.llmProviders.getForFeature('plan_my_day');
+      connections = await api.llmProviders.getEnabled();
       const def = connections.find(c => c.is_default);
       if (def) selectedConnectionId = def.id;
     } catch (e) { /* silent — fallback still works */ }
