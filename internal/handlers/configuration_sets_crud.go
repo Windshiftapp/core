@@ -11,6 +11,7 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/services"
 	"windshift/internal/utils"
 )
 
@@ -20,13 +21,15 @@ type ConfigurationSetHandler struct {
 	notificationService interface {
 		ForceRefreshCache() error
 	} // Notification service for cache refresh (optional, can be nil)
+	permissionService *services.PermissionService
 }
 
-func NewConfigurationSetHandler(db database.Database, notificationService interface{ ForceRefreshCache() error }) *ConfigurationSetHandler {
+func NewConfigurationSetHandler(db database.Database, notificationService interface{ ForceRefreshCache() error }, permissionService *services.PermissionService) *ConfigurationSetHandler {
 	return &ConfigurationSetHandler{
 		db:                  db,
 		repo:                repository.NewConfigurationSetRepository(db),
 		notificationService: notificationService,
+		permissionService:   permissionService,
 	}
 }
 
@@ -170,6 +173,9 @@ func (h *ConfigurationSetHandler) Create(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Invalidate permission cache for affected workspaces
+	_ = h.permissionService.OnConfigurationSetChanged(configSetID)
+
 	// Refresh notification cache if service is available
 	var warnings []models.APIWarning
 	if h.notificationService != nil {
@@ -225,6 +231,9 @@ func (h *ConfigurationSetHandler) Delete(w http.ResponseWriter, r *http.Request)
 		respondInternalError(w, r, err)
 		return
 	}
+
+	// Invalidate permission cache before deletion (while workspace associations still exist)
+	_ = h.permissionService.OnConfigurationSetChanged(id)
 
 	// Delete the configuration set (including all associations)
 	if err := h.repo.Delete(id); err != nil {

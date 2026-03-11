@@ -20,7 +20,6 @@ type ConnectionInfo struct {
 	BaseURL      string       `json:"base_url,omitempty"`
 	IsDefault    bool         `json:"is_default"`
 	IsEnabled    bool         `json:"is_enabled"`
-	Features     []string     `json:"features"`
 	CreatedAt    time.Time    `json:"created_at"`
 	UpdatedAt    time.Time    `json:"updated_at"`
 }
@@ -41,29 +40,26 @@ func NewConnectionManager(db database.Database, encryption *sso.SecretEncryption
 	}
 }
 
-// ResolveForFeature returns a Client for the given feature.
-// If connectionID > 0, uses that specific connection.
-// Otherwise, uses the default connection for the feature.
+// Resolve returns a Client for the given connection ID.
+// If connectionID > 0, uses that specific enabled connection.
+// Otherwise, picks the default enabled connection (or the first enabled one).
 // Falls back to the env-var-based client if no DB connections exist.
-func (m *ConnectionManager) ResolveForFeature(feature string, connectionID int) (Client, error) {
+func (m *ConnectionManager) Resolve(connectionID int) (Client, error) {
 	var row *sql.Row
 	if connectionID > 0 {
 		row = m.db.QueryRow(
-			`SELECT c.id, c.provider_type, c.model, c.api_key_encrypted, c.base_url
-			 FROM llm_connections c
-			 JOIN llm_connection_features f ON f.connection_id = c.id
-			 WHERE c.id = ? AND c.is_enabled = true AND f.feature = ?`,
-			connectionID, feature,
+			`SELECT id, provider_type, model, api_key_encrypted, base_url
+			 FROM llm_connections
+			 WHERE id = ? AND is_enabled = true`,
+			connectionID,
 		)
 	} else {
 		row = m.db.QueryRow(
-			`SELECT c.id, c.provider_type, c.model, c.api_key_encrypted, c.base_url
-			 FROM llm_connections c
-			 JOIN llm_connection_features f ON f.connection_id = c.id
-			 WHERE c.is_enabled = true AND f.feature = ?
-			 ORDER BY c.is_default DESC, c.id ASC
+			`SELECT id, provider_type, model, api_key_encrypted, base_url
+			 FROM llm_connections
+			 WHERE is_enabled = true
+			 ORDER BY is_default DESC, id ASC
 			 LIMIT 1`,
-			feature,
 		)
 	}
 
@@ -117,7 +113,6 @@ func (m *ConnectionManager) ListConnections() ([]ConnectionInfo, error) {
 		if baseURL.Valid {
 			c.BaseURL = baseURL.String
 		}
-		c.Features = m.getFeatures(c.ID)
 		connections = append(connections, c)
 	}
 	if connections == nil {
@@ -126,18 +121,16 @@ func (m *ConnectionManager) ListConnections() ([]ConnectionInfo, error) {
 	return connections, nil
 }
 
-// ListForFeature returns enabled connections assigned to a feature (for user dropdown).
-func (m *ConnectionManager) ListForFeature(feature string) ([]ConnectionInfo, error) {
+// ListEnabled returns all enabled connections (for user dropdown).
+func (m *ConnectionManager) ListEnabled() ([]ConnectionInfo, error) {
 	rows, err := m.db.Query(
-		`SELECT c.id, c.name, c.provider_type, c.model, c.api_key_encrypted, c.base_url, c.is_default, c.is_enabled, c.created_at, c.updated_at
-		 FROM llm_connections c
-		 JOIN llm_connection_features f ON f.connection_id = c.id
-		 WHERE c.is_enabled = true AND f.feature = ?
-		 ORDER BY c.is_default DESC, c.name ASC`,
-		feature,
+		`SELECT id, name, provider_type, model, api_key_encrypted, base_url, is_default, is_enabled, created_at, updated_at
+		 FROM llm_connections
+		 WHERE is_enabled = true
+		 ORDER BY is_default DESC, name ASC`,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list connections for feature: %w", err)
+		return nil, fmt.Errorf("failed to list enabled connections: %w", err)
 	}
 	defer rows.Close()
 
@@ -152,7 +145,6 @@ func (m *ConnectionManager) ListForFeature(feature string) ([]ConnectionInfo, er
 		if baseURL.Valid {
 			c.BaseURL = baseURL.String
 		}
-		c.Features = []string{feature}
 		connections = append(connections, c)
 	}
 	if connections == nil {
@@ -179,7 +171,6 @@ func (m *ConnectionManager) GetConnection(id int) (*ConnectionInfo, error) {
 	if baseURL.Valid {
 		c.BaseURL = baseURL.String
 	}
-	c.Features = m.getFeatures(c.ID)
 	return &c, nil
 }
 
@@ -192,7 +183,6 @@ type CreateConnectionRequest struct {
 	BaseURL      string       `json:"base_url,omitempty"`
 	IsDefault    bool         `json:"is_default"`
 	IsEnabled    bool         `json:"is_enabled"`
-	Features     []string     `json:"features,omitempty"`
 }
 
 // CreateConnection creates a new LLM connection.
@@ -228,16 +218,6 @@ func (m *ConnectionManager) CreateConnection(req CreateConnectionRequest) (*Conn
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
 
-	// Insert features
-	for _, feature := range req.Features {
-		if _, err := m.db.Exec(
-			"INSERT INTO llm_connection_features (connection_id, feature) VALUES (?, ?)",
-			id, feature,
-		); err != nil {
-			return nil, fmt.Errorf("failed to insert feature: %w", err)
-		}
-	}
-
 	return m.GetConnection(int(id))
 }
 
@@ -250,7 +230,6 @@ type UpdateConnectionRequest struct {
 	BaseURL      string       `json:"base_url,omitempty"`
 	IsDefault    bool         `json:"is_default"`
 	IsEnabled    bool         `json:"is_enabled"`
-	Features     []string     `json:"features,omitempty"`
 }
 
 // UpdateConnection updates an existing LLM connection.
@@ -285,11 +264,6 @@ func (m *ConnectionManager) UpdateConnection(id int, req UpdateConnectionRequest
 		if err != nil {
 			return nil, fmt.Errorf("failed to update connection: %w", err)
 		}
-	}
-
-	// Replace features
-	if err := m.SetFeatures(id, req.Features); err != nil {
-		return nil, err
 	}
 
 	return m.GetConnection(id)
@@ -333,38 +307,3 @@ func (m *ConnectionManager) TestConnection(id int) error {
 	return client.Health(ctx)
 }
 
-// SetFeatures replaces the feature assignments for a connection.
-func (m *ConnectionManager) SetFeatures(id int, features []string) error {
-	if _, err := m.db.Exec("DELETE FROM llm_connection_features WHERE connection_id = ?", id); err != nil {
-		return fmt.Errorf("failed to delete existing features: %w", err)
-	}
-	for _, feature := range features {
-		if _, err := m.db.Exec(
-			"INSERT INTO llm_connection_features (connection_id, feature) VALUES (?, ?)",
-			id, feature,
-		); err != nil {
-			return fmt.Errorf("failed to insert feature: %w", err)
-		}
-	}
-	return nil
-}
-
-func (m *ConnectionManager) getFeatures(connectionID int) []string {
-	rows, err := m.db.Query("SELECT feature FROM llm_connection_features WHERE connection_id = ?", connectionID)
-	if err != nil {
-		return []string{}
-	}
-	defer rows.Close()
-
-	var features []string
-	for rows.Next() {
-		var f string
-		if err := rows.Scan(&f); err == nil {
-			features = append(features, f)
-		}
-	}
-	if features == nil {
-		features = []string{}
-	}
-	return features
-}

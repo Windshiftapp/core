@@ -12,10 +12,3 @@ CREATE TABLE IF NOT EXISTS llm_connections (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE TABLE IF NOT EXISTS llm_connection_features (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    connection_id INTEGER NOT NULL REFERENCES llm_connections(id) ON DELETE CASCADE,
-    feature TEXT NOT NULL,
-    UNIQUE(connection_id, feature)
-);

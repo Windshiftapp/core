@@ -87,6 +87,7 @@ const routes = {
   '/iterations': 'iterations',
   '/iterations/type/:typeId': 'iterations',
   '/iterations/:id': 'iteration-detail',
+  '/iterations/:id/dependencies': 'iteration-dependencies',
   '/logbook': 'logbook',
   '/logbook/bucket/:bucketId': 'logbook',
   '/logbook/documents/:documentId': 'logbook-document',

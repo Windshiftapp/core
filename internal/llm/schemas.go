@@ -92,6 +92,38 @@ var SchemaGenerateReleaseNotes = json.RawMessage(`{
 	"additionalProperties": false
 }`)
 
+// SchemaAnalyzeDependencies is the JSON Schema for the AnalyzeDependencies response.
+var SchemaAnalyzeDependencies = json.RawMessage(`{
+	"type": "object",
+	"properties": {
+		"dependencies": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"properties": {
+					"source_key": {
+						"type": "string"
+					},
+					"target_key": {
+						"type": "string"
+					},
+					"relationship": {
+						"type": "string",
+						"enum": ["depends_on", "blocks", "relates_to"]
+					},
+					"reason": {
+						"type": "string"
+					}
+				},
+				"required": ["source_key", "target_key", "relationship", "reason"],
+				"additionalProperties": false
+			}
+		}
+	},
+	"required": ["dependencies"],
+	"additionalProperties": false
+}`)
+
 // SchemaDecompose is the JSON Schema for the DecomposeItem response.
 var SchemaDecompose = json.RawMessage(`{
 	"type": "object",

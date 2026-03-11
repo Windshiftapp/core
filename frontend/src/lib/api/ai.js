@@ -12,6 +12,13 @@ export const ai = {
     post(
       `/ai/milestones/${milestoneId}/generate-release-notes${connectionId ? `?connection_id=${connectionId}` : ''}`
     ),
+  analyzeDependencies: (iterationId, body = {}, connectionId) =>
+    post(
+      `/ai/iterations/${iterationId}/analyze-dependencies${connectionId ? `?connection_id=${connectionId}` : ''}`,
+      body
+    ),
+  acceptDependencies: (iterationId, suggestions) =>
+    post(`/ai/iterations/${iterationId}/accept-dependencies`, { suggestions }),
 };
 
 export const llmConnections = {
@@ -21,10 +28,9 @@ export const llmConnections = {
   update: (id, data) => put(`/admin/llm-connections/${id}`, data),
   delete: (id) => del(`/admin/llm-connections/${id}`),
   test: (id) => post(`/admin/llm-connections/${id}/test`),
-  setFeatures: (id, features) => put(`/admin/llm-connections/${id}/features`, { features }),
 };
 
 export const llmProviders = {
   getProviders: () => get('/llm/providers'),
-  getForFeature: (feature) => get(`/llm/connections?feature=${feature}`),
+  getEnabled: () => get('/llm/connections'),
 };

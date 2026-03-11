@@ -10,9 +10,9 @@ import (
 )
 
 // NewInternalLLMProxy creates an HTTP handler that proxies chat completion
-// requests to the admin-configured LLM connection for the given feature.
+// requests to the admin-configured default LLM connection.
 // Authentication uses a shared secret (SSO_SECRET) with constant-time comparison.
-func NewInternalLLMProxy(llmManager *llm.ConnectionManager, feature, secret string) http.Handler {
+func NewInternalLLMProxy(llmManager *llm.ConnectionManager, secret string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !validateInternalToken(r, secret) {
 			w.Header().Set("Content-Type", "application/json")
@@ -29,9 +29,9 @@ func NewInternalLLMProxy(llmManager *llm.ConnectionManager, feature, secret stri
 			return
 		}
 
-		client, err := llmManager.ResolveForFeature(feature, 0)
+		client, err := llmManager.Resolve(0)
 		if err != nil || client == nil || !client.Available() {
-			slog.Warn("LLM proxy: no client available for feature", "feature", feature, "error", err)
+			slog.Warn("LLM proxy: no client available", "error", err)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_, _ = w.Write([]byte(`{"error":"LLM service unavailable"}`))
@@ -40,7 +40,7 @@ func NewInternalLLMProxy(llmManager *llm.ConnectionManager, feature, secret stri
 
 		resp, err := client.ChatCompletion(r.Context(), req)
 		if err != nil {
-			slog.Error("LLM proxy: chat completion failed", "feature", feature, "error", err)
+			slog.Error("LLM proxy: chat completion failed", "error", err)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadGateway)
 			_, _ = w.Write([]byte(`{"error":"LLM request failed"}`))
@@ -53,8 +53,8 @@ func NewInternalLLMProxy(llmManager *llm.ConnectionManager, feature, secret stri
 }
 
 // NewInternalLLMHealthCheck creates an HTTP handler that checks whether the
-// admin-configured LLM connection for the given feature is available.
-func NewInternalLLMHealthCheck(llmManager *llm.ConnectionManager, feature, secret string) http.Handler {
+// admin-configured default LLM connection is available.
+func NewInternalLLMHealthCheck(llmManager *llm.ConnectionManager, secret string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !validateInternalToken(r, secret) {
 			w.Header().Set("Content-Type", "application/json")
@@ -63,7 +63,7 @@ func NewInternalLLMHealthCheck(llmManager *llm.ConnectionManager, feature, secre
 			return
 		}
 
-		client, err := llmManager.ResolveForFeature(feature, 0)
+		client, err := llmManager.Resolve(0)
 		if err != nil || client == nil || !client.Available() {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)

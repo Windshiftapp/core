@@ -171,6 +171,9 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Invalidate permission cache for affected workspaces
+	_ = h.permissionService.OnConfigurationSetChanged(id)
+
 	// Refresh notification cache if service is available
 	var warnings []models.APIWarning
 	if h.notificationService != nil {

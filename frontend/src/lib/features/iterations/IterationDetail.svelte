@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { ArrowLeft, Calendar, Target, Edit, Trash2, ChevronDown, ChevronRight, MoreHorizontal, Globe, Building2 } from 'lucide-svelte';
+  import { ArrowLeft, Calendar, Target, Edit, Trash2, ChevronDown, ChevronRight, MoreHorizontal, Globe, Building2, Sparkles } from 'lucide-svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import BurndownChart from './BurndownChart.svelte';
   import { api } from '../../api.js';
@@ -16,6 +16,7 @@
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
+  import { aiStore } from '../../stores/aiStore.svelte.js';
 
   let { iterationId, workspaceId = null } = $props();
 
@@ -197,6 +198,14 @@
         hoverClass: 'hover-bg',
         onClick: startEdit
       },
+      ...(aiStore.available && progress?.total_items > 0 ? [{
+        id: 'dependencies',
+        type: 'regular',
+        icon: Sparkles,
+        title: 'Analyze Dependencies',
+        hoverClass: 'hover-bg',
+        onClick: () => navigate(`/iterations/${iterationId}/dependencies`)
+      }] : []),
       {
         id: 'delete',
         type: 'regular',
