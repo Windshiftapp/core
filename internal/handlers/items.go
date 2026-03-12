@@ -938,6 +938,16 @@ func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Capture ancestor IDs before deletion for cache invalidation
+	var ancestorIDs []int
+	if h.itemCache != nil && h.hierarchyService != nil {
+		if ancestors, aErr := h.hierarchyService.GetAncestors(id); aErr == nil {
+			for _, a := range ancestors {
+				ancestorIDs = append(ancestorIDs, a.ID)
+			}
+		}
+	}
+
 	// Delete using repository
 	tx, err := h.db.Begin()
 	if err != nil {
@@ -961,6 +971,12 @@ func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if err := tx.Commit(); err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	// Invalidate item hierarchy and workspace project caches
+	if h.itemCache != nil {
+		_ = h.itemCache.InvalidateItemHierarchy(id, ancestorIDs)
+		_ = h.itemCache.InvalidateWorkspaceProjects(item.WorkspaceID)
 	}
 
 	// Emit side effects via EventCoordinator (notifications, webhooks)
@@ -1149,6 +1165,14 @@ func (h *ItemHandler) ReparentChildren(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Invalidate caches for reparented children
+	if h.itemCache != nil {
+		_ = h.itemCache.InvalidateWorkspaceProjects(item.WorkspaceID)
+		for _, child := range children {
+			_ = h.itemCache.InvalidateItemHierarchy(child.ID, nil)
+		}
+	}
+
 	respondJSONOK(w, map[string]interface{}{"reparentedCount": len(children)})
 }
 
@@ -1189,12 +1213,28 @@ func (h *ItemHandler) DeleteCascade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Capture ancestor IDs before deletion for cache invalidation
+	var ancestorIDs []int
+	if h.itemCache != nil && h.hierarchyService != nil {
+		if ancestors, aErr := h.hierarchyService.GetAncestors(id); aErr == nil {
+			for _, a := range ancestors {
+				ancestorIDs = append(ancestorIDs, a.ID)
+			}
+		}
+	}
+
 	// Use the CRUD service for cascade delete
 	crudService := services.NewItemCRUDService(h.db)
 	result, err := crudService.Delete(id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	// Invalidate item hierarchy and workspace project caches
+	if h.itemCache != nil {
+		_ = h.itemCache.InvalidateItemHierarchy(id, ancestorIDs)
+		_ = h.itemCache.InvalidateWorkspaceProjects(item.WorkspaceID)
 	}
 
 	// Emit side effects via EventCoordinator (notifications, webhooks)

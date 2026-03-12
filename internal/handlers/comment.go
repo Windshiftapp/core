@@ -522,6 +522,11 @@ func (h *CommentHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Clean up orphaned mention records for the deleted comment
+	if h.mentionService != nil {
+		_ = h.mentionService.DeleteMentionsForSource("comment", commentID)
+	}
+
 	// Emit notification event
 	if h.notificationService != nil {
 		assigneeIDPtr := utils.NullInt64ToPtr(assigneeID)
