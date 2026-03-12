@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"crypto/rand"
 	"database/sql"
 	"encoding/csv"
 	"encoding/json"
@@ -39,13 +38,13 @@ type CSVUploadResponse struct {
 
 // StartAssetImportRequest is the request body for starting a CSV import job.
 type StartAssetImportRequest struct {
-	UploadID    string                 `json:"upload_id"`
-	AssetTypeID int                    `json:"asset_type_id"`
-	Mappings    AssetImportMappings    `json:"mappings"`
-	CategoryMap map[string]int         `json:"category_map,omitempty"`
-	StatusMap   map[string]int         `json:"status_map,omitempty"`
-	HasHeader   bool                   `json:"has_header"`
-	Delimiter   string                 `json:"delimiter,omitempty"`
+	UploadID    string              `json:"upload_id"`
+	AssetTypeID int                 `json:"asset_type_id"`
+	Mappings    AssetImportMappings `json:"mappings"`
+	CategoryMap map[string]int      `json:"category_map,omitempty"`
+	StatusMap   map[string]int      `json:"status_map,omitempty"`
+	HasHeader   bool                `json:"has_header"`
+	Delimiter   string              `json:"delimiter,omitempty"`
 }
 
 // AssetImportMappings maps CSV columns to asset fields.
@@ -143,7 +142,11 @@ func (h *AssetHandler) UploadCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	destPath := filepath.Join(importDir, safeFilename)
+	destPath, err := securejoin.SecureJoin(importDir, safeFilename)
+	if err != nil {
+		respondBadRequest(w, r, "Invalid file path")
+		return
+	}
 	destFile, err := os.Create(destPath)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to create temp file: %w", err))
@@ -179,7 +182,7 @@ func (h *AssetHandler) UploadCSV(w http.ResponseWriter, r *http.Request) {
 	headers, previewRows, totalRows, err := h.parseCSVPreview(destPath, delimiter, hasHeader, 5)
 	if err != nil {
 		// Clean up on error
-		os.RemoveAll(importDir)
+		_ = os.RemoveAll(importDir)
 		respondBadRequest(w, r, fmt.Sprintf("Failed to parse CSV: %v", err))
 		return
 	}
@@ -482,7 +485,7 @@ func (h *AssetHandler) executeCSVImport(jobID string, setID int, req StartAssetI
 	h.updateImportJobStatus(jobID, "running", "initializing", nil, "")
 
 	// Open CSV file
-	f, err := os.Open(filePath)
+	f, err := os.Open(filePath) //nolint:gosec // filePath from trusted internal import job state
 	if err != nil {
 		h.updateImportJobStatus(jobID, "failed", "", nil, fmt.Sprintf("Failed to open CSV file: %v", err))
 		return
@@ -546,13 +549,13 @@ func (h *AssetHandler) executeCSVImport(jobID string, setID int, req StartAssetI
 	progress.TotalRows = totalRows
 
 	// Reset file position
-	f.Seek(0, 0)
+	_, _ = f.Seek(0, 0)
 	reader = csv.NewReader(f)
 	reader.Comma = delimiter
 	reader.LazyQuotes = true
 	reader.TrimLeadingSpace = true
 	if req.HasHeader {
-		reader.Read() // skip header again
+		_, _ = reader.Read() // skip header again
 	}
 
 	h.updateImportJobProgress(jobID, progress)
@@ -597,7 +600,7 @@ func (h *AssetHandler) executeCSVImport(jobID string, setID int, req StartAssetI
 	h.updateImportJobStatus(jobID, "completed", "completed", progress, "")
 
 	// Clean up temp file
-	importDir := filepath.Dir(filePath)
+	importDir := filepath.Dir(filePath) //nolint:gosec // filePath from trusted internal import job state
 	if err := os.RemoveAll(importDir); err != nil {
 		slog.Error("Failed to clean up import temp files", "dir", importDir, "error", err)
 	}
@@ -741,11 +744,11 @@ type SuggestedField struct {
 
 // CreateTypeFromImportRequest is the request body for creating a type with fields during import.
 type CreateTypeFromImportRequest struct {
-	Name        string                       `json:"name"`
-	Description string                       `json:"description"`
-	Icon        string                       `json:"icon"`
-	Color       string                       `json:"color"`
-	Fields      []CreateTypeFromImportField  `json:"fields"`
+	Name        string                      `json:"name"`
+	Description string                      `json:"description"`
+	Icon        string                      `json:"icon"`
+	Color       string                      `json:"color"`
+	Fields      []CreateTypeFromImportField `json:"fields"`
 }
 
 // CreateTypeFromImportField represents a field to create/associate with the new type.
@@ -1139,7 +1142,7 @@ func cleanHeaderName(header string) string {
 	// Title-case each word
 	words := strings.Fields(s)
 	for i, w := range words {
-		if len(w) > 0 {
+		if w != "" {
 			runes := []rune(w)
 			runes[0] = unicode.ToUpper(runes[0])
 			words[i] = string(runes)
@@ -1310,7 +1313,7 @@ func detectHeaderMismatch(headers []string, previewRows [][]string, hasHeader bo
 		if headerKeywords[strings.ToLower(v)] {
 			keywordMatches++
 		}
-		if len(v) <= 30 && !numericPattern.MatchString(v) && len(v) > 0 {
+		if len(v) <= 30 && !numericPattern.MatchString(v) && v != "" {
 			shortNonNumeric++
 		}
 	}
@@ -1338,14 +1341,4 @@ func detectHeaderMismatch(headers []string, previewRows [][]string, hasHeader bo
 	}
 
 	return ""
-}
-
-// generateUniqueFilename creates a random filename preserving the extension.
-func generateImportFilename(originalFilename string) (string, error) {
-	ext := filepath.Ext(originalFilename)
-	randomBytes := make([]byte, 16)
-	if _, err := rand.Read(randomBytes); err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%x%s", randomBytes, ext), nil
 }

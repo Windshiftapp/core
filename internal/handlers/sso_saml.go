@@ -210,6 +210,18 @@ func (h *SSOHandler) SAMLAssertionConsumerService(w http.ResponseWriter, r *http
 	}
 
 	user := result.User
+
+	// If IdP verified the email, update our DB to reflect that
+	if !result.NeedsEmailVerification && !user.EmailVerified {
+		if h.emailVerificationService != nil {
+			if err := h.emailVerificationService.SetEmailVerified(user.ID, true); err != nil {
+				slog.Warn("failed to set email verified from IdP", slog.String("component", "sso"), slog.Int("user_id", user.ID), slog.Any("error", err))
+			} else {
+				user.EmailVerified = true
+			}
+		}
+	}
+
 	if !user.IsActive {
 		h.redirectWithError(w, r, "Account is disabled")
 		return

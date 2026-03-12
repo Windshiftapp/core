@@ -292,7 +292,7 @@ func (p *PostgresDB) Initialize() error {
 			},
 			{
 				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='customer_organisations' AND column_name='custom_field_values' AND data_type='jsonb'",
-				alter: "ALTER TABLE customer_organisations ALTER COLUMN custom_field_values TYPE JSONB USING custom_field_values::jsonb",
+				alter: "ALTER TABLE customer_organisations ALTER COLUMN custom_field_values TYPE JSONB USING custom_field_values::jsonb", //nolint:misspell // actual table name
 			},
 		}
 

@@ -27,7 +27,7 @@ type assetTypeUsage struct {
 
 type customFieldWithUsage struct {
 	models.CustomFieldDefinition
-	AssetTypeUsages []assetTypeUsage        `json:"asset_type_usages"`
+	AssetTypeUsages []assetTypeUsage             `json:"asset_type_usages"`
 	Indexed         *models.CustomFieldIndexInfo `json:"indexed,omitempty"`
 }
 
@@ -38,7 +38,7 @@ type indexCountInfo struct {
 
 type customFieldsResponse struct {
 	Data        []customFieldWithUsage    `json:"data"`
-	IndexCounts map[string]indexCountInfo  `json:"index_counts"`
+	IndexCounts map[string]indexCountInfo `json:"index_counts"`
 }
 
 // indexable field types that benefit from B-tree indexes
@@ -405,7 +405,6 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	oldCF.Description = oldDescription.String
 	if oldOptionsJSON.Valid {
 		oldCF.Options = oldOptionsJSON.String
 	}

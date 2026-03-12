@@ -1175,7 +1175,9 @@ func (h *AIHandler) AnalyzeDependencies(w http.ResponseWriter, r *http.Request) 
 		strings.Join(iterPlaceholders, ","),
 		strings.Join(wsPlaceholders, ","))
 
-	queryArgs := append(iterIDs, wsArgs...)
+	queryArgs := make([]interface{}, 0, len(iterIDs)+len(wsArgs))
+	queryArgs = append(queryArgs, iterIDs...)
+	queryArgs = append(queryArgs, wsArgs...)
 	rows, err := h.db.Query(query, queryArgs...)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to query iteration items: %w", err))
@@ -1223,7 +1225,9 @@ func (h *AIHandler) AnalyzeDependencies(w http.ResponseWriter, r *http.Request) 
 		  AND source_id IN (%s) AND target_id IN (%s)`,
 		strings.Join(itemIDPlaceholders, ","),
 		strings.Join(itemIDPlaceholders, ","))
-	linkArgs := append(itemIDs, itemIDs...)
+	linkArgs := make([]interface{}, 0, len(itemIDs)*2)
+	linkArgs = append(linkArgs, itemIDs...)
+	linkArgs = append(linkArgs, itemIDs...)
 	linkRows, err := h.db.Query(linkQuery, linkArgs...)
 	if err == nil {
 		defer func() { _ = linkRows.Close() }()
@@ -1336,7 +1340,7 @@ Return a JSON object with:
 	// Resolve LLM client
 	var connectionID int
 	if cidStr := r.URL.Query().Get("connection_id"); cidStr != "" {
-		fmt.Sscan(cidStr, &connectionID) //nolint:errcheck
+		fmt.Sscan(cidStr, &connectionID) //nolint:errcheck // best-effort parse, zero-value fallback is fine
 	}
 
 	llmClient, err := h.llmManager.Resolve(connectionID)

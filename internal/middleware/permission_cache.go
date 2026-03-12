@@ -35,7 +35,7 @@ func (pm *CachedPermissionMiddleware) RequireGlobalPermission(permissionKey stri
 			// Check permission using cached service
 			hasPermission, err := pm.permissionService.HasGlobalPermission(user.ID, permissionKey)
 			if err != nil {
-				slog.Error("failed to check global permission", slog.Any("error", err), slog.Int("user_id", user.ID), slog.String("permission", permissionKey))
+				slog.Error("failed to check global permission", slog.Any("error", err), slog.Int("user_id", user.ID), slog.String("permission", permissionKey)) //nolint:gosec // logging internal values for debugging
 				http.Error(w, "Permission check failed", http.StatusInternalServerError)
 				return
 			}
@@ -70,7 +70,7 @@ func (pm *CachedPermissionMiddleware) RequireWorkspacePermission(permissionKey s
 			// Check permission using cached service
 			hasPermission, err := pm.permissionService.HasWorkspacePermission(user.ID, workspaceID, permissionKey)
 			if err != nil {
-				slog.Error("failed to check workspace permission", slog.Any("error", err), slog.Int("user_id", user.ID), slog.Int("workspace_id", workspaceID))
+				slog.Error("failed to check workspace permission", slog.Any("error", err), slog.Int("user_id", user.ID), slog.Int("workspace_id", workspaceID)) //nolint:gosec // logging internal values for debugging
 				http.Error(w, "Permission check failed", http.StatusInternalServerError)
 				return
 			}
