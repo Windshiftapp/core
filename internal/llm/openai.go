@@ -84,7 +84,7 @@ func (c *openaiClient) ChatCompletion(ctx context.Context, req ChatCompletionReq
 		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
 	}
 
-	resp, err := c.http.Do(httpReq)
+	resp, err := c.http.Do(httpReq) //nolint:gosec // URL from server-configured LLM endpoint
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}

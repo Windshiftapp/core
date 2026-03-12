@@ -159,9 +159,9 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		markdown.WriteString("## Blocked Tests\n\n")
 		for _, result := range results {
 			if result.Status == "blocked" {
-				markdown.WriteString(fmt.Sprintf("### ⚠️ %s\n", result.Title))
+				fmt.Fprintf(&markdown, "### ⚠️ %s\n", result.Title)
 				if result.Notes != "" {
-					markdown.WriteString(fmt.Sprintf("**Reason:** %s\n", result.Notes))
+					fmt.Fprintf(&markdown, "**Reason:** %s\n", result.Notes)
 				}
 				markdown.WriteString("\n")
 			}
@@ -195,11 +195,11 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		// Escape pipe characters in notes for markdown table
 		notes = strings.ReplaceAll(notes, "|", "\\|")
 
-		markdown.WriteString(fmt.Sprintf("| %s | %s %s | %s |\n",
+		fmt.Fprintf(&markdown, "| %s | %s %s | %s |\n",
 			result.Title,
 			statusIcon,
 			cases.Title(language.English).String(result.Status),
-			notes))
+			notes)
 	}
 
 	response := map[string]string{

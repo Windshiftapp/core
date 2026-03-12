@@ -836,7 +836,7 @@ func (g *SQLGenerator) mapAssetFieldName(fieldName string) (expr string, args []
 
 // mapItemFieldName maps QL field names to work item SQL column names
 // Supports custom fields using syntax: cf_fieldname or custom.fieldname
-func (g *SQLGenerator) mapItemFieldName(fieldName string) (string, []interface{}, error) {
+func (g *SQLGenerator) mapItemFieldName(fieldName string) (expr string, args []interface{}, err error) {
 	lowerField := strings.ToLower(fieldName)
 	prefix := g.aliasPrefix
 

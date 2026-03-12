@@ -274,10 +274,8 @@ func validateWebhookURL(rawURL string) error {
 				return fmt.Errorf("webhook URL %q resolves to private IP %s", host, ipStr)
 			}
 		}
-	} else {
-		if isPrivateIP(lower) {
-			return fmt.Errorf("webhook URL must not target private IP %s", host)
-		}
+	} else if isPrivateIP(lower) {
+		return fmt.Errorf("webhook URL must not target private IP %s", host)
 	}
 
 	return nil

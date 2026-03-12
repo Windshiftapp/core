@@ -147,7 +147,7 @@ func (h *AssetHandler) UploadCSV(w http.ResponseWriter, r *http.Request) {
 		respondBadRequest(w, r, "Invalid file path")
 		return
 	}
-	destFile, err := os.Create(destPath)
+	destFile, err := os.Create(destPath) //nolint:gosec // path sanitized by securejoin
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to create temp file: %w", err))
 		return
@@ -600,8 +600,8 @@ func (h *AssetHandler) executeCSVImport(jobID string, setID int, req StartAssetI
 	h.updateImportJobStatus(jobID, "completed", "completed", progress, "")
 
 	// Clean up temp file
-	importDir := filepath.Dir(filePath) //nolint:gosec // filePath from trusted internal import job state
-	if err := os.RemoveAll(importDir); err != nil {
+	importDir := filepath.Dir(filePath)
+	if err := os.RemoveAll(importDir); err != nil { //nolint:gosec // filePath from trusted internal import job state
 		slog.Error("Failed to clean up import temp files", "dir", importDir, "error", err)
 	}
 }
@@ -1062,7 +1062,7 @@ func (h *AssetHandler) CreateTypeFromImport(w http.ResponseWriter, r *http.Reque
 }
 
 // inferFieldType analyzes sample values and returns a suggested field type and options.
-func inferFieldType(values []string) (string, []string) {
+func inferFieldType(values []string) (fieldType string, options []string) {
 	if len(values) == 0 {
 		return "text", nil
 	}
@@ -1215,8 +1215,8 @@ func (h *AssetHandler) detectDelimiter(filePath string) rune {
 	return bestDelim
 }
 
-func (h *AssetHandler) parseCSVPreview(filePath string, delimiter rune, hasHeader bool, maxPreviewRows int) ([]string, [][]string, int, error) {
-	f, err := os.Open(filePath)
+func (h *AssetHandler) parseCSVPreview(filePath string, delimiter rune, hasHeader bool, maxPreviewRows int) (headers []string, rows [][]string, totalRows int, err error) {
+	f, err := os.Open(filePath) //nolint:gosec // filePath from trusted internal import job state
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -1227,7 +1227,6 @@ func (h *AssetHandler) parseCSVPreview(filePath string, delimiter rune, hasHeade
 	reader.LazyQuotes = true
 	reader.TrimLeadingSpace = true
 
-	var headers []string
 	var previewRows [][]string
 
 	if hasHeader {
@@ -1238,13 +1237,13 @@ func (h *AssetHandler) parseCSVPreview(filePath string, delimiter rune, hasHeade
 	}
 
 	// Read preview rows
-	totalRows := 0
+	totalRows = 0
 	for {
-		record, err := reader.Read()
-		if err == io.EOF {
+		record, readErr := reader.Read()
+		if readErr == io.EOF {
 			break
 		}
-		if err != nil {
+		if readErr != nil {
 			totalRows++
 			continue
 		}

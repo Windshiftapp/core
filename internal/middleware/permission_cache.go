@@ -105,7 +105,7 @@ func (pm *CachedPermissionMiddleware) RequireWorkspacePermissions(permissions []
 			// Check multiple permissions in single cache lookup
 			hasPerms, err := pm.permissionService.HasWorkspacePermissions(user.ID, workspaceID, permissions)
 			if err != nil {
-				slog.Error("failed to check workspace permissions", slog.Any("error", err), slog.Int("user_id", user.ID), slog.Int("workspace_id", workspaceID))
+				slog.Error("failed to check workspace permissions", slog.Any("error", err), slog.Int("user_id", user.ID), slog.Int("workspace_id", workspaceID)) //nolint:gosec // logging internal values for debugging
 				http.Error(w, "Permission check failed", http.StatusInternalServerError)
 				return
 			}
@@ -143,7 +143,7 @@ func (pm *CachedPermissionMiddleware) RequireAllWorkspacePermissions(permissions
 			// Check multiple permissions in single cache lookup
 			hasPerms, err := pm.permissionService.HasWorkspacePermissions(user.ID, workspaceID, permissions)
 			if err != nil {
-				slog.Error("failed to check workspace permissions", slog.Any("error", err), slog.Int("user_id", user.ID), slog.Int("workspace_id", workspaceID))
+				slog.Error("failed to check workspace permissions", slog.Any("error", err), slog.Int("user_id", user.ID), slog.Int("workspace_id", workspaceID)) //nolint:gosec // logging internal values for debugging
 				http.Error(w, "Permission check failed", http.StatusInternalServerError)
 				return
 			}
@@ -174,7 +174,7 @@ func (pm *CachedPermissionMiddleware) RequireSystemAdmin() func(http.Handler) ht
 			// Check if user is system admin using cached service
 			isAdmin, err := pm.permissionService.IsSystemAdmin(user.ID)
 			if err != nil {
-				slog.Error("failed to check system admin status", slog.Any("error", err), slog.Int("user_id", user.ID))
+				slog.Error("failed to check system admin status", slog.Any("error", err), slog.Int("user_id", user.ID)) //nolint:gosec // logging internal values for debugging
 				http.Error(w, "Permission check failed", http.StatusInternalServerError)
 				return
 			}

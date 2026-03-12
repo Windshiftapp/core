@@ -151,7 +151,7 @@ type Server struct {
 // It initializes all services and handlers but does not start listening.
 func New(cfg Config) (*Server, error) {
 	s := &Server{
-		config:          cfg,
+		config:            cfg,
 		scmSyncStopChan:   make(chan struct{}),
 		magicLinkStopChan: make(chan struct{}),
 		cleanupStopChan:   make(chan struct{}),

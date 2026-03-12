@@ -366,4 +366,3 @@ func (s *EnumService) Delete(id int, r *http.Request) error {
 
 	return nil
 }
-

@@ -151,7 +151,7 @@ func (g *GiteaProvider) ListRepositories(ctx context.Context, opts ListRepositor
 	}
 	g.setAuthHeader(req)
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured SCM server
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func (g *GiteaProvider) GetRepository(ctx context.Context, owner, repo string) (
 	}
 	g.setAuthHeader(req)
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured SCM server
 	if err != nil {
 		return nil, err
 	}
