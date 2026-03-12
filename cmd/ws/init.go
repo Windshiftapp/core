@@ -173,7 +173,7 @@ func generateWindshiftMD(ws *Workspace, statuses []Status, itemTypes []ItemType,
 		if s.IsCompleted {
 			isCompleted = "Yes"
 		}
-		sb.WriteString(fmt.Sprintf("| %d | %s | %s | %s | %s |\n", s.ID, s.Name, s.CategoryName, isDefault, isCompleted))
+		fmt.Fprintf(&sb, "| %d | %s | %s | %s | %s |\n", s.ID, s.Name, s.CategoryName, isDefault, isCompleted)
 	}
 	sb.WriteString("\n")
 
@@ -199,7 +199,7 @@ func generateWindshiftMD(ws *Workspace, statuses []Status, itemTypes []ItemType,
 		}
 
 		if len(initialStatuses) > 0 {
-			sb.WriteString(fmt.Sprintf("**Initial statuses:** %s\n\n", strings.Join(initialStatuses, ", ")))
+			fmt.Fprintf(&sb, "**Initial statuses:** %s\n\n", strings.Join(initialStatuses, ", "))
 		}
 
 		sb.WriteString("| From Status | Can Move To |\n")
@@ -207,7 +207,7 @@ func generateWindshiftMD(ws *Workspace, statuses []Status, itemTypes []ItemType,
 		for _, s := range statuses {
 			targets := transitionMap[s.ID]
 			if len(targets) > 0 {
-				sb.WriteString(fmt.Sprintf("| %s | %s |\n", s.Name, strings.Join(targets, ", ")))
+				fmt.Fprintf(&sb, "| %s | %s |\n", s.Name, strings.Join(targets, ", "))
 			}
 		}
 		sb.WriteString("\n")
