@@ -53,7 +53,7 @@ type AssetEvaluator struct {
 }
 
 // NewAssetEvaluator creates a new QL evaluator for assets
-func NewAssetEvaluator(setMap, workspaceMap map[string]int, customFieldMap map[string]int, dbDriver string) *AssetEvaluator {
+func NewAssetEvaluator(setMap, workspaceMap, customFieldMap map[string]int, dbDriver string) *AssetEvaluator {
 	return &AssetEvaluator{
 		sqlGenerator: NewAssetSQLGenerator(setMap, customFieldMap, dbDriver),
 		workspaceMap: workspaceMap,

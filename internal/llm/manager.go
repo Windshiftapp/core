@@ -306,4 +306,3 @@ func (m *ConnectionManager) TestConnection(id int) error {
 	defer cancel()
 	return client.Health(ctx)
 }
-

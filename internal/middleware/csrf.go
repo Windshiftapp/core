@@ -38,7 +38,7 @@ func SecFetchSiteProtection(next http.Handler) http.Handler {
 		case "":
 			// Empty header means non-browser client or proxy stripping the header.
 			// Log a warning to help diagnose misconfigured reverse proxies.
-			slog.Warn("CSRF: Sec-Fetch-Site header missing on state-changing request",
+			slog.Warn("CSRF: Sec-Fetch-Site header missing on state-changing request", //nolint:gosec // logging remote address for debugging is intentional
 				"method", r.Method,
 				"path", r.URL.Path,
 				"remote_addr", r.RemoteAddr,

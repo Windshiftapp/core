@@ -1,7 +1,12 @@
 // Asset CSV Import Store - State management for the import wizard
 // Uses Svelte 5 runes for reactivity
 
-import { assetImport as importApi, assetTypes, assetCategories, assetStatuses } from '../../../api/assets.js';
+import {
+  assetCategories,
+  assetStatuses,
+  assetTypes,
+  assetImport as importApi,
+} from '../../../api/assets.js';
 
 // Upload state
 let uploadState = $state({
@@ -175,9 +180,7 @@ export const assetImportStore = {
 
     const findColumn = (...names) => {
       for (const name of names) {
-        const idx = headers.findIndex(
-          (h) => h === name || h.includes(name) || name.includes(h)
-        );
+        const idx = headers.findIndex((h) => h === name || h.includes(name) || name.includes(h));
         if (idx >= 0) return idx;
       }
       return -1;

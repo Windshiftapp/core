@@ -41,7 +41,7 @@ func NewInnerSQLGenerator(workspaceMap map[string]int, dbDriver string) *SQLGene
 }
 
 // NewAssetSQLGenerator creates a new SQL generator for asset queries
-func NewAssetSQLGenerator(setMap map[string]int, customFieldMap map[string]int, dbDriver string) *SQLGenerator {
+func NewAssetSQLGenerator(setMap, customFieldMap map[string]int, dbDriver string) *SQLGenerator {
 	return &SQLGenerator{
 		setMap:         setMap,
 		aliasPrefix:    "",
@@ -52,7 +52,7 @@ func NewAssetSQLGenerator(setMap map[string]int, customFieldMap map[string]int, 
 }
 
 // NewInnerAssetSQLGenerator creates a new SQL generator for inner asset queries
-func NewInnerAssetSQLGenerator(setMap map[string]int, customFieldMap map[string]int, dbDriver string) *SQLGenerator {
+func NewInnerAssetSQLGenerator(setMap, customFieldMap map[string]int, dbDriver string) *SQLGenerator {
 	return &SQLGenerator{
 		setMap:         setMap,
 		aliasPrefix:    "inner_",
@@ -64,14 +64,14 @@ func NewInnerAssetSQLGenerator(setMap map[string]int, customFieldMap map[string]
 
 // jsonExtract returns the DB-appropriate expression for extracting a field from a JSON column.
 // Returns a parameterized SQL expression and its arguments to prevent injection.
-func (g *SQLGenerator) jsonExtract(column, field string) (string, []interface{}) {
+func (g *SQLGenerator) jsonExtract(column, field string) (expr string, args []interface{}) {
 	if g.dbDriver == "postgres" {
 		return fmt.Sprintf("%s->>?", column), []interface{}{field}
 	}
 	// SQLite 3.38+: ->> always returns TEXT (like PostgreSQL), avoiding type mismatch
 	// issues where json_extract returns INTEGER for numbers but TEXT for strings.
 	// NULLIF guards against empty-string data which causes "malformed JSON" errors.
-	path := fmt.Sprintf("$.\"%s\"", field)
+	path := fmt.Sprintf("$.\"%s\"", field) //nolint:gocritic // JSON path requires quoted field name
 	return fmt.Sprintf("NULLIF(%s, '') ->> '%s'", column, path), nil
 }
 
@@ -731,7 +731,7 @@ var validCustomFieldNameRegex = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_ -]*$`)
 
 // mapFieldName maps QL field names to SQL column names
 // Dispatches to entity-specific mapping based on entityType
-func (g *SQLGenerator) mapFieldName(fieldName string) (string, []interface{}, error) {
+func (g *SQLGenerator) mapFieldName(fieldName string) (expr string, args []interface{}, err error) {
 	if g.entityType == EntityTypeAsset {
 		return g.mapAssetFieldName(fieldName)
 	}
@@ -740,7 +740,7 @@ func (g *SQLGenerator) mapFieldName(fieldName string) (string, []interface{}, er
 
 // mapAssetFieldName maps QL field names to asset SQL column names
 // Supports custom fields using syntax: cf_fieldname or custom.fieldname
-func (g *SQLGenerator) mapAssetFieldName(fieldName string) (string, []interface{}, error) {
+func (g *SQLGenerator) mapAssetFieldName(fieldName string) (expr string, args []interface{}, err error) {
 	lowerField := strings.ToLower(fieldName)
 	prefix := g.aliasPrefix
 

@@ -490,23 +490,6 @@ func (h *WorkspaceRoleHandler) GetWorkspaceRoleAssignments(w http.ResponseWriter
 	_ = json.NewEncoder(w).Encode(users)
 }
 
-func (h *WorkspaceRoleHandler) getWorkspaceRoleByID(roleID int) (*models.WorkspaceRole, error) {
-	db, err := h.getReadDB()
-	if err != nil {
-		return nil, err
-	}
-	var role models.WorkspaceRole
-	err = db.QueryRow(`
-		SELECT id, name, description, is_system, display_order, created_at, updated_at
-		FROM workspace_roles
-		WHERE id = ?
-	`, roleID).Scan(&role.ID, &role.Name, &role.Description, &role.IsSystem, &role.DisplayOrder, &role.CreatedAt, &role.UpdatedAt)
-	if err != nil {
-		return nil, err
-	}
-	return &role, nil
-}
-
 // getSessionUserID extracts user ID from session context
 func (h *WorkspaceRoleHandler) getSessionUserID(r *http.Request) int {
 	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {

@@ -1,4 +1,4 @@
-import { fetchAPI, API_BASE } from './core.js';
+import { API_BASE, fetchAPI } from './core.js';
 
 export const assetSets = {
   getAll: () => fetchAPI('/asset-sets'),
