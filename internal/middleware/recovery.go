@@ -15,7 +15,7 @@ func Recovery(next http.Handler) http.Handler {
 		defer func() {
 			if err := recover(); err != nil {
 				// Log the panic with stack trace
-				slog.Error("panic recovered",
+				slog.Error("panic recovered", //nolint:gosec // logging panic recovery info for debugging
 					slog.Any("error", err),
 					slog.String("path", r.URL.Path),
 					slog.String("method", r.Method),

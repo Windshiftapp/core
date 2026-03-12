@@ -209,7 +209,7 @@ func (pm *CachedPermissionMiddleware) RequireAnyWorkspaceAccess() func(http.Hand
 			// Check if user has any workspace access (admin override handled in service)
 			hasAccess, err := pm.hasAnyWorkspaceAccess(user.ID, workspaceID)
 			if err != nil {
-				slog.Error("failed to check workspace access", slog.Any("error", err), slog.Int("user_id", user.ID), slog.Int("workspace_id", workspaceID))
+				slog.Error("failed to check workspace access", slog.Any("error", err), slog.Int("user_id", user.ID), slog.Int("workspace_id", workspaceID)) //nolint:gosec // logging internal values for debugging
 				http.Error(w, "Permission check failed", http.StatusInternalServerError)
 				return
 			}
