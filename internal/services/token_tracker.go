@@ -3,7 +3,6 @@ package services
 import (
 	"fmt"
 	"log/slog"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -22,40 +21,35 @@ func DefaultTokenTrackerConfig() TokenTrackerConfig {
 	}
 }
 
+// tokenUpdateEntry represents a token usage update queued for DB persistence
+type tokenUpdateEntry struct {
+	TokenID    int
+	LastUsedAt time.Time
+}
+
 // TokenTracker handles batched updates of API token last_used_at timestamps
 // This prevents database write contention by buffering updates and flushing periodically
 type TokenTracker struct {
-	db     database.Database
-	config TokenTrackerConfig
-
-	// Pending token updates (buffered for batch write)
-	pendingTokens map[int]time.Time // tokenID -> last_used_at
-	pendingMu     sync.RWMutex
+	db      database.Database
+	batcher *WriteBatcher[tokenUpdateEntry]
 
 	// Statistics
 	updates int64
-	flushes int64
-	errors  int64
-
-	// Flush ticker
-	flushTicker *time.Ticker
-	stopChan    chan struct{}
-	wg          sync.WaitGroup
 }
 
 // NewTokenTracker creates a new token tracker service
-func NewTokenTracker(db database.Database, config TokenTrackerConfig) *TokenTracker {
+func NewTokenTracker(db database.Database, _ TokenTrackerConfig) *TokenTracker {
 	tracker := &TokenTracker{
-		db:            db,
-		config:        config,
-		pendingTokens: make(map[int]time.Time),
-		flushTicker:   time.NewTicker(config.FlushInterval),
-		stopChan:      make(chan struct{}),
+		db: db,
 	}
 
-	// Start periodic flush goroutine
-	tracker.wg.Add(1)
-	go tracker.periodicFlush()
+	config := WriteBatcherConfig{
+		FlushInterval: 30 * time.Second,
+		MaxBatchSize:  100,
+		Name:          "token_updates",
+	}
+	tracker.batcher = NewWriteBatcher(config, tracker.flushTokenBatch)
+	tracker.batcher.Start()
 
 	slog.Debug("TokenTracker initialized", slog.String("component", "tokens"), slog.Duration("flush_interval", config.FlushInterval))
 
@@ -65,97 +59,57 @@ func NewTokenTracker(db database.Database, config TokenTrackerConfig) *TokenTrac
 // RecordTokenUse marks a token as used (buffers for batch write)
 // This method is safe to call concurrently from multiple goroutines
 func (tt *TokenTracker) RecordTokenUse(tokenID int) {
-	tt.pendingMu.Lock()
-	tt.pendingTokens[tokenID] = time.Now()
-	tt.pendingMu.Unlock()
-
+	tt.batcher.Add(tokenUpdateEntry{
+		TokenID:    tokenID,
+		LastUsedAt: time.Now(),
+	})
 	atomic.AddInt64(&tt.updates, 1)
 }
 
-// periodicFlush runs in background goroutine
-func (tt *TokenTracker) periodicFlush() {
-	defer tt.wg.Done()
-
-	for {
-		select {
-		case <-tt.flushTicker.C:
-			if err := tt.FlushPendingUpdates(); err != nil {
-				slog.Error("Error flushing pending token updates", slog.String("component", "tokens"), slog.Any("error", err))
-			}
-		case <-tt.stopChan:
-			slog.Debug("Stopping token tracker periodic flush", slog.String("component", "tokens"))
-			return
-		}
-	}
-}
-
-// FlushPendingUpdates writes all buffered updates to database
+// FlushPendingUpdates flushes the write batcher
 func (tt *TokenTracker) FlushPendingUpdates() error {
-	tt.pendingMu.Lock()
+	return tt.batcher.Flush()
+}
 
-	// Copy and clear (prevents lock contention during database writes)
-	tokens := tt.pendingTokens
-	tt.pendingTokens = make(map[int]time.Time)
-
-	tt.pendingMu.Unlock()
-
-	if len(tokens) == 0 {
-		return nil
+// flushTokenBatch persists a batch of token updates to the database.
+// Called by WriteBatcher every 30s or when 100 items are queued.
+func (tt *TokenTracker) flushTokenBatch(entries []tokenUpdateEntry) error {
+	tx, err := tt.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
 	}
+	defer func() { _ = tx.Rollback() }()
 
-	slog.Debug("Flushing token updates to database", slog.String("component", "tokens"), slog.Int("count", len(tokens)))
-
-	// Flush each token update
-	for tokenID, lastUsedAt := range tokens {
-		if err := tt.flushTokenToDB(tokenID, lastUsedAt); err != nil {
-			slog.Error("Error flushing token update", slog.String("component", "tokens"), slog.Int("token_id", tokenID), slog.Any("error", err))
-			atomic.AddInt64(&tt.errors, 1)
+	for _, entry := range entries {
+		_, err := tx.Exec(`
+			UPDATE api_tokens
+			SET last_used_at = ?, updated_at = CURRENT_TIMESTAMP
+			WHERE id = ?
+		`, entry.LastUsedAt, entry.TokenID)
+		if err != nil {
+			return fmt.Errorf("update token last_used_at: %w", err)
 		}
 	}
 
-	atomic.AddInt64(&tt.flushes, 1)
-	return nil
-}
-
-// flushTokenToDB writes a single token update to the database
-func (tt *TokenTracker) flushTokenToDB(tokenID int, lastUsedAt time.Time) error {
-	_, err := tt.db.Exec(`
-		UPDATE api_tokens
-		SET last_used_at = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?
-	`, lastUsedAt, tokenID)
-
-	if err != nil {
-		return fmt.Errorf("failed to update token last_used_at: %w", err)
-	}
-
-	return nil
+	return tx.Commit()
 }
 
 // Close gracefully shuts down the tracker with final flush
 func (tt *TokenTracker) Close() error {
 	slog.Debug("Closing TokenTracker", slog.String("component", "tokens"))
-
-	// Stop periodic flush
-	close(tt.stopChan)
-	tt.flushTicker.Stop()
-	tt.wg.Wait()
-
-	// Final flush of pending updates
-	if err := tt.FlushPendingUpdates(); err != nil {
-		slog.Error("Error during final token tracker flush", slog.String("component", "tokens"), slog.Any("error", err))
-		return err
-	}
-
+	tt.batcher.Stop()
 	slog.Debug("TokenTracker closed successfully", slog.String("component", "tokens"))
 	return nil
 }
 
 // GetStats returns tracker statistics
 func (tt *TokenTracker) GetStats() map[string]int64 {
+	stats := tt.batcher.Stats()
 	return map[string]int64{
 		"updates": atomic.LoadInt64(&tt.updates),
-		"flushes": atomic.LoadInt64(&tt.flushes),
-		"errors":  atomic.LoadInt64(&tt.errors),
+		"flushed": stats.ItemsFlushed,
+		"flushes": stats.FlushCount,
+		"errors":  stats.FlushErrors,
+		"pending": int64(stats.Pending),
 	}
 }

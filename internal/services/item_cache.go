@@ -71,16 +71,13 @@ func DefaultItemCacheConfig() ItemCacheConfig {
 // NewItemCacheService creates a new item cache service
 func NewItemCacheService(db database.Database, config ItemCacheConfig) (*ItemCacheService, error) {
 	// Configure hierarchy cache
-	hierarchyConfig := bigcache.Config{
-		Shards:             1024,
-		LifeWindow:         config.HierarchyTTL,
-		CleanWindow:        1 * time.Minute,
-		MaxEntriesInWindow: 100000, // Support up to 100k items
-		MaxEntrySize:       4096,   // 4KB per entry
-		Verbose:            false,
-		HardMaxCacheSize:   config.MaxCacheSize / 2, // Half for hierarchy
-		OnRemove:           nil,
-	}
+	hierarchyConfig := NewBigCacheConfig(BigCacheOptions{
+		TTL:             config.HierarchyTTL,
+		MaxCacheMB:      config.MaxCacheSize / 2, // Half for hierarchy
+		MaxEntrySize:    4096,                    // 4KB per entry
+		MaxEntriesInWin: 100000,                  // Support up to 100k items
+		CleanWindow:     1 * time.Minute,
+	})
 
 	hierarchyCache, err := bigcache.New(context.Background(), hierarchyConfig)
 	if err != nil {
@@ -88,16 +85,13 @@ func NewItemCacheService(db database.Database, config ItemCacheConfig) (*ItemCac
 	}
 
 	// Configure project cache
-	projectConfig := bigcache.Config{
-		Shards:             256,
-		LifeWindow:         config.ProjectTTL,
-		CleanWindow:        5 * time.Minute,
-		MaxEntriesInWindow: 10000, // Support up to 10k workspaces
-		MaxEntrySize:       65536, // 64KB per entry (can be large for big workspaces)
-		Verbose:            false,
-		HardMaxCacheSize:   config.MaxCacheSize / 2, // Half for projects
-		OnRemove:           nil,
-	}
+	projectConfig := NewBigCacheConfig(BigCacheOptions{
+		TTL:             config.ProjectTTL,
+		MaxCacheMB:      config.MaxCacheSize / 2, // Half for projects
+		Shards:          256,
+		MaxEntrySize:    65536, // 64KB per entry (can be large for big workspaces)
+		MaxEntriesInWin: 10000, // Support up to 10k workspaces
+	})
 
 	projectCache, err := bigcache.New(context.Background(), projectConfig)
 	if err != nil {

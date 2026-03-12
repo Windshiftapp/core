@@ -274,6 +274,32 @@ func main() {
 		llmProvidersFile = envLLMProviders
 	}
 
+	// Notification tuning env vars
+	var notificationFlushInterval time.Duration
+	var notificationBatchSize int
+	var notificationSyncInterval time.Duration
+	if envVal := os.Getenv("NOTIFICATION_FLUSH_INTERVAL"); envVal != "" {
+		if parsed, err := time.ParseDuration(envVal); err == nil {
+			notificationFlushInterval = parsed
+		} else {
+			slog.Warn("invalid NOTIFICATION_FLUSH_INTERVAL, using default", "value", envVal, "error", err)
+		}
+	}
+	if envVal := os.Getenv("NOTIFICATION_BATCH_SIZE"); envVal != "" {
+		if parsed, err := strconv.Atoi(envVal); err == nil {
+			notificationBatchSize = parsed
+		} else {
+			slog.Warn("invalid NOTIFICATION_BATCH_SIZE, using default", "value", envVal, "error", err)
+		}
+	}
+	if envVal := os.Getenv("NOTIFICATION_SYNC_INTERVAL"); envVal != "" {
+		if parsed, err := time.ParseDuration(envVal); err == nil {
+			notificationSyncInterval = parsed
+		} else {
+			slog.Warn("invalid NOTIFICATION_SYNC_INTERVAL, using default", "value", envVal, "error", err)
+		}
+	}
+
 	// Validate additional proxies requires use-proxy
 	if additionalProxies != "" && !useProxy {
 		slog.Warn("--additional-proxies ignored: --use-proxy not enabled")
@@ -294,28 +320,31 @@ func main() {
 
 	// Build server configuration
 	cfg := server.Config{
-		Port:                port,
-		DBPath:              dbPath,
-		PostgresConn:        postgresConn,
-		DisableCSRF:         disableCSRF,
-		AttachmentPath:      attachmentPath,
-		AllowedHosts:        allowedHosts,
-		AllowedPort:         allowedPort,
-		UseProxy:            useProxy,
-		AdditionalProxies:   additionalProxies,
-		MaxReadConns:        maxReadConns,
-		MaxWriteConns:       maxWriteConns,
-		TLSCertPath:         tlsCertPath,
-		TLSKeyPath:          tlsKeyPath,
-		DisablePlugins:      disablePlugins,
-		EnableAdminFallback: enableAdminFallback,
-		BaseURL:             baseURL,
-		LLMEndpoint:         llmEndpoint,
-		LLMProvidersFile:    llmProvidersFile,
-		LogbookEndpoint:     logbookEndpoint,
-		SSHEnabled:          enableSSH,
-		FrontendFiles:       frontendFiles,
-		ShutdownChan:        shutdownChan,
+		Port:                      port,
+		DBPath:                    dbPath,
+		PostgresConn:              postgresConn,
+		DisableCSRF:               disableCSRF,
+		AttachmentPath:            attachmentPath,
+		AllowedHosts:              allowedHosts,
+		AllowedPort:               allowedPort,
+		UseProxy:                  useProxy,
+		AdditionalProxies:         additionalProxies,
+		MaxReadConns:              maxReadConns,
+		MaxWriteConns:             maxWriteConns,
+		TLSCertPath:               tlsCertPath,
+		TLSKeyPath:                tlsKeyPath,
+		DisablePlugins:            disablePlugins,
+		EnableAdminFallback:       enableAdminFallback,
+		BaseURL:                   baseURL,
+		LLMEndpoint:               llmEndpoint,
+		LLMProvidersFile:          llmProvidersFile,
+		LogbookEndpoint:           logbookEndpoint,
+		SSHEnabled:                enableSSH,
+		FrontendFiles:             frontendFiles,
+		ShutdownChan:              shutdownChan,
+		NotificationFlushInterval: notificationFlushInterval,
+		NotificationBatchSize:     notificationBatchSize,
+		NotificationSyncInterval:  notificationSyncInterval,
 	}
 
 	// Create and start the server

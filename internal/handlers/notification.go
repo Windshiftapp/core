@@ -13,15 +13,39 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/services"
 	"windshift/internal/utils"
 
 	"github.com/allegro/bigcache/v3"
 )
 
+// notificationWrite represents a notification queued for database persistence
+type notificationWrite struct {
+	Notification models.Notification
+	IsNew        bool // true = INSERT, false = UPDATE (e.g. read status change)
+}
+
+// NotificationManagerConfig holds tuning parameters for the notification manager.
+type NotificationManagerConfig struct {
+	FlushInterval time.Duration // WriteBatcher flush interval (default: 30s)
+	MaxBatchSize  int           // WriteBatcher max batch size (default: 50)
+	SyncInterval  time.Duration // Periodic consistency check interval (default: 2min)
+}
+
+// DefaultNotificationManagerConfig returns a config with sensible defaults.
+func DefaultNotificationManagerConfig() NotificationManagerConfig {
+	return NotificationManagerConfig{
+		FlushInterval: 30 * time.Second,
+		MaxBatchSize:  50,
+		SyncInterval:  2 * time.Minute,
+	}
+}
+
 // NotificationManager handles notification caching and persistence
 type NotificationManager struct {
 	cache      *bigcache.BigCache
 	db         database.Database
+	batcher    *services.WriteBatcher[notificationWrite]
 	syncTicker *time.Ticker
 	stopChan   chan struct{}
 	mu         sync.RWMutex
@@ -39,19 +63,14 @@ type NotificationHandler struct {
 }
 
 // NewNotificationManager creates a new notification manager with BigCache
-func NewNotificationManager(db database.Database) (*NotificationManager, error) {
-	config := bigcache.Config{
-		Shards:             1024,
-		LifeWindow:         24 * time.Hour, // Keep notifications for 24 hours in cache
-		CleanWindow:        5 * time.Minute,
-		MaxEntriesInWindow: 1000 * 10 * 60, // 10 minutes * 1000 entries per minute
-		MaxEntrySize:       1024,           // 1KB per entry
-		Verbose:            false,
-		HardMaxCacheSize:   512, // 512 MB
-		OnRemove:           nil,
-	}
+func NewNotificationManager(db database.Database, nmCfg NotificationManagerConfig) (*NotificationManager, error) {
+	cacheConfig := services.NewBigCacheConfig(services.BigCacheOptions{
+		TTL:          24 * time.Hour,
+		MaxCacheMB:   512,
+		MaxEntrySize: 1024, // 1KB per entry
+	})
 
-	cache, err := bigcache.New(context.Background(), config)
+	cache, err := bigcache.New(context.Background(), cacheConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create BigCache: %w", err)
 	}
@@ -59,11 +78,19 @@ func NewNotificationManager(db database.Database) (*NotificationManager, error) 
 	manager := &NotificationManager{
 		cache:      cache,
 		db:         db,
-		syncTicker: time.NewTicker(10 * time.Minute), // Sync every 10 minutes
+		syncTicker: time.NewTicker(nmCfg.SyncInterval),
 		stopChan:   make(chan struct{}),
 	}
 
-	// Start periodic sync goroutine
+	batcherConfig := services.WriteBatcherConfig{
+		FlushInterval: nmCfg.FlushInterval,
+		MaxBatchSize:  nmCfg.MaxBatchSize,
+		Name:          "notifications",
+	}
+	manager.batcher = services.NewWriteBatcher(batcherConfig, manager.flushNotificationBatch)
+	manager.batcher.Start()
+
+	// Start periodic sync goroutine (consistency check, reconciles temp IDs)
 	go manager.periodicSync()
 
 	return manager, nil
@@ -152,6 +179,12 @@ func (nm *NotificationManager) AddNotification(notification models.Notification)
 		return err
 	}
 
+	// Queue for durable DB persistence via WriteBatcher
+	nm.batcher.Add(notificationWrite{
+		Notification: notification,
+		IsNew:        true,
+	})
+
 	slog.Debug("successfully added notification", slog.String("component", "notifications"), slog.Int("user_id", notification.UserID), slog.Int("cache_size", len(cache.Notifications)))
 	return nil
 }
@@ -184,12 +217,22 @@ func (nm *NotificationManager) MarkAsRead(userID, notificationID int) error {
 
 	// Find and update notification
 	for i := range cache.Notifications {
-		if cache.Notifications[i].ID == notificationID {
-			cache.Notifications[i].Read = true
-			cache.Notifications[i].UpdatedAt = time.Now()
-			cache.IsDirty = true
-			break
+		if cache.Notifications[i].ID != notificationID {
+			continue
 		}
+
+		cache.Notifications[i].Read = true
+		cache.Notifications[i].UpdatedAt = time.Now()
+		cache.IsDirty = true
+
+		// Queue read-status update for DB persistence (only for real DB IDs)
+		if notificationID <= int(time.Now().Unix()) {
+			nm.batcher.Add(notificationWrite{
+				Notification: cache.Notifications[i],
+				IsNew:        false,
+			})
+		}
+		break
 	}
 
 	// Update cache
@@ -255,7 +298,7 @@ func (nm *NotificationManager) loadNotificationsFromDB(userID, limit, offset int
 	return notifications, nil
 }
 
-// periodicSync runs every 10 minutes to sync dirty cache entries to database
+// periodicSync runs periodically to sync any remaining dirty cache entries to database (consistency check)
 func (nm *NotificationManager) periodicSync() {
 	for {
 		select {
@@ -368,11 +411,48 @@ func (nm *NotificationManager) syncUserNotifications(_ int, notifications []mode
 	return tx.Commit()
 }
 
+// flushNotificationBatch persists a batch of notifications to the database.
+// Called by WriteBatcher every 30s or when 50 items are queued.
+func (nm *NotificationManager) flushNotificationBatch(items []notificationWrite) error {
+	tx, err := nm.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	for _, item := range items {
+		n := item.Notification
+		if item.IsNew {
+			// INSERT new notification (omit ID to let DB auto-assign)
+			_, err := tx.Exec(`
+				INSERT INTO notifications (user_id, title, message, type, timestamp, read, avatar, action_url, metadata, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			`, n.UserID, n.Title, n.Message, n.Type, n.Timestamp, n.Read,
+				nullableString(n.Avatar), nullableString(n.ActionURL),
+				nullableString(n.Metadata), n.CreatedAt, n.UpdatedAt)
+			if err != nil {
+				return fmt.Errorf("insert notification: %w", err)
+			}
+		} else {
+			// UPDATE existing notification (read status change)
+			_, err := tx.Exec(`
+				UPDATE notifications SET read = ?, updated_at = ? WHERE id = ? AND user_id = ?
+			`, n.Read, n.UpdatedAt, n.ID, n.UserID)
+			if err != nil {
+				return fmt.Errorf("update notification: %w", err)
+			}
+		}
+	}
+
+	return tx.Commit()
+}
+
 // Stop stops the notification manager
 func (nm *NotificationManager) Stop() {
 	nm.syncTicker.Stop()
 	close(nm.stopChan)
-	nm.syncCacheToDatabase() // Final sync
+	nm.batcher.Stop()        // Flush remaining batched writes
+	nm.syncCacheToDatabase() // Final consistency sync
 	_ = nm.cache.Close()
 }
 

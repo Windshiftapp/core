@@ -149,15 +149,7 @@ func (h *SCMProviderHandler) refreshOAuthTokenIfNeeded(
 			return "", fmt.Errorf("failed to refresh token: %w", err)
 		}
 	case models.SCMProviderTypeGitHub:
-		var provider *scm.GitHubProvider
-		provider, err = scm.NewGitHubProvider(cfg)
-		if err != nil {
-			return "", fmt.Errorf("failed to create provider for refresh: %w", err)
-		}
-		newTokens, err = provider.RefreshToken(ctx, refreshToken)
-		if err != nil {
-			return "", fmt.Errorf("failed to refresh token: %w", err)
-		}
+		return "", fmt.Errorf("token refresh not supported for GitHub OAuth")
 	default:
 		return "", fmt.Errorf("token refresh not supported for provider type: %s", providerType)
 	}
