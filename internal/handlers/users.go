@@ -752,12 +752,7 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, execErr := h.db.ExecWrite("DELETE FROM users WHERE id = ?", id); execErr != nil {
-		respondInternalError(w, r, execErr)
-		return
-	}
-
-	// Log audit event (currentUser already fetched above)
+	// Log audit event before anonymization so we capture the original details
 	if currentUser != nil {
 		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
@@ -775,6 +770,11 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 			},
 			Success: true,
 		})
+	}
+
+	if err := services.OffboardUser(h.db, id); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)

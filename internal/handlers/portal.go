@@ -1446,7 +1446,7 @@ func (h *PortalHandler) DownloadPortalAttachment(w http.ResponseWriter, r *http.
 	}
 
 	// Open and serve the file
-	file, err := os.Open(filePath)
+	file, err := os.Open(filePath) //nolint:gosec // G304 — filePath validated via filepath.Abs prefix check above
 	if err != nil {
 		slog.Error("failed to open attachment file", slog.String("component", "portal"), slog.String("path", filePath), slog.Any("error", err))
 		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "File not found"))

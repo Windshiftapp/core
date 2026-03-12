@@ -44,7 +44,7 @@ type providersFile struct {
 
 // LoadProviders reads and parses an LLM providers JSON file.
 func LoadProviders(filePath string) error {
-	data, err := os.ReadFile(filePath)
+	data, err := os.ReadFile(filePath) //nolint:gosec // G304 — filePath from trusted CLI flag (-llm-providers)
 	if err != nil {
 		return fmt.Errorf("read providers file: %w", err)
 	}

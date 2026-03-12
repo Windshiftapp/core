@@ -1154,7 +1154,7 @@ func cleanHeaderName(header string) string {
 // --- CSV Helpers ---
 
 func (h *AssetHandler) detectDelimiter(filePath string) rune {
-	f, err := os.Open(filePath)
+	f, err := os.Open(filePath) //nolint:gosec // G304 — filePath sanitized via securejoin.SecureJoin
 	if err != nil {
 		return ','
 	}

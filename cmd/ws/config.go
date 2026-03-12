@@ -115,7 +115,7 @@ func saveGlobalConfig(config Config) error {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	f, err := os.Create(path)
+	f, err := os.Create(path) //nolint:gosec // G304 — path from getGlobalConfigPath() (user home dir)
 	if err != nil {
 		return fmt.Errorf("failed to create config file: %w", err)
 	}
@@ -126,7 +126,7 @@ func saveGlobalConfig(config Config) error {
 }
 
 func saveProjectConfig(config Config, path string) error {
-	f, err := os.Create(path)
+	f, err := os.Create(path) //nolint:gosec // G304 — path from CLI user's own config args
 	if err != nil {
 		return fmt.Errorf("failed to create config file: %w", err)
 	}

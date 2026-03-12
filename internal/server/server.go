@@ -85,6 +85,13 @@ type Config struct {
 	// FrontendFiles is the embedded filesystem containing frontend assets
 	FrontendFiles embed.FS
 
+	// NotificationFlushInterval is the WriteBatcher flush interval for notifications
+	NotificationFlushInterval time.Duration
+	// NotificationBatchSize is the WriteBatcher max batch size for notifications
+	NotificationBatchSize int
+	// NotificationSyncInterval is the periodic consistency check interval for notifications
+	NotificationSyncInterval time.Duration
+
 	// Testing-specific options
 	// ShutdownChan allows external control of server shutdown (for testing)
 	ShutdownChan chan os.Signal
@@ -94,11 +101,15 @@ type Config struct {
 
 // DefaultConfig returns a Config with sensible defaults.
 func DefaultConfig() Config {
+	nmDefaults := handlers.DefaultNotificationManagerConfig()
 	return Config{
-		Port:          "8080",
-		DBPath:        "windshift.db",
-		MaxReadConns:  120,
-		MaxWriteConns: 1,
+		Port:                      "8080",
+		DBPath:                    "windshift.db",
+		MaxReadConns:              120,
+		MaxWriteConns:             1,
+		NotificationFlushInterval: nmDefaults.FlushInterval,
+		NotificationBatchSize:     nmDefaults.MaxBatchSize,
+		NotificationSyncInterval:  nmDefaults.SyncInterval,
 	}
 }
 
@@ -295,7 +306,17 @@ func (s *Server) initialize() error {
 	mux := http.NewServeMux()
 
 	// Initialize notification manager
-	s.notificationManager, err = handlers.NewNotificationManager(s.db)
+	nmCfg := handlers.DefaultNotificationManagerConfig()
+	if cfg.NotificationFlushInterval > 0 {
+		nmCfg.FlushInterval = cfg.NotificationFlushInterval
+	}
+	if cfg.NotificationBatchSize > 0 {
+		nmCfg.MaxBatchSize = cfg.NotificationBatchSize
+	}
+	if cfg.NotificationSyncInterval > 0 {
+		nmCfg.SyncInterval = cfg.NotificationSyncInterval
+	}
+	s.notificationManager, err = handlers.NewNotificationManager(s.db, nmCfg)
 	if err != nil {
 		return fmt.Errorf("failed to create notification manager: %w", err)
 	}
@@ -1134,11 +1155,6 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		_ = s.notificationService.Close()
 	}
 
-	if s.notificationManager != nil {
-		slog.Info("stopping notification manager")
-		s.notificationManager.Stop()
-	}
-
 	// Stop HTTP server
 	if s.httpServer != nil {
 		s.httpServer.SetKeepAlivesEnabled(false)
@@ -1203,6 +1219,12 @@ func (s *Server) cleanup() {
 	}
 	if s.calendarFeedLimiter != nil {
 		s.calendarFeedLimiter.Stop()
+	}
+
+	// Stop notification manager (flush cached notifications to DB)
+	if s.notificationManager != nil {
+		slog.Info("stopping notification manager")
+		s.notificationManager.Stop()
 	}
 
 	// Close activity tracker

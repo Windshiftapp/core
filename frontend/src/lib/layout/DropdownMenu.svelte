@@ -170,7 +170,9 @@
           <svelte:component this={triggerIcon} class="{triggerIconClass} flex-shrink-0" />
         {/if}
       {/if}
-      <span class="{triggerAlignment === 'between' ? 'flex-1 text-left' : ''}">{triggerText}</span>
+      {#if triggerText}
+        <span class="{triggerAlignment === 'between' ? 'flex-1 text-left' : ''}">{triggerText}</span>
+      {/if}
       {#if showChevron}
         <ChevronDown class="w-3 h-3 flex-shrink-0" />
       {/if}

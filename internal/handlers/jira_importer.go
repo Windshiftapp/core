@@ -1850,7 +1850,7 @@ func (h *JiraImportHandler) importAttachments(ctx context.Context, jobID string,
 		filePath := filepath.Join(attachmentPath, storedFilename)
 
 		// Save to disk
-		file, err := os.Create(filePath)
+		file, err := os.Create(filePath) //nolint:gosec // G304 — filePath from attachmentPath + UUID + filename
 		if err != nil {
 			_ = reader.Close()
 			slog.Error("Failed to create attachment file",

@@ -290,7 +290,7 @@ func generateDefaultAliases(statuses []Status) map[string]string {
 }
 
 func updateAgentsFile(filename string) {
-	content, err := os.ReadFile(filename)
+	content, err := os.ReadFile(filename) //nolint:gosec // G304 — filename is a hardcoded literal
 	if err != nil {
 		// File doesn't exist, skip
 		return

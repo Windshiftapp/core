@@ -59,16 +59,11 @@ func DefaultPermissionCacheConfig() PermissionCacheConfig {
 // NewPermissionService creates a new permission service with caching
 func NewPermissionService(db database.Database, config PermissionCacheConfig) (*PermissionService, error) {
 	// Configure BigCache
-	cacheConfig := bigcache.Config{
-		Shards:             1024,
-		LifeWindow:         config.TTL,
-		CleanWindow:        5 * time.Minute,
-		MaxEntriesInWindow: 1000 * 10 * 60, // 10 minutes * 1000 entries per minute
-		MaxEntrySize:       8192,           // 8KB per entry (larger for permission data)
-		Verbose:            false,
-		HardMaxCacheSize:   config.MaxCacheSize, // Configurable MB
-		OnRemove:           nil,
-	}
+	cacheConfig := NewBigCacheConfig(BigCacheOptions{
+		TTL:          config.TTL,
+		MaxCacheMB:   config.MaxCacheSize,
+		MaxEntrySize: 8192, // 8KB per entry (larger for permission data)
+	})
 
 	cache, err := bigcache.New(context.Background(), cacheConfig)
 	if err != nil {

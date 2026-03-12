@@ -178,8 +178,8 @@ func (s *AttachmentSettingsService) GetStatus() (*AttachmentStatus, error) {
 		if err == nil && info.IsDir() {
 			// Try to create a test file to verify write permissions
 			testFile := filepath.Join(attachmentPath, ".write-test")
-			if f, err := os.Create(testFile); err == nil {
-				f.Close()
+			if f, err := os.Create(testFile); err == nil { //nolint:gosec // G304 — testFile from controlled filepath.Join
+				_ = f.Close()
 				_ = os.Remove(testFile)
 				status.Writable = true
 			}

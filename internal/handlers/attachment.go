@@ -862,7 +862,7 @@ func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Open thumbnail file
-	file, err := os.Open(thumbnailPath)
+	file, err := os.Open(thumbnailPath) //nolint:gosec // G304 — thumbnailPath from DB (UUID-based storage path)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to open thumbnail: %w", err))
 		return

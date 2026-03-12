@@ -55,7 +55,11 @@ type ActivityTracker struct {
 	db     database.Database
 	config ActivityTrackerConfig
 
-	// Pending activities (buffered for batch write)
+	// Write batchers for DB persistence
+	visitBatcher    *WriteBatcher[WorkspaceVisit]
+	activityBatcher *WriteBatcher[ItemActivity]
+
+	// Shadow maps for read-your-writes (visible before batcher flush)
 	pendingWorkspaceVisits map[string]*WorkspaceVisit // key: userID:workspaceID
 	pendingItemActivities  map[string]*ItemActivity   // key: userID:itemID:activityType
 	pendingMu              sync.RWMutex
@@ -65,11 +69,6 @@ type ActivityTracker struct {
 	misses  int64
 	errors  int64
 	flushes int64
-
-	// Flush ticker
-	flushTicker *time.Ticker
-	stopChan    chan struct{}
-	wg          sync.WaitGroup
 }
 
 // WorkspaceVisit tracks a workspace visit
@@ -102,16 +101,11 @@ type UserActivityCache struct {
 // NewActivityTracker creates a new activity tracker with caching
 func NewActivityTracker(db database.Database, config ActivityTrackerConfig) (*ActivityTracker, error) {
 	// Configure BigCache
-	cacheConfig := bigcache.Config{
-		Shards:             1024,
-		LifeWindow:         config.TTL,
-		CleanWindow:        5 * time.Minute,
-		MaxEntriesInWindow: 1000 * 10 * 60, // 10 minutes * 1000 entries per minute
-		MaxEntrySize:       16384,          // 16KB per entry (larger for activity data)
-		Verbose:            false,
-		HardMaxCacheSize:   config.MaxCacheSize,
-		OnRemove:           nil,
-	}
+	cacheConfig := NewBigCacheConfig(BigCacheOptions{
+		TTL:          config.TTL,
+		MaxCacheMB:   config.MaxCacheSize,
+		MaxEntrySize: 16384, // 16KB per entry (larger for activity data)
+	})
 
 	cache, err := bigcache.New(context.Background(), cacheConfig)
 	if err != nil {
@@ -124,15 +118,26 @@ func NewActivityTracker(db database.Database, config ActivityTrackerConfig) (*Ac
 		config:                 config,
 		pendingWorkspaceVisits: make(map[string]*WorkspaceVisit),
 		pendingItemActivities:  make(map[string]*ItemActivity),
-		flushTicker:            time.NewTicker(config.FlushInterval),
-		stopChan:               make(chan struct{}),
 	}
 
-	// Start periodic flush goroutine
-	tracker.wg.Add(1)
-	go tracker.periodicFlush()
+	// Create write batchers for DB persistence
+	visitConfig := WriteBatcherConfig{
+		FlushInterval: 30 * time.Second,
+		MaxBatchSize:  100,
+		Name:          "workspace_visits",
+	}
+	tracker.visitBatcher = NewWriteBatcher(visitConfig, tracker.flushWorkspaceVisitBatch)
+	tracker.visitBatcher.Start()
 
-	slog.Debug("ActivityTracker initialized", slog.String("component", "activity"), slog.Duration("flush_interval", config.FlushInterval))
+	activityConfig := WriteBatcherConfig{
+		FlushInterval: 30 * time.Second,
+		MaxBatchSize:  100,
+		Name:          "item_activities",
+	}
+	tracker.activityBatcher = NewWriteBatcher(activityConfig, tracker.flushItemActivityBatch)
+	tracker.activityBatcher.Start()
+
+	slog.Debug("ActivityTracker initialized", slog.String("component", "activity"), slog.Duration("flush_interval", visitConfig.FlushInterval))
 
 	return tracker, nil
 }
@@ -144,21 +149,31 @@ func (at *ActivityTracker) getCacheKey(userID int) string {
 
 // TrackWorkspaceVisit records a workspace visit
 func (at *ActivityTracker) TrackWorkspaceVisit(userID, workspaceID int) error {
+	now := time.Now()
 	key := fmt.Sprintf("%d:%d", userID, workspaceID)
 
+	// Update shadow map for read-your-writes
 	at.pendingMu.Lock()
 	if visit, exists := at.pendingWorkspaceVisits[key]; exists {
-		visit.VisitedAt = time.Now()
+		visit.VisitedAt = now
 		visit.VisitCount++
 	} else {
 		at.pendingWorkspaceVisits[key] = &WorkspaceVisit{
 			UserID:      userID,
 			WorkspaceID: workspaceID,
-			VisitedAt:   time.Now(),
+			VisitedAt:   now,
 			VisitCount:  1,
 		}
 	}
 	at.pendingMu.Unlock()
+
+	// Queue for DB persistence via WriteBatcher
+	at.visitBatcher.Add(WorkspaceVisit{
+		UserID:      userID,
+		WorkspaceID: workspaceID,
+		VisitedAt:   now,
+		VisitCount:  1,
+	})
 
 	// Invalidate cache for this user
 	_ = at.InvalidateUserCache(userID)
@@ -168,35 +183,43 @@ func (at *ActivityTracker) TrackWorkspaceVisit(userID, workspaceID int) error {
 
 // TrackItemActivity records an item activity (view/edit/comment)
 func (at *ActivityTracker) TrackItemActivity(userID, itemID int, activityType ActivityType) error {
+	now := time.Now()
 	key := fmt.Sprintf("%d:%d:%s", userID, itemID, activityType)
 
+	// Update shadow map for read-your-writes
 	at.pendingMu.Lock()
 	if activity, exists := at.pendingItemActivities[key]; exists {
-		activity.ActivityAt = time.Now()
+		activity.ActivityAt = now
 		activity.ActivityCount++
 	} else {
 		at.pendingItemActivities[key] = &ItemActivity{
 			UserID:        userID,
 			ItemID:        itemID,
 			ActivityType:  activityType,
-			ActivityAt:    time.Now(),
+			ActivityAt:    now,
 			ActivityCount: 1,
 		}
 	}
 	at.pendingMu.Unlock()
 
+	// Queue for DB persistence via WriteBatcher
+	at.activityBatcher.Add(ItemActivity{
+		UserID:        userID,
+		ItemID:        itemID,
+		ActivityType:  activityType,
+		ActivityAt:    now,
+		ActivityCount: 1,
+	})
+
 	// Invalidate cache for this user
 	_ = at.InvalidateUserCache(userID)
-
-	// All activities are now served from pending buffer via mergePendingActivities()
-	// No immediate flush needed - activities batch write every 5 minutes
 
 	return nil
 }
 
 // AddWatch adds a watch for an item
 func (at *ActivityTracker) AddWatch(userID, itemID int, reason string) error {
-	_, err := at.db.Exec(`
+	_, err := at.db.ExecWrite(`
 		INSERT INTO item_watches (user_id, item_id, is_active, watch_reason, created_at, updated_at)
 		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		ON CONFLICT(user_id, item_id) DO UPDATE SET
@@ -217,7 +240,7 @@ func (at *ActivityTracker) AddWatch(userID, itemID int, reason string) error {
 
 // RemoveWatch removes a watch for an item
 func (at *ActivityTracker) RemoveWatch(userID, itemID int) error {
-	_, err := at.db.Exec(`
+	_, err := at.db.ExecWrite(`
 		UPDATE item_watches
 		SET is_active = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE user_id = ? AND item_id = ?
@@ -483,95 +506,109 @@ func (at *ActivityTracker) InvalidateUserCache(userID int) error {
 	return at.cache.Delete(cacheKey)
 }
 
-// periodicFlush runs periodic flush of pending activities
-func (at *ActivityTracker) periodicFlush() {
-	defer at.wg.Done()
-
-	for {
-		select {
-		case <-at.flushTicker.C:
-			if err := at.FlushPendingActivities(); err != nil {
-				slog.Error("Error flushing pending activities", slog.String("component", "activity"), slog.Any("error", err))
-			}
-		case <-at.stopChan:
-			slog.Debug("Stopping periodic flush", slog.String("component", "activity"))
-			return
-		}
+// FlushPendingActivities flushes both write batchers
+func (at *ActivityTracker) FlushPendingActivities() error {
+	if err := at.visitBatcher.Flush(); err != nil {
+		return fmt.Errorf("flush workspace visits: %w", err)
 	}
+	if err := at.activityBatcher.Flush(); err != nil {
+		return fmt.Errorf("flush item activities: %w", err)
+	}
+	return nil
 }
 
-// FlushPendingActivities writes all pending activities to database
-func (at *ActivityTracker) FlushPendingActivities() error {
+// flushWorkspaceVisitBatch persists a batch of workspace visits to the database.
+// Called by WriteBatcher every 30s or when 100 items are queued.
+func (at *ActivityTracker) flushWorkspaceVisitBatch(visits []WorkspaceVisit) error {
+	expiresAt := time.Now().AddDate(0, 0, at.config.RetentionDays)
+
+	tx, err := at.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	for _, visit := range visits {
+		_, err := tx.Exec(`
+			INSERT INTO user_workspace_visits (user_id, workspace_id, last_visited_at, visit_count, expires_at)
+			VALUES (?, ?, ?, ?, ?)
+			ON CONFLICT(user_id, workspace_id) DO UPDATE SET
+				last_visited_at = CASE WHEN excluded.last_visited_at > user_workspace_visits.last_visited_at THEN excluded.last_visited_at ELSE user_workspace_visits.last_visited_at END,
+				visit_count = visit_count + ?,
+				expires_at = ?,
+				updated_at = CURRENT_TIMESTAMP
+		`, visit.UserID, visit.WorkspaceID, visit.VisitedAt, visit.VisitCount, expiresAt,
+			visit.VisitCount, expiresAt)
+		if err != nil {
+			return fmt.Errorf("flush workspace visit: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	// Clear flushed entries from shadow map
 	at.pendingMu.Lock()
-
-	// Copy and clear pending activities
-	workspaceVisits := at.pendingWorkspaceVisits
-	itemActivities := at.pendingItemActivities
-	at.pendingWorkspaceVisits = make(map[string]*WorkspaceVisit)
-	at.pendingItemActivities = make(map[string]*ItemActivity)
-
+	for _, visit := range visits {
+		key := fmt.Sprintf("%d:%d", visit.UserID, visit.WorkspaceID)
+		if existing, ok := at.pendingWorkspaceVisits[key]; ok {
+			if !existing.VisitedAt.After(visit.VisitedAt) {
+				delete(at.pendingWorkspaceVisits, key)
+			}
+		}
+	}
 	at.pendingMu.Unlock()
-
-	if len(workspaceVisits) == 0 && len(itemActivities) == 0 {
-		return nil
-	}
-
-	slog.Debug("Flushing activities to database", slog.String("component", "activity"), slog.Int("workspace_visits", len(workspaceVisits)), slog.Int("item_activities", len(itemActivities)))
-
-	// Flush workspace visits
-	for _, visit := range workspaceVisits {
-		if err := at.flushWorkspaceVisitToDB(visit); err != nil {
-			slog.Error("Error flushing workspace visit", slog.String("component", "activity"), slog.Any("error", err))
-			atomic.AddInt64(&at.errors, 1)
-		}
-	}
-
-	// Flush item activities
-	for _, activity := range itemActivities {
-		if err := at.flushItemActivityToDB(activity); err != nil {
-			slog.Error("Error flushing item activity", slog.String("component", "activity"), slog.Any("error", err))
-			atomic.AddInt64(&at.errors, 1)
-		}
-	}
 
 	atomic.AddInt64(&at.flushes, 1)
 	return nil
 }
 
-// flushWorkspaceVisitToDB writes a workspace visit to database
-func (at *ActivityTracker) flushWorkspaceVisitToDB(visit *WorkspaceVisit) error {
+// flushItemActivityBatch persists a batch of item activities to the database.
+// Called by WriteBatcher every 30s or when 100 items are queued.
+func (at *ActivityTracker) flushItemActivityBatch(activities []ItemActivity) error {
 	expiresAt := time.Now().AddDate(0, 0, at.config.RetentionDays)
 
-	_, err := at.db.Exec(`
-		INSERT INTO user_workspace_visits (user_id, workspace_id, last_visited_at, visit_count, expires_at)
-		VALUES (?, ?, ?, ?, ?)
-		ON CONFLICT(user_id, workspace_id) DO UPDATE SET
-			last_visited_at = ?,
-			visit_count = visit_count + ?,
-			expires_at = ?,
-			updated_at = CURRENT_TIMESTAMP
-	`, visit.UserID, visit.WorkspaceID, visit.VisitedAt, visit.VisitCount, expiresAt,
-		visit.VisitedAt, visit.VisitCount, expiresAt)
+	tx, err := at.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
 
-	return err
-}
+	for _, activity := range activities {
+		_, err := tx.Exec(`
+			INSERT INTO user_item_activities (user_id, item_id, activity_type, last_activity_at, activity_count, expires_at)
+			VALUES (?, ?, ?, ?, ?, ?)
+			ON CONFLICT(user_id, item_id, activity_type) DO UPDATE SET
+				last_activity_at = CASE WHEN excluded.last_activity_at > user_item_activities.last_activity_at THEN excluded.last_activity_at ELSE user_item_activities.last_activity_at END,
+				activity_count = activity_count + ?,
+				expires_at = ?,
+				updated_at = CURRENT_TIMESTAMP
+		`, activity.UserID, activity.ItemID, activity.ActivityType, activity.ActivityAt, activity.ActivityCount, expiresAt,
+			activity.ActivityCount, expiresAt)
+		if err != nil {
+			return fmt.Errorf("flush item activity: %w", err)
+		}
+	}
 
-// flushItemActivityToDB writes an item activity to database
-func (at *ActivityTracker) flushItemActivityToDB(activity *ItemActivity) error {
-	expiresAt := time.Now().AddDate(0, 0, at.config.RetentionDays)
+	if err := tx.Commit(); err != nil {
+		return err
+	}
 
-	_, err := at.db.Exec(`
-		INSERT INTO user_item_activities (user_id, item_id, activity_type, last_activity_at, activity_count, expires_at)
-		VALUES (?, ?, ?, ?, ?, ?)
-		ON CONFLICT(user_id, item_id, activity_type) DO UPDATE SET
-			last_activity_at = ?,
-			activity_count = activity_count + ?,
-			expires_at = ?,
-			updated_at = CURRENT_TIMESTAMP
-	`, activity.UserID, activity.ItemID, activity.ActivityType, activity.ActivityAt, activity.ActivityCount, expiresAt,
-		activity.ActivityAt, activity.ActivityCount, expiresAt)
+	// Clear flushed entries from shadow map
+	at.pendingMu.Lock()
+	for _, activity := range activities {
+		key := fmt.Sprintf("%d:%d:%s", activity.UserID, activity.ItemID, activity.ActivityType)
+		if existing, ok := at.pendingItemActivities[key]; ok {
+			if !existing.ActivityAt.After(activity.ActivityAt) {
+				delete(at.pendingItemActivities, key)
+			}
+		}
+	}
+	at.pendingMu.Unlock()
 
-	return err
+	atomic.AddInt64(&at.flushes, 1)
+	return nil
 }
 
 // CleanupExpiredActivities removes expired activity records
@@ -579,7 +616,7 @@ func (at *ActivityTracker) CleanupExpiredActivities() error {
 	now := time.Now()
 
 	// Clean up expired workspace visits
-	result, err := at.db.Exec(`DELETE FROM user_workspace_visits WHERE expires_at < ?`, now)
+	result, err := at.db.ExecWrite(`DELETE FROM user_workspace_visits WHERE expires_at < ?`, now)
 	if err != nil {
 		return fmt.Errorf("failed to clean up workspace visits: %w", err)
 	}
@@ -587,7 +624,7 @@ func (at *ActivityTracker) CleanupExpiredActivities() error {
 	slog.Debug("Cleaned up expired workspace visits", slog.String("component", "activity"), slog.Int64("deleted", deleted))
 
 	// Clean up expired item activities
-	result, err = at.db.Exec(`DELETE FROM user_item_activities WHERE expires_at < ?`, now)
+	result, err = at.db.ExecWrite(`DELETE FROM user_item_activities WHERE expires_at < ?`, now)
 	if err != nil {
 		return fmt.Errorf("failed to clean up item activities: %w", err)
 	}
@@ -598,7 +635,7 @@ func (at *ActivityTracker) CleanupExpiredActivities() error {
 	// This is a safety measure in case expiration isn't working properly
 
 	// Workspace visits: keep only last 10 per user
-	_, err = at.db.Exec(`
+	_, err = at.db.ExecWrite(`
 		DELETE FROM user_workspace_visits
 		WHERE id NOT IN (
 			SELECT id FROM (
@@ -615,7 +652,7 @@ func (at *ActivityTracker) CleanupExpiredActivities() error {
 
 	// Item activities: keep only last 50 per user per type
 	for _, activityType := range []ActivityType{ActivityView, ActivityEdit, ActivityComment} {
-		_, err = at.db.Exec(`
+		_, err = at.db.ExecWrite(`
 			DELETE FROM user_item_activities
 			WHERE activity_type = ? AND id NOT IN (
 				SELECT id FROM (
@@ -679,18 +716,10 @@ type ActivityTrackerStats struct {
 func (at *ActivityTracker) Close() error {
 	slog.Debug("Closing ActivityTracker", slog.String("component", "activity"))
 
-	// Stop periodic flush
-	close(at.stopChan)
-	at.flushTicker.Stop()
-	slog.Debug("Waiting for periodic flush goroutine", slog.String("component", "activity"))
-	at.wg.Wait()
-	slog.Debug("Periodic flush goroutine stopped", slog.String("component", "activity"))
-
-	// Final flush of pending activities
-	if err := at.FlushPendingActivities(); err != nil {
-		slog.Error("Error during final flush", slog.String("component", "activity"), slog.Any("error", err))
-	}
-	slog.Debug("Final flush complete, closing cache", slog.String("component", "activity"))
+	// Stop write batchers (flushes remaining items)
+	at.visitBatcher.Stop()
+	at.activityBatcher.Stop()
+	slog.Debug("Write batchers stopped", slog.String("component", "activity"))
 
 	// Close cache
 	err := at.cache.Close()

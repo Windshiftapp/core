@@ -188,7 +188,7 @@ Schedule tasks across the full workday, not all at the same time. Use only item 
 	// Resolve LLM client (optionally from connection_id query param)
 	var connectionID int
 	if cidStr := r.URL.Query().Get("connection_id"); cidStr != "" {
-		fmt.Sscan(cidStr, &connectionID) //nolint:errcheck // connection ID parsing is best-effort
+		fmt.Sscan(cidStr, &connectionID) //nolint:errcheck,gosec // connection ID parsing is best-effort
 	}
 
 	llmClient, err := h.llmManager.Resolve(connectionID)
@@ -845,7 +845,7 @@ func (h *AIHandler) GenerateReleaseNotes(w http.ResponseWriter, r *http.Request)
 	// Resolve LLM client
 	var connectionID int
 	if cidStr := r.URL.Query().Get("connection_id"); cidStr != "" {
-		fmt.Sscan(cidStr, &connectionID) //nolint:errcheck // connection ID parsing is best-effort
+		fmt.Sscan(cidStr, &connectionID) //nolint:errcheck,gosec // connection ID parsing is best-effort
 	}
 
 	llmClient, err := h.llmManager.Resolve(connectionID)
@@ -1340,7 +1340,7 @@ Return a JSON object with:
 	// Resolve LLM client
 	var connectionID int
 	if cidStr := r.URL.Query().Get("connection_id"); cidStr != "" {
-		fmt.Sscan(cidStr, &connectionID) //nolint:errcheck // best-effort parse, zero-value fallback is fine
+		fmt.Sscan(cidStr, &connectionID) //nolint:errcheck,gosec // best-effort parse, zero-value fallback is fine
 	}
 
 	llmClient, err := h.llmManager.Resolve(connectionID)

@@ -232,7 +232,7 @@ func (m *Manager) loadPluginsFromDir(pluginDir string) error {
 // LoadPlugin loads a single plugin from a directory and compiles its WASM.
 func (m *Manager) LoadPlugin(pluginPath string) error {
 	manifestPath := filepath.Join(pluginPath, "manifest.json")
-	manifestData, err := os.ReadFile(manifestPath)
+	manifestData, err := os.ReadFile(manifestPath) //nolint:gosec // G304 — pluginPath from os.ReadDir enumeration, hardcoded filename
 	if err != nil {
 		return fmt.Errorf("failed to read manifest.json: %w", err)
 	}
@@ -555,7 +555,7 @@ func (m *Manager) UploadPlugin(name string, zipData []byte) error {
 			return fmt.Errorf("failed to read manifest from zip: %w", err)
 		}
 		manifestData, err = io.ReadAll(rc)
-		rc.Close()
+		_ = rc.Close()
 		if err != nil {
 			return fmt.Errorf("failed to read manifest data: %w", err)
 		}
@@ -610,7 +610,7 @@ func (m *Manager) UploadPlugin(name string, zipData []byte) error {
 		}
 
 		fileData, err := io.ReadAll(rc)
-		rc.Close()
+		_ = rc.Close()
 		if err != nil {
 			return fmt.Errorf("failed to read file %s from zip: %w", file.Name, err)
 		}
@@ -726,7 +726,7 @@ func (m *Manager) GetAsset(pluginName, assetPath string) (data []byte, contentTy
 		return nil, "", fmt.Errorf("invalid asset path: %w", err)
 	}
 
-	data, err = os.ReadFile(fullPath)
+	data, err = os.ReadFile(fullPath) //nolint:gosec // G304 — fullPath sanitized via securejoin.SecureJoin
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to read asset: %w", err)
 	}
@@ -857,5 +857,5 @@ func ReadPluginFile(pluginDir, pluginName, filename string) (io.ReadCloser, erro
 		return nil, errors.New("invalid file path")
 	}
 
-	return os.Open(filePath)
+	return os.Open(filePath) //nolint:gosec // G304 — filePath sanitized via securejoin.SecureJoin
 }

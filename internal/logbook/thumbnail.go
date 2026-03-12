@@ -35,7 +35,7 @@ func GenerateThumbnail(docID, filePath, mimeType, outputDir string) (string, err
 
 // generateImageThumbnail decodes an image file and scales it to a thumbnail.
 func generateImageThumbnail(inputPath, outputPath string) error {
-	f, err := os.Open(inputPath)
+	f, err := os.Open(inputPath) //nolint:gosec // G304 — inputPath from DB-stored path (UUID dirs + filepath.Base filename)
 	if err != nil {
 		return fmt.Errorf("open image: %w", err)
 	}
@@ -64,7 +64,7 @@ func generatePDFThumbnail(inputPath, outputPath string) error {
 		return fmt.Errorf("pdftoppm: %w: %s", err, string(out))
 	}
 
-	f, err := os.Open(tmpFile)
+	f, err := os.Open(tmpFile) //nolint:gosec // G304 — tmpFile derived from outputPath (UUID-based) + hardcoded suffix
 	if err != nil {
 		return fmt.Errorf("open pdftoppm output: %w", err)
 	}
@@ -105,7 +105,7 @@ func scaleAndSaveJPEG(img image.Image, outputPath string, maxSize int) error {
 	dst := image.NewRGBA(image.Rect(0, 0, newW, newH))
 	draw.CatmullRom.Scale(dst, dst.Bounds(), img, bounds, draw.Over, nil)
 
-	out, err := os.Create(outputPath)
+	out, err := os.Create(outputPath) //nolint:gosec // G304 — outputPath from UUID-based storage path
 	if err != nil {
 		return fmt.Errorf("create thumbnail file: %w", err)
 	}
