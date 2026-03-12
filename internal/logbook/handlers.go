@@ -54,7 +54,7 @@ func respondNotFound(w http.ResponseWriter, r *http.Request) {
 }
 
 func respondInternalError(w http.ResponseWriter, r *http.Request, err error) {
-	slog.Error("internal server error",
+	slog.Error("internal server error", //nolint:gosec // logging internal error for debugging
 		slog.Any("error", err),
 		slog.String("path", r.URL.Path),
 		slog.String("method", r.Method),

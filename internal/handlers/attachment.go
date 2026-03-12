@@ -1000,7 +1000,7 @@ func (h *AttachmentHandler) generateThumbnail(originalPath, filename string) (st
 	slog.Debug("starting thumbnail generation", slog.String("component", "attachments"), slog.String("original_path", originalPath))
 
 	// Open original image
-	file, err := os.Open(originalPath)
+	file, err := os.Open(originalPath) //nolint:gosec // path from server-managed attachment storage
 	if err != nil {
 		slog.Error("failed to open image file", slog.String("component", "attachments"), slog.Any("error", err))
 		return "", err
@@ -1051,7 +1051,7 @@ func (h *AttachmentHandler) generateThumbnail(originalPath, filename string) (st
 
 	// Create thumbnail file
 	slog.Debug("creating thumbnail file", slog.String("component", "attachments"))
-	thumbnailFile, err := os.Create(thumbnailPath)
+	thumbnailFile, err := os.Create(thumbnailPath) //nolint:gosec // path derived from server-managed attachment storage
 	if err != nil {
 		slog.Error("failed to create thumbnail file", slog.String("component", "attachments"), slog.Any("error", err))
 		return "", err
