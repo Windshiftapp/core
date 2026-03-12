@@ -11,11 +11,18 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/services"
 	"windshift/internal/utils"
 )
 
 type WorkflowHandler struct {
-	db database.Database
+	db              database.Database
+	workflowService *services.WorkflowService
+}
+
+// SetWorkflowService sets the workflow service for cache invalidation
+func (h *WorkflowHandler) SetWorkflowService(ws *services.WorkflowService) {
+	h.workflowService = ws
 }
 
 func NewWorkflowHandler(db database.Database) *WorkflowHandler {
@@ -250,6 +257,11 @@ func (h *WorkflowHandler) Update(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	// Invalidate initial status cache so new items get the correct initial status
+	if h.workflowService != nil {
+		h.workflowService.InvalidateInitialStatusCache()
+	}
+
 	respondJSONOK(w, updatedWorkflow)
 }
 
@@ -423,6 +435,11 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 			Details:      map[string]interface{}{"update_type": "transitions"},
 			Success:      true,
 		})
+	}
+
+	// Invalidate initial status cache so new items get the correct initial status
+	if h.workflowService != nil {
+		h.workflowService.InvalidateInitialStatusCache()
 	}
 
 	// Return updated transitions

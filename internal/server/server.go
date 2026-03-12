@@ -119,6 +119,7 @@ type Server struct {
 	activityTracker       *services.ActivityTracker
 	tokenTracker          *services.TokenTracker
 	scmSyncStopChan       chan struct{}
+	magicLinkStopChan     chan struct{}
 	cleanupStopChan       chan struct{}
 	cleanupTicker         *time.Ticker
 	pluginManager         *plugins.Manager
@@ -151,8 +152,9 @@ type Server struct {
 func New(cfg Config) (*Server, error) {
 	s := &Server{
 		config:          cfg,
-		scmSyncStopChan: make(chan struct{}),
-		cleanupStopChan: make(chan struct{}),
+		scmSyncStopChan:   make(chan struct{}),
+		magicLinkStopChan: make(chan struct{}),
+		cleanupStopChan:   make(chan struct{}),
 	}
 
 	if err := s.initialize(); err != nil {
@@ -471,7 +473,9 @@ func (s *Server) initialize() error {
 		services.NewEnumService(s.db, services.NewStatusConfig()),
 		func() interface{} { return &models.Status{} })
 	statusHandlerLegacy := handlers.NewStatusHandler(s.db)
+	workflowService := services.NewWorkflowService(s.db)
 	workflowHandler := handlers.NewWorkflowHandler(s.db)
+	workflowHandler.SetWorkflowService(workflowService)
 	userHandler := handlers.NewUserHandler(s.db, permService)
 	groupHandler := handlers.NewGroupHandler(s.db, permService)
 	credentialHandler := handlers.NewCredentialHandler(s.db, permService, cfg.SSHEnabled)
@@ -600,6 +604,9 @@ func (s *Server) initialize() error {
 
 	// Start SCM sync scheduler
 	go s.runSCMSync(scmSyncService)
+
+	// Start magic link cleanup scheduler
+	go s.runMagicLinkCleanup(magicLinkService)
 
 	// Webhook sender
 	webhookSender := webhook.NewWebhookSender(s.db)
@@ -1092,6 +1099,9 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	safeClose(s.scmSyncStopChan)
 	s.scmSyncStopChan = nil
 
+	safeClose(s.magicLinkStopChan)
+	s.magicLinkStopChan = nil
+
 	if s.cleanupTicker != nil {
 		s.cleanupTicker.Stop()
 		s.cleanupTicker = nil
@@ -1251,6 +1261,24 @@ func (s *Server) runActivityCleanup() {
 				slog.Error("failed to cleanup expired activities", "error", err)
 			}
 		case <-s.cleanupStopChan:
+			return
+		}
+	}
+}
+
+// runMagicLinkCleanup runs periodic cleanup of expired magic link tokens.
+func (s *Server) runMagicLinkCleanup(magicLinkService *services.MagicLinkService) {
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+	slog.Info("magic link cleanup scheduler started (1-hour interval)")
+	for {
+		select {
+		case <-ticker.C:
+			if err := magicLinkService.CleanupExpiredMagicLinks(); err != nil {
+				slog.Error("magic link cleanup error", "error", err)
+			}
+		case <-s.magicLinkStopChan:
+			slog.Info("magic link cleanup scheduler stopped")
 			return
 		}
 	}
