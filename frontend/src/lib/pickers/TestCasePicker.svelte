@@ -1,11 +1,9 @@
 <script>
   import { BasePicker } from '.';
-  import { createEventDispatcher, untrack } from 'svelte';
+  import { untrack } from 'svelte';
   import { api } from '../api.js';
   import { FileText } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
-
-  const dispatch = createEventDispatcher();
 
   let {
     workspaceId,
@@ -15,7 +13,9 @@
     label = '',
     disabled = false,
     autoOpen = false,
-    class: className = ''
+    class: className = '',
+    onSelect = () => {},
+    onCancel = () => {}
   } = $props();
 
   const resolvedPlaceholder = $derived(placeholder || t('pickers.searchTestCases'));
@@ -54,11 +54,11 @@
   });
 
   function handleSelect(item) {
-    dispatch('select', item);
+    onSelect(item);
   }
 
   function handleCancel() {
-    dispatch('cancel');
+    onCancel();
   }
 </script>
 

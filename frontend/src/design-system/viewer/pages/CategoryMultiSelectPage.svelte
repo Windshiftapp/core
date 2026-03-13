@@ -1,5 +1,5 @@
 <script>
-  import CategoryMultiSelect from '../../../lib/CategoryMultiSelect.svelte'
+  import CategoryMultiSelect from '../../../lib/pickers/CategoryMultiSelect.svelte'
 
   // Mock category data
   const categories = [
@@ -46,7 +46,7 @@
         bind:selectedIds
         {categories}
         placeholder="Select categories..."
-        on_change={handleChange}
+        onChange={handleChange}
       />
     </div>
     <p class="mt-2 text-xs" style="color: var(--ds-text-subtle);">
@@ -266,7 +266,7 @@
         </thead>
         <tbody style="color: var(--ds-text-subtle);">
           <tr>
-            <td class="p-2"><code>on_change</code></td>
+            <td class="p-2"><code>onChange</code></td>
             <td class="p-2">{`({ selectedIds, added?, removed? }) => void`}</td>
             <td class="p-2">Called when selection changes. Includes which ID was added or removed.</td>
           </tr>

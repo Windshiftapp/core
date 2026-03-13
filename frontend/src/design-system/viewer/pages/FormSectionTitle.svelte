@@ -1,7 +1,7 @@
 <script>
-  import FormSectionTitle from '../../../lib/FormSectionTitle.svelte';
-  import Label from '../../../lib/Label.svelte';
-  import Input from '../../../lib/Input.svelte';
+  import FormSectionTitle from '../../../lib/layout/FormSectionTitle.svelte';
+  import Label from '../../../lib/components/Label.svelte';
+  import Input from '../../../lib/components/Input.svelte';
 </script>
 
 <div class="space-y-8">

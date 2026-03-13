@@ -1,5 +1,5 @@
 <script>
-  import LoadingState from '../../../lib/LoadingState.svelte';
+  import LoadingState from '../../../lib/components/LoadingState.svelte';
 </script>
 
 <div class="space-y-8">

@@ -567,8 +567,8 @@
   query={mentionQuery}
   position={mentionPosition}
   {isPersonalWorkspace}
-  onselect={handleMentionSelect}
-  oncancel={handleMentionCancel}
+  onSelect={handleMentionSelect}
+  onCancel={handleMentionCancel}
 />
 <!-- User Hover Card for mentions -->
 {#if hoverCardVisible}

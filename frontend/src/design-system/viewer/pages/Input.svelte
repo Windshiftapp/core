@@ -1,5 +1,5 @@
 <script>
-  import Input from '../../../lib/Input.svelte'
+  import Input from '../../../lib/components/Input.svelte'
 
   let textValue = $state('')
   let emailValue = $state('')

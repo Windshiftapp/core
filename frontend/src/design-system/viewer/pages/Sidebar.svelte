@@ -1,9 +1,9 @@
 <script>
-  import SidebarContainer from '../../../lib/SidebarContainer.svelte'
-  import SidebarHeader from '../../../lib/SidebarHeader.svelte'
-  import SidebarSection from '../../../lib/SidebarSection.svelte'
-  import SidebarItem from '../../../lib/SidebarItem.svelte'
-  import SidebarSearch from '../../../lib/SidebarSearch.svelte'
+  import SidebarContainer from '../../../lib/layout/SidebarContainer.svelte'
+  import SidebarHeader from '../../../lib/layout/SidebarHeader.svelte'
+  import SidebarSection from '../../../lib/layout/SidebarSection.svelte'
+  import SidebarItem from '../../../lib/layout/SidebarItem.svelte'
+  import SidebarSearch from '../../../lib/layout/SidebarSearch.svelte'
   import { Layers, Home, Users, FileText, Settings, HelpCircle, FolderOpen, BarChart, Inbox } from 'lucide-svelte'
 
   let searchValue = $state('')

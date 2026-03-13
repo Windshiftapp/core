@@ -1,5 +1,5 @@
 <script>
-  import SearchInput from '../../../lib/SearchInput.svelte'
+  import SearchInput from '../../../lib/components/SearchInput.svelte'
 
   let searchValue = ''
 </script>

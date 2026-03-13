@@ -249,9 +249,9 @@
       <table class="w-full text-sm">
         <thead>
           <tr style="background-color: var(--ds-interactive-subtle); border-bottom: 1px solid var(--ds-border);">
-            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">Role</th>
-            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">Effective Access</th>
-            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">Members</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">Role</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">Effective Access</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">Members</th>
           </tr>
         </thead>
         <tbody>

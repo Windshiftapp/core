@@ -2,18 +2,18 @@
   import { BasePicker } from '.';
   import { createAsyncLoader } from '../composables';
   import { api } from '../api.js';
-  import { onMount, createEventDispatcher } from 'svelte';
+  import { onMount } from 'svelte';
   import { Users } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
-
-  const dispatch = createEventDispatcher();
 
   let {
     value = $bindable(null),
     placeholder = '',
     label = '',
     disabled = false,
-    class: className = ''
+    class: className = '',
+    onSelect = () => {},
+    onCancel = () => {}
   } = $props();
 
   const resolvedPlaceholder = $derived(placeholder || t('pickers.selectGroup'));
@@ -21,14 +21,6 @@
   const groups = createAsyncLoader(() => api.get('/groups'));
 
   onMount(() => groups.load());
-
-  function handleSelect(event) {
-    dispatch('select', event.detail);
-  }
-
-  function handleCancel() {
-    dispatch('cancel');
-  }
 </script>
 
 <BasePicker
@@ -43,8 +35,8 @@
   searchFields={['group_name', 'name', 'description']}
   getValue={(group) => group?.id}
   getLabel={(group) => group?.group_name || group?.name || ''}
-  on:select={handleSelect}
-  on:cancel={handleCancel}
+  onSelect={(item) => onSelect(item)}
+  onCancel={() => onCancel()}
 >
   {#snippet itemSnippet({ item: group, isSelected })}
     <div class="flex items-center gap-3 flex-1 min-w-0">

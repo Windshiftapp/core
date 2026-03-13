@@ -1,5 +1,5 @@
 <script>
-  import Pagination from '../../../lib/Pagination.svelte'
+  import Pagination from '../../../lib/components/Pagination.svelte'
 
   let page1 = 1
   let page2 = 5

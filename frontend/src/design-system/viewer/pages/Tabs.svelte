@@ -1,5 +1,5 @@
 <script>
-  import Tabs from '../../../lib/Tabs.svelte'
+  import Tabs from '../../../lib/components/Tabs.svelte'
   import { FileText, Settings, Users, BarChart } from 'lucide-svelte'
 
   let basicActiveTab = 'tab1'

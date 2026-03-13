@@ -13,6 +13,7 @@
   import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import TableHeaderBar from '../../components/TableHeaderBar.svelte';
   import { formatDate } from '../../utils/dateFormatter.js';
   import { moduleSettings } from '../../stores/moduleSettings.js';
   import { itemTestCaseLinksStore } from '../../stores/index.js';
@@ -435,16 +436,14 @@
         <!-- Table Container -->
         <div class="rounded-xl border shadow-sm overflow-hidden" style="{styles.glassStyle(12)}">
           <!-- Table Header -->
-          <div class="border-b px-4 py-3" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
-            <div class="flex items-center gap-4 text-xs font-semibold uppercase tracking-wider" style="{styles.glassSubtleTextStyle}">
-              <div class="w-12"></div> <!-- Expand + Icon space -->
-              <div class="min-w-24">{t('collectionTree.issue')}</div>
-              <div class="flex-1">{t('common.summary')}</div>
-              <div class="w-24">{t('common.status')}</div>
-              <div class="w-20">{t('common.priority')}</div>
-              <div class="w-20">{t('common.created')}</div>
-            </div>
-          </div>
+          <TableHeaderBar columns="3rem 6rem 1fr 6rem 5rem 5rem">
+            <div></div>
+            <div>{t('collectionTree.issue')}</div>
+            <div>{t('common.summary')}</div>
+            <div>{t('common.status')}</div>
+            <div>{t('common.priority')}</div>
+            <div>{t('common.created')}</div>
+          </TableHeaderBar>
 
           <!-- Tree Items -->
           <div style="--divide-color: var(--ds-border);">

@@ -16,6 +16,7 @@
   import Pagination from '../../components/Pagination.svelte';
   import ViewHeader from '../../layout/ViewHeader.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import TableHeaderBar from '../../components/TableHeaderBar.svelte';
   import ListCellRenderer from './ListCellRenderer.svelte';
   import ColumnSelector from './ColumnSelector.svelte';
   import SubFilterBar from './SubFilterBar.svelte';
@@ -74,8 +75,20 @@
   );
 
   // Computed: Generate grid-template-columns CSS
+  const fixedColumnWidths = {
+    key: 'max-content',
+    status: '8rem',
+    priority: '7rem',
+    assignee: '9rem',
+    milestone: '12rem',
+    iteration: '9rem',
+    due_date: '7rem',
+    created_at: '7rem',
+    project: '9rem',
+  };
+
   let gridTemplateColumns = $derived(
-    listColumns.map(col => col.field_identifier === 'key' ? 'max-content' : `${col.width}fr`).join(' ') + ' auto'
+    listColumns.map(col => fixedColumnWidths[col.field_identifier] ?? `${col.width}fr`).join(' ') + ' auto'
   );
 
 
@@ -325,17 +338,15 @@
       {:else}
         <div class="rounded-xl border shadow-sm overflow-hidden" style="{styles.tableStyle(12)} {styles.hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
           <!-- Table Header -->
-          <div class="px-4 py-3 border-b" style="{styles.tableHeaderStyle} {styles.hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
-            <div
-              class="grid gap-4 text-xs font-semibold uppercase tracking-wider"
-              style="grid-template-columns: {gridTemplateColumns}; {styles.glassSubtleTextStyle}"
-            >
-              {#each listColumns as column (column.field_identifier)}
-                <div>{getColumnHeaderName(column)}</div>
-              {/each}
-              <div>{t('common.actions')}</div>
-            </div>
-          </div>
+          <TableHeaderBar
+            columns={gridTemplateColumns}
+            style="{styles.tableHeaderStyle} {styles.hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : ''}"
+          >
+            {#each listColumns as column (column.field_identifier)}
+              <div>{getColumnHeaderName(column)}</div>
+            {/each}
+            <div>{t('common.actions')}</div>
+          </TableHeaderBar>
 
           <!-- Table Body -->
           <div>

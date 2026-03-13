@@ -101,28 +101,28 @@
   <!-- Error or Empty state -->
   <div class="text-center {padding} {className}">
     {#if resolvedIcon}
-      <svelte:component this={resolvedIcon} class="w-10 h-10 mx-auto mb-3" style="color: {iconColor};" />
+      <svelte:component this={resolvedIcon} class="w-8 h-8 mx-auto mb-3" style="color: {iconColor};" />
     {/if}
 
     {#if title}
       <h3
-        class="text-lg font-medium mb-1"
+        class="text-base font-medium mb-1"
         style="color: {titleColor};"
       >
         {title}
       </h3>
     {:else if type === 'error'}
-      <h3 class="text-lg font-medium mb-1" style="color: {titleColor};">
+      <h3 class="text-base font-medium mb-1" style="color: {titleColor};">
         {t('components.errorState.title')}
       </h3>
     {:else if type === 'empty'}
-      <h3 class="text-lg font-medium mb-1" style="color: {titleColor};">
+      <h3 class="text-base font-medium mb-1" style="color: {titleColor};">
         {t('common.noData')}
       </h3>
     {/if}
 
     {#if displayMessage}
-      <p class="text-base mb-4" style="color: {messageColor};">{displayMessage}</p>
+      <p class="text-sm mb-4" style="color: {messageColor};">{displayMessage}</p>
     {/if}
 
     {#if action}

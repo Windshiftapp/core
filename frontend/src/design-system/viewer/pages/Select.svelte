@@ -1,5 +1,5 @@
 <script>
-  import Select from '../../../lib/Select.svelte'
+  import Select from '../../../lib/components/Select.svelte'
 
   let basicValue = $state('')
   let sizeValue = $state('')

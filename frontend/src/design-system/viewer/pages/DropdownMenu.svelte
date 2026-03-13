@@ -1,5 +1,5 @@
 <script>
-  import DropdownMenu from '../../../lib/DropdownMenu.svelte'
+  import DropdownMenu from '../../../lib/layout/DropdownMenu.svelte'
   import { Settings, User, LogOut, Edit, Trash2, Copy, Archive, Star, MoreHorizontal, ChevronDown, Filter } from 'lucide-svelte'
 
   let searchValue = ''

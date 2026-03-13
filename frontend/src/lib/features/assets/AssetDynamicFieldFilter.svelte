@@ -139,8 +139,8 @@
     return result;
   }
 
-  function handleFieldSelect(event) {
-    onChange({ ...filter, field: event.detail, value: '', values: [] });
+  function handleFieldSelect(field) {
+    onChange({ ...filter, field: field, value: '', values: [] });
   }
 
   function handleFieldClear() {
@@ -204,8 +204,8 @@
         placeholder="Choose field..."
         {fieldGroups}
         {customFieldItems}
-        on:select={handleFieldSelect}
-        on:clear={handleFieldClear}
+        onSelect={handleFieldSelect}
+        onClear={handleFieldClear}
       />
     </div>
   </div>

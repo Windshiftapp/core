@@ -2,18 +2,18 @@
   import { BasePicker } from '.';
   import { createAsyncLoader } from '../composables';
   import { api } from '../api.js';
-  import { onMount, createEventDispatcher } from 'svelte';
+  import { onMount } from 'svelte';
   import { Shield } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
-
-  const dispatch = createEventDispatcher();
 
   let {
     value = $bindable(null),
     placeholder = '',
     label = '',
     disabled = false,
-    class: className = ''
+    class: className = '',
+    onSelect = () => {},
+    onCancel = () => {}
   } = $props();
 
   const resolvedPlaceholder = $derived(placeholder || t('pickers.selectRole'));
@@ -21,14 +21,6 @@
   const roles = createAsyncLoader(() => api.get('/workspace-roles'));
 
   onMount(() => roles.load());
-
-  function handleSelect(event) {
-    dispatch('select', event.detail);
-  }
-
-  function handleCancel() {
-    dispatch('cancel');
-  }
 </script>
 
 <BasePicker
@@ -43,8 +35,8 @@
   searchFields={['name', 'description']}
   getValue={(role) => role?.id}
   getLabel={(role) => role?.name ?? ''}
-  on:select={handleSelect}
-  on:cancel={handleCancel}
+  onSelect={(item) => onSelect(item)}
+  onCancel={() => onCancel()}
 >
   {#snippet itemSnippet({ item: role, isSelected })}
     <div class="flex items-center gap-3 flex-1 min-w-0">

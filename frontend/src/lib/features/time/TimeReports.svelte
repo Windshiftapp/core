@@ -502,12 +502,12 @@
         <table class="w-full">
           <thead style="background-color: var(--ds-background-neutral);">
             <tr>
-              <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('common.date')}</th>
-              <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('time.reports.customer')}</th>
-              <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('time.reports.project')}</th>
-              <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('common.description')}</th>
-              <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('common.time')}</th>
-              <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('time.duration')}</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">{t('common.date')}</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">{t('time.reports.customer')}</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">{t('time.reports.project')}</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">{t('common.description')}</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">{t('common.time')}</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">{t('time.duration')}</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">

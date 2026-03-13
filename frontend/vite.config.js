@@ -53,25 +53,31 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     assetsDir: '_app',
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks: {
-          milkdown: [
-            '@milkdown/core',
-            '@milkdown/kit/core',
-            '@milkdown/kit/preset/commonmark',
-            '@milkdown/kit/preset/gfm',
-            '@milkdown/kit/plugin/listener',
-            '@milkdown/kit/plugin/upload',
-            '@milkdown/kit/utils',
-            '@milkdown/utils',
-            '@milkdown/kit/component/image-block',
-            '@milkdown/theme-nord',
+        codeSplitting: {
+          groups: [
+            {
+              name: 'milkdown',
+              test: /@milkdown/,
+            },
+            {
+              name: 'd3',
+              test: /d3-(scale|shape|time-format)/,
+            },
+            {
+              name: 'excalidraw',
+              test: /@excalidraw\/excalidraw/,
+            },
+            {
+              name: 'svelteflow',
+              test: /@xyflow\/svelte/,
+            },
+            {
+              name: 'dnd',
+              test: /@atlaskit\/pragmatic-drag-and-drop/,
+            },
           ],
-          d3: ['d3-scale', 'd3-shape', 'd3-time-format'],
-          excalidraw: ['@excalidraw/excalidraw'],
-          svelteflow: ['@xyflow/svelte'],
-          dnd: ['@atlaskit/pragmatic-drag-and-drop'],
         },
       },
     },

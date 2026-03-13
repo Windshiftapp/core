@@ -1,6 +1,6 @@
 <script>
-  import WorkspaceSelector from '../../../lib/WorkspaceSelector.svelte'
-  import Label from '../../../lib/Label.svelte'
+  import WorkspaceSelector from '../../../lib/workspaces/WorkspaceSelector.svelte'
+  import Label from '../../../lib/components/Label.svelte'
   import { Building } from 'lucide-svelte'
 
   // Mock workspace data

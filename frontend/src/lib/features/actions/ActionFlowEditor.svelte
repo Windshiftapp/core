@@ -255,8 +255,8 @@
     });
   }
 
-  function handleSetFieldSelect(e) {
-    actionFlowStore.updateNodeConfig(selectedNode.id, { field_name: e.detail.id });
+  function handleSetFieldSelect(field) {
+    actionFlowStore.updateNodeConfig(selectedNode.id, { field_name: field.id });
   }
 
   function handleSetFieldClear() {
@@ -281,9 +281,9 @@
     });
   }
 
-  function handleConditionFieldSelect(e) {
+  function handleConditionFieldSelect(field) {
     actionFlowStore.updateNodeConfig(selectedNode.id, {
-      field_name: e.detail.id
+      field_name: field.id
     });
   }
 
@@ -541,8 +541,8 @@
             <label for="config-set-field-name" class="block text-xs font-medium mb-1">{t('actions.config.fieldName')}</label>
             <FieldSelector
               selectedField={selectedNode.data?.config?.field_name ? { id: selectedNode.data.config.field_name, name: selectedNode.data.config.field_name } : null}
-              onselect={handleSetFieldSelect}
-              onclear={handleSetFieldClear}
+              onSelect={handleSetFieldSelect}
+              onClear={handleSetFieldClear}
             />
           </div>
           <div>
@@ -597,8 +597,8 @@
             <label for="config-condition-field" class="block text-xs font-medium mb-1">{t('actions.config.fieldToCheck')}</label>
             <FieldSelector
               selectedField={selectedNode.data?.config?.field_name ? { id: selectedNode.data.config.field_name, name: selectedNode.data.config.field_name } : null}
-              onselect={handleConditionFieldSelect}
-              onclear={handleConditionFieldClear}
+              onSelect={handleConditionFieldSelect}
+              onClear={handleConditionFieldClear}
             />
           </div>
           <div>

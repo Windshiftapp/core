@@ -508,8 +508,7 @@
                   config={statusConfig}
                   placeholder={t('common.select')}
                   showUnassigned={false}
-                  on:select={async (e) => {
-                    const selectedStatus = e.detail;
+                  onSelect={async (selectedStatus) => {
                     if (selectedStatus?.id && selectedStatus.id !== item.status_id) {
                       await changeItemStatus(item, selectedStatus.id, false);
                     }

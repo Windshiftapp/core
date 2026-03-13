@@ -1,5 +1,5 @@
 <script>
-  import ItemKey from '../../../lib/ItemKey.svelte'
+  import ItemKey from '../../../lib/features/items/ItemKey.svelte'
 </script>
 
 <div class="p-8 max-w-6xl">

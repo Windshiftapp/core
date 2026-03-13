@@ -1,8 +1,8 @@
 <script>
-  import FormField from '../../../lib/FormField.svelte'
-  import Input from '../../../lib/Input.svelte'
-  import Select from '../../../lib/Select.svelte'
-  import Textarea from '../../../lib/Textarea.svelte'
+  import FormField from '../../../lib/components/FormField.svelte'
+  import Input from '../../../lib/components/Input.svelte'
+  import Select from '../../../lib/components/Select.svelte'
+  import Textarea from '../../../lib/components/Textarea.svelte'
 </script>
 
 <div class="p-8 max-w-6xl">

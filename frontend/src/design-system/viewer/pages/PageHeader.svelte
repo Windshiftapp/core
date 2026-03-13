@@ -1,6 +1,6 @@
 <script>
-  import PageHeader from '../../../lib/PageHeader.svelte'
-  import Button from '../../../lib/Button.svelte'
+  import PageHeader from '../../../lib/layout/PageHeader.svelte'
+  import Button from '../../../lib/components/Button.svelte'
   import { LayoutDashboard, Users, FileText, Settings, Plus, Download, Filter } from 'lucide-svelte'
 </script>
 

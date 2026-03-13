@@ -256,10 +256,10 @@
           <table class="w-full">
             <thead style="background-color: var(--ds-background-neutral);">
               <tr>
-                <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">Project</th>
-                <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">Status</th>
-                <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">Created</th>
-                <th class="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">Actions</th>
+                <th class="px-6 py-4 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">Project</th>
+                <th class="px-6 py-4 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">Status</th>
+                <th class="px-6 py-4 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">Created</th>
+                <th class="px-6 py-4 text-right text-xs font-semibold tracking-wide" style="color: var(--ds-text);">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y" style="divide-color: var(--ds-border);">

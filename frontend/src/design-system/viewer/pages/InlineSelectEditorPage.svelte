@@ -1,5 +1,5 @@
 <script>
-  import InlineSelectEditor from '../../../lib/InlineSelectEditor.svelte'
+  import InlineSelectEditor from '../../../lib/editors/InlineSelectEditor.svelte'
 
   // Mock options for demos
   const statusOptions = [

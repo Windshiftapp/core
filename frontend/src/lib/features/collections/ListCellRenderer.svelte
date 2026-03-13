@@ -200,8 +200,8 @@
           placeholder="Set status"
           showUnassigned={false}
           allowClear={false}
-          on:select={async (e) => {
-            const statusId = e.detail?.id;
+          onSelect={async (selected) => {
+            const statusId = selected?.id;
             if (statusId && statusId !== item.status_id) {
               await handleItemUpdate('status_id', statusId);
             }
@@ -236,8 +236,8 @@
         showUnassigned={true}
         unassignedLabel="No priority"
         allowClear={true}
-        on:select={async (e) => {
-          const priorityId = e.detail?.id || null;
+        onSelect={async (selected) => {
+          const priorityId = selected?.id || null;
           await handleItemUpdate('priority_id', priorityId);
         }}
       >
@@ -329,8 +329,8 @@
         showUnassigned={true}
         unassignedLabel="No milestone"
         allowClear={true}
-        on:select={async (e) => {
-          const milestoneId = e.detail?.id || null;
+        onSelect={async (selected) => {
+          const milestoneId = selected?.id || null;
           await handleItemUpdate('milestone_id', milestoneId);
         }}
       >
@@ -371,8 +371,8 @@
         showUnassigned={true}
         unassignedLabel="No iteration"
         allowClear={true}
-        on:select={async (e) => {
-          const iterationId = e.detail?.id || null;
+        onSelect={async (selected) => {
+          const iterationId = selected?.id || null;
           await handleItemUpdate('iteration_id', iterationId);
         }}
       >
@@ -446,8 +446,8 @@
         showUnassigned={true}
         unassignedLabel="No project"
         allowClear={true}
-        on:select={async (e) => {
-          const projectId = e.detail?.id || null;
+        onSelect={async (selected) => {
+          const projectId = selected?.id || null;
           await handleItemUpdate('project_id', projectId);
         }}
       >

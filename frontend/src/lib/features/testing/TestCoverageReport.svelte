@@ -355,17 +355,18 @@
       <p style="color: var(--ds-text-subtle);">{t('testing.loadingCoverageData')}</p>
     </div>
   {:else if !config || selectedTypeIds.length === 0}
-    <div class="empty-config-state">
-      <ShieldX class="w-12 h-12" style="color: var(--ds-text-subtle); opacity: 0.5;" />
-      <p class="empty-title">{t('testing.noRequirementTypesConfigured')}</p>
-      <p class="empty-copy">
-        {t('testing.selectItemTypesForCoverage')}
-      </p>
-      <Button variant="primary" onclick={openConfigModal}>
-        <Settings class="w-4 h-4" />
-        {t('testing.configureRequirements')}
-      </Button>
-    </div>
+    <EmptyState
+      icon={ShieldX}
+      title={t('testing.noRequirementTypesConfigured')}
+      description={t('testing.selectItemTypesForCoverage')}
+    >
+      {#snippet action()}
+        <Button variant="primary" onclick={openConfigModal}>
+          <Settings class="w-4 h-4" />
+          {t('testing.configureRequirements')}
+        </Button>
+      {/snippet}
+    </EmptyState>
   {:else if !summaryData || summaryData.total === 0}
     <EmptyState
       icon={ShieldX}
@@ -564,8 +565,7 @@
     pointer-events: none;
   }
 
-  .loading-state,
-  .empty-config-state {
+  .loading-state {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -573,19 +573,6 @@
     padding: 4rem 2rem;
     text-align: center;
     gap: 0.75rem;
-  }
-
-  .empty-title {
-    font-weight: 600;
-    color: var(--ds-text);
-    margin-top: 0.5rem;
-  }
-
-  .empty-copy {
-    font-size: 0.875rem;
-    color: var(--ds-text-subtle);
-    max-width: 300px;
-    margin-bottom: 0.5rem;
   }
 
   .coverage-content {

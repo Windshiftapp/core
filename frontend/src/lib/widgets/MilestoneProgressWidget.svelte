@@ -1,5 +1,6 @@
 <script>
   import { Flag } from 'lucide-svelte';
+  import EmptyState from '../components/EmptyState.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { formatDateShort } from '../utils/dateFormatter.js';
 
@@ -156,13 +157,11 @@
       {/each}
     </div>
   {:else}
-    <div class="empty-state">
-      <Flag class="empty-icon" />
-      <p class="empty-title">{t('widgets.milestoneProgress.emptyTitle')}</p>
-      <p class="empty-copy">
-        {t('widgets.milestoneProgress.emptySubtitle')}
-      </p>
-    </div>
+    <EmptyState
+      icon={Flag}
+      title={t('widgets.milestoneProgress.emptyTitle')}
+      description={t('widgets.milestoneProgress.emptySubtitle')}
+    />
   {/if}
 </div>
 
@@ -345,37 +344,6 @@
   .legend-empty {
     font-size: 0.8rem;
     color: var(--ds-text-subtle);
-  }
-
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 2.5rem 1rem;
-    border: 1px dashed var(--ds-border);
-    border-radius: 1rem;
-    color: var(--ds-text-subtlest);
-    gap: 0.35rem;
-  }
-
-  .empty-icon {
-    width: 3rem;
-    height: 3rem;
-    opacity: 0.35;
-    display: block;
-  }
-
-  .empty-title {
-    font-weight: 600;
-    color: var(--ds-text-subtle);
-  }
-
-  .empty-copy {
-    font-size: 0.8rem;
-    color: var(--ds-text-subtle);
-    margin-top: 0.25rem;
   }
 
   @media (max-width: 768px) {

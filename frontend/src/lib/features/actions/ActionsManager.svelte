@@ -4,8 +4,9 @@
   import { confirm } from '../../composables/useConfirm.js';
   import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import Button from '../../components/Button.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import TestActionModal from './TestActionModal.svelte';
-  import { Plus, Play } from 'lucide-svelte';
+  import { Plus, Play, Zap } from 'lucide-svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
 
   export let workspaceId;
@@ -91,13 +92,12 @@
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
     </div>
   {:else if actions.length === 0}
-    <div class="empty-state text-center py-12">
-      <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-      </svg>
-      <h3 class="mt-2 text-sm font-medium">{t('actions.noActions')}</h3>
-      <p class="mt-1 text-sm text-gray-500">{t('actions.noActionsDescription')}</p>
-      <div class="mt-6">
+    <EmptyState
+      icon={Zap}
+      title={t('actions.noActions')}
+      description={t('actions.noActionsDescription')}
+    >
+      {#snippet action()}
         <Button
           variant="primary"
           icon={Plus}
@@ -106,8 +106,8 @@
         >
           {t('actions.createFirst')}
         </Button>
-      </div>
-    </div>
+      {/snippet}
+    </EmptyState>
   {:else}
     <div class="actions-list space-y-3">
       {#each actions as action}
@@ -216,10 +216,6 @@
 <style>
   .actions-manager {
     padding: 1.5rem;
-  }
-
-  .empty-state {
-    color: var(--ds-text-subtle);
   }
 
   .action-card {

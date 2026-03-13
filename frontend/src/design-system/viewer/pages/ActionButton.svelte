@@ -1,5 +1,5 @@
 <script>
-  import ActionButton from '../../../lib/ActionButton.svelte';
+  import ActionButton from '../../../lib/layout/ActionButton.svelte';
   import { Edit, Trash2, Copy, Download, Upload, RefreshCw, Settings, Plus, Eye, EyeOff, Star, Heart } from 'lucide-svelte';
 </script>
 

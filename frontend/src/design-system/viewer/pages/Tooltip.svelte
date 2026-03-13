@@ -1,6 +1,6 @@
 <script>
-  import Tooltip from '../../../lib/Tooltip.svelte'
-  import Button from '../../../lib/Button.svelte'
+  import Tooltip from '../../../lib/components/Tooltip.svelte'
+  import Button from '../../../lib/components/Button.svelte'
   import { Info, HelpCircle, Settings } from 'lucide-svelte'
 </script>
 

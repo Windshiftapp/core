@@ -119,8 +119,7 @@
     getLabel: (item) => item.name,
   };
 
-  function handleSprintPickerSelect(event) {
-    const iter = event.detail;
+  function handleSprintPickerSelect(iter) {
     if (iter?.id) {
       addGlobalIteration(iter.id);
     }
@@ -542,7 +541,11 @@
 
   // Setup drag and drop when data changes
   $effect(() => {
-    if (backlogItems.length > 0 && typeof document !== 'undefined') {
+    // Track both items and visible iterations so drag-drop re-initializes
+    // when global sprints are added/removed
+    const _items = backlogItems.length;
+    const _iterations = visibleIterations.length;
+    if (_items > 0 && typeof document !== 'undefined') {
       if (setupTimeout) clearTimeout(setupTimeout);
       setupTimeout = setTimeout(() => {
         setupDragAndDrop();
@@ -579,7 +582,7 @@
                 placeholder={t('iterations.addGlobalSprint')}
                 allowClear={false}
                 showSelectedInTrigger={false}
-                onselect={handleSprintPickerSelect}
+                onSelect={handleSprintPickerSelect}
               >
                 {#snippet children()}
                   <span

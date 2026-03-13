@@ -41,7 +41,7 @@
       showUnassigned={true}
       unassignedLabel="No {field.name.toLowerCase()}"
       allowClear={true}
-      on:select={(e) => onChange(e.detail?.id || null)}
+      onSelect={(item) => onChange(item?.id || null)}
     >
       {#snippet children()}
         {#if milestone}
@@ -79,7 +79,7 @@
       showUnassigned={true}
       unassignedLabel="No {field.name.toLowerCase()}"
       allowClear={true}
-      on:select={(e) => onChange(e.detail?.id || null)}
+      onSelect={(item) => onChange(item?.id || null)}
     >
       {#snippet children()}
         {#if iteration}

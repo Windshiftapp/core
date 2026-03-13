@@ -226,8 +226,8 @@
     : enrichedTemplates);
 
   // Handle milestone selection and update URL
-  function handleMilestoneSelect(event) {
-    selectedMilestoneFilter = event.detail.value;
+  function handleMilestoneSelect(result) {
+    selectedMilestoneFilter = result.value;
     updateURL();
   }
 
@@ -253,7 +253,7 @@
           <MilestoneCombobox
             bind:value={selectedMilestoneFilter}
             placeholder={t('milestones.allMilestones')}
-            onselect={handleMilestoneSelect}
+            onSelect={handleMilestoneSelect}
           />
         </div>
         <Button

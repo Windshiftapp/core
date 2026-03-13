@@ -1,6 +1,6 @@
 <script>
-  import SectionHeader from '../../../lib/SectionHeader.svelte'
-  import Button from '../../../lib/Button.svelte'
+  import SectionHeader from '../../../lib/layout/SectionHeader.svelte'
+  import Button from '../../../lib/components/Button.svelte'
   import { Plus, Settings, Download, Filter } from 'lucide-svelte'
 </script>
 

@@ -1,5 +1,5 @@
 <script>
-  import ItemPicker from '../../../lib/ItemPicker.svelte'
+  import ItemPicker from '../../../lib/pickers/ItemPicker.svelte'
   import { User, Folder, Tag, Calendar } from 'lucide-svelte'
 
   // Mock data for demos
@@ -335,18 +335,18 @@
       <table class="w-full text-sm">
         <thead>
           <tr style="border-bottom: 1px solid var(--ds-border);">
-            <th class="text-left p-2 font-medium" style="color: var(--ds-text);">Event</th>
+            <th class="text-left p-2 font-medium" style="color: var(--ds-text);">Callback Prop</th>
             <th class="text-left p-2 font-medium" style="color: var(--ds-text);">Description</th>
           </tr>
         </thead>
         <tbody style="color: var(--ds-text-subtle);">
           <tr style="border-bottom: 1px solid var(--ds-border);">
-            <td class="p-2"><code>on:select</code></td>
-            <td class="p-2">Fired when an item is selected, with the full item object</td>
+            <td class="p-2"><code>onSelect</code></td>
+            <td class="p-2">Called when an item is selected, receives the item object directly</td>
           </tr>
           <tr>
-            <td class="p-2"><code>on:cancel</code></td>
-            <td class="p-2">Fired when the popover closes without a selection</td>
+            <td class="p-2"><code>onCancel</code></td>
+            <td class="p-2">Called when the popover closes without a selection</td>
           </tr>
         </tbody>
       </table>

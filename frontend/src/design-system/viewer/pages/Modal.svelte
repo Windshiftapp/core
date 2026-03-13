@@ -1,8 +1,8 @@
 <script>
-  import Modal from '../../../lib/Modal.svelte'
-  import Button from '../../../lib/Button.svelte'
-  import Input from '../../../lib/Input.svelte'
-  import FormField from '../../../lib/FormField.svelte'
+  import Modal from '../../../lib/dialogs/Modal.svelte'
+  import Button from '../../../lib/components/Button.svelte'
+  import Input from '../../../lib/components/Input.svelte'
+  import FormField from '../../../lib/components/FormField.svelte'
 
   let basicOpen = $state(false)
   let customWidthOpen = $state(false)

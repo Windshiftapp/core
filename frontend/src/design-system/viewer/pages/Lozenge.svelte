@@ -1,5 +1,5 @@
 <script>
-  import Lozenge from '../../../lib/Lozenge.svelte'
+  import Lozenge from '../../../lib/components/Lozenge.svelte'
 
   const colors = [
     'red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal',

@@ -1,5 +1,5 @@
 <script>
-  import Progress from '../../../lib/Progress.svelte'
+  import Progress from '../../../lib/components/Progress.svelte'
 
   let barValue = $state(65)
   let circularValue = $state(75)

@@ -417,7 +417,7 @@
         <RolePicker
           label={t('settings.permissionSets.addByRole')}
           placeholder={t('settings.permissionSets.searchAndSelectRole')}
-          onselect={(e) => addAssignment('role', e.detail.id)}
+          onSelect={(role) => addAssignment('role', role.id)}
         />
       </div>
 
@@ -426,7 +426,7 @@
         <GroupPicker
           label={t('settings.permissionSets.addByGroup')}
           placeholder={t('settings.permissionSets.searchAndSelectGroup')}
-          onselect={(e) => addAssignment('group', e.detail.id)}
+          onSelect={(group) => addAssignment('group', group.id)}
         />
       </div>
 
@@ -435,7 +435,7 @@
         <UserPicker
           label={t('settings.permissionSets.addByUser')}
           placeholder={t('settings.permissionSets.searchAndSelectUser')}
-          onselect={(e) => addAssignment('user', e.detail.id)}
+          onSelect={(user) => addAssignment('user', user.id)}
         />
       </div>
     </div>

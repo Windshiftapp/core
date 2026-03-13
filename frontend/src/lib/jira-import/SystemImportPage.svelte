@@ -210,16 +210,16 @@
           <table class="w-full">
             <thead>
               <tr style="border-bottom: 1px solid var(--ds-border);">
-                <th class="text-left py-3 px-4 text-xs font-medium uppercase tracking-wider"
-                    style="color: var(--ds-text-subtle);">Status</th>
-                <th class="text-left py-3 px-4 text-xs font-medium uppercase tracking-wider"
-                    style="color: var(--ds-text-subtle);">Instance</th>
-                <th class="text-left py-3 px-4 text-xs font-medium uppercase tracking-wider"
-                    style="color: var(--ds-text-subtle);">Scope</th>
-                <th class="text-left py-3 px-4 text-xs font-medium uppercase tracking-wider"
-                    style="color: var(--ds-text-subtle);">Started</th>
-                <th class="text-left py-3 px-4 text-xs font-medium uppercase tracking-wider"
-                    style="color: var(--ds-text-subtle);">Completed</th>
+                <th class="text-left py-3 px-4 text-xs font-semibold tracking-wide"
+                    style="color: var(--ds-text);">Status</th>
+                <th class="text-left py-3 px-4 text-xs font-semibold tracking-wide"
+                    style="color: var(--ds-text);">Instance</th>
+                <th class="text-left py-3 px-4 text-xs font-semibold tracking-wide"
+                    style="color: var(--ds-text);">Scope</th>
+                <th class="text-left py-3 px-4 text-xs font-semibold tracking-wide"
+                    style="color: var(--ds-text);">Started</th>
+                <th class="text-left py-3 px-4 text-xs font-semibold tracking-wide"
+                    style="color: var(--ds-text);">Completed</th>
               </tr>
             </thead>
             <tbody>

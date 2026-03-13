@@ -410,8 +410,8 @@
         autoOpen={autoOpenPickers}
         class="w-full"
         {disabled}
-        on:select={(e) => onChange(e.detail?.id || null)}
-        on:cancel={() => onCancel?.()}
+        onSelect={(item) => onChange(item?.id || null)}
+        onCancel={() => onCancel?.()}
       />
     {:else if field.field_type === 'user'}
       {@const userValue = value && typeof value === 'object' ? value.id : value}
@@ -442,8 +442,8 @@
         autoOpen={autoOpenPickers}
         class="w-full"
         {disabled}
-        on:select={(e) => onChange(e.detail?.id || null)}
-        on:cancel={() => onCancel?.()}
+        onSelect={(item) => onChange(item?.id || null)}
+        onCancel={() => onCancel?.()}
       />
     {:else if field.field_type === 'asset'}
       {@const assetConfig = field.options ? JSON.parse(field.options) : {}}
@@ -506,11 +506,11 @@
         class="w-full"
         userId={null}
         {disabled}
-        on:select={(e) => {
-          const labelArray = e.detail.value || [];
+        onSelect={(result) => {
+          const labelArray = result.value || [];
           onChange(labelArray.join(','));
         }}
-        on:cancel={() => onCancel?.()}
+        onCancel={() => onCancel?.()}
       />
     {:else if field.field_type === 'select'}
       <BasePicker

@@ -1,5 +1,5 @@
 <script>
-  import Button from '../../../lib/Button.svelte'
+  import Button from '../../../lib/components/Button.svelte'
   import { Settings, ArrowRight, Plus, Download, Trash2 } from 'lucide-svelte'
 </script>
 

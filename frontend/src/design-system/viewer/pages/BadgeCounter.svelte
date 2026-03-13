@@ -1,5 +1,5 @@
 <script>
-  import BadgeCounter from '../../../lib/BadgeCounter.svelte'
+  import BadgeCounter from '../../../lib/components/BadgeCounter.svelte'
   import { Bell, Mail, MessageSquare } from 'lucide-svelte'
 </script>
 

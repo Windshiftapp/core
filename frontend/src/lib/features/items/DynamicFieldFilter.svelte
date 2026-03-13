@@ -170,10 +170,10 @@
     }
   }
 
-  function handleFieldSelect(event) {
+  function handleFieldSelect(field) {
     dispatch('change', {
       ...filter,
-      field: event.detail,
+      field: field,
       value: '',
       values: []
     });
@@ -238,11 +238,11 @@
     dispatch('remove');
   }
 
-  function handleMilestoneSelect(event) {
+  function handleMilestoneSelect(result) {
     dispatch('change', {
       ...filter,
-      value: event.detail.value,  // milestone ID
-      displayValue: event.detail.milestone?.name  // for display
+      value: result.value,  // milestone ID
+      displayValue: result.milestone?.name  // for display
     });
   }
 
@@ -289,8 +289,8 @@
       <FieldSelector
         selectedField={filter.field}
         placeholder="Choose field..."
-        on:select={handleFieldSelect}
-        on:clear={handleFieldClear}
+        onSelect={handleFieldSelect}
+        onClear={handleFieldClear}
       />
     </div>
   </div>
@@ -366,7 +366,7 @@
         <MilestoneCombobox
           value={filter.value}
           placeholder="Select milestone..."
-          on:select={handleMilestoneSelect}
+          onSelect={handleMilestoneSelect}
         />
       {:else if filter.field.type === 'enum' || filter.field.type === 'select'}
         <!-- Dropdown for enum/select fields -->

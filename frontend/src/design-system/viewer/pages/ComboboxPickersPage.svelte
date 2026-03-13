@@ -538,16 +538,16 @@
         </thead>
         <tbody style="color: var(--ds-text-subtle);">
           <tr style="border-bottom: 1px solid var(--ds-border);">
-            <td class="p-2"><code>on:select</code></td>
-            <td class="p-2">Fired when an item is selected. Contains the selected item object.</td>
+            <td class="p-2"><code>onSelect</code></td>
+            <td class="p-2">Callback when an item is selected. Receives the selected item object directly.</td>
           </tr>
           <tr style="border-bottom: 1px solid var(--ds-border);">
-            <td class="p-2"><code>on:change</code></td>
-            <td class="p-2">Fired when selection changes (for multi-select). Contains array of selected IDs.</td>
+            <td class="p-2"><code>onChange</code></td>
+            <td class="p-2">Callback when selection changes (for multi-select). Receives array of selected IDs.</td>
           </tr>
           <tr>
-            <td class="p-2"><code>on:cancel</code></td>
-            <td class="p-2">Fired when dropdown closes without a selection.</td>
+            <td class="p-2"><code>onCancel</code></td>
+            <td class="p-2">Callback when dropdown closes without a selection.</td>
           </tr>
         </tbody>
       </table>
@@ -574,19 +574,19 @@
 <WorkspacePicker
   bind:value={selectedWorkspaces}
   label="Workspaces"
-  on:change={() => {}}
+  onChange={(ids) => console.log('selected:', ids)}
 />
 
 <GroupPicker
   bind:value={selectedGroup}
   label="Group"
-  on:select={() => {}}
+  onSelect={(group) => console.log('selected:', group)}
 />
 
 <RolePicker
   bind:value={selectedRole}
   label="Role"
-  on:select={() => {}}
+  onSelect={(role) => console.log('selected:', role)}
 />`}</pre>
     </div>
   </section>

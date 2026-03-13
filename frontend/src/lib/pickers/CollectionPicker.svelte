@@ -1,18 +1,18 @@
 <script>
   import { BasePicker } from '.';
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { FolderOpen, Globe } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
-
-  const dispatch = createEventDispatcher();
 
   let {
     value = $bindable([]),
     placeholder = '',
     label = '',
     disabled = false,
-    class: className = ''
+    class: className = '',
+    onChange = () => {},
+    onCancel = () => {}
   } = $props();
 
   const resolvedPlaceholder = $derived(placeholder || t('pickers.selectCollections'));
@@ -50,14 +50,6 @@
     }
   }
 
-  function handleChange(event) {
-    dispatch('change', event.detail);
-  }
-
-  function handleCancel() {
-    dispatch('cancel');
-  }
-
   function getWorkspaceName(workspaceId) {
     if (!workspaceId) return t('common.global');
     const workspace = workspaces.find(w => w.id === workspaceId);
@@ -78,8 +70,8 @@
   searchFields={['name', 'description']}
   getValue={(collection) => collection?.id}
   getLabel={(collection) => collection?.name ?? ''}
-  on:change={handleChange}
-  on:cancel={handleCancel}
+  onChange={(value) => onChange(value)}
+  onCancel={() => onCancel()}
 >
   {#snippet chipSnippet({ item: collection })}
     <!-- Collection Icon -->

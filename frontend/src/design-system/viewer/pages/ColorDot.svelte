@@ -1,5 +1,5 @@
 <script>
-  import ColorDot from '../../../lib/ColorDot.svelte'
+  import ColorDot from '../../../lib/components/ColorDot.svelte'
 
   const colors = [
     { name: 'Gray', hex: '#9CA3AF' },

@@ -16,8 +16,8 @@
     position = { x: 0, y: 0 },
     open = false,
     isPersonalWorkspace = false,
-    onselect = null,
-    oncancel = null
+    onSelect = null,
+    onCancel = null
   } = $props();
 
   // State
@@ -72,7 +72,7 @@
   });
 
   function handleSelect(user) {
-    onselect?.(user);
+    onSelect?.(user);
   }
 
   function handleKeyDown(e) {
@@ -94,7 +94,7 @@
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      oncancel?.();
+      onCancel?.();
     }
   }
 </script>

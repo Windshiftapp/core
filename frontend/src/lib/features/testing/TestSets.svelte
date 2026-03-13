@@ -166,8 +166,7 @@
     }
   }
 
-  async function handleAddTestCase(event) {
-    const testCase = event.detail;
+  async function handleAddTestCase(testCase) {
     if (!testCase || !testCase.id) return;
 
     try {
@@ -194,8 +193,8 @@
     : $testSets);
 
   // Handle milestone selection and update URL
-  function handleMilestoneSelect(event) {
-    selectedMilestoneFilter = event.detail.value;
+  function handleMilestoneSelect(result) {
+    selectedMilestoneFilter = result.value;
     updateURL();
   }
 
@@ -296,7 +295,7 @@
           <MilestoneCombobox
             bind:value={selectedMilestoneFilter}
             placeholder={t('milestones.allMilestones')}
-            onselect={handleMilestoneSelect}
+            onSelect={handleMilestoneSelect}
           />
         </div>
         <Button
@@ -389,7 +388,7 @@
         <TestCasePicker
           {workspaceId}
           excludeIds={setTestCases.map(tc => tc.id)}
-          onselect={handleAddTestCase}
+          onSelect={handleAddTestCase}
           placeholder={t('testing.searchTestCasesToAdd')}
         />
       </div>

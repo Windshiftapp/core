@@ -1,5 +1,5 @@
 <script>
-  import Textarea from '../../../lib/Textarea.svelte'
+  import Textarea from '../../../lib/components/Textarea.svelte'
 
   let basicValue = $state('')
 </script>

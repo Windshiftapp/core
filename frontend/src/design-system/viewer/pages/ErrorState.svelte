@@ -1,5 +1,5 @@
 <script>
-  import ErrorState from '../../../lib/ErrorState.svelte';
+  import ErrorState from '../../../lib/components/ErrorState.svelte';
   import { FileX, WifiOff, Lock, ServerCrash } from 'lucide-svelte';
 
   function handleRetry() {

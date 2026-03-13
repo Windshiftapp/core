@@ -908,9 +908,9 @@
       <thead style="border-bottom: 1px solid var(--ds-border);">
             <tr>
               <th class="px-2 py-3 w-10"></th>
-              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('common.title')}</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('common.labels')}</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('common.actions')}</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">{t('common.title')}</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">{t('common.labels')}</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold tracking-wide" style="color: var(--ds-text);">{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>

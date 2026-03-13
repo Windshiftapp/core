@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { ShieldCheck, ShieldX, Settings } from 'lucide-svelte';
+  import EmptyState from '../components/EmptyState.svelte';
   import { api } from '../api.js';
 
   let { workspaceId, collectionId = null } = $props();
@@ -85,13 +86,11 @@
       <button class="retry-btn" onclick={loadCoverageData}>Retry</button>
     </div>
   {:else if !coverageData || coverageData.total === 0}
-    <div class="empty-state">
-      <ShieldX class="empty-icon" />
-      <p class="empty-title">No requirements configured</p>
-      <p class="empty-copy">
-        Configure requirement types in the Test Reports page to see coverage data.
-      </p>
-    </div>
+    <EmptyState
+      icon={ShieldX}
+      title="No requirements configured"
+      description="Configure requirement types in the Test Reports page to see coverage data."
+    />
   {:else}
     <div class="coverage-content">
       <div class="pie-wrapper">
@@ -161,8 +160,7 @@
   }
 
   .loading-state,
-  .error-state,
-  .empty-state {
+  .error-state {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -198,24 +196,6 @@
 
   .retry-btn:hover {
     background: var(--ds-surface-sunken);
-  }
-
-  .empty-state :global(.empty-icon) {
-    width: 48px;
-    height: 48px;
-    color: var(--ds-text-subtle);
-    opacity: 0.5;
-  }
-
-  .empty-title {
-    font-weight: 600;
-    color: var(--ds-text);
-    margin-top: 0.5rem;
-  }
-
-  .empty-copy {
-    font-size: 0.875rem;
-    max-width: 280px;
   }
 
   .coverage-content {

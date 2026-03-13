@@ -1,7 +1,7 @@
 <script>
-  import HelperText from '../../../lib/HelperText.svelte'
-  import Label from '../../../lib/Label.svelte'
-  import Input from '../../../lib/Input.svelte'
+  import HelperText from '../../../lib/components/HelperText.svelte'
+  import Label from '../../../lib/components/Label.svelte'
+  import Input from '../../../lib/components/Input.svelte'
 </script>
 
 <div class="p-8 max-w-6xl">

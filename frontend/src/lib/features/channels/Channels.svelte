@@ -406,8 +406,7 @@
               unassignedLabel={t('channels.allCategories', 'All Categories')}
               allowClear={false}
               class="w-48"
-              onselect={(e) => {
-                const item = e.detail;
+              onSelect={(item) => {
                 if (embedded) {
                   embeddedCategoryId = item ? item.id : null;
                 } else {

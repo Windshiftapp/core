@@ -287,19 +287,19 @@
         <table class="min-w-full" style="border-collapse: separate; border-spacing: 0;">
           <thead style="background-color: var(--ds-interactive-subtle);">
             <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle); border-bottom: 1px solid var(--ds-border);">
+              <th class="px-6 py-3 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text); border-bottom: 1px solid var(--ds-border);">
                 {t('settings.permissions.permission')}
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle); border-bottom: 1px solid var(--ds-border);">
+              <th class="px-6 py-3 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text); border-bottom: 1px solid var(--ds-border);">
                 {t('common.description')}
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle); border-bottom: 1px solid var(--ds-border);">
+              <th class="px-6 py-3 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text); border-bottom: 1px solid var(--ds-border);">
                 {t('settings.permissions.assignedUsers')}
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle); border-bottom: 1px solid var(--ds-border);">
+              <th class="px-6 py-3 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text); border-bottom: 1px solid var(--ds-border);">
                 {t('settings.permissions.assignedGroups')}
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle); border-bottom: 1px solid var(--ds-border);">
+              <th class="px-6 py-3 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text); border-bottom: 1px solid var(--ds-border);">
                 {t('common.actions')}
               </th>
             </tr>

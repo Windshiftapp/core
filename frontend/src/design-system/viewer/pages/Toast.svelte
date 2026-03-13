@@ -1,7 +1,7 @@
 <script>
-  import Toast from '../../../lib/Toast.svelte';
-  import ErrorToast from '../../../lib/ErrorToast.svelte';
-  import ToastContainer from '../../../lib/ToastContainer.svelte';
+  import Toast from '../../../lib/features/notifications/Toast.svelte';
+  import ErrorToast from '../../../lib/features/notifications/ErrorToast.svelte';
+  import ToastContainer from '../../../lib/features/notifications/ToastContainer.svelte';
   import { addToast, successToast, errorToast, warningToast, infoToast, clearToasts } from '../../../lib/stores/toasts.svelte.js';
   import { CircleCheck, XCircle, AlertCircle, Info } from 'lucide-svelte';
 

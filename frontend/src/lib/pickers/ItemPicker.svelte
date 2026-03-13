@@ -1,12 +1,9 @@
 <script>
   import { createPopover, melt } from '@melt-ui/svelte';
   import { ChevronDown, X, CheckSquare, Square } from 'lucide-svelte';
-  import { createEventDispatcher } from 'svelte';
   import { getVisibleColor } from '../utils/colorUtils.js';
   import { t } from '../stores/i18n.svelte.js';
   import { formatDateShort } from '../utils/dateFormatter.js';
-
-  const dispatch = createEventDispatcher();
 
   // Generate unique IDs for ARIA attributes
   const listboxId = `listbox-${Math.random().toString(36).slice(2, 9)}`;
@@ -31,7 +28,9 @@
     class: className = '',
     children = null,  // Optional custom trigger snippet
     onSearchChange = null,  // Callback for async search: (searchTerm) => void
-    searchDebounce = 300  // Debounce delay for onSearchChange in ms
+    searchDebounce = 300,  // Debounce delay for onSearchChange in ms
+    onSelect = null,  // Callback when item is selected: (item) => void
+    onCancel = null   // Callback when picker is cancelled: () => void
   } = $props();
 
   const resolvedPlaceholder = $derived(placeholder || t('pickers.select'));
@@ -94,7 +93,7 @@
       } else {
         // Popover closing without selection - dispatch cancel
         if (!wasSelectionMade) {
-          dispatch('cancel');
+          onCancel?.();
         }
         wasSelectionMade = false;
       }
@@ -156,7 +155,7 @@
     if (multiSelect) {
       if (!item) {
         values = [];
-        dispatch('select', values);
+        onSelect?.(values);
         return;
       }
       const itemValue = finalConfig.getValue(item);
@@ -170,13 +169,13 @@
         if (maxSelections && values.length >= maxSelections) return;
         values = [...values, itemValue];
       }
-      dispatch('select', values);
+      onSelect?.(values);
       return;
     }
     wasSelectionMade = true;
     value = item ? finalConfig.getValue(item) : null;
     $open = false;
-    dispatch('select', item);
+    onSelect?.(item);
   }
 
   // Handle keyboard navigation
@@ -225,7 +224,7 @@
       if (v == null || val == null) return v !== val;
       return Number(v) !== Number(val);
     });
-    dispatch('select', values);
+    onSelect?.(values);
   }
 
   // Check if an item value is selected (multi-select)

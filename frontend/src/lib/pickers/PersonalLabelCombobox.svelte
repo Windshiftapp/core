@@ -1,18 +1,18 @@
 <script>
   import { BasePicker } from '.';
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { Plus, Check } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
-
-  const dispatch = createEventDispatcher();
 
   let {
     value = $bindable([]),
     placeholder = '',
     class: className = '',
     disabled = false,
-    userId = null
+    userId = null,
+    onSelect = () => {},
+    onCancel = () => {}
   } = $props();
 
   const resolvedPlaceholder = $derived(placeholder || t('pickers.selectLabels'));
@@ -58,9 +58,9 @@
     }
   }
 
-  function handleChange(event) {
+  function handleChange(selectedIds) {
     // Convert IDs back to names
-    const selectedIds = event.detail || [];
+    selectedIds = selectedIds || [];
     const selectedNames = selectedIds
       .map(id => labels.find(l => l.id === id)?.name)
       .filter(Boolean);
@@ -71,14 +71,14 @@
       .map(id => labels.find(l => l.id === id))
       .filter(Boolean);
 
-    dispatch('select', {
+    onSelect({
       value: selectedNames,
       labels: selectedLabels
     });
   }
 
   function handleCancel() {
-    dispatch('cancel');
+    onCancel();
   }
 
   async function handleCreate(searchQuery) {
@@ -97,7 +97,7 @@
       const newValue = [...valueAsNames, newLabel.name];
       value = newValue;
 
-      dispatch('select', {
+      onSelect({
         value: newValue,
         labels: [...labels.filter(l => valueAsNames.includes(l.name)), newLabel]
       });
@@ -123,8 +123,8 @@
   searchFields={['name']}
   getValue={(label) => label?.id}
   getLabel={(label) => label?.name ?? ''}
-  on:change={handleChange}
-  on:cancel={handleCancel}
+  onChange={handleChange}
+  onCancel={handleCancel}
 >
   {#snippet itemSnippet({ item: label, isSelected })}
     <div class="flex items-center gap-3 flex-1 min-w-0">

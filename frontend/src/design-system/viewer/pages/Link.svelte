@@ -1,5 +1,5 @@
 <script>
-  import Link from '../../../lib/Link.svelte'
+  import Link from '../../../lib/components/Link.svelte'
 </script>
 
 <div class="p-8 max-w-6xl">

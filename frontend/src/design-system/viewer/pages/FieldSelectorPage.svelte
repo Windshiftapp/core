@@ -1,6 +1,6 @@
 <script>
-  import FieldSelector from '../../../lib/FieldSelector.svelte'
-  import Label from '../../../lib/Label.svelte'
+  import FieldSelector from '../../../lib/pickers/FieldSelector.svelte'
+  import Label from '../../../lib/components/Label.svelte'
 
   let selectedField = $state(null)
   let selectedField2 = $state(null)
@@ -25,7 +25,7 @@
       <FieldSelector
         bind:selectedField
         placeholder="Select a field..."
-        on:select={handleSelect}
+        onSelect={handleSelect}
       />
     </div>
     <p class="mt-2 text-xs" style="color: var(--ds-text-subtle);">
@@ -222,12 +222,12 @@
         </thead>
         <tbody style="color: var(--ds-text-subtle);">
           <tr style="border-bottom: 1px solid var(--ds-border);">
-            <td class="p-2"><code>on:select</code></td>
-            <td class="p-2">Fired when a field is selected. Contains the full field object.</td>
+            <td class="p-2"><code>onSelect</code></td>
+            <td class="p-2">Called when a field is selected. Receives the full field object.</td>
           </tr>
           <tr>
-            <td class="p-2"><code>on:clear</code></td>
-            <td class="p-2">Fired when the selection is cleared.</td>
+            <td class="p-2"><code>onClear</code></td>
+            <td class="p-2">Called when the selection is cleared.</td>
           </tr>
         </tbody>
       </table>

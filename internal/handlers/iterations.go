@@ -317,6 +317,37 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Fetch existing iteration and merge to support partial updates
+	existing, err := h.planningService.GetIteration(id)
+	if err != nil {
+		respondNotFound(w, r, "iteration")
+		return
+	}
+	if iteration.Name == "" {
+		iteration.Name = existing.Name
+	}
+	if iteration.StartDate == "" {
+		iteration.StartDate = existing.StartDate
+	}
+	if iteration.EndDate == "" {
+		iteration.EndDate = existing.EndDate
+	}
+	if iteration.Status == "" {
+		iteration.Status = existing.Status
+	}
+	if iteration.WorkspaceID == nil {
+		iteration.WorkspaceID = existing.WorkspaceID
+	}
+	if iteration.TypeID == nil {
+		iteration.TypeID = existing.TypeID
+	}
+	if !iteration.IsGlobal && iteration.WorkspaceID == nil {
+		iteration.IsGlobal = existing.IsGlobal
+	}
+	if iteration.Description == "" {
+		iteration.Description = existing.Description
+	}
+
 	// Validate required fields
 	if strings.TrimSpace(iteration.Name) == "" {
 		respondValidationError(w, r, "Iteration name is required")

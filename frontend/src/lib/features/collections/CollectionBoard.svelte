@@ -823,8 +823,7 @@
                     showUnassigned={false}
                     allowClear={false}
                     showSelectedInTrigger={false}
-                    on:select={(e) => {
-                      const iter = e.detail;
+                    onSelect={(iter) => {
                       if (iter) {
                         setSprintFilter(iter.id);
                       }

@@ -1,5 +1,5 @@
 <script>
-  import CardHeader from '../../../lib/CardHeader.svelte'
+  import CardHeader from '../../../lib/components/CardHeader.svelte'
 </script>
 
 <div class="p-8 max-w-6xl">

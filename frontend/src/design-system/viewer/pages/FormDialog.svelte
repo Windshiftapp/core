@@ -1,9 +1,9 @@
 <script>
-  import FormDialog from '../../../lib/FormDialog.svelte'
-  import DialogFooter from '../../../lib/DialogFooter.svelte'
-  import Button from '../../../lib/Button.svelte'
-  import Input from '../../../lib/Input.svelte'
-  import FormField from '../../../lib/FormField.svelte'
+  import FormDialog from '../../../lib/dialogs/FormDialog.svelte'
+  import DialogFooter from '../../../lib/dialogs/DialogFooter.svelte'
+  import Button from '../../../lib/components/Button.svelte'
+  import Input from '../../../lib/components/Input.svelte'
+  import FormField from '../../../lib/components/FormField.svelte'
   import { User, Trash2, Settings } from 'lucide-svelte'
 
   let basicOpen = $state(false)

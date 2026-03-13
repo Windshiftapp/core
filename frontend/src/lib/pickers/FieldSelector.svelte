@@ -1,26 +1,26 @@
 <script>
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import { ChevronDown, X } from 'lucide-svelte';
   import SearchInput from '../components/SearchInput.svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
 
-  const dispatch = createEventDispatcher();
+  let {
+    placeholder = '',
+    selectedField = $bindable(null),
+    disabled = false,
+    fieldGroups = null,
+    customFieldItems = null,
+    onSelect = () => {},
+    onClear = () => {}
+  } = $props();
 
-  export let placeholder = '';
-  export let selectedField = null;
-  export let disabled = false;
-  // Optional overrides: when provided, skip default field/API loading
-  export let fieldGroups = null; // array of { category, fields } to override standardFields
-  export let customFieldItems = null; // array of custom field objects to override API loading
+  const resolvedPlaceholder = $derived(placeholder || t('pickers.selectField'));
 
-  $: resolvedPlaceholder = placeholder || t('pickers.selectField');
-
-  let isOpen = false;
-  let searchQuery = '';
-  let filteredFields = [];
-  let customFields = [];
-  let dropdownElement;
+  let isOpen = $state(false);
+  let searchQuery = $state('');
+  let customFields = $state([]);
+  let dropdownElement = $state();
 
   // Helper to get field translation (handles both object and string formats)
   function getFieldTranslation(fieldKey) {
@@ -31,9 +31,8 @@
     return { name: field || fieldKey, description: '' };
   }
 
-  // Standard fields grouped by category - using reactive to support i18n
-  // When fieldGroups prop is provided, use it instead of the default item-centric fields
-  $: standardFields = fieldGroups || [
+  // Standard fields grouped by category
+  const standardFields = $derived(fieldGroups || [
     {
       category: t('pickers.fieldCategories.basic'),
       fields: [
@@ -67,18 +66,42 @@
         { id: 'labels', name: getFieldTranslation('labels').name, type: 'enum', description: getFieldTranslation('labels').description }
       ]
     },
-  ];
+  ]);
+
+  // Filtered fields derived from search query
+  const filteredFields = $derived.by(() => {
+    const query = searchQuery.toLowerCase();
+
+    const filteredStandard = standardFields.map(group => ({
+      category: group.category,
+      fields: group.fields.filter(field =>
+        (field.name || '').toLowerCase().includes(query) ||
+        (field.description || '').toLowerCase().includes(query)
+      )
+    })).filter(group => group.fields.length > 0);
+
+    const filteredCustom = customFields.filter(field =>
+      (field.name || '').toLowerCase().includes(query) ||
+      (field.description || '').toLowerCase().includes(query)
+    );
+
+    if (filteredCustom.length > 0) {
+      return [...filteredStandard, {
+        category: t('pickers.customFields'),
+        fields: filteredCustom
+      }];
+    }
+
+    return filteredStandard;
+  });
 
   onMount(async () => {
     await loadCustomFields();
-    updateFilteredFields();
   });
 
   async function loadCustomFields() {
-    // When customFieldItems prop is provided, use it instead of API
     if (customFieldItems) {
       customFields = customFieldItems;
-      updateFilteredFields();
       return;
     }
     try {
@@ -91,39 +114,9 @@
         isCustom: true,
         options: field.options ? JSON.parse(field.options) : null
       }));
-      updateFilteredFields();
     } catch (error) {
       console.error('Failed to load custom fields:', error);
       customFields = [];
-    }
-  }
-
-  function updateFilteredFields() {
-    const query = searchQuery.toLowerCase();
-
-    // Filter standard fields
-    const filteredStandard = standardFields.map(group => ({
-      category: group.category,
-      fields: group.fields.filter(field =>
-        (field.name || '').toLowerCase().includes(query) ||
-        (field.description || '').toLowerCase().includes(query)
-      )
-    })).filter(group => group.fields.length > 0);
-
-    // Filter custom fields
-    const filteredCustom = customFields.filter(field =>
-      (field.name || '').toLowerCase().includes(query) ||
-      (field.description || '').toLowerCase().includes(query)
-    );
-
-    filteredFields = filteredStandard;
-
-    // Add custom fields as a separate category if any match
-    if (filteredCustom.length > 0) {
-      filteredFields.push({
-        category: t('pickers.customFields'),
-        fields: filteredCustom
-      });
     }
   }
 
@@ -131,20 +124,18 @@
     selectedField = field;
     isOpen = false;
     searchQuery = '';
-    updateFilteredFields();
-    dispatch('select', field);
+    onSelect(field);
   }
 
   function clearSelection() {
     selectedField = null;
-    dispatch('clear');
+    onClear();
   }
 
   function toggleDropdown() {
     if (!disabled) {
       isOpen = !isOpen;
       if (isOpen) {
-        // Focus search input when dropdown opens
         setTimeout(() => {
           const searchInput = dropdownElement?.querySelector('input[type="text"]');
           searchInput?.focus();
@@ -157,13 +148,11 @@
     if (dropdownElement && !dropdownElement.contains(event.target)) {
       isOpen = false;
       searchQuery = '';
-      updateFilteredFields();
     }
   }
 
   function handleSearchInput(event) {
     searchQuery = event.target.value;
-    updateFilteredFields();
   }
 
   function getFieldTypeLabel(type) {
@@ -195,10 +184,6 @@
       textarea: 'bg-blue-100 text-blue-800'
     };
     return colors[type] || 'bg-neutral-100 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-200';
-  }
-
-  $: if (searchQuery !== undefined) {
-    updateFilteredFields();
   }
 </script>
 

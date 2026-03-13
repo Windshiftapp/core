@@ -747,7 +747,7 @@
                             secondary: { text: (item) => item.workspace_item_number ? `#${item.workspace_item_number}` : '' },
                             searchFields: ['name', 'title', 'workspace_item_number']
                           }}
-                          on:select={(e) => linkItemToStep(currentStep.id, e.detail)}
+                          onSelect={(item) => linkItemToStep(currentStep.id, item)}
                         />
                       </div>
 

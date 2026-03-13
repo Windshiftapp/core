@@ -1,5 +1,5 @@
 <script>
-  import Spinner from '../../../lib/Spinner.svelte'
+  import Spinner from '../../../lib/components/Spinner.svelte'
 </script>
 
 <div class="p-8 max-w-6xl">

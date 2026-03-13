@@ -11,7 +11,7 @@
     label = '',
     helperText = '',
     disabled = false,
-    on_change = () => {},
+    onChange = () => {},
     class: className = ''
   } = $props();
 
@@ -46,13 +46,13 @@
   function addCategory(categoryId) {
     if (!selectedIds.includes(categoryId)) {
       selectedIds = [...selectedIds, categoryId];
-      on_change({ selectedIds, added: categoryId });
+      onChange({ selectedIds, added: categoryId });
     }
   }
 
   function removeCategory(categoryId) {
     selectedIds = selectedIds.filter(id => id !== categoryId);
-    on_change({ selectedIds, removed: categoryId });
+    onChange({ selectedIds, removed: categoryId });
   }
 
   function toggleDropdown() {

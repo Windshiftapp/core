@@ -394,14 +394,13 @@
         showUnassigned={false}
         autoOpen={editingStatus}
         class="w-full"
-        on:select={(e) => {
-          const selectedStatus = e.detail;
+        onSelect={(selectedStatus) => {
           onsaveField?.({
             field: 'status_id',
             value: selectedStatus?.id || null
           });
         }}
-        on:cancel={() => {
+        onCancel={() => {
           oncancelEdit?.({ field: 'status_id' });
         }}
       >
@@ -440,8 +439,7 @@
         showUnassigned={true}
         unassignedLabel="No priority"
         class="w-full"
-        on:select={(e) => {
-          const selectedPriority = e.detail;
+        onSelect={(selectedPriority) => {
           onsaveField?.({
             field: 'priority_id',
             value: selectedPriority?.id || null
@@ -522,9 +520,7 @@
           placeholder="Select project..."
           showUnassigned={false}
           class="w-full"
-          on:select={(e) => {
-            const selectedProject = e.detail;
-
+          onSelect={(selectedProject) => {
             // Handle special items
             if (selectedProject?.specialType === 'none') {
               onsaveField?.({
@@ -622,10 +618,10 @@
         unassignedLabel="No milestone"
         disabled={!canEdit}
         class="w-full"
-        on:select={(e) => {
+        onSelect={(item) => {
           onsaveField?.({
             field: 'milestone',
-            value: e.detail?.id || null
+            value: item?.id || null
           });
         }}
       >
@@ -657,8 +653,7 @@
         showUnassigned={true}
         unassignedLabel="No iteration"
         class="w-full"
-        on:select={(e) => {
-          const selectedIteration = e.detail;
+        onSelect={(selectedIteration) => {
           onsaveField?.({
             field: 'iteration',
             value: selectedIteration?.id || null,

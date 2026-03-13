@@ -54,7 +54,7 @@
   let theadClass = '';
   let tbodyClass = 'divide-y';
   let trClass = 'transition-colors duration-150';
-  let thClass = 'px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider';
+  let thClass = 'px-6 py-4 text-left text-xs font-semibold tracking-wide';
   let tdClass = 'px-6 py-4';
   
   export { containerClass as class };
@@ -130,7 +130,7 @@
             {#each columns as column, colIndex}
               <th
                 class="{thClass} {getColumnAlign(column)} {getColumnWidth(column)}"
-                style="color: var(--ds-text-subtle); {getColumnWidthStyle(column)} {column.headerStyle || ''}"
+                style="color: var(--ds-text); {getColumnWidthStyle(column)} {column.headerStyle || ''}"
               >
                 {column.label}
               </th>

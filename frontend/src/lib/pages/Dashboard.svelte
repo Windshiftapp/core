@@ -286,11 +286,11 @@
           <table class="w-full">
             <thead style="background-color: var(--ds-background-neutral);">
               <tr>
-                <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('items.item')}</th>
-                <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('workspaces.workspace')}</th>
-                <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('common.status')}</th>
-                <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('common.priority')}</th>
-                <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('common.created')}</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">{t('items.item')}</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">{t('workspaces.workspace')}</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">{t('common.status')}</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">{t('common.priority')}</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">{t('common.created')}</th>
               </tr>
             </thead>
             <tbody class="divide-y" style="divide-color: var(--ds-border);">

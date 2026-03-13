@@ -147,8 +147,8 @@
     }
   }
 
-  function handleMilestoneSelect(event) {
-    selectedMilestoneId = event.detail.value;
+  function handleMilestoneSelect(result) {
+    selectedMilestoneId = result.value;
     loadReportData();
   }
 </script>
@@ -172,7 +172,7 @@
               <MilestoneCombobox
                 bind:value={selectedMilestoneId}
                 placeholder={t('milestones.allMilestones')}
-                on:select={handleMilestoneSelect}
+                onSelect={handleMilestoneSelect}
               />
             </div>
             <Button

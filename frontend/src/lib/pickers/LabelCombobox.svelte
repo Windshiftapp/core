@@ -1,17 +1,17 @@
 <script>
   import { BasePicker } from '.';
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
-
-  const dispatch = createEventDispatcher();
 
   let {
     value = null,
     placeholder = '',
     class: className = '',
     disabled = false,
-    workspaceId = null
+    workspaceId = null,
+    onSelect = () => {},
+    onCancel = () => {}
   } = $props();
 
   const resolvedPlaceholder = $derived(placeholder || t('pickers.allLabels'));
@@ -46,16 +46,15 @@
     }
   }
 
-  function handleSelect(event) {
-    const label = event.detail;
-    dispatch('select', {
+  function handleSelect(label) {
+    onSelect({
       value: label ? label.id : null,
       label: label
     });
   }
 
   function handleCancel() {
-    dispatch('cancel');
+    onCancel();
   }
 </script>
 
@@ -71,8 +70,8 @@
   searchFields={['name', 'description']}
   getValue={(label) => label?.id}
   getLabel={(label) => label?.name ?? ''}
-  on:select={handleSelect}
-  on:cancel={handleCancel}
+  onSelect={handleSelect}
+  onCancel={handleCancel}
 >
   {#snippet itemSnippet({ item: label, isSelected })}
     <div class="flex items-center gap-3 flex-1 min-w-0">

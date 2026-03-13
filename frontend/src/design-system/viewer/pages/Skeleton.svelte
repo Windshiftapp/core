@@ -1,5 +1,5 @@
 <script>
-  import Skeleton from '../../../lib/Skeleton.svelte'
+  import Skeleton from '../../../lib/components/Skeleton.svelte'
 </script>
 
 <div class="p-8 max-w-6xl">

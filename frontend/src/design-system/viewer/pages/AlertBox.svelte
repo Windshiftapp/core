@@ -1,5 +1,5 @@
 <script>
-  import AlertBox from '../../../lib/AlertBox.svelte'
+  import AlertBox from '../../../lib/components/AlertBox.svelte'
 </script>
 
 <div class="p-8 max-w-6xl">

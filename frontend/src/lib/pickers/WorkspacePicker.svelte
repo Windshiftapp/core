@@ -1,19 +1,19 @@
 <script>
   import { BasePicker } from '.';
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { Briefcase, Package } from 'lucide-svelte';
   import { workspaceIconMap } from '../utils/icons.js';
   import { t } from '../stores/i18n.svelte.js';
-
-  const dispatch = createEventDispatcher();
 
   let {
     value = $bindable([]),
     placeholder = '',
     label = '',
     disabled = false,
-    class: className = ''
+    class: className = '',
+    onChange = () => {},
+    onCancel = () => {}
   } = $props();
 
   const resolvedPlaceholder = $derived(placeholder || t('pickers.selectWorkspaces'));
@@ -44,14 +44,6 @@
     }
   }
 
-  function handleChange(event) {
-    dispatch('change', event.detail);
-  }
-
-  function handleCancel() {
-    dispatch('cancel');
-  }
-
   function getIconComponent(iconName) {
     if (iconName && workspaceIconMap[iconName]) {
       return workspaceIconMap[iconName];
@@ -73,8 +65,8 @@
   searchFields={['name', 'key', 'description']}
   getValue={(workspace) => workspace?.id}
   getLabel={(workspace) => workspace?.name ?? ''}
-  on:change={handleChange}
-  on:cancel={handleCancel}
+  onChange={(value) => onChange(value)}
+  onCancel={() => onCancel()}
 >
   {#snippet chipSnippet({ item: workspace })}
     <!-- Workspace Icon/Avatar -->

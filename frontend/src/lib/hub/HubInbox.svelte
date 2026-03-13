@@ -90,19 +90,19 @@
       <table class="w-full text-sm">
         <thead>
           <tr style="background-color: var(--ds-surface-raised);">
-            <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">
+            <th class="px-3 py-2 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">
               {t('hub.request', 'Request')}
             </th>
-            <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">
+            <th class="px-3 py-2 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">
               {t('hub.portal', 'Portal')}
             </th>
-            <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">
+            <th class="px-3 py-2 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">
               {t('hub.submitter', 'Submitter')}
             </th>
-            <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">
+            <th class="px-3 py-2 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">
               {t('hub.status', 'Status')}
             </th>
-            <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ds-text-subtle);">
+            <th class="px-3 py-2 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">
               {t('hub.date', 'Date')}
             </th>
           </tr>

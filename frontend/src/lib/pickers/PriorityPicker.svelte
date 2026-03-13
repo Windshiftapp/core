@@ -122,8 +122,8 @@
     disabled={disabled}
     class={triggerClass}
     {children}
-    on:select={(event) => handlePrioritySelect(event.detail)}
-    on:cancel={() => {
+    onSelect={(item) => handlePrioritySelect(item)}
+    onCancel={() => {
       if (selectedPriorityId === null) {
         return;
       }

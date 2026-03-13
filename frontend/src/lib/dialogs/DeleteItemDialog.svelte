@@ -145,8 +145,7 @@
     }
   }
 
-  function handleNewParentSelect(event) {
-    const selected = event.detail;
+  function handleNewParentSelect(selected) {
     selectedNewParentId = selected?.id || null;
   }
 
@@ -281,7 +280,7 @@
                   showUnassigned={true}
                   unassignedLabel={t('items.makeRootItem')}
                   disabled={loading}
-                  on:select={handleNewParentSelect}
+                  onSelect={handleNewParentSelect}
                 />
                 <p class="text-xs mt-1.5" style="color: var(--ds-text-subtle);">
                   {reparentCandidates.length > 0
