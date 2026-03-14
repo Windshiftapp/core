@@ -32,10 +32,10 @@ RUN mkdir -p /data/logbook && \
 FROM alpine:3.21
 
 # Install runtime dependencies
-RUN apk add --no-cache ca-certificates poppler-utils
+RUN apk add --no-cache ca-certificates poppler-utils libstdc++
 
 # Copy kreuzberg-cli for text extraction
-COPY --from=ghcr.io/kreuzberg-dev/kreuzberg-cli:4.3.1 /usr/local/bin/kreuzberg /usr/local/bin/kreuzberg
+COPY --from=ghcr.io/kreuzberg-dev/kreuzberg-cli:4.4.6 /usr/local/bin/kreuzberg /usr/local/bin/kreuzberg
 
 # Copy binary
 COPY --from=builder /build/logbook /logbook

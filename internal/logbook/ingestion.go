@@ -282,9 +282,9 @@ func (s *IngestionService) classify(ctx context.Context, docID, title, content, 
 				Role: "system",
 				Content: `Classify this document into exactly one category. Reply with ONLY the category name.
 
-knowledge
-record
-correspondence`,
+knowledge — documents containing substantive information: reports, guides, documentation, policies, specifications, analyses, procedures, standards, white papers, research, reference material
+record — purely transactional or archival items with no informational value: invoices, receipts, purchase orders, shipping notifications, payment confirmations, automated system alerts
+correspondence — person-to-person communication: emails, letters, memos, chat transcripts`,
 			},
 			{
 				Role:    "user",
@@ -296,12 +296,12 @@ correspondence`,
 	})
 	if err != nil {
 		slog.Warn("classification failed", slog.String("doc_id", docID), slog.Any("error", err))
-		return models.LogbookContentTypeRecord
+		return models.LogbookContentTypeKnowledge
 	}
 
 	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
 		slog.Warn("classification returned empty response", slog.String("doc_id", docID))
-		return models.LogbookContentTypeRecord
+		return models.LogbookContentTypeKnowledge
 	}
 
 	raw := resp.Choices[0].Message.Content
@@ -367,7 +367,7 @@ Preserve all substantive content, facts, data, and structure exactly as-is.`,
 
 // parseClassificationType scans the LLM response for known classification keywords.
 // Uses exact match first, then word-boundary matching to avoid substring false positives
-// (e.g. "knowledge" inside "acknowledge"). Defaults to "record" on unknown input.
+// (e.g. "knowledge" inside "acknowledge"). Defaults to "knowledge" on unknown input.
 func parseClassificationType(response string) string {
 	t := strings.ToLower(strings.TrimSpace(response))
 
@@ -402,8 +402,8 @@ func parseClassificationType(response string) string {
 	if best != nil {
 		return best.kind
 	}
-	slog.Warn("unknown classification response, defaulting to record", slog.String("raw", response))
-	return models.LogbookContentTypeRecord
+	slog.Warn("unknown classification response, defaulting to knowledge", slog.String("raw", response))
+	return models.LogbookContentTypeKnowledge
 }
 
 // generateArticle uses the direct LLM client to generate a structured KB article from content.

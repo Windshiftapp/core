@@ -3,6 +3,7 @@ package kreuzberg
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -44,6 +45,10 @@ func DefaultChunkConfig() ChunkConfig {
 func ExtractFile(filePath string) (*ExtractionResult, error) {
 	out, err := exec.Command("kreuzberg", "extract", filePath, "--format", "json").Output() //nolint:gosec // G204: command path from application config, not user input
 	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
+			return nil, fmt.Errorf("kreuzberg extraction failed: %w: %s", err, string(exitErr.Stderr))
+		}
 		return nil, fmt.Errorf("kreuzberg extraction failed: %w", err)
 	}
 	var result struct {
