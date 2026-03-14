@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { api } from '../api.js';
   import Button from '../components/Button.svelte';
   import Label from '../components/Label.svelte';
@@ -9,19 +8,15 @@
   import { t } from '../stores/i18n.svelte.js';
   import { portal } from '../actions/portal.js';
 
-  export let branchLink;
-  export let itemKey = '';
-  export let itemTitle = '';
+  let { branchLink, itemKey = '', itemTitle = '', oncreated, onclose } = $props();
 
-  const dispatch = createEventDispatcher();
-
-  let submitting = false;
-  let error = null;
+  let submitting = $state(false);
+  let error = $state(null);
 
   // Form state
-  let prTitle = itemKey ? `${itemKey}: ${itemTitle}` : '';
-  let prBody = itemKey ? `Linked to ${itemKey}` : '';
-  let baseBranch = '';
+  let prTitle = $state(itemKey ? `${itemKey}: ${itemTitle}` : '');
+  let prBody = $state(itemKey ? `Linked to ${itemKey}` : '');
+  let baseBranch = $state('');
 
   async function submit() {
     if (!branchLink?.id) {
@@ -41,7 +36,7 @@
 
       const result = await api.itemSCMLinks.createPRFromBranch(branchLink.id, data);
       successToast(t('scm.prCreatedSuccess', { prNumber: result.pr_number }));
-      dispatch('created', result);
+      oncreated?.(result);
     } catch (err) {
       console.error('Failed to create PR:', err);
       error = err.message || t('scm.failedToCreatePR');
@@ -52,7 +47,7 @@
   }
 
   function close() {
-    dispatch('close');
+    onclose?.();
   }
 </script>
 

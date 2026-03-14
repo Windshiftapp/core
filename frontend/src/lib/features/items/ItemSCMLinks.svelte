@@ -7,21 +7,17 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
 
-  export let itemId;
+  let { itemId, onaddlink, oncreatebranch, oncreatepr } = $props();
 
-  let loading = true;
-  let links = [];
-  let expanded = true;
-  let refreshing = false;
-  let error = null;
+  let loading = $state(true);
+  let links = $state([]);
+  let expanded = $state(true);
+  let refreshing = $state(false);
+  let error = $state(null);
 
   // SCM connection status
-  let connectionStatus = null;
-  let checkingConnection = true;
-
-  // Event dispatcher for opening the add link modal
-  import { createEventDispatcher } from 'svelte';
-  const dispatch = createEventDispatcher();
+  let connectionStatus = $state(null);
+  let checkingConnection = $state(true);
 
   onMount(async () => {
     await checkConnectionStatus();
@@ -67,7 +63,6 @@
     });
   }
 
-  // Export for parent component to call
   export async function loadLinks() {
     if (!itemId) return;
     loading = true;
@@ -127,11 +122,11 @@
   }
 
   function openAddLinkModal() {
-    dispatch('add-link');
+    onaddlink?.();
   }
 
   function openCreateBranchModal() {
-    dispatch('create-branch');
+    oncreatebranch?.();
   }
 
   function getLinkIcon(linkType) {
@@ -178,7 +173,7 @@
   }
 
   function openCreatePRModal(link) {
-    dispatch('create-pr', { link });
+    oncreatepr?.({ link });
   }
 </script>
 
@@ -263,8 +258,8 @@
             style="background-color: var(--ds-surface);"
           >
             <!-- Icon -->
-            <svelte:component
-              this={getLinkIcon(link.link_type)}
+            {@const LinkIcon = getLinkIcon(link.link_type)}
+            <LinkIcon
               class="w-4 h-4 flex-shrink-0 mt-0.5"
               style="color: var(--ds-text-subtle);"
             />

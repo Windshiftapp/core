@@ -109,8 +109,8 @@
                 class="timeline-marker"
                 style="background-color: {getStatusColor(step.status)};"
               >
-                <svelte:component
-                  this={getStatusIcon(step.status)}
+                {@const StatusIcon = getStatusIcon(step.status)}
+                <StatusIcon
                   class="w-4 h-4"
                   style="color: white;"
                 />

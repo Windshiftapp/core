@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { api } from '../api.js';
   import Button from '../components/Button.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
@@ -11,15 +10,17 @@
   import { t } from '../stores/i18n.svelte.js';
   import Checkbox from '../components/Checkbox.svelte';
 
-  const dispatch = createEventDispatcher();
-
-  export let isOpen = false;
-  export let mode = 'create'; // 'create' or 'edit'
-  /** @type {{ name: string, description: string, icon: string, color: string, asset_set_id: string|null, cql_query: string, column_config: any[], is_active: boolean } | null} */
-  export let assetReport = null;
-  export let channelId = null;
-  export let availableAssetSets = [];
-  export let isDarkMode = false;
+  let {
+    isOpen = false,
+    mode = 'create',
+    /** @type {{ name: string, description: string, icon: string, color: string, asset_set_id: string|null, cql_query: string, column_config: any[], is_active: boolean } | null} */
+    assetReport = null,
+    channelId = null,
+    availableAssetSets = [],
+    isDarkMode = false,
+    onsaved = undefined,
+    onclose = undefined
+  } = $props();
 
   let submitting = false;
   let error = null;
@@ -42,7 +43,7 @@
   let lastOpenState = false;
 
   // Consolidated reactive statement to handle modal state changes
-  $: {
+  $effect(() => {
     if (isOpen !== lastOpenState) {
       lastOpenState = isOpen;
 
@@ -91,7 +92,7 @@
         isFormInitialized = false;
       }
     }
-  }
+  });
 
   async function handleSubmit() {
     try {
@@ -134,7 +135,7 @@
 
       success = true;
       handleClose();
-      dispatch('saved');
+      onsaved?.();
     } catch (err) {
       console.error('Failed to save asset report:', err);
       error = err.message || t('portal.failedToSaveAssetReport');
@@ -144,7 +145,7 @@
   }
 
   function handleClose() {
-    dispatch('close');
+    onclose?.();
   }
 </script>
 

@@ -364,12 +364,14 @@
       emptyIcon={Circle}
       actionItems={buildScreenDropdownItems}
     >
-      <div slot="name" let:item={screen}>
-        <div class="font-semibold" style="color: var(--ds-text);">{screen.name}</div>
-        {#if screen.description}
-          <div class="text-sm mt-1" style="color: var(--ds-text-subtle);">{screen.description}</div>
-        {/if}
-      </div>
+      {#snippet name(screen)}
+        <div>
+          <div class="font-semibold" style="color: var(--ds-text);">{screen.name}</div>
+          {#if screen.description}
+            <div class="text-sm mt-1" style="color: var(--ds-text-subtle);">{screen.description}</div>
+          {/if}
+        </div>
+      {/snippet}
     </DataTable>
   {:else}
     <PageHeader

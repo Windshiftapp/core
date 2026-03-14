@@ -25,54 +25,54 @@
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
 
   // Props
-  export let collectionId = null; // When provided, load and edit this collection
+  let { collectionId = null } = $props(); // When provided, load and edit this collection
 
-  let workspaces = [];
-  let currentCollection = null; // Store the loaded collection data
-  let selectedWorkspaces = [];
-  let statuses = [];
-  let selectedStatuses = [];
-  let priorities = [];
-  let selectedPriorities = [];
+  let workspaces = $state([]);
+  let currentCollection = $state(null); // Store the loaded collection data
+  let selectedWorkspaces = $state([]);
+  let statuses = $state([]);
+  let selectedStatuses = $state([]);
+  let priorities = $state([]);
+  let selectedPriorities = $state([]);
 
-  let statusCategories = [];
-  let dynamicFilters = [];
+  let statusCategories = $state([]);
+  let dynamicFilters = $state([]);
   // Items are now managed by searchStore for reactivity
-  let itemsPagination = null;
-  let loading = true;
-  let searchQuery = '';
-  let currentPage = 1;
-  let itemsPerPage = 50;
+  let itemsPagination = $state(null);
+  let loading = $state(true);
+  let searchQuery = $state('');
+  let currentPage = $state(1);
+  let itemsPerPage = $state(50);
 
   // Subscribe to searchStore for reactive items and loading state
-  let storeState = {};
+  let storeState = $state({});
   searchStore.subscribe(value => storeState = value);
 
   // Reactive unpacking for items and loading
-  $: workItems = storeState.searchResults || [];
-  $: loadingItems = storeState.loading || false;
-  $: qlErrorFromStore = storeState.error;
+  let workItems = $derived(storeState.searchResults || []);
+  let loadingItems = $derived(storeState.loading || false);
+  let qlErrorFromStore = $derived(storeState.error);
 
   // QL state
-  let qlQuery = '';
-  let showQLInput = false;
-  let qlEvaluator = null;
-  let qlError = null;
-  let qlManuallyEdited = false;
+  let qlQuery = $state('');
+  let showQLInput = $state(false);
+  let qlEvaluator = $state(null);
+  let qlError = $state(null);
+  let qlManuallyEdited = $state(false);
 
   // Sidebar state
-  let sidebarCollapsed = false;
+  let sidebarCollapsed = $state(false);
 
 
   // Workspace association modal state
   // Read workspace return context from query param
-  let returnWorkspaceId = null;
-  let returnPath = null;
+  let returnWorkspaceId = $state(null);
+  let returnPath = $state(null);
 
-  let showWorkspaceAssociationModal = false;
-  let workspaceAssociationSelection = [];
-  let workspaceAssociationError = null;
-  let workspaceAssociationSaving = false;
+  let showWorkspaceAssociationModal = $state(false);
+  let workspaceAssociationSelection = $state([]);
+  let workspaceAssociationError = $state(null);
+  let workspaceAssociationSaving = $state(false);
 
   onMount(async () => {
     await loadWorkspaces();
@@ -436,55 +436,37 @@
     syncFiltersToSearchStore();
   }
 
-  // Event handlers for WorkItemFilter component
-  function handleUpdateWorkspaces(event) {
-    selectedWorkspaces = event.detail;
+  // Event handlers for sidebar filter callbacks
+  function handleUpdateWorkspaces(value) {
+    selectedWorkspaces = value;
     qlManuallyEdited = false;
     syncQLQuery();
   }
 
-  function handleUpdateStatuses(event) {
-    selectedStatuses = (event.detail || [])
-      .map(value => Number(value))
+  function handleUpdateStatuses(value) {
+    selectedStatuses = (value || [])
+      .map(v => Number(v))
       .filter(id => !Number.isNaN(id));
     qlManuallyEdited = false;
     syncQLQuery();
   }
 
-  function handleUpdatePriorities(event) {
-    selectedPriorities = (event.detail || [])
-      .map(value => Number(value))
+  function handleUpdatePriorities(value) {
+    selectedPriorities = (value || [])
+      .map(v => Number(v))
       .filter(id => !Number.isNaN(id));
     qlManuallyEdited = false;
     syncQLQuery();
   }
 
-  function handleUpdateSearch(event) {
-    searchQuery = event.detail;
+  function handleUpdateSearch(value) {
+    searchQuery = value;
     qlManuallyEdited = false;
     syncQLQuery();
   }
 
-  function handleUpdateQL(event) {
-    // Handle both old string format and new object format for backward compatibility
-    const detail = typeof event.detail === 'string'
-      ? { ql: event.detail, isManual: true }
-      : event.detail;
-
-    qlQuery = detail.ql;
-    qlManuallyEdited = detail.isManual;
-  }
-
-  function handleUpdateQLMode(event) {
-    showQLInput = event.detail;
-    if (!showQLInput) {
-      syncQLQuery(); // Sync UI filters to QL when hiding QL input
-    }
-    qlError = null;
-  }
-
-  function handleUpdateDynamicFilters(event) {
-    dynamicFilters = event.detail;
+  function handleUpdateDynamicFilters(value) {
+    dynamicFilters = value;
     qlManuallyEdited = false;
     syncQLQuery();
   }
@@ -579,11 +561,11 @@
   ];
 
   // Transform work items for DataTable
-  $: tableData = workItems.map(item => ({
+  let tableData = $derived(workItems.map(item => ({
     ...item,
     display_key: `${getWorkspaceKey(item.workspace_id)}-${item.id}`,
     workspace_name: getWorkspaceName(item.workspace_id)
-  }));
+  })));
 
   function viewItem(item) {
     navigate(`/workspaces/${item.workspace_id}/items/${item.id}`);
@@ -635,7 +617,7 @@
   async function handlePageChange(event) {
     await loadWorkItems(event.detail.page, event.detail.itemsPerPage);
   }
-  
+
   async function handlePageSizeChange(event) {
     await loadWorkItems(event.detail.page, event.detail.itemsPerPage);
   }
@@ -707,29 +689,35 @@
   }
 
   // Track previous search query to detect actual changes
-  let previousSearchQuery = searchQuery;
+  let previousSearchQuery = $state(searchQuery);
 
   // Reload items when search query actually changes (not on initial load)
-  $: if (searchQuery !== previousSearchQuery && !loading) {
-    previousSearchQuery = searchQuery;
-    currentPage = 1;
-    qlManuallyEdited = false; // Reset flag when using search
-    syncQLQuery();
-    syncURLParams(); // Update URL when search changes
-    loadWorkItems(1, itemsPerPage);
-  }
-  $: trimmedCollectionName = (currentCollection?.name || '').trim();
-  $: trimmedQlQuery = qlQuery.trim();
-  $: canSubmitCollection = Boolean(currentCollection && trimmedCollectionName && trimmedQlQuery);
-  $: associatedWorkspace = currentCollection?.workspace_id
+  $effect(() => {
+    if (searchQuery !== previousSearchQuery && !loading) {
+      previousSearchQuery = searchQuery;
+      currentPage = 1;
+      qlManuallyEdited = false; // Reset flag when using search
+      syncQLQuery();
+      syncURLParams(); // Update URL when search changes
+      loadWorkItems(1, itemsPerPage);
+    }
+  });
+
+  let trimmedCollectionName = $derived((currentCollection?.name || '').trim());
+  let trimmedQlQuery = $derived(qlQuery.trim());
+  let canSubmitCollection = $derived(Boolean(currentCollection && trimmedCollectionName && trimmedQlQuery));
+  let associatedWorkspace = $derived(currentCollection?.workspace_id
     ? workspaces.find(w => w.id === currentCollection.workspace_id)
-    : null;
-  $: associatedWorkspaceName = associatedWorkspace
+    : null);
+  let associatedWorkspaceName = $derived(associatedWorkspace
     ? `${associatedWorkspace.name}${associatedWorkspace.key ? ` (${associatedWorkspace.key})` : ''}`
-    : '';
-  $: if (workspaceAssociationSelection.length > 1) {
-    workspaceAssociationSelection = [workspaceAssociationSelection[workspaceAssociationSelection.length - 1]];
-  }
+    : '');
+
+  $effect(() => {
+    if (workspaceAssociationSelection.length > 1) {
+      workspaceAssociationSelection = [workspaceAssociationSelection[workspaceAssociationSelection.length - 1]];
+    }
+  });
 </script>
 
 <div class="min-h-screen flex" style="background-color: var(--ds-surface);">
@@ -742,12 +730,12 @@
     {selectedPriorities}
     {searchQuery}
     {dynamicFilters}
-    on:update-workspaces={handleUpdateWorkspaces}
-    on:update-statuses={handleUpdateStatuses}
-    on:update-priorities={handleUpdatePriorities}
-    on:update-search={handleUpdateSearch}
-    on:update-dynamic-filters={handleUpdateDynamicFilters}
-    on:execute-search={handleExecuteQL}
+    onupdateworkspaces={handleUpdateWorkspaces}
+    onupdatestatuses={handleUpdateStatuses}
+    onupdatepriorities={handleUpdatePriorities}
+    onupdatesearch={handleUpdateSearch}
+    onupdatedynamicfilters={handleUpdateDynamicFilters}
+    onexecutesearch={handleExecuteQL}
   />
 
   <!-- Main Content -->
@@ -760,11 +748,11 @@
       canSave={canSubmitCollection}
       categories={$collectionCategoriesStore}
       {returnPath}
-      on:save={updateCollectionDirectly}
-      on:associate-workspace={openAssociateWorkspaceModal}
-      on:name-change={(e) => { if (currentCollection) currentCollection.name = e.detail; }}
-      on:description-change={(e) => { if (currentCollection) currentCollection.description = e.detail; }}
-      on:category-change={(e) => { if (currentCollection) currentCollection.category_id = e.detail; }}
+      onsave={updateCollectionDirectly}
+      onassociateworkspace={openAssociateWorkspaceModal}
+      onnamechange={(value) => { if (currentCollection) currentCollection.name = value; }}
+      ondescriptionchange={(value) => { if (currentCollection) currentCollection.description = value; }}
+      oncategorychange={(value) => { if (currentCollection) currentCollection.category_id = value; }}
     />
 
     <!-- Always-visible QL Query Bar -->
@@ -772,10 +760,10 @@
       query={qlQuery}
       isEditing={showQLInput}
       error={qlError}
-      on:toggle-edit={() => showQLInput = !showQLInput}
-      on:execute={handleExecuteQL}
-      on:clear={() => { qlQuery = ''; qlManuallyEdited = false; syncQLQuery(); handleExecuteQL(); }}
-      on:query-change={(e) => { qlQuery = e.detail; qlManuallyEdited = true; }}
+      ontoggleedit={() => showQLInput = !showQLInput}
+      onexecute={handleExecuteQL}
+      onclear={() => { qlQuery = ''; qlManuallyEdited = false; syncQLQuery(); handleExecuteQL(); }}
+      onquerychange={(value) => { qlQuery = value; qlManuallyEdited = true; }}
     />
 
     <!-- Results Section -->
@@ -814,8 +802,8 @@
             totalItems={itemsPagination.total}
             itemsPerPage={itemsPagination.limit}
             maxItems={10000}
-            on:pageChange={handlePageChange}
-            on:pageSizeChange={handlePageSizeChange}
+            onpageChange={handlePageChange}
+            onpageSizeChange={handlePageSizeChange}
           />
         </div>
       {:else}

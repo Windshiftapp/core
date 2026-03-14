@@ -4,9 +4,7 @@
   import React from 'react';
   import "@excalidraw/excalidraw/index.css";
 
-  export let initialData = null;
-  export let onChange = () => {};
-  export let theme = 'light';
+  let { initialData = null, onChange = () => {}, theme = 'light' } = $props();
 
   let container;
   let excalidrawRef;

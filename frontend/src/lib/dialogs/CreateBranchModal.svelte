@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import Button from '../components/Button.svelte';
   import Label from '../components/Label.svelte';
@@ -11,33 +11,33 @@
   import { t } from '../stores/i18n.svelte.js';
   import { portal } from '../actions/portal.js';
 
-  export let itemId;
-  export let itemKey = '';
-  export let itemTitle = '';
+  let { itemId, itemKey = '', itemTitle = '', oncreated, onclose } = $props();
 
-  const dispatch = createEventDispatcher();
-
-  let loading = true;
-  let submitting = false;
-  let repositories = [];
-  let error = null;
+  let loading = $state(true);
+  let submitting = $state(false);
+  let repositories = $state([]);
+  let error = $state(null);
 
   // Form state
-  let selectedRepoId = null;
-  let branchName = '';
-  let baseBranch = '';
+  let selectedRepoId = $state(null);
+  let branchName = $state('');
+  let baseBranch = $state('');
 
-  $: selectedRepo = repositories.find(r => r.id === selectedRepoId);
+  let selectedRepo = $derived(repositories.find(r => r.id === selectedRepoId));
 
   // Generate default branch name when item key changes or repo is selected
-  $: if (itemKey && !branchName) {
-    branchName = generateBranchName(itemKey, itemTitle);
-  }
+  $effect(() => {
+    if (itemKey && !branchName) {
+      branchName = generateBranchName(itemKey, itemTitle);
+    }
+  });
 
   // Set default base branch when repo changes
-  $: if (selectedRepo && !baseBranch) {
-    baseBranch = selectedRepo.default_branch || 'main';
-  }
+  $effect(() => {
+    if (selectedRepo && !baseBranch) {
+      baseBranch = selectedRepo.default_branch || 'main';
+    }
+  });
 
   onMount(async () => {
     await loadRepositories();
@@ -89,7 +89,7 @@
 
       const result = await api.itemSCMLinks.createBranch(itemId, data);
       successToast(t('scm.branchCreatedSuccess'));
-      dispatch('created', result);
+      oncreated?.(result);
     } catch (err) {
       console.error('Failed to create branch:', err);
       error = err.message || t('scm.failedToCreateBranch');
@@ -100,7 +100,7 @@
   }
 
   function close() {
-    dispatch('close');
+    onclose?.();
   }
 </script>
 

@@ -137,7 +137,8 @@
                 style="border: 1px solid var(--ds-border);"
               >
                 <div class="flex-shrink-0 mr-3 mt-1">
-                  <svelte:component this={getNotificationIcon(notification.type)} class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+                  {@const NotifIcon = getNotificationIcon(notification.type)}
+                  <NotifIcon class="w-4 h-4" style="color: var(--ds-text-subtle);" />
                 </div>
                 <div class="flex-1 min-w-0">
                   <p class="text-base mb-1" style="color: var(--ds-text);">{notification.title}</p>
@@ -389,7 +390,8 @@
                     <div class="flex items-center gap-2">
                       <!-- Workspace Icon -->
                       <div class="w-6 h-6 rounded flex items-center justify-center flex-shrink-0" style="background-color: {workspace.color || '#3b82f6'};">
-                        <svelte:component this={workspaceIconMap[workspace.icon] || Grip} size={14} color="white" />
+                        {@const WsIcon = workspaceIconMap[workspace.icon] || Grip}
+                        <WsIcon size={14} color="white" />
                       </div>
                       <div>
                         <h3 class="text-sm" style="color: var(--ds-text);">

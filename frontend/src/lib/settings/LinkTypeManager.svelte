@@ -304,17 +304,17 @@
   actionItems={buildLinkTypeActionItems}
 >
   <!-- Name column with description -->
-  <div slot="name" let:item={linkType}>
+  {#snippet name(linkType)}
     <div>
       <div class="text-sm font-medium" style="color: var(--ds-text);">{linkType.name}</div>
       {#if linkType.description}
         <div class="text-sm" style="color: var(--ds-text-subtle);">{linkType.description}</div>
       {/if}
     </div>
-  </div>
+  {/snippet}
 
   <!-- Color column with preview and hex code -->
-  <div slot="color" let:item={linkType}>
+  {#snippet color(linkType)}
     <div class="flex items-center gap-2">
       <div
         class="w-6 h-6 rounded border border-gray-300"
@@ -322,8 +322,10 @@
       ></div>
       <span class="text-sm font-mono" style="color: var(--ds-text-subtle);">{linkType.color}</span>
     </div>
-  </div>
+  {/snippet}
 
   <!-- Status column with badge -->
-  <Lozenge slot="status" let:item={linkType} color={getStatusBadge(linkType).color} text={getStatusBadge(linkType).text} />
+  {#snippet status(linkType)}
+    <Lozenge color={getStatusBadge(linkType).color} text={getStatusBadge(linkType).text} />
+  {/snippet}
 </DataTable>

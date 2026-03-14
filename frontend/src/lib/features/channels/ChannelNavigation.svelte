@@ -71,7 +71,7 @@
           onmouseleave={(e) => { if (!isTypeActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
         >
           <div class="w-4 h-4 rounded bg-gradient-to-br {type.color} flex-shrink-0 flex items-center justify-center">
-            <svelte:component this={type.icon} class="w-2.5 h-2.5 text-white" />
+            <type.icon class="w-2.5 h-2.5 text-white" />
           </div>
           <span>{type.label}</span>
         </button>

@@ -276,7 +276,8 @@
 			{#each credentials as credential}
 				<div class="flex items-center justify-between p-4 border rounded hover-bg" style="border-color: var(--ds-border);">
 					<div class="flex items-center space-x-3">
-						<svelte:component this={getCredentialIcon(credential.credential_type)} class="h-6 w-6" style="color: var(--ds-icon-subtle);" />
+						{@const CredIcon = getCredentialIcon(credential.credential_type)}
+						<CredIcon class="h-6 w-6" style="color: var(--ds-icon-subtle);" />
 						<div>
 							<div class="font-medium" style="color: var(--ds-text);">{credential.name}</div>
 							<div class="text-sm" style="color: var(--ds-text-subtle);">

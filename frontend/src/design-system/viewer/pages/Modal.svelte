@@ -23,7 +23,7 @@
       Open Basic Modal
     </Button>
 
-    <Modal bind:isOpen={basicOpen} on:close={() => basicOpen = false}>
+    <Modal bind:isOpen={basicOpen} onclose={() => basicOpen = false}>
       <div class="p-6">
         <h3 class="text-lg font-semibold mb-2">Basic Modal</h3>
         <p class="text-gray-600 mb-4">
@@ -47,7 +47,7 @@
       </Button>
     </div>
 
-    <Modal bind:isOpen={customWidthOpen} maxWidth="max-w-2xl" on:close={() => customWidthOpen = false}>
+    <Modal bind:isOpen={customWidthOpen} maxWidth="max-w-2xl" onclose={() => customWidthOpen = false}>
       <div class="p-6">
         <h3 class="text-lg font-semibold mb-2">Wide Modal</h3>
         <p class="text-gray-600 mb-4">
@@ -100,13 +100,13 @@
 
     <Modal
       bind:isOpen={formOpen}
-      on:close={() => formOpen = false}
+      onclose={() => formOpen = false}
       onSubmit={() => {
         alert('Form submitted!')
         formOpen = false
       }}
-      let:submitHint
     >
+      {#snippet children(submitHint)}
       <div class="p-6">
         <h3 class="text-lg font-semibold mb-4">Create New Item</h3>
 
@@ -127,6 +127,7 @@
           </Button>
         </div>
       </div>
+      {/snippet}
     </Modal>
   </section>
 
@@ -212,7 +213,7 @@
         </thead>
         <tbody style="color: var(--ds-text-subtle);">
           <tr>
-            <td class="p-2"><code>on:close</code></td>
+            <td class="p-2"><code>onclose</code></td>
             <td class="p-2">Fired when modal is closed via backdrop click, X button, or Escape key</td>
           </tr>
         </tbody>

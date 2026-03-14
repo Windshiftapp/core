@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { X, Mail, User, Lock, Building2 } from 'lucide-svelte';
   import { portalStore } from '../stores/portal.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
@@ -7,7 +6,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import Button from '../components/Button.svelte';
 
-  const dispatch = createEventDispatcher();
+  let { onloginsuccess } = $props();
 
   let email = $state('');
   let password = $state('');
@@ -51,7 +50,7 @@
     if (result.success) {
       // Refresh portal auth state to detect internal user session
       await portalAuthStore.checkAuth(portalStore.currentSlug);
-      dispatch('loginsuccess');
+      onloginsuccess?.();
       closeModal();
     } else {
       internalError = authStore.error || 'Login failed';

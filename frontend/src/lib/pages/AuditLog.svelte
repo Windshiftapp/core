@@ -311,23 +311,33 @@
 				emptyMessage={t('auditLog.noAuditLogs')}
 				emptyIcon={FileText}
 			>
-				<div slot="user" let:item={log}>
-					<div class="font-medium" style="color: var(--ds-text);">{log.username}</div>
-					{#if log.user_id}
-						<div class="text-xs" style="color: var(--ds-text-subtle);">ID: {log.user_id}</div>
-					{/if}
-				</div>
+				{#snippet user(log)}
+					<div>
+						<div class="font-medium" style="color: var(--ds-text);">{log.username}</div>
+						{#if log.user_id}
+							<div class="text-xs" style="color: var(--ds-text-subtle);">ID: {log.user_id}</div>
+						{/if}
+					</div>
+				{/snippet}
 
-				<Lozenge slot="action" let:item={log} color={getActionBadgeColor(log.action_type)} text={log.action_type} />
+				{#snippet action(log)}
+					<Lozenge color={getActionBadgeColor(log.action_type)} text={log.action_type} />
+				{/snippet}
 
-				<div slot="resource" let:item={log}>
-					<div class="font-medium" style="color: var(--ds-text);">{log.resource_name || '—'}</div>
-					<div class="text-xs" style="color: var(--ds-text-subtle);">{log.resource_type}</div>
-				</div>
+				{#snippet resource(log)}
+					<div>
+						<div class="font-medium" style="color: var(--ds-text);">{log.resource_name || '—'}</div>
+						<div class="text-xs" style="color: var(--ds-text-subtle);">{log.resource_type}</div>
+					</div>
+				{/snippet}
 
-				<Lozenge slot="status" let:item={log} color={log.success ? 'green' : 'red'} text={log.success ? t('auditLog.success') : t('auditLog.failed')} />
+				{#snippet status(log)}
+					<Lozenge color={log.success ? 'green' : 'red'} text={log.success ? t('auditLog.success') : t('auditLog.failed')} />
+				{/snippet}
 
-				<Button slot="details" let:item={log} variant="ghost" icon={Eye} size="small" onclick={() => viewDetails(log)} title={t('common.viewDetails')} />
+				{#snippet details(log)}
+					<Button variant="ghost" icon={Eye} size="small" onclick={() => viewDetails(log)} title={t('common.viewDetails')} />
+				{/snippet}
 			</DataTable>
 
 			<!-- Pagination -->

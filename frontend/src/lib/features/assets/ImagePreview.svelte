@@ -1,13 +1,9 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { X, Download, ZoomIn, ZoomOut, RotateCw, Maximize2 } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
-  const dispatch = createEventDispatcher();
-  
   /** @type {{ id: string, original_filename: string, file_size: number, mime_type: string, uploader_name: string, [key: string]: any } | null} */
-  export let attachment = null;
-  export let show = false;
+  let { attachment = null, show = $bindable(false), onclose = undefined } = $props();
   
   let imageElement = null;
   let scale = 1;
@@ -20,10 +16,11 @@
   let initialTranslateX = 0;
   let initialTranslateY = 0;
   
-  // Reset transform when attachment changes
-  $: if (attachment) {
-    resetTransform();
-  }
+  $effect(() => {
+    if (attachment) {
+      resetTransform();
+    }
+  });
   
   function resetTransform() {
     scale = 1;
@@ -35,7 +32,7 @@
   function close() {
     show = false;
     resetTransform();
-    dispatch('close');
+    onclose?.();
   }
   
   async function download() {

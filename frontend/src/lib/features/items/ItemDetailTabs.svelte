@@ -5,24 +5,28 @@
   import Comments from '../items/Comments.svelte';
   import ItemHistory from '../items/ItemHistory.svelte';
   import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
-  import { createEventDispatcher } from 'svelte';
   import { formatDateTimeLocale, formatDateShort } from '../../utils/dateFormatter.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
 
-  const dispatch = createEventDispatcher();
+  let {
+    item,
+    workspace,
+    tab = 'comments',
+    moduleSettings = { time_tracking_enabled: true },
+    timeWorklogs = [],
+    activeTimer = null,
+    statusOptions = [],
+    onswitchtab = undefined,
+    onstarttimer = undefined,
+    onlogtime = undefined,
+    oneditworklog = undefined,
+    ondeleteworklog = undefined,
+  } = $props();
 
   // Delete confirmation state
-  let showDeleteConfirmation = false;
-  let worklogToDelete = null;
-
-  export let item;
-  export let workspace;
-  export let tab = 'comments';
-  export let moduleSettings = { time_tracking_enabled: true };
-  export let timeWorklogs = [];
-  export let activeTimer = null;
-  export let statusOptions = [];
+  let showDeleteConfirmation = $state(false);
+  let worklogToDelete = $state(null);
 
   function getStatusName(statusId) {
     if (!statusId) return '';
@@ -30,10 +34,10 @@
     return status?.name || '';
   }
 
-  let commentCount = 0;
+  let commentCount = $state(0);
 
   function switchTab(newTab) {
-    dispatch('switch-tab', { tab: newTab });
+    onswitchtab?.({ tab: newTab });
   }
   
   function getDefaultProjectForTimeLogging() {
@@ -54,11 +58,11 @@
   }
   
   function handleStartTimer() {
-    dispatch('start-timer');
+    onstarttimer?.();
   }
 
   function handleLogTime() {
-    dispatch('log-time');
+    onlogtime?.();
   }
   
   function handleCommentsLoaded(data) {
@@ -66,7 +70,7 @@
   }
 
   function handleEditWorklog(worklog) {
-    dispatch('edit-worklog', worklog);
+    oneditworklog?.(worklog);
   }
 
   function handleDeleteWorklog(worklog) {
@@ -96,7 +100,7 @@
 
   function confirmDeleteWorklog() {
     if (worklogToDelete) {
-      dispatch('delete-worklog', worklogToDelete);
+      ondeleteworklog?.(worklogToDelete);
     }
     showDeleteConfirmation = false;
     worklogToDelete = null;

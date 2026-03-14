@@ -215,7 +215,7 @@
                   closePopover();
                 }}
               >
-                <svelte:component this={TypeIcon} size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
+                <TypeIcon size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
                 <span>{itemType.name}</span>
               </button>
             {/each}

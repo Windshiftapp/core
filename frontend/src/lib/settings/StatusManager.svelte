@@ -299,24 +299,29 @@
       emptyIcon={Circle}
       actionItems={buildStatusDropdownItems}
     >
-      <div slot="status" let:item={status} class="flex items-center gap-3">
-        <h3 class="font-medium" style="color: var(--ds-text);">{status.name}</h3>
-        {#if status.is_default}
-          <Lozenge color="green" text={t('common.default')} />
-        {/if}
-      </div>
-      
-      <div slot="category" let:item={status} class="flex items-center gap-2">
-        <div
-          class="w-4 h-4 rounded border border-gray-300"
-          style="background-color: {getCategoryColor(status.category_id)};"
-        ></div>
-        <span class="font-medium" style="color: var(--ds-text);">{getCategoryName(status.category_id)}</span>
-      </div>
+      {#snippet status(status)}
+        <div class="flex items-center gap-3">
+          <h3 class="font-medium" style="color: var(--ds-text);">{status.name}</h3>
+          {#if status.is_default}
+            <Lozenge color="green" text={t('common.default')} />
+          {/if}
+        </div>
+      {/snippet}
+
+      {#snippet category(status)}
+        <div class="flex items-center gap-2">
+          <div
+            class="w-4 h-4 rounded border border-gray-300"
+            style="background-color: {getCategoryColor(status.category_id)};"
+          ></div>
+          <span class="font-medium" style="color: var(--ds-text);">{getCategoryName(status.category_id)}</span>
+        </div>
+      {/snippet}
     </DataTable>
   {/if}
 
-  <Modal isOpen={showCreateForm} onclose={cancelForm} maxWidth="max-w-lg" onSubmit={saveStatus} let:submitHint>
+  <Modal isOpen={showCreateForm} onclose={cancelForm} maxWidth="max-w-lg" onSubmit={saveStatus}>
+    {#snippet children(submitHint)}
     <!-- Modal header -->
     <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
       <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
@@ -378,6 +383,7 @@
         />
       </form>
     </div>
+    {/snippet}
   </Modal>
 </div>
 

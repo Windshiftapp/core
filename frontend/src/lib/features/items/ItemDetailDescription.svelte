@@ -5,13 +5,10 @@
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import AttachmentDiagramList from '../assets/AttachmentDiagramList.svelte';
   import AIActionsDropdown from './AIActionsDropdown.svelte';
-  import { createEventDispatcher } from 'svelte';
   import { getShortcut, matchesShortcut, getDisplayString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { attachmentStatus, aiStore } from '../../stores';
   import { onClickOutside } from 'runed';
-
-  const dispatch = createEventDispatcher();
 
   // Get shortcut configurations
   const saveShortcut = getShortcut('description', 'save');
@@ -19,8 +16,8 @@
 
   let {
     item,
-    editingDescription = false,
-    editDescription = '',
+    editingDescription = $bindable(false),
+    editDescription = $bindable(''),
     saving = false,
     availableSubIssueTypes = [],
     attachments = [],
@@ -28,6 +25,20 @@
     showLinkButton = true,
     manualActions = [],
     canCreate = false,
+    onsavefield = undefined,
+    oncanceledit = undefined,
+    onstartEditingDescription = undefined,
+    onshowAddLink = undefined,
+    oncreateSubIssue = undefined,
+    onimageuploaded = undefined,
+    onattachmentUpload = undefined,
+    onattachmentUploadFiles = undefined,
+    onattachmentDelete = undefined,
+    onnewDiagram = undefined,
+    oneditDiagram = undefined,
+    ondeleteDiagram = undefined,
+    onexecuteAction = undefined,
+    onaiaction = undefined,
   } = $props();
 
   let milkdownEditor = $state(null);
@@ -59,11 +70,11 @@
   // Handle image uploaded via editor
   function handleImageInsert(attachment) {
     // Dispatch to parent to refresh attachment list
-    dispatch('image-uploaded', { attachment });
+    onimageuploaded?.({ attachment });
   }
 
   function startEditingDescription() {
-    dispatch('start-editing-description');
+    onstartEditingDescription?.();
   }
 
   // Initialize editor content when editing starts
@@ -84,11 +95,11 @@
   });
 
   function saveDescription() {
-    dispatch('save-field', { field: 'description', value: editorContent });
+    onsavefield?.({ field: 'description', value: editorContent });
   }
 
   function cancelEdit() {
-    dispatch('cancel-edit', { field: 'description' });
+    oncanceledit?.({ field: 'description' });
   }
 
   function handleKeydown(event) {
@@ -104,19 +115,19 @@
   }
 
   function handleDeleteAttachment(attachment) {
-    dispatch('attachment-delete', attachment);
+    onattachmentDelete?.(attachment);
   }
 
   function handleNewDiagram() {
-    dispatch('new-diagram');
+    onnewDiagram?.();
   }
 
   function handleEditDiagram(diagram) {
-    dispatch('edit-diagram', diagram);
+    oneditDiagram?.(diagram);
   }
 
   function handleDeleteDiagram(diagram) {
-    dispatch('delete-diagram', diagram);
+    ondeleteDiagram?.(diagram);
   }
 
   // Handle click outside using runed
@@ -126,7 +137,7 @@
   );
 
   function handleExecuteAction(action) {
-    dispatch('execute-action', action);
+    onexecuteAction?.(action);
     showActionsMenu = false;
   }
 </script>
@@ -187,7 +198,7 @@
       <button
         class="action-btn inline-flex items-center gap-1.5 px-2 py-1.5 rounded text-xs transition-all"
         style="color: var(--ds-text-subtle);"
-        onclick={() => dispatch('show-add-link')}
+        onclick={() => onshowAddLink?.()}
         title={t('items.addLink')}
       >
         <Link2 class="w-4 h-4 flex-shrink-0" />
@@ -198,7 +209,7 @@
       <button
         class="action-btn inline-flex items-center gap-1.5 px-2 py-1.5 rounded text-xs transition-all"
         style="color: var(--ds-text-subtle);"
-        onclick={() => dispatch('create-sub-issue')}
+        onclick={() => oncreateSubIssue?.()}
         title={t('items.createChild')}
       >
         <Plus class="w-4 h-4 flex-shrink-0" />
@@ -220,7 +231,7 @@
           onchange={(e) => {
             const files = e.target.files;
             if (files?.length) {
-              dispatch('attachment-upload-files', { files: Array.from(files) });
+              onattachmentUploadFiles?.({ files: Array.from(files) });
             }
             e.target.value = '';
           }}
@@ -272,7 +283,7 @@
         {item}
         {availableSubIssueTypes}
         {canCreate}
-        on:ai-action
+        onaiaction={(data) => onaiaction?.(data)}
       />
     {/if}
   </div>
@@ -282,9 +293,9 @@
     <AttachmentDiagramList
       {attachments}
       {diagrams}
-      on:delete={e => handleDeleteAttachment(e.detail)}
-      on:edit-diagram={e => handleEditDiagram(e.detail)}
-      on:delete-diagram={e => handleDeleteDiagram(e.detail)}
+      ondelete={handleDeleteAttachment}
+      oneditdiagram={handleEditDiagram}
+      ondeletediagram={handleDeleteDiagram}
     />
   </div>
 </div>

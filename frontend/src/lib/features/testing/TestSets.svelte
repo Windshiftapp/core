@@ -317,8 +317,8 @@
     submitDisabled={!formData.name.trim()}
     maxWidth="max-w-2xl"
     onclose={() => showForm = false}
-    let:submitHint
   >
+    {#snippet children(submitHint)}
     <div class="p-6">
       <h3 class="text-xl font-semibold mb-6" style="color: var(--ds-text);">
         {editingSet ? t('testing.editTestPlan') : t('testing.addTestPlan')}
@@ -363,6 +363,7 @@
         </Button>
       </div>
     </div>
+    {/snippet}
   </Modal>
 
   <Modal

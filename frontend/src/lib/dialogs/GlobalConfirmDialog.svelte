@@ -1,8 +1,8 @@
 <script>
   import { confirmDialog } from '../composables/useConfirm.js';
   import ConfirmDialog from './ConfirmDialog.svelte';
-  
-  $: dialog = $confirmDialog;
+
+  let dialog = $derived($confirmDialog);
   
   function handleConfirm() {
     if (dialog.onConfirm) {

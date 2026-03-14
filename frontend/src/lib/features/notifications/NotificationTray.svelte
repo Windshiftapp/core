@@ -135,7 +135,7 @@
             >
               <NotificationCard
                 {notification}
-                on:close={closeDropdown}
+                onclose={closeDropdown}
               />
             </div>
           {/each}

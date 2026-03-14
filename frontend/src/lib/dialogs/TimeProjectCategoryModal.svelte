@@ -33,8 +33,8 @@
     submitDisabled={!formData.name.trim()}
     maxWidth="max-w-lg"
     onclose={handleCancel}
-    let:submitHint
   >
+    {#snippet children(submitHint)}
     <div class="p-6">
       <h3 class="text-xl font-semibold mb-6" style="color: var(--ds-text);">
         {isEditing ? t('timeProjectCategory.editCategory') : t('timeProjectCategory.newCategory')}
@@ -80,5 +80,6 @@
         </Button>
       </div>
     </div>
+    {/snippet}
   </Modal>
 {/if}

@@ -305,13 +305,14 @@
           textStyle={styles.textStyle}
           subtleTextStyle={styles.subtleTextStyle}
         >
-          <CollectionViewSwitcher
-            slot="actions"
-            {workspaceId}
-            {collectionId}
-            activeView="configure"
-            hasGradient={styles.hasCustomBackground}
-          />
+          {#snippet actions()}
+            <CollectionViewSwitcher
+              {workspaceId}
+              {collectionId}
+              activeView="configure"
+              hasGradient={styles.hasCustomBackground}
+            />
+          {/snippet}
         </ViewHeader>
 
         <!-- Configuration content in raised box -->

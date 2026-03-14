@@ -75,7 +75,8 @@
       {#if workspace.avatar || workspace.image}
         <img src={workspace.avatar || workspace.image} alt="" class="w-full h-full object-cover" />
       {:else}
-        <svelte:component this={getIconComponent(workspace.icon)} class="w-2 h-2" />
+        {@const WsIcon = getIconComponent(workspace.icon)}
+        <WsIcon class="w-2 h-2" />
       {/if}
     </div>
     <span class="font-medium">{workspace.key}</span>
@@ -90,7 +91,8 @@
           {#if workspace.avatar || workspace.image}
             <img src={workspace.avatar || workspace.image} alt="" class="w-full h-full object-cover" />
           {:else}
-            <svelte:component this={getIconComponent(workspace.icon)} class="w-3 h-3" />
+            {@const WsIcon = getIconComponent(workspace.icon)}
+            <WsIcon class="w-3 h-3" />
           {/if}
         </div>
       </div>

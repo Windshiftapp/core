@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import Modal from './Modal.svelte';
   import Button from '../components/Button.svelte';
   import Textarea from '../components/Textarea.svelte';
@@ -8,27 +7,28 @@
   import Checkbox from '../components/Checkbox.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  const dispatch = createEventDispatcher();
-
-  // Props
-  export let isOpen = false;
-  export let formData = {
-    name: '',
-    color: '#3b82f6',
-    description: '',
-    is_default: false,
-    is_completed: false
-  };
-  export let isEditing = false;
+  let {
+    isOpen = false,
+    formData = $bindable({
+      name: '',
+      color: '#3b82f6',
+      description: '',
+      is_default: false,
+      is_completed: false
+    }),
+    isEditing = false,
+    onsave = undefined,
+    oncancel = undefined
+  } = $props();
 
   function handleSubmit() {
     if (formData.name.trim()) {
-      dispatch('save');
+      onsave?.();
     }
   }
 
   function handleCancel() {
-    dispatch('cancel');
+    oncancel?.();
   }
 </script>
 
@@ -39,8 +39,8 @@
     submitDisabled={!formData.name.trim()}
     maxWidth="max-w-lg"
     onclose={handleCancel}
-    let:submitHint
   >
+    {#snippet children(submitHint)}
     <div class="p-6">
       <h3 class="text-xl font-semibold mb-6" style="color: var(--ds-text);">
         {isEditing ? t('statusCategory.editStatusCategory') : t('statusCategory.createStatusCategory')}
@@ -106,6 +106,7 @@
         </Button>
       </div>
     </div>
+    {/snippet}
   </Modal>
 {/if}
 

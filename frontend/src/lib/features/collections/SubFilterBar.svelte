@@ -19,8 +19,8 @@
     filters = [...filters, { field: null, operator: '=', value: '', values: [] }];
   }
 
-  function handleFilterChange(index, event) {
-    filters = filters.map((f, i) => i === index ? event.detail : f);
+  function handleFilterChange(index, data) {
+    filters = filters.map((f, i) => i === index ? data : f);
   }
 
   function handleFilterRemove(index) {
@@ -85,9 +85,9 @@
           <DynamicFieldFilter
             {filter}
             compact={true}
-            on:change={(e) => handleFilterChange(index, e)}
-            on:remove={() => handleFilterRemove(index)}
-            on:execute={applyFilters}
+            onchange={(data) => handleFilterChange(index, data)}
+            onremove={() => handleFilterRemove(index)}
+            onexecute={applyFilters}
           />
         {/each}
       </div>

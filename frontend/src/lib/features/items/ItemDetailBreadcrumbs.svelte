@@ -19,8 +19,8 @@
 } = $props();
   
   // We need access to item types to filter by hierarchy level
-  let itemTypes = [];
-  let validParentHierarchyLevel = null;
+  let itemTypes = $state([]);
+  let validParentHierarchyLevel = $state(null);
   
   // Parent editing state
   let showParentSelector = $state(false);
@@ -200,7 +200,8 @@
                 class="w-4 h-4 rounded flex items-center justify-center text-white text-xs cursor-help"
                 style="background-color: {parent.itemType.color};"
               >
-                <svelte:component this={iconMap[parent.itemType.icon] || FileText} class="w-3 h-3" />
+                {@const ParentIcon = iconMap[parent.itemType.icon] || FileText}
+                <ParentIcon class="w-3 h-3" />
               </div>
             {/snippet}
           </Tooltip>
@@ -339,7 +340,8 @@
                       style="background-color: {resultItemType.color};"
                       title={resultItemType.name}
                     >
-                      <svelte:component this={iconMap[resultItemType.icon] || FileText} class="w-3 h-3" />
+                      {@const ResultIcon = iconMap[resultItemType.icon] || FileText}
+                      <ResultIcon class="w-3 h-3" />
                     </div>
                   {/if}
 
@@ -369,7 +371,8 @@
             class="w-4 h-4 rounded flex items-center justify-center text-white text-xs cursor-help"
             style="background-color: {currentItemType.color};"
           >
-            <svelte:component this={iconMap[currentItemType.icon] || FileText} class="w-3 h-3" />
+            {@const CurrentIcon = iconMap[currentItemType.icon] || FileText}
+            <CurrentIcon class="w-3 h-3" />
           </div>
         {/snippet}
       </Tooltip>

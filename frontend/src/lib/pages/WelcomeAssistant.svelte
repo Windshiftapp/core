@@ -1,5 +1,5 @@
 <script>
-  import { onMount, createEventDispatcher } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { User, Blocks, Clock, ClipboardList, AlertCircle, Check } from 'lucide-svelte';
   import Modal from '../dialogs/Modal.svelte';
@@ -9,33 +9,34 @@
   import Toggle from '../components/Toggle.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  export let isOpen = true;
+  let {
+    isOpen = $bindable(true),
+    'onsetup-completed': onsetupCompleted = null
+  } = $props();
 
-  const dispatch = createEventDispatcher();
-
-  let currentStep = 1;
+  let currentStep = $state(1);
   let totalSteps = 2;
-  let setupStatus = null;
-  let loading = true;
-  let submitting = false;
-  let error = '';
+  let setupStatus = $state(null);
+  let loading = $state(true);
+  let submitting = $state(false);
+  let error = $state('');
 
   // Form data
-  let adminUser = {
+  let adminUser = $state({
     email: '',
     username: 'admin',
     first_name: '',
     last_name: '',
     password: '',
     confirmPassword: ''
-  };
+  });
 
-  let moduleSettings = {
+  let moduleSettings = $state({
     time_tracking_enabled: true,
     test_management_enabled: true
-  };
+  });
 
-  let keyboardDiv;
+  let keyboardDiv = $state(null);
 
   onMount(async () => {
     try {
@@ -143,9 +144,9 @@
       currentStep = totalSteps; // Show success step
 
       try {
-        dispatch('setup-completed', result);
-      } catch (dispatchError) {
-        console.error('Error dispatching setup-completed event:', dispatchError);
+        onsetupCompleted?.(result);
+      } catch (callbackError) {
+        console.error('Error calling setup-completed callback:', callbackError);
       }
 
       setTimeout(() => {
@@ -160,12 +161,14 @@
     }
   }
 
-  $: progressPercentage = ((currentStep - 1) / (totalSteps - 1)) * 100;
+  let progressPercentage = $derived(((currentStep - 1) / (totalSteps - 1)) * 100);
 
   // Refocus keyboard div when step changes
-  $: if (keyboardDiv && currentStep) {
-    setTimeout(() => keyboardDiv.focus(), 100);
-  }
+  $effect(() => {
+    if (keyboardDiv && currentStep) {
+      setTimeout(() => keyboardDiv.focus(), 100);
+    }
+  });
 </script>
 
 {#if !loading && isOpen}

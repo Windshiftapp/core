@@ -4,15 +4,15 @@
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
 
-  export let item;
-  export let workspace;
-  export let editingTitle = false;
-  export let editTitle = "";
-  export let saving = false;
-
-  // Event dispatchers
-  import { createEventDispatcher } from "svelte";
-  const dispatch = createEventDispatcher();
+  let {
+    item,
+    workspace,
+    editingTitle = $bindable(false),
+    editTitle = $bindable(''),
+    saving = false,
+    onsavefield = undefined,
+    oncanceledit = undefined,
+  } = $props();
 
 
   function startEditingTitle() {
@@ -33,7 +33,7 @@
       return;
     }
 
-    dispatch("save-field", { field: "title", value: trimmedTitle });
+    onsavefield?.({ field: "title", value: trimmedTitle });
   }
 
   function handleKeydown(event) {
@@ -42,7 +42,7 @@
       validateAndSaveTitle();
     } else if (event.key === "Escape") {
       event.preventDefault();
-      dispatch("cancel-edit", { field: "title" });
+      oncanceledit?.({ field: "title" });
     }
   }
 
@@ -79,7 +79,7 @@
               variant="default"
               size="small"
               icon={X}
-              onclick={() => dispatch("cancel-edit", { field: "title" })}
+              onclick={() => oncanceledit?.({ field: "title" })}
             />
           </div>
         </div>

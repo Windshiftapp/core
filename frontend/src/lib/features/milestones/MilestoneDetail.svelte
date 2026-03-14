@@ -216,7 +216,7 @@
     ];
   }
 
-  async function handleReleased(event) {
+  async function handleReleased(updatedMilestone) {
     showReleaseModal = false;
     await loadProgress();
   }
@@ -514,8 +514,8 @@
       milestone={milestone ?? { id: milestoneId, name: progress.milestone_name, description: progress.description }}
       {workspaceId}
       hasExistingRelease={milestone?.releases?.length > 0 || milestone?.latest_release != null}
-      on:released={handleReleased}
-      on:close={() => showReleaseModal = false}
+      onreleased={handleReleased}
+      onclose={() => showReleaseModal = false}
     />
   </Modal>
 {/if}
@@ -527,8 +527,8 @@
   onSubmit={saveMilestone}
   submitDisabled={!formData.name.trim()}
   maxWidth="max-w-2xl"
-  let:submitHint
 >
+  {#snippet children(submitHint)}
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{t('common.edit')}</h3>
   </div>
@@ -592,5 +592,6 @@
     showKeyboardHint={true}
     confirmKeyboardHint={submitHint}
   />
+  {/snippet}
 </Modal>
 

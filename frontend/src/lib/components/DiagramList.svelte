@@ -8,9 +8,7 @@
   import { confirm } from '../composables/useConfirm.js';
   import { formatDateTimeSimple } from '../utils/dateFormatter.js';
 
-  export let itemId;
-  export let onEdit = () => {};
-  export let onDelete = () => {};
+  let { itemId, onEdit = () => {}, onDelete = () => {} } = $props();
 
   let diagrams = [];
   let loading = true;

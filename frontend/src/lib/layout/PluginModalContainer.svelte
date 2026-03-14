@@ -5,7 +5,7 @@
 	import Label from '../components/Label.svelte';
 	import { t } from '../stores/i18n.svelte.js';
 
-	$: activeModals = $pluginModalRequests;
+	let activeModals = $derived($pluginModalRequests);
 </script>
 
 <!-- Render all active plugin modals -->

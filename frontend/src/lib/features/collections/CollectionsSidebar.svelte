@@ -7,24 +7,29 @@
   import Button from '../../components/Button.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import { api } from '../../api.js';
-  import { createEventDispatcher } from 'svelte';
 
-  const dispatch = createEventDispatcher();
-
-  // Props
-  export let collapsed = false;
-  export let workspaces = [];
-  export let selectedWorkspaces = [];
-  export let selectedStatuses = [];
-  export let selectedPriorities = [];
-  export let searchQuery = '';
-  export let dynamicFilters = [];
+  let {
+    collapsed = $bindable(false),
+    workspaces = [],
+    selectedWorkspaces = [],
+    selectedStatuses = [],
+    selectedPriorities = [],
+    searchQuery = '',
+    dynamicFilters = [],
+    ontogglecollapse = null,
+    onupdateworkspaces = null,
+    onupdatestatuses = null,
+    onupdatepriorities = null,
+    onupdatesearch = null,
+    onupdatedynamicfilters = null,
+    onexecutesearch = null,
+  } = $props();
 
   // Internal state
-  let allStatuses = [];
-  let allPriorities = [];
-  let showSearchModal = false;
-  let tempSearchQuery = '';
+  let allStatuses = $state([]);
+  let allPriorities = $state([]);
+  let showSearchModal = $state(false);
+  let tempSearchQuery = $state('');
 
   const SIDEBAR_STORAGE_KEY = 'collections-sidebar-collapsed';
 
@@ -59,22 +64,22 @@
   function toggleCollapse() {
     collapsed = !collapsed;
     localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed));
-    dispatch('toggle-collapse', collapsed);
+    ontogglecollapse?.(collapsed);
   }
 
   function handleWorkspacesChange(newValue) {
-    dispatch('update-workspaces', newValue);
-    dispatch('execute-search');
+    onupdateworkspaces?.(newValue);
+    onexecutesearch?.();
   }
 
   function handleStatusesChange(newValue) {
-    dispatch('update-statuses', newValue);
-    dispatch('execute-search');
+    onupdatestatuses?.(newValue);
+    onexecutesearch?.();
   }
 
   function handlePrioritiesChange(newValue) {
-    dispatch('update-priorities', newValue);
-    dispatch('execute-search');
+    onupdatepriorities?.(newValue);
+    onexecutesearch?.();
   }
 
   function openSearchModal() {
@@ -87,15 +92,15 @@
   }
 
   function applySearch() {
-    dispatch('update-search', tempSearchQuery);
-    dispatch('execute-search');
+    onupdatesearch?.(tempSearchQuery);
+    onexecutesearch?.();
     showSearchModal = false;
   }
 
   function clearSearch() {
     tempSearchQuery = '';
-    dispatch('update-search', '');
-    dispatch('execute-search');
+    onupdatesearch?.('');
+    onexecutesearch?.();
     showSearchModal = false;
   }
 
@@ -106,23 +111,23 @@
       value: '',
       values: []
     };
-    dispatch('update-dynamic-filters', [...dynamicFilters, newFilter]);
+    onupdatedynamicfilters?.([...dynamicFilters, newFilter]);
   }
 
   function removeDynamicFilter(index) {
-    dispatch('update-dynamic-filters', dynamicFilters.filter((_, i) => i !== index));
-    dispatch('execute-search');
+    onupdatedynamicfilters?.(dynamicFilters.filter((_, i) => i !== index));
+    onexecutesearch?.();
   }
 
-  function handleDynamicFilterChange(index, event) {
+  function handleDynamicFilterChange(index, data) {
     const updated = [...dynamicFilters];
-    updated[index] = event.detail;
-    dispatch('update-dynamic-filters', updated);
-    dispatch('execute-search');
+    updated[index] = data;
+    onupdatedynamicfilters?.(updated);
+    onexecutesearch?.();
   }
 
   function handleDynamicFilterExecute() {
-    dispatch('execute-search');
+    onexecutesearch?.();
   }
 </script>
 
@@ -230,9 +235,9 @@
           <DynamicFieldFilter
             {filter}
             compact={true}
-            on:change={(event) => handleDynamicFilterChange(index, event)}
-            on:remove={() => removeDynamicFilter(index)}
-            on:execute={handleDynamicFilterExecute}
+            onchange={(data) => handleDynamicFilterChange(index, data)}
+            onremove={() => removeDynamicFilter(index)}
+            onexecute={handleDynamicFilterExecute}
           />
         {/each}
 

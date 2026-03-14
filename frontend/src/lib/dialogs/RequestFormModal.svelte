@@ -279,7 +279,8 @@
       <!-- Icon -->
       <div class="flex justify-center mb-3">
         <div class="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-          <svelte:component this={iconMap[requestType?.icon] || Package} class="w-7 h-7 text-white" />
+          {@const RequestTypeIcon = iconMap[requestType?.icon] || Package}
+          <RequestTypeIcon class="w-7 h-7 text-white" />
         </div>
       </div>
 

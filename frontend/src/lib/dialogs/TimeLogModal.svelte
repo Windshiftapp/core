@@ -161,8 +161,8 @@
   maxWidth="max-w-2xl"
   onSubmit={handleSave}
   submitDisabled={!isFormValid}
-  let:submitHint
 >
+  {#snippet children(submitHint)}
   <!-- Header -->
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{editingWorklog ? t('time.editTimeEntry') : t('time.logTime')}</h3>
@@ -303,4 +303,5 @@
     showKeyboardHint={true}
     confirmKeyboardHint={submitHint}
   />
+  {/snippet}
 </Modal>

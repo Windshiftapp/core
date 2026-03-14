@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { api } from '../api.js';
   import Button from '../components/Button.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
@@ -10,34 +9,36 @@
   import DialogFooter from './DialogFooter.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  const dispatch = createEventDispatcher();
+  let {
+    isOpen = false,
+    mode = 'create',
+    requestType = null,
+    channelId = null,
+    availableItemTypes = [],
+    isDarkMode = false,
+    onsaved = undefined,
+    onclose = undefined
+  } = $props();
 
-  export let isOpen = false;
-  export let mode = 'create'; // 'create' or 'edit'
-  export let requestType = null;
-  export let channelId = null;
-  export let availableItemTypes = [];
-  export let isDarkMode = false;
-
-  let submitting = false;
-  let error = null;
-  let success = false;
+  let submitting = $state(false);
+  let error = $state(null);
+  let success = $state(false);
 
   // Form data
-  let formData = {
+  let formData = $state({
     name: '',
     description: '',
     icon: 'FileText',
     color: '#6b7280',
     item_type_id: null
-  };
+  });
 
   // Track if form has been initialized to prevent re-initialization
-  let isFormInitialized = false;
-  let lastOpenState = false;
+  let isFormInitialized = $state(false);
+  let lastOpenState = $state(false);
 
   // Consolidated reactive statement to handle modal state changes
-  $: {
+  $effect(() => {
     if (isOpen !== lastOpenState) {
       lastOpenState = isOpen;
 
@@ -77,7 +78,7 @@
         isFormInitialized = false;
       }
     }
-  }
+  });
 
   async function handleSubmit() {
     try {
@@ -116,7 +117,7 @@
 
       success = true;
       handleClose();
-      dispatch('saved');
+      onsaved?.();
     } catch (err) {
       console.error('Failed to save request type:', err);
       error = err.message || t('portal.failedToSaveRequestType');
@@ -126,7 +127,7 @@
   }
 
   function handleClose() {
-    dispatch('close');
+    onclose?.();
   }
 </script>
 

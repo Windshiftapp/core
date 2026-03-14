@@ -1,9 +1,6 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { X } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
-
-  const dispatch = createEventDispatcher();
 
   let {
     isOpen = false,
@@ -16,12 +13,13 @@
     showHeader = true,
     backdropOpacity = 0.4,
     backdropBlur = 'blur(8px)',
-    onClose = null
+    onClose = null,
+    header = undefined,
+    children = undefined
   } = $props();
 
   function close() {
     isOpen = false;
-    dispatch('close');
     onClose?.();
   }
 
@@ -68,7 +66,9 @@
           class={`${headerPaddingClass} border-b flex items-center justify-between`}
           style={`background-color: ${isDarkMode ? '#334155' : '#f9fafb'}; border-color: ${isDarkMode ? '#475569' : '#e5e7eb'};`}
         >
-          <slot name="header">
+          {#if header}
+            {@render header()}
+          {:else}
             <div>
               {#if title}
                 <h2 class="text-lg font-semibold" style={`color: ${isDarkMode ? '#e2e8f0' : '#111827'};`}>
@@ -81,7 +81,7 @@
                 </p>
               {/if}
             </div>
-          </slot>
+          {/if}
           <button
             onclick={close}
             class="p-2 rounded transition-all hover:bg-white/10"
@@ -93,7 +93,7 @@
       {/if}
 
       <div class={bodyClass}>
-        <slot />
+        {@render children?.()}
       </div>
       </div>
     </div>

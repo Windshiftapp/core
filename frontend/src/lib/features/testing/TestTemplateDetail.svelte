@@ -10,22 +10,22 @@
   import SectionHeader from '../../layout/SectionHeader.svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
-  let template = null;
-  let executions = [];
-  let testSet = null;
-  let loading = true;
-  let editMode = false;
-  let editName = '';
-  let editDescription = '';
+  let template = $state(null);
+  let executions = $state([]);
+  let testSet = $state(null);
+  let loading = $state(true);
+  let editMode = $state(false);
+  let editName = $state('');
+  let editDescription = $state('');
 
   // Dialog state
-  let showConfirmDialog = false;
-  let confirmMessage = '';
-  let confirmTitle = '';
-  let confirmAction = null;
+  let showConfirmDialog = $state(false);
+  let confirmMessage = $state('');
+  let confirmTitle = $state('');
+  let confirmAction = $state(null);
 
-  $: workspaceId = $currentRoute.params.id;
-  $: templateId = $currentRoute.params.templateId;
+  let workspaceId = $derived($currentRoute.params.id);
+  let templateId = $derived($currentRoute.params.templateId);
 
   function testPath(suffix = '') {
     const base = workspaceId ? `/workspaces/${workspaceId}/tests` : '/workspaces';

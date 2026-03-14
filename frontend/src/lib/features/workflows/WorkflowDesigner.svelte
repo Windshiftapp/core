@@ -6,14 +6,14 @@
   import Button from '../../components/Button.svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
-  let workflow = null;
-  let statuses = [];
-  let loading = true;
-  let loadingFlow = false;
-  let SvelteFlowDesigner = null;
+  let workflow = $state(null);
+  let statuses = $state([]);
+  let loading = $state(true);
+  let loadingFlow = $state(false);
+  let SvelteFlowDesigner = $state(null);
 
   // Get workflow ID from route params
-  $: workflowId = $currentRoute.params?.id;
+  let workflowId = $derived($currentRoute.params?.id);
 
   onMount(async () => {
     if (workflowId) {
@@ -107,8 +107,7 @@
     </div>
   {:else if SvelteFlowDesigner && workflow && statuses.length > 0}
     <div class="h-[calc(100vh-120px)]">
-      <svelte:component
-        this={SvelteFlowDesigner}
+      <SvelteFlowDesigner
         {workflow}
         {statuses}
         onSave={handleSave}

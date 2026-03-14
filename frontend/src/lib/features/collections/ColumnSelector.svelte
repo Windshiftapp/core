@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { createPopover, melt } from '@melt-ui/svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { Columns3, GripVertical, Check, ChevronDown, X, Plus, Lock, MoreHorizontal } from 'lucide-svelte';
@@ -8,13 +7,12 @@
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import SearchInput from '../../components/SearchInput.svelte';
 
-  const dispatch = createEventDispatcher();
-
   let {
     columns = [],
     customFieldDefinitions = [],
     canConfigure = true,
-    hasGradient = false
+    hasGradient = false,
+    onchange,
   } = $props();
 
   // Available system fields
@@ -177,7 +175,7 @@
 
   // Save changes
   function saveChanges() {
-    dispatch('change', { columns: editableColumns });
+    onchange?.({ columns: editableColumns });
     open.set(false);
   }
 
@@ -212,7 +210,7 @@
     showCustomFieldModal = false;
     customFieldSearchQuery = '';
     if (modalDirty) {
-      dispatch('change', { columns: editableColumns });
+      onchange?.({ columns: editableColumns });
       modalDirty = false;
     }
   }

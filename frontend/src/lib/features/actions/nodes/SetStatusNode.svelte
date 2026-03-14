@@ -6,17 +6,16 @@
   import { getHandlePositions } from './flowDirection.js';
   import StatusBadge from '../../../components/StatusBadge.svelte';
 
-  export let data = {};
-  export let selected = false;
+  let { data = {}, selected = false } = $props();
 
-  $: positions = getHandlePositions(actionFlowStore.direction);
+  let positions = $derived(getHandlePositions(actionFlowStore.direction));
 
   function getStatus(statusId) {
     if (!statusId || !data.statuses) return null;
     return data.statuses.find(s => s.id === statusId);
   }
 
-  $: status = data.config?.status_id ? getStatus(data.config.status_id) : null;
+  let status = $derived(data.config?.status_id ? getStatus(data.config.status_id) : null);
 </script>
 
 <div class="set-status-node action-flow-node" class:selected>

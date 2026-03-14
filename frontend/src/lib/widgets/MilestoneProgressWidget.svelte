@@ -4,7 +4,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { formatDateShort } from '../utils/dateFormatter.js';
 
-  export let milestones = [];
+  let { milestones = [] } = $props();
 
   const radius = 48;
   const circumference = 2 * Math.PI * radius;

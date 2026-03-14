@@ -619,21 +619,21 @@
         />
       {:else}
         <DataTable data={assetTypes} columns={typeColumns}>
-          <div slot="name" let:item={row}>
+          {#snippet name(row)}
             <span class="font-medium">{row.name}</span>
             {#if row.description}
               <p class="text-xs" style="color: var(--ds-text-subtle);">{row.description}</p>
             {/if}
-          </div>
-          <div slot="color" let:item={row}>
+          {/snippet}
+          {#snippet color(row)}
             <ColorDot color={row.color || '#6b7280'} size="lg" />
-          </div>
-          <div slot="status" let:item={row}>
+          {/snippet}
+          {#snippet status(row)}
             <Lozenge color={row.is_active ? 'green' : 'gray'}>
               {row.is_active ? 'Active' : 'Inactive'}
             </Lozenge>
-          </div>
-          <div slot="actions" let:item={row}>
+          {/snippet}
+          {#snippet actions(row)}
             <div class="flex gap-1">
               <Button variant="ghost" size="sm" onclick={() => showFieldsForm(row)} title="Configure Fields">
                 <Settings class="w-4 h-4" />
@@ -645,7 +645,7 @@
                 <Trash2 class="w-4 h-4 text-red-500" />
               </Button>
             </div>
-          </div>
+          {/snippet}
         </DataTable>
       {/if}
     {/if}
@@ -780,7 +780,7 @@
         />
       {:else}
         <DataTable data={allRoleAssignments()} columns={roleColumns}>
-          <div slot="assignee" let:item={row}>
+          {#snippet assignee(row)}
             <div class="flex items-center gap-2">
               {#if row.type === 'user'}
                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style="background-color: rgb(219 234 254); color: rgb(30 64 175);">
@@ -794,17 +794,17 @@
                 </span>
               {/if}
             </div>
-          </div>
-          <div slot="role" let:item={row}>
+          {/snippet}
+          {#snippet role(row)}
             <Lozenge color={row.role_name === 'Administrator' ? 'red' : row.role_name === 'Editor' ? 'yellow' : 'blue'}>
               {row.role_name}
             </Lozenge>
-          </div>
-          <div slot="actions" let:item={row}>
+          {/snippet}
+          {#snippet actions(row)}
             <Button variant="ghost" size="sm" onclick={() => revokeRole(row.id, row.type)}>
               <X class="w-4 h-4" style="color: var(--ds-text-danger);" />
             </Button>
-          </div>
+          {/snippet}
         </DataTable>
       {/if}
     {/if}

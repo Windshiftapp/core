@@ -2,12 +2,11 @@
   import { FolderOpen, CheckCircle, Clock, AlertCircle } from 'lucide-svelte';
   import StatCard from './StatCard.svelte';
 
-  export let stats = {
+  let { stats = {
     totalCollections: 0,
     itemsByStatusCategory: {},
     totalItems: 0
-  };
-  export let statusCategories = [];
+  }, statusCategories = [] } = $props();
 
   function getCategoryIcon(categoryName) {
     const name = categoryName.toLowerCase();

@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import Button from '../components/Button.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
@@ -10,21 +10,19 @@
   import { t } from '../stores/i18n.svelte.js';
   import { portal } from '../actions/portal.js';
 
-  export let itemId;
+  let { itemId, oncreated, onclose } = $props();
 
-  const dispatch = createEventDispatcher();
-
-  let loading = true;
-  let submitting = false;
-  let repositories = [];
-  let error = null;
+  let loading = $state(true);
+  let submitting = $state(false);
+  let repositories = $state([]);
+  let error = $state(null);
 
   // Form state
-  let selectedRepoId = null;
-  let linkType = 'pull_request';
-  let externalId = '';
-  let title = '';
-  let externalUrl = '';
+  let selectedRepoId = $state(null);
+  let linkType = $state('pull_request');
+  let externalId = $state('');
+  let title = $state('');
+  let externalUrl = $state('');
 
   onMount(async () => {
     await loadRepositories();
@@ -77,7 +75,7 @@
       };
 
       await api.itemSCMLinks.create(itemId, data);
-      dispatch('created');
+      oncreated?.();
     } catch (err) {
       console.error('Failed to create link:', err);
       error = err.message || t('scm.failedToCreateLink');
@@ -129,7 +127,7 @@
   }
 
   function close() {
-    dispatch('close');
+    onclose?.();
   }
 
   function getPlaceholder(type) {

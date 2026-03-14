@@ -2,42 +2,47 @@
   import { BaseEdge, EdgeReconnectAnchor, getBezierPath } from '@xyflow/svelte';
   import { t } from '../../../stores/i18n.svelte.js';
 
-  export let id;
-  export let sourceX;
-  export let sourceY;
-  export let targetX;
-  export let targetY;
-  export let sourcePosition;
-  export let targetPosition;
-  export let data = {};
-  export let markerEnd;
-  export let style;
-  export let sourceHandleId;
-  export let selected = false;
+  let {
+    id,
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    sourcePosition,
+    targetPosition,
+    data = {},
+    markerEnd,
+    style,
+    sourceHandleId,
+    selected = false,
+  } = $props();
 
-  let reconnecting = false;
+  let reconnecting = $state(false);
 
-  $: [edgePath, labelX, labelY] = getBezierPath({
+  let bezierResult = $derived(getBezierPath({
     sourceX,
     sourceY,
     sourcePosition,
     targetX,
     targetY,
     targetPosition
-  });
+  }));
+  let edgePath = $derived(bezierResult[0]);
+  let labelX = $derived(bezierResult[1]);
+  let labelY = $derived(bezierResult[2]);
 
-  $: edgeColor = sourceHandleId === 'true'
+  let edgeColor = $derived(sourceHandleId === 'true'
     ? 'var(--ds-success)'
     : sourceHandleId === 'false'
       ? 'var(--ds-danger)'
-      : 'var(--ds-border-bold)';
+      : 'var(--ds-border-bold)');
 
-  $: showLabel = sourceHandleId === 'true' || sourceHandleId === 'false';
-  $: labelText = sourceHandleId === 'true'
+  let showLabel = $derived(sourceHandleId === 'true' || sourceHandleId === 'false');
+  let labelText = $derived(sourceHandleId === 'true'
     ? t('actions.condition.true')
     : sourceHandleId === 'false'
       ? t('actions.condition.false')
-      : '';
+      : '');
 </script>
 
 <!-- Hide base edge during reconnection -->

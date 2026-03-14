@@ -368,7 +368,7 @@
             class="w-full px-3 py-2 text-left rounded-lg text-sm font-medium flex items-center gap-2 node-palette-item cursor-pointer"
             onclick={() => handleAddNode(item.type)}
           >
-            <svelte:component this={item.icon} class="w-4 h-4 flex-shrink-0" />
+            <item.icon class="w-4 h-4 flex-shrink-0" />
             <span>{item.label}</span>
           </button>
         {/each}

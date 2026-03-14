@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
   import InlineFieldEditor from '../../editors/InlineFieldEditor.svelte';
@@ -13,8 +12,6 @@
   import { Calendar, User, Target, Globe, Building2, FolderKanban } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { formatDate } from '../../utils/dateFormatter.js';
-
-  const dispatch = createEventDispatcher();
 
   let {
     item,
@@ -30,7 +27,9 @@
     users = [],
     projects = [],
     itemTypes = [],
-    customFieldDefinitions = []
+    customFieldDefinitions = [],
+    onitemUpdated,
+    onupdateError,
   } = $props();
 
   // Get the field definition for custom fields
@@ -50,9 +49,9 @@
   async function handleItemUpdate(field, value) {
     try {
       const updatedItem = await api.items.update(item.id, { [field]: value });
-      dispatch('item-updated', { item: updatedItem, field, value });
+      onitemUpdated?.({ item: updatedItem, field, value });
     } catch (error) {
-      dispatch('update-error', { error: error.message, field, value });
+      onupdateError?.({ error: error.message, field, value });
     }
   }
 
@@ -66,9 +65,9 @@
           [fieldIdentifier]: value
         }
       });
-      dispatch('item-updated', { item: updatedItem, field: fieldIdentifier, value });
+      onitemUpdated?.({ item: updatedItem, field: fieldIdentifier, value });
     } catch (error) {
-      dispatch('update-error', { error: error.message, field: fieldIdentifier, value });
+      onupdateError?.({ error: error.message, field: fieldIdentifier, value });
     }
   }
 
@@ -78,9 +77,9 @@
     try {
       await api.items.update(item.id, { status: newStatus });
       item.status = newStatus;
-      dispatch('item-updated', { item, field: 'status', value: newStatus });
+      onitemUpdated?.({ item, field: 'status', value: newStatus });
     } catch (error) {
-      dispatch('update-error', { error: error.message, field: 'status', value: newStatus });
+      onupdateError?.({ error: error.message, field: 'status', value: newStatus });
     }
   }
 
@@ -157,7 +156,8 @@
             style="background-color: {itemType.color};"
             title={itemType.name}
           >
-            <svelte:component this={itemTypeIconMap[itemType.icon] || itemTypeIconMap.FileText} class="w-3 h-3" />
+            {@const CellTypeIcon = itemTypeIconMap[itemType.icon] || itemTypeIconMap.FileText}
+            <CellTypeIcon class="w-3 h-3" />
           </div>
         {/if}
       {/if}
@@ -170,8 +170,8 @@
             placeholder="Enter title..."
             required={true}
             className="font-medium"
-            onitemUpdated={(detail) => dispatch('item-updated', detail)}
-            onupdateError={(detail) => dispatch('update-error', detail)}
+            onitemUpdated={(detail) => onitemUpdated?.(detail)}
+            onupdateError={(detail) => onupdateError?.(detail)}
           />
         {:else}
           <span class="font-medium truncate" style="color: var(--ds-text);">{item.title}</span>
@@ -417,8 +417,8 @@
         field="due_date"
         fieldType="date"
         placeholder="Set due date"
-        on:item-updated
-        on:update-error
+        onitemUpdated={(detail) => onitemUpdated?.(detail)}
+        onupdateError={(detail) => onupdateError?.(detail)}
       />
     {:else}
       <div class="flex items-center gap-1 text-sm whitespace-nowrap" style="color: var(--ds-text-subtle);">

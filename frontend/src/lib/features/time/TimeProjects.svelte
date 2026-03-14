@@ -386,7 +386,7 @@
     actionItems={buildProjectDropdownItems}
   >
     <!-- Project name with color dot and description -->
-    <div slot="project" let:item={project}>
+    {#snippet project(project)}
       <div class="flex items-center gap-2">
         {#if project.color}
           <ColorDot color={project.color} size="md" />
@@ -398,10 +398,10 @@
           {/if}
         </div>
       </div>
-    </div>
+    {/snippet}
 
     <!-- Category with color dot -->
-    <div slot="category" let:item={project}>
+    {#snippet category(project)}
       {#if project.category_name}
         <div class="flex items-center gap-2">
           {#if project.category_color}
@@ -412,25 +412,25 @@
       {:else}
         <span class="text-sm" style="color: var(--ds-text);">-</span>
       {/if}
-    </div>
+    {/snippet}
 
     <!-- Customer -->
-    <div slot="customer" let:item={project}>
+    {#snippet customer(project)}
       <span class="text-sm" style="color: var(--ds-text);">
         {project.customer_name || '-'}
       </span>
-    </div>
+    {/snippet}
 
     <!-- Status badge -->
-    <div slot="status" let:item={project}>
+    {#snippet status(project)}
       <Lozenge
         color={project.status === 'Active' ? 'green' : project.status === 'On Hold' ? 'yellow' : project.status === 'Completed' ? 'blue' : 'gray'}
         text={project.status || 'Active'}
       />
-    </div>
+    {/snippet}
 
     <!-- Hourly rate -->
-    <div slot="rate" let:item={project}>
+    {#snippet rate(project)}
       {#if project.hourly_rate > 0}
         <span class="text-sm font-medium" style="color: var(--ds-text);">
           ${project.hourly_rate.toFixed(2)}/hr
@@ -438,7 +438,7 @@
       {:else}
         <span class="text-sm" style="color: var(--ds-text-subtle);">-</span>
       {/if}
-    </div>
+    {/snippet}
   </DataTable>
 {:else if activeTab === 'categories'}
   <TimeProjectCategories />

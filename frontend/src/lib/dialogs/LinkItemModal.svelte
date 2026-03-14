@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import Modal from './Modal.svelte';
   import ModalHeader from './ModalHeader.svelte';
   import DialogFooter from './DialogFooter.svelte';
@@ -9,7 +8,6 @@
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
 
-  const dispatch = createEventDispatcher();
   const iconMap = itemTypeIconMap;
   const TEST_LINK_TYPE_ID = 1;
 
@@ -134,14 +132,7 @@
   function handleSubmit() {
     if (!canSubmit) return;
 
-    if (onsubmit) {
-      onsubmit({
-        link_type_id: formData.link_type_id,
-        target_id: formData.target_id,
-        target_type: formData.target_type
-      });
-    }
-    dispatch('submit', {
+    onsubmit?.({
       link_type_id: formData.link_type_id,
       target_id: formData.target_id,
       target_type: formData.target_type
@@ -162,7 +153,6 @@
     highlightedIndex = -1;
     isOpen = false;
     oncancel?.();
-    dispatch('cancel');
   }
 </script>
 
@@ -172,8 +162,8 @@
   onclose={handleClose}
   onSubmit={handleSubmit}
   submitDisabled={!canSubmit}
-  let:submitHint
 >
+  {#snippet children(submitHint)}
   <ModalHeader
     title={t('items.addLink')}
     onClose={handleClose}
@@ -275,7 +265,8 @@
                           class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
                           style="background-color: {itemTypeColor || '#6b7280'}20; color: {itemTypeColor || '#6b7280'};"
                         >
-                          <svelte:component this={iconMap[itemTypeIcon]} class="w-3 h-3" />
+                          {@const ItemTypeIconComponent = iconMap[itemTypeIcon]}
+                        <ItemTypeIconComponent class="w-3 h-3" />
                         </div>
                       {:else}
                         <div
@@ -318,4 +309,5 @@
     confirmKeyboardHint={submitHint}
     showKeyboardHint={true}
   />
+  {/snippet}
 </Modal>

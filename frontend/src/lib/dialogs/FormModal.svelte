@@ -67,8 +67,8 @@
     submitDisabled={saveDisabled || saving}
     {maxWidth}
     onclose={handleCancel}
-    let:submitHint
   >
+    {#snippet children(submitHint)}
     <!-- Header -->
     <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
       <div class="flex items-center justify-between">
@@ -108,5 +108,6 @@
         class="mx-0"
       />
     {/if}
+    {/snippet}
   </Modal>
 {/if}

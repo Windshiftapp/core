@@ -15,24 +15,24 @@
   import { confirm } from '../composables/useConfirm.js';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 
-  export let workspaceId;
+  let { workspaceId } = $props();
 
-  let members = [];
-  let roles = [];
-  let loading = true;
-  let error = null;
+  let members = $state([]);
+  let roles = $state([]);
+  let loading = $state(true);
+  let error = $state(null);
   const defaultRoleOrder = ['Viewer', 'Editor', 'Tester', 'Administrator'];
 
   // Add member modal state
-  let showModal = false;
-  let selectedUserId = null;
-  let selectedRoleId = null;
-  let adding = false;
+  let showModal = $state(false);
+  let selectedUserId = $state(null);
+  let selectedRoleId = $state(null);
+  let adding = $state(false);
 
   // Search and pagination state
-  let searchQuery = '';
-  let currentPage = 1;
-  let itemsPerPage = 20;
+  let searchQuery = $state('');
+  let currentPage = $state(1);
+  let itemsPerPage = $state(20);
 
   onMount(async () => {
     await loadData();
@@ -197,7 +197,7 @@
   }
 
   // Search filtering
-  $: filteredMembers = members.filter(member => {
+  let filteredMembers = $derived(members.filter(member => {
     if (!searchQuery.trim()) return true;
 
     const query = searchQuery.toLowerCase();
@@ -207,18 +207,24 @@
       member.email?.toLowerCase().includes(query) ||
       member.username?.toLowerCase().includes(query)
     );
-  });
+  }));
 
   // Pagination
-  $: paginatedMembers = filteredMembers.slice(
+  let paginatedMembers = $derived(filteredMembers.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
-  );
+  ));
 
   // Reset to page 1 when search changes
-  $: if (searchQuery) {
-    currentPage = 1;
-  }
+  let prevSearchQuery = $state('');
+  $effect(() => {
+    if (searchQuery !== prevSearchQuery) {
+      prevSearchQuery = searchQuery;
+      if (searchQuery) {
+        currentPage = 1;
+      }
+    }
+  });
 
   // Event handlers for pagination
   function handlePageChange(event) {
@@ -330,7 +336,7 @@
       emptyIcon={Shield}
       actionItems={getActionItems}
     >
-      <svelte:fragment slot="user" let:item>
+      {#snippet user(item)}
         <div class="flex items-center gap-3">
           <Avatar
             src={item.avatar_url}
@@ -344,9 +350,9 @@
             <Text size="xs" variant="subtle">{item.email}</Text>
           </div>
         </div>
-      </svelte:fragment>
+      {/snippet}
 
-      <svelte:fragment slot="role" let:item>
+      {#snippet role(item)}
         <div class="flex flex-wrap gap-2">
           {#each item.roles as role}
             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium" style={getRoleBadgeStyle(role.role_id)}>
@@ -355,7 +361,7 @@
             </span>
           {/each}
         </div>
-      </svelte:fragment>
+      {/snippet}
     </DataTable>
 
     {#if filteredMembers.length > 0}
@@ -382,8 +388,8 @@
   submitDisabled={!selectedUserId || !selectedRoleId || adding}
   maxWidth="max-w-2xl"
   onclose={handleCancel}
-  let:submitHint
 >
+  {#snippet children(submitHint)}
   <div class="p-6">
     <h2 class="text-xl font-semibold mb-6" style="color: var(--ds-text);">
       Add Workspace Member
@@ -430,4 +436,5 @@
       </Button>
     </div>
   </div>
+  {/snippet}
 </Modal>

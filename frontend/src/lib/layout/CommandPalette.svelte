@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { createCombobox, melt } from '@melt-ui/svelte';
   import { scale } from 'svelte/transition';
   import { backOut } from 'svelte/easing';
@@ -12,16 +11,17 @@
   import { confirm } from '../composables/useConfirm.js';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
 
-  const dispatch = createEventDispatcher();
-  
-  export let isOpen = false;
-  export let additionalCommands = [];
-  
-  let workspaces = [];
-  let workItems = [];
-  let loadingData = false;
+  let {
+    isOpen = $bindable(false),
+    additionalCommands = [],
+    onclose,
+  } = $props();
+
+  let workspaces = $state([]);
+  let workItems = $state([]);
+  let loadingData = $state(false);
   let searchTimeout;
-  
+
   // Load data for quick actions
   async function loadData() {
     try {
@@ -34,7 +34,7 @@
       loadingData = false;
     }
   }
-  
+
   // Search work items dynamically
   async function searchWorkItems(query) {
     if (!query || query.length < 2) {
@@ -54,7 +54,7 @@
       workItems = [];
     }
   }
-  
+
   // Debounced work item search
   function debouncedSearchWorkItems(query) {
     clearTimeout(searchTimeout);
@@ -62,7 +62,7 @@
       searchWorkItems(query);
     }, 300);
   }
-  
+
   function getWorkspaceTestBase() {
     const workspaceId = $currentRoute.params?.id;
     return workspaceId ? `/workspaces/${workspaceId}/tests` : '/workspaces';
@@ -151,7 +151,7 @@
 
     return commands;
   }
-  
+
   // Quick workspace navigation commands
   function createWorkspaceCommands() {
     const workspaceCommands = [];
@@ -175,14 +175,14 @@
   // Workspace context commands (only show when in a workspace)
   function createWorkspaceContextCommands() {
     const currentWorkspaceId = $currentRoute.params?.id;
-    const contextCommands = [];
+    const ctxCommands = [];
 
     if (currentWorkspaceId && ['workspace-detail', 'workspace-settings', 'workspace-board', 'workspace-list', 'workspace-tree', 'workspace-map', 'item-detail'].includes($currentRoute.view)) {
       // Find current workspace name
       const currentWorkspace = workspaces.find(w => w.id === parseInt(currentWorkspaceId));
       const workspaceName = currentWorkspace ? currentWorkspace.name : 'Current Workspace';
 
-      contextCommands.push({
+      ctxCommands.push({
         id: 'workspace-overview',
         label: t('commandPalette.commands.workspaceOverview.label', { name: workspaceName }),
         description: t('commandPalette.commands.workspaceOverview.description'),
@@ -192,9 +192,9 @@
       });
     }
 
-    return contextCommands;
+    return ctxCommands;
   }
-  
+
   // Work item commands from search results
   function createWorkItemCommands() {
     return workItems.map(item => {
@@ -220,9 +220,9 @@
       };
     });
   }
-  
+
   // Combine all commands with proper priority ordering
-  $: commands = [
+  let commands = $derived([
     // Priority 1: Context-sensitive commands (highest priority)
     ...$contextCommands,
 
@@ -240,56 +240,56 @@
 
     // Priority 6: Work item search results (lowest priority)
     ...(workItems.length > 0 ? createWorkItemCommands() : [])
-  ];
-  
-  
-  
+  ]);
+
+
+
   // Fuzzy search function
   function fuzzyMatch(text, search) {
     const searchLower = search.toLowerCase();
     const textLower = text.toLowerCase();
-    
+
     // Exact match gets highest score
     if (textLower.includes(searchLower)) {
       return 100;
     }
-    
+
     // Fuzzy match - check if all search characters appear in order
     let searchIndex = 0;
     let score = 0;
-    
+
     for (let i = 0; i < textLower.length && searchIndex < searchLower.length; i++) {
       if (textLower[i] === searchLower[searchIndex]) {
         score += 10;
         searchIndex++;
       }
     }
-    
+
     // Return score if all characters were found
     return searchIndex === searchLower.length ? score : 0;
   }
-  
+
   function searchCommands(query, commandsList = commands) {
     if (!query.trim()) return commandsList;
-    
+
     const results = commandsList.map(cmd => {
       // Search in label, keywords, and description
       const labelScore = fuzzyMatch(cmd.label, query);
       const keywordScore = cmd.keywords.length > 0 ? Math.max(...cmd.keywords.map(k => fuzzyMatch(k, query))) : 0;
       const descScore = fuzzyMatch(cmd.description, query);
-      
+
       const maxScore = Math.max(labelScore, keywordScore, descScore);
-      
+
       return {
         ...cmd,
         score: maxScore
       };
     }).filter(cmd => cmd.score > 0)
       .sort((a, b) => b.score - a.score);
-    
+
     return results;
   }
-  
+
   // Create combobox without portal
   const {
     elements: { menu, input, option },
@@ -299,39 +299,45 @@
     forceVisible: true,
     portal: null
   });
-  
+
   // Sync with parent component
-  $: if (isOpen !== $open) {
-    open.set(isOpen);
-  }
-  
+  $effect(() => {
+    if (isOpen !== $open) {
+      open.set(isOpen);
+    }
+  });
+
   // Trigger work item search when input changes
-  $: if ($inputValue && $inputValue.length >= 2) {
-    debouncedSearchWorkItems($inputValue);
-  } else if ($inputValue.length < 2) {
-    workItems = [];
-  }
+  $effect(() => {
+    if ($inputValue && $inputValue.length >= 2) {
+      debouncedSearchWorkItems($inputValue);
+    } else if ($inputValue.length < 2) {
+      workItems = [];
+    }
+  });
 
   // Update filtered commands based on input and commands array, limit to 4 items
   // Make explicit dependency on commands to ensure reactivity when workItems change
-  $: filteredCommands = searchCommands($inputValue, commands).slice(0, 4);
-  
-  let userInteracted = false;
-  
+  let filteredCommands = $derived(searchCommands($inputValue, commands).slice(0, 4));
+
+  let userInteracted = $state(false);
+
   // Auto-select first result when typing (but don't execute)
-  $: if (filteredCommands.length > 0 && $inputValue.trim() && !userInteracted) {
-    const firstCommand = filteredCommands[0];
-    selected.set({ value: firstCommand.id, label: firstCommand.label });
-  }
-  
+  $effect(() => {
+    if (filteredCommands.length > 0 && $inputValue.trim() && !userInteracted) {
+      const firstCommand = filteredCommands[0];
+      selected.set({ value: firstCommand.id, label: firstCommand.label });
+    }
+  });
+
   // Handle selection only when user explicitly selects (Enter key or click)
   // Don't auto-execute on selection change
-  
+
   // Navigate to admin tab function
   function navigateToAdminTab(tab) {
     navigate(`/admin/${tab}`);
   }
-  
+
   async function executeCommand(command) {
     if (command.type === 'context-action') {
       // Handle context-sensitive commands
@@ -376,7 +382,7 @@
         }, 100);
         return;
       }
-      
+
       // Show create modal with specific type for other create commands
       // Use window event for consistency with other components and reliability with dynamic loading
       const currentWorkspaceId = $currentRoute.params?.id;
@@ -455,14 +461,14 @@
       close();
     }
   }
-  
+
   function close() {
     isOpen = false;
     open.set(false);
     inputValue.set('');
-    dispatch('close');
+    onclose?.();
   }
-  
+
   // Handle keyboard interactions (Escape handled by ModalBackdrop)
   function handleKeydown(e) {
     if (!isOpen) return;
@@ -476,23 +482,27 @@
       userInteracted = true;
     }
   }
-  
-  let searchInputRef;
-  
+
+  let searchInputRef = $state(null);
+
   // Load data and focus input when opened
-  $: if (isOpen) {
-    loadData();
-    // Initialize timer to get latest state
-    timerStore.initialize();
-  }
-  
+  $effect(() => {
+    if (isOpen) {
+      loadData();
+      // Initialize timer to get latest state
+      timerStore.initialize();
+    }
+  });
+
   // Focus the search input when opened
-  $: if (isOpen && searchInputRef) {
-    setTimeout(() => {
-      searchInputRef.focus();
-      searchInputRef.select();
-    }, 50);
-  }
+  $effect(() => {
+    if (isOpen && searchInputRef) {
+      setTimeout(() => {
+        searchInputRef.focus();
+        searchInputRef.select();
+      }, 50);
+    }
+  });
 </script>
 
 <style>
@@ -543,7 +553,7 @@
   }
 </style>
 
-<svelte:window on:keydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} />
 
 <ModalBackdrop bind:show={isOpen} opacity={0.4} blur={8} extraFilter="saturate(120%)" zIndex={60} align="top" paddingTop="pt-[20vh]" onclose={close}>
     <!-- Input Container with scale entrance -->
@@ -563,7 +573,7 @@
             style="color: var(--ds-text);"
           />
         </div>
-        
+
         <!-- Menu positioned directly after input -->
         {#if $open}
           <div
@@ -606,7 +616,7 @@
                 {/each}
               </div>
             {/if}
-            
+
             <!-- Footer - Help section moved to bottom of dropdown -->
             <div class="p-3 border-t" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
               <div class="flex justify-between text-xs mb-2" style="color: var(--ds-text-subtle);">

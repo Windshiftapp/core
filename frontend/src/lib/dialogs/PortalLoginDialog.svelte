@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher, tick } from 'svelte';
+  import { tick } from 'svelte';
   import { authStore } from '../stores';
   import { api } from '../api.js';
   import { Eye, EyeOff, Lock, User, AlertCircle, X } from 'lucide-svelte';
@@ -14,11 +14,12 @@
   } from '../utils/loginUtils.js';
   import { t } from '../stores/i18n.svelte.js';
 
-  const dispatch = createEventDispatcher();
-
-  export let isOpen = false;
-  export let gradientValue = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-  export let isDarkMode = false;
+  let {
+    isOpen = $bindable(false),
+    gradientValue = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    isDarkMode = false,
+    onsuccess = undefined
+  } = $props();
 
   let emailOrUsername = '';
   let password = '';
@@ -32,20 +33,24 @@
   // Focus the first input when dialog opens
   let emailInput;
 
-  $: if (isOpen && emailInput) {
-    tick().then(() => {
-      try {
-        emailInput?.focus();
-      } catch (error) {
-        console.warn('Failed to focus email input:', error);
-      }
-    });
-  }
+  $effect(() => {
+    if (isOpen && emailInput) {
+      tick().then(() => {
+        try {
+          emailInput?.focus();
+        } catch (error) {
+          console.warn('Failed to focus email input:', error);
+        }
+      });
+    }
+  });
 
   // Clear form when dialog closes
-  $: if (!isOpen) {
-    clearForm();
-  }
+  $effect(() => {
+    if (!isOpen) {
+      clearForm();
+    }
+  });
 
   function clearForm() {
     const baseState = getBaseLoginState();
@@ -90,7 +95,7 @@
         // Update auth store with user info
         authStore.setAuthData(loginResult.user, loginResult.session);
         isOpen = false;
-        dispatch('success');
+        onsuccess?.();
       } else {
         throw new Error(loginResult.message || 'FIDO authentication failed');
       }
@@ -128,7 +133,7 @@
 
     if (result.success) {
       isOpen = false;
-      dispatch('success');
+      onsuccess?.();
     }
   }
 

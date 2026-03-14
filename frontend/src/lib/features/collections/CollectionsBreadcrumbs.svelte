@@ -4,20 +4,23 @@
   import { SquareKanban, Save, Tag } from 'lucide-svelte';
   import Button from '../../components/Button.svelte';
   import Select from '../../components/Select.svelte';
-  import { createEventDispatcher } from 'svelte';
 
-  const dispatch = createEventDispatcher();
-
-  // Props
-  export let collection = null;
-  export let workspace = null;
-  export let isEditing = false;
-  export let canSave = false;
-  export let categories = [];
-  export let returnPath = null;
+  let {
+    collection = null,
+    workspace = null,
+    isEditing = false,
+    canSave = false,
+    categories = [],
+    returnPath = null,
+    onsave = null,
+    onassociateworkspace = null,
+    onnamechange = null,
+    ondescriptionchange = null,
+    oncategorychange = null,
+  } = $props();
 
   // Computed: is this a global collection (no workspace)?
-  $: isGlobal = !collection?.workspace_id;
+  let isGlobal = $derived(!collection?.workspace_id);
 
   function handleNavigateWorkspaces() {
     navigate('/workspaces');
@@ -38,29 +41,29 @@
   }
 
   function handleSave() {
-    dispatch('save');
+    onsave?.();
   }
 
   function handleAssociateWorkspace() {
-    dispatch('associate-workspace');
+    onassociateworkspace?.();
   }
 
   function handleNameChange(event) {
-    dispatch('name-change', event.target.value);
+    onnamechange?.(event.target.value);
   }
 
   function handleDescriptionChange(event) {
-    dispatch('description-change', event.target.value);
+    ondescriptionchange?.(event.target.value);
   }
 
   function handleCategoryChange(event) {
     const value = event.target.value;
-    dispatch('category-change', value === '' || value === 'null' ? null : parseInt(value, 10));
+    oncategorychange?.(value === '' || value === 'null' ? null : parseInt(value, 10));
   }
 
-  $: workspaceName = workspace?.name
+  let workspaceName = $derived(workspace?.name
     ? `${workspace.name}${workspace.key ? ` (${workspace.key})` : ''}`
-    : '';
+    : '');
 </script>
 
 <div class="mb-4">

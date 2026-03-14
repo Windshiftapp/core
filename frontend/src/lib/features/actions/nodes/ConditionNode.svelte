@@ -5,11 +5,10 @@
   import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
   import { getConditionOutputPositions } from './flowDirection.js';
 
-  export let data = {};
-  export let selected = false;
+  let { data = {}, selected = false } = $props();
 
-  $: condPositions = getConditionOutputPositions(actionFlowStore.direction);
-  $: isVertical = actionFlowStore.direction === 'vertical';
+  let condPositions = $derived(getConditionOutputPositions(actionFlowStore.direction));
+  let isVertical = $derived(actionFlowStore.direction === 'vertical');
 
   function getOperatorSymbol(operator) {
     const symbols = {

@@ -350,7 +350,8 @@
       <!-- Header -->
       <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color: var(--ds-border);">
         <div class="flex items-center gap-3">
-          <svelte:component this={getChannelTypeIcon(channel.type)} class="w-6 h-6" style="color: var(--ds-text);" />
+          {@const ChannelTypeIcon = getChannelTypeIcon(channel.type)}
+          <ChannelTypeIcon class="w-6 h-6" style="color: var(--ds-text);" />
           <div>
             <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
               {channel.name}

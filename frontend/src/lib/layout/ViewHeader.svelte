@@ -1,14 +1,17 @@
 <script>
   import { t } from '../stores/i18n.svelte.js';
 
-  export let workspaceName = '';
-  export let collection = '';
-  export let viewName = '';
-  export let itemCount = null;
-  export let actionButtons = null; // Slot for action buttons on the right
-  export let hasGradient = false; // Whether gradient is active
-  export let textStyle = 'color: var(--ds-text);'; // Main text color style
-  export let subtleTextStyle = 'color: var(--ds-text-subtle);'; // Subtle text color style
+  let {
+    workspaceName = '',
+    collection = '',
+    viewName = '',
+    itemCount = null,
+    actionButtons = null,
+    hasGradient = false,
+    textStyle = 'color: var(--ds-text);',
+    subtleTextStyle = 'color: var(--ds-text-subtle);',
+    actions
+  } = $props();
 </script>
 
 <div class="flex items-center justify-between mb-4">
@@ -30,13 +33,9 @@
     </div>
   </div>
 
-  {#if actionButtons}
+  {#if actions}
     <div>
-      <slot name="actions" />
-    </div>
-  {:else if $$slots.actions}
-    <div>
-      <slot name="actions" />
+      {@render actions()}
     </div>
   {/if}
 </div>

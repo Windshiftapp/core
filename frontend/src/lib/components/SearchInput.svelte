@@ -2,14 +2,16 @@
   import { Search } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  export let value = '';
-  export let placeholder = '';
-  export let disabled = false;
-  export let className = '';
-  export let size = 'medium'; // 'small', 'medium', 'large'
-  export let hasGradient = false;
-  export let on_input = undefined;
-  export let on_keydown = undefined;
+  let {
+    value = $bindable(''),
+    placeholder = '',
+    disabled = false,
+    className = '',
+    size = 'medium',
+    hasGradient = false,
+    on_input = undefined,
+    on_keydown = undefined
+  } = $props();
 
   function handleInput(event) {
     value = event.target.value;
@@ -32,14 +34,13 @@
     large: 'w-5 h-5'
   };
 
-// Dynamic styles based on gradient and theme
-  $: inputStyles = hasGradient 
+  let inputStyles = $derived(hasGradient
     ? 'background-color: rgba(255, 255, 255, 0.98); backdrop-filter: blur(10px); border-color: rgba(255, 255, 255, 0.9); color: #111827;'
-    : 'background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);';
+    : 'background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);');
 
-  $: iconColorClass = hasGradient 
-    ? 'text-gray-900' // Darkest color for maximum contrast against light gradient
-    : 'text-gray-500'; // Standard color for normal input
+  let iconColorClass = $derived(hasGradient
+    ? 'text-gray-900'
+    : 'text-gray-500');
 </script>
 
 <div class="relative {className}">

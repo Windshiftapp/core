@@ -9,8 +9,8 @@
   import SidebarHeader from '../../layout/SidebarHeader.svelte';
   
   // Get active category from URL params
-  $: activeCategoryId = $currentRoute.params?.categoryId || null;
-  $: isAllActive = activeCategoryId === null;
+  let activeCategoryId = $derived($currentRoute.params?.categoryId || null);
+  let isAllActive = $derived(activeCategoryId === null);
   
   onMount(async () => {
     // Load categories when component mounts

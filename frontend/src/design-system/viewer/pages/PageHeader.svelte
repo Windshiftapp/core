@@ -104,9 +104,9 @@
           subtitle="Manage your team"
           count="12 members"
         >
-          <svelte:fragment slot="actions">
+          {#snippet actions()}
             <Button variant="primary" icon={Plus}>Invite Member</Button>
-          </svelte:fragment>
+          {/snippet}
         </PageHeader>
       </div>
       <div
@@ -119,11 +119,11 @@
           subtitle="All uploaded files"
           count="48 files"
         >
-          <svelte:fragment slot="actions">
+          {#snippet actions()}
             <Button variant="secondary" icon={Filter}>Filter</Button>
             <Button variant="secondary" icon={Download}>Export</Button>
             <Button variant="primary" icon={Plus}>Upload</Button>
-          </svelte:fragment>
+          {/snippet}
         </PageHeader>
       </div>
     </div>
@@ -141,10 +141,10 @@
         title="Settings"
         subtitle="Configure your workspace preferences"
       >
-        <svelte:fragment slot="actions">
+        {#snippet actions()}
           <Button variant="ghost">Reset to Defaults</Button>
           <Button variant="primary">Save Changes</Button>
-        </svelte:fragment>
+        {/snippet}
       </PageHeader>
       <div class="h-48 flex items-center justify-center border border-dashed rounded" style="border-color: var(--ds-border);">
         <span class="text-sm" style="color: var(--ds-text-subtle);">Page content area</span>
@@ -189,8 +189,8 @@
             <td class="p-2">null</td>
           </tr>
           <tr>
-            <td class="p-2"><code>slot="actions"</code></td>
-            <td class="p-2">slot content</td>
+            <td class="p-2"><code>actions</code></td>
+            <td class="p-2">snippet</td>
             <td class="p-2">-</td>
           </tr>
         </tbody>

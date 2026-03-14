@@ -12,21 +12,21 @@
   import Button from '../../components/Button.svelte';
   import { ShieldAlert } from 'lucide-svelte';
 
-  export let workspaceId;
+  let { workspaceId } = $props();
 
   // Permission check
-  $: canManageActions = workspacePermissions.canManageActions(workspaceId);
+  let canManageActions = $derived(workspacePermissions.canManageActions(workspaceId));
 
-  let actions = [];
-  let statuses = [];
-  let loading = true;
-  let editingAction = null;
-  let viewingLogsAction = null;
-  let showCreateModal = false;
+  let actions = $state([]);
+  let statuses = $state([]);
+  let loading = $state(true);
+  let editingAction = $state(null);
+  let viewingLogsAction = $state(null);
+  let showCreateModal = $state(false);
 
   // New action form data
-  let newActionName = '';
-  let newActionDescription = '';
+  let newActionName = $state('');
+  let newActionDescription = $state('');
 
   onMount(async () => {
     await Promise.all([loadActions(), loadStatuses(), statusCategoriesStore.init()]);
@@ -82,8 +82,7 @@
     }
   }
 
-  async function handleEdit(event) {
-    const action = event.detail;
+  async function handleEdit(action) {
     try {
       // Fetch full action with nodes and edges
       const fullAction = await api.get(`/workspaces/${workspaceId}/actions/${action.id}`);
@@ -94,8 +93,7 @@
     }
   }
 
-  async function handleToggle(event) {
-    const action = event.detail;
+  async function handleToggle(action) {
     try {
       await api.post(`/workspaces/${workspaceId}/actions/${action.id}/toggle`);
       await loadActions();
@@ -106,8 +104,7 @@
     }
   }
 
-  async function handleDelete(event) {
-    const action = event.detail;
+  async function handleDelete(action) {
     try {
       await api.delete(`/workspaces/${workspaceId}/actions/${action.id}`);
       await loadActions();
@@ -118,8 +115,8 @@
     }
   }
 
-  function handleViewLogs(event) {
-    viewingLogsAction = event.detail;
+  function handleViewLogs(action) {
+    viewingLogsAction = action;
   }
 
   function handleBackFromLogs() {
@@ -178,11 +175,11 @@
     {workspaceId}
     {actions}
     {loading}
-    on:create={handleCreate}
-    on:edit={handleEdit}
-    on:toggle={handleToggle}
-    on:delete={handleDelete}
-    on:viewLogs={handleViewLogs}
+    oncreate={handleCreate}
+    onedit={handleEdit}
+    ontoggle={handleToggle}
+    ondelete={handleDelete}
+    onviewlogs={handleViewLogs}
   />
 {/if}
 
@@ -193,8 +190,8 @@
   submitDisabled={!newActionName.trim()}
   maxWidth="max-w-md"
   onclose={() => showCreateModal = false}
-  let:submitHint
 >
+  {#snippet children(submitHint)}
   <div class="p-6">
     <h2 class="text-lg font-semibold mb-4 modal-title">{t('actions.create')}</h2>
 
@@ -239,6 +236,7 @@
       </Button>
     </div>
   </div>
+  {/snippet}
 </Modal>
 
 <style>

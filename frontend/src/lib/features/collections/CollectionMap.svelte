@@ -664,8 +664,8 @@ async function loadStatuses() {
                     class="w-4 h-4 rounded flex items-center justify-center"
                     style="background-color: {breadcrumb.itemType.color};"
                   >
-                    <svelte:component
-                      this={iconMap[breadcrumb.itemType.icon] || FileText}
+                    {@const BreadcrumbIcon = iconMap[breadcrumb.itemType.icon] || FileText}
+                    <BreadcrumbIcon
                       class="w-2.5 h-2.5 text-white"
                     />
                   </div>
@@ -733,7 +733,8 @@ async function loadStatuses() {
                           style="background-color: {itemType.color};"
                           title={itemType.name}
                         >
-                          <svelte:component this={iconMap[itemType.icon] || FileText} class="w-3 h-3" />
+                          {@const MapItemIcon = iconMap[itemType.icon] || FileText}
+                          <MapItemIcon class="w-3 h-3" />
                         </div>
                       {/if}
                       <ItemKey item={backboneItem} {workspace}
@@ -830,7 +831,8 @@ async function loadStatuses() {
                               style="background-color: {childItemType.color};"
                               title={childItemType.name}
                             >
-                              <svelte:component this={iconMap[childItemType.icon] || FileText} class="w-3 h-3" />
+                              {@const ChildIcon = iconMap[childItemType.icon] || FileText}
+                              <ChildIcon class="w-3 h-3" />
                             </div>
                           {/if}
                           <ItemKey item={childItem} {workspace}

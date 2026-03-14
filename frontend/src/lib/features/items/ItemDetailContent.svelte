@@ -168,28 +168,28 @@
     oncopyKey?.();
   }
 
-  function handleSaveField(event) {
-    onsaveField?.(event.detail);
+  function handleSaveField(data) {
+    onsaveField?.(data);
   }
 
-  function handleCancelEdit(event) {
-    oncancelEdit?.(event.detail);
+  function handleCancelEdit(data) {
+    oncancelEdit?.(data);
   }
 
-  function handleSwitchTab(event) {
-    onswitchTab?.(event.detail);
+  function handleSwitchTab(data) {
+    onswitchTab?.(data);
   }
 
   function handleCreateSubIssue() {
     oncreateSubIssue?.();
   }
 
-  function handleRemoveLink(event) {
-    onremoveLink?.(event.detail);
+  function handleRemoveLink(data) {
+    onremoveLink?.(data);
   }
 
-  function handleViewTestCase(event) {
-    onviewTestCase?.(event.detail);
+  function handleViewTestCase(data) {
+    onviewTestCase?.(data);
   }
 
   function handleShowLinkModal() {
@@ -232,12 +232,12 @@
     onlogTime?.();
   }
 
-  function handleEditWorklog(event) {
-    oneditWorklog?.(event.detail);
+  function handleEditWorklog(data) {
+    oneditWorklog?.(data);
   }
 
-  function handleDeleteWorklog(event) {
-    ondeleteWorklog?.(event.detail);
+  function handleDeleteWorklog(data) {
+    ondeleteWorklog?.(data);
   }
 
   function handleParentChanged() {
@@ -245,9 +245,9 @@
   }
 
   // Handle image uploaded via editor drag/paste
-  function handleImageUploaded(event) {
+  function handleImageUploaded(data) {
     // Refresh attachments list
-    onattachmentUpload?.(event.detail);
+    onattachmentUpload?.(data);
   }
 
   // Handle insert image from attachment list
@@ -296,16 +296,16 @@
     }
   }
 
-  function handleExecuteAction(event) {
-    onexecuteAction?.(event.detail);
+  function handleExecuteAction(data) {
+    onexecuteAction?.(data);
   }
 
   function handleReorderChildren() {
     onreorderChildren?.();
   }
 
-  function handleAIAction(event) {
-    onaiAction?.(event.detail);
+  function handleAIAction(data) {
+    onaiAction?.(data);
   }
 </script>
 
@@ -359,16 +359,14 @@
             oncopyKey={handleCopyKey}
           />
           
-          <ItemDetailHeader 
+          <ItemDetailHeader
             {item}
             {workspace}
             bind:editingTitle
             bind:editTitle
             {saving}
-            on:save-field={handleSaveField}
-            on:cancel-edit={handleCancelEdit}
-            on:copy-key={handleCopyKey}
-            on:go-back={handleGoBack}
+            onsavefield={handleSaveField}
+            oncanceledit={handleCancelEdit}
           />
           <ItemDetailDescription
             bind:this={descriptionComponent}
@@ -381,20 +379,20 @@
             {diagrams}
             {manualActions}
             {canCreate}
-            on:save-field={handleSaveField}
-            on:cancel-edit={handleCancelEdit}
-            on:start-editing-description={() => onstartEditingDescription?.()}
-            on:show-add-link={handleShowLinkModal}
-            on:create-sub-issue={handleCreateSubIssue}
-            on:image-uploaded={handleImageUploaded}
-            on:attachment-upload={(e) => onattachmentUpload?.(e.detail)}
-            on:attachment-upload-files={(e) => onattachmentUploadFiles?.(e.detail)}
-            on:attachment-delete={(e) => onattachmentDelete?.(e.detail)}
-            on:new-diagram={handleNewDiagram}
-            on:edit-diagram={(e) => handleEditDiagram(e.detail)}
-            on:delete-diagram={(e) => handleDeleteDiagram(e.detail)}
-            on:execute-action={handleExecuteAction}
-            on:ai-action={handleAIAction}
+            onsavefield={handleSaveField}
+            oncanceledit={handleCancelEdit}
+            onstartEditingDescription={() => onstartEditingDescription?.()}
+            onshowAddLink={handleShowLinkModal}
+            oncreateSubIssue={handleCreateSubIssue}
+            onimageuploaded={handleImageUploaded}
+            onattachmentUpload={(data) => onattachmentUpload?.(data)}
+            onattachmentUploadFiles={(data) => onattachmentUploadFiles?.(data)}
+            onattachmentDelete={(data) => onattachmentDelete?.(data)}
+            onnewDiagram={handleNewDiagram}
+            oneditDiagram={handleEditDiagram}
+            ondeleteDiagram={handleDeleteDiagram}
+            onexecuteAction={handleExecuteAction}
+            onaiaction={handleAIAction}
           />
 
           <ItemDetailLinks
@@ -410,12 +408,12 @@
             {loadingChildItems}
             {itemTypes}
             isLowestLevel={availableSubIssueTypes.length === 0}
-            on:navigate={handleNavigate}
-            on:create-sub-issue={handleCreateSubIssue}
-            on:remove-link={handleRemoveLink}
-            on:view-test-case={handleViewTestCase}
-            on:show-link-modal={handleShowLinkModal}
-            on:reorder-children={handleReorderChildren}
+            onnavigate={handleNavigate}
+            oncreatesubissue={handleCreateSubIssue}
+            onremovelink={handleRemoveLink}
+            onviewtestcase={handleViewTestCase}
+            onshowlinkmodal={handleShowLinkModal}
+            onreorderchildren={handleReorderChildren}
           />
 
           <ItemDetailTabs
@@ -424,17 +422,13 @@
             {tab}
             {moduleSettings}
             {timeWorklogs}
-            {showTimeEntry}
-            {timeFormData}
-            {savingTimeEntry}
-            {timeProjects}
             {activeTimer}
             {statusOptions}
-            on:switch-tab={handleSwitchTab}
-            on:start-timer={handleStartTimer}
-            on:log-time={handleLogTime}
-            on:edit-worklog={handleEditWorklog}
-            on:delete-worklog={handleDeleteWorklog}
+            onswitchtab={handleSwitchTab}
+            onstarttimer={handleStartTimer}
+            onlogtime={handleLogTime}
+            oneditworklog={handleEditWorklog}
+            ondeleteworklog={handleDeleteWorklog}
           />
         </div>
 
@@ -503,8 +497,7 @@
 
 <!-- Diagram Modal (lazy-loaded) -->
 {#if showDiagramModal && item && DiagramModal}
-  <svelte:component
-    this={DiagramModal}
+  <DiagramModal
     itemId={item.id}
     diagram={editingDiagram}
     onClose={handleCloseDiagramModal}

@@ -19,7 +19,8 @@
     {#if subtitle || count !== null}
       <div class="flex items-center gap-2 text-sm" style="{subtitleStyle || 'color: var(--ds-text-subtle);'}">
         {#if icon && subtitle}
-          <svelte:component this={icon} class="w-3.5 h-3.5" style="{subtitleStyle || 'color: var(--ds-icon-subtle);'}" />
+          {@const Icon = icon}
+          <Icon class="w-3.5 h-3.5" style="{subtitleStyle || 'color: var(--ds-icon-subtle);'}" />
         {/if}
         {#if subtitle}
           <span>{subtitle}</span>

@@ -780,81 +780,83 @@
           textStyle={styles.textStyle}
           subtleTextStyle={styles.subtleTextStyle}
         >
-          <div slot="actions" class="flex items-center gap-3">
-            {#if allIterations.length > 0}
-              <div class="inline-flex items-center rounded-lg border overflow-hidden text-sm"
-                   style="{styles.hasCustomBackground
-                     ? 'background-color: var(--ds-glass-bg); backdrop-filter: blur(12px); border-color: var(--ds-glass-border);'
-                     : 'border-color: var(--ds-border);'}">
-                <button
-                  class="px-3 py-1.5 transition-colors"
-                  style={!sprintFilterId
-                    ? (styles.hasCustomBackground
-                      ? 'color: var(--ds-text); background-color: var(--ds-glass-bg); font-weight: 500;'
-                      : 'background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue); font-weight: 500;')
-                    : (styles.hasCustomBackground
-                      ? 'color: var(--ds-text); background-color: transparent;'
-                      : 'color: var(--ds-text-subtle); background-color: transparent;')}
-                  onclick={() => setSprintFilter(null)}
-                >
-                  {t('collections.allItems')}
-                </button>
-                {#if activeLocalSprint}
+          {#snippet actions()}
+            <div class="flex items-center gap-3">
+              {#if allIterations.length > 0}
+                <div class="inline-flex items-center rounded-lg border overflow-hidden text-sm"
+                     style="{styles.hasCustomBackground
+                       ? 'background-color: var(--ds-glass-bg); backdrop-filter: blur(12px); border-color: var(--ds-glass-border);'
+                       : 'border-color: var(--ds-border);'}">
                   <button
-                    class="px-3 py-1.5 transition-colors border-l"
-                    style="{styles.hasCustomBackground ? 'border-color: var(--ds-glass-border);' : 'border-color: var(--ds-border);'} {sprintFilterId === activeLocalSprint.id
+                    class="px-3 py-1.5 transition-colors"
+                    style={!sprintFilterId
                       ? (styles.hasCustomBackground
                         ? 'color: var(--ds-text); background-color: var(--ds-glass-bg); font-weight: 500;'
                         : 'background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue); font-weight: 500;')
                       : (styles.hasCustomBackground
                         ? 'color: var(--ds-text); background-color: transparent;'
-                        : 'color: var(--ds-text-subtle); background-color: transparent;')}"
-                    onclick={() => setSprintFilter(activeLocalSprint.id)}
+                        : 'color: var(--ds-text-subtle); background-color: transparent;')}
+                    onclick={() => setSprintFilter(null)}
                   >
-                    {activeLocalSprint.name}
+                    {t('collections.allItems')}
                   </button>
-                {/if}
-                {#if otherSprintOptions.length > 0}
-                  <ItemPicker
-                    items={otherSprintOptions}
-                    value={sprintFilterId && sprintFilterId !== activeLocalSprint?.id ? sprintFilterId : null}
-                    config={sprintPickerConfig}
-                    placeholder={t('iterations.filterBySprint')}
-                    showUnassigned={false}
-                    allowClear={false}
-                    showSelectedInTrigger={false}
-                    onSelect={(iter) => {
-                      if (iter) {
-                        setSprintFilter(iter.id);
-                      }
-                    }}
-                  >
-                    {#snippet children()}
-                      <span
-                        class="px-3 py-1.5 text-sm border-l flex items-center gap-1 transition-colors"
-                        style="{styles.hasCustomBackground ? 'border-color: var(--ds-glass-border);' : 'border-color: var(--ds-border);'} {selectedOtherSprint
-                          ? (styles.hasCustomBackground
-                            ? 'color: var(--ds-text); font-weight: 500; background-color: var(--ds-glass-bg);'
-                            : 'color: var(--ds-accent-blue); font-weight: 500; background-color: var(--ds-accent-blue-subtler);')
-                          : (styles.hasCustomBackground
-                            ? 'color: var(--ds-text);'
-                            : 'color: var(--ds-text-subtle);')}"
-                      >
-                        {selectedOtherSprint ? selectedOtherSprint.name : t('iterations.filterBySprint')}
-                        <ChevronDown size={12} />
-                      </span>
-                    {/snippet}
-                  </ItemPicker>
-                {/if}
-              </div>
-            {/if}
-            <CollectionViewSwitcher
-              {workspaceId}
-              {collectionId}
-              activeView="board"
-              hasGradient={styles.hasCustomBackground}
-            />
-          </div>
+                  {#if activeLocalSprint}
+                    <button
+                      class="px-3 py-1.5 transition-colors border-l"
+                      style="{styles.hasCustomBackground ? 'border-color: var(--ds-glass-border);' : 'border-color: var(--ds-border);'} {sprintFilterId === activeLocalSprint.id
+                        ? (styles.hasCustomBackground
+                          ? 'color: var(--ds-text); background-color: var(--ds-glass-bg); font-weight: 500;'
+                          : 'background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue); font-weight: 500;')
+                        : (styles.hasCustomBackground
+                          ? 'color: var(--ds-text); background-color: transparent;'
+                          : 'color: var(--ds-text-subtle); background-color: transparent;')}"
+                      onclick={() => setSprintFilter(activeLocalSprint.id)}
+                    >
+                      {activeLocalSprint.name}
+                    </button>
+                  {/if}
+                  {#if otherSprintOptions.length > 0}
+                    <ItemPicker
+                      items={otherSprintOptions}
+                      value={sprintFilterId && sprintFilterId !== activeLocalSprint?.id ? sprintFilterId : null}
+                      config={sprintPickerConfig}
+                      placeholder={t('iterations.filterBySprint')}
+                      showUnassigned={false}
+                      allowClear={false}
+                      showSelectedInTrigger={false}
+                      onSelect={(iter) => {
+                        if (iter) {
+                          setSprintFilter(iter.id);
+                        }
+                      }}
+                    >
+                      {#snippet children()}
+                        <span
+                          class="px-3 py-1.5 text-sm border-l flex items-center gap-1 transition-colors"
+                          style="{styles.hasCustomBackground ? 'border-color: var(--ds-glass-border);' : 'border-color: var(--ds-border);'} {selectedOtherSprint
+                            ? (styles.hasCustomBackground
+                              ? 'color: var(--ds-text); font-weight: 500; background-color: var(--ds-glass-bg);'
+                              : 'color: var(--ds-accent-blue); font-weight: 500; background-color: var(--ds-accent-blue-subtler);')
+                            : (styles.hasCustomBackground
+                              ? 'color: var(--ds-text);'
+                              : 'color: var(--ds-text-subtle);')}"
+                        >
+                          {selectedOtherSprint ? selectedOtherSprint.name : t('iterations.filterBySprint')}
+                          <ChevronDown size={12} />
+                        </span>
+                      {/snippet}
+                    </ItemPicker>
+                  {/if}
+                </div>
+              {/if}
+              <CollectionViewSwitcher
+                {workspaceId}
+                {collectionId}
+                activeView="board"
+                hasGradient={styles.hasCustomBackground}
+              />
+            </div>
+          {/snippet}
         </ViewHeader>
       </div>
 
@@ -974,7 +976,8 @@
                                     style="background-color: {itemType.color};"
                                     title={itemType.name}
                                   >
-                                    <svelte:component this={itemTypeIconMap[itemType.icon] || itemTypeIconMap.FileText} class="w-3 h-3" />
+                                    {@const TypeIcon = itemTypeIconMap[itemType.icon] || itemTypeIconMap.FileText}
+                                    <TypeIcon class="w-3 h-3" />
                                   </div>
                                 {/if}
                               {/if}

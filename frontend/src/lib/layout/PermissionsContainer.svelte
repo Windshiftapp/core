@@ -5,17 +5,17 @@
   import { t } from '../stores/i18n.svelte.js';
 
   // Get active subtab from URL query params, default to 'permissions'
-  $: subtab = $currentRoute.query?.subtab || 'permissions';
+  let subtab = $derived($currentRoute.query?.subtab || 'permissions');
 
   function switchSubtab(newSubtab) {
     navigate(`/admin/permissions?subtab=${newSubtab}`);
   }
 
-  $: tabs = [
+  let tabs = $derived([
     { id: 'permissions', label: t('permissions.title') }
     // Permission sets hidden for now - using role-based permissions instead
     // { id: 'permission-sets', label: t('permissions.permissionSet') + 's' }
-  ];
+  ]);
 </script>
 
 <div class="space-y-6">

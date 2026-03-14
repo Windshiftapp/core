@@ -1,14 +1,14 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { Paperclip, PenTool, Trash2 } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
-
-  const dispatch = createEventDispatcher();
 
   let {
     attachments = [],
     diagrams = [],
-    canDelete = true
+    canDelete = true,
+    ondelete,
+    oneditdiagram,
+    ondeletediagram
   } = $props();
 
   function formatFileSize(bytes) {
@@ -46,15 +46,15 @@
   }
 
   function handleDelete(attachment) {
-    dispatch('delete', attachment);
+    ondelete?.(attachment);
   }
 
   function handleEditDiagram(diagram) {
-    dispatch('edit-diagram', diagram);
+    oneditdiagram?.(diagram);
   }
 
   function handleDeleteDiagram(diagram) {
-    dispatch('delete-diagram', diagram);
+    ondeletediagram?.(diagram);
   }
 </script>
 

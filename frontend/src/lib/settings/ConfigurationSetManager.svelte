@@ -408,7 +408,8 @@
     </Card>
   {:else}
     <!-- Create Form -->
-    <Modal isOpen={creating} onclose={cancelCreating} maxWidth="max-w-2xl" onSubmit={createConfigurationSet} let:submitHint>
+    <Modal isOpen={creating} onclose={cancelCreating} maxWidth="max-w-2xl" onSubmit={createConfigurationSet}>
+      {#snippet children(submitHint)}
       <!-- Modal header -->
       <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
         <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
@@ -547,6 +548,7 @@
         showKeyboardHint={true}
         confirmKeyboardHint={submitHint}
       />
+      {/snippet}
     </Modal>
 
     <!-- Configuration Sets List -->
@@ -719,7 +721,8 @@
   {/if}
 
 <!-- Edit Modal -->
-<Modal isOpen={showEditModal} onclose={cancelEditing} maxWidth="max-w-2xl" onSubmit={updateConfigurationSet} let:submitHint>
+<Modal isOpen={showEditModal} onclose={cancelEditing} maxWidth="max-w-2xl" onSubmit={updateConfigurationSet}>
+  {#snippet children(submitHint)}
   <!-- Modal header -->
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
@@ -856,6 +859,7 @@
     showKeyboardHint={true}
     confirmKeyboardHint={submitHint}
   />
+  {/snippet}
 </Modal>
 
 <!-- Migration Assistant -->

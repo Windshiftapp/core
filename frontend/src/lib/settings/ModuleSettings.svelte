@@ -22,8 +22,8 @@
   let selectedFile = $state(null);
   let selectedManifest = $state(null);
   let dragActive = $state(false);
-  let fileInput;
-  let manifestInput;
+  let fileInput = $state(null);
+  let manifestInput = $state(null);
 
   // Local toggle state
   let testManagementEnabled = $state(false);

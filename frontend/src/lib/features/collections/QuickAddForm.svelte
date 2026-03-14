@@ -79,7 +79,8 @@
           {#if selectedWorkspace?.avatar_url}
             <img src={selectedWorkspace.avatar_url} alt="{selectedWorkspace.name} avatar" class="w-full h-full object-cover" />
           {:else if selectedWorkspace?.icon}
-            <svelte:component this={iconMap[selectedWorkspace.icon] || Package} class="{compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-white" />
+            {@const WsIcon = iconMap[selectedWorkspace.icon] || Package}
+            <WsIcon class="{compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-white" />
           {:else}
             <Package class="{compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-white" />
           {/if}
@@ -106,7 +107,8 @@
                     class="w-5 h-5 rounded flex items-center justify-center"
                     style="background-color: {ws.color || 'var(--ds-interactive)'};"
                   >
-                    <svelte:component this={iconMap[ws.icon] || Package} class="w-3 h-3 text-white" />
+                    {@const WsDropdownIcon = iconMap[ws.icon] || Package}
+                    <WsDropdownIcon class="w-3 h-3 text-white" />
                   </div>
                 {/if}
                 <span class="truncate">{ws.name}</span>
@@ -131,7 +133,8 @@
               title={selectedItemType?.name || 'Select type'}
             >
               {#if selectedItemType}
-                <svelte:component this={iconMap[selectedItemType.icon] || Package} class="w-3 h-3 text-white" />
+                {@const SelectedTypeIcon = iconMap[selectedItemType.icon] || Package}
+                <SelectedTypeIcon class="w-3 h-3 text-white" />
               {:else}
                 <Package class="w-3 h-3" style="color: var(--ds-text-subtle);" />
               {/if}
@@ -152,7 +155,8 @@
                   class="w-4 h-4 rounded flex items-center justify-center"
                   style="background-color: {selectedItemType.color};"
                 >
-                  <svelte:component this={iconMap[selectedItemType.icon] || Package} class="w-2.5 h-2.5 text-white" />
+                  {@const SelectedTypeSmallIcon = iconMap[selectedItemType.icon] || Package}
+                  <SelectedTypeSmallIcon class="w-2.5 h-2.5 text-white" />
                 </div>
                 <span class="text-xs">{selectedItemType.name}</span>
               {:else}
@@ -180,7 +184,8 @@
                     class="w-5 h-5 rounded flex items-center justify-center"
                     style="background-color: {itemType.color};"
                   >
-                    <svelte:component this={iconMap[itemType.icon] || Package} class="w-3 h-3 text-white" />
+                    {@const TypeDropdownIcon = iconMap[itemType.icon] || Package}
+                    <TypeDropdownIcon class="w-3 h-3 text-white" />
                   </div>
                   <span class="truncate">{itemType.name}</span>
                 </button>

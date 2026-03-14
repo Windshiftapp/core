@@ -391,7 +391,7 @@
                 onmouseenter={(e) => { if (!isActive) e.currentTarget.style.color = 'var(--ds-text)'; }}
                 onmouseleave={(e) => { if (!isActive) e.currentTarget.style.color = 'var(--ds-text-subtle)'; }}
               >
-                <svelte:component this={type.icon} class="w-4 h-4" />
+                <type.icon class="w-4 h-4" />
                 {type.label}
               </button>
             {/each}
@@ -516,7 +516,8 @@
       >
         {#snippet name({ item })}
           <div class="flex items-center gap-3">
-            <svelte:component this={getChannelTypeIcon(item.type)} class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+            {@const ChannelIcon = getChannelTypeIcon(item.type)}
+            <ChannelIcon class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
             <div>
               <div class="font-medium" style="color: var(--ds-text);">{item.name}</div>
               {#if item.description}
@@ -557,8 +558,8 @@
   submitDisabled={!channelFormData.name.trim()}
   maxWidth="max-w-lg"
   autoFocus={true}
-  let:submitHint
 >
+  {#snippet children(submitHint)}
   <!-- Header -->
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
@@ -596,7 +597,7 @@
                 ? 'border-color: var(--ds-border-focused); background: var(--ds-surface-selected);'
                 : 'border-color: var(--ds-border); background: var(--ds-surface);'}
             >
-              <svelte:component this={option.icon} class="w-5 h-5 flex-shrink-0" style="color: {option.color};" />
+              <option.icon class="w-5 h-5 flex-shrink-0" style="color: {option.color};" />
               <span class="font-medium" style="color: var(--ds-text);">{option.label}</span>
             </button>
           {/each}
@@ -634,6 +635,7 @@
     showKeyboardHint={true}
     confirmKeyboardHint={submitHint}
   />
+  {/snippet}
 </Modal>
 
 <!-- Channel Category Modal -->

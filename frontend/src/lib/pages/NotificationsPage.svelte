@@ -13,12 +13,12 @@
   import { slide } from 'svelte/transition';
   import PageHeader from '../layout/PageHeader.svelte';
 
-  let filteredNotifications = [];
-  let unreadCount = 0;
-  let searchQuery = '';
-  let selectedType = 'all'; // all, assignment, comment, status_change, reminder, milestone
-  let selectedStatus = 'all'; // all, read, unread
-  let showFilters = false;
+  let filteredNotifications = $state([]);
+  let unreadCount = $state(0);
+  let searchQuery = $state('');
+  let selectedType = $state('all'); // all, assignment, comment, status_change, reminder, milestone
+  let selectedStatus = $state('all'); // all, read, unread
+  let showFilters = $state(false);
 
   // Filter options
   const typeOptions = [
@@ -128,10 +128,11 @@
   }
 
   // Watch for changes to trigger filtering
-  $: applyFilters($notifications);
-  $: if (searchQuery !== undefined || selectedType || selectedStatus) {
+  $effect(() => {
+    // Re-run when notifications, search query, type filter, or status filter changes
+    const _ = [searchQuery, selectedType, selectedStatus];
     applyFilters($notifications);
-  }
+  });
 </script>
 
 <div class="min-h-screen" style="background-color: var(--ds-surface);">

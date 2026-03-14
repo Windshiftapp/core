@@ -123,7 +123,8 @@
             style="background-color: {itemType.color};"
             title={itemType.name}
           >
-            <svelte:component this={itemTypeIconMap[itemType.icon] || itemTypeIconMap.FileText} class="w-3 h-3" style="color: white;" />
+            {@const RowTypeIcon = itemTypeIconMap[itemType.icon] || itemTypeIconMap.FileText}
+            <RowTypeIcon class="w-3 h-3" style="color: white;" />
           </div>
         {:else}
           <div class="w-5 h-5 rounded flex items-center justify-center flex-shrink-0" style="background-color: var(--ds-accent-blue);">

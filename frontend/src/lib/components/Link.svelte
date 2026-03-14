@@ -12,21 +12,18 @@
    * - Optional onClick for modal/custom behavior while preserving link benefits
    */
 
-  export let href = '';
-  export let active = false;
-  export let disabled = false;
-  export let onClick = null; // Optional click handler for modals or custom behavior
-  export let style = ''; // Inline styles
-  export let onmouseenter = null;
-  export let onmouseleave = null;
-
-  // Allow passing through additional classes
-  let className = '';
-  export { className as class };
-
-  // Expose the anchor element reference for parent components
-  let anchorElement = undefined;
-  export { anchorElement as element };
+  let {
+    href = '',
+    active = false,
+    disabled = false,
+    onClick = null,
+    style = '',
+    onmouseenter = null,
+    onmouseleave = null,
+    class: className = '',
+    element: anchorElement = $bindable(undefined),
+    children
+  } = $props();
 
 
 </script>
@@ -43,5 +40,5 @@
   aria-disabled={disabled}
   tabindex={disabled ? -1 : 0}
 >
-  <slot />
+  {@render children?.()}
 </a>

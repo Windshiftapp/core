@@ -1,13 +1,10 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { X, MessageCircle, UserPlus, Activity, Clock, Target } from 'lucide-svelte';
   import { notificationActions } from '../../stores/notifications.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
 
-  export let notification;
-
-  const dispatch = createEventDispatcher();
+  let { notification, onclose = undefined } = $props();
 
   function getNotificationIcon(type) {
     const iconMap = {
@@ -40,7 +37,7 @@
     // Navigate to the action URL if provided
     if (notification.actionUrl) {
       navigate(notification.actionUrl);
-      dispatch('close'); // Close the notification dropdown
+      onclose?.();
     }
   }
 
@@ -68,7 +65,8 @@
         </div>
       {:else}
         <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background-color: var(--ds-interactive-subtle);">
-          <svelte:component this={getNotificationIcon(notification.type)} class="w-4 h-4" style={getNotificationIconStyle(notification.type)} />
+          {@const NotifIcon = getNotificationIcon(notification.type)}
+          <NotifIcon class="w-4 h-4" style={getNotificationIconStyle(notification.type)} />
         </div>
       {/if}
     </div>

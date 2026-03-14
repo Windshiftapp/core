@@ -39,45 +39,44 @@
   // Customization sidebar
   import WorkspaceCustomizationSidebar from './WorkspaceCustomizationSidebar.svelte';
 
-  export let workspaceId;
-  export let collectionId = null;
+  let { workspaceId, collectionId = null } = $props();
 
-  let workspace = null;
-  let statusCategories = [];
-  let stats = {
+  let workspace = $state(null);
+  let statusCategories = $state([]);
+  let stats = $state({
     totalCollections: 0,
     itemsByStatusCategory: {},
     totalItems: 0
-  };
-  let completedByWeekData = [];
-  let createdLast7DaysData = [];
-  let milestones = [];
-  let loading = true;
-  let currentCollectionName = 'Default';
-  let collectionFilter = null;
-  let dataLoadVersion = 0;
+  });
+  let completedByWeekData = $state([]);
+  let createdLast7DaysData = $state([]);
+  let milestones = $state([]);
+  let loading = $state(true);
+  let currentCollectionName = $state('Default');
+  let collectionFilter = $state(null);
+  let dataLoadVersion = $state(0);
 
   // Homepage layout state
-  let sections = [];
-  let widgets = [];
-  let isEditMode = false;
-  let isCustomizeMode = false;
-  let customizationCategory = 'built-in';
-  let setupCleanups = [];
-  let savePending = false;
+  let sections = $state([]);
+  let widgets = $state([]);
+  let isEditMode = $state(false);
+  let isCustomizeMode = $state(false);
+  let customizationCategory = $state('built-in');
+  let setupCleanups = $state([]);
+  let savePending = $state(false);
 
   // Drag state
-  let draggedWidget = null;
-  let dropZoneStates = new Map(); // Map<sectionId, { isOver: boolean }>
+  let draggedWidget = $state(null);
+  let dropZoneStates = $state(new Map()); // Map<sectionId, { isOver: boolean }>
 
   // Initialize gradient styles from global stores
   const gradientStyles = useGradientStyles();
 
   // Section editing
-  let editingSectionId = null;
-  let editingSectionTitle = '';
-  let editingSectionSubtitle = '';
-  let isNewSection = false; // Track if we're creating a new section
+  let editingSectionId = $state(null);
+  let editingSectionTitle = $state('');
+  let editingSectionSubtitle = $state('');
+  let isNewSection = $state(false); // Track if we're creating a new section
 
   // Default section layout
   function getDefaultSections() {
@@ -136,24 +135,27 @@
     return completedCategoryIds.has(status.category_id);
   }
 
-  let lastLoadKey = null;
+  let lastLoadKey = $state(null);
 
-  $: if (workspaceId) {
-    const currentKey = `${workspaceId}-${collectionId ?? 'default'}`;
-    if (currentKey !== lastLoadKey) {
-      lastLoadKey = currentKey;
-      loadData();
+  $effect(() => {
+    if (workspaceId) {
+      const currentKey = `${workspaceId}-${collectionId ?? 'default'}`;
+      if (currentKey !== lastLoadKey) {
+        lastLoadKey = currentKey;
+        loadData();
+      }
     }
-  }
+  });
 
   // Setup drag and drop when in customize mode
-  let dragSetupKey = null;
-  $: dragSetupKey = isCustomizeMode ? customizationCategory : null;
-  $: if (dragSetupKey !== null) {
-    setTimeout(() => setupDragAndDrop(), 350);
-  } else {
-    cleanupDragAndDrop();
-  }
+  let dragSetupKey = $derived(isCustomizeMode ? customizationCategory : null);
+  $effect(() => {
+    if (dragSetupKey !== null) {
+      setTimeout(() => setupDragAndDrop(), 350);
+    } else {
+      cleanupDragAndDrop();
+    }
+  });
 
   async function loadData() {
     if (!workspaceId) return;
@@ -361,7 +363,7 @@
     }
   }
 
-  let saveTimeout;
+  let saveTimeout = $state(null);
   function debouncedSave() {
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(() => saveHomepageLayout(), 1000);
@@ -635,7 +637,7 @@
       textStyle={gradientStyles.textStyle}
       subtleTextStyle={gradientStyles.subtleTextStyle}
     >
-      <svelte:fragment slot="actions">
+      {#snippet actions()}
         <div class="flex items-center gap-2">
           <!-- Edit button -->
           <Button
@@ -655,7 +657,7 @@
             {isCustomizeMode ? 'Done' : 'Customize'}
           </Button>
         </div>
-      </svelte:fragment>
+      {/snippet}
     </ViewHeader>
 
     <!-- Edit mode notice -->

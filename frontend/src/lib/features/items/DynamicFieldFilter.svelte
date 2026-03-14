@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher, onMount } from 'svelte';
   import { X, Calendar, Pencil } from 'lucide-svelte';
   import FieldSelector from '../../pickers/FieldSelector.svelte';
   import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
@@ -15,25 +14,26 @@
     { value: 'false', label: 'False' }
   ];
 
-  const dispatch = createEventDispatcher();
-
-  export let filter = {
-    field: null,
-    operator: '=',
-    value: '',
-    values: [] // For IN operator
-  };
-
-  // Compact mode for narrow containers (like sidebar)
-  export let compact = false;
+  let {
+    filter = {
+      field: null,
+      operator: '=',
+      value: '',
+      values: [] // For IN operator
+    },
+    compact = false,
+    onchange = undefined,
+    onremove = undefined,
+    onexecute = undefined,
+  } = $props();
 
   // Modal state for text input
-  let showTextModal = false;
-  let tempTextValue = '';
+  let showTextModal = $state(false);
+  let tempTextValue = $state('');
 
-  let operatorOptions = [];
-  let valueOptions = []; // For enum/select fields
-  let loadingOptions = false;
+  let operatorOptions = $state([]);
+  let valueOptions = $state([]); // For enum/select fields
+  let loadingOptions = $state(false);
 
   // Operator options based on field type
   const operatorsByType = {
@@ -91,10 +91,12 @@
     ]
   };
 
-  $: if (filter.field) {
-    updateOperatorOptions(filter.field.type);
-    loadValueOptions(filter.field);
-  }
+  $effect(() => {
+    if (filter.field) {
+      updateOperatorOptions(filter.field.type);
+      loadValueOptions(filter.field);
+    }
+  });
 
   function updateOperatorOptions(fieldType) {
     operatorOptions = operatorsByType[fieldType] || operatorsByType.text;
@@ -103,7 +105,7 @@
     const validOperators = operatorOptions.map(op => op.value);
     if (!validOperators.includes(filter.operator)) {
       const newOperator = operatorOptions[0]?.value || '=';
-      dispatch('change', {
+      onchange?.({
         ...filter,
         operator: newOperator
       });
@@ -171,7 +173,7 @@
   }
 
   function handleFieldSelect(field) {
-    dispatch('change', {
+    onchange?.({
       ...filter,
       field: field,
       value: '',
@@ -180,7 +182,7 @@
   }
 
   function handleFieldClear() {
-    dispatch('change', {
+    onchange?.({
       ...filter,
       field: null,
       value: '',
@@ -193,14 +195,14 @@
 
     // Reset value/values based on new operator
     if (newOperator === 'IN' || newOperator === 'NOT IN') {
-      dispatch('change', {
+      onchange?.({
         ...filter,
         operator: newOperator,
         values: [],
         value: ''
       });
     } else {
-      dispatch('change', {
+      onchange?.({
         ...filter,
         operator: newOperator,
         value: '',
@@ -210,7 +212,7 @@
   }
 
   function handleValueChange(event) {
-    dispatch('change', {
+    onchange?.({
       ...filter,
       value: event.target.value
     });
@@ -219,7 +221,7 @@
   function handleValueKeydown(event) {
     if (event.key === 'Enter') {
       event.preventDefault();
-      dispatch('execute');
+      onexecute?.();
     }
   }
 
@@ -228,18 +230,18 @@
       ? filter.values.filter(v => v !== value)
       : [...filter.values, value];
 
-    dispatch('change', {
+    onchange?.({
       ...filter,
       values: newValues
     });
   }
 
   function handleRemove() {
-    dispatch('remove');
+    onremove?.();
   }
 
   function handleMilestoneSelect(result) {
-    dispatch('change', {
+    onchange?.({
       ...filter,
       value: result.value,  // milestone ID
       displayValue: result.milestone?.name  // for display
@@ -260,21 +262,21 @@
   }
 
   function applyTextValue() {
-    dispatch('change', {
+    onchange?.({
       ...filter,
       value: tempTextValue
     });
-    dispatch('execute');
+    onexecute?.();
     showTextModal = false;
   }
 
   function clearTextValue() {
     tempTextValue = '';
-    dispatch('change', {
+    onchange?.({
       ...filter,
       value: ''
     });
-    dispatch('execute');
+    onexecute?.();
     showTextModal = false;
   }
 </script>
@@ -310,9 +312,9 @@
             if (item) {
               const newOperator = item.value;
               if (newOperator === 'IN' || newOperator === 'NOT IN') {
-                dispatch('change', { ...filter, operator: newOperator, values: [], value: '' });
+                onchange?.({ ...filter, operator: newOperator, values: [], value: '' });
               } else {
-                dispatch('change', { ...filter, operator: newOperator, values: [] });
+                onchange?.({ ...filter, operator: newOperator, values: [] });
               }
             }
           }}
@@ -382,7 +384,7 @@
             getValue={(item) => item.value}
             getLabel={(item) => item.label}
             onSelect={(item) => {
-              dispatch('change', { ...filter, value: item ? item.value : '' });
+              onchange?.({ ...filter, value: item ? item.value : '' });
             }}
           />
         {:else}
@@ -445,7 +447,7 @@
           getValue={(item) => item.value}
           getLabel={(item) => item.label}
           onSelect={(item) => {
-            dispatch('change', { ...filter, value: item ? item.value : '' });
+            onchange?.({ ...filter, value: item ? item.value : '' });
           }}
         />
       {:else}

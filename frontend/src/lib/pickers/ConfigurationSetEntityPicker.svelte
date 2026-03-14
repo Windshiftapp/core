@@ -103,9 +103,11 @@
                   style="background-color: {entityType === 'item-types' ? entity.color || '#3b82f6' : (entity.color || '#3b82f6') + '20'};"
                 >
                   {#if entityType === 'item-types' && entity.icon && itemTypeIconMap[entity.icon]}
-                    <svelte:component this={itemTypeIconMap[entity.icon]} class="w-4 h-4 text-white" />
+                    {@const EntityIcon = itemTypeIconMap[entity.icon]}
+                    <EntityIcon class="w-4 h-4 text-white" />
                   {:else if entityType === 'priorities' && entity.icon && priorityIconMap[entity.icon]}
-                    <svelte:component this={priorityIconMap[entity.icon]} class="w-4 h-4" style="color: {entity.color || '#3b82f6'};" />
+                    {@const EntityIcon = priorityIconMap[entity.icon]}
+                    <EntityIcon class="w-4 h-4" style="color: {entity.color || '#3b82f6'};" />
                   {:else}
                     <span style="color: {entityType === 'item-types' ? 'white' : entity.color || '#3b82f6'}; font-size: 12px;" class="font-medium">
                       {entity.name?.charAt(0) || '?'}
@@ -168,9 +170,11 @@
                   style="background-color: {entityType === 'item-types' ? entity.color || '#3b82f6' : (entity.color || '#3b82f6') + '20'};"
                 >
                   {#if entityType === 'item-types' && entity.icon && itemTypeIconMap[entity.icon]}
-                    <svelte:component this={itemTypeIconMap[entity.icon]} class="w-4 h-4 text-white" />
+                    {@const EntityIcon = itemTypeIconMap[entity.icon]}
+                    <EntityIcon class="w-4 h-4 text-white" />
                   {:else if entityType === 'priorities' && entity.icon && priorityIconMap[entity.icon]}
-                    <svelte:component this={priorityIconMap[entity.icon]} class="w-4 h-4" style="color: {entity.color || '#3b82f6'};" />
+                    {@const EntityIcon = priorityIconMap[entity.icon]}
+                    <EntityIcon class="w-4 h-4" style="color: {entity.color || '#3b82f6'};" />
                   {:else}
                     <span style="color: {entityType === 'item-types' ? 'white' : entity.color || '#3b82f6'}; font-size: 12px;" class="font-medium">
                       {entity.name?.charAt(0) || '?'}

@@ -6,12 +6,12 @@
   import { t } from '../../stores/i18n.svelte.js';
 
   // Get active subtab from URL query params, default to 'statuses'
-  $: subtab = $currentRoute.query?.subtab || 'statuses';
+  let subtab = $derived($currentRoute.query?.subtab || 'statuses');
 
-  $: tabs = [
+  let tabs = $derived([
     { id: 'statuses', label: t('statuses.statuses') },
     { id: 'status-categories', label: t('statuses.statusCategories') }
-  ];
+  ]);
 </script>
 
 <div class="space-y-6">

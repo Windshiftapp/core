@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { AlertTriangle, X, Trash2, Users } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
@@ -8,13 +7,12 @@
   import { t } from '../stores/i18n.svelte.js';
   import { api } from '../api';
 
-  const dispatch = createEventDispatcher();
-
   let {
     show = $bindable(false),
     item = null, // { id, title, parentId }
     ondeleted = null, // callback when deletion completes
-    onerror = null // callback on error
+    onerror = null, // callback on error
+    oncancel = null
   } = $props();
 
   // Internal state
@@ -134,7 +132,6 @@
         const result = await api.items.deleteCascade(item.id);
         ondeleted?.({ mode: 'deleteAll', deletedCount: result.deletedCount });
       }
-      dispatch('deleted');
       show = false;
     } catch (err) {
       console.error('Delete failed:', err);
@@ -150,7 +147,7 @@
   }
 
   function handleCancel() {
-    dispatch('cancel');
+    oncancel?.();
     show = false;
   }
 

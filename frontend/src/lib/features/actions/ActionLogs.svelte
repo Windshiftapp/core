@@ -96,7 +96,7 @@
         pageSize={25}
       >
         <!-- Status slot with icon -->
-        <svelte:fragment slot="status" let:item>
+        {#snippet status(item)}
           <div class="flex items-center gap-2">
             {#if item.status === 'completed'}
               <CheckCircle class="w-4 h-4 text-green-500" />
@@ -114,10 +114,10 @@
               <span class="capitalize status-text">{item.status}</span>
             {/if}
           </div>
-        </svelte:fragment>
+        {/snippet}
 
         <!-- Item slot with clickable link -->
-        <svelte:fragment slot="item" let:item>
+        {#snippet item(item)}
           {#if item.item_id}
             <a
               href={`/workspaces/${workspaceId}/items/${item.item_id}`}
@@ -128,15 +128,15 @@
           {:else}
             <span class="text-subtle">{item.item_title || '-'}</span>
           {/if}
-        </svelte:fragment>
+        {/snippet}
 
         <!-- Date slot -->
-        <svelte:fragment slot="date" let:item>
+        {#snippet date(item)}
           <span class="date-text">{formatDate(item.started_at)}</span>
-        </svelte:fragment>
+        {/snippet}
 
         <!-- Error slot -->
-        <svelte:fragment slot="error" let:item>
+        {#snippet error(item)}
           {#if item.error_message}
             <span class="text-red-500 text-xs truncate block max-w-xs" title={item.error_message}>
               {item.error_message}
@@ -144,10 +144,10 @@
           {:else}
             <span class="text-gray-400">—</span>
           {/if}
-        </svelte:fragment>
+        {/snippet}
 
         <!-- Details button slot -->
-        <svelte:fragment slot="details" let:item>
+        {#snippet details(item)}
           <Button
             variant="ghost"
             size="sm"
@@ -156,7 +156,7 @@
           >
             <Eye class="w-4 h-4" />
           </Button>
-        </svelte:fragment>
+        {/snippet}
       </DataTable>
     {/if}
   </div>

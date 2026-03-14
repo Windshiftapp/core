@@ -586,27 +586,31 @@
 			emptyIcon={Circle}
 			actionItems={buildUserDropdownItems}
 		>
-			<div slot="name" let:item={user} class="flex items-center">
-				{#if user.avatar_url}
-					<img class="h-10 w-10 rounded-full" src={user.avatar_url} alt="" />
-				{:else}
-					<div class="h-10 w-10 rounded-full flex items-center justify-center" style="background-color: var(--ds-background-neutral)">
-						<span class="text-sm font-medium" style="color: var(--ds-text)">
-							{user.first_name.charAt(0)}{user.last_name.charAt(0)}
-						</span>
-					</div>
-				{/if}
-				<div class="ml-4">
-					<div class="text-sm font-medium" style="color: var(--ds-text)">
-						{user.full_name}
-					</div>
-					<div class="text-sm" style="color: var(--ds-text-subtle)">
-						{t('common.created')} {formatDateSimple(user.created_at)}
+			{#snippet name(user)}
+				<div class="flex items-center">
+					{#if user.avatar_url}
+						<img class="h-10 w-10 rounded-full" src={user.avatar_url} alt="" />
+					{:else}
+						<div class="h-10 w-10 rounded-full flex items-center justify-center" style="background-color: var(--ds-background-neutral)">
+							<span class="text-sm font-medium" style="color: var(--ds-text)">
+								{user.first_name.charAt(0)}{user.last_name.charAt(0)}
+							</span>
+						</div>
+					{/if}
+					<div class="ml-4">
+						<div class="text-sm font-medium" style="color: var(--ds-text)">
+							{user.full_name}
+						</div>
+						<div class="text-sm" style="color: var(--ds-text-subtle)">
+							{t('common.created')} {formatDateSimple(user.created_at)}
+						</div>
 					</div>
 				</div>
-			</div>
+			{/snippet}
 
-			<Lozenge slot="status" let:item={user} color={user.is_active ? 'green' : 'red'} text={user.is_active ? t('common.active') : t('common.inactive')} />
+			{#snippet status(user)}
+				<Lozenge color={user.is_active ? 'green' : 'red'} text={user.is_active ? t('common.active') : t('common.inactive')} />
+			{/snippet}
 		</DataTable>
 	{/if}
 </div>

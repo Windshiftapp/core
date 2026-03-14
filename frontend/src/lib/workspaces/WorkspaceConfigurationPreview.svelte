@@ -1,18 +1,13 @@
 <script>
-  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { Settings, Workflow, Monitor, Bell } from 'lucide-svelte';
   import Lozenge from '../components/Lozenge.svelte';
 
-  export let workspaceId;
+  let { workspaceId } = $props();
 
-  let configurationSet = null;
-  let isUsingDefault = false;
-  let loading = true;
-
-  onMount(async () => {
-    await loadConfigurationSet();
-  });
+  let configurationSet = $state(null);
+  let isUsingDefault = $state(false);
+  let loading = $state(true);
 
   async function loadConfigurationSet() {
     try {
@@ -42,9 +37,11 @@
   }
 
   // Refresh when workspace changes
-  $: if (workspaceId) {
-    loadConfigurationSet();
-  }
+  $effect(() => {
+    if (workspaceId) {
+      loadConfigurationSet();
+    }
+  });
 </script>
 
 {#if loading}

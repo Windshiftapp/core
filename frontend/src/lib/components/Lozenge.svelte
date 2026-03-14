@@ -13,7 +13,8 @@
     // Custom color props for dynamic colors (e.g., item type colors)
     customBg = null, // Hex color for background
     customBorder = null, // Hex color for border (defaults to customBg)
-    customText = null // Hex color for text (defaults to customBg)
+    customText = null, // Hex color for text (defaults to customBg)
+    children = null
   } = $props();
 
   // Size classes
@@ -89,8 +90,8 @@
   style={computedStyle}
 >
   {#if icon}
-    <svelte:component this={icon} size={12} />
+    <icon size={12} />
   {/if}
   {#if text}{text}{/if}
-  <slot />
+  {@render children?.()}
 </span>

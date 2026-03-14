@@ -5,10 +5,9 @@
   import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
   import { getHandlePositions } from './flowDirection.js';
 
-  export let data = {};
-  export let selected = false;
+  let { data = {}, selected = false } = $props();
 
-  $: positions = getHandlePositions(actionFlowStore.direction);
+  let positions = $derived(getHandlePositions(actionFlowStore.direction));
 </script>
 
 <div class="create-asset-node action-flow-node" class:selected>

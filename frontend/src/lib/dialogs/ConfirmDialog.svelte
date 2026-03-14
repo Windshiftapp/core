@@ -1,12 +1,9 @@
 <script>
-  import { createEventDispatcher } from 'svelte';  // Keep for backward compatibility
   import { AlertTriangle, X, Trash2, Check } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { getShortcut, matchesShortcut } from '../utils/keyboardShortcuts.js';
-
-  const dispatch = createEventDispatcher();  // Keep for backward compatibility
 
   let {
     show = $bindable(false),
@@ -51,14 +48,12 @@
   }
 
   function doConfirm() {
-    dispatch('confirm');  // Keep for backward compatibility
-    onconfirm?.();        // New Svelte 5 style
+    onconfirm?.();
     show = false;
   }
 
   function cancel() {
-    dispatch('cancel');   // Keep for backward compatibility
-    oncancel?.();         // New Svelte 5 style
+    oncancel?.();
     show = false;
   }
 
@@ -106,8 +101,7 @@
         <div class="flex items-center gap-3">
           {#if icon}
             <div class="flex-shrink-0">
-              <svelte:component
-                this={icon}
+              <icon
                 class="w-6 h-6"
                 style="color: {styles.iconColor};"
               />

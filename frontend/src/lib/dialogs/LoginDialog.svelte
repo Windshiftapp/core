@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher, onMount, tick } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { navigate } from '../router.js';
   import { authStore, ssoStore } from '../stores';
   import { api } from '../api.js';
@@ -20,30 +20,31 @@
   } from '../utils/loginUtils.js';
   import { t } from '../stores/i18n.svelte.js';
 
-  const dispatch = createEventDispatcher();
+  let {
+    isOpen = $bindable(false),
+    onsuccess = undefined
+  } = $props();
 
-  export let isOpen = false;
-
-  let emailOrUsername = '';
-  let password = '';
-  let rememberMe = false;
-  let showPassword = false;
-  let validationError = '';
-  let fidoAvailable = false;
-  let tryingFido = false;
-  let showFidoOption = false;
-  let ssoError = null;
-  let ssoRequiredMessage = null;
+  let emailOrUsername = $state('');
+  let password = $state('');
+  let rememberMe = $state(false);
+  let showPassword = $state(false);
+  let validationError = $state('');
+  let fidoAvailable = $state(false);
+  let tryingFido = $state(false);
+  let showFidoOption = $state(false);
+  let ssoError = $state(null);
+  let ssoRequiredMessage = $state(null);
 
   // Auth policy status (fetched on mount)
-  let policyStatus = {
+  let policyStatus = $state({
     hide_password_form: false,
     sso_enabled: false,
     passkey_required: false
-  };
+  });
 
   // Focus the first input when dialog opens
-  let emailInput;
+  let emailInput = $state(null);
 
   // Initialize SSO status and auth policy on mount
   onMount(async () => {
@@ -66,20 +67,24 @@
     }
   }
 
-  $: if (isOpen && emailInput) {
-    setTimeout(() => {
-      try {
-        emailInput?.focus();
-      } catch (error) {
-        console.warn('Failed to focus email input:', error);
-      }
-    }, 100);
-  }
-  
+  $effect(() => {
+    if (isOpen && emailInput) {
+      setTimeout(() => {
+        try {
+          emailInput?.focus();
+        } catch (error) {
+          console.warn('Failed to focus email input:', error);
+        }
+      }, 100);
+    }
+  });
+
   // Clear form when dialog closes
-  $: if (!isOpen) {
-    clearForm();
-  }
+  $effect(() => {
+    if (!isOpen) {
+      clearForm();
+    }
+  });
   
   function clearForm() {
     const baseState = getBaseLoginState();
@@ -132,7 +137,7 @@
         // Update auth store with user info
         authStore.setAuthData(loginResult.user, loginResult.sessionToken || loginResult.session);
         isOpen = false;
-        dispatch('success');
+        onsuccess?.();
       } else {
         throw new Error(loginResult.message || 'FIDO authentication failed');
       }
@@ -173,14 +178,14 @@
       // Check if enrollment is required
       if (result.enrollment_required) {
         isOpen = false;
-        dispatch('success');
+        onsuccess?.();
         // Redirect to security settings for passkey enrollment
         navigate('/security?enroll=passkey');
         return;
       }
 
       isOpen = false;
-      dispatch('success');
+      onsuccess?.();
     } else if (result.sso_required) {
       // Show SSO required message instead of regular error
       ssoRequiredMessage = result.policy_message;

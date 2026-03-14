@@ -14,21 +14,21 @@
   import { getStatusBadgeCSS, getStatusLabel, getStatusButtonStyle, getStatusButtonHoverStyle } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
 
-  let testRun = null;
-  let testCases = [];
-  let currentCaseIndex = 0;
-  let currentStepIndex = 0;
-  let testResults = {};
-  let stepResults = {};
-  let loading = true;
-  let workspaceItems = [];
-  let showCreateModal = false;
-  let pendingLinkStepId = null;
-  let sidebarCollapsed = false;
-  let showFinishConfirmation = false;
-  let showErrorDialog = false;
-  let errorMessage = '';
-  let previewImage = null;
+  let testRun = $state(null);
+  let testCases = $state([]);
+  let currentCaseIndex = $state(0);
+  let currentStepIndex = $state(0);
+  let testResults = $state({});
+  let stepResults = $state({});
+  let loading = $state(true);
+  let workspaceItems = $state([]);
+  let showCreateModal = $state(false);
+  let pendingLinkStepId = $state(null);
+  let sidebarCollapsed = $state(false);
+  let showFinishConfirmation = $state(false);
+  let showErrorDialog = $state(false);
+  let errorMessage = $state('');
+  let previewImage = $state(null);
 
   function handleRenderedContentClick(event) {
     if (event.target.tagName === 'IMG') {
@@ -39,11 +39,11 @@
     }
   }
 
-  $: workspaceId = $currentRoute.params.id;
-  $: runId = $currentRoute.params.runId;
-  $: fromPage = $currentRoute.query?.from;
-  $: currentCase = (Array.isArray(testCases) && testCases[currentCaseIndex]) || null;
-  $: currentStep = currentCase?.test_steps?.[currentStepIndex] || null;
+  let workspaceId = $derived($currentRoute.params.id);
+  let runId = $derived($currentRoute.params.runId);
+  let fromPage = $derived($currentRoute.query?.from);
+  let currentCase = $derived((Array.isArray(testCases) && testCases[currentCaseIndex]) || null);
+  let currentStep = $derived(currentCase?.test_steps?.[currentStepIndex] || null);
 
   function testPath(suffix = '') {
     const base = workspaceId ? `/workspaces/${workspaceId}/tests` : '/workspaces';
@@ -388,8 +388,7 @@
     showCreateModal = true;
   }
 
-  async function handleItemCreated(event) {
-    const item = event.detail;
+  async function handleItemCreated(item) {
     if (pendingLinkStepId && item) {
       await linkItemToStep(pendingLinkStepId, item);
       pendingLinkStepId = null;
@@ -689,7 +688,7 @@
                 <Label color="default" class="mb-2">{t('testing.actual')}</Label>
                 <Textarea
                   value={stepResults[currentStep.id]?.actual_result || ''}
-                  on:input={(e) => updateStepResult(currentStep.id, 'actual_result', e.target.value)}
+                  oninput={(e) => updateStepResult(currentStep.id, 'actual_result', e.target.value)}
                   rows={3}
                   placeholder={t('testing.actualResultPlaceholder')}
                 />
@@ -700,7 +699,7 @@
                 <Label color="default" class="mb-2">{t('common.notes')}</Label>
                 <Textarea
                   value={stepResults[currentStep.id]?.notes || ''}
-                  on:input={(e) => updateStepResult(currentStep.id, 'notes', e.target.value)}
+                  oninput={(e) => updateStepResult(currentStep.id, 'notes', e.target.value)}
                   rows={2}
                   placeholder={t('testing.notesPlaceholder')}
                 />
@@ -863,7 +862,7 @@
 <CreateModal
   bind:isOpen={showCreateModal}
   compactMode={true}
-  on:created={handleItemCreated}
+  oncreated={handleItemCreated}
 />
 
 <!-- Finish Execution Confirmation Dialog -->

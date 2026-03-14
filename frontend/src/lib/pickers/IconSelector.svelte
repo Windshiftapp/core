@@ -93,7 +93,8 @@
     >
       <div class="compact-preview">
         <div class="compact-icon" style="background-color: {selectedColor}">
-          <svelte:component this={iconMap[selectedIcon] || Package} size={16} color="white" />
+          {@const SelectedIcon = iconMap[selectedIcon] || Package}
+          <SelectedIcon size={16} color="white" />
         </div>
         <div class="compact-text">
           <span class="font-medium text-sm" style="color: var(--ds-text);">{selectedIcon}</span>
@@ -136,7 +137,8 @@
                 onclick={() => selectIcon(icon)}
                 title={icon}
               >
-                <svelte:component this={iconMap[icon]} size={14} />
+                {@const IconComp = iconMap[icon]}
+                <IconComp size={14} />
               </button>
             {/each}
           </div>
@@ -183,7 +185,8 @@
     <!-- Preview -->
     <div class="preview-section mb-4">
       <div class="preview-icon" style="background-color: {selectedColor}">
-        <svelte:component this={iconMap[selectedIcon] || Package} size={20} color="white" />
+        {@const PreviewIcon = iconMap[selectedIcon] || Package}
+        <PreviewIcon size={20} color="white" />
       </div>
       <div class="preview-text">
         <div class="font-medium" style="color: var(--ds-text);">{selectedIcon}</div>
@@ -216,7 +219,8 @@
             onclick={() => selectIcon(icon)}
             title={icon}
           >
-            <svelte:component this={iconMap[icon]} size={16} />
+            {@const IconComp = iconMap[icon]}
+            <IconComp size={16} />
           </button>
         {/each}
       </div>

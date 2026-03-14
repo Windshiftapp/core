@@ -634,16 +634,18 @@
           totalItems={totalAssets}
           onPageChange={handlePageChange}
         >
-          <div slot="type" let:item class="flex items-center gap-2">
+          {#snippet type(item)}
+            <div class="flex items-center gap-2">
             {#if item.asset_type_name}
               <ColorDot color={item.asset_type_color || '#6b7280'} size="sm" />
               <span>{item.asset_type_name}</span>
             {:else}
               <span style="color: var(--ds-text-subtlest);">—</span>
             {/if}
-          </div>
+            </div>
+          {/snippet}
 
-          <div slot="category" let:item>
+          {#snippet category(item)}
             {#if item.category_name}
               <span class="inline-flex items-center gap-1">
                 <Folder class="w-3 h-3 text-yellow-500" />
@@ -652,9 +654,9 @@
             {:else}
               <span style="color: var(--ds-text-subtlest);">—</span>
             {/if}
-          </div>
+          {/snippet}
 
-          <div slot="status" let:item>
+          {#snippet status(item)}
             {#if item.status_name}
               <span class="inline-flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full" style="background-color: {item.status_color || '#6b7280'};"></span>
@@ -663,7 +665,7 @@
             {:else}
               <span style="color: var(--ds-text-subtlest);">—</span>
             {/if}
-          </div>
+          {/snippet}
         </DataTable>
       {/if}
     </div>

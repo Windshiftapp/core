@@ -7,22 +7,25 @@
   import { tick } from 'svelte';
   import Checkbox from '../components/Checkbox.svelte';
 
-  export let triggerText = '';
-  export let triggerIcon = null;
-  export let triggerAvatar = null; // URL for avatar image
-  export let triggerIconBgColor = null; // Background color for the icon (hex color)
-  export let triggerBgColor = null; // Background color for entire button (hex color)
-  export let triggerIconClass = 'w-4 h-4'; // Icon size class
-  export let triggerGap = 'gap-2'; // Gap between icon and text
-  export let items = [];
-  export let maxWidth = 'max-w-3xl';
-  export let placement = 'bottom'; // 'bottom', 'right', 'left', 'top'
-  export let triggerClass = '';
-  export let triggerStyle = '';
-  export let showChevron = true;
-  export let iconOnly = false; // New prop for icon-only buttons
-  export let onOpen = null; // Callback when dropdown opens
-  export let triggerAlignment = 'center'; // 'center', 'start', 'between'
+  let {
+    triggerText = '',
+    triggerIcon = null,
+    triggerAvatar = null,
+    triggerIconBgColor = null,
+    triggerBgColor = null,
+    triggerIconClass = 'w-4 h-4',
+    triggerGap = 'gap-2',
+    items = [],
+    maxWidth = 'max-w-3xl',
+    placement = 'bottom',
+    triggerClass = '',
+    triggerStyle = '',
+    showChevron = true,
+    iconOnly = false,
+    onOpen = null,
+    triggerAlignment = 'center',
+    children
+  } = $props();
 
   // Create popover (replaces createDropdownMenu to avoid typeahead focus-stealing)
   const {
@@ -37,21 +40,19 @@
   });
 
   // Watch for open state changes
-  let previousOpen = false;
-  let triggerElement;
-  let searchInputElement;
+  let previousOpen = $state(false);
+  let triggerElement = $state(null);
+  let searchInputElement = $state(null);
 
-  $: hasSearchInput = items.some(i => i.type === 'search');
+  let hasSearchInput = $derived(items.some(i => i.type === 'search'));
 
-  $: {
+  $effect(() => {
     if ($open && !previousOpen) {
-      // Dropdown just opened
       if (onOpen) onOpen();
       tick().then(() => {
         if (searchInputElement) {
           searchInputElement.focus();
         } else {
-          // Focus first menu item for non-search dropdowns
           const container = document.querySelector('[data-menu-container]');
           if (container) {
             const firstItem = container.querySelector('button[data-menu-item]');
@@ -60,19 +61,18 @@
         }
       });
     } else if (previousOpen && !$open) {
-      // Dropdown just closed, blur the trigger element
       if (triggerElement) {
         triggerElement.blur();
       }
     }
     previousOpen = $open;
-  }
+  });
 
-  $: alignmentClass = triggerAlignment === 'between'
+  let alignmentClass = $derived(triggerAlignment === 'between'
     ? 'justify-between'
     : triggerAlignment === 'start'
       ? 'justify-start'
-      : 'justify-center';
+      : 'justify-center');
 
   function closeMenu() {
     if ($open) {
@@ -140,9 +140,8 @@
     class="{triggerAvatar ? 'p-0' : iconOnly ? '' : triggerClass ? '' : 'px-4 py-2'} rounded text-sm font-medium transition cursor-pointer flex items-center {alignmentClass} {triggerGap} flex-shrink-0 {triggerBgColor ? getTextColorForBackground(triggerBgColor) : ''} {triggerClass}"
     style="{triggerBgColor ? `background-color: ${triggerBgColor}; ${triggerStyle}` : triggerStyle}"
   >
-    {#if $$slots.default}
-      <!-- Custom trigger content via slot -->
-      <slot />
+    {#if children}
+      {@render children()}
       {#if showChevron}
         <ChevronDown class="w-3 h-3" />
       {/if}
@@ -158,16 +157,19 @@
       {#if triggerIcon}
         {#if triggerBgColor}
           <!-- When full background is colored, show icon without circle -->
-          <svelte:component this={triggerIcon} class="{triggerIconClass} flex-shrink-0" />
+          {@const TriggerIconComp = triggerIcon}
+          <TriggerIconComp class="{triggerIconClass} flex-shrink-0" />
         {:else if triggerIconBgColor}
+          {@const TriggerIconComp = triggerIcon}
           <div
             class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
             style="background-color: {triggerIconBgColor};"
           >
-            <svelte:component this={triggerIcon} class="w-3.5 h-3.5 text-white" />
+            <TriggerIconComp class="w-3.5 h-3.5 text-white" />
           </div>
         {:else}
-          <svelte:component this={triggerIcon} class="{triggerIconClass} flex-shrink-0" />
+          {@const TriggerIconComp = triggerIcon}
+          <TriggerIconComp class="{triggerIconClass} flex-shrink-0" />
         {/if}
       {/if}
       {#if triggerText}
@@ -244,12 +246,14 @@
                 <img src={groupItem.avatarUrl} alt="Avatar" class="w-6 h-6 mr-3 rounded object-cover" />
               {:else if groupItem.icon}
                 {#if groupItem.iconColor}
+                  {@const GroupItemIcon = groupItem.icon}
                   <div class="w-6 h-6 mr-3 rounded flex items-center justify-center" style="background-color: {groupItem.iconColor};">
-                    <svelte:component this={groupItem.icon} class="w-4 h-4" style="color: white;" />
+                    <GroupItemIcon class="w-4 h-4" style="color: white;" />
                   </div>
                 {:else}
+                  {@const GroupItemIcon = groupItem.icon}
                   <div class="w-6 h-6 mr-3 rounded flex items-center justify-center">
-                    <svelte:component this={groupItem.icon} class="w-4 h-4 {groupItem.iconClass || 'transition-colors'}" style="color: var(--ds-icon-subtle);" />
+                    <GroupItemIcon class="w-4 h-4 {groupItem.iconClass || 'transition-colors'}" style="color: var(--ds-icon-subtle);" />
                   </div>
                 {/if}
               {/if}
@@ -291,12 +295,14 @@
               </div>
             {:else if itemData.icon}
               {#if itemData.iconColor}
+                {@const ItemIcon = itemData.icon}
                 <div class="w-6 h-6 mr-3 rounded flex items-center justify-center" style="background-color: {itemData.iconColor};">
-                  <svelte:component this={itemData.icon} class="w-4 h-4" style="color: white;" />
+                  <ItemIcon class="w-4 h-4" style="color: white;" />
                 </div>
               {:else}
+                {@const ItemIcon = itemData.icon}
                 <div class="w-6 h-6 mr-3 rounded flex items-center justify-center">
-                  <svelte:component this={itemData.icon} class="w-4 h-4 {itemData.iconClass || ''}" />
+                  <ItemIcon class="w-4 h-4 {itemData.iconClass || ''}" />
                 </div>
               {/if}
             {/if}

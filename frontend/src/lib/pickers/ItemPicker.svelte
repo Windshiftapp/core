@@ -337,7 +337,8 @@
           {#if iconData.type === 'color-dot'}
             <div class="{iconData.size} rounded-full flex-shrink-0" style="background-color: {getVisibleColor(iconData.color)};"></div>
           {:else}
-            <svelte:component this={iconData} size={16} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
+            {@const IconData = iconData}
+            <IconData size={16} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
           {/if}
         {/if}
         <span class="truncate">{finalConfig.getLabel(selectedItem)}</span>
@@ -521,7 +522,8 @@
                 {#if iconData.type === 'color-dot'}
                   <div class="{iconData.size} rounded-full flex-shrink-0" style="background-color: {getVisibleColor(iconData.color)};"></div>
                 {:else}
-                  <svelte:component this={iconData} size={16} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
+                  {@const IconData = iconData}
+                  <IconData size={16} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
                 {/if}
               {/if}
 
@@ -565,7 +567,8 @@
                 {#if startDate || endDate}
                   <div class="flex items-center gap-2 text-xs mb-1" style="color: var(--ds-text-subtle);">
                     {#if meta.icon}
-                      <svelte:component this={meta.icon} size={12} />
+                      {@const MetaIcon = meta.icon}
+                      <MetaIcon size={12} />
                     {/if}
                     <span>
                       {formatDate(startDate)} → {formatDate(endDate)}
@@ -592,7 +595,8 @@
                 {#if text}
                   <div class="flex items-center gap-2 text-xs mb-1" style="color: var(--ds-text-subtle);">
                     {#if meta.icon}
-                      <svelte:component this={meta.icon} size={12} />
+                      {@const MetaIcon = meta.icon}
+                      <MetaIcon size={12} />
                     {/if}
                     <span>{text}</span>
                   </div>

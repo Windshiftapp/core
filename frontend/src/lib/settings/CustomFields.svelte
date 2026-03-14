@@ -776,13 +776,18 @@
       emptyIcon={Circle}
       actionItems={buildFieldDropdownItems}
     >
-      <div slot="name" let:item={field}>
-        <span>{field.name}</span>
-      </div>
+      {#snippet name(field)}
+        <div>
+          <span>{field.name}</span>
+        </div>
+      {/snippet}
 
-      <Lozenge slot="type" let:item={field} color="blue" text={getFieldTypeLabel(field.field_type)} />
+      {#snippet type(field)}
+        <Lozenge color="blue" text={getFieldTypeLabel(field.field_type)} />
+      {/snippet}
 
-      <div slot="usage" let:item={field} class="text-sm">
+      {#snippet usage(field)}
+        <div class="text-sm">
         {#if screensLoaded}
           {@const matchingScreens = getFieldScreens(field.id)}
           {@const assetTypes = field.asset_type_usages || []}
@@ -814,7 +819,8 @@
         {:else}
           <span class="text-gray-400">{t('common.loading')}</span>
         {/if}
-      </div>
+        </div>
+      {/snippet}
     </DataTable>
   </div>
 

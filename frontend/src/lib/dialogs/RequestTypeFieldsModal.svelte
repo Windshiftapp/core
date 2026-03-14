@@ -1,5 +1,4 @@
 <script>
-  import { onMount, createEventDispatcher } from 'svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
   import { api } from '../api.js';
@@ -11,44 +10,46 @@
   import { t } from '../stores/i18n.svelte.js';
   import Checkbox from '../components/Checkbox.svelte';
 
-  const dispatch = createEventDispatcher();
-
-  export let isOpen = false;
-  export let requestTypeId = null;
-  export let requestTypeName = '';
-  export let isDarkMode = false;
+  let {
+    isOpen = $bindable(false),
+    requestTypeId = null,
+    requestTypeName = '',
+    isDarkMode = false,
+    onsaved = undefined,
+    onclose = undefined
+  } = $props();
 
   // Field data
-  let fields = [];
-  let availableFields = [];
-  let loading = false;
-  let error = null;
-  let saving = false;
+  let fields = $state([]);
+  let availableFields = $state([]);
+  let loading = $state(false);
+  let error = $state(null);
+  let saving = $state(false);
 
   // Step management - steps are explicitly tracked, not derived from fields
-  let steps = [1];
-  let currentStep = 1;
+  let steps = $state([1]);
+  let currentStep = $state(1);
 
   // Search/filter
-  let fieldSearchQuery = '';
+  let fieldSearchQuery = $state('');
 
   // Drag state
-  let draggedField = false;
-  let fieldDragState = new Map();
-  let setupCleanups = [];
+  let draggedField = $state(false);
+  let fieldDragState = $state(new Map());
+  let setupCleanups = $state([]);
   let setupTimeout;
 
   // Virtual field creation
-  let addingVirtualField = false;
-  let virtualFieldName = '';
-  let virtualFieldType = 'text';
-  let virtualFieldRequired = false;
-  let virtualFieldOptions = [{ value: '', label: '' }];
+  let addingVirtualField = $state(false);
+  let virtualFieldName = $state('');
+  let virtualFieldType = $state('text');
+  let virtualFieldRequired = $state(false);
+  let virtualFieldOptions = $state([{ value: '', label: '' }]);
 
   // Field editing
-  let editingField = null;
-  let editDisplayName = '';
-  let editDescription = '';
+  let editingField = $state(null);
+  let editDisplayName = $state('');
+  let editDescription = $state('');
 
   // Helper function to capitalize field labels
   function capitalizeLabel(name) {
@@ -57,24 +58,28 @@
   }
 
   // Track the previous open state to only load when actually opening
-  let wasOpen = false;
+  let wasOpen = $state(false);
 
   // Computed: fields for current step
-  $: currentStepFields = fields
-    .filter(f => (f.step_number || 1) === currentStep)
-    .sort((a, b) => a.display_order - b.display_order);
+  let currentStepFields = $derived(
+    fields
+      .filter(f => (f.step_number || 1) === currentStep)
+      .sort((a, b) => a.display_order - b.display_order)
+  );
 
   // Computed: filtered available fields (exclude already configured and apply search)
-  $: filteredAvailableFields = availableFields
-    .filter(f => !fields.some(cf => cf.field_identifier === f.identifier))
-    .filter(f => {
-      if (!fieldSearchQuery.trim()) return true;
-      const query = fieldSearchQuery.toLowerCase();
-      return f.name.toLowerCase().includes(query) || f.identifier.toLowerCase().includes(query);
-    });
+  let filteredAvailableFields = $derived(
+    availableFields
+      .filter(f => !fields.some(cf => cf.field_identifier === f.identifier))
+      .filter(f => {
+        if (!fieldSearchQuery.trim()) return true;
+        const query = fieldSearchQuery.toLowerCase();
+        return f.name.toLowerCase().includes(query) || f.identifier.toLowerCase().includes(query);
+      })
+  );
 
   // Load fields when modal opens
-  $: {
+  $effect(() => {
     if (isOpen && !wasOpen && requestTypeId) {
       wasOpen = true;
       loadFields();
@@ -82,13 +87,15 @@
       wasOpen = false;
       clearForm();
     }
-  }
+  });
 
   // Re-setup drag and drop when fields or step changes
-  $: if (!loading && fields && typeof document !== 'undefined') {
-    if (setupTimeout) clearTimeout(setupTimeout);
-    setupTimeout = setTimeout(() => setupDragAndDrop(), 50);
-  }
+  $effect(() => {
+    if (!loading && fields && typeof document !== 'undefined') {
+      if (setupTimeout) clearTimeout(setupTimeout);
+      setupTimeout = setTimeout(() => setupDragAndDrop(), 50);
+    }
+  });
 
   async function loadFields() {
     try {
@@ -508,7 +515,7 @@
       }));
 
       await api.requestTypes.updateFields(requestTypeId, fieldsToSave);
-      dispatch('saved');
+      onsaved?.();
     } catch (err) {
       console.error('Failed to save fields:', err);
       error = err.message || t('requestTypeFields.failedToSaveFields');
@@ -519,7 +526,7 @@
 
   function handleClose() {
     isOpen = false;
-    dispatch('close');
+    onclose?.();
   }
 
   function getFieldTypeLabel(field) {
@@ -842,7 +849,7 @@
                   class="flex flex-col items-center gap-1 p-3 rounded border transition-all"
                   style="background-color: {virtualFieldType === type.value ? 'var(--ds-interactive-subtle)' : 'transparent'}; border-color: {virtualFieldType === type.value ? 'var(--ds-interactive)' : 'var(--ds-border)'}; color: {virtualFieldType === type.value ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'};"
                 >
-                  <svelte:component this={type.icon} class="w-5 h-5" />
+                  <type.icon class="w-5 h-5" />
                   <span class="text-xs">{type.label}</span>
                 </button>
               {/each}

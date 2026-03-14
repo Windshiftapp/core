@@ -192,13 +192,13 @@
 <!-- Welcome Assistant -->
 <WelcomeAssistant
   bind:isOpen={showWelcomeAssistant}
-  on:setup-completed={() => moduleSettings.reload()}
+  onsetup-completed={() => moduleSettings.reload()}
 />
 
 <!-- Login Dialog -->
 <LoginDialog
   bind:isOpen={showLoginDialog}
-  on:success={() => {
+  onsuccess={() => {
     showLoginDialog = false;
   }}
 />

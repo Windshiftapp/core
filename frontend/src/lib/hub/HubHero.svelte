@@ -191,7 +191,8 @@
                       >
                         <div class="w-8 h-8 rounded flex items-center justify-center flex-shrink-0" style="background-color: {rt.color || '#6b7280'};">
                           {#if rt.icon && iconMap[rt.icon]}
-                            <svelte:component this={iconMap[rt.icon]} class="w-4 h-4 text-white" />
+                            {@const RtIcon = iconMap[rt.icon]}
+                            <RtIcon class="w-4 h-4 text-white" />
                           {:else}
                             <FileText class="w-4 h-4 text-white" />
                           {/if}

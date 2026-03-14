@@ -11,7 +11,7 @@
 
   let editorComponent = $state(null);
   let diagramName = $state(diagram ? diagram.name : t('components.diagram.untitled'));
-  let initialData = null;
+  let initialData = $state(null);
   let saving = $state(false);
   let hasChanges = $state(false);
 

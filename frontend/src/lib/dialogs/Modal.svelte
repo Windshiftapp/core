@@ -1,25 +1,25 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { fade, scale } from 'svelte/transition';
   import { backOut } from 'svelte/easing';
   import { getShortcut, matchesShortcut, getDisplayString } from '../utils/keyboardShortcuts.js';
 
-  const dispatch = createEventDispatcher();
+  let {
+    isOpen = $bindable(false),
+    preventClose = false,
+    maxWidth = 'max-w-lg',
+    maxHeight = '',
+    autoFocus = true,
+    onSubmit = null,
+    submitDisabled = false,
+    zIndexClass = 'z-50',
+    noBackdrop = false,
+    onclose = null,
+    children
+  } = $props();
 
-  export let isOpen = false;
-  export let preventClose = false;
-  export let maxWidth = 'max-w-lg';
-  export let maxHeight = '';
-  export let autoFocus = true;
-  export let onSubmit = null; // Optional submit handler
-  export let submitDisabled = false; // Whether submit is disabled
-  export let zIndexClass = 'z-50';
-  export let noBackdrop = false;
-  export let onclose = null; // Callback for close (Svelte 5 compatible)
-
-  let backdropElement;
-  let modalContentElement;
-  let hasTextarea = false;
+  let backdropElement = $state(null);
+  let modalContentElement = $state(null);
+  let hasTextarea = $state(false);
 
   // Get shortcut configurations
   const submitShortcut = getShortcut('modal', 'submit');
@@ -28,7 +28,6 @@
   function close() {
     if (!preventClose) {
       isOpen = false;
-      dispatch('close');
       onclose?.();
     }
   }
@@ -83,29 +82,24 @@
     }
   }
 
-  // Compute the keyboard hint for submit button using centralized display logic
-  $: submitHint = hasTextarea ? getDisplayString(submitShortcut) : '↵';
+  let submitHint = $derived(hasTextarea ? getDisplayString(submitShortcut) : '↵');
 
-  // Focus management when modal opens
-  $: if (isOpen && modalContentElement && backdropElement) {
-    setTimeout(() => {
-      // Detect textarea presence
-      detectTextarea();
-
-      // First, focus backdrop for keyboard events
-      backdropElement.focus();
-
-      // Then, autofocus first focusable element if enabled
-      if (autoFocus) {
-        const focusable = modalContentElement.querySelector(
-          'input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled])'
-        );
-        if (focusable) {
-          focusable.focus();
+  $effect(() => {
+    if (isOpen && modalContentElement && backdropElement) {
+      setTimeout(() => {
+        detectTextarea();
+        backdropElement.focus();
+        if (autoFocus) {
+          const focusable = modalContentElement.querySelector(
+            'input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled])'
+          );
+          if (focusable) {
+            focusable.focus();
+          }
         }
-      }
-    }, 100);
-  }
+      }, 100);
+    }
+  });
 </script>
 
 {#if isOpen}
@@ -128,7 +122,7 @@
       class="relative rounded-xl overflow-hidden {maxWidth} w-full mx-4 mb-8 modal-content {maxHeight ? 'flex flex-col' : ''}"
       style="background-color: var(--ds-surface-raised, var(--ds-surface, white)); box-shadow: var(--shadow-float, 0 20px 50px rgba(0, 0, 0, 0.18));{maxHeight ? ` max-height: ${maxHeight};` : ''}"
     >
-      <slot {submitHint}></slot>
+      {@render children?.(submitHint)}
     </div>
   </div>
 {/if}

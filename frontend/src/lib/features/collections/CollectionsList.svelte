@@ -238,8 +238,8 @@
               workspaces={workspaceOptions}
               placeholder={t('collections.allWorkspaces')}
               allowClear={true}
-              on:select={(event) => {
-                selectedWorkspaceFilter = event.detail?.id || null;
+              onSelect={(event) => {
+                selectedWorkspaceFilter = event?.id || null;
               }}
               class="!py-2"
             />
@@ -259,7 +259,7 @@
         actionItems={buildCollectionActions}
         onRowClick={(collection) => viewCollection(collection)}
       >
-        <div slot="name" let:item={collection}>
+        {#snippet name(collection)}
           <div>
             <div class="flex items-center gap-2">
               <div class="font-semibold" style="color: var(--ds-text);">{collection.name}</div>
@@ -273,9 +273,9 @@
               <div class="text-sm mt-1" style="color: var(--ds-text-subtle);">{collection.description}</div>
             {/if}
           </div>
-        </div>
+        {/snippet}
 
-        <div slot="category" let:item={collection}>
+        {#snippet category(collection)}
           {#if collection.category_name}
             <div class="flex items-center gap-2">
               <ColorDot color={collection.category_color || '#6b7280'} size="sm" />
@@ -284,13 +284,13 @@
           {:else}
             <span class="text-sm" style="color: var(--ds-text-subtle);">—</span>
           {/if}
-        </div>
+        {/snippet}
 
-        <div slot="query" let:item={collection}>
+        {#snippet query(collection)}
           <div class="font-mono text-sm" style="color: var(--ds-text-subtle);">
             {collection.cql_query || t('collections.noQuery')}
           </div>
-        </div>
+        {/snippet}
       </DataTable>
     </div>
   </div>

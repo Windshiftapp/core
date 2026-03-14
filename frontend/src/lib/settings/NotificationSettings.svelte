@@ -1,6 +1,5 @@
 <script>
-  import { onMount, createEventDispatcher } from 'svelte';
-  import { writable } from 'svelte/store';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { authStore } from '../stores/auth.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -20,8 +19,6 @@
   import Checkbox from '../components/Checkbox.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
-
-  const dispatch = createEventDispatcher();
 
   let notificationSettings = $state([]);
   let availableEvents = $state([]);

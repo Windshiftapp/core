@@ -388,7 +388,8 @@
                   onmouseenter={(e) => { if (!isItemActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
                   onmouseleave={(e) => { if (!isItemActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
                 >
-                  <svelte:component this={item.icon} class="flex-shrink-0 -ml-1 mr-3 w-4 h-4" aria-hidden="true" />
+                  {@const ItemIcon = item.icon}
+                  <ItemIcon class="flex-shrink-0 -ml-1 mr-3 w-4 h-4" aria-hidden="true" />
                   <span>{item.label}</span>
                 </LinkComponent>
               {/each}

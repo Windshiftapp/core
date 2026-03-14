@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { useEventListener } from 'runed';
   import { navigate, currentRoute } from '../router.js';
   import { milestonesStore } from '../stores/milestones.js';
@@ -44,15 +43,15 @@
     'collection': t('createModal.collection')
   });
 
-  const dispatch = createEventDispatcher();
-
   const submitShortcut = getShortcut('modal', 'submit');
 
   let {
     isOpen = $bindable(false),
     compactMode = false,
     initialType = 'work-item',
-    skipNavigate = false
+    skipNavigate = false,
+    onclose = null,
+    oncreated = null
   } = $props();
 
   let selectedType = $state(initialType);
@@ -144,7 +143,7 @@
     };
     collectionCategoryId = null;
 
-    dispatch('close');
+    onclose?.();
   }
 
   function selectType(type) {
@@ -172,7 +171,7 @@
         const result = await api.items.create(formData);
 
         window.dispatchEvent(new CustomEvent('refresh-work-items', { detail: { itemId: result.id } }));
-        dispatch('created', result);
+        oncreated?.(result);
 
         if (shouldNavigateAfterCreate($currentRoute.view)) {
           navigate(`/workspaces/${formData.workspace_id}/items/${result.id}`);
@@ -362,7 +361,7 @@
                       closePopover();
                     }}
                   >
-                    <svelte:component this={type.icon} size={16} style="color: var(--ds-text-subtle);" />
+                    <type.icon size={16} style="color: var(--ds-text-subtle);" />
                     <span class="font-medium">{type.label}</span>
                   </button>
                 {/each}

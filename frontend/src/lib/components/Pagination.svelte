@@ -1,43 +1,38 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-svelte';
   import Button from './Button.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
   import { t } from '../stores/i18n.svelte.js';
-  
-  const dispatch = createEventDispatcher();
-  
-  export let currentPage = 1;
-  export let totalItems = 0;
-  export let itemsPerPage = 50;
-  export let maxItems = 10000; // Maximum items to show from API
-  export let showPageSizes = true;
-  export let pageSizeOptions = [10, 25, 50, 100];
-  export let compact = false; // For smaller spaces
-  export let hasGradient = false; // Gradient background awareness
-  export let onpageChange = null; // Callback prop (Svelte 5 callers)
-  export let onpageSizeChange = null; // Callback prop (Svelte 5 callers)
 
-  // Gradient-aware text styles (using inline styles instead of Tailwind classes)
-  $: textStyle = hasGradient ? 'color: var(--ds-text);' : 'color: var(--ds-text);';
-  $: subtleTextStyle = hasGradient ? 'color: var(--ds-text-subtle);' : 'color: var(--ds-text-subtle);';
-  $: ellipsisStyle = hasGradient ? 'color: var(--ds-text-subtlest);' : 'color: var(--ds-text-subtlest);';
-  $: warningStyle = hasGradient ? 'color: #ea580c;' : 'color: #ea580c;';
+  let {
+    currentPage = 1,
+    totalItems = 0,
+    itemsPerPage = 50,
+    maxItems = 10000,
+    showPageSizes = true,
+    pageSizeOptions = [10, 25, 50, 100],
+    compact = false,
+    hasGradient = false,
+    onpageChange = null,
+    onpageSizeChange = null
+  } = $props();
 
-  // Glass container style for gradient backgrounds
-  $: containerStyle = hasGradient
+  let textStyle = $derived(hasGradient ? 'color: var(--ds-text);' : 'color: var(--ds-text);');
+  let subtleTextStyle = $derived(hasGradient ? 'color: var(--ds-text-subtle);' : 'color: var(--ds-text-subtle);');
+  let ellipsisStyle = $derived(hasGradient ? 'color: var(--ds-text-subtlest);' : 'color: var(--ds-text-subtlest);');
+  let warningStyle = $derived(hasGradient ? 'color: #ea580c;' : 'color: #ea580c;');
+
+  let containerStyle = $derived(hasGradient
     ? 'background-color: var(--ds-glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--ds-glass-border); border-radius: 0.75rem; padding: 1rem;'
-    : '';
+    : '');
 
-  // Calculate pagination values
-  $: totalPages = Math.ceil(Math.min(totalItems, maxItems) / itemsPerPage);
-  $: startItem = Math.min((currentPage - 1) * itemsPerPage + 1, totalItems);
-  $: endItem = Math.min(currentPage * itemsPerPage, totalItems, maxItems);
-  $: isFirstPage = currentPage === 1;
-  $: isLastPage = currentPage === totalPages || endItem >= Math.min(totalItems, maxItems);
-  
-  // Generate page numbers to show
-  $: visiblePages = generateVisiblePages(currentPage, totalPages);
+  let totalPages = $derived(Math.ceil(Math.min(totalItems, maxItems) / itemsPerPage));
+  let startItem = $derived(Math.min((currentPage - 1) * itemsPerPage + 1, totalItems));
+  let endItem = $derived(Math.min(currentPage * itemsPerPage, totalItems, maxItems));
+  let isFirstPage = $derived(currentPage === 1);
+  let isLastPage = $derived(currentPage === totalPages || endItem >= Math.min(totalItems, maxItems));
+
+  let visiblePages = $derived(generateVisiblePages(currentPage, totalPages));
   
   function generateVisiblePages(current, total) {
     if (total <= 7) {
@@ -57,7 +52,6 @@
   
   function goToPage(page) {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
-      dispatch('pageChange', { page, itemsPerPage });
       onpageChange?.({ detail: { page, itemsPerPage } });
     }
   }
@@ -65,7 +59,6 @@
   function handlePageSizeChange(event) {
     const newPageSize = parseInt(event.target.value);
     const newPage = Math.min(currentPage, Math.ceil(Math.min(totalItems, maxItems) / newPageSize));
-    dispatch('pageSizeChange', { page: newPage, itemsPerPage: newPageSize });
     onpageSizeChange?.({ detail: { page: newPage, itemsPerPage: newPageSize } });
   }
 </script>
@@ -96,7 +89,7 @@
                 if (item) {
                   const newPageSize = item;
                   const newPage = Math.min(currentPage, Math.ceil(Math.min(totalItems, maxItems) / newPageSize));
-                  dispatch('pageSizeChange', { page: newPage, itemsPerPage: newPageSize });
+                  onpageSizeChange?.({ detail: { page: newPage, itemsPerPage: newPageSize } });
                 }
               }}
             />

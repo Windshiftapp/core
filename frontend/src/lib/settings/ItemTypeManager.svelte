@@ -3,7 +3,6 @@
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
-  import { createEventDispatcher } from 'svelte';
   import { Plus, Edit, Trash2, FileText } from 'lucide-svelte';
   import { itemTypeIconMap, itemTypeIconOptions } from '../utils/icons.js';
   import Button from '../components/Button.svelte';
@@ -17,8 +16,6 @@
   import Lozenge from '../components/Lozenge.svelte';
   import ColorPicker from '../editors/ColorPicker.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
-
-  const dispatch = createEventDispatcher();
 
   let itemTypes = $state([]);
   let hierarchyLevels = $state([]);
@@ -257,23 +254,29 @@
     emptyIcon={FileText}
     actionItems={buildItemTypeDropdownItems}
   >
-    <div slot="icon" let:item={itemType} class="flex items-center justify-center">
-      <div class="w-6 h-6 rounded flex items-center justify-center" style="background-color: {itemType.color}">
-        <svelte:component this={itemTypeIconMap[itemType.icon] || FileText} size={12} color="white" />
+    {#snippet icon(itemType)}
+      <div class="flex items-center justify-center">
+        <div class="w-6 h-6 rounded flex items-center justify-center" style="background-color: {itemType.color}">
+          <svelte:component this={itemTypeIconMap[itemType.icon] || FileText} size={12} color="white" />
+        </div>
       </div>
-    </div>
+    {/snippet}
 
-    <Lozenge slot="hierarchy_level" let:item={itemType} color="blue" text={getHierarchyLevelName(itemType.hierarchy_level)} />
+    {#snippet hierarchy_level(itemType)}
+      <Lozenge color="blue" text={getHierarchyLevelName(itemType.hierarchy_level)} />
+    {/snippet}
 
-    <div slot="configuration_set_names" let:item={itemType} class="flex flex-wrap gap-1">
-      {#if itemType.configuration_set_names && itemType.configuration_set_names.length > 0}
-        {#each itemType.configuration_set_names as configSetName}
-          <Lozenge color="gray" text={configSetName} />
-        {/each}
-      {:else}
-        <span class="text-xs text-gray-500">No configuration sets</span>
-      {/if}
-    </div>
+    {#snippet configuration_set_names(itemType)}
+      <div class="flex flex-wrap gap-1">
+        {#if itemType.configuration_set_names && itemType.configuration_set_names.length > 0}
+          {#each itemType.configuration_set_names as configSetName}
+            <Lozenge color="gray" text={configSetName} />
+          {/each}
+        {:else}
+          <span class="text-xs text-gray-500">No configuration sets</span>
+        {/if}
+      </div>
+    {/snippet}
   </DataTable>
 
   <Modal isOpen={showCreateForm} onclose={cancelEdit} maxWidth="max-w-2xl">

@@ -7,15 +7,14 @@
 	import Spinner from '../../components/Spinner.svelte';
 	import AlertBox from '../../components/AlertBox.svelte';
 
-	export let itemId;
+	let { itemId } = $props();
 
-	let history = [];
-	let loading = true;
-	let error = '';
-	let timezone = 'UTC';
+	let history = $state([]);
+	let loading = $state(true);
+	let error = $state('');
 
 	// Get user's timezone
-	$: timezone = getUserTimezone(authStore.currentUser);
+	let timezone = $derived(getUserTimezone(authStore.currentUser));
 
 	onMount(() => {
 		loadHistory();
@@ -35,7 +34,7 @@
 	}
 
 	// Group history entries by timestamp (changes made at the same time)
-	$: groupedHistory = groupByTimestamp(history);
+	let groupedHistory = $derived(groupByTimestamp(history));
 
 	function groupByTimestamp(entries) {
 		if (!entries || entries.length === 0) return [];

@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../../api.js';
   import { successToast, errorToast } from '../../stores/toasts.svelte.js';
   import Label from '../../components/Label.svelte';
@@ -8,9 +8,7 @@
   import BasePicker from '../../pickers/BasePicker.svelte';
   import { Tag, Loader2, Sparkles, AlertTriangle } from 'lucide-svelte';
 
-  let { milestone, workspaceId = null, hasExistingRelease = false } = $props();
-
-  const dispatch = createEventDispatcher();
+  let { milestone, workspaceId = null, hasExistingRelease = false, onreleased, onclose } = $props();
 
   let loading = $state(true);
   let submitting = $state(false);
@@ -174,7 +172,7 @@
           : 'Milestone marked as completed.',
         'Released'
       );
-      dispatch('released', updatedMilestone);
+      onreleased?.(updatedMilestone);
     } catch (err) {
       console.error('Failed to release milestone:', err);
       error = err.message || 'Failed to create release.';
@@ -185,7 +183,7 @@
   }
 
   function cancel() {
-    dispatch('close');
+    onclose?.();
   }
 </script>
 

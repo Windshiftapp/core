@@ -218,23 +218,27 @@
     emptyIcon={Palette}
     actionItems={buildCategoryDropdownItems}
   >
-    <div slot="category" let:item={category} class="flex items-center gap-3">
-      <h3 class="font-medium" style="color: var(--ds-text);">{category.name}</h3>
-      {#if category.is_default}
-        <Lozenge color="blue" text={t('settings.statusCategories.default')} />
-      {/if}
-      {#if category.is_completed}
-        <Lozenge color="emerald" text={t('settings.statusCategories.completed')} />
-      {/if}
-    </div>
-    
-    <div slot="color" let:item={category} class="flex items-center gap-2">
-      <div
-        class="w-4 h-4 rounded border border-gray-300"
-        style="background-color: {category.color};"
-      ></div>
-      <span class="text-sm font-mono" style="color: var(--ds-text-subtle);">{category.color}</span>
-    </div>
+    {#snippet category(category)}
+      <div class="flex items-center gap-3">
+        <h3 class="font-medium" style="color: var(--ds-text);">{category.name}</h3>
+        {#if category.is_default}
+          <Lozenge color="blue" text={t('settings.statusCategories.default')} />
+        {/if}
+        {#if category.is_completed}
+          <Lozenge color="emerald" text={t('settings.statusCategories.completed')} />
+        {/if}
+      </div>
+    {/snippet}
+
+    {#snippet color(category)}
+      <div class="flex items-center gap-2">
+        <div
+          class="w-4 h-4 rounded border border-gray-300"
+          style="background-color: {category.color};"
+        ></div>
+        <span class="text-sm font-mono" style="color: var(--ds-text-subtle);">{category.color}</span>
+      </div>
+    {/snippet}
   </DataTable>
 
   <!-- Status Category Modal -->
@@ -242,7 +246,7 @@
     isOpen={showModal}
     bind:formData
     isEditing={!!editingId}
-    on:save={saveCategory}
-    on:cancel={cancelForm}
+    onsave={saveCategory}
+    oncancel={cancelForm}
   />
 </div>

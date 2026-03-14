@@ -25,9 +25,9 @@
 
 	// Editing state
 	let editingCommentId = $state(null);
-	let editingContent = '';
+	let editingContent = $state('');
 	let isSavingEdit = $state(false);
-	let editEditorRef;
+	let editEditorRef = $state(null);
 
 	// Sort state
 	let sortOrder = $state('oldest'); // 'oldest' | 'newest'

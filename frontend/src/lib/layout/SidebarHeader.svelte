@@ -11,7 +11,8 @@
 <div class="{noBorder ? 'mb-6' : 'px-4 py-5 border-b'} {className}" style="{noBorder ? '' : 'border-color: var(--ds-border);'}">
   <div class="flex items-center gap-3">
     {#if icon}
-      <svelte:component this={icon} class="w-8 h-8 flex-shrink-0" style="color: var(--ds-interactive);" />
+      {@const Icon = icon}
+      <Icon class="w-8 h-8 flex-shrink-0" style="color: var(--ds-interactive);" />
     {/if}
     <div class="min-w-0">
       <h1 class="text-xl font-semibold truncate" style="color: var(--ds-text);">

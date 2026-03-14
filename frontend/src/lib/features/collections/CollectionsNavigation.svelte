@@ -9,9 +9,9 @@
   import { getHexFromColorName } from '../../utils/colors.js';
 
   // Determine active view based on URL
-  $: activeCategoryId = $currentRoute.params?.categoryId || null;
-  $: isWorkspaceView = $currentRoute.path?.includes('/workspace');
-  $: isAllGlobalActive = !isWorkspaceView && activeCategoryId === null;
+  let activeCategoryId = $derived($currentRoute.params?.categoryId || null);
+  let isWorkspaceView = $derived($currentRoute.path?.includes('/workspace'));
+  let isAllGlobalActive = $derived(!isWorkspaceView && activeCategoryId === null);
 
   onMount(async () => {
     await collectionCategoriesStore.init();

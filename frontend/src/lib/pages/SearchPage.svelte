@@ -15,11 +15,16 @@
   import { getStatusStyle } from '../utils/statusColors.js';
 
   // Subscribe to the entire store state
-  let state = {};
+  /** @type {Record<string, any>} */
+  let state = $state({});
   const unsubscribe = searchStore.subscribe(value => state = value);
 
   // Reactive shorthand for commonly used values
-  $: ({ searchResults, loading, workspaces, hasFilters, error: cqlError } = state);
+  let searchResults = $derived(state.searchResults ?? []);
+  let loading = $derived(state.loading ?? false);
+  let workspaces = $derived(state.workspaces ?? []);
+  let hasFilters = $derived(state.hasFilters ?? false);
+  let cqlError = $derived(state.error ?? null);
 
   onMount(async () => {
     // Load reference data (workspaces, statuses, priorities)

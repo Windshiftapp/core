@@ -5,12 +5,9 @@
   import Card from '../components/Card.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  export let requiredPermission = null;
-  export let message = null;
-  export let showBackButton = true;
+  let { requiredPermission = null, message = null, showBackButton = true } = $props();
 
-  // Use translation if no message provided
-  $: displayMessage = message || t('errors.INSUFFICIENT_PERMISSION');
+  let displayMessage = $derived(message || t('errors.INSUFFICIENT_PERMISSION'));
 </script>
 
 <div class="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8" style="background-color: var(--ds-surface);">

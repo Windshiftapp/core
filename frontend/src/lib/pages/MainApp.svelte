@@ -749,7 +749,8 @@
   {#if loading}
     {@render loadingState(config?.loadingMsg || 'Loading...')}
   {:else if component}
-    <svelte:component this={component} {...props} />
+    {@const LazyComponent = component}
+    <LazyComponent {...props} />
   {:else}
     {@render errorState(config?.errorMsg || 'Failed to load component', () => loadComponentForRoute(loaderKey))}
   {/if}
@@ -867,13 +868,15 @@
 
     {:else if view === 'admin'}
       <PermissionGuard requireSystemAdmin={true}>
-        {@render lazyLoadedComponent(view, routeProps)}
-        <svelte:fragment slot="fallback" let:requiredPermissionDisplay>
+        {#snippet children()}
+          {@render lazyLoadedComponent(view, routeProps)}
+        {/snippet}
+        {#snippet fallback(requiredPermissionDisplay)}
           <UnauthorizedAccess
             message="You need system administrator privileges to access the administration panel."
             requiredPermission={requiredPermissionDisplay}
           />
-        </svelte:fragment>
+        {/snippet}
       </PermissionGuard>
 
     {:else if view === 'workspace-actions'}
@@ -925,16 +928,10 @@
       </div>
     </ModalBackdrop>
   {:else if commandPaletteComponent && showCommandPalette}
-    <svelte:component
-      this={commandPaletteComponent}
+    {@const CommandPalette = commandPaletteComponent}
+    <CommandPalette
       bind:isOpen={showCommandPalette}
       onclose={() => showCommandPalette = false}
-      onshow-create-modal={(event) => {
-        if (event.detail?.type) {
-          createModalInitialType = event.detail.type;
-        }
-        showCreateModal = true;
-      }}
     />
   {/if}
 {/if}
@@ -952,8 +949,8 @@
       </div>
     </ModalBackdrop>
   {:else if createModalComponent && showCreateModal}
-    <svelte:component
-      this={createModalComponent}
+    {@const CreateModal = createModalComponent}
+    <CreateModal
       bind:isOpen={showCreateModal}
       initialType={createModalInitialType}
       skipNavigate={createModalSkipNavigate}

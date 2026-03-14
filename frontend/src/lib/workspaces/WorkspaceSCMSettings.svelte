@@ -8,19 +8,19 @@
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
 
-  export let workspaceId;
+  let { workspaceId } = $props();
 
-  let loading = true;
-  let availableProviders = [];
-  let connections = [];
-  let expandedConnections = new Set();
-  let linkedRepos = {}; // connId -> repos array
-  let loadingRepos = new Set();
-  let authStatuses = {}; // connId -> auth status object
+  let loading = $state(true);
+  let availableProviders = $state([]);
+  let connections = $state([]);
+  let expandedConnections = $state(new Set());
+  let linkedRepos = $state({}); // connId -> repos array
+  let loadingRepos = $state(new Set());
+  let authStatuses = $state({}); // connId -> auth status object
 
   // Modal state
-  let showRepoSelector = false;
-  let selectedConnection = null;
+  let showRepoSelector = $state(false);
+  let selectedConnection = $state(null);
 
 
   onMount(async () => {

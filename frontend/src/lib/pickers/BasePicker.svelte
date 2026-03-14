@@ -201,7 +201,7 @@
   }
 
   // Handle dropdown close without selection (single-select only)
-  let wasOpen = false;
+  let wasOpen = $state(false);
   $effect(() => {
     if (wasOpen && !$open && !$selected && !multiple) {
       onCancel();
@@ -245,7 +245,7 @@
   }
 
   // Focus the input and open dropdown when clicking the container
-  let inputRef = null;
+  let inputRef = $state(null);
   function focusInput() {
     inputRef?.focus();
     $open = true;

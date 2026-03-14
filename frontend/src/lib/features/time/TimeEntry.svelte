@@ -244,15 +244,15 @@
     class="rounded-none border-0 shadow-none overflow-hidden"
   >
     <!-- Project: name + customer -->
-    <div slot="project" let:item={worklog}>
+    {#snippet project(worklog)}
       <div class="text-sm">
         <div class="font-semibold" style="color: var(--ds-text);">{worklog.project_name}</div>
         <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">{worklog.customer_name}</div>
       </div>
-    </div>
+    {/snippet}
 
     <!-- Work Item: clickable link -->
-    <div slot="item" let:item={worklog}>
+    {#snippet item(worklog)}
       {#if worklog.item_title && worklog.workspace_key && worklog.workspace_item_number}
         <button
           class="font-medium text-blue-600 hover:text-blue-800 cursor-pointer text-left hover:underline text-sm"
@@ -264,14 +264,14 @@
       {:else}
         <span class="text-gray-400 text-xs">—</span>
       {/if}
-    </div>
+    {/snippet}
 
     <!-- Time range with mono font -->
-    <div slot="details" let:item={worklog}>
+    {#snippet details(worklog)}
       <span class="text-sm font-mono" style="color: var(--ds-text-subtle);">
         {formatTime(worklog.start_time)} — {formatTime(worklog.end_time)}
       </span>
-    </div>
+    {/snippet}
   </DataTable>
 
   <!-- Summary footer -->

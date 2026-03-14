@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import {
     ArrowLeft,
     Edit,
@@ -22,10 +21,9 @@
     isOpen = $bindable(false),
     testCaseId = null,
     workspaceId = null,
-    embedded = false
+    embedded = false,
+    onclose = null
   } = $props();
-
-  const dispatch = createEventDispatcher();
 
   let loading = $state(false);
   let error = $state(null);
@@ -84,7 +82,7 @@
 
   function handleClose() {
     isOpen = false;
-    dispatch('close');
+    onclose?.();
   }
 
   function getStatusPillStyle(status) {
@@ -171,7 +169,7 @@
     bind:isOpen
     maxWidth="max-w-4xl"
     zIndexClass="z-60"
-    on:close={handleClose}
+    onclose={handleClose}
   >
     {@render previewContent()}
   </Modal>
@@ -418,8 +416,8 @@
                     style="border-color: var(--ds-border); background-color: var(--ds-surface);"
                   >
                     <div class="flex-shrink-0 mt-0.5">
-                      <svelte:component
-                        this={getStatusIcon(execution.status)}
+                      {@const StatusIcon = getStatusIcon(execution.status)}
+                      <StatusIcon
                         class="w-5 h-5"
                         style={`color: ${getStatusIconColor(execution.status)};`}
                       />

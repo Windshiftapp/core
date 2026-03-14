@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { api } from '../api.js';
   import Spinner from '../components/Spinner.svelte';
   import Button from '../components/Button.svelte';
@@ -10,39 +9,42 @@
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  export let configurationSet = null;
-  export let targetConfigurationSet = null; // NEW: The config set being migrated TO
-  export let isVisible = false;
-  export let workspaceId = null;
-  export let comprehensive = false; // NEW: Use comprehensive migration
+  let {
+    configurationSet = null,
+    targetConfigurationSet = null,
+    isVisible = $bindable(false),
+    workspaceId = null,
+    comprehensive = false,
+    onclose = null
+  } = $props();
 
-  const dispatch = createEventDispatcher();
-
-  let migrationAnalysis = null;
-  let isAnalyzing = false;
-  let isMigrating = false;
-  let analysisError = null;
-  let migrationError = null;
-  let migrationSuccess = false;
+  let migrationAnalysis = $state(null);
+  let isAnalyzing = $state(false);
+  let isMigrating = $state(false);
+  let analysisError = $state(null);
+  let migrationError = $state(null);
+  let migrationSuccess = $state(false);
 
   // Mappings for each dimension
-  let statusMappings = [];
-  let itemTypeMappings = [];
-  let customFieldMappings = [];
-  let priorityMappings = [];
+  let statusMappings = $state([]);
+  let itemTypeMappings = $state([]);
+  let customFieldMappings = $state([]);
+  let priorityMappings = $state([]);
 
   // Tab state
-  let activeTab = 'status';
+  let activeTab = $state('status');
 
-  $: if ((configurationSet || targetConfigurationSet) && isVisible) {
-    analyzeMigration();
-  }
+  $effect(() => {
+    if ((configurationSet || targetConfigurationSet) && isVisible) {
+      analyzeMigration();
+    }
+  });
 
   // Compute tab counts
-  $: statusCount = statusMappings.filter(m => m.requires_migration).length;
-  $: itemTypeCount = itemTypeMappings.filter(m => m.requires_migration).length;
-  $: fieldCount = customFieldMappings.filter(m => m.requires_default).length;
-  $: priorityCount = priorityMappings.filter(m => m.requires_migration).length;
+  let statusCount = $derived(statusMappings.filter(m => m.requires_migration).length);
+  let itemTypeCount = $derived(itemTypeMappings.filter(m => m.requires_migration).length);
+  let fieldCount = $derived(customFieldMappings.filter(m => m.requires_default).length);
+  let priorityCount = $derived(priorityMappings.filter(m => m.requires_migration).length);
 
   async function analyzeMigration() {
     if (!workspaceId) return;
@@ -289,18 +291,20 @@
     migrationSuccess = false;
     activeTab = 'status';
 
-    // Dispatch close event with success/cancelled information
-    dispatch('close', {
+    // Call close callback with success/cancelled information
+    onclose?.({
       success: wasSuccessful && !cancelled,
       cancelled: cancelled
     });
   }
 
   // Get available workflow statuses for dropdowns
-  let workflowStatuses = [];
-  $: if (migrationAnalysis && migrationAnalysis.new_workflow_id) {
-    loadWorkflowStatuses();
-  }
+  let workflowStatuses = $state([]);
+  $effect(() => {
+    if (migrationAnalysis && migrationAnalysis.new_workflow_id) {
+      loadWorkflowStatuses();
+    }
+  });
 
   async function loadWorkflowStatuses() {
     try {
@@ -330,12 +334,12 @@
   }
 
   // Check if migration is needed
-  $: requiresMigration = comprehensive
+  let requiresMigration = $derived(comprehensive
     ? (migrationAnalysis?.requires_migration ?? false)
-    : (migrationAnalysis?.requires_migration ?? false);
+    : (migrationAnalysis?.requires_migration ?? false));
 
   // Check if any tab has pending migrations
-  $: hasPendingMigrations = statusCount > 0 || itemTypeCount > 0 || fieldCount > 0 || priorityCount > 0;
+  let hasPendingMigrations = $derived(statusCount > 0 || itemTypeCount > 0 || fieldCount > 0 || priorityCount > 0);
 </script>
 
 <Modal

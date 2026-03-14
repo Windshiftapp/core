@@ -3,7 +3,7 @@
   import WidgetState from './WidgetState.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  export let workspaceId = null;
+  let { workspaceId = null } = $props();
 
   let upcomingItems = [];
 </script>

@@ -398,8 +398,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     itemDetailStore.closeLinkModal();
   }
 
-  async function handleLinkCreated(event) {
-    const { link_type_id, target_id, target_type } = event.detail;
+  async function handleLinkCreated({ link_type_id, target_id, target_type }) {
 
     try {
       await itemDetailStore.createLink(link_type_id, target_id, target_type);
@@ -1141,7 +1140,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
           embedded={true}
           isOpen={itemDetailStore.showTestCaseModal}
           testCaseId={itemDetailStore.selectedTestCaseId}
-          on:close={handleCloseTestCaseModal}
+          onclose={handleCloseTestCaseModal}
         />
       {:else}
         {#if itemDetailStore.item && itemDetailStore.workspace}
@@ -1227,7 +1226,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   <TestCaseViewModal
     isOpen={itemDetailStore.showTestCaseModal}
     testCaseId={itemDetailStore.selectedTestCaseId}
-    on:close={handleCloseTestCaseModal}
+    onclose={handleCloseTestCaseModal}
   />
 {/if}
 
@@ -1262,8 +1261,8 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   isOpen={itemDetailStore.showLinkModal}
   linkTypes={itemDetailStore.filteredLinkTypes}
   currentItemId={parseInt(itemId)}
-  on:submit={handleLinkCreated}
-  on:cancel={handleLinkModalCancel}
+  onsubmit={handleLinkCreated}
+  oncancel={handleLinkModalCancel}
 />
 
 <!-- AI View Modal (Catch Me Up / Find Similar) -->

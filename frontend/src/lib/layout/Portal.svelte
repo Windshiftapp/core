@@ -582,8 +582,8 @@
           requestTypeId={selectedRequestType.id}
           requestTypeName={selectedRequestType.name}
           isDarkMode={portalStore.isDarkMode}
-          on:saved={handleFieldsSaved}
-          on:close={() => showFieldsModal = false}
+          onsaved={handleFieldsSaved}
+          onclose={() => showFieldsModal = false}
         />
       {/if}
 
@@ -608,8 +608,8 @@
           channelId={portalStore.portalData.channel_id}
           {availableItemTypes}
           isDarkMode={portalStore.isDarkMode}
-          on:saved={handleRequestTypeSaved}
-          on:close={() => showRequestTypeModal = false}
+          onsaved={handleRequestTypeSaved}
+          onclose={() => showRequestTypeModal = false}
         />
       {/if}
     {:else}
@@ -644,7 +644,7 @@
     {/if}
 
     <!-- Portal Login Modal (Magic Link) - always accessible -->
-    <PortalLoginModal on:loginsuccess={handleLoginSuccess} />
+    <PortalLoginModal onloginsuccess={handleLoginSuccess} />
 
     <!-- Magic Link Verification - always accessible -->
     <ModalBackdrop show={!!verifyToken} blur={4} closeOnClick={false} closeOnEscape={false}>

@@ -5,34 +5,34 @@
   import { t } from '../stores/i18n.svelte.js';
   import { sanitizeHtml } from '../utils/sanitize.ts';
 
-  export let columns = []; // Array of column definitions: { key, label, width?, align?, sortable? }
-  export let data = []; // Array of data objects
-  export let keyField = 'id'; // Field to use as unique key
-  export let loading = false; // Loading state
-  export let emptyMessage = '';
-  export let emptyDescription = ''; // Optional description for empty state
-  export let emptyIcon = null; // Lucide icon component
-  export let actionItems = null; // Function that takes (item) => dropdownItems array
-  export let onRowClick = null; // Function to handle row clicks
+  let {
+    columns = [],
+    data = [],
+    keyField = 'id',
+    loading = false,
+    emptyMessage = '',
+    emptyDescription = '',
+    emptyIcon = null,
+    actionItems = null,
+    onRowClick = null,
+    pagination = false,
+    pageSize = 25,
+    currentPage = $bindable(1),
+    totalItems = null,
+    onPageChange = null,
+    class: containerClass = 'rounded border shadow-sm',
+    ...slotProps
+  } = $props();
 
-  // Pagination props
-  export let pagination = false;        // Enable pagination
-  export let pageSize = 25;             // Items per page
-  export let currentPage = 1;           // Current page (bindable)
-  export let totalItems = null;         // Total items (for server-side pagination)
-  export let onPageChange = null;       // Callback for page changes
+  let totalCount = $derived(totalItems ?? data.length);
+  let totalPages = $derived(Math.ceil(totalCount / pageSize) || 1);
+  let startItem = $derived(totalCount > 0 ? (currentPage - 1) * pageSize + 1 : 0);
+  let endItem = $derived(Math.min(currentPage * pageSize, totalCount));
+  let showPagination = $derived(pagination && totalCount > pageSize);
 
-  // Pagination computed values
-  $: totalCount = totalItems ?? data.length;
-  $: totalPages = Math.ceil(totalCount / pageSize) || 1;
-  $: startItem = totalCount > 0 ? (currentPage - 1) * pageSize + 1 : 0;
-  $: endItem = Math.min(currentPage * pageSize, totalCount);
-  $: showPagination = pagination && totalCount > pageSize;
-
-  // Display data - for server-side pagination data is already paginated
-  $: displayData = (pagination && totalItems == null)
+  let displayData = $derived((pagination && totalItems == null)
     ? data.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-    : data;
+    : data);
 
   function prevPage() {
     if (currentPage > 1) {
@@ -50,14 +50,11 @@
   
   // Default styling classes
   let tableClass = 'w-full';
-  let containerClass = 'rounded border shadow-sm';
   let theadClass = '';
   let tbodyClass = 'divide-y';
   let trClass = 'transition-colors duration-150';
   let thClass = 'px-6 py-4 text-left text-xs font-semibold tracking-wide';
   let tdClass = 'px-6 py-4';
-  
-  export { containerClass as class };
   
   function getColumnWidth(column) {
     // If width contains %, px, rem, etc., return as inline style
@@ -160,118 +157,8 @@
                         iconOnly={true}
                       />
                     </div>
-                  {:else if column.slot === 'name'}
-                    <slot name="name" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'type'}
-                    <slot name="type" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'status'}
-                    <slot name="status" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'usage'}
-                    <slot name="usage" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'category'}
-                    <slot name="category" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'color'}
-                    <slot name="color" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'icon'}
-                    <slot name="icon" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'hierarchy_level'}
-                    <slot name="hierarchy_level" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'tests'}
-                    <slot name="tests" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'days_remaining'}
-                    <slot name="days_remaining" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'action'}
-                    <slot name="action" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'user'}
-                    <slot name="user" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'resource'}
-                    <slot name="resource" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'details'}
-                    <slot name="details" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'item'}
-                    <slot name="item" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'date_range'}
-                    <slot name="date_range" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'scope'}
-                    <slot name="scope" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'role'}
-                    <slot name="role" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'date'}
-                    <slot name="date" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'actions'}
-                    <slot name="actions" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'level'}
-                    <slot name="level" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'step_number'}
-                    <slot name="step_number" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'step_action'}
-                    <slot name="step_action" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'step_data'}
-                    <slot name="step_data" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'step_expected'}
-                    <slot name="step_expected" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'project'}
-                    <slot name="project" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'customer'}
-                    <slot name="customer" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
-                  {:else if column.slot === 'rate'}
-                    <slot name="rate" {item} {column}>
-                      {getCellValue(item, column) || '—'}
-                    </slot>
+                  {:else if column.slot && slotProps[column.slot]}
+                    {@render slotProps[column.slot](item, column)}
                   {:else}
                     <!-- Default cell content -->
                     {#if column.render && column.html}

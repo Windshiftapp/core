@@ -73,7 +73,7 @@
   }}
 >
   {#if icon}
-    <svelte:component this={icon} size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
+    <icon size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
   {/if}
   {#if colorDot}
     <div class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {getVisibleColor(colorDot)};"></div>

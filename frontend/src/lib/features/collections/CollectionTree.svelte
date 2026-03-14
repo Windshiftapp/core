@@ -523,8 +523,7 @@
 
                   <!-- Work Item Type Icon -->
                   <div class="w-4 h-4 rounded flex items-center justify-center" style="background-color: {typeInfo.color.startsWith('#') ? typeInfo.color : 'var(--ds-interactive-subtle)'}">
-                    <svelte:component
-                      this={typeInfo.icon}
+                    <typeInfo.icon
                       class="w-2.5 h-2.5 text-white"
                     />
                   </div>

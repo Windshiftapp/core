@@ -107,8 +107,8 @@
   onSubmit={createBucket}
   submitDisabled={!formData.name.trim()}
   maxWidth="max-w-md"
-  let:submitHint
 >
+  {#snippet children(submitHint)}
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
       {t('logbook.createBucket')}
@@ -152,4 +152,5 @@
     showKeyboardHint={true}
     confirmKeyboardHint={submitHint}
   />
+  {/snippet}
 </Modal>

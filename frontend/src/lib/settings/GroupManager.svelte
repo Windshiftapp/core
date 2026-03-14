@@ -485,9 +485,13 @@
 			emptyIcon={Circle}
 			actionItems={buildGroupDropdownItems}
 		>
-			<Lozenge slot="ldap_sync" let:item={group} color={group.ldap_sync_enabled ? 'blue' : 'gray'} text={group.ldap_sync_enabled ? t('settings.groups.enabled') : t('settings.groups.manual')} />
+			{#snippet ldap_sync(group)}
+				<Lozenge color={group.ldap_sync_enabled ? 'blue' : 'gray'} text={group.ldap_sync_enabled ? t('settings.groups.enabled') : t('settings.groups.manual')} />
+			{/snippet}
 
-			<Lozenge slot="status" let:item={group} color={group.is_active ? 'green' : 'red'} text={group.is_active ? t('settings.groups.active') : t('settings.groups.inactive')} />
+			{#snippet status(group)}
+				<Lozenge color={group.is_active ? 'green' : 'red'} text={group.is_active ? t('settings.groups.active') : t('settings.groups.inactive')} />
+			{/snippet}
 		</DataTable>
 	{/if}
 </div>

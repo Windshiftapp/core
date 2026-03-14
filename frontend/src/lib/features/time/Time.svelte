@@ -56,7 +56,8 @@
             onmouseenter={(e) => { if (!isTabActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
             onmouseleave={(e) => { if (!isTabActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
           >
-            <svelte:component this={tab.icon} class="flex-shrink-0 -ml-1 mr-3 w-5 h-5" />
+            {@const TabIcon = tab.icon}
+            <TabIcon class="flex-shrink-0 -ml-1 mr-3 w-5 h-5" />
             {tab.label}
           </button>
         {/each}
@@ -69,7 +70,8 @@
     {#each tabs as tab}
       {#if activeTab === tab.id}
         <div class="p-6">
-          <svelte:component this={tab.component} />
+          {@const TabComponent = tab.component}
+          <TabComponent />
         </div>
       {/if}
     {/each}

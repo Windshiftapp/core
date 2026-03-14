@@ -10,13 +10,13 @@
   import { getStatusBadgeCSS, getStatusLabel } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
 
-  let testRun = null;
-  let testResults = [];
-  let loading = true;
+  let testRun = $state(null);
+  let testResults = $state([]);
+  let loading = $state(true);
 
-  $: workspaceId = $currentRoute.params.id;
-  $: runId = $currentRoute.params.runId;
-  $: fromPage = $currentRoute.query?.from;
+  let workspaceId = $derived($currentRoute.params.id);
+  let runId = $derived($currentRoute.params.runId);
+  let fromPage = $derived($currentRoute.query?.from);
 
   onMount(async () => {
     if (runId) {
@@ -214,7 +214,7 @@
   }
 
   // Delete confirmation
-  let showDeleteConfirm = false;
+  let showDeleteConfirm = $state(false);
 
   function confirmDelete() {
     showDeleteConfirm = true;

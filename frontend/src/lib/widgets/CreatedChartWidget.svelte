@@ -2,7 +2,7 @@
   import ResponsiveLineChart from './ResponsiveLineChart.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  export let chartData = [];
+  let { chartData = [] } = $props();
 </script>
 
 <ResponsiveLineChart

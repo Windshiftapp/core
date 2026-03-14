@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
@@ -9,15 +8,22 @@
   import { Plus, Play, Zap } from 'lucide-svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
 
-  export let workspaceId;
-  export let actions = [];
-  export let loading = false;
-
-  const dispatch = createEventDispatcher();
+  /** @type {{ workspaceId: any, actions?: any[], loading?: boolean, oncreate?: () => void, onedit?: (action: any) => void, ontoggle?: (action: any) => void, ondelete?: (action: any) => void, onviewlogs?: (action: any) => void, ontestexecuted?: (action: any) => void }} */
+  let {
+    workspaceId,
+    actions = [],
+    loading = false,
+    oncreate,
+    onedit,
+    ontoggle,
+    ondelete,
+    onviewlogs,
+    ontestexecuted,
+  } = $props();
 
   // Test action modal state
-  let showTestModal = false;
-  let testAction = null;
+  let showTestModal = $state(false);
+  let testAction = $state(null);
 
   function handleTest(action) {
     testAction = action;
@@ -40,15 +46,15 @@
   }
 
   function handleCreate() {
-    dispatch('create');
+    oncreate?.();
   }
 
   function handleEdit(action) {
-    dispatch('edit', action);
+    onedit?.(action);
   }
 
   function handleToggle(action) {
-    dispatch('toggle', action);
+    ontoggle?.(action);
   }
 
   async function handleDelete(action) {
@@ -60,12 +66,12 @@
       variant: 'danger'
     });
     if (confirmed) {
-      dispatch('delete', action);
+      ondelete?.(action);
     }
   }
 
   function handleViewLogs(action) {
-    dispatch('viewLogs', action);
+    onviewlogs?.(action);
   }
 </script>
 
@@ -208,7 +214,7 @@
     onclose={closeTestModal}
     onsuccess={() => {
       // Optionally refresh logs or show toast
-      dispatch('testExecuted', testAction);
+      ontestexecuted?.(testAction);
     }}
   />
 {/if}

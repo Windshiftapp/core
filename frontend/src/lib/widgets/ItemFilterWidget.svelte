@@ -3,8 +3,7 @@
   import WidgetState from './WidgetState.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  export let workspaceId = null;
-  export let config = {};
+  let { workspaceId = null, config = {} } = $props();
 
   let filteredItems = [];
 </script>

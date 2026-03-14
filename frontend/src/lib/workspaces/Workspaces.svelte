@@ -15,8 +15,7 @@
   import { formatDateSimple } from '../utils/dateFormatter.js';
 
   // Props
-  export let showPageHeader = true; // Whether to show admin header and use admin layout
-  export let noPadding = false;
+  let { showPageHeader = true, noPadding = false } = $props();
 
   // Use centralized icon map for workspace icons
   const iconMap = workspaceIconMap;
@@ -133,7 +132,7 @@
         actionItems={buildWorkspaceDropdownItems}
         onRowClick={(workspace) => navigate(`/workspaces/${workspace.id}`)}
       >
-    <div slot="name" let:item={workspace}>
+    {#snippet name(workspace)}
       <div class="flex items-center gap-3">
         <!-- Workspace Visual Identity -->
         {#if workspace.avatar_url}
@@ -158,9 +157,11 @@
           {/if}
         </div>
       </div>
-    </div>
+    {/snippet}
 
-    <Lozenge slot="status" let:item={workspace} color={workspace.active ? 'green' : 'gray'} text={workspace.active ? 'Active' : 'Inactive'} />
+    {#snippet status(workspace)}
+      <Lozenge color={workspace.active ? 'green' : 'gray'} text={workspace.active ? 'Active' : 'Inactive'} />
+    {/snippet}
   </DataTable>
     </div>
 </div>

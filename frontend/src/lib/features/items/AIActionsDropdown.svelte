@@ -1,14 +1,12 @@
 <script>
   import { Sparkles, BookOpen, Search, GitBranch, ChevronDown } from 'lucide-svelte';
-  import { createEventDispatcher } from 'svelte';
   import { onClickOutside } from 'runed';
-
-  const dispatch = createEventDispatcher();
 
   let {
     item = null,
     availableSubIssueTypes = [],
     canCreate = false,
+    onaiaction,
   } = $props();
 
   let showMenu = $state(false);
@@ -20,7 +18,7 @@
   );
 
   function handleAction(action) {
-    dispatch('ai-action', { action });
+    onaiaction?.({ action });
     showMenu = false;
   }
 

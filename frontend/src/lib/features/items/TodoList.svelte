@@ -16,23 +16,23 @@
   import { t } from '../../stores/i18n.svelte.js';
   import Checkbox from '../../components/Checkbox.svelte';
 
-  export let workspaceId;
+  let { workspaceId } = $props();
 
-  let personalTodos = [];
-  let assignedWork = [];
-  let statuses = [];
-  let statusCategories = [];
-  let statusesByWorkspace = new Map();
-  let loading = true;
-  let newTodoTitle = '';
-  let isAddingTodo = false;
-  let showItemModal = false;
-  let selectedItemId = null;
+  let personalTodos = $state([]);
+  let assignedWork = $state([]);
+  let statuses = $state([]);
+  let statusCategories = $state([]);
+  let statusesByWorkspace = $state(new Map());
+  let loading = $state(true);
+  let newTodoTitle = $state('');
+  let isAddingTodo = $state(false);
+  let showItemModal = $state(false);
+  let selectedItemId = $state(null);
 
   // Delete confirmation dialog state
-  let showDeleteConfirm = false;
-  let itemToDelete = null;
-  let isPersonalDelete = true;
+  let showDeleteConfirm = $state(false);
+  let itemToDelete = $state(null);
+  let isPersonalDelete = $state(true);
 
   // Status configuration for ItemPicker
   const statusConfig = {
@@ -50,12 +50,12 @@
   };
 
   // Transform statuses for ItemPicker
-  $: statusOptions = statuses.map(status => ({
+  let statusOptions = $derived(statuses.map(status => ({
     id: status.id,
     label: status.name,
     value: status.name,
     categoryColor: status.category_color
-  }));
+  })));
 
   onMount(async () => {
     await Promise.all([loadStatuses(), loadStatusCategories(), loadPersonalTodos(), loadAssignedWork()]);
@@ -192,7 +192,7 @@
 
 
   // Column definitions for assigned work DataTable
-  $: assignedWorkColumns = [
+  let assignedWorkColumns = $derived([
     {
       key: 'title',
       label: t('common.title'),
@@ -221,7 +221,7 @@
       label: t('common.actions'),
       width: '10%'
     }
-  ];
+  ]);
 
   function buildItemActions(item) {
     return [

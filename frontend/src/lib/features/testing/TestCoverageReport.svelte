@@ -475,9 +475,10 @@
             >
               <div class="type-icon" style="background-color: {type.color}20; color: {type.color};">
                 {#if type.icon && itemTypeIconMap[type.icon]}
-                  <svelte:component this={itemTypeIconMap[type.icon]} size={20} />
+                  {@const CoverageTypeIcon = itemTypeIconMap[type.icon]}
+                  <CoverageTypeIcon size={20} />
                 {:else}
-                  <svelte:component this={Package} size={20} />
+                  <Package size={20} />
                 {/if}
               </div>
               <span class="type-name">{type.name}</span>

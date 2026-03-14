@@ -1,5 +1,5 @@
 <script>
-  import { onMount, createEventDispatcher } from 'svelte';
+  import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { Settings } from 'lucide-svelte';
   import Label from '../components/Label.svelte';
@@ -7,19 +7,17 @@
   import ConfigurationSetPicker from '../pickers/ConfigurationSetPicker.svelte';
   import MigrationAssistant from '../pages/MigrationAssistant.svelte';
 
-  export let workspaceId;
+  let { workspaceId, onconfigurationChanged = null } = $props();
   
-  const dispatch = createEventDispatcher();
-  
-  let configurationSets = [];
-  let selectedConfigurationSetId = null;
-  let loading = true;
-  let saving = false;
-  
+  let configurationSets = $state([]);
+  let selectedConfigurationSetId = $state(null);
+  let loading = $state(true);
+  let saving = $state(false);
+
   // Migration assistant state
-  let showMigrationAssistant = false;
-  let migrationConfigSet = null;
-  let pendingConfigurationChange = null;
+  let showMigrationAssistant = $state(false);
+  let migrationConfigSet = $state(null);
+  let pendingConfigurationChange = $state(null);
 
   onMount(async () => {
     await loadData();
@@ -172,7 +170,7 @@
     await loadData(); // Reload to refresh the data
     
     // Notify parent component about the change
-    dispatch('configurationChanged', {
+    onconfigurationChanged?.({
       oldConfigSet: currentConfigSet,
       newConfigSet: newConfigSet
     });
@@ -184,8 +182,8 @@
     return 'Configured'; // We could enhance this to show actual screen names
   }
 
-  async function handleMigrationAssistantClose(event) {
-    const { success, cancelled } = event.detail || {};
+  async function handleMigrationAssistantClose(data) {
+    const { success, cancelled } = data || {};
     
     try {
       if (success && pendingConfigurationChange) {
@@ -268,5 +266,5 @@
   isVisible={showMigrationAssistant}
   workspaceId={parseInt(workspaceId)}
   comprehensive={true}
-  on:close={handleMigrationAssistantClose}
+  onclose={handleMigrationAssistantClose}
 />

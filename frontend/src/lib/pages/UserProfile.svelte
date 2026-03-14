@@ -21,51 +21,51 @@
 		arrayBufferToBase64url
 	} from '../utils/webauthn-utils.js';
 
-	let user = null;
-	let credentials = [];
-	let appTokens = [];
-	let loading = false;
-	let error = '';
-	let showAddCredential = false;
-	let enrollingFIDO = false;
-	let newCredentialName = '';
-	let testingLogin = false;
-	let loginTestResult = '';
-	let showAddToken = false;
-	let creatingToken = false;
-	let newTokenName = '';
-	let newTokenScopes = [];
-	let newTokenExpiry = '';
-	let showNewToken = false;
-	let newTokenValue = '';
+	let user = $state(null);
+	let credentials = $state([]);
+	let appTokens = $state([]);
+	let loading = $state(false);
+	let error = $state('');
+	let showAddCredential = $state(false);
+	let enrollingFIDO = $state(false);
+	let newCredentialName = $state('');
+	let testingLogin = $state(false);
+	let loginTestResult = $state('');
+	let showAddToken = $state(false);
+	let creatingToken = $state(false);
+	let newTokenName = $state('');
+	let newTokenScopes = $state([]);
+	let newTokenExpiry = $state('');
+	let showNewToken = $state(false);
+	let newTokenValue = $state('');
 
 	// Avatar management state
-	let showAvatarUpload = false;
-	let uploadingAvatar = false;
+	let showAvatarUpload = $state(false);
+	let uploadingAvatar = $state(false);
 
 	// Regional settings state
-	let selectedTimezone = 'UTC';
-	let selectedLanguage = 'en';
-	let savingRegionalSettings = false;
-	let regionalSettingsSaved = false;
+	let selectedTimezone = $state('UTC');
+	let selectedLanguage = $state('en');
+	let savingRegionalSettings = $state(false);
+	let regionalSettingsSaved = $state(false);
 
 	// Calendar feed state
-	let calendarFeedInfo = null;
-	let loadingCalendarFeed = false;
-	let calendarFeedError = '';
-	let generatingFeed = false;
-	let revokingFeed = false;
-	let showFullFeedUrl = false;
-	let feedUrlCopied = false;
+	let calendarFeedInfo = $state(null);
+	let loadingCalendarFeed = $state(false);
+	let calendarFeedError = $state('');
+	let generatingFeed = $state(false);
+	let revokingFeed = $state(false);
+	let showFullFeedUrl = $state(false);
+	let feedUrlCopied = $state(false);
 
 	// Tab state
-	let activeTab = 'avatar'; // Default to avatar tab
+	let activeTab = $state('avatar'); // Default to avatar tab
 
 	// Use current user ID from auth store
-	$: currentUserId = authStore.currentUser?.id;
+	let currentUserId = $derived(authStore.currentUser?.id);
 
 	// Configure tabs based on whether attachments are enabled
-	$: tabs = [
+	let tabs = $derived([
 		...(attachmentStatus.enabled ? [{
 			id: 'avatar',
 			label: t('users.avatar'),
@@ -86,12 +86,14 @@
 			label: t('users.calendarIntegration'),
 			icon: CalendarDays
 		}
-	];
+	]);
 
 	// Set initial active tab (avatar if attachments enabled, otherwise regional-settings)
-	$: if (tabs.length > 0 && !tabs.find(t => t.id === activeTab)) {
-		activeTab = tabs[0].id;
-	}
+	$effect(() => {
+		if (tabs.length > 0 && !tabs.find(t => t.id === activeTab)) {
+			activeTab = tabs[0].id;
+		}
+	});
 
 	onMount(() => {
 		if (currentUserId) {
@@ -102,11 +104,13 @@
 	});
 
 	// Watch for currentUserId changes and load data when available
-	$: if (currentUserId && !user) {
-		loadUserProfile();
-		loadCredentials();
-		loadAppTokens();
-	}
+	$effect(() => {
+		if (currentUserId && !user) {
+			loadUserProfile();
+			loadCredentials();
+			loadAppTokens();
+		}
+	});
 
 	async function loadUserProfile() {
 		if (!currentUserId) return;

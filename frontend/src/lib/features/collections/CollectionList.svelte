@@ -156,8 +156,8 @@
     }
   }
 
-  function handleColumnChange(event) {
-    const { columns: newColumns } = event.detail;
+  function handleColumnChange(data) {
+    const { columns: newColumns } = data;
     saveBoardConfiguration(newColumns);
   }
 
@@ -236,12 +236,12 @@
   }
 
   // Handle inline editing events — reload from server to get fresh data
-  function handleItemUpdated(event) {
+  function handleItemUpdated(data) {
     reloadCollection();
   }
 
-  function handleUpdateError(event) {
-    const { error, field, value } = event.detail;
+  function handleUpdateError(data) {
+    const { error, field, value } = data;
     console.error(`Failed to update ${field}:`, error);
     alert(t('dialogs.alerts.failedToUpdate', { error: `${field}: ${error}` }));
   }
@@ -311,7 +311,7 @@
             {customFieldDefinitions}
             canConfigure={canConfigureColumns}
             hasGradient={styles.hasCustomBackground}
-            on:change={handleColumnChange}
+            onchange={handleColumnChange}
           />
         </div>
       </div>
@@ -373,8 +373,8 @@
                         {projects}
                         {itemTypes}
                         {customFieldDefinitions}
-                        on:item-updated={handleItemUpdated}
-                        on:update-error={handleUpdateError}
+                        onitemUpdated={handleItemUpdated}
+                        onupdateError={handleUpdateError}
                       />
                     </div>
                   {/each}
@@ -403,8 +403,8 @@
               itemsPerPage={itemsPagination.limit}
               maxItems={10000}
               hasGradient={styles.hasCustomBackground}
-              on:pageChange={handlePageChange}
-              on:pageSizeChange={handlePageSizeChange}
+              onpageChange={handlePageChange}
+              onpageSizeChange={handlePageSizeChange}
             />
           </div>
         {:else}

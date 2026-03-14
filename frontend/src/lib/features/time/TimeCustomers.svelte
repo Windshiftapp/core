@@ -194,7 +194,7 @@
     actionItems={buildCustomerDropdownItems}
   >
     <!-- Customer name with avatar/initials and description -->
-    <div slot="name" let:item={customer}>
+    {#snippet name(customer)}
       <div class="flex items-center gap-3">
         <Avatar
           src={customer.avatar_url}
@@ -210,16 +210,16 @@
           {/if}
         </div>
       </div>
-    </div>
+    {/snippet}
 
     <!-- Email -->
-    <div slot="email" let:item={customer}>
+    {#snippet email(customer)}
       <Text size="sm">{customer.email || '—'}</Text>
-    </div>
+    {/snippet}
 
     <!-- Status badge -->
-    <div slot="status" let:item={customer}>
+    {#snippet status(customer)}
       <Lozenge color={customer.active ? 'green' : 'gray'} text={customer.active ? t('common.active') : t('common.inactive')} />
-    </div>
+    {/snippet}
   </DataTable>
 

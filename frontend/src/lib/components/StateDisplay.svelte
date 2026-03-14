@@ -101,7 +101,7 @@
   <!-- Error or Empty state -->
   <div class="text-center {padding} {className}">
     {#if resolvedIcon}
-      <svelte:component this={resolvedIcon} class="w-8 h-8 mx-auto mb-3" style="color: {iconColor};" />
+      <resolvedIcon class="w-8 h-8 mx-auto mb-3" style="color: {iconColor};" />
     {/if}
 
     {#if title}

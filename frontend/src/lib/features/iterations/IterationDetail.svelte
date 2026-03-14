@@ -481,8 +481,8 @@
   onSubmit={saveIteration}
   submitDisabled={!formData.name.trim() || !formData.start_date || !formData.end_date}
   maxWidth="max-w-2xl"
-  let:submitHint
 >
+  {#snippet children(submitHint)}
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{t('iterations.editIteration')}</h3>
   </div>
@@ -559,5 +559,6 @@
     showKeyboardHint={true}
     confirmKeyboardHint={submitHint}
   />
+  {/snippet}
 </Modal>
 

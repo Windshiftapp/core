@@ -171,7 +171,7 @@
   let showCreateBranchModal = $state(false);
   let showCreatePRFromBranchModal = $state(false);
   let selectedBranchLink = $state(null);
-  let scmLinksRef;
+  let scmLinksRef = $state(null);
 
   // Computed item key for SCM operations
   const itemKey = $derived(
@@ -765,10 +765,10 @@
       <ItemSCMLinks
         bind:this={scmLinksRef}
         itemId={item.id}
-        on:add-link={() => showAddSCMLinkModal = true}
-        on:create-branch={() => showCreateBranchModal = true}
-        on:create-pr={(e) => {
-          selectedBranchLink = e.detail.link;
+        onaddlink={() => showAddSCMLinkModal = true}
+        oncreatebranch={() => showCreateBranchModal = true}
+        oncreatepr={(detail) => {
+          selectedBranchLink = detail.link;
           showCreatePRFromBranchModal = true;
         }}
       />
@@ -788,8 +788,8 @@
 {#if showAddSCMLinkModal && item?.id}
   <AddSCMLinkModal
     itemId={item.id}
-    on:close={() => showAddSCMLinkModal = false}
-    on:created={() => {
+    onclose={() => showAddSCMLinkModal = false}
+    oncreated={() => {
       showAddSCMLinkModal = false;
       // Refresh the links
       if (scmLinksRef) {
@@ -805,8 +805,8 @@
     itemId={item.id}
     itemKey={itemKey}
     itemTitle={item.title || ''}
-    on:close={() => showCreateBranchModal = false}
-    on:created={() => {
+    onclose={() => showCreateBranchModal = false}
+    oncreated={() => {
       showCreateBranchModal = false;
       // Refresh the links
       if (scmLinksRef) {
@@ -822,11 +822,11 @@
     branchLink={selectedBranchLink}
     itemKey={itemKey}
     itemTitle={item?.title || ''}
-    on:close={() => {
+    onclose={() => {
       showCreatePRFromBranchModal = false;
       selectedBranchLink = null;
     }}
-    on:created={() => {
+    oncreated={() => {
       showCreatePRFromBranchModal = false;
       selectedBranchLink = null;
       // Refresh the links

@@ -24,7 +24,7 @@
         currentPage={page1}
         totalItems={150}
         itemsPerPage={25}
-        on:pageChange={(e) => page1 = e.detail.page}
+        onpageChange={(e) => page1 = e.detail.page}
       />
     </div>
   </section>
@@ -43,7 +43,7 @@
         currentPage={page2}
         totalItems={500}
         itemsPerPage={25}
-        on:pageChange={(e) => page2 = e.detail.page}
+        onpageChange={(e) => page2 = e.detail.page}
       />
     </div>
   </section>
@@ -61,10 +61,10 @@
         itemsPerPage={pageSize}
         showPageSizes
         pageSizeOptions={[10, 25, 50, 100]}
-        on:pageChange={(e) => {
+        onpageChange={(e) => {
           page3 = e.detail.page
         }}
-        on:pageSizeChange={(e) => {
+        onpageSizeChange={(e) => {
           page3 = e.detail.page
           pageSize = e.detail.itemsPerPage
         }}

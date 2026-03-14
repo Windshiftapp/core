@@ -1,34 +1,36 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import Button from '../../components/Button.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import { getShortcut, matchesShortcut, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
 
-  const dispatch = createEventDispatcher();
-
   // Get QL shortcut configuration
   const qlExecuteShortcut = getShortcut('ql', 'execute');
 
-  // Props
-  export let query = '';
-  export let isEditing = false;
-  export let error = null;
+  let {
+    query = '',
+    isEditing = false,
+    error = null,
+    ontoggleedit = null,
+    onexecute = null,
+    onclear = null,
+    onquerychange = null,
+  } = $props();
 
   function handleToggleEdit() {
-    dispatch('toggle-edit');
+    ontoggleedit?.();
   }
 
   function handleExecute() {
-    dispatch('execute');
+    onexecute?.();
   }
 
   function handleClear() {
-    dispatch('clear');
+    onclear?.();
   }
 
   function handleQueryChange(event) {
-    dispatch('query-change', event.target.value);
+    onquerychange?.(event.target.value);
   }
 
   function handleKeydown(event) {

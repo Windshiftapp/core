@@ -243,7 +243,7 @@
     ];
   }
 
-  async function handleReleased(event) {
+  async function handleReleased(updatedMilestone) {
     showReleaseModal = false;
     releasingMilestone = null;
     // Refresh milestones to show updated status
@@ -483,11 +483,11 @@
           actionItems={buildMilestoneDropdownItems}
           class="rounded-xl border shadow-sm"
         >
-        <div slot="name" let:item>{@render nameCell(item)}</div>
-        <div slot="status" let:item class="flex items-center gap-2">{@render statusCell(item)}</div>
-        <div slot="category" let:item class="flex items-center gap-2">{@render categoryCell(item)}</div>
-        <div slot="days_remaining" let:item>{@render daysRemainingCell(item)}</div>
-        <div slot="tests" let:item class="text-sm">{@render testsCell(item)}</div>
+        {#snippet name(item)}{@render nameCell(item)}{/snippet}
+        {#snippet status(item)}<div class="flex items-center gap-2">{@render statusCell(item)}</div>{/snippet}
+        {#snippet category(item)}<div class="flex items-center gap-2">{@render categoryCell(item)}</div>{/snippet}
+        {#snippet days_remaining(item)}{@render daysRemainingCell(item)}{/snippet}
+        {#snippet tests(item)}<div class="text-sm">{@render testsCell(item)}</div>{/snippet}
         </DataTable>
       {:else}
         <!-- Workspace view: split into Local and Global sections -->
@@ -508,11 +508,11 @@
                 actionItems={buildMilestoneDropdownItems}
                 class="rounded-xl border shadow-sm"
               >
-              <div slot="name" let:item>{@render nameCell(item)}</div>
-              <div slot="status" let:item class="flex items-center gap-2">{@render statusCell(item)}</div>
-              <div slot="category" let:item class="flex items-center gap-2">{@render categoryCell(item)}</div>
-              <div slot="days_remaining" let:item>{@render daysRemainingCell(item)}</div>
-              <div slot="tests" let:item class="text-sm">{@render testsCell(item)}</div>
+              {#snippet name(item)}{@render nameCell(item)}{/snippet}
+              {#snippet status(item)}<div class="flex items-center gap-2">{@render statusCell(item)}</div>{/snippet}
+              {#snippet category(item)}<div class="flex items-center gap-2">{@render categoryCell(item)}</div>{/snippet}
+              {#snippet days_remaining(item)}{@render daysRemainingCell(item)}{/snippet}
+              {#snippet tests(item)}<div class="text-sm">{@render testsCell(item)}</div>{/snippet}
               </DataTable>
             </section>
           {/if}
@@ -533,11 +533,11 @@
                 actionItems={buildMilestoneDropdownItems}
                 class="rounded-xl border shadow-sm"
               >
-              <div slot="name" let:item>{@render nameCell(item)}</div>
-              <div slot="status" let:item class="flex items-center gap-2">{@render statusCell(item)}</div>
-              <div slot="category" let:item class="flex items-center gap-2">{@render categoryCell(item)}</div>
-              <div slot="days_remaining" let:item>{@render daysRemainingCell(item)}</div>
-              <div slot="tests" let:item class="text-sm">{@render testsCell(item)}</div>
+              {#snippet name(item)}{@render nameCell(item)}{/snippet}
+              {#snippet status(item)}<div class="flex items-center gap-2">{@render statusCell(item)}</div>{/snippet}
+              {#snippet category(item)}<div class="flex items-center gap-2">{@render categoryCell(item)}</div>{/snippet}
+              {#snippet days_remaining(item)}{@render daysRemainingCell(item)}{/snippet}
+              {#snippet tests(item)}<div class="text-sm">{@render testsCell(item)}</div>{/snippet}
               </DataTable>
             </section>
           {/if}
@@ -554,8 +554,8 @@
   onSubmit={saveMilestone}
   submitDisabled={!formData.name.trim()}
   maxWidth="max-w-2xl"
-  let:submitHint
 >
+  {#snippet children(submitHint)}
   <!-- Modal header -->
   <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
@@ -669,6 +669,7 @@
     showKeyboardHint={true}
     confirmKeyboardHint={submitHint}
   />
+  {/snippet}
 </Modal>
 
 <!-- Release Modal -->
@@ -682,8 +683,8 @@
     <MilestoneReleaseModal
       milestone={releasingMilestone}
       workspaceId={releasingMilestone.workspace_id ?? workspaceId}
-      on:released={handleReleased}
-      on:close={() => { showReleaseModal = false; releasingMilestone = null; }}
+      onreleased={handleReleased}
+      onclose={() => { showReleaseModal = false; releasingMilestone = null; }}
     />
   </Modal>
 {/if}

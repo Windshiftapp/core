@@ -343,21 +343,21 @@
       emptyIcon={ClipboardList}
       actionItems={buildStepDropdownItems}
     >
-      <div slot="step_number" let:item={step}>
+      {#snippet step_number(step)}
         <span style="color: var(--ds-text-link); font-weight: 500;">
           {step.step_number || (testSteps.findIndex(s => s.id === step.id) + 1)}
         </span>
-      </div>
+      {/snippet}
 
-      <div slot="step_action" let:item={step}>
+      {#snippet step_action(step)}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="text-sm prose-sm max-w-none test-step-rendered" onclick={handleRenderedContentClick}>
           <MilkdownEditor content={step.action || ''} readonly={true} showToolbar={false} />
         </div>
-      </div>
+      {/snippet}
 
-      <div slot="step_data" let:item={step}>
+      {#snippet step_data(step)}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="text-sm prose-sm max-w-none test-step-rendered" onclick={handleRenderedContentClick}>
@@ -367,15 +367,15 @@
             <span style="color: var(--ds-text-subtle);">—</span>
           {/if}
         </div>
-      </div>
+      {/snippet}
 
-      <div slot="step_expected" let:item={step}>
+      {#snippet step_expected(step)}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="text-sm prose-sm max-w-none test-step-rendered" onclick={handleRenderedContentClick}>
           <MilkdownEditor content={step.expected || ''} readonly={true} showToolbar={false} />
         </div>
-      </div>
+      {/snippet}
     </DataTable>
 
     <!-- Steps Summary -->

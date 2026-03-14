@@ -271,23 +271,23 @@
     editDescription = item.description || '';
   }
 
-  function handleSaveField(event) {
-    const { field, value } = event.detail;
+  function handleSaveField(data) {
+    const { field, value } = data;
     if (field === 'description') {
       editDescription = value;
       saveDescription();
     }
   }
 
-  function handleCancelEdit(event) {
-    const { field } = event.detail;
+  function handleCancelEdit(data) {
+    const { field } = data;
     if (field === 'description') {
       cancelDescription();
     }
   }
 
-  async function handleAttachmentUploadFiles(event) {
-    const { files } = event.detail;
+  async function handleAttachmentUploadFiles(data) {
+    const { files } = data;
     for (const file of files) {
       try {
         const formData = new FormData();
@@ -301,8 +301,7 @@
     await loadAttachments();
   }
 
-  async function handleAttachmentDelete(event) {
-    const attachment = event.detail;
+  async function handleAttachmentDelete(attachment) {
     try {
       await api.attachments.delete(attachment.id);
       attachments = attachments.filter(a => a.id !== attachment.id);
@@ -455,10 +454,10 @@
           showLinkButton={false}
           {attachments}
           diagrams={[]}
-          on:save-field={handleSaveField}
-          on:cancel-edit={handleCancelEdit}
-          on:attachment-upload-files={handleAttachmentUploadFiles}
-          on:attachment-delete={handleAttachmentDelete}
+          onsavefield={handleSaveField}
+          oncanceledit={handleCancelEdit}
+          onattachmentUploadFiles={handleAttachmentUploadFiles}
+          onattachmentDelete={handleAttachmentDelete}
         />
       </div>
 

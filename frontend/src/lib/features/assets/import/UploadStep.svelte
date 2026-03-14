@@ -13,7 +13,7 @@
   let ct = $derived(assetImportStore.createType);
 
   let dragOver = $state(false);
-  let fileInput;
+  let fileInput = $state(null);
 
   const fieldTypeOptions = [
     { value: 'text', label: 'Text' },

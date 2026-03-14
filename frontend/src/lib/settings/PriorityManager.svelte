@@ -1,7 +1,6 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import { createEventDispatcher } from 'svelte';
   import { Plus, Edit, Trash2, AlertCircle } from 'lucide-svelte';
   import { priorityIconMap, priorityIconOptions } from '../utils/icons.js';
   import Button from '../components/Button.svelte';
@@ -18,8 +17,6 @@
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
-
-  const dispatch = createEventDispatcher();
 
   let priorities = $state([]);
   let isLoading = $state(true);
@@ -229,30 +226,37 @@
     emptyIcon={AlertCircle}
     actionItems={buildPriorityDropdownItems}
   >
-    <div slot="icon" let:item={priority} class="flex items-center justify-center">
-      <div class="w-6 h-6 rounded flex items-center justify-center" style="background-color: {priority.color}">
-        <svelte:component this={priorityIconMap[priority.icon] || AlertCircle} size={12} color="white" />
+    {#snippet icon(priority)}
+      <div class="flex items-center justify-center">
+        <div class="w-6 h-6 rounded flex items-center justify-center" style="background-color: {priority.color}">
+          <svelte:component this={priorityIconMap[priority.icon] || AlertCircle} size={12} color="white" />
+        </div>
       </div>
-    </div>
+    {/snippet}
 
-    <div slot="is_default" let:item={priority} class="flex items-center">
-      {#if priority.is_default}
-        <Lozenge color="green" text={t('common.default')} />
-      {/if}
-    </div>
+    {#snippet is_default(priority)}
+      <div class="flex items-center">
+        {#if priority.is_default}
+          <Lozenge color="green" text={t('common.default')} />
+        {/if}
+      </div>
+    {/snippet}
 
-    <div slot="configuration_set_names" let:item={priority} class="flex flex-wrap gap-1">
-      {#if priority.configuration_set_names && priority.configuration_set_names.length > 0}
-        {#each priority.configuration_set_names as configSetName}
-          <Lozenge color="gray" text={configSetName} />
-        {/each}
-      {:else}
-        <span class="text-xs text-gray-500">{t('common.noData')}</span>
-      {/if}
-    </div>
+    {#snippet configuration_set_names(priority)}
+      <div class="flex flex-wrap gap-1">
+        {#if priority.configuration_set_names && priority.configuration_set_names.length > 0}
+          {#each priority.configuration_set_names as configSetName}
+            <Lozenge color="gray" text={configSetName} />
+          {/each}
+        {:else}
+          <span class="text-xs text-gray-500">{t('common.noData')}</span>
+        {/if}
+      </div>
+    {/snippet}
   </DataTable>
 
-  <Modal isOpen={showCreateForm} onclose={cancelEdit} maxWidth="max-w-2xl" onSubmit={savePriority} let:submitHint>
+  <Modal isOpen={showCreateForm} onclose={cancelEdit} maxWidth="max-w-2xl" onSubmit={savePriority}>
+    {#snippet children(submitHint)}
     <!-- Modal header -->
     <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
       <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
@@ -334,6 +338,7 @@
       showKeyboardHint={true}
       confirmKeyboardHint={submitHint}
     />
+    {/snippet}
   </Modal>
 
 <style>

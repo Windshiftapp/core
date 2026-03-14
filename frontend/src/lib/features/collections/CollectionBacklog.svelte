@@ -573,35 +573,37 @@
           textStyle={styles.textStyle}
           subtleTextStyle={styles.subtleTextStyle}
         >
-          <div slot="actions" class="flex items-center gap-2">
-            {#if availableGlobalIterations.length > 0}
-              <ItemPicker
-                bind:value={addSprintPickerValue}
-                items={availableGlobalIterations}
-                config={sprintPickerConfig}
-                placeholder={t('iterations.addGlobalSprint')}
-                allowClear={false}
-                showSelectedInTrigger={false}
-                onSelect={handleSprintPickerSelect}
-              >
-                {#snippet children()}
-                  <span
-                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors"
-                    style="{styles.glassStyle?.(12) ?? ''} {styles.glassTextStyle ?? ''}"
-                  >
-                    <Plus class="w-4 h-4" />
-                    {t('iterations.addGlobalSprint')}
-                  </span>
-                {/snippet}
-              </ItemPicker>
-            {/if}
-            <CollectionViewSwitcher
-              {workspaceId}
-              {collectionId}
-              activeView="backlog"
-              hasGradient={styles.hasCustomBackground}
-            />
-          </div>
+          {#snippet actions()}
+            <div class="flex items-center gap-2">
+              {#if availableGlobalIterations.length > 0}
+                <ItemPicker
+                  bind:value={addSprintPickerValue}
+                  items={availableGlobalIterations}
+                  config={sprintPickerConfig}
+                  placeholder={t('iterations.addGlobalSprint')}
+                  allowClear={false}
+                  showSelectedInTrigger={false}
+                  onSelect={handleSprintPickerSelect}
+                >
+                  {#snippet children()}
+                    <span
+                      class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors"
+                      style="{styles.glassStyle?.(12) ?? ''} {styles.glassTextStyle ?? ''}"
+                    >
+                      <Plus class="w-4 h-4" />
+                      {t('iterations.addGlobalSprint')}
+                    </span>
+                  {/snippet}
+                </ItemPicker>
+              {/if}
+              <CollectionViewSwitcher
+                {workspaceId}
+                {collectionId}
+                activeView="backlog"
+                hasGradient={styles.hasCustomBackground}
+              />
+            </div>
+          {/snippet}
         </ViewHeader>
       </div>
 

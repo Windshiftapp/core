@@ -3,32 +3,39 @@
   import { itemTypeIconMap } from '../../utils/icons.js';
   import Button from '../../components/Button.svelte';
   import LinkComponent from '../../components/Link.svelte';
-  import { createEventDispatcher, onDestroy } from 'svelte';
+  import { onDestroy } from 'svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
   import DropIndicator from '../../layout/DropIndicator.svelte';
   import { api } from '../../api.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import ItemKey from './ItemKey.svelte';
 
-  const dispatch = createEventDispatcher();
-
-  export let item;
-  export let workspace;
-  export let workspaceId;
-  export let itemId;
-  export let itemLinks = [];
-  export let loadingLinks = false;
-  export let availableSubIssueTypes = [];
-  export let childItems = [];
-  export let loadingChildItems = false;
-  export let itemTypes = [];
-  export let isModal = false;
-  export let isLowestLevel = false;
+  let {
+    item,
+    workspace,
+    workspaceId,
+    itemId,
+    itemLinks = [],
+    loadingLinks = false,
+    availableSubIssueTypes = [],
+    childItems = [],
+    loadingChildItems = false,
+    itemTypes = [],
+    isModal = false,
+    isLowestLevel = false,
+    onviewtestcase = undefined,
+    onnavigate = undefined,
+    oncreatesubissue = undefined,
+    onremovelink = undefined,
+    onshowlinkmodal = undefined,
+    onreorderchildren = undefined,
+  } = $props();
 
   const TEST_LINK_TYPE_ID = 1;
 
   // Use centralized icon map for item types
-  $: currentItemId = parseInt(itemId);
+  let currentItemId = $derived(parseInt(itemId));
   const iconMap = itemTypeIconMap;
 
   function getLinkLabel(link) {
@@ -42,7 +49,7 @@
   function handleLinkClick(event, linkedItemType, linkedItemId, linkedItemWorkspaceId, linkedItemHref) {
     if (linkedItemType === 'test_case') {
       event.preventDefault();
-      dispatch('view-test-case', { testCaseId: linkedItemId });
+      onviewtestcase?.({ testCaseId: linkedItemId });
       return;
     }
 
@@ -50,35 +57,37 @@
       event.preventDefault();
       const targetWorkspaceId = linkedItemWorkspaceId || workspaceId;
       const destination = linkedItemHref || `/workspaces/${targetWorkspaceId}/items/${linkedItemId}`;
-      dispatch('navigate', { path: destination });
+      onnavigate?.(destination);
     }
   }
 
   function startCreateSubIssue() {
-    dispatch('create-sub-issue');
+    oncreatesubissue?.();
   }
 
   function removeLink(linkId) {
-    dispatch('remove-link', { linkId });
+    onremovelink?.({ linkId });
   }
 
   function handleShowLinkModal() {
-    dispatch('show-link-modal');
+    onshowlinkmodal?.();
   }
 
   // Drag and drop state for child items
-  let dragState = new Map();
+  let dragState = $state(new Map());
   let setupElements = new Map();
   let pendingDrops = new Set();
   let setupTimeout;
   const childRowGap = 8; // space-y-2 = 8px
 
-  $: if (isLowestLevel && childItems.length > 0 && typeof document !== 'undefined') {
-    if (setupTimeout) clearTimeout(setupTimeout);
-    setupTimeout = setTimeout(() => {
-      setupDragAndDrop();
-    }, 100);
-  }
+  $effect(() => {
+    if (isLowestLevel && childItems.length > 0 && typeof document !== 'undefined') {
+      if (setupTimeout) clearTimeout(setupTimeout);
+      setupTimeout = setTimeout(() => {
+        setupDragAndDrop();
+      }, 100);
+    }
+  });
 
   function setupDragAndDrop() {
     if (setupTimeout) clearTimeout(setupTimeout);
@@ -207,10 +216,10 @@
         next_item_id: nextItemId
       });
 
-      dispatch('reorder-children');
+      onreorderchildren?.();
     } catch (error) {
       console.error('Failed to reorder child item:', error);
-      dispatch('reorder-children');
+      onreorderchildren?.();
     } finally {
       setTimeout(() => pendingDrops.delete(dropId), 500);
     }
@@ -285,7 +294,8 @@
                   class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
                   style="background-color: {linkedItemTypeColor || '#6b7280'}20; color: {linkedItemTypeColor || '#6b7280'};"
                 >
-                  <svelte:component this={iconMap[linkedItemTypeIcon]} class="w-3.5 h-3.5" />
+                  {@const LinkedIcon = iconMap[linkedItemTypeIcon]}
+                  <LinkedIcon class="w-3.5 h-3.5" />
                 </div>
               {:else}
                 <div
@@ -378,7 +388,8 @@
                     class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
                     style="background-color: {childItemType.color || '#6b7280'}20; color: {childItemType.color || '#6b7280'};"
                   >
-                    <svelte:component this={iconMap[childItemType.icon] || FileText} class="w-3.5 h-3.5" />
+                    {@const ChildTypeIcon = iconMap[childItemType.icon] || FileText}
+                    <ChildTypeIcon class="w-3.5 h-3.5" />
                   </div>
                 {:else}
                   <div
@@ -389,13 +400,8 @@
                   </div>
                 {/if}
                 <!-- Item key -->
-                <LinkComponent
-                  href="/workspaces/{childItem.workspace_id || workspaceId}/items/{childItem.id}"
-                  class="text-xs font-mono whitespace-nowrap transition-colors cursor-pointer"
-                  style="color: var(--ds-text-subtle);"
-                >
-                  {childItem.workspace_key || childItem.workspace?.key || workspace?.key || 'WORK'}-{childItem.id}
-                </LinkComponent>
+                <ItemKey item={childItem} {workspace}
+                  href="/workspaces/{childItem.workspace_id || workspaceId}/items/{childItem.id}" />
                 <!-- Item title -->
                 <LinkComponent
                   href="/workspaces/{childItem.workspace_id || workspaceId}/items/{childItem.id}"

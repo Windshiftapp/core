@@ -1,10 +1,9 @@
 <script>
-  export let edge; // 'top' | 'bottom'
-  export let gap = 4; // spacing in pixels (matches the vertical gap between cards)
+  let { edge, gap = 4 } = $props();
 
-  const minOffset = 6; // keep the indicator visible even with tight gaps
+  const minOffset = 6;
   const thickness = 4;
-  $: offset = Math.max(gap / 2 + 2, minOffset);
+  let offset = $derived(Math.max(gap / 2 + 2, minOffset));
 </script>
 
 {#if edge}

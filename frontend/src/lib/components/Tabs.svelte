@@ -28,7 +28,7 @@
         onmouseleave={(e) => { if (activeTab !== tab.id) e.target.style.color = 'var(--ds-text-subtle)'; }}
       >
         {#if tab.icon}
-          <svelte:component this={tab.icon} class="w-4 h-4" />
+          <tab.icon class="w-4 h-4" />
         {/if}
         {tab.label}
         {#if tab.badge}

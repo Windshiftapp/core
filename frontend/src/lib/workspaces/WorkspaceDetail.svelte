@@ -16,24 +16,24 @@
   import Checkbox from '../components/Checkbox.svelte';
   import Card from '../components/Card.svelte';
 
-  export let workspaceId;
+  let { workspaceId } = $props();
 
-  let workspace = null;
-  let projects = [];
-  let loading = true;
-  let showCreateForm = false;
-  let currentCollection = 'Default';
-  let currentView = 'board';
-  let formData = {
+  let workspace = $state(null);
+  let projects = $state([]);
+  let loading = $state(true);
+  let showCreateForm = $state(false);
+  let formData = $state({
     name: '',
     description: '',
     active: true
-  };
+  });
 
-  // Reactive statement to get workspace ID from store if on personal route
-  $: effectiveWorkspaceId = $currentRoute.path?.startsWith('/personal')
-    ? $workspacesStore.personalWorkspace?.id
-    : workspaceId;
+  // Derived workspace ID: use personal workspace from store if on personal route
+  let effectiveWorkspaceId = $derived(
+    $currentRoute.path?.startsWith('/personal')
+      ? $workspacesStore.personalWorkspace?.id
+      : workspaceId
+  );
 
   onMount(async () => {
     // Wait for personal workspace to load if on personal route
@@ -119,15 +119,6 @@
     }
   }
   
-  function handleViewChange(event) {
-    currentView = event.detail.view;
-    currentCollection = event.detail.collection;
-  }
-  
-  function handleCollectionChange(event) {
-    currentCollection = event.detail.collection;
-    currentView = event.detail.view;
-  }
 </script>
 
 {#if loading}
@@ -159,10 +150,6 @@
       <!-- Workspace Navigation -->
       <WorkspaceNavigation
         workspaceId={effectiveWorkspaceId}
-        bind:currentCollection
-        bind:currentView
-        onviewchange={handleViewChange}
-        oncollectionchange={handleCollectionChange}
       />
 
       <!-- Content Container -->
@@ -173,7 +160,7 @@
             viewName="Overview"
             itemCount={projects.length}
           >
-            <div slot="actions">
+            {#snippet actions()}
               <button
                 onclick={startCreate}
                 class="bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700 transition-all duration-200 font-semibold shadow-sm hover:shadow-md"
@@ -183,7 +170,7 @@
                   Add Project
                 </div>
               </button>
-            </div>
+            {/snippet}
           </ViewHeader>
         </div>
 
