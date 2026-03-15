@@ -55,8 +55,6 @@ Let us know if you encounter any bug or uncertainties about a feature via Github
 #### OIDC Providers
 If you can connect Windshift to an OIDC Provider, let us know how it goes via Discussion. Both positive and negative feedback helps us here. We have tested OIDC with PocketID from our side.
 
-#### Svelte 4 to 5 Migration
-Parts of the codebase are older and were written in Svelte 4. We have migrated a lot of things to Svelte 5 but there is still work to do. If you are familiar with Svelte 5, this would be a great first time contribution.
 
 ## Tech Stack
 
