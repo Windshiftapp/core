@@ -24,7 +24,7 @@
     "typecheck": "svelte-check --threshold error"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.2.5",
+    "@biomejs/biome": "^2.4.7",
     "@module-federation/vite": "^1.12.3",
     "@playwright/test": "^1.49.0",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
