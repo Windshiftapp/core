@@ -134,3 +134,4 @@ windshift.dsl
 endpoints.txt
 RELEASE_NOTES.md
 .dev-windshift-pg
+releases/v0.3.1.md

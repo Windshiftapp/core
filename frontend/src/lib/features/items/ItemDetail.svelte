@@ -5,13 +5,10 @@
   import { navigate, currentRoute } from '../../router.js';
   import { workspacePermissions, itemDetailStore } from '../../stores';
   import { t } from '../../stores/i18n.svelte.js';
-  import { toHotkeyString, getShortcut, matchesShortcut, isTypingInField } from '../../utils/keyboardShortcuts.js';
-  import { Trash2, FileText, AlertCircle, X, Maximize2, Minimize2, Copy, BookOpen, Search, GitBranch } from 'lucide-svelte';
-  import { scale, fly } from 'svelte/transition';
-  import { quintOut } from 'svelte/easing';
+  import { getShortcut, matchesShortcut, isTypingInField } from '../../utils/keyboardShortcuts.js';
+  import { Trash2, X, Maximize2, Minimize2, Copy, BookOpen, Search, GitBranch } from 'lucide-svelte';
   import { Bookmark, BookmarkCheck, ExternalLink } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
-  import { confirm } from '../../composables/useConfirm.js';
   import { addToast, successToast, errorToast } from '../../stores/toasts.svelte.js';
   import { timerStore } from '../../stores/timerStore.svelte.js';
   import { useItemAttachments } from '../../composables/useItemAttachments.svelte.js';
@@ -58,102 +55,20 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   // Bind to store values using $derived
   let item = $derived(itemDetailStore.item);
   let workspace = $derived(itemDetailStore.workspace);
-  let parentHierarchy = $derived(itemDetailStore.parentHierarchy);
-  let milestones = $derived(itemDetailStore.milestones);
-  let iterations = $derived(itemDetailStore.iterations);
-  let priorities = $derived(itemDetailStore.priorities);
-  let customFieldDefinitions = $derived(itemDetailStore.customFieldDefinitions);
-  let workspaceScreenFields = $derived(itemDetailStore.workspaceScreenFields);
-  let workspaceScreenSystemFields = $derived(itemDetailStore.workspaceScreenSystemFields);
-  let loading = $derived(itemDetailStore.loading);
-  let error = $derived(itemDetailStore.error);
-  let saving = $derived(itemDetailStore.saving);
 
   // Modal state
-  let isFullscreen = $derived(itemDetailStore.isFullscreen);
   let modalElement = $state(null);
 
-  // Editing state - derive from store's unified editing object
-  let editingTitle = $derived(itemDetailStore.editing.title.active);
-  let editTitle = $derived(itemDetailStore.editing.title.value);
-  let dropdownItems = $derived(itemDetailStore.dropdownItems);
-  let editingDescription = $derived(itemDetailStore.editing.description.active);
-  let editDescription = $derived(itemDetailStore.editing.description.value);
-  let editingStatus = $derived(itemDetailStore.editing.status.active);
-  let editStatus = $state('');
-  let editingPriority = $derived(itemDetailStore.editing.priority.active);
-  let editingDueDate = $derived(itemDetailStore.editing.dueDate.active);
-  let editPriority = $state('');
-  let editingMilestone = $derived(itemDetailStore.editing.milestone.active);
-  let editMilestone = $derived(itemDetailStore.editing.milestone.value);
-  let editingIteration = $derived(itemDetailStore.editing.iteration.active);
-  let editIteration = $derived(itemDetailStore.editing.iteration.value);
-  let editingProject = $derived(itemDetailStore.editing.project.active);
-  let editProject = $derived(itemDetailStore.editing.project.value);
-  let editingAssignee = $derived(itemDetailStore.editing.assignee.active);
-  let editAssignee = $derived(itemDetailStore.editing.assignee.value);
-  let editingCustomFields = $derived(itemDetailStore.editing.customFields.active);
-  let editCustomFieldValues = $derived(itemDetailStore.editing.customFields.values);
-  let itemLinks = $derived(itemDetailStore.itemLinks);
-  let linkTypes = $derived(itemDetailStore.linkTypes);
-  let loadingLinks = $derived(itemDetailStore.loadingLinks);
-  let showLinkModal = $derived(itemDetailStore.showLinkModal);
-  const TEST_LINK_TYPE_ID = 1;
-  let showTestCaseModal = $derived(itemDetailStore.showTestCaseModal);
-  let selectedTestCaseId = $derived(itemDetailStore.selectedTestCaseId);
 
-  // Delete dialog state
-  let showDeleteDialog = $derived(itemDetailStore.showDeleteDialog);
 
-  // Filter link types for item → item linking
-  // The "Tests" link type (ID=1) can only link between items and test cases
-  let filteredLinkTypes = $derived(itemDetailStore.filteredLinkTypes);
 
-  let currentItemType = $derived(itemDetailStore.currentItemType);
-  let currentHierarchyLevel = $derived(itemDetailStore.currentHierarchyLevel);
   let availableSubIssueTypes = $derived(itemDetailStore.availableSubIssueTypes);
-  let isWatching = $derived(itemDetailStore.isWatching);
-  let loadingWatchStatus = $derived(itemDetailStore.loadingWatchStatus);
-  let childItems = $derived(itemDetailStore.childItems);
-  let loadingChildItems = $derived(itemDetailStore.loadingChildItems);
-  let itemTypes = $derived(itemDetailStore.itemTypes);
-  let timeProjects = $derived(itemDetailStore.timeProjects);
-  let timeWorklogs = $derived(itemDetailStore.timeWorklogs);
-  let showTimeLogModal = $derived(itemDetailStore.showTimeLogModal);
-  let editingWorklog = $derived(itemDetailStore.editingWorklog);
-  let workItems = $derived(itemDetailStore.workItems);
-  let customers = $derived(itemDetailStore.customers);
-  let workspaces = $derived(itemDetailStore.workspaces);
-
-  // Diagrams
-  let diagrams = $derived(itemDetailStore.diagrams);
-  let loadingDiagrams = $derived(itemDetailStore.loadingDiagrams);
-
-  // Manual actions
-  let manualActions = $derived(itemDetailStore.manualActions);
-
-  // Status transition lazy loading
-  let availableStatusTransitions = $derived(itemDetailStore.availableStatusTransitions);
-  let loadingStatusTransitions = $derived(itemDetailStore.loadingStatusTransitions);
-
-  // Track if any changes were made
-  let hasChanges = $derived(itemDetailStore.hasChanges);
 
   // Track itemId changes for reactivity
   let previousItemId = $state(itemId);
 
   // Timer guard flag to prevent duplicate timer starts
   let isStartingTimer = $state(false);
-
-  // Animation state for smooth transitions
-  let transitioning = $derived(itemDetailStore.transitioning);
-  
-  // Status options are loaded dynamically from the API
-  // No hardcoded defaults - backend returns all statuses with category colors
-  // Priority options are now loaded dynamically via PriorityPicker component
-
-  // Status options derived from store
-  let statusOptions = $derived(itemDetailStore.statusOptions);
 
   // Modal control functions
   function closeModal() {
@@ -176,15 +91,8 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   useEventListener(() => document, 'keydown', (event) => {
     if (event.key !== 'Escape') return;
     if (!isModal) return;
-
-    const isEditing = editingTitle || editingDescription || editingStatus ||
-                     editingPriority || editingMilestone || editingIteration || editingProject || editingAssignee ||
-                     Object.keys(editingCustomFields).length > 0;
-    const createModalOpen = document.querySelector('.create-work-item-modal, [role="dialog"]');
-
-    if (!isEditing && !createModalOpen) {
-      closeModal();
-    }
+    closeModal();
+   
   });
 
   // Handle global keyboard shortcuts for item detail
@@ -319,29 +227,11 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
       showCopySuccess(key);
     } catch (error) {
       console.error('[handleCopyKey] Failed to copy key to clipboard:', error);
-      // Fallback for browsers that don't support clipboard API
-      try {
-        const textArea = document.createElement('textarea');
-        const key = `${item.workspace_key || workspace?.key || 'WORK'}-${item.workspace_item_number}`;
-        textArea.value = key;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        showCopySuccess(key);
-      } catch (fallbackError) {
-        console.error('[handleCopyKey] Fallback copy also failed:', fallbackError);
-        showCopyError();
-      }
     }
   }
 
   function showCopySuccess(key) {
     successToast(`${item?.workspace_key || workspace?.key || 'WORK'}-${item?.workspace_item_number}`, t('toast.copied'));
-  }
-
-  function showCopyError() {
-    errorToast(t('items.failedToCopyToClipboard'), t('items.copyError'));
   }
   
   async function handleSaveField(detail) {
