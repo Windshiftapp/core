@@ -83,6 +83,8 @@ type Config struct {
 	LLMEndpoint string
 	// LLMProvidersFile is the path to a custom LLM providers JSON file (optional)
 	LLMProvidersFile string
+	// AIPromptsDir is a directory containing custom AI prompt override files (optional)
+	AIPromptsDir string
 	// LogbookEndpoint is the URL of the logbook sidecar service (e.g., http://logbook:8090)
 	LogbookEndpoint string
 	// SSHEnabled indicates whether the SSH TUI server is enabled
@@ -805,10 +807,11 @@ func (s *Server) initialize() error {
 	}
 	llmManager := llm.NewConnectionManager(s.db, scmProviderHandler.GetEncryption(), fallbackLLMClient)
 	llmConnHandler := handlers.NewLLMConnectionHandler(s.db, llmManager)
-	aiHandler := handlers.NewAIHandler(s.db, llmManager, permService, timePermissionService)
+	promptStore := llm.NewPromptStore(cfg.AIPromptsDir)
+	aiHandler := handlers.NewAIHandler(s.db, llmManager, permService, timePermissionService, promptStore)
 
 	// Briefing scheduler (generates daily briefings for all users)
-	s.briefingScheduler = scheduler.NewBriefingScheduler(s.db, llmManager, permService, timePermissionService)
+	s.briefingScheduler = scheduler.NewBriefingScheduler(s.db, llmManager, permService, timePermissionService, promptStore)
 	s.briefingScheduler.Start()
 
 	// Logbook reverse proxy (optional sidecar)

@@ -23,15 +23,17 @@ type AIHandler struct {
 	llmManager      *llm.ConnectionManager
 	permService     *services.PermissionService
 	timePermService *services.TimePermissionService
+	promptStore     *llm.PromptStore
 }
 
 // NewAIHandler creates a new AI handler.
-func NewAIHandler(db database.Database, llmManager *llm.ConnectionManager, permService *services.PermissionService, timePermService *services.TimePermissionService) *AIHandler {
+func NewAIHandler(db database.Database, llmManager *llm.ConnectionManager, permService *services.PermissionService, timePermService *services.TimePermissionService, promptStore *llm.PromptStore) *AIHandler {
 	return &AIHandler{
 		db:              db,
 		llmManager:      llmManager,
 		permService:     permService,
 		timePermService: timePermService,
+		promptStore:     promptStore,
 	}
 }
 
@@ -183,14 +185,7 @@ func (h *AIHandler) PlanMyDay(w http.ResponseWriter, r *http.Request) {
 		now = now.In(loc)
 	}
 
-	systemPrompt := `You are a work planning assistant. Given a list of work items assigned to a user, suggest a prioritized schedule for today. Consider due dates, priorities, milestone target dates, iteration end dates, and logical task ordering.
-
-Return a JSON object with:
-- activities: array of objects with time (HH:MM format), duration_minutes, item_key (exact key from provided list), title, and reason
-- summary: a short overview of the planned day
-
-Schedule tasks across the full workday, not all at the same time. Use only item keys from the provided list.
-Only reference dates explicitly provided in the item data. Never invent or assume dates.`
+	systemPrompt := h.promptStore.Get(llm.PromptPlanMyDay)
 
 	userPrompt := fmt.Sprintf("Today is %s (%s timezone). Here are my open work items:\n\n%s\n\nPlease plan my day.",
 		now.Format("Monday, January 2, 2006"), timezone, strings.Join(itemLines, "\n"))
@@ -493,16 +488,7 @@ func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	systemPrompt := `You are a project management assistant. Given context about a work item (description, comments, history, links, source control activity), provide a concise briefing that catches someone up on the current state.
-
-Write in markdown format. Structure the briefing with:
-1. A one-sentence summary of what this item is about
-2. Current status and recent activity
-3. Key decisions or discussions from comments
-4. Any blockers or dependencies from linked items
-5. Source control progress if applicable
-
-Be concise and factual. Focus on what someone needs to know to understand the current state.`
+	systemPrompt := h.promptStore.Get(llm.PromptCatchMeUp)
 
 	userPrompt := fmt.Sprintf("Please catch me up on this work item:\n\n%s", strings.Join(contextLines, "\n"))
 
@@ -628,13 +614,7 @@ func (h *AIHandler) FindSimilarItems(w http.ResponseWriter, r *http.Request) {
 		currentDesc = currentDesc[:500] + "..."
 	}
 
-	systemPrompt := `You are a project management assistant. Given a work item and a list of other items in the same workspace, identify items that are similar, potentially duplicates, or closely related.
-
-Return a JSON object with:
-- similar_items: array with item_key (exact key from candidate list), similarity (duplicate/closely_related/somewhat_related), and reason
-- summary: a one-sentence summary of findings
-
-Only include genuinely similar items. If none are similar, return an empty array. Maximum 10 results.`
+	systemPrompt := h.promptStore.Get(llm.PromptFindSimilar)
 
 	userPrompt := fmt.Sprintf(`Current item %s: %s
 Description: %s
@@ -776,13 +756,7 @@ func (h *AIHandler) DecomposeItem(w http.ResponseWriter, r *http.Request) {
 		contextParts = append(contextParts, fmt.Sprintf("\nExisting children (avoid duplicates): %s", strings.Join(existingChildren, "; ")))
 	}
 
-	systemPrompt := `You are a project management assistant. Given a work item, suggest how to break it down into smaller sub-tasks.
-
-Return a JSON object with:
-- sub_tasks: array of objects, each with "title" (string, imperative form) and "description" (string, 1-2 sentences)
-- reasoning: brief explanation of the decomposition approach
-
-Suggest 3-8 meaningful, actionable sub-tasks. Don't create trivially small tasks. If existing children are listed, don't duplicate them.`
+	systemPrompt := h.promptStore.Get(llm.PromptDecompose)
 
 	userPrompt := fmt.Sprintf("Break this work item into sub-tasks:\n\n%s", strings.Join(contextParts, "\n"))
 
@@ -926,11 +900,7 @@ func (h *AIHandler) GenerateReleaseNotes(w http.ResponseWriter, r *http.Request)
 			testStats.TotalTestPlans, testStats.TotalTestRuns, testStats.SuccessfulTestRuns, testStats.FailedTestRuns))
 	}
 
-	systemPrompt := `You are a software release manager. Given information about a project milestone, write professional release notes in markdown format.
-
-Include an introductory paragraph summarizing the release, then use ## section headers (e.g. "## What's New", "## Bug Fixes", "## Improvements") with bullet points under each. Write in a professional tone with enough detail that users understand the impact of each change.
-
-Return ONLY the markdown text — no JSON, no code block fences, no preamble.`
+	systemPrompt := h.promptStore.Get(llm.PromptReleaseNotes)
 
 	userPrompt := fmt.Sprintf("Generate release notes for this milestone:\n\n%s", strings.Join(contextLines, "\n"))
 
@@ -1307,22 +1277,7 @@ func (h *AIHandler) AnalyzeDependencies(w http.ResponseWriter, r *http.Request) 
 		_ = idx
 	}
 
-	systemPrompt := `You are a project management dependency analyst. Given work items organized by team and sprint, identify dependencies between them.
-
-A dependency exists when:
-- One item must complete before another can start
-- Two items modify the same system/component and need coordination
-- One item produces output another consumes
-- Items share infrastructure, API, or data requirements
-
-When items span multiple sprints, pay special attention to schedule risks:
-- A current sprint item depending on a future sprint item is a BLOCKER (cannot complete on time)
-- A future sprint item depending on a current sprint item is normal sequencing
-
-Focus on cross-team and cross-sprint dependencies first, then within-team. Only suggest genuine dependencies, not superficial similarities. Maximum 20 suggestions.
-
-Return a JSON object with:
-- dependencies: array of objects with source_key (item key like "PROJ-123"), target_key, relationship (one of: "depends_on", "blocks", "relates_to"), and reason`
+	systemPrompt := h.promptStore.Get(llm.PromptDependencyAnalysis)
 
 	userPrompt := strings.Join(promptSections, "\n\n") + "\n\nIdentify dependencies between these items."
 
@@ -1610,28 +1565,7 @@ func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		chatNow = chatNow.In(chatLoc)
 	}
 
-	systemPrompt := fmt.Sprintf(
-		"You are a helpful assistant for Windshift, a project management tool. "+
-			"You can look up workspaces and items to answer the user's questions. "+
-			"Use the available tools to find information before answering. "+
-			"Be concise and factual. If you cannot find the requested information, say so.\n\n"+
-			"Today's date is %s.\n\n"+
-			"The current user is %s (user ID: %d). "+
-			"When the user asks about \"my items\", \"assigned to me\", or similar, "+
-			"use the list_items tool with assignee_id=%d. "+
-			"You can omit workspace_id to search across all workspaces at once.\n\n"+
-			"You can also look up milestones and iterations (sprints) and filter items using CQL query expressions including custom fields. Use list_custom_fields to discover available custom fields.\n\n"+
-			"You can update items with the update_item tool: change status, priority, assignee, due date, milestone, iteration, and more. "+
-			"You can pass names instead of IDs (e.g. status_name=\"Done\", assignee_name=\"John Doe\") and they will be resolved automatically. "+
-			"Always confirm what was changed in your response.\n\n"+
-			"You can also manage time tracking: list time projects with list_time_projects, view worklogs with list_worklogs, and log time with log_time. "+
-			"When logging time, first use list_time_projects to find the correct project_id.\n\n"+
-			"EFFICIENCY: list_items already returns due dates, milestone target dates, and iteration end dates for each item. "+
-			"One list_items call is usually sufficient to answer questions about deadlines or what is due soon. "+
-			"Do NOT call get_item for items already returned by list_items. "+
-			"Only use list_milestones or list_iterations when the user asks about those entities directly. "+
-			"Answer as soon as you have enough information.\n\n"+
-			"Only state facts returned by the tools. Never invent or assume dates, statuses, or other item fields.",
+	systemPrompt := fmt.Sprintf(h.promptStore.Get(llm.PromptAIChat),
 		chatNow.Format("2006-01-02"), user.FullName, user.ID, user.ID,
 	)
 

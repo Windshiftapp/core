@@ -42,8 +42,8 @@ RUN CGO_ENABLED=0 \
 # Create data directory with placeholder file for proper volume initialization
 # Docker only copies ownership to named volumes when there are actual files present
 # Empty directories alone don't trigger the volume initialization with correct permissions
-RUN mkdir -p /data/attachments /data/plugins && \
-    touch /data/.keep /data/attachments/.keep /data/plugins/.keep && \
+RUN mkdir -p /data/attachments /data/plugins /data/prompts && \
+    touch /data/.keep /data/attachments/.keep /data/plugins/.keep /data/prompts/.keep && \
     chown -R 65534:65534 /data
 
 # Stage 3: Scratch runtime (minimal image)
@@ -70,6 +70,7 @@ ENV PORT=8080
 ENV DB_PATH=/data/windshift.db
 ENV ATTACHMENT_PATH=/data/attachments
 ENV PLUGIN_DIR=/data/plugins
+ENV AI_PROMPTS_DIR=/data/prompts
 
 USER 65534:65534
 

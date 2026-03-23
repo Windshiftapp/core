@@ -20,6 +20,7 @@ type BriefingScheduler struct {
 	llmManager      *llm.ConnectionManager
 	permService     *services.PermissionService
 	timePermService *services.TimePermissionService
+	promptStore     *llm.PromptStore
 	ticker          *time.Ticker
 	stopChan        chan struct{}
 	mu              sync.RWMutex
@@ -27,12 +28,13 @@ type BriefingScheduler struct {
 }
 
 // NewBriefingScheduler creates a new briefing scheduler.
-func NewBriefingScheduler(db database.Database, llmManager *llm.ConnectionManager, permService *services.PermissionService, timePermService *services.TimePermissionService) *BriefingScheduler {
+func NewBriefingScheduler(db database.Database, llmManager *llm.ConnectionManager, permService *services.PermissionService, timePermService *services.TimePermissionService, promptStore *llm.PromptStore) *BriefingScheduler {
 	return &BriefingScheduler{
 		db:              db,
 		llmManager:      llmManager,
 		permService:     permService,
 		timePermService: timePermService,
+		promptStore:     promptStore,
 		ticker:          time.NewTicker(6 * time.Hour),
 		stopChan:        make(chan struct{}),
 	}
@@ -383,23 +385,7 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userI
 		return
 	}
 
-	systemPrompt := `You are a daily briefing assistant for Windshift, a project management tool.
-Generate a concise morning briefing in Markdown with these sections:
-
-## Activity Recap
-Summarize what happened since yesterday based on the provided changes and comments.
-Group by item, highlight important updates. Mention who made key changes.
-
-## Today's Focus
-Based on the user's assigned items, suggest what to prioritize today.
-Consider: due dates, priority, milestone target dates, iteration end dates, items with recent activity, blockers.
-
-## Upcoming Deadlines
-List items due within the next 7 days. Also include items whose milestone target date or iteration end date falls within the next 7 days.
-
-Be concise and actionable. Use item keys (like PROJ-42).
-If there's little activity, keep it brief.
-Only reference dates explicitly provided in the item data. Never invent or assume dates.`
+	systemPrompt := bs.promptStore.Get(llm.PromptDailyBriefing)
 
 	loc, err := time.LoadLocation(timezone)
 	if err != nil {

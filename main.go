@@ -31,57 +31,17 @@ import (
 //go:embed all:frontend/dist
 var frontendFiles embed.FS
 
+//go:embed banner.txt
+var bannerArt string
+
 // ANSI color for startup banner
 const colorTeal = "\033[38;5;37m"
 const colorReset = "\033[0m"
 
 // printBanner prints the windshift logo at startup
 func printBanner() {
-	logo := `
-                                         x&&&&&&&&&&&&x:
-                                      &&&&&&&&&&&&&&&&&&&&&&:
-                                 :&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&X
-                              x&&&&&&&&&&&&              x&&&&&&&&&&&&
-                            &&&&&&&&&&                        :&&&&&&&&&+
-                         .&&&&&&&&                                X&&&&&&&$
-                        &&&&&&&                                      &&&&&&&$
-                      &&&&&&&                                          &&&&&&&
-                     &&&&&&     X&&&&&&&&&&&&&&+                         &&&&&&
-                   X&&&&&x  &&&&&&&&&&&&&&&&&&&&&&&$                       &&&&&&
-                  &&&&&&:&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&                     &&&&&&
-                 &&&&&&&&&&&&&&$               .&&&&&&&&&                    X&&&&&
-                +&&&&&&&&&&&:                      &&&&&&&&                   X&&&&&
-                &&&&&&&&&&                            &&&&&&&                  &&&&&
-               &&&&&&&&&                                &&&&&&                  &&&&&:
-              :&&&&&&&X                                  &&&&&&                 .&&&&&
-              &&&&&&&                                     X&&&&&                 &&&&&.
-              &&&&&&:                                      X&&&&&                .&&&&X
-             ;&&&&&x                                  ..;+:.&&&&&;                &&&&&
-             x&&&&&                             :&&&&&&&&&&&&&&&&&                &&&&&
-             X&&&&X                           &&&&&&&&&&&&&&&&&&&&                &&&&&
-             X&&&&.                        :&&&&&&&&&x       &&&&:                &&&&&
-             +&&&&+                       &&&&&&&.                                &&&&&
-              &&&&&                     ;&&&&&&                                  .&&&&$
-              &&&&&                    +&&&&&:                                   &&&&&;
-              +&&&&x                   &&&&&                                     &&&&&
-               &&&&&                  &&&&&                                     &&&&&+
-               .&&&&&                 &&&&&                                    x&&&&&
-                &&&&&&                &&&&&                                   :&&&&&
-                 &&&&&&               &&&&&                                   &&&&&
-                  &&&&&&              &&&&&                                 +&&&&&:
-                   &&&&&&             &&&&&                                &&&&&&.
-                    X&&&&&&           X&&&&&                             ;&&&&&&
-                      &&&&&&X          &&&&&&                          .&&&&&&$
-                       &&&&&&&         &&&&&&                        &&&&&&&
-                         &&&&&&&&;       &&&&&&&                   &&&&&&&&.
-                           x&&&&&&&&&      &&&&&&&&            +&&&&&&&&&
-                              &&&&&&&&&&&+  x&&&&&&&&&&&&&&&&&&&&&&&&&X
-                                .&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&x
-                                     &&&&&&&&&&&&&&&&&&&&&&&&&&+
-                                          :&&&&&&&&&&&&x
-`
 	fmt.Print(colorTeal)
-	fmt.Print(logo)
+	fmt.Print(bannerArt)
 	fmt.Print(colorReset)
 	fmt.Println()
 	fmt.Println(colorTeal + "                                      W I N D S H I F T" + colorReset)
@@ -115,6 +75,7 @@ func main() {
 	var pluginDir string
 	var enableAdminFallback bool
 	var llmProvidersFile string
+	var aiPromptsDir string
 	flag.StringVar(&port, "port", "8080", "Port to run the HTTP server on")
 	flag.StringVar(&port, "p", "8080", "Port to run the HTTP server on (shorthand)")
 	flag.StringVar(&dbPath, "db", "windshift.db", "Database file path (SQLite)")
@@ -140,6 +101,7 @@ func main() {
 	flag.BoolVar(&disablePlugins, "disable-plugins", false, "Disable the plugin system (prevents loading and uploading plugins)")
 	flag.BoolVar(&enableAdminFallback, "enable-fallback", false, "Enable admin password fallback for restrictive auth policies (disabled by default for security)")
 	flag.StringVar(&llmProvidersFile, "llm-providers", "", "Path to custom LLM providers JSON file (overrides built-in provider list)")
+	flag.StringVar(&aiPromptsDir, "ai-prompts-dir", "", "Directory containing custom AI prompt override files")
 	flag.Parse()
 
 	// Initialize logger early, before any other operations
@@ -267,6 +229,11 @@ func main() {
 		llmProvidersFile = envLLMProviders
 	}
 
+	// AI prompts directory override
+	if envAIPromptsDir := os.Getenv("AI_PROMPTS_DIR"); envAIPromptsDir != "" && aiPromptsDir == "" {
+		aiPromptsDir = envAIPromptsDir
+	}
+
 	// Notification tuning env vars
 	var notificationFlushInterval time.Duration
 	var notificationBatchSize int
@@ -319,6 +286,7 @@ func main() {
 		BaseURL:                   baseURL,
 		LLMEndpoint:               llmEndpoint,
 		LLMProvidersFile:          llmProvidersFile,
+		AIPromptsDir:              aiPromptsDir,
 		LogbookEndpoint:           logbookEndpoint,
 		SSHEnabled:                enableSSH,
 		FrontendFiles:             frontendFiles,
