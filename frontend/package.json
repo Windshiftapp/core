@@ -54,7 +54,7 @@
     "@melt-ui/svelte": "^0.86.6",
     "@milkdown/components": "^7.18.0",
     "@milkdown/kit": "^7.18.0",
-    "@milkdown/plugin-listener": "^7.18.0",
+    "@milkdown/plugin-listener": "^7.19.2",
     "@milkdown/theme-nord": "^7.18.0",
     "@tailwindcss/vite": "^4.1.11",
     "@xyflow/svelte": "^1.5.0",
