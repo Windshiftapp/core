@@ -25,7 +25,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.5",
-    "@module-federation/vite": "^1.12.3",
+    "@module-federation/vite": "^1.13.2",
     "@playwright/test": "^1.49.0",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "@testing-library/jest-dom": "^6.9.1",
