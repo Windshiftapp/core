@@ -4,11 +4,11 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"log/slog"
 	"net"
@@ -1042,6 +1042,12 @@ func (s *Server) initialize() error {
 			mux.Handle("GET /_app/", fileServer)
 			mux.Handle("GET /windshift-3.svg", fileServer)
 
+			// Read index.html once at startup for nonce injection
+			indexHTML, err := fs.ReadFile(distFS, "index.html")
+			if err != nil {
+				slog.Warn("could not read index.html from embedded FS", "error", err)
+			}
+
 			mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 				if len(r.URL.Path) >= 4 && r.URL.Path[:4] == "/api" {
 					http.NotFound(w, r)
@@ -1052,15 +1058,17 @@ func (s *Server) initialize() error {
 					return
 				}
 
-				indexFile, err := distFS.Open("index.html")
-				if err != nil {
+				if indexHTML == nil {
 					http.NotFound(w, r)
 					return
 				}
-				defer func() { _ = indexFile.Close() }()
+
+				// Inject CSP nonce into the inline theme script tag
+				nonce := CSPNonceFromContext(r.Context())
+				html := bytes.Replace(indexHTML, []byte("<script>"), []byte(`<script nonce="`+nonce+`">`), 1)
 
 				w.Header().Set("Content-Type", "text/html")
-				http.ServeContent(w, r, "index.html", time.Time{}, indexFile.(io.ReadSeeker)) //nolint:errcheck // Type assertion is safe here as fs.File from embed.FS implements io.ReadSeeker
+				http.ServeContent(w, r, "index.html", time.Time{}, bytes.NewReader(html))
 			})
 		}
 	}

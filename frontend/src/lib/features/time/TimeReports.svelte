@@ -71,13 +71,18 @@
     const totalMinutes = projectWorklogs.reduce((sum, w) => sum + w.duration_minutes, 0);
     const totalHours = Math.round((totalMinutes / 60) * 100) / 100;
 
+    // All-time total hours from backend (unaffected by date filters)
+    const allTimeTotal = projectWorklogs[0]?.project_total_hours
+      ? Math.round(projectWorklogs[0].project_total_hours * 100) / 100
+      : totalHours;
+
     // Budget from project settings
     let budgetPercent = null;
     let budgetLabel = '';
     const maxHours = selectedProject?.settings?.max_hours;
     if (maxHours && maxHours > 0) {
-      budgetPercent = Math.round((totalHours / maxHours) * 100);
-      budgetLabel = `${totalHours} / ${maxHours}h (${budgetPercent}%)`;
+      budgetPercent = Math.round((allTimeTotal / maxHours) * 100);
+      budgetLabel = `${allTimeTotal} / ${maxHours}h (${budgetPercent}%)`;
     }
 
     // Unique contributors

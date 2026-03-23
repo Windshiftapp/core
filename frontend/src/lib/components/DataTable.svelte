@@ -144,7 +144,7 @@
               onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
             >
               {#each columns as column, colIndex}
-                <td class="{getColumnPadding(column)} {getColumnAlign(column)} {getColumnWidth(column)} {colIndex === 0 ? 'pl-4' : ''}" style="{getColumnWidthStyle(column)}">
+                <td class="{getColumnPadding(column)} {getColumnAlign(column)} {getColumnWidth(column)}" style="{getColumnWidthStyle(column)}">
                   {#if column.key === 'actions' && actionItems}
                     <div class="dropdown-trigger">
                       <DropdownMenu

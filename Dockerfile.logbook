@@ -35,7 +35,10 @@ FROM alpine:3.21
 RUN apk add --no-cache ca-certificates poppler-utils libstdc++
 
 # Copy kreuzberg-cli for text extraction
-COPY --from=ghcr.io/kreuzberg-dev/kreuzberg-cli:4.4.6 /usr/local/bin/kreuzberg /usr/local/bin/kreuzberg
+COPY --from=ghcr.io/kreuzberg-dev/kreuzberg-cli:4.5.4 /usr/local/bin/kreuzberg /usr/local/bin/kreuzberg
+
+# Pre-warm model cache (downloads OCR and layout detection models at build time)
+RUN kreuzberg cache warm
 
 # Copy binary
 COPY --from=builder /build/logbook /logbook

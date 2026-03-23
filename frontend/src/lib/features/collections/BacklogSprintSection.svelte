@@ -86,7 +86,7 @@
 
     <!-- Status lozenge -->
     {#if iteration && lozengeColor}
-      <Lozenge color={lozengeColor} text={iteration.status} />
+      <Lozenge color={lozengeColor} text={iteration.status} onGradient={styles.hasCustomBackground} />
     {/if}
 
     <!-- Date range -->
@@ -104,7 +104,7 @@
     <!-- Action buttons -->
     {#if canStart}
       <button
-        class="ml-2 px-2 py-0.5 text-xs font-medium rounded border border-blue-400 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+        class="ml-2 px-2 py-0.5 text-xs font-medium rounded border transition-colors {styles.hasCustomBackground ? 'border-white text-white bg-transparent' : 'border-blue-400 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20'}"
         onclick={(e) => { e.stopPropagation(); onStartSprint?.(iteration); }}
         title={t('iterations.startSprint')}
       >
@@ -117,7 +117,7 @@
 
     {#if canComplete}
       <button
-        class="ml-2 px-2 py-0.5 text-xs font-medium rounded border border-green-400 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+        class="ml-2 px-2 py-0.5 text-xs font-medium rounded border transition-colors {styles.hasCustomBackground ? 'border-white text-white bg-transparent' : 'border-green-400 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20'}"
         onclick={(e) => { e.stopPropagation(); onCompleteSprint?.(iteration); }}
         title={t('iterations.completeSprint')}
       >

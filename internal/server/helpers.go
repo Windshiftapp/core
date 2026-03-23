@@ -1,7 +1,10 @@
 package server
 
 import (
+	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"log/slog"
 	"net"
@@ -166,8 +169,21 @@ func createSecurityHeaders(enableHTTPS, useProxy bool, additionalProxies []net.I
 			w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 			w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 
+			// Generate a per-request cryptographic nonce for CSP script-src
+			nonceBytes := make([]byte, 16)
+			if _, err := rand.Read(nonceBytes); err != nil {
+				slog.Error("failed to generate CSP nonce", "error", err)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				return
+			}
+			nonce := base64.StdEncoding.EncodeToString(nonceBytes)
+
+			// Store nonce in request context for downstream handlers
+			ctx := context.WithValue(r.Context(), contextKeyCSPNonce, nonce)
+			r = r.WithContext(ctx)
+
 			csp := "default-src 'self'; " +
-				"script-src 'self' 'unsafe-inline'; " +
+				"script-src 'self' 'nonce-" + nonce + "'; " +
 				"style-src 'self' 'unsafe-inline'; " +
 				"img-src 'self' data: blob: https://images.unsplash.com; " +
 				"font-src 'self'; " +

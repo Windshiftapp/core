@@ -17,7 +17,8 @@
   import { backlogStore, workspaceDataStore } from '../../stores/index.js';
   import { useWorkItemPoller } from '../../composables/useWorkItemPoller.svelte.js';
   import { successToast, warningToast } from '../../stores/toasts.svelte.js';
-  import { confirm } from '../../composables/useConfirm.js';
+  import { getStatusCategory } from '../../utils/statusColors.js';
+  import CompleteSprintDialog from '../../dialogs/CompleteSprintDialog.svelte';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -47,6 +48,12 @@
   let addedGlobalIds = $state(new Set());
   let collapsedSections = $state(new Set());
   let sectionDropHighlight = $state(new Map()); // iterationId|'unassigned' -> boolean
+
+  // --- Complete Sprint dialog state ---
+  let completeSprintShow = $state(false);
+  let completeSprintIteration = $state(null);
+  let completeSprintIncomplete = $state([]);
+  let completeSprintTargets = $state([]);
 
   // localStorage keys
   const globalIdsKey = $derived(`backlog-global-iterations-${workspaceId}`);
@@ -231,21 +238,43 @@
     }
   }
 
-  async function completeSprint(iteration) {
-    const confirmed = await confirm({
-      title: t('iterations.completeSprint'),
-      message: t('iterations.completeSprintConfirm', { name: iteration.name }),
-      confirmText: t('iterations.complete'),
-      variant: 'danger',
+  function completeSprint(iteration) {
+    // Compute incomplete items for this sprint
+    const sprintItems = backlogItems.filter(i => i.iteration_id === iteration.id);
+    const incomplete = sprintItems.filter(i => {
+      const cat = getStatusCategory(i.status_name, statuses, statusCategories);
+      return !cat || cat.name !== 'Done';
     });
-    if (!confirmed) return;
+
+    completeSprintIteration = { ...iteration, _totalItems: sprintItems.length };
+    completeSprintIncomplete = incomplete;
+    completeSprintTargets = allIterations.filter(
+      i => i.id !== iteration.id && (i.status === 'planned' || i.status === 'active')
+    );
+    completeSprintShow = true;
+  }
+
+  async function handleCompleteSprintConfirm(moveTarget) {
+    const iteration = completeSprintIteration;
+    if (!iteration) return;
 
     try {
+      // Move incomplete items if needed
+      if (completeSprintIncomplete.length > 0) {
+        const targetIterationId = moveTarget.type === 'sprint' ? moveTarget.iterationId : null;
+        await Promise.all(
+          completeSprintIncomplete.map(item =>
+            api.items.update(item.id, { iteration_id: targetIterationId })
+          )
+        );
+      }
+
       await api.iterations.update(iteration.id, { status: 'completed' });
       allIterations = allIterations.map(i =>
         i.id === iteration.id ? { ...i, status: 'completed' } : i
       );
       successToast(t('iterations.sprintCompleted', { name: iteration.name }));
+      reloadCollection();
     } catch (error) {
       console.error('Failed to complete sprint:', error);
     }
@@ -701,6 +730,15 @@
     onclose={closeItemModal}
   />
 {/if}
+
+<!-- Complete Sprint Dialog -->
+<CompleteSprintDialog
+  bind:show={completeSprintShow}
+  iteration={completeSprintIteration}
+  incompleteItems={completeSprintIncomplete}
+  targetIterations={completeSprintTargets}
+  onconfirm={handleCompleteSprintConfirm}
+/>
 
 <style>
   /* Improve drag feedback without layout shifts */

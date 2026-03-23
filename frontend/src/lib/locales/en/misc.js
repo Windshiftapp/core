@@ -338,11 +338,16 @@ export default {
     startSprint: 'Start Sprint',
     start: 'Start',
     completeSprint: 'Complete Sprint',
-    completeSprintConfirm:
-      'Are you sure you want to complete sprint "{name}"? Items that are not done will remain in the backlog.',
+    completeSprintConfirm: 'Complete sprint "{name}"?',
     sprintStarted: 'Sprint "{name}" started',
     sprintCompleted: 'Sprint "{name}" completed',
     activeScopeWarning: 'Changing the scope of an active sprint is not recommended',
+    itemsDone: '{count} items done',
+    itemsIncomplete: '{count} incomplete',
+    allItemsDone: 'All items are done!',
+    moveToBacklog: 'Move to backlog',
+    moveToSprint: 'Move to another sprint',
+    incompleteItemsAction: 'Incomplete items:',
   },
 
   milestones: {

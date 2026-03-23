@@ -14,6 +14,7 @@
     customBg = null, // Hex color for background
     customBorder = null, // Hex color for border (defaults to customBg)
     customText = null, // Hex color for text (defaults to customBg)
+    onGradient = false, // White border + white text on gradient backgrounds
     children = null
   } = $props();
 
@@ -52,12 +53,12 @@
 
   // Computed style - uses semi-transparent backgrounds for dark mode support
   let computedStyle = $derived.by(() => {
+    if (onGradient) {
+      return 'background-color: transparent; border-color: white; color: white;';
+    }
     if (customBg) {
       const luminance = getLuminance(customBg);
       const isGray = isGrayColor(customBg);
-      // For light colors, darken text and border for visibility
-      // Light colors (luminance > 0.65): darken by 50%
-      // Medium-light (luminance > 0.5): darken by 30%
       let textBorderColor = customBg;
       let bgOpacity = '1A';
       if (luminance > 0.65) {
@@ -67,7 +68,6 @@
         textBorderColor = darkenColor(customBg, 0.3);
         bgOpacity = '20';
       }
-      // In dark mode, lighten gray colors for better visibility
       if (themeStore.isDarkMode && isGray) {
         textBorderColor = lightenColor(customBg, 1);
         bgOpacity = '30';
@@ -76,7 +76,6 @@
     }
     const baseColor = colorStyles[color] || colorStyles.sky;
     const isGray = color === 'zinc' || color === 'grey' || color === 'gray';
-    // In dark mode, lighten gray colors for better visibility
     if (themeStore.isDarkMode && isGray) {
       const lightGray = lightenColor(baseColor, 1);
       return `background-color: ${baseColor}30; border-color: ${lightGray}; color: ${lightGray};`;

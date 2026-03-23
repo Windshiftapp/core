@@ -43,7 +43,7 @@ func DefaultChunkConfig() ChunkConfig {
 // ExtractFile extracts text content from a file using the kreuzberg CLI.
 // Supports PDF, Office formats, plain text, images, and 75+ other formats.
 func ExtractFile(filePath string) (*ExtractionResult, error) {
-	out, err := exec.Command("kreuzberg", "extract", filePath, "--format", "json").Output() //nolint:gosec // G204: command path from application config, not user input
+	out, err := exec.Command("kreuzberg", "extract", "--format", "json", "--output-format", "markdown", "--", filePath).Output() //nolint:gosec // G204: command path from application config, not user input
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
@@ -53,14 +53,16 @@ func ExtractFile(filePath string) (*ExtractionResult, error) {
 	}
 	var result struct {
 		Content  string `json:"content"`
-		MimeType string `json:"mime_type"`
+		Metadata struct {
+			MimeType string `json:"mime_type"`
+		} `json:"metadata"`
 	}
 	if err := json.Unmarshal(out, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse kreuzberg output: %w", err)
 	}
 	return &ExtractionResult{
 		Content:  result.Content,
-		MimeType: result.MimeType,
+		MimeType: result.Metadata.MimeType,
 	}, nil
 }
 

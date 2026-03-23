@@ -345,7 +345,8 @@
       <!-- Content -->
       <div class="flex flex-1 relative min-h-screen w-full overflow-hidden">
         <!-- Main Content Area - Flexible width -->
-        <div class="flex-1 w-0 min-w-0 px-10 pt-6 pb-6 overflow-y-auto overflow-x-hidden">
+        <div class="flex-1 w-0 min-w-0 pt-6 pb-6 overflow-y-auto overflow-x-hidden">
+          <div class="max-w-5xl mx-auto px-10">
           <ItemDetailBreadcrumbs
             {workspace}
             {parentHierarchy}
@@ -416,6 +417,7 @@
             onreorderchildren={handleReorderChildren}
           />
 
+          <br />
           <ItemDetailTabs
             {item}
             {workspace}
@@ -430,6 +432,7 @@
             oneditworklog={handleEditWorklog}
             ondeleteworklog={handleDeleteWorklog}
           />
+          </div>
         </div>
 
         <!-- Resizable Right Panel -->

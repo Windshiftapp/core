@@ -2,7 +2,9 @@ package logbook
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -391,8 +393,15 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	filePath := filepath.Join(storagePath, filepath.Base(header.Filename))
-	if err := os.WriteFile(filePath, content, 0o600); err != nil { //nolint:gosec // G703: filepath.Base() strips traversal
+	// Randomize stored filename to prevent user-controlled filenames on disk
+	randomBytes := make([]byte, 16)
+	if _, err := rand.Read(randomBytes); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	storedName := hex.EncodeToString(randomBytes) + filepath.Ext(header.Filename)
+	filePath := filepath.Join(storagePath, storedName)
+	if err := os.WriteFile(filePath, content, 0o600); err != nil { //nolint:gosec // G703: storedName is hex-random, not user input
 		respondInternalError(w, r, err)
 		return
 	}

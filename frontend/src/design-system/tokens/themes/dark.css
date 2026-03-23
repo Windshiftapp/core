@@ -4,6 +4,7 @@
    ================================================================= */
 
 html[data-color-mode="dark"] {
+  color-scheme: dark;
   /* =================================================================
      SURFACE COLORS
      Background colors for UI layers
