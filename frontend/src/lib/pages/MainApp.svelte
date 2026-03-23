@@ -1,8 +1,8 @@
 <script>
   import { onMount } from 'svelte';
-  import { fade, slide } from 'svelte/transition';
+  import { slide } from 'svelte/transition';
   import { currentRoute, navigate, isWorkspaceRoute } from '../router.js';
-  import { testingStore, authStore, permissionStore, uiStore, currentWorkspace, workspacesStore, workspacePermissions, ssoStore, workspaceDataStore, activityStore } from '../stores';
+  import { authStore, permissionStore, uiStore, currentWorkspace, workspacesStore, workspacePermissions, ssoStore, workspaceDataStore, activityStore } from '../stores';
   import EmailVerificationBanner from '../features/notifications/EmailVerificationBanner.svelte';
   import { moduleSettings } from '../stores/moduleSettings.js';
   import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';

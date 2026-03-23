@@ -1,6 +1,6 @@
 <script>
   import { Link2, Plus, Paperclip, PenTool, Zap, ChevronDown } from 'lucide-svelte';
-  import { tick, onMount } from 'svelte';
+  import { tick } from 'svelte';
   import Button from '../../components/Button.svelte';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import AttachmentDiagramList from '../assets/AttachmentDiagramList.svelte';

@@ -11,10 +11,8 @@
   import AddSCMLinkModal from '../../dialogs/AddSCMLinkModal.svelte';
   import CreateBranchModal from '../../dialogs/CreateBranchModal.svelte';
   import CreatePRFromBranchModal from '../../dialogs/CreatePRFromBranchModal.svelte';
-  import { isGrayColor, lightenColor } from '../../utils/colorUtils.js';
   import { getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import { workspacePermissions } from '../../stores';
-  import { themeStore } from '../../stores/theme.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { formatDateShort } from '../../utils/dateFormatter.js';
   import StatusBadge from '../../components/StatusBadge.svelte';

@@ -43,7 +43,14 @@ export const time = {
       fetchAPI(`/time/projects/${id}`, {
         method: 'DELETE',
       }),
-    getWorklogs: (id) => fetchAPI(`/time/projects/${id}/worklogs`),
+    getWorklogs: (id, filters = {}) => {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) params.append(key, value);
+      });
+      const queryString = params.toString();
+      return fetchAPI(`/time/projects/${id}/worklogs${queryString ? `?${queryString}` : ''}`);
+    },
 
     // Project Managers
     getManagers: (id) => fetchAPI(`/time/projects/${id}/managers`),

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Plus, CheckSquare, Calendar, Home, Inbox, SquareKanban, List, GitBranch, MapPin, Settings, BookOpen, Package, ChevronDown, FileCheck, FileStack, Play, BarChart3, ListTree, Milestone, Grip, Zap, Palette, Sparkles, Pencil } from 'lucide-svelte';
+  import { Plus, CheckSquare, Calendar, Home, SquareKanban, List, MapPin, Settings, BookOpen, Package, ChevronDown, FileCheck, FileStack, Play, BarChart3, ListTree, Milestone, Grip, Zap, Palette, Sparkles, Pencil } from 'lucide-svelte';
   import { workspaceIconMap } from '../utils/icons.js';
   import { navigate, currentRoute } from '../router.js';
   import { currentWorkspace, workspacePermissions } from '../stores';

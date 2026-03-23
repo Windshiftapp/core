@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { currentRoute, navigate } from '../../router.js';
   import { api } from '../../api.js';
-  import { ArrowLeft, Play, Check, X, Bug, AlertTriangle, FileText, Trash2 } from 'lucide-svelte';
+  import { ArrowLeft, Play, AlertTriangle, FileText, Trash2 } from 'lucide-svelte';
   import Button from '../../components/Button.svelte';
   import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
   import Spinner from '../../components/Spinner.svelte';

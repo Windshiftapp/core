@@ -20,7 +20,8 @@ let driftWarningShown = false;
 function createApiError(response, responseText) {
   let fallbackMessage = `Request failed: ${response.statusText}`;
   if (!responseText && (response.status === 502 || response.status === 504)) {
-    fallbackMessage = 'The server took too long to respond. The AI service may be overloaded — please try again.';
+    fallbackMessage =
+      'The server took too long to respond. The AI service may be overloaded — please try again.';
   }
   const error = new Error(responseText || fallbackMessage);
 
@@ -56,10 +57,10 @@ export async function fetchAPI(endpoint, options = {}) {
       credentials: 'same-origin', // Include cookies for session auth
       headers,
     });
-  } catch (err) {
+  } catch (_err) {
     // Network errors (including CORS blocks) surface as TypeError
     const corsError = new Error(
-      'Unable to connect to the server. This may be a CORS configuration issue — check that the server\'s BASE_URL matches the URL you\'re accessing it from.'
+      "Unable to connect to the server. This may be a CORS configuration issue — check that the server's BASE_URL matches the URL you're accessing it from."
     );
     corsError.status = 0;
     corsError.code = 'NETWORK_ERROR';

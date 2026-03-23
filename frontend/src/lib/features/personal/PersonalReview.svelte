@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../../api.js';
   import { authStore, uiStore } from '../../stores';
-  import { ChevronLeft, ChevronRight, Calendar, BookOpen, Clock, Lightbulb, Maximize, Minimize, BookOpenCheck, FileEdit } from 'lucide-svelte';
+  import { ChevronLeft, ChevronRight, Calendar, Clock, Lightbulb, Maximize, Minimize, BookOpenCheck, FileEdit } from 'lucide-svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import Card from '../../components/Card.svelte';
   import WorkItemRow from '../items/WorkItemRow.svelte';
@@ -12,13 +12,13 @@
   import Button from '../../components/Button.svelte';
   import { getShortcut, matchesShortcut, toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { formatDateSimple, formatDateWithOptions } from '../../utils/dateFormatter.js';
+  import { formatDate, formatDateSimple, formatDateWithOptions } from '../../utils/dateFormatter.js';
 
   // Props (Svelte 5)
   let { currentUser = null } = $props();
 
   // State (Svelte 5)
-  let currentDate = $state(new Date().toISOString().split('T')[0]);
+  let currentDate = $state(formatDate(new Date()));
   let reviewType = $state(localStorage.getItem('reviewType') || 'daily');
   let reviewContent = $state('');
   let completedItems = $state([]);
@@ -45,8 +45,8 @@
     sunday.setDate(monday.getDate() + 6);
 
     return {
-      start: monday.toISOString().split('T')[0],
-      end: sunday.toISOString().split('T')[0],
+      start: formatDate(monday),
+      end: formatDate(sunday),
       week: `Week of ${formatDateWithOptions(monday, { month: 'short', day: 'numeric' })} - ${formatDateWithOptions(sunday, { month: 'short', day: 'numeric', year: 'numeric' })}`
     };
   }
@@ -88,11 +88,11 @@ ${t('personal.placeholderImprovements')}`;
     } else {
       date.setDate(date.getDate() + (direction * 7));
     }
-    currentDate = date.toISOString().split('T')[0];
+    currentDate = formatDate(date);
   }
 
   function goToToday() {
-    currentDate = new Date().toISOString().split('T')[0];
+    currentDate = formatDate(new Date());
   }
 
   // Load completed items for the date range

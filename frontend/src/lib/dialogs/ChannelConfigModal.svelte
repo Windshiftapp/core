@@ -1,5 +1,4 @@
 <script>
-  import { untrack } from 'svelte';
   import { LifeBuoy, Settings, Webhook, ExternalLink, Users, Globe, Mail, Send } from 'lucide-svelte';
   import { api } from '../api.js';
   import { channelCategoriesStore } from '../stores/channelCategories.js';

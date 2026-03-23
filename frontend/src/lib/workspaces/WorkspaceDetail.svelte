@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import { currentRoute, navigate } from '../router.js';
+  import { currentRoute } from '../router.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { currentWorkspace, workspacesStore } from '../stores';

@@ -13,7 +13,7 @@
   import ColorDot from '../../components/ColorDot.svelte';
   import Select from '../../components/Select.svelte';
   import DataTable from '../../components/DataTable.svelte';
-  import { Plus, Package, Edit, Trash2, Box, ChevronRight, ChevronDown, Folder, FolderOpen, Search, ExternalLink, Code, Upload, Share2, ArrowLeft, Settings } from 'lucide-svelte';
+  import { Plus, Package, Edit, Trash2, Box, ChevronRight, ChevronDown, Folder, FolderOpen, Search, Code, Upload, Share2, ArrowLeft, Settings } from 'lucide-svelte';
   import { permissionStore } from '../../stores/permissions.svelte.js';
   import AssetRelationshipGraph from './AssetRelationshipGraph.svelte';
   import AssetImportWizard from './import/AssetImportWizard.svelte';

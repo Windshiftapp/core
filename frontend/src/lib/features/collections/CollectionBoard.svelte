@@ -9,7 +9,7 @@
   import QuickAddForm from './QuickAddForm.svelte';
   import { getCollection, checkItemVisibility } from './collectionService.js';
   import { infoToast, successToast, warningToast } from '../../stores/toasts.svelte.js';
-  import { Plus, GripVertical, ChevronDown, Calendar } from 'lucide-svelte';
+  import { Plus, ChevronDown, Calendar } from 'lucide-svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';

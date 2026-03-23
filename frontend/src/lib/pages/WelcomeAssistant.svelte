@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import { User, Blocks, Clock, ClipboardList, AlertCircle, Check } from 'lucide-svelte';
+  import { User, Blocks, ClipboardList, AlertCircle, Check } from 'lucide-svelte';
   import Modal from '../dialogs/Modal.svelte';
   import Button from '../components/Button.svelte';
   import Label from '../components/Label.svelte';

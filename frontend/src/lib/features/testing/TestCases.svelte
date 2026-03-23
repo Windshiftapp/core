@@ -8,7 +8,7 @@
   import Textarea from '../../components/Textarea.svelte';
   import Select from '../../components/Select.svelte';
   import LabelCombobox from '../../pickers/LabelCombobox.svelte';
-  import { writable, get } from 'svelte/store';
+  import { writable } from 'svelte/store';
   import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
   import Button from '../../components/Button.svelte';
   import Label from '../../components/Label.svelte';

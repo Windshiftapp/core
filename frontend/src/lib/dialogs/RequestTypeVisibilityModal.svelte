@@ -1,5 +1,5 @@
 <script>
-  import { Shield, X, Users, Building2, Check, Info } from 'lucide-svelte';
+  import { Shield, Users, Building2, Check, Info } from 'lucide-svelte';
   import Modal from './Modal.svelte';
   import Spinner from '../components/Spinner.svelte';
   import { api } from '../api.js';

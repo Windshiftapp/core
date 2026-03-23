@@ -1,5 +1,4 @@
 <script>
-  import { onMount } from 'svelte';
   import Modal from './Modal.svelte';
   import ModalHeader from './ModalHeader.svelte';
   import ConfirmDialog from './ConfirmDialog.svelte';

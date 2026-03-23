@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy, tick } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import {
     Palette, Navigation, X, TextCursorInput, BookOpen, Check,

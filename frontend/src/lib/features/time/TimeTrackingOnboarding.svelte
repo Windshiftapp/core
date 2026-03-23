@@ -1,6 +1,6 @@
 <script>
   import { api } from '../../api.js';
-  import { Clock, Briefcase, Check, AlertCircle, User, X } from 'lucide-svelte';
+  import { Clock, Briefcase, User, X } from 'lucide-svelte';
   import Button from '../../components/Button.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import Textarea from '../../components/Textarea.svelte';

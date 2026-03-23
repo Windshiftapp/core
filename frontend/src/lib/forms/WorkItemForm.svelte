@@ -1,5 +1,5 @@
 <script>
-  import { X, MoreHorizontal, Calendar, Flag, User, Layers, ChevronDown } from 'lucide-svelte';
+  import { MoreHorizontal, Calendar, Flag, User, Layers, ChevronDown } from 'lucide-svelte';
   import { itemTypeIconMap } from '../utils/icons.js';
   import { workItemFormStore } from '../stores/workItemFormStore.svelte.js';
   import { workspacesStore } from '../stores';

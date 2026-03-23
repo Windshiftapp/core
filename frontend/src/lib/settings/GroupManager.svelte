@@ -1,7 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { api } from '../api.js';
-	import { Plus, Edit, Trash2, UserStar, UserPlus, UserMinus, Circle, CheckCircle, X } from 'lucide-svelte';
+	import { Plus, Edit, Trash2, UserStar, UserPlus, UserMinus, Circle, X } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
 	import Input from '../components/Input.svelte';
 	import Textarea from '../components/Textarea.svelte';

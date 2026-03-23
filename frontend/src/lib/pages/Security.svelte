@@ -3,7 +3,7 @@
 	import { currentRoute, navigate } from '../router.js';
 	import { authStore, securityStore } from '../stores';
 	import { t } from '../stores/i18n.svelte.js';
-	import { User, Shield, Key, Smartphone, Plus, Trash2, Calendar, CheckCircle, PlayCircle, Code, Copy, Eye, EyeOff, Terminal, AlertTriangle, X } from 'lucide-svelte';
+	import { User, Shield, Key, Smartphone, Plus, Trash2, Code, Copy, Terminal, AlertTriangle, X } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
 	import SectionHeader from '../layout/SectionHeader.svelte';
 	import ConfirmDialog from '../dialogs/ConfirmDialog.svelte';
@@ -329,7 +329,7 @@
 					onclick={() => securityStore.showAddToken = true}
 					icon={Plus}
 					size="medium"
-					keyboardHint="A"
+					keyboardHint="T"
 				>
 					{t('security.createToken')}
 				</Button>
@@ -623,7 +623,7 @@
 					type="date"
 					value={newTokenExpiry}
 					oninput={(e) => setNewTokenExpiry(e.target.value)}
-					min={new Date().toISOString().split('T')[0]}
+					min={formatDate(new Date())}
 					class="w-full px-3 py-2 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
 					style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
 				/>

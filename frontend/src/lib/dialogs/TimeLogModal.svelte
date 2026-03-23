@@ -12,11 +12,14 @@
   import Modal from './Modal.svelte';
   import DialogFooter from './DialogFooter.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { formatDate } from '../utils/dateFormatter.js';
 
   // Configuration props
   let {
     defaultProjectId = null,
     defaultItemId = null,
+    defaultDate = null,
+    defaultStartTime = null,
     showProjectField = true,
     showWorkItemField = true,
     allowProjectChange = true,
@@ -51,8 +54,8 @@
     project_id: editingWorklog?.project_id ?? defaultProjectId,
     item_id: editingWorklog?.item_id ?? defaultItemId,
     description: editingWorklog?.description ?? '',
-    date: editingWorklog ? new Date(editingWorklog.date * 1000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-    start_time: editingWorklog ? formatTimeFromUnix(editingWorklog.start_time) : '',
+    date: editingWorklog ? formatDate(new Date(editingWorklog.date * 1000)) : (defaultDate ?? formatDate(new Date())),
+    start_time: editingWorklog ? formatTimeFromUnix(editingWorklog.start_time) : (defaultStartTime ?? ''),
     end_time: editingWorklog ? formatTimeFromUnix(editingWorklog.end_time) : '',
     duration: editingWorklog ? formatDurationFromMinutes(editingWorklog.duration_minutes) : ''
   });

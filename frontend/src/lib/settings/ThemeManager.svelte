@@ -1,6 +1,5 @@
 <script>
   import { onMount } from 'svelte';
-  import { writable } from 'svelte/store';
   import { api } from '../api.js';
   import { Plus, Edit, Trash2, Palette, Check, X } from 'lucide-svelte';
   import Button from '../components/Button.svelte';

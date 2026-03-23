@@ -1,7 +1,6 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import { Settings } from 'lucide-svelte';
   import Label from '../components/Label.svelte';
   import Card from '../components/Card.svelte';
   import ConfigurationSetPicker from '../pickers/ConfigurationSetPicker.svelte';

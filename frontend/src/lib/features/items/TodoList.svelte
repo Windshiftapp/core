@@ -7,7 +7,6 @@
   import DeleteItemDialog from '../../dialogs/DeleteItemDialog.svelte';
   import ItemDetail from '../items/ItemDetail.svelte';
   import PersonalTaskDetail from '../personal/PersonalTaskDetail.svelte';
-  import { getStatusCategory } from '../../utils/statusColors.js';
   import { authStore } from '../../stores';
   import { t } from '../../stores/i18n.svelte.js';
   import Checkbox from '../../components/Checkbox.svelte';

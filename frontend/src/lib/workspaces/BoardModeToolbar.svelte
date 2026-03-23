@@ -8,7 +8,6 @@
   import { Package, List, MapPin, Calendar, Milestone, Settings, Palette, SquareKanban } from 'lucide-svelte';
   import Rows_3 from 'lucide-svelte/icons/rows-3';
   import ListTree from 'lucide-svelte/icons/list-tree';
-  import { t } from '../stores/i18n.svelte.js';
 
   let { workspaceId = null } = $props();
 

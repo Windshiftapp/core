@@ -1,15 +1,14 @@
 <script>
-  import { onMount, untrack } from 'svelte';
+  import { untrack } from 'svelte';
   import { useEventListener } from 'runed';
   import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { collectionStore, reloadCollection } from '../../stores/collectionContext.js';
-  import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
+  import { useGradientStyles } from '../../stores/workspaceGradient.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { workspaceDataStore } from '../../stores/index.js';
-  import { useWorkItemPoller } from '../../composables/useWorkItemPoller.svelte.js';
   import { MoreHorizontal, Trash2, Eye } from 'lucide-svelte';
   import SearchInput from '../../components/SearchInput.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';

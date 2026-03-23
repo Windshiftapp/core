@@ -174,7 +174,9 @@ func (h *ConfigurationSetHandler) Create(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Invalidate permission cache for affected workspaces
-	_ = h.permissionService.OnConfigurationSetChanged(configSetID)
+	if h.permissionService != nil {
+		_ = h.permissionService.OnConfigurationSetChanged(configSetID)
+	}
 
 	// Refresh notification cache if service is available
 	var warnings []models.APIWarning
@@ -233,7 +235,9 @@ func (h *ConfigurationSetHandler) Delete(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Invalidate permission cache before deletion (while workspace associations still exist)
-	_ = h.permissionService.OnConfigurationSetChanged(id)
+	if h.permissionService != nil {
+		_ = h.permissionService.OnConfigurationSetChanged(id)
+	}
 
 	// Delete the configuration set (including all associations)
 	if err := h.repo.Delete(id); err != nil {

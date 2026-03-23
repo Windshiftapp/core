@@ -4,7 +4,7 @@
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
-  import { Filter, Search, MoreHorizontal, Calendar, User, AlertCircle, Trash2, Eye, Save, SquareKanban } from 'lucide-svelte';
+  import { Filter, Search, Trash2, Eye } from 'lucide-svelte';
   import { escapeHtml } from '../../utils/sanitize.ts';
   import Button from '../../components/Button.svelte';
   import Card from '../../components/Card.svelte';

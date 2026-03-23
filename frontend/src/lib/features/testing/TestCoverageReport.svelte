@@ -1,7 +1,6 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../../api.js';
-  import { navigate } from '../../router.js';
   import Button from '../../components/Button.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import EmptyState from '../../components/EmptyState.svelte';

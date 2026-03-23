@@ -15,7 +15,7 @@
 	import AlertBox from '../components/AlertBox.svelte';
 	import Lozenge from '../components/Lozenge.svelte';
 	import Label from '../components/Label.svelte';
-	import { formatDate, formatDateTimeLocale } from '../utils/dateFormatter.js';
+	import { formatDateTimeLocale } from '../utils/dateFormatter.js';
 	import { t } from '../stores/i18n.svelte.js';
 
 	let logs = $state([]);

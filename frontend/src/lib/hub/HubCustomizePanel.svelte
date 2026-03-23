@@ -5,7 +5,6 @@
   } from 'lucide-svelte';
   import { hubStore, gradients } from '../stores/hub.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
-  import { navigate } from '../router.js';
   import LogoUploader from '../components/LogoUploader.svelte';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
 

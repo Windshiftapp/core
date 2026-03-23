@@ -4,7 +4,7 @@
   import { collectionStore } from '../../stores/collectionContext.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
-  import { ChevronRight, ChevronDown, GitBranch, Circle, AlertCircle, Calendar, FileCheck, Minus } from 'lucide-svelte';
+  import { ChevronRight, ChevronDown, GitBranch, Circle, FileCheck, Minus } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import ViewHeader from '../../layout/ViewHeader.svelte';
   import ItemKey from '../items/ItemKey.svelte';

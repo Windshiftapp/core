@@ -12,7 +12,7 @@
 
   const shortDateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
   import { getCollection } from '../features/collections/collectionService.js';
-  import { Edit3, Plus, X, LayoutGrid, GripVertical, Pencil, Trash2 } from 'lucide-svelte';
+  import { Edit3, Plus, X, LayoutGrid, Pencil, Trash2 } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';

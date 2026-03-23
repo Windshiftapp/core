@@ -5,9 +5,9 @@
   import { workspacePermissions, currentWorkspace, attachmentStatus, workspacesStore } from '../stores';
   import { workspaceGradientIndex, applyToAllViews as applyToAllViewsStore, workspaceBackgroundImageUrl } from '../stores/workspaceGradient.svelte.js';
   import { gradients } from '../utils/gradients.js';
-  import { backgroundCategories, backgroundPresets, getPresetsByCategory } from '../utils/backgroundImages.js';
+  import { backgroundCategories, getPresetsByCategory } from '../utils/backgroundImages.js';
   import { workspaceIconMap } from '../utils/icons.js';
-  import { Palette, Camera, Trash2, X, Shield, Package, Upload, Image } from 'lucide-svelte';
+  import { Palette, Camera, Trash2, X, Shield, Package, Upload } from 'lucide-svelte';
   import IconSelector from '../pickers/IconSelector.svelte';
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';

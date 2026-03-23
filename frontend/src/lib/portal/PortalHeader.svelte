@@ -1,7 +1,7 @@
 <script>
   import { Menu, ArrowLeft, Palette, Edit3, Check, Sun, Moon, User, LogOut, List } from 'lucide-svelte';
   import { authStore } from '../stores';
-  import { portalStore, gradients } from '../stores/portal.svelte.js';
+  import { portalStore } from '../stores/portal.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
 

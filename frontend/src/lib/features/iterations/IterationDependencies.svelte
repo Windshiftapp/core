@@ -9,7 +9,6 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import { successToast, errorToast } from '../../stores/toasts.svelte.js';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
-  import { formatDateShort } from '../../utils/dateFormatter.js';
 
   let { iterationId } = $props();
 

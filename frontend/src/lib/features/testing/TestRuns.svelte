@@ -3,7 +3,7 @@
   import { api } from '../../api.js';
   import { writable } from 'svelte/store';
   import { navigate } from '../../router.js';
-  import { Trash2, Play, Eye, PlayCircle, User } from 'lucide-svelte';
+  import { Trash2, Play, Eye } from 'lucide-svelte';
   import { escapeHtml } from '../../utils/sanitize.ts';
   import Button from '../../components/Button.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
@@ -15,7 +15,7 @@
   import Modal from '../../dialogs/Modal.svelte';
   import Label from '../../components/Label.svelte';
   import UserPicker from '../../pickers/UserPicker.svelte';
-  import { renderStatusBadge, renderMilestoneBadge } from '../../utils/statusColors.js';
+  import { renderStatusBadge } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { useEventListener } from 'runed';
 

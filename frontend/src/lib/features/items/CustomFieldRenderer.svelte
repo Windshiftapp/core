@@ -11,7 +11,7 @@
   import ColorDot from '../../components/ColorDot.svelte';
   import { api } from '../../api.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { formatDateShort } from '../../utils/dateFormatter.js';
+  import { formatDate, formatDateShort } from '../../utils/dateFormatter.js';
 
   // Helper to parse field options
   function parseOptions(optionsStr) {
@@ -92,7 +92,7 @@
     if (!dateValue) return '';
     try {
       const date = new Date(dateValue);
-      return date.toISOString().split('T')[0];
+      return formatDate(date);
     } catch (e) {
       return '';
     }

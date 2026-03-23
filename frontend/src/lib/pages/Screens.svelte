@@ -2,8 +2,8 @@
   import { onMount } from 'svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
-  import { Plus, Edit, Trash2, Settings, MoreHorizontal, Circle, Layout } from 'lucide-svelte';
-  import { SYSTEM_FIELDS, getSystemFieldName } from '../stores/fieldConfig.js';
+  import { Plus, Edit, Trash2, Settings, Circle, Layout } from 'lucide-svelte';
+  import { SYSTEM_FIELDS } from '../stores/fieldConfig.js';
   import { screenEditorStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';

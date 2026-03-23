@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import { Search, Calendar, User, Eye, Trash2, MoreHorizontal, Building, AlertCircle } from 'lucide-svelte';
+  import { Search, Calendar, Eye, Trash2, MoreHorizontal, Building, AlertCircle } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import DropdownMenu from '../layout/DropdownMenu.svelte';

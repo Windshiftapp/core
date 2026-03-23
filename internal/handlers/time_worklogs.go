@@ -150,12 +150,14 @@ func (h *TimeWorklogHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		       w.end_time, w.duration_minutes, w.created_at, w.updated_at,
 		       c.name, p.name, i.title, ws.id, ws.key, i.workspace_item_number,
 		       p.settings as project_settings,
-		       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = w.project_id) as project_total_hours
+		       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = w.project_id) as project_total_hours,
+		       w.user_id, COALESCE(u.first_name || ' ' || u.last_name, '') as user_name
 		FROM time_worklogs w
 		JOIN customer_organisations c ON w.customer_id = c.id
 		JOIN time_projects p ON w.project_id = p.id
 		LEFT JOIN items i ON w.item_id = i.id
 		LEFT JOIN workspaces ws ON i.workspace_id = ws.id
+		LEFT JOIN users u ON w.user_id = u.id
 		WHERE 1=1`
 
 	args := []interface{}{}
@@ -201,12 +203,13 @@ func (h *TimeWorklogHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	var worklogs []models.Worklog
 	for rows.Next() {
 		var worklog models.Worklog
-		var itemTitle, workspaceKey, projectSettings sql.NullString
+		var itemTitle, workspaceKey, projectSettings, userName sql.NullString
 		var workspaceID, workspaceItemNumber sql.NullInt64
 		var projectTotalHours sql.NullFloat64
 		err := rows.Scan(&worklog.ID, &worklog.ProjectID, &worklog.CustomerID, &worklog.ItemID, &worklog.Description, &worklog.Date, &worklog.StartTime,
 			&worklog.EndTime, &worklog.DurationMins, &worklog.CreatedAt, &worklog.UpdatedAt, &worklog.CustomerName, &worklog.ProjectName, &itemTitle,
-			&workspaceID, &workspaceKey, &workspaceItemNumber, &projectSettings, &projectTotalHours)
+			&workspaceID, &workspaceKey, &workspaceItemNumber, &projectSettings, &projectTotalHours,
+			&worklog.UserID, &userName)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -215,6 +218,7 @@ func (h *TimeWorklogHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		worklog.WorkspaceID = utils.NullInt64ToPtr(workspaceID)
 		worklog.WorkspaceKey = workspaceKey.String
 		worklog.WorkspaceItemNumber = int(workspaceItemNumber.Int64)
+		worklog.UserName = userName.String
 		if projectTotalHours.Valid {
 			worklog.ProjectTotalHours = &projectTotalHours.Float64
 		}
@@ -640,21 +644,61 @@ func (h *TimeWorklogHandler) GetByProject(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	// Only project managers can view project-level worklogs (includes all users)
+	if h.timePermissionService != nil {
+		isManager, err := h.timePermissionService.IsTimeProjectManager(user.ID, projectID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if !isManager {
+			respondForbidden(w, r)
+			return
+		}
+	}
+
 	//nolint:misspell // database table name uses British spelling (customer_organisations)
-	rows, err := h.db.Query(`
+	query := `
 		SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
 		       w.end_time, w.duration_minutes, w.created_at, w.updated_at,
 		       c.name, p.name, i.title, ws.id, ws.key, i.workspace_item_number,
 		       p.settings as project_settings,
-		       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = w.project_id) as project_total_hours
+		       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = w.project_id) as project_total_hours,
+		       w.user_id, COALESCE(u.first_name || ' ' || u.last_name, '') as user_name
 		FROM time_worklogs w
 		JOIN customer_organisations c ON w.customer_id = c.id
 		JOIN time_projects p ON w.project_id = p.id
 		LEFT JOIN items i ON w.item_id = i.id
 		LEFT JOIN workspaces ws ON i.workspace_id = ws.id
-		WHERE w.project_id = ?
-		ORDER BY w.date DESC, w.start_time DESC
-	`, projectID)
+		LEFT JOIN users u ON w.user_id = u.id
+		WHERE w.project_id = ?`
+
+	args := []interface{}{projectID}
+
+	if dateFrom := r.URL.Query().Get("date_from"); dateFrom != "" {
+		if fromDate, err := time.Parse("2006-01-02", dateFrom); err == nil {
+			fromUnix := time.Date(fromDate.Year(), fromDate.Month(), fromDate.Day(), 0, 0, 0, 0, time.Local).Unix()
+			query += " AND w.date >= ?"
+			args = append(args, fromUnix)
+		}
+	}
+
+	if dateTo := r.URL.Query().Get("date_to"); dateTo != "" {
+		if toDate, err := time.Parse("2006-01-02", dateTo); err == nil {
+			toUnix := time.Date(toDate.Year(), toDate.Month(), toDate.Day(), 23, 59, 59, 0, time.Local).Unix()
+			query += " AND w.date <= ?"
+			args = append(args, toUnix)
+		}
+	}
+
+	query += " ORDER BY w.date DESC, w.start_time DESC"
+
+	rows, err := h.db.Query(query, args...)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -664,13 +708,14 @@ func (h *TimeWorklogHandler) GetByProject(w http.ResponseWriter, r *http.Request
 	var worklogs []models.Worklog
 	for rows.Next() {
 		var worklog models.Worklog
-		var itemTitle, workspaceKey, projectSettings sql.NullString
+		var itemTitle, workspaceKey, projectSettings, userName sql.NullString
 		var workspaceID, workspaceItemNumber sql.NullInt64
 		var projectTotalHours sql.NullFloat64
 		err := rows.Scan(&worklog.ID, &worklog.ProjectID, &worklog.CustomerID, &worklog.ItemID, &worklog.Description,
 			&worklog.Date, &worklog.StartTime, &worklog.EndTime, &worklog.DurationMins,
 			&worklog.CreatedAt, &worklog.UpdatedAt, &worklog.CustomerName, &worklog.ProjectName, &itemTitle,
-			&workspaceID, &workspaceKey, &workspaceItemNumber, &projectSettings, &projectTotalHours)
+			&workspaceID, &workspaceKey, &workspaceItemNumber, &projectSettings, &projectTotalHours,
+			&worklog.UserID, &userName)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -679,6 +724,7 @@ func (h *TimeWorklogHandler) GetByProject(w http.ResponseWriter, r *http.Request
 		worklog.WorkspaceID = utils.NullInt64ToPtr(workspaceID)
 		worklog.WorkspaceKey = workspaceKey.String
 		worklog.WorkspaceItemNumber = int(workspaceItemNumber.Int64)
+		worklog.UserName = userName.String
 		if projectTotalHours.Valid {
 			worklog.ProjectTotalHours = &projectTotalHours.Float64
 		}

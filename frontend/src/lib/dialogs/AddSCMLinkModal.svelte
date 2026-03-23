@@ -5,7 +5,7 @@
   import BasePicker from '../pickers/BasePicker.svelte';
   import Label from '../components/Label.svelte';
   import DialogFooter from './DialogFooter.svelte';
-  import { X, GitMerge, GitBranch, GitCommit, Loader2, Search } from 'lucide-svelte';
+  import { X, GitMerge, GitBranch, GitCommit, Loader2 } from 'lucide-svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { portal } from '../actions/portal.js';

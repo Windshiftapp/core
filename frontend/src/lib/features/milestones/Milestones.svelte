@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
-  import { errorToast, successToast } from '../../stores/toasts.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import {
     Milestone, Calendar, CheckCircle, Clock, Plus, Edit, Trash2,
     MoreHorizontal, Tag, MessageSquare, Globe, Building2, GitBranch
@@ -18,7 +18,7 @@
   import { categoriesStore } from '../../stores/categories.js';
   import { milestonesStore } from '../../stores/milestones.js';
   import { moduleSettings } from '../../stores/moduleSettings.js';
-  import { currentRoute, navigate } from '../../router.js';
+  import { currentRoute } from '../../router.js';
   import { formatDateShort } from '../../utils/dateFormatter.js';
   import { api } from '../../api.js';
   import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';

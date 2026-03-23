@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import { Save, AlertCircle, CheckCircle, X, Plus, Trash2, Paperclip } from 'lucide-svelte';
+  import { AlertCircle, CheckCircle, X, Plus, Paperclip } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Spinner from '../components/Spinner.svelte';

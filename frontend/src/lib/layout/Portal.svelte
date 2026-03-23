@@ -2,7 +2,7 @@
   import { onMount, onDestroy, tick } from 'svelte';
   import { currentRoute } from '../router.js';
   import { authStore } from '../stores';
-  import { AlertCircle, Menu, ArrowLeft, Palette, Edit3, Sun, Moon, User, LogOut, List } from 'lucide-svelte';
+  import { AlertCircle, Menu, ArrowLeft, Palette, Sun, Moon, User, LogOut, List } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   // Components

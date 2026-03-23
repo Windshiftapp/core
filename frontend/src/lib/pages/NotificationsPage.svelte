@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { notifications, notificationActions } from '../stores/notifications.js';
-  import { Bell, Check, Filter, Calendar, MoreHorizontal, X } from 'lucide-svelte';
+  import { Bell, Check, Filter, MoreHorizontal, X } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import NotificationCard from '../features/notifications/NotificationCard.svelte';

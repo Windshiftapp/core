@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '../api.js';
 	import { authStore } from '../stores';
-	import { Plus, Edit, Trash2, RotateCcw, MoreHorizontal, Circle, CheckCircle, Copy, Key, Users, UserCheck, UserX, AlertTriangle } from 'lucide-svelte';
+	import { Plus, Edit, Trash2, RotateCcw, Circle, CheckCircle, Copy, Key, Users, UserCheck, UserX, AlertTriangle } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
 	import Input from '../components/Input.svelte';
 	import DataTable from '../components/DataTable.svelte';

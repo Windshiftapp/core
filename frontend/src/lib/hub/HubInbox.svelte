@@ -1,7 +1,6 @@
 <script>
-  import { onMount } from 'svelte';
   import { ExternalLink, Filter, ChevronLeft, ChevronRight, Inbox as InboxIcon } from 'lucide-svelte';
-  import { hubStore, gradients } from '../stores/hub.svelte.js';
+  import { hubStore } from '../stores/hub.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { formatDateShort, formatDateWithOptions } from '../utils/dateFormatter.js';
   import Spinner from '../components/Spinner.svelte';

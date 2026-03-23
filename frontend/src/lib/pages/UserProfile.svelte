@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { api, getCalendarFeedToken, createCalendarFeedToken, revokeCalendarFeedToken } from '../api.js';
 	import { authStore, attachmentStatus } from '../stores';
-	import { User, Shield, Key, Smartphone, Plus, Trash2, Calendar, CheckCircle, PlayCircle, Code, Copy, Eye, EyeOff, Camera, Upload, Globe, CalendarDays, RefreshCw, Link2, ExternalLink, GitBranch } from 'lucide-svelte';
+	import { User, Shield, Key, Smartphone, Trash2, Camera, Upload, Globe, CalendarDays, RefreshCw, Link2, Eye, EyeOff, Copy, GitBranch } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
 	import PageHeader from '../layout/PageHeader.svelte';
 	import Tabs from '../components/Tabs.svelte';

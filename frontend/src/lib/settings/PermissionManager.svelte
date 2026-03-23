@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
-  import { Shield, Users as UsersIcon, Plus, X, AlertCircle, Check, User, Crown } from 'lucide-svelte';
+  import { Shield, Users as UsersIcon, Plus, X, User, Crown } from 'lucide-svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import AssigneePicker from '../pickers/AssigneePicker.svelte';
   import Spinner from '../components/Spinner.svelte';

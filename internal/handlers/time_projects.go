@@ -111,6 +111,18 @@ func (h *TimeProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		projects = append(projects, p)
 	}
 
+	// Set IsManager flag for each project
+	if h.timePermissionService != nil {
+		for i := range projects {
+			isManager, err := h.timePermissionService.IsTimeProjectManager(user.ID, projects[i].ID)
+			if err != nil {
+				slog.Warn("failed to check manager status", slog.Int("project_id", projects[i].ID), slog.Any("error", err))
+				continue
+			}
+			projects[i].IsManager = isManager
+		}
+	}
+
 	respondJSONOK(w, projects)
 }
 

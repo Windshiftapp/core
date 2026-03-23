@@ -261,7 +261,8 @@ type TimeProject struct {
 	CustomerName  string   `json:"customer_name,omitempty"`
 	CategoryName  string   `json:"category_name,omitempty"`
 	CategoryColor string   `json:"category_color,omitempty"`
-	TotalHours    *float64 `json:"total_hours,omitempty"` // Computed from worklogs
+	TotalHours    *float64 `json:"total_hours,omitempty"`    // Computed from worklogs
+	IsManager     bool     `json:"is_manager,omitempty"`     // Whether current user is a manager of this project
 }
 
 // Worklog represents a time tracking entry

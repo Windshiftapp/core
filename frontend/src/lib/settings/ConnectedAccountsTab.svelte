@@ -1,7 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { api } from '../api.js';
-	import { Github, GitBranch, CheckCircle, XCircle, LogOut, Loader2, ExternalLink } from 'lucide-svelte';
+	import { Github, GitBranch, CheckCircle, XCircle, LogOut, Loader2 } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
 	import AlertBox from '../components/AlertBox.svelte';
 	import { t } from '../stores/i18n.svelte.js';

@@ -2,8 +2,9 @@
   import TimeCustomers from './TimeCustomers.svelte';
   import TimeProjects from './TimeProjects.svelte';
   import TimeEntry from '../time/TimeEntry.svelte';
+  import Timesheet from './Timesheet.svelte';
   import TimeReports from './TimeReports.svelte';
-  import { User, Briefcase, Clock, BarChart3 } from 'lucide-svelte';
+  import { User, Briefcase, Clock, CalendarDays, BarChart3 } from 'lucide-svelte';
   import { currentRoute, navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
   import SidebarHeader from '../../layout/SidebarHeader.svelte';
@@ -12,6 +13,7 @@
 
   const tabs = $derived([
     { id: 'time-entry', label: t('time.entry.title'), icon: Clock, component: TimeEntry, route: '/time' },
+    { id: 'timesheet', label: t('time.timesheet.title'), icon: CalendarDays, component: Timesheet, route: '/time/timesheet' },
     { id: 'customers', label: t('time.organizations.title'), icon: User, component: TimeCustomers, route: '/time/customers' },
     { id: 'projects', label: t('time.projects.title'), icon: Briefcase, component: TimeProjects, route: '/time/projects' },
     { id: 'reports', label: t('time.reports.title'), icon: BarChart3, component: TimeReports, route: '/time/worklogs' }
@@ -22,6 +24,8 @@
     const path = $currentRoute.path;
     if (path === '/time') {
       activeTab = 'time-entry';
+    } else if (path === '/time/timesheet') {
+      activeTab = 'timesheet';
     } else if (path === '/time/customers') {
       activeTab = 'customers';
     } else if (path === '/time/categories') {

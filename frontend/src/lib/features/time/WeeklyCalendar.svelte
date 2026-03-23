@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { useEventListener } from 'runed';
-  import { ChevronLeft, ChevronRight, Calendar, CheckSquare, X, ChevronDown, Download, ExternalLink, MoreHorizontal } from 'lucide-svelte';
+  import { ChevronLeft, ChevronRight, Calendar, CheckSquare, X, Download, MoreHorizontal } from 'lucide-svelte';
   import { api, fetchAPI } from '../../api.js';
   import PageHeader from '../../layout/PageHeader.svelte';
   import PersonalTaskDetail from '../personal/PersonalTaskDetail.svelte';
@@ -11,7 +11,7 @@
   import { getStatusStyleFromStatuses } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { navigate } from '../../router.js';
-  import { formatDateWithOptions } from '../../utils/dateFormatter.js';
+  import { formatDate, formatDateWithOptions } from '../../utils/dateFormatter.js';
   import Checkbox from '../../components/Checkbox.svelte';
 
   // Get current date and week
@@ -306,7 +306,7 @@
   }
 
   function formatDateKey(date) {
-    return date.toISOString().split('T')[0]; // YYYY-MM-DD format
+    return formatDate(date);
   }
 
   function formatWeekRange(weekStart) {
@@ -687,7 +687,7 @@
       currentWeekTasks.push(...dayItems);
     }
 
-    const filename = `windshift-calendar-${currentWeekStart.toISOString().split('T')[0]}.ics`;
+    const filename = `windshift-calendar-${formatDate(currentWeekStart)}.ics`;
     exportTasksToICS(currentWeekTasks, window.location.origin, filename);
   }
 

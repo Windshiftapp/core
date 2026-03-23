@@ -2,7 +2,7 @@
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
   import { api } from '../api.js';
-  import { Plus, Trash2, GripVertical, Pencil, Type, AlignLeft, ListChecks, ToggleLeft, AlertTriangle, Search } from 'lucide-svelte';
+  import { Plus, Trash2, Pencil, Type, AlignLeft, ListChecks, ToggleLeft, AlertTriangle, Search } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
   import Spinner from '../components/Spinner.svelte';
   import PortalModal from './PortalModal.svelte';

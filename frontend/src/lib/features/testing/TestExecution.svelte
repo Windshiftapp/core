@@ -11,7 +11,7 @@
   import CreateModal from '../../dialogs/CreateModal.svelte';
   import Label from '../../components/Label.svelte';
   import Textarea from '../../components/Textarea.svelte';
-  import { getStatusBadgeCSS, getStatusLabel, getStatusButtonStyle, getStatusButtonHoverStyle } from '../../utils/statusColors.js';
+  import { getStatusBadgeCSS, getStatusLabel, getStatusButtonStyle } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
 
   let testRun = $state(null);

@@ -1,7 +1,7 @@
 <script>
   import { useEventListener } from 'runed';
   import { X, BarChart3, Package, GripVertical } from 'lucide-svelte';
-  import { widgetRegistry, widgetCategories, getWidgetsByCategory } from '../services/widgetRegistry.js';
+  import { widgetCategories, getWidgetsByCategory } from '../services/widgetRegistry.js';
   import { workspaceIconMap } from '../utils/icons.js';
 
   let { isOpen = $bindable(false), activeCategory = $bindable('built-in') } = $props();

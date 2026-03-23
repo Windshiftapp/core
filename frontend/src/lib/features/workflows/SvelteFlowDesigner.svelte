@@ -1,5 +1,5 @@
 <script>
-  import { onMount, untrack } from 'svelte';
+  import { untrack } from 'svelte';
   import {
     SvelteFlow,
     Controls,

@@ -2,7 +2,7 @@
   import { authStore, workspacesStore, attachmentStatus } from '../stores';
   import { navigate } from '../router.js';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
-  import { User, Home, Shield, Camera, Sun, Moon, Monitor } from 'lucide-svelte';
+  import { User, Home, Shield, Sun, Moon, Monitor } from 'lucide-svelte';
   import { themeStore } from '../stores/theme.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
 

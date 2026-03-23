@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Filter, Search, X, Code, Plus } from 'lucide-svelte';
+  import { Filter, Search, Code, Plus } from 'lucide-svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import Button from '../../components/Button.svelte';
   import DynamicFieldFilter from '../items/DynamicFieldFilter.svelte';

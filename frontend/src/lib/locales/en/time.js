@@ -32,6 +32,18 @@ export default {
     durationHelperText:
       'Enter start time + duration (2h) to auto-calculate end time, or enter start + end times to auto-calculate duration. Time formats: 1h, 30m, 1h30m, 2h15m, 1d (=8h)',
 
+    // Timesheet
+    timesheet: {
+      title: 'Timesheet',
+      subtitle: 'Weekly timesheet overview',
+      total: 'Total',
+      noEntries: 'No time entries this week. Add a project to get started.',
+      projectItem: 'Project / Work Item',
+      addProject: 'Add project to timesheet...',
+      removeProject: 'Remove from timesheet',
+      showWeekends: 'Weekends',
+    },
+
     // Onboarding
     onboarding: {
       title: 'Set Up Time Tracking',
@@ -79,7 +91,6 @@ export default {
       exportPDF: 'Export PDF',
       filters: 'Filters',
       customer: 'Customer',
-      project: 'Project',
       allCustomers: 'All customers',
       allProjects: 'All projects',
       descriptionFilter: 'Description Filter',
@@ -95,6 +106,22 @@ export default {
       noEntriesFound: 'No time entries found for the selected filters.',
       totalTime: 'Total Time',
       entriesShown: '{count} entries shown',
+      // Project reporting
+      projectReports: 'Project Reports',
+      personal: 'Personal',
+      project: 'Project',
+      selectProject: 'Select a project',
+      budget: 'Budget',
+      budgetUsage: 'Budget Usage',
+      contributors: 'Contributors',
+      memberBreakdown: 'Team Breakdown',
+      member: 'Member',
+      hoursLogged: 'Hours Logged',
+      entries: 'Entries',
+      avgPerDay: 'Avg/Day',
+      dailyHours: 'Daily Hours',
+      noBudgetSet: 'No budget set',
+      noProjectSelected: 'Select a project to view its report',
     },
 
     // Timer

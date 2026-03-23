@@ -1,5 +1,5 @@
 <script>
-  import { onMount, tick } from 'svelte';
+  import { onMount } from 'svelte';
   import { navigate } from '../router.js';
   import { authStore, ssoStore } from '../stores';
   import { api } from '../api.js';

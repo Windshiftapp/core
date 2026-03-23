@@ -1,11 +1,13 @@
 import { writable } from 'svelte/store';
 
-export const currentRoute = writable(/** @type {{path: string, view: string|null, params: Record<string, string>, query: Record<string, string>}} */ ({
-  path: '/',
-  view: null,
-  params: {},
-  query: {},
-}));
+export const currentRoute = writable(
+  /** @type {{path: string, view: string|null, params: Record<string, string>, query: Record<string, string>}} */ ({
+    path: '/',
+    view: null,
+    params: {},
+    query: {},
+  })
+);
 
 // Available routes
 const routes = {
@@ -67,6 +69,7 @@ const routes = {
   '/time': 'time',
   '/time/customers': 'time',
   '/time/projects': 'time',
+  '/time/timesheet': 'time',
   '/time/worklogs': 'time',
   // Workspace-scoped test management routes
   '/workspaces/:id/tests': 'test-cases',
@@ -154,7 +157,7 @@ export function updateQueryParams(updates, { push = false } = {}) {
     }
   }
   const qs = params.toString();
-  const path = window.location.pathname + (qs ? '?' + qs : '');
+  const path = window.location.pathname + (qs ? `?${qs}` : '');
   if (push) {
     window.history.pushState({}, '', path);
   } else {

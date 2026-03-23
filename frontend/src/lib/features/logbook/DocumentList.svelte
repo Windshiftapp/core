@@ -1,5 +1,4 @@
 <script>
-  import { onMount } from 'svelte';
   import { navigate } from '../../router.js';
   import { logbookStore } from '../../stores/logbook.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';

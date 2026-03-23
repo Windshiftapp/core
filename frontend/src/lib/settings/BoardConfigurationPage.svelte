@@ -5,7 +5,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { getCollection } from '../features/collections/collectionService.js';
-  import { Plus, GripVertical, Trash2, X } from 'lucide-svelte';
+  import { Plus, GripVertical, Trash2 } from 'lucide-svelte';
   import { useGradientStyles, loadWorkspaceGradient } from '../stores/workspaceGradient.svelte.js';
   import ViewHeader from '../layout/ViewHeader.svelte';
   import Button from '../components/Button.svelte';

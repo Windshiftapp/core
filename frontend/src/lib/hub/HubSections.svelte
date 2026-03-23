@@ -1,6 +1,6 @@
 <script>
-  import { Plus, ChevronUp, ChevronDown, Trash2, GripVertical } from 'lucide-svelte';
-  import { hubStore, gradients } from '../stores/hub.svelte.js';
+  import { Plus, ChevronUp, ChevronDown, Trash2 } from 'lucide-svelte';
+  import { hubStore } from '../stores/hub.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import HubPortalCard from './HubPortalCard.svelte';
 
