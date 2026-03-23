@@ -45,7 +45,7 @@
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^1.7.6",
     "@atlaskit/pragmatic-drag-and-drop-hitbox": "^1.1.0",
-    "@dagrejs/dagre": "^2.0.4",
+    "@dagrejs/dagre": "^3.0.0",
     "@excalidraw/excalidraw": "^0.18.0",
     "@fontsource/geist-sans": "^5.2.5",
     "@fontsource/inter": "^5.2.8",
